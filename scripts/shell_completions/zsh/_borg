@@ -147,6 +147,7 @@ _borg-create() {
     '--stdin-name=[use NAME in archive for stdin data (default: "stdin")]:NAME' \
     '--content-from-command[interpret PATH as command and store its stdout]' \
     '--exclude-nodump[exclude files flagged NODUMP]' \
+    '--exclude-dataless[exclude files flagged DATALESS (macOS: not-locally-materialized cloud files)]' \
     '(-x --one-file-system)'{-x,--one-file-system}'[stay in the same file system]' \
     '--numeric-owner[only store numeric user and group identifiers]' \
     '--noatime[do not store atime into archive]' \

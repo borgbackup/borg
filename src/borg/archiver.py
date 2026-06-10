@@ -109,6 +109,11 @@ assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND excep
 
 STATS_HEADER = "                       Original size      Compressed size    Deduplicated size"
 
+# macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
+# Reading such files triggers downloading their content. stat.SF_DATALESS is only available
+# from Python 3.13 on, thus we fall back to the value from macOS' sys/stat.h.
+SF_DATALESS = getattr(stat, 'SF_DATALESS', 0x40000000)
+
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
 
@@ -703,6 +708,7 @@ class Archiver:
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
+        self.exclude_dataless = args.exclude_dataless
         dry_run = args.dry_run
         t0 = utcnow()
         t0_monotonic = time.monotonic()
@@ -828,12 +834,18 @@ class Archiver:
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
 
-            if self.exclude_nodump:
-                # Ignore if nodump flag is set
+            if self.exclude_nodump or self.exclude_dataless:
                 with backup_io('flags'):
-                    if get_flags(path=path, st=st) & stat.UF_NODUMP:
-                        self.print_file_status('x', path)
-                        return
+                    flags = get_flags(path=path, st=st)
+                # Ignore if nodump flag is set
+                if self.exclude_nodump and flags & stat.UF_NODUMP:
+                    self.print_file_status('x', path)
+                    return
+                # Ignore if dataless flag is set (macOS: content not materialized locally,
+                # reading the file would trigger downloading it from cloud storage)
+                if self.exclude_dataless and flags & SF_DATALESS:
+                    self.print_file_status('x', path)
+                    return
 
             if not stat.S_ISDIR(st.st_mode):
                 # directories cannot go in this branch because they can be excluded based on tag
@@ -3930,6 +3942,9 @@ class Archiver:
         exclude_group = define_exclusion_group(subparser, tag_files=True)
         exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',
                                    help='exclude files flagged NODUMP')
+        exclude_group.add_argument('--exclude-dataless', dest='exclude_dataless', action='store_true',
+                                   help='exclude files flagged DATALESS (macOS: placeholder files whose content '
+                                        'is not materialized locally, e.g. not-downloaded cloud storage files)')
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',

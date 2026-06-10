@@ -2191,6 +2191,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if has_lchflags:
             self.assert_in("x input/file3", output)
 
+    def test_create_exclude_dataless(self):
+        """test that files flagged SF_DATALESS are excluded with --exclude-dataless"""
+        from ..archiver import SF_DATALESS
+
+        self.create_regular_file('file1', size=1024 * 80)
+        self.create_regular_file('cloudfile', size=1024 * 80)
+
+        # SF_DATALESS cannot be set from userspace, so fake the flags lookup.
+        def fake_get_flags(path, st, fd=None):
+            return SF_DATALESS if path.endswith('cloudfile') else 0
+
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with patch('borg.archiver.get_flags', fake_get_flags):
+            output = self.cmd('create', '--list', '--exclude-dataless', self.repository_location + '::test', 'input')
+        self.assert_in('A input/file1', output)
+        self.assert_in('x input/cloudfile', output)
+        # without --exclude-dataless, the file is backed up
+        with patch('borg.archiver.get_flags', fake_get_flags):
+            output = self.cmd('create', '--list', self.repository_location + '::test2', 'input')
+        self.assert_in('A input/cloudfile', output)
+
     def test_create_json(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)

@@ -4,6 +4,7 @@ from hashlib import sha256
 
 import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
+from ..hashindex import ChunkIndex
 from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
@@ -208,6 +209,53 @@ def test_get_with_range(tmp_path):
         repository.store_store("packs/" + bin_to_hex(pack_id), pack)
         assert repository.get(pack_id, obj_offset=0, obj_size=len(chunk1)) == chunk1
         assert repository.get(pack_id, obj_offset=len(chunk1), obj_size=len(chunk2)) == chunk2
+
+
+def test_get_read_data_false_with_range(tmp_path):
+    # read_data=False with obj_size limits the load to the object boundary.
+    hdr_size = RepoObj.obj_header.size
+    chunk1 = fchunk(b"FIRST")
+    chunk2 = fchunk(b"SECOND")
+    pack = chunk1 + chunk2
+    pack_id = H(43)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
+        result = repository.get(pack_id, read_data=False, obj_offset=0, obj_size=len(chunk1))
+        assert result == chunk1[:hdr_size]  # empty meta, so header only
+        result2 = repository.get(pack_id, read_data=False, obj_offset=len(chunk1), obj_size=len(chunk2))
+        assert result2 == chunk2[:hdr_size]
+
+
+def test_get_read_data_false_large_meta(tmp_path):
+    # When meta_size > extra_size (975 bytes), get() retries with a larger load.
+    hdr_size = RepoObj.obj_header.size
+    big_meta = b"M" * 1000  # 1000 > 975, forces the retry load
+    chunk = fchunk(b"DATA", meta=big_meta)
+    pack_id = H(44)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), chunk)
+        result = repository.get(pack_id, read_data=False, obj_offset=0, obj_size=len(chunk))
+        assert result == chunk[: hdr_size + len(big_meta)]
+
+
+def test_get_uses_chunk_index_location(tmp_path):
+    # get() routes to the correct pack and offset when a ChunkIndex is set via set_chunk_index().
+    chunk1 = fchunk(b"FIRST")
+    chunk2 = fchunk(b"SECOND")
+    pack = chunk1 + chunk2
+    pack_id = H(55)
+    id1, id2 = H(56), H(57)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        # Inject the pack directly; bypasses PackWriter to test routing independently.
+        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
+        chunks = ChunkIndex()
+        chunks.add(id1, len(chunk1))
+        chunks.update_pack_info([(id1, pack_id, 0, len(chunk1))])
+        chunks.add(id2, len(chunk2))
+        chunks.update_pack_info([(id2, pack_id, len(chunk1), len(chunk2))])
+        repository.set_chunk_index(chunks)
+        assert repository.get(id1) == chunk1
+        assert repository.get(id2) == chunk2
 
 
 def test_pack_writer_final_partial_pack_uses_sha256():

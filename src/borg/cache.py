@@ -679,6 +679,7 @@ class ChunksMixin:
     def chunks(self):
         if self._chunks is None:
             self._chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
+            self.repository.set_chunk_index(self._chunks)
         return self._chunks
 
     def seen_chunk(self, id, size=None):
@@ -869,6 +870,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def wipe_cache(self):
         logger.warning("Discarding incompatible cache and forcing a cache rebuild")
         self._chunks = ChunkIndex()
+        self.repository.set_chunk_index(self._chunks)
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
 

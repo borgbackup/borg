@@ -408,22 +408,23 @@ class Repository:
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._pack_writer = PackWriter(self.store, max_count=1)
-        self._chunks = None
+        self._chunks = ChunkIndex()
         self.opened = True
 
     def set_chunk_index(self, chunks):
         """Set the ChunkIndex get() uses to resolve pack locations.
 
         The caller retains ownership; Repository holds a borrowed reference.
-        Pass None to clear.
+        Pass None to reset to an empty index.
         """
-        self._chunks = chunks
+        self._chunks = chunks if chunks is not None else ChunkIndex()
 
     def flush(self):
-        """Flush any buffered pack writer chunks. Returns pack_results (or None)."""
+        """Flush any buffered pack writer chunks."""
         if self._pack_writer is not None:
-            return self._pack_writer.flush()
-        return None
+            pack_results = self._pack_writer.flush()
+            if pack_results:
+                self._chunks.update_pack_info(pack_results)
 
     def close(self):
         if self._pack_writer is not None:
@@ -609,13 +610,13 @@ class Repository:
                     # note: do not collect the marker id
         return result
 
-    def get(self, id, read_data=True, raise_missing=True, obj_offset=0, obj_size=None):
+    def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
-        pack_id = id  # N=1: pack_id == chunk_id
-        if self._chunks is not None:
-            entry = self._chunks.get(id)
-            if entry is not None and entry.pack_id != UNKNOWN_BYTES32:  # UNKNOWN: buffered, not yet flushed
-                pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
+        pack_id = id  # N=1 fallback: pack_id == chunk_id
+        obj_offset, obj_size = 0, None
+        entry = self._chunks.get(id)
+        if entry is not None and entry.pack_id != UNKNOWN_BYTES32:  # UNKNOWN: buffered, not yet flushed
+            pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
         key = "packs/" + bin_to_hex(pack_id)
         try:
@@ -654,8 +655,6 @@ class Repository:
                 return None
 
     def get_many(self, ids, read_data=True, raise_missing=True):
-        # N>1: set_chunk_index() must be called before any get() so locations from prior sessions
-        # are available; without it get() falls back to N=1 (pack_id == chunk_id) for every id.
         for id_ in ids:
             yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
 
@@ -667,8 +666,7 @@ class Repository:
 
         Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples for
         every chunk written to disk this call.  At max_count=1 this is always
-        one entry.  Callers should pass these to ChunkIndex.update_pack_info()
-        so the index holds real location values rather than UNKNOWN_INT32 placeholders.
+        one entry.
         """
         self._lock_refresh()
         data_size = len(data)

@@ -832,11 +832,8 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def close(self):
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
-        # Flush any chunks still buffered in the pack writer and update the index
-        # so the last batch gets real pack location values instead of UNKNOWN_*.
         if self._chunks is not None:
-            pack_results = self.repository.flush()
-            self._chunks.update_pack_info(pack_results)
+            self.repository.flush()
         if self._files is not None:
             pi.output("Saving files cache")
             integrity_data = self._write_files_cache(self._files)

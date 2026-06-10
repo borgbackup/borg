@@ -199,31 +199,24 @@ def test_pack_writer_n2_flush():
     assert results[1] == (id2, expected_pack_id, len(data1), len(data2))
 
 
-def test_get_with_range(tmp_path):
-    # get() passes obj_offset/obj_size through to store.load() for range reads.
-    chunk1 = fchunk(b"FIRST")
-    chunk2 = fchunk(b"SECOND")
-    pack = chunk1 + chunk2
-    pack_id = H(42)
-    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
-        assert repository.get(pack_id, obj_offset=0, obj_size=len(chunk1)) == chunk1
-        assert repository.get(pack_id, obj_offset=len(chunk1), obj_size=len(chunk2)) == chunk2
-
-
 def test_get_read_data_false_with_range(tmp_path):
-    # read_data=False with obj_size limits the load to the object boundary.
+    # read_data=False with ChunkIndex entries limits the load to each object's boundary.
     hdr_size = RepoObj.obj_header.size
     chunk1 = fchunk(b"FIRST")
     chunk2 = fchunk(b"SECOND")
     pack = chunk1 + chunk2
     pack_id = H(43)
+    id1, id2 = H(47), H(48)
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(pack_id), pack)
-        result = repository.get(pack_id, read_data=False, obj_offset=0, obj_size=len(chunk1))
-        assert result == chunk1[:hdr_size]  # empty meta, so header only
-        result2 = repository.get(pack_id, read_data=False, obj_offset=len(chunk1), obj_size=len(chunk2))
-        assert result2 == chunk2[:hdr_size]
+        chunks = ChunkIndex()
+        chunks.add(id1, len(chunk1))
+        chunks.update_pack_info([(id1, pack_id, 0, len(chunk1))])
+        chunks.add(id2, len(chunk2))
+        chunks.update_pack_info([(id2, pack_id, len(chunk1), len(chunk2))])
+        repository.set_chunk_index(chunks)
+        assert repository.get(id1, read_data=False) == chunk1[:hdr_size]
+        assert repository.get(id2, read_data=False) == chunk2[:hdr_size]
 
 
 def test_get_read_data_false_large_meta(tmp_path):
@@ -232,9 +225,14 @@ def test_get_read_data_false_large_meta(tmp_path):
     big_meta = b"M" * 1000  # 1000 > 975, forces the retry load
     chunk = fchunk(b"DATA", meta=big_meta)
     pack_id = H(44)
+    chunk_id = H(49)
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(pack_id), chunk)
-        result = repository.get(pack_id, read_data=False, obj_offset=0, obj_size=len(chunk))
+        chunks = ChunkIndex()
+        chunks.add(chunk_id, len(chunk))
+        chunks.update_pack_info([(chunk_id, pack_id, 0, len(chunk))])
+        repository.set_chunk_index(chunks)
+        result = repository.get(chunk_id, read_data=False)
         assert result == chunk[: hdr_size + len(big_meta)]
 
 

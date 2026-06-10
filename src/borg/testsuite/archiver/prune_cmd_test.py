@@ -725,6 +725,7 @@ def test_prune_all_zero_multiple_multiple(archivers, request):
     output = _cmd_prune_error(archiver, "--keep-secondly=0S", "--keep-daily=0")
     assert re.search(r"None of the .* settings have a positive value. At least one must be non-zero.", output)
 
+
 @pytest.mark.parametrize(
     "lo_val,hi_val",
     [("14d", "7d"), ("-1", "7d"), ("-1", "1"), ("-1", "-1"), ("all", "7d"), ("all", "1"), ("all", "-1")],

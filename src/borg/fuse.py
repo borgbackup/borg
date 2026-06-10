@@ -27,7 +27,7 @@ from collections import defaultdict, Counter
 from signal import SIGINT
 from typing import TYPE_CHECKING
 
-from .constants import ROBJ_FILE_STREAM, zeros
+from .constants import ROBJ_FILE_STREAM, ROBJ_DONTCARE, zeros
 
 if TYPE_CHECKING:
     # For type checking, assume llfuse is available
@@ -112,8 +112,9 @@ class ItemCache:
     indirect_entry_struct = struct.Struct("=cII")
     assert indirect_entry_struct.size == 9
 
-    def __init__(self, decrypted_repository):
-        self.decrypted_repository = decrypted_repository
+    def __init__(self, repository, repo_objs):
+        self.repository = repository
+        self.repo_objs = repo_objs
         # self.meta, the "meta-array" is a densely packed array of metadata about where items can be found.
         # It is indexed by the inode number minus self.offset. (This is in a way eerily similar to how the first
         # unices did this).
@@ -133,7 +134,7 @@ class ItemCache:
 
         # A temporary file that contains direct items, i.e. items directly cached in this layer.
         # These are items that span more than one chunk and thus cannot be efficiently cached
-        # by the object cache (self.decrypted_repository), which would require variable-length structures;
+        # by the object cache (self.chunks), which would require variable-length structures;
         # possible but not worth the effort, see iter_archive_items.
         self.fd = tempfile.TemporaryFile(prefix="borg-tmp")
 
@@ -161,7 +162,8 @@ class ItemCache:
             chunk_id = bytes(self.meta[chunk_id_offset : chunk_id_offset + 32])
             chunk = self.chunks.get(chunk_id)
             if not chunk:
-                csize, chunk = next(self.decrypted_repository.get_many([chunk_id]))
+                cdata = self.repository.get(chunk_id)
+                _, chunk = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
                 self.chunks[chunk_id] = chunk
             data = memoryview(chunk)[chunk_offset:]
             unpacker = msgpack.Unpacker()
@@ -189,7 +191,8 @@ class ItemCache:
         meta = self.meta
         pack_indirect_into = self.indirect_entry_struct.pack_into
 
-        for key, (csize, data) in zip(archive_item_ids, self.decrypted_repository.get_many(archive_item_ids)):
+        for key, cdata in zip(archive_item_ids, self.repository.get_many(archive_item_ids)):
+            _, data = self.repo_objs.parse(key, cdata, ro_type=ROBJ_DONTCARE)
             # Store the chunk ID in the meta-array
             if write_offset + 32 >= len(meta):
                 meta.extend(bytes(self.GROW_META_BY))
@@ -268,7 +271,7 @@ class ItemCache:
 class FuseBackend:
     """Virtual filesystem based on archive(s) to provide information to fuse"""
 
-    def __init__(self, manifest, args, decrypted_repository):
+    def __init__(self, manifest, args, repository):
         self._args = args
         self.numeric_ids = args.numeric_ids
         self._manifest = manifest
@@ -292,7 +295,7 @@ class FuseBackend:
         self.default_dir = None
         # Archives to be loaded when first accessed, mapped by their placeholder inode
         self.pending_archives = {}
-        self.cache = ItemCache(decrypted_repository)
+        self.cache = ItemCache(repository, self.repo_objs)
         self.allow_damaged_files = False
         self.versions = False
         self.uid_forced = None
@@ -477,10 +480,9 @@ class FuseBackend:
 class FuseOperations(llfuse.Operations, FuseBackend):
     """Export archive as a FUSE filesystem"""
 
-    def __init__(self, manifest, args, decrypted_repository):
+    def __init__(self, manifest, args, repository):
         llfuse.Operations.__init__(self)
-        FuseBackend.__init__(self, manifest, args, decrypted_repository)
-        self.decrypted_repository = decrypted_repository
+        FuseBackend.__init__(self, manifest, args, repository)
         data_cache_capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
         logger.debug("mount data cache capacity: %d chunks", data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity)
@@ -510,7 +512,6 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             self.data_cache._capacity,
             format_file_size(sum(len(chunk) for key, chunk in self.data_cache.items())),
         )
-        self.decrypted_repository.log_instrumentation()
 
     def mount(self, mountpoint, mount_options, foreground=False, show_rc=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""

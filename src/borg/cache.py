@@ -227,7 +227,7 @@ class FilesCacheMixin:
         assert "d" in cache_mode or "c" in cache_mode or "m" in cache_mode
         self.cache_mode = cache_mode
         self._files = None
-        self._newest_cmtime = 0
+        self._newest_cmtime = None  # None means "no file was chunked/seen yet", see _write_files_cache
         self._newest_path_hashes = set()
         self.start_backup = start_backup
 
@@ -312,13 +312,13 @@ class FilesCacheMixin:
                 path_hash = self.key.id_hash(safe_encode(item.path))
                 # keep track of the key(s) for the most recent timestamp(s):
                 ctime_ns = item.ctime
-                if ctime_ns > self._newest_cmtime:
+                if self._newest_cmtime is None or ctime_ns > self._newest_cmtime:
                     self._newest_cmtime = ctime_ns
                     self._newest_path_hashes = {path_hash}
                 elif ctime_ns == self._newest_cmtime:
                     self._newest_path_hashes.add(path_hash)
                 mtime_ns = item.mtime
-                if mtime_ns > self._newest_cmtime:
+                if self._newest_cmtime is None or mtime_ns > self._newest_cmtime:
                     self._newest_cmtime = mtime_ns
                     self._newest_path_hashes = {path_hash}
                 elif mtime_ns == self._newest_cmtime:

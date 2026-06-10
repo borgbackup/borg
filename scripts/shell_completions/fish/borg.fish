@@ -122,6 +122,7 @@ complete -c borg -f      -l 'exclude-caches'        -d 'Exclude directories tagg
 complete -c borg         -l 'exclude-if-present'    -d 'Exclude directories that contain FILENAME'      -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'keep-exclude-tags'     -d 'Keep tag files of excluded directories'         -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'exclude-nodump'        -d 'Exclude files flagged NODUMP'                   -n "__fish_seen_subcommand_from create"
+complete -c borg -f      -l 'exclude-dataless'      -d 'Exclude files flagged DATALESS (macOS)'         -n "__fish_seen_subcommand_from create"
 # Filesystem options
 complete -c borg -f -s x -l 'one-file-system'       -d 'Stay in the same file system'                   -n "__fish_seen_subcommand_from create"
 complete -c borg -f      -l 'numeric-ids'           -d 'Only store numeric user:group identifiers'      -n "__fish_seen_subcommand_from create"

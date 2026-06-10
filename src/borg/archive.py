@@ -53,6 +53,11 @@ from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
 
+# macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
+# Reading such files triggers downloading their content. stat.SF_DATALESS is only available
+# from Python 3.13 on, thus we fall back to the value from macOS' sys/stat.h.
+SF_DATALESS = getattr(stat, "SF_DATALESS", 0x40000000)
+
 has_link = hasattr(os, "link")
 
 

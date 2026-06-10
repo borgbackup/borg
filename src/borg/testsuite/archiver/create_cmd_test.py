@@ -1172,6 +1172,33 @@ def test_create_with_compression_algorithms(archivers, request):
                 assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
 
 
+def test_create_exclude_dataless(archivers, request, monkeypatch):
+    """Files flagged SF_DATALESS are excluded with --exclude-dataless."""
+    from ...archive import SF_DATALESS
+    import borg.archiver.create_cmd as create_cmd_module
+
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "cloudfile", size=1024 * 80)
+
+    # SF_DATALESS cannot be set from userspace, so fake the flags lookup.
+    def fake_get_flags(path, st, fd=None):
+        return SF_DATALESS if path.endswith("cloudfile") else 0
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    monkeypatch.setattr(create_cmd_module, "get_flags", fake_get_flags)
+    output = cmd(archiver, "create", "--list", "--exclude-dataless", "test", "input")
+    assert "A input/file1" in output
+    assert "x input/cloudfile" in output
+
+    # without --exclude-dataless, the file is backed up
+    output = cmd(archiver, "create", "--list", "test2", "input")
+    assert "A input/cloudfile" in output
+
+
 def test_exclude_nodump_dir_with_file(archivers, request):
     """A directory flagged NODUMP and its contents must not be archived."""
     archiver = request.getfixturevalue(archivers)

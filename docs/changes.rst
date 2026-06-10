@@ -185,6 +185,7 @@ New features:
 
 Fixes:
 
+- files cache: fix no-change backup emptying the files cache, #9749
 - fix canonical_path() missing ':' before port number
 - fix: xattr xdg backup exclusion should be on 'false'
 - fix slashdot hack excluding source directory metadata, #9534

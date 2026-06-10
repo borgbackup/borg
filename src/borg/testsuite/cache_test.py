@@ -1,12 +1,15 @@
 import os
+import time
 
 import pytest
 
 from .hashindex_test import H
 from .crypto.key_test import TestKey
 from ..archive import Statistics
-from ..cache import AdHocWithFilesCache, delete_chunkindex_cache, read_chunkindex_from_repo_cache
+from ..cache import AdHocWithFilesCache, FileCacheEntry, delete_chunkindex_cache, read_chunkindex_from_repo_cache
 from ..crypto.key import AESOCBRepoKey
+from ..helpers import safe_ns
+from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import Repository
 
@@ -53,6 +56,31 @@ class TestAdHocWithFilesCache:
         assert cache.file_known_and_unchanged(b"foo", bytes(32), st) == (False, None)
         assert cache.cache_mode == "d"
         assert cache.files == {}
+
+    def test_no_change_backup_keeps_files_cache(self, repository, key, manifest):
+        # Regression test for #9749: a backup that does not chunk any new file leaves
+        # _newest_cmtime unset. The writer must treat "unset" as "keep everything" and
+        # must NOT discard the current (age == 0) entries with an epoch cutoff.
+        # "cis" == normalized form of the "borg create" default "ctime,size,inode"
+        cache = AdHocWithFilesCache(manifest, cache_mode="cis", archive_name="test")
+        # the chunk that our cached file references (needed so the entry can be (de)compressed):
+        cache.add_chunk(H(5), {}, b"5678", stats=Statistics())
+        # a "current" files cache entry as left behind by a no-change backup: the file was found
+        # unchanged (so its age was reset to 0), but nothing got chunked, so memorize_file() was
+        # never called and _newest_cmtime stayed at its initial value.
+        now_ns = safe_ns(time.time_ns())
+        entry = FileCacheEntry(
+            age=0, inode=1, size=4, ctime=int_to_timestamp(now_ns), mtime=int_to_timestamp(now_ns), chunks=[(H(5), 4)]
+        )
+        path_hash = H(42)
+        files = {path_hash: cache.compress_entry(entry)}
+        assert cache._newest_cmtime is None  # nothing was chunked in this backup
+        integrity_data = cache._write_files_cache(files)
+        cache.cache_config.integrity[cache.files_cache_name()] = integrity_data
+        # with the bug (initial value 0 instead of None) the cutoff would be the epoch and the
+        # entry would be dropped; after the fix the entry must still be there:
+        loaded = cache._read_files_cache()
+        assert path_hash in loaded
 
 
 def test_delete_chunkindex_cache_missing(tmp_path):

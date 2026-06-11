@@ -10,7 +10,7 @@ from io import TextIOWrapper
 
 from ._common import with_repository, Highlander
 from .. import helpers
-from ..archive import Archive, is_special
+from ..archive import Archive, is_special, SF_DATALESS
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
@@ -32,7 +32,7 @@ from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
-from ..platform import is_win32
+from ..platform import is_win32, get_flags
 
 from ..logger import create_logger
 
@@ -225,6 +225,7 @@ class CreateMixIn:
         self.noflags = args.noflags
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
+        self.exclude_dataless = args.exclude_dataless
         dry_run = args.dry_run
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
@@ -475,6 +476,15 @@ class CreateMixIn:
             # but we WILL save the mountpoint directory (or more precise: the root
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
+
+            if self.exclude_dataless:
+                # this needs to be done BEFORE opening the file, as opening
+                # would otherwise materialize the file contents.
+                with backup_io("flags"):
+                    flags = get_flags(path=path, st=st)
+                if flags & SF_DATALESS:
+                    self.print_file_status("x", path)
+                    return
 
             if not stat.S_ISDIR(st.st_mode):
                 # directories cannot go in this branch because they can be excluded based on tag
@@ -886,7 +896,14 @@ class CreateMixIn:
             help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
 
-        define_exclusion_group(subparser, tag_files=True)
+        exclude_group = define_exclusion_group(subparser, tag_files=True)
+        exclude_group.add_argument(
+            "--exclude-dataless",
+            dest="exclude_dataless",
+            action="store_true",
+            help="exclude files flagged DATALESS (macOS: placeholder files whose content "
+            "is not materialized locally, e.g. not-downloaded cloud storage files)",
+        )
 
         fs_group = subparser.add_argument_group("Filesystem options")
         fs_group.add_argument(

@@ -503,6 +503,15 @@ def parse_stringified_list(s):
     return [item for item in items if item != ""]
 
 
+def _redact_url_credentials(url):
+    """Remove embedded credentials from a repository URL for safe display/identity use."""
+    # netloc style: scheme://user[:pass]@host... -> scheme://host...
+    url = re.sub(r"(://)[^/@]+@", r"\1", url)
+    # s3/b2 style: (s3|b2):profile@... or (s3|b2):key:secret@... -> (s3|b2):...
+    url = re.sub(r"^((?:s3|b2):)[^@/]+@", r"\1", url)
+    return url
+
+
 class Location:
     """Object representing a repository location"""
 
@@ -528,12 +537,14 @@ class Location:
     # :port (optional)
     optional_port_re = r"(?::(?P<port>\d+))?"
 
-    # path may contain any chars. to avoid ambiguities with other regexes,
-    # it must not start with "//" nor with "scheme://" nor with "rclone:".
-    local_path_re = r"""
-        (?!(//|(ssh|socket|sftp|file)://|(rclone|s3|b2):))
-        (?P<path>.+)
-    """
+    # locations that borgstore parses and validates itself - borg only detects the scheme and
+    # passes the raw URL through. covers both "scheme://..." and opaque "scheme:..." forms.
+    BORGSTORE_SCHEMES = ("sftp", "http", "https", "s3", "b2", "rclone")
+
+    # path may contain any chars. to avoid ambiguities with other regexes, it must not start with
+    # "//", a "scheme://" or one of the borgstore "scheme:" specifiers (all of which are matched
+    # before local_re in _parse). the borgstore scheme list is sourced from BORGSTORE_SCHEMES.
+    local_path_re = r"(?!(//|(?:ssh|file)://|(?:" + "|".join(BORGSTORE_SCHEMES) + r"):))" r"(?P<path>.+)"
 
     # abs_path must start with a slash (or drive letter on Windows).
     abs_path_re = r"(?P<path>[A-Za-z]:/.+)" if is_win32 else r"(?P<path>/.+)"
@@ -541,9 +552,14 @@ class Location:
     # path may or may not start with a slash.
     abs_or_rel_path_re = r"(?P<path>.+)"
 
-    # regexes for misc. kinds of supported location specifiers:
-    ssh_or_sftp_re = re.compile(
-        r"(?P<proto>(ssh|sftp))://"
+    # We only parse out individual fields (user/host/port/path) for the protocols where borg
+    # itself needs them: legacy "ssh" (v1 repositories) and "rest" (for the ssh tunnel + FILE
+    # backend), plus local "file" paths. Everything else (see BORGSTORE_SCHEMES) is handed to
+    # borgstore as the raw URL and parsed/validated there - we only detect the scheme.
+
+    # ssh:// is only used for legacy borg 1.x repositories nowadays.
+    ssh_re = re.compile(
+        r"(?P<proto>ssh)://"
         + optional_user_re
         + host_re
         + optional_port_re
@@ -565,39 +581,8 @@ class Location:
         re.VERBOSE,
     )
 
-    # BorgStore REST server
-    # (http|https)://user:pass@host:port/
-    http_re = re.compile(
-        r"(?P<proto>http|https)://"
-        + r"((?P<user>[^:@]+):(?P<pass>[^@]+)@)?"
-        + host_re
-        + optional_port_re
-        + r"(?P<path>/)",
-        re.VERBOSE,
-    )
-
-    # (s3|b2):[(profile|(access_key_id:access_key_secret))@][scheme://hostname[:port]]/bucket/path
-    s3_re = re.compile(
-        r"""
-        (?P<s3type>(s3|b2)):
-        ((
-            (?P<profile>[^@:]+)  # profile (no colons allowed)
-            |
-            (?P<access_key_id>[^:@]+):(?P<access_key_secret>[^@]+)  # access key and secret
-        )@)?  # optional authentication
-        (
-            [^:/]+://  # scheme (often https)
-            (?P<hostname>[^:/]+)
-            (:(?P<port>\d+))?
-        )?  # optional endpoint
-        /
-        (?P<bucket>[^/]+)/  # bucket name
-        (?P<path>.+)  # path
-    """,
-        re.VERBOSE,
-    )
-
-    rclone_re = re.compile(r"(?P<proto>rclone):(?P<path>(.*))", re.VERBOSE)
+    # scheme detector for the borgstore-handled locations listed in BORGSTORE_SCHEMES above.
+    scheme_re = re.compile(r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]*):")
 
     sl = "/" if is_win32 else ""
     file_re = re.compile(r"(?P<proto>file)://" + sl + abs_path_re, re.VERBOSE)
@@ -636,7 +621,7 @@ class Location:
             raise ValueError('Invalid location format: "%s"' % self.processed)
 
     def _parse(self, text):
-        m = self.ssh_or_sftp_re.match(text)
+        m = self.ssh_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.user = m.group("user")
@@ -652,33 +637,16 @@ class Location:
             self.port = m.group("port") and int(m.group("port")) or None
             self.path = os.path.normpath(m.group("path"))
             return True
-        m = self.http_re.match(text)
-        if m:
-            self.proto = m.group("proto")
-            self.user = m.group("user")
-            self._pass = True if m.group("pass") else False
-            self._host = m.group("host")
-            self.port = m.group("port") and int(m.group("port")) or None
-            self.path = m.group("path")
-            return True
-        m = self.rclone_re.match(text)
-        if m:
-            self.proto = m.group("proto")
-            self.path = m.group("path")
-            return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.path = os.path.normpath(m.group("path"))
             return True
-        m = self.s3_re.match(text)
-        if m:
-            self.proto = m.group("s3type")
-            self.user = m.group("profile") if m.group("profile") else m.group("access_key_id")
-            self._pass = True if m.group("access_key_secret") else False
-            self._host = m.group("hostname")
-            self.port = m.group("port") and int(m.group("port")) or None
-            self.path = m.group("bucket") + "/" + m.group("path")
+        m = self.scheme_re.match(text)
+        if m and m.group("scheme") in self.BORGSTORE_SCHEMES:
+            # borgstore parses/validates these; we only detect the scheme and pass the raw
+            # URL (self.processed) through to it - no fields are extracted here.
+            self.proto = m.group("scheme")
             return True
         m = self.local_re.match(text)
         if m:
@@ -711,9 +679,7 @@ class Location:
     def canonical_path(self):
         if self.proto == "file":
             return self.path
-        if self.proto == "rclone":
-            return f"{self.proto}:{self.path}"
-        if self.proto in ("rest", "sftp", "ssh", "s3", "b2", "http", "https"):
+        if self.proto in ("rest", "ssh"):
             return (
                 f"{self.proto}://"
                 f"{(self.user + '@') if self.user else ''}"
@@ -721,6 +687,10 @@ class Location:
                 f"{(':' + str(self.port)) if self.port else ''}/"
                 f"{self.path}"
             )
+        if self.proto in self.BORGSTORE_SCHEMES:
+            # borgstore-handled locations: use the raw (processed) URL as given, but strip any
+            # embedded credentials so we never write secrets to the security state file or logs.
+            return _redact_url_credentials(self.processed)
         raise NotImplementedError(self.proto)
 
     def with_timestamp(self, timestamp):

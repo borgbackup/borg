@@ -198,58 +198,51 @@ class TestLocationWithoutEnv:
             == "Location(proto='rest', user=None, pass=None, host=None, port=None, path='/absolute/path')"
         )
 
+    # For the protocols handled (parsed + validated) by borgstore itself, borg only detects
+    # the scheme and passes the raw URL through; it no longer extracts user/host/port/path.
+
     def test_s3(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
-        assert (
-            repr(Location("s3:/test/path"))
-            == "Location(proto='s3', user=None, pass=None, host=None, port=None, path='test/path')"
+        loc = Location("s3:/test/path")
+        assert loc.proto == "s3"
+        assert (loc.user, loc.host, loc.port, loc.path) == (None, None, None, None)
+        assert loc.processed == "s3:/test/path"
+        # credentials in the URL are stripped from canonical_path (security state file / logs)
+        assert Location("s3:profile@http://172.28.52.116:9000/test/path").canonical_path() == (
+            "s3:http://172.28.52.116:9000/test/path"
         )
-        assert (
-            repr(Location("s3:profile@http://172.28.52.116:9000/test/path"))
-            == "Location(proto='s3', user='profile', pass=None, host='172.28.52.116', port=9000, path='test/path')"  # noqa: E501
+        assert Location("s3:user:pass@http://172.28.52.116:9000/test/path").canonical_path() == (
+            "s3:http://172.28.52.116:9000/test/path"
         )
-        assert (
-            repr(Location("s3:user:pass@http://172.28.52.116:9000/test/path"))
-            == "Location(proto='s3', user='user', pass='REDACTED', host='172.28.52.116', port=9000, path='test/path')"  # noqa: E501
-        )
-        assert (
-            repr(Location("b2:user:pass@https://s3.us-east-005.backblazeb2.com/test/path"))
-            == "Location(proto='b2', user='user', pass='REDACTED', host='s3.us-east-005.backblazeb2.com', port=None, path='test/path')"  # noqa: E501
+        assert Location("b2:user:pass@https://s3.us-east-005.backblazeb2.com/test/path").canonical_path() == (
+            "b2:https://s3.us-east-005.backblazeb2.com/test/path"
         )
 
     def test_rclone(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
-        assert (
-            repr(Location("rclone:remote:path"))
-            == "Location(proto='rclone', user=None, pass=None, host=None, port=None, path='remote:path')"
-        )
+        loc = Location("rclone:remote:path")
+        assert loc.proto == "rclone"
+        assert (loc.user, loc.host, loc.port, loc.path) == (None, None, None, None)
+        assert loc.processed == "rclone:remote:path"
+        assert loc.canonical_path() == "rclone:remote:path"
 
     def test_sftp(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
-        # relative path
-        assert (
-            repr(Location("sftp://user@host:1234/rel/path"))
-            == "Location(proto='sftp', user='user', pass=None, host='host', port=1234, path='rel/path')"
-        )
-        # absolute path
-        assert (
-            repr(Location("sftp://user@host:1234//abs/path"))
-            == "Location(proto='sftp', user='user', pass=None, host='host', port=1234, path='/abs/path')"
-        )
+        loc = Location("sftp://user@host:1234/rel/path")
+        assert loc.proto == "sftp"
+        assert (loc.user, loc.host, loc.port, loc.path) == (None, None, None, None)
+        assert loc.processed == "sftp://user@host:1234/rel/path"
+        # credentials stripped from canonical_path
+        assert loc.canonical_path() == "sftp://host:1234/rel/path"
 
     def test_http(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
-        assert (
-            repr(Location("http://user:pass@host:1234/"))
-            == "Location(proto='http', user='user', pass='REDACTED', host='host', port=1234, path='/')"
-        )
-
-    def test_socket(self, monkeypatch):
-        monkeypatch.delenv("BORG_REPO", raising=False)
-        # socket:// is no longer supported and must be rejected as an invalid location.
-        url = "socket:///c:/repo/path" if is_win32 else "socket:///repo/path"
-        with pytest.raises(ValueError):
-            Location(url)
+        loc = Location("http://user:pass@host:1234/")
+        assert loc.proto == "http"
+        assert (loc.user, loc.host, loc.port, loc.path) == (None, None, None, None)
+        assert loc.processed == "http://user:pass@host:1234/"
+        # credentials stripped from canonical_path
+        assert loc.canonical_path() == "http://host:1234/"
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)

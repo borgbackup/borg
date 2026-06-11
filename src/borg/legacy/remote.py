@@ -6,7 +6,6 @@ import os
 import queue
 import select
 import shlex
-import socket
 import sys
 import textwrap
 import time
@@ -23,7 +22,6 @@ from ..helpers import replace_placeholders
 from ..helpers import sysinfo
 from ..helpers import format_file_size
 from ..helpers import prepare_subprocess_env, ignore_sigint
-from ..helpers import get_socket_filename
 from ..fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from ..logger import create_logger, borg_serve_log_queue
 from ..helpers import msgpack
@@ -255,7 +253,7 @@ class LegacyRemoteRepository:
         self.upload_buffer_size_limit = args.upload_buffer * 1024 * 1024 if args and args.upload_buffer else 0
         self.unpacker = get_limited_unpacker("client")
         self.server_version = None  # we update this after server sends its version
-        self.p = self.sock = None
+        self.p = None
         self._args = args
         if self.location.proto == "ssh":
             testing = location.host == "__testsuite__"
@@ -281,25 +279,6 @@ class LegacyRemoteRepository:
             self.stderr_fd = self.p.stderr.fileno()
             self.r_fds = [self.stdout_fd, self.stderr_fd]
             self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
-        elif self.location.proto == "socket":
-            if args.use_socket is False or args.use_socket is True:  # nothing or --socket
-                socket_path = get_socket_filename()
-            else:  # --socket=/some/path
-                socket_path = args.use_socket
-            self.sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
-            try:
-                self.sock.connect(socket_path)  # note: socket_path length is rather limited.
-            except FileNotFoundError:
-                self.sock = None
-                raise Error(f"The socket file {socket_path} does not exist.")
-            except ConnectionRefusedError:
-                self.sock = None
-                raise Error(f"There is no borg serve running for the socket file {socket_path}.")
-            self.stdin_fd = self.sock.makefile("wb").fileno()
-            self.stdout_fd = self.sock.makefile("rb").fileno()
-            self.stderr_fd = None
-            self.r_fds = [self.stdout_fd]
-            self.x_fds = [self.stdin_fd, self.stdout_fd]
         else:
             raise Error(f"Unsupported protocol {location.proto}")
 
@@ -339,7 +318,7 @@ class LegacyRemoteRepository:
     def __del__(self):
         if len(self.responses):
             logging.debug("still %d cached responses left in LegacyRemoteRepository" % (len(self.responses),))
-        if self.p or self.sock:
+        if self.p:
             self.close()
             assert False, "cleanup happened in LegacyRemoteRepository.__del__"
 
@@ -661,21 +640,12 @@ class LegacyRemoteRepository:
         """actual remoting is done via self.call in the @api decorator"""
 
     def close(self):
-        if self.p or self.sock:
-            self.call("close", {}, wait=True)
         if self.p:
+            self.call("close", {}, wait=True)
             self.p.stdin.close()
             self.p.stdout.close()
             self.p.wait()
             self.p = None
-        if self.sock:
-            try:
-                self.sock.shutdown(socket.SHUT_RDWR)
-            except OSError as e:
-                if e.errno != errno.ENOTCONN:
-                    raise
-            self.sock.close()
-            self.sock = None
 
     def async_response(self, wait=True):
         for resp in self.call_many("async_responses", calls=[], wait=True, async_wait=wait):

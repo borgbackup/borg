@@ -51,7 +51,7 @@ def reopen(repository, exclusive: bool | None = True, create=False):
         return LegacyRepository(repository.path, exclusive=exclusive, create=create)
 
     if isinstance(repository, LegacyRemoteRepository):
-        if repository.p is not None or repository.sock is not None:
+        if repository.p is not None:
             raise RuntimeError("Remote repo must be closed before a reopen. Cannot support nested repository contexts.")
         return LegacyRemoteRepository(repository.location, exclusive=exclusive, create=create)
 

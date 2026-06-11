@@ -169,10 +169,6 @@ def get_runtime_dir(*, legacy=False, create=True):
     return runtime_dir
 
 
-def get_socket_filename():
-    return str(Path(get_runtime_dir()) / "borg.sock")
-
-
 def get_cache_dir(*, legacy=False, create=True):
     """Determine where to store Borg cache data."""
 

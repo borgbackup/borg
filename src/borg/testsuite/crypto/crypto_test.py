@@ -276,7 +276,8 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     getpass.return_value = "hello, pass phrase"
     monkeypatch.setenv("BORG_DISPLAY_PASSPHRASE", "no")
     AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm="argon2"))
-    repository.load_key.return_value = repository.save_key.call_args.args[0]
+    saved = repository.store_key.call_args.args[0]
+    repository.load_keys.return_value = [("key0", saved)]
 
     AESOCBRepoKey.detect(repository, manifest_data=None)
 

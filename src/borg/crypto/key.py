@@ -40,6 +40,10 @@ def keyfile_name_for(content: bytes) -> str:
 
 KEYFILE_ID = "BORG_KEY"
 
+# label of the first borg key, created at repo-create time. it is protected from deletion
+# and its label is reserved (cannot be assigned to additionally added borg keys).
+ADMIN_LABEL = "admin"
+
 
 def is_keyfile(data: str | bytes, repoid: Optional[str] = None) -> bool:
     # repoid is a hex str, if given. if given, we only accept keyfiles for that repo.
@@ -391,24 +395,31 @@ class FlexiKey:
     FILE_ID = KEYFILE_ID
     STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE  # override in subclass
 
+    # multiple-borg-keys state (a repository may have multiple borg keys, one per passphrase):
+    _encrypted_key_label = None  # label read from the EncryptedKey envelope on decrypt
+    _loaded_key_id = None  # key id (content digest / store name) of the borg key we unlocked
+    _loaded_label = None  # label of the borg key we unlocked
+
     @classmethod
     def detect(cls, repository, manifest_data, *, other=False):
         key = cls(repository)
         target = key.find_key()
         prompt = "Enter passphrase for key %s: " % target
         passphrase = Passphrase.env_passphrase(other=other)
+        # a repository may have multiple borg keys, one per passphrase; try the
+        # passphrase against all of them.
         if passphrase is None:
             passphrase = Passphrase()
-            if not key.load(target, passphrase):
+            if not key.load_any(passphrase):
                 for retry in range(0, 3):
                     passphrase = Passphrase.getpass(prompt)
-                    if key.load(target, passphrase):
+                    if key.load_any(passphrase):
                         break
                     Passphrase.display_debug_info(passphrase)
                 else:
                     raise PasswordRetriesExceeded
         else:
-            if not key.load(target, passphrase):
+            if not key.load_any(passphrase):
                 Passphrase.display_debug_info(passphrase)
                 raise PassphraseWrong
         key.init_ciphers(manifest_data)
@@ -445,6 +456,7 @@ class FlexiKey:
             raise UnsupportedKeyFormatError()
         else:
             self._encrypted_key_algorithm = encrypted_key.algorithm
+            self._encrypted_key_label = encrypted_key.get("label")
             if encrypted_key.algorithm == "argon2 chacha20-poly1305":
                 return self.decrypt_key_file_argon2(encrypted_key, passphrase)
             else:
@@ -493,26 +505,29 @@ class FlexiKey:
         except low_level.IntegrityError:
             return None
 
-    def encrypt_key_file(self, data, passphrase, algorithm):
+    def encrypt_key_file(self, data, passphrase, algorithm, label=None):
         if algorithm == "argon2 chacha20-poly1305":
-            return self.encrypt_key_file_argon2(data, passphrase)
+            return self.encrypt_key_file_argon2(data, passphrase, label=label)
         else:
             raise ValueError(f"Unexpected algorithm: {algorithm}")
 
-    def encrypt_key_file_argon2(self, data, passphrase):
+    def encrypt_key_file_argon2(self, data, passphrase, label=None):
         salt = os.urandom(ARGON2_SALT_BYTES)
         key = self.argon2(passphrase, output_len_in_bytes=32, salt=salt, **ARGON2_ARGS)
         ae_cipher = CHACHA20_POLY1305(key=key, iv=0, header_len=0, aad_offset=0)
-        encrypted_key = EncryptedKey(
+        kw = dict(
             version=1,
             algorithm="argon2 chacha20-poly1305",
             salt=salt,
             data=ae_cipher.encrypt(data),
             **{"argon2_" + k: v for k, v in ARGON2_ARGS.items()},
         )
+        if label is not None:
+            kw["label"] = label
+        encrypted_key = EncryptedKey(**kw)
         return msgpack.packb(encrypted_key.as_dict())
 
-    def _save(self, passphrase, algorithm):
+    def _save(self, passphrase, algorithm, label=None):
         key = Key(
             version=2,
             repository_id=self.repository_id,
@@ -520,14 +535,20 @@ class FlexiKey:
             id_key=self.id_key,
             chunk_seed=self.chunk_seed,
         )
-        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm)
+        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm, label=label)
         key_data = "\n".join(textwrap.wrap(binascii.b2a_base64(data).decode("ascii")))
         return key_data
 
     def change_passphrase(self, passphrase=None):
         if passphrase is None:
             passphrase = Passphrase.new(allow_empty=True)
-        self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm)
+        # replace the borg key we unlocked with: keep its label, write the new borg key, then
+        # (for repokey) delete the previously-loaded borg key (keyfile mode auto-erases it in save()).
+        old_id = self._loaded_key_id
+        self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm, label=self._loaded_label)
+        if self.STORAGE == KeyBlobStorage.REPO and old_id and hasattr(self.repository, "delete_key"):
+            if self._loaded_key_id != old_id:
+                self.repository.delete_key(old_id)
 
     @classmethod
     def create(cls, repository, args, *, other_key=None):
@@ -556,7 +577,8 @@ class FlexiKey:
         passphrase = Passphrase.new(allow_empty=True)
         key.init_ciphers()
         target = key.get_new_target(args)
-        key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS["argon2"])
+        # the first borg key of a repository is the protected "admin" key.
+        key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS["argon2"], label=ADMIN_LABEL)
         logger.info('Key in "%s" created.' % key.target)
         logger.info("Keep this key safe. Your data will be inaccessible without it.")
         return key
@@ -620,6 +642,22 @@ class FlexiKey:
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
 
+    def _find_all_keys_in_keys_dir(self):
+        # return all keyfiles in the keys dir that belong to this repository (multiple passphrases).
+        id = self.repository.id
+        keys_path = Path(get_keys_dir())
+        found = []
+        if not keys_path.exists():
+            return found
+        for entry in sorted(keys_path.iterdir()):
+            filename = keys_path / entry.name
+            try:
+                self.sanity_check(str(filename), id)
+            except (KeyfileInvalidError, KeyfileMismatchError):
+                continue
+            found.append(str(filename))
+        return found
+
     def get_new_target(self, args):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             keyfile = self._find_key_file_from_environment()
@@ -636,35 +674,106 @@ class FlexiKey:
         if keyfile:
             return os.path.abspath(keyfile)
 
-    def load(self, target, passphrase):
+    def _repo_candidates(self):
+        # legacy-safe enumeration: modern Repository has load_keys() (multiple borg keys),
+        # legacy LegacyRepository only has load_key() (a single borg key).
+        repo = self.repository
+        result = []
+        if hasattr(repo, "load_keys"):
+            for name, keydata in repo.load_keys():
+                result.append((name, keydata.decode("utf-8"), None))
+        else:
+            keydata = repo.load_key()
+            if keydata:
+                result.append((sha256(keydata).hexdigest(), keydata.decode("utf-8"), None))
+        return result
+
+    def _keyfile_candidates(self):
+        env_keyfile = self._find_key_file_from_environment()
+        paths = [env_keyfile] if env_keyfile is not None else self._find_all_keys_in_keys_dir()
+        result = []
+        for path in paths:
+            try:
+                with open(path, "rb") as fd:
+                    blob = fd.read()
+            except OSError:
+                continue
+            result.append((sha256(blob).hexdigest(), blob.decode("utf-8"), str(path)))
+        return result
+
+    def _iter_keys(self):
+        # return [(key_id, blob_text, keyfile_path_or_None)] for all borg keys of this repo.
         if self.STORAGE == KeyBlobStorage.KEYFILE:
-            with open(target) as fd:
-                key_data = fd.read()
-            _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
+            return self._keyfile_candidates()
         elif self.STORAGE == KeyBlobStorage.REPO:
+            return self._repo_candidates()
+        else:
+            raise TypeError("Unsupported borg key storage type")
+
+    def _key_envelope(self, blob_text):
+        # decode the (unencrypted) EncryptedKey envelope of a borg key without decrypting it.
+        if is_keyfile(blob_text):
+            _, b64 = keyfile_parse(blob_text, bin_to_hex(self.repository.id))
+        else:
+            b64 = blob_text  # borg 1.x repokey: raw base64, no BORG_KEY header
+        raw = binascii.a2b_base64(b64)
+        unpacker = get_limited_unpacker("key")
+        unpacker.feed(raw)
+        return EncryptedKey(internal_dict=unpacker.unpack())
+
+    def _try_key(self, key_id, blob_text, keyfile_path, passphrase):
+        # try to unlock a single borg key with the given passphrase; on success, remember it.
+        if is_keyfile(blob_text):
+            # keyfile / modern repokey: data is wrapped in keyfile_format (BORG_KEY header).
+            try:
+                _, key_data = keyfile_parse(blob_text, bin_to_hex(self.repository.id))
+            except ValueError:
+                return False
+        else:
+            # borg 1.x repokey: stored as raw base64 without the BORG_KEY header.
+            key_data = blob_text
+        try:
+            loaded = self._load(key_data, passphrase)
+        except Exception as exc:  # noqa: BLE001 - a corrupted borg key must not break unlocking via the others
+            logger.debug("Borg key %s could not be loaded (corrupted?), skipping it: %s", key_id[:12], exc)
+            return False
+        if loaded:
+            self.target = keyfile_path if self.STORAGE == KeyBlobStorage.KEYFILE else self.repository
+            self._loaded_key_id = key_id
+            self._loaded_label = self._encrypted_key_label
+            return True
+        return False
+
+    def load_any(self, passphrase):
+        """Try the passphrase against every borg key of this repository."""
+        if self.STORAGE == KeyBlobStorage.REPO:
             # While the repository is encrypted, we consider a repokey repository with a blank
             # passphrase an unencrypted repository.
             self.logically_encrypted = passphrase != ""  # nosec B105
+        for key_id, blob_text, keyfile_path in self._iter_keys():
+            if self._try_key(key_id, blob_text, keyfile_path, passphrase):
+                return True
+        return False
 
-            # what we get in target is just a repo location, but we already have the repo obj:
-            target = self.repository
-            key_data = target.load_key()
-            if not key_data:
-                # if we got an empty key, it means there is no key.
-                loc = target._location.canonical_path()
-                raise RepoKeyNotFoundError(loc) from None
-            key_data = key_data.decode("utf-8")  # remote repo: msgpack issue #99, getting bytes
-            if is_keyfile(key_data):
-                _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
+    def load(self, target, passphrase):
+        # load a specific borg key: for keyfiles, the explicit file given as target; for repokey,
+        # any of the repository's borg keys (which are addressed by passphrase, not by target).
+        if self.STORAGE == KeyBlobStorage.KEYFILE:
+            try:
+                with open(target, "rb") as fd:
+                    blob = fd.read()
+            except OSError:
+                return False
+            return self._try_key(sha256(blob).hexdigest(), blob.decode("utf-8"), str(target), passphrase)
+        elif self.STORAGE == KeyBlobStorage.REPO:
+            return self.load_any(passphrase)
         else:
             raise TypeError("Unsupported borg key storage type")
-        success = self._load(key_data, passphrase)
-        if success:
-            self.target = target
-        return success
 
-    def save(self, target, passphrase, algorithm, create=False):
-        key_data = self._save(passphrase, algorithm)
+    def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
+        # replace=True replaces the previously-loaded borg key (change-passphrase semantics);
+        # replace=False adds an additional borg key, keeping the existing ones (key add).
+        key_data = self._save(passphrase, algorithm, label=label)
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             old_target = getattr(self, "target", None)
             keys_dir = get_keys_dir()
@@ -681,7 +790,7 @@ class FlexiKey:
             # use binary mode so line endings are NOT translated to CRLF on Windows
             with SaveFile(target, binary=True) as fd:
                 fd.write(keyfile_data.encode())
-            if auto_named and isinstance(old_target, str) and old_target != target:
+            if replace and auto_named and isinstance(old_target, str) and old_target != target:
                 try:
                     in_keys_dir = os.path.samefile(os.path.dirname(old_target), keys_dir)
                 except OSError:
@@ -691,22 +800,102 @@ class FlexiKey:
                         secure_erase(old_target, avoid_collateral_damage=True)
                     except OSError as exc:
                         logger.debug('Could not remove previous keyfile "%s": %s', old_target, exc)
+            self._loaded_key_id = sha256(keyfile_data.encode()).hexdigest()
         elif self.STORAGE == KeyBlobStorage.REPO:
             self.logically_encrypted = passphrase != ""  # nosec B105
             key_data = keyfile_format(bin_to_hex(self.repository_id), key_data)
             key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes
-            target.save_key(key_data)
+            # additive store: keeps the other borg keys of this repository.
+            store_key = getattr(target, "store_key", None)
+            if store_key is not None:
+                self._loaded_key_id = store_key(key_data)
+            else:
+                target.save_key(key_data)  # legacy repository: single borg key
+                self._loaded_key_id = sha256(key_data).hexdigest()
         else:
             raise TypeError("Unsupported borg key storage type")
-        self.target = target
+        self.target = target if self.STORAGE != KeyBlobStorage.REPO else self.repository
+        self._loaded_label = label
 
     def remove(self, target):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
-            os.remove(target)
+            os.remove(target)  # the keyfile of the borg key we unlocked; other borg keys are separate files
         elif self.STORAGE == KeyBlobStorage.REPO:
-            target.save_key(b"")  # save empty key (no new api at remote repo necessary)
+            # remove only the borg key we unlocked, leaving the repository's other borg keys alone.
+            if hasattr(target, "delete_key") and self._loaded_key_id:
+                target.delete_key(self._loaded_key_id)
+            else:
+                target.save_key(b"")  # legacy repository (single borg key)
         else:
             raise TypeError("Unsupported borg key storage type")
+
+    def list_keys(self):
+        """Return metadata for all borg keys of this repository (no decryption)."""
+        mode = "keyfile" if self.STORAGE == KeyBlobStorage.KEYFILE else "repokey"
+        result = []
+        for key_id, blob_text, keyfile_path in self._iter_keys():
+            try:
+                env = self._key_envelope(blob_text)
+                label, algorithm = env.get("label"), env.get("algorithm")
+            except Exception as exc:  # noqa: BLE001 - a corrupted borg key must stay visible and removable
+                logger.warning("Borg key %s is corrupted (could not be parsed): %s", key_id[:12], exc)
+                label, algorithm = None, "(corrupted)"
+            result.append(
+                {
+                    "id": key_id,
+                    "mode": mode,
+                    "label": label,
+                    "algorithm": algorithm,
+                    "path": keyfile_path,
+                    "current": key_id == self._loaded_key_id,
+                }
+            )
+        return result
+
+    def add_key(self, passphrase=None, label=None):
+        """Add an additional borg key protecting the same key material with a new passphrase."""
+        if self.STORAGE == KeyBlobStorage.REPO and not hasattr(self.repository, "store_key"):
+            raise Error("This repository type does not support multiple borg keys.")
+        if self.STORAGE == KeyBlobStorage.KEYFILE and os.environ.get("BORG_KEY_FILE"):
+            raise Error(
+                "Cannot add a borg key while BORG_KEY_FILE points to a single keyfile; "
+                "unset it so the new keyfile can be stored in the keys directory."
+            )
+        if not label:
+            raise Error("A label is required when adding a borg key (--label).")
+        if label == ADMIN_LABEL:
+            raise Error('The "%s" label is reserved for the borg key created at repository creation.' % ADMIN_LABEL)
+        if label in {bk["label"] for bk in self.list_keys()}:
+            raise Error("A borg key with label %r already exists." % label)
+        if passphrase is None:
+            passphrase = Passphrase.new(allow_empty=True)
+        self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm, label=label, replace=False)
+
+    def remove_key(self, *, label=None, key_id=None, current=False):
+        """Remove a borg key. Selects by label, by key id prefix, or the current one."""
+        keys = self.list_keys()
+        if len(keys) <= 1:
+            raise Error("Cannot remove the last remaining borg key of a repository.")
+        if current:
+            matches = [k for k in keys if k["id"] == self._loaded_key_id]
+        elif key_id is not None:
+            matches = [k for k in keys if k["id"].startswith(key_id)]
+        elif label is not None:
+            matches = [k for k in keys if k["label"] == label]
+        else:
+            raise Error("No borg key selector given (use --label, --key or --passphrase).")
+        if len(matches) != 1:
+            raise Error("The selector needs to match precisely 1 key, but it matched %d keys." % len(matches))
+        victim = matches[0]
+        if victim["label"] == ADMIN_LABEL:
+            raise Error('The "%s" borg key is protected and cannot be removed.' % ADMIN_LABEL)
+        if self.STORAGE == KeyBlobStorage.REPO:
+            self.repository.delete_key(victim["id"])
+        elif self.STORAGE == KeyBlobStorage.KEYFILE:
+            os.remove(victim["path"])
+        else:
+            raise TypeError("Unsupported borg key storage type")
+        return victim
 
 
 class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
@@ -732,8 +921,13 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         self.logically_encrypted = False
         return success
 
-    def save(self, target, passphrase, algorithm, create=False):
-        super().save(target, passphrase, algorithm, create=create)
+    def load_any(self, passphrase):
+        success = super().load_any(passphrase)
+        self.logically_encrypted = False
+        return success
+
+    def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
+        super().save(target, passphrase, algorithm, create=create, label=label, replace=replace)
         self.logically_encrypted = False
 
     def init_ciphers(self, manifest_data=None):

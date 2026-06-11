@@ -28,6 +28,38 @@ class KeysMixIn:
             # print key location to make backing it up easier
             logger.info("Key location: %s", key.find_key())
 
+    @with_repository(manifest=True, compatibility=(Manifest.Operation.CHECK,))
+    def do_key_add(self, args, repository, manifest):
+        """Add a new borg key (protected by an independent passphrase) to the repository."""
+        key = manifest.key
+        if not hasattr(key, "add_key"):
+            raise CommandError("This repository is not encrypted, cannot add a borg key.")
+        key.add_key(label=args.label)
+        logger.info("Borg key with label %r added.", args.label)
+        if hasattr(key, "find_key"):
+            logger.info("Key location: %s", key.find_key())
+
+    @with_repository(manifest=True, compatibility=(Manifest.Operation.CHECK,))
+    def do_key_remove(self, args, repository, manifest):
+        """Remove a borg key from the repository."""
+        key = manifest.key
+        if not hasattr(key, "remove_key"):
+            raise CommandError("This repository is not encrypted, cannot remove a borg key.")
+        victim = key.remove_key(label=args.label, key_id=args.key, current=args.by_passphrase)
+        logger.info("Borg key %s (label %r) removed.", victim["id"][:12], victim["label"])
+
+    @with_repository(manifest=True, compatibility=(Manifest.Operation.CHECK,))
+    def do_key_list(self, args, repository, manifest):
+        """List the borg keys of the repository."""
+        key = manifest.key
+        if not hasattr(key, "list_keys"):
+            raise CommandError("This repository is not encrypted, there are no borg keys to list.")
+        fmt = "%-1s %-12s %-8s %-24s %s"
+        print(fmt % ("", "KEY ID", "MODE", "LABEL", "ALGORITHM"))
+        for bk in key.list_keys():
+            marker = "*" if bk["current"] else ""
+            print(fmt % (marker, bk["id"][:12], bk["mode"], bk["label"] or "-", bk["algorithm"] or "-"))
+
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_key_change_location(self, args, repository, manifest, cache):
         """Changes the repository key location."""
@@ -65,8 +97,14 @@ class KeysMixIn:
             setattr(key_new, name, value)
 
         key_new.target = key_new.get_new_target(args)
-        # save with same passphrase and algorithm
-        key_new.save(key_new.target, key._passphrase, create=True, algorithm=key._encrypted_key_algorithm)
+        # save with same passphrase, algorithm and label (keep the unlocked borg key's label)
+        key_new.save(
+            key_new.target,
+            key._passphrase,
+            create=True,
+            algorithm=key._encrypted_key_algorithm,
+            label=key._loaded_label,
+        )
 
         # rewrite the manifest with the new key, so that the key-type byte of the manifest changes
         manifest.key = key_new
@@ -84,9 +122,9 @@ class KeysMixIn:
 
     @with_repository(lock=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
-        """Exports the repository key for backup."""
+        """Exports a borg key of the repository for backup."""
         manager = KeyManager(repository)
-        manager.load_keyblob()
+        manager.load_keyblob(label=args.label, key_id=args.key)
         try:
             if args.path is not None and os.path.isdir(args.path):
                 # on Windows, Python raises PermissionError instead of IsADirectoryError
@@ -100,6 +138,7 @@ class KeysMixIn:
                 manager.export(args.path)
         except IsADirectoryError:
             raise CommandError(f"'{args.path}' must be a file, not a directory")
+        logger.info("Exported borg key %s (label %r).", manager.loaded_key_id[:12], manager.loaded_label)
 
     @with_repository(lock=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
@@ -150,6 +189,12 @@ class KeysMixIn:
         repository, one needs both the exported key and the original passphrase.
         Keep the exported key and the passphrase at safe places.
 
+        A repository may have more than one borg key (each protected by its own
+        passphrase, see ``borg key add``). Select which borg key to export with
+        ``--label`` or ``--key`` (its key id or a unique prefix, see
+        ``borg key list``). If the repository has only a single borg key, no
+        selector is required.
+
         There are three backup formats. The normal backup format is suitable for
         digital storage as a file. The ``--paper`` backup format is optimized
         for printing and typing in while importing, with per line checks to
@@ -160,8 +205,13 @@ class KeysMixIn:
         subparser = ArgumentParser(
             parents=[common_parser], description=self.do_key_export.__doc__, epilog=key_export_epilog
         )
-        key_parsers.add_subcommand("export", subparser, help="export the repository key for backup")
+        key_parsers.add_subcommand("export", subparser, help="export a borg key for backup")
         subparser.add_argument("path", metavar="PATH", nargs="?", type=PathSpec, help="where to store the backup")
+        export_select = subparser.add_mutually_exclusive_group()
+        export_select.add_argument("--label", metavar="LABEL", dest="label", help="export the borg key with this label")
+        export_select.add_argument(
+            "--key", metavar="ID", dest="key", help="export the borg key with this id (or unique id prefix)"
+        )
         subparser.add_argument(
             "--paper",
             dest="paper",
@@ -222,6 +272,67 @@ class KeysMixIn:
             parents=[common_parser], description=self.do_key_change_passphrase.__doc__, epilog=change_passphrase_epilog
         )
         key_parsers.add_subcommand("change-passphrase", subparser, help="change the repository passphrase")
+
+        add_epilog = process_epilog(
+            """
+        A repository can be protected by more than one borg key. Each borg key contains the
+        same secret key material, but is protected by an independent (potentially different)
+        passphrase, and any of them can be used to unlock the same repository. This is useful
+        e.g. to give individual users their own passphrase while keeping a separate
+        admin/recovery passphrase.
+
+        This command adds an additional borg key. It does not re-encrypt any repository data
+        and does not change the existing borg keys. The new passphrase is read from
+        ``BORG_NEW_PASSPHRASE`` or queried interactively.
+
+        Each borg key has a label. The first borg key, created at repository creation time, has
+        the reserved label ``admin`` and is protected from deletion. Additionally added borg
+        keys require a unique, user-defined ``--label``.
+        """
+        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_key_add.__doc__, epilog=add_epilog)
+        key_parsers.add_subcommand("add", subparser, help="add a borg key (independent passphrase)")
+        subparser.add_argument(
+            "--label", metavar="LABEL", dest="label", required=True, help="label for the new borg key (must be unique)"
+        )
+
+        remove_epilog = process_epilog(
+            """
+        Remove a borg key from the repository.
+
+        The borg key to remove is selected by exactly one of: ``--label`` (its label),
+        ``--key`` (its key id or a unique prefix, see ``borg key list``), or
+        ``--passphrase`` (remove the borg key that was used to unlock the repository now).
+
+        The ``admin`` borg key is protected and cannot be removed, and the last remaining
+        borg key of a repository cannot be removed either.
+        """
+        )
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_key_remove.__doc__, epilog=remove_epilog
+        )
+        key_parsers.add_subcommand("remove", subparser, help="remove a borg key")
+        remove_group = subparser.add_mutually_exclusive_group(required=True)
+        remove_group.add_argument("--label", metavar="LABEL", dest="label", help="remove the borg key with this label")
+        remove_group.add_argument(
+            "--key", metavar="ID", dest="key", help="remove the borg key with this id (or unique id prefix)"
+        )
+        remove_group.add_argument(
+            "--passphrase",
+            dest="by_passphrase",
+            action="store_true",
+            help="remove the borg key that was used to unlock the repository",
+        )
+
+        list_epilog = process_epilog(
+            """
+        List the borg keys of the repository, showing each borg key's id, mode (``repokey`` or
+        ``keyfile``), label and key derivation/encryption algorithm. The borg key used to
+        unlock the repository in this invocation is marked with ``*``.
+        """
+        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_key_list.__doc__, epilog=list_epilog)
+        key_parsers.add_subcommand("list", subparser, help="list the repository borg keys")
 
         change_location_epilog = process_epilog(
             """

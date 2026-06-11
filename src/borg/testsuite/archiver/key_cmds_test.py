@@ -371,3 +371,304 @@ def test_change_location_does_not_change_algorithm_argon2(archivers, request):
             _, key_data = keyfile_parse(key_data, bin_to_hex(repository.id))
         key = msgpack.unpackb(binascii.a2b_base64(key_data))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
+
+
+# --- multiple borg keys per repository (borg issue #9743) ---------------------------------------
+
+from ...constants import EXIT_ERROR  # noqa: E402
+from ...helpers import Error  # noqa: E402
+from ...helpers.passphrase import PassphraseWrong  # noqa: E402
+
+DEFAULT_PASSPHRASE = "waytooeasyonlyfortests"  # see set_env_variables fixture in conftest
+
+# exit code a forking/binary archiver returns for a wrong passphrase. The test env defaults to
+# BORG_EXIT_CODES=modern (see helpers/errors.py), so this is the specific PassphraseWrong code, not EXIT_ERROR.
+EXIT_PASSPHRASE_WRONG = PassphraseWrong.exit_mcode
+
+
+def _expect_error(archiver, *args, exit_code=EXIT_ERROR):
+    """Assert a borg Error, regardless of whether the archiver forks (exit code) or not (raises)."""
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, *args, exit_code=exit_code)
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, *args)
+
+
+def _key_id_for_label(archiver, label):
+    """Return the borg key id shown by 'key list' for the given label."""
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    out = cmd(archiver, "key", "list")
+    for line in out.splitlines():
+        fields = line.split()
+        if label in fields:
+            for f in fields:
+                if len(f) == 12 and all(c in "0123456789abcdef" for c in f):
+                    return f
+    raise AssertionError(f"label {label!r} not found in:\n{out}")
+
+
+@pytest.mark.parametrize("encryption", [RK_ENCRYPTION, KF_ENCRYPTION])
+def test_key_first_key_is_admin(archivers, request, encryption):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", encryption)
+    out = cmd(archiver, "key", "list")
+    assert "admin" in out
+    mode = "keyfile" if encryption == KF_ENCRYPTION else "repokey"
+    rows = [ln for ln in out.splitlines() if "argon2" in ln]
+    assert len(rows) == 1
+    assert rows[0].lstrip().startswith("*")
+    assert mode in rows[0]
+
+
+@pytest.mark.parametrize("encryption", [RK_ENCRYPTION, KF_ENCRYPTION])
+def test_key_add(archivers, request, encryption):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", encryption)  # admin = DEFAULT_PASSPHRASE
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+
+    out = cmd(archiver, "key", "list")
+    rows = [ln for ln in out.splitlines() if "argon2" in ln]
+    assert len(rows) == 2
+    assert "admin" in out and "alice" in out
+
+    # both borg keys unlock the repository
+    os.environ["BORG_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "repo-list")
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    cmd(archiver, "repo-list")
+
+
+def test_key_add_rejects_duplicate_and_reserved(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+    os.environ["BORG_NEW_PASSPHRASE"] = "otherpass"
+    _expect_error(archiver, "key", "add", "--label", "alice")  # duplicate
+    _expect_error(archiver, "key", "add", "--label", "admin")  # reserved
+
+
+@pytest.mark.parametrize("encryption", [RK_ENCRYPTION, KF_ENCRYPTION])
+def test_key_remove_by_label(archivers, request, encryption):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", encryption)
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    cmd(archiver, "key", "remove", "--label", "alice")
+
+    os.environ["BORG_PASSPHRASE"] = "alicepass"
+    _expect_error(archiver, "repo-list", exit_code=EXIT_PASSPHRASE_WRONG)  # alice's passphrase no longer works
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    cmd(archiver, "repo-list")  # admin still works
+    out = cmd(archiver, "key", "list")
+    assert "alice" not in out and "admin" in out
+
+
+def test_key_remove_by_id(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+
+    key_id = _key_id_for_label(archiver, "alice")
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    cmd(archiver, "key", "remove", "--key", key_id[:8])
+
+    os.environ["BORG_PASSPHRASE"] = "alicepass"
+    _expect_error(archiver, "repo-list", exit_code=EXIT_PASSPHRASE_WRONG)
+
+
+def test_key_remove_current(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+
+    os.environ["BORG_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "remove", "--passphrase")  # remove the borg key used to unlock
+    _expect_error(archiver, "repo-list", exit_code=EXIT_PASSPHRASE_WRONG)  # alice gone
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    cmd(archiver, "repo-list")  # admin remains
+
+
+def test_key_admin_protected_and_last_key(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    _expect_error(archiver, "key", "remove", "--label", "admin")  # protected, not last
+    cmd(archiver, "key", "remove", "--label", "alice")
+    _expect_error(archiver, "key", "remove", "--label", "admin")  # now last borg key
+
+
+def test_key_change_passphrase_only_affects_current_key(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    os.environ["BORG_NEW_PASSPHRASE"] = "adminpass2"
+    cmd(archiver, "key", "change-passphrase")  # rotate admin (we are unlocked as admin)
+
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    _expect_error(archiver, "repo-list", exit_code=EXIT_PASSPHRASE_WRONG)  # old admin passphrase fails
+    os.environ["BORG_PASSPHRASE"] = "adminpass2"
+    cmd(archiver, "repo-list")  # new admin works
+    os.environ["BORG_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "repo-list")  # alice untouched
+
+    os.environ["BORG_PASSPHRASE"] = "adminpass2"
+    out = cmd(archiver, "key", "list")
+    rows = [ln for ln in out.splitlines() if "argon2" in ln]
+    assert len(rows) == 2
+    assert "admin" in out and "alice" in out
+
+
+def test_key_multiple_keys_share_secrets(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")
+    # create an archive unlocked as alice ...
+    os.environ["BORG_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "create", "arch", archiver.input_path)
+    # ... and read it back unlocked as admin (same underlying key material)
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    out = cmd(archiver, "repo-list")
+    assert "arch" in out
+
+
+def test_key_change_location_only_affects_unlocked_key(archivers, request):
+    # change-location moves only the borg key we unlocked; the repository's other borg keys
+    # (here: alice's repokey) must be left in place, not deleted along with it.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)  # admin repokey
+    os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
+    cmd(archiver, "key", "add", "--label", "alice")  # second repokey
+
+    with Repository(archiver.repository_path) as repository:
+        assert len(repository.load_keys()) == 2  # admin + alice
+
+    # change only the unlocked (admin) borg key to keyfile location
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    cmd(archiver, "key", "change-location", "keyfile")
+
+    # admin's repokey is gone from the store, but alice's repokey is untouched
+    with Repository(archiver.repository_path) as repository:
+        assert len(repository.load_keys()) == 1
+
+
+def test_key_change_location_keeps_label(archivers, request):
+    # change-location must preserve the label of the borg key it migrates.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)  # admin repokey
+    os.environ["BORG_NEW_PASSPHRASE"] = "xxxpass"
+    cmd(archiver, "key", "add", "--label", "xxx")  # second repokey, labeled xxx
+
+    # migrate the xxx borg key (unlocked with its own passphrase) from repokey to keyfile
+    os.environ["BORG_PASSPHRASE"] = "xxxpass"
+    cmd(archiver, "key", "change-location", "keyfile")
+
+    out = cmd(archiver, "key", "list")  # still unlocked as xxx
+    rows = [ln for ln in out.splitlines() if "argon2" in ln]
+    assert len(rows) == 1
+    assert "keyfile" in rows[0]
+    assert "xxx" in rows[0]  # label preserved, not lost
+
+
+def _exported_label(path, repo_id):
+    """Return the label stored in the borg key backup written by 'key export'."""
+    with open(path) as fd:
+        content = fd.read()
+    _, b64 = keyfile_parse(content, bin_to_hex(repo_id))
+    return msgpack.unpackb(binascii.a2b_base64(b64)).get("label")
+
+
+def test_key_export_selects_borg_key(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)  # admin borg key
+    os.environ["BORG_NEW_PASSPHRASE"] = "xxxpass"
+    cmd(archiver, "key", "add", "--label", "xxx")  # second borg key
+
+    repo_id = _extract_repository_id(archiver.repository_path)
+    out_xxx = archiver.output_path + "/xxx"
+    out_admin = archiver.output_path + "/admin"
+
+    # more than one borg key and no selector given -> must ask for one
+    _expect_error(archiver, "key", "export", out_xxx, exit_code=CommandError().exit_code)
+
+    # selecting by label exports exactly that borg key
+    cmd(archiver, "key", "export", "--label", "xxx", out_xxx)
+    cmd(archiver, "key", "export", "--label", "admin", out_admin)
+    assert _exported_label(out_xxx, repo_id) == "xxx"
+    assert _exported_label(out_admin, repo_id) == "admin"
+
+    # selecting the same borg key by id prefix yields the same export
+    admin_id = _key_id_for_label(archiver, "admin")
+    out_admin2 = archiver.output_path + "/admin2"
+    cmd(archiver, "key", "export", "--key", admin_id[:8], out_admin2)
+    assert _exported_label(out_admin2, repo_id) == "admin"
+
+
+def test_key_export_single_key_needs_no_selector(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)  # only the admin borg key exists
+    out = archiver.output_path + "/exported"
+    cmd(archiver, "key", "export", out)  # backward compatible: no selector required
+    repo_id = _extract_repository_id(archiver.repository_path)
+    assert _exported_label(out, repo_id) == "admin"
+
+
+def test_key_remove_rejects_ambiguous_key_selector(archivers, request):
+    # a --key prefix that matches more than one borg key (here: the empty prefix) must be rejected.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "xxxpass"
+    cmd(archiver, "key", "add", "--label", "xxx")
+    os.environ["BORG_PASSPHRASE"] = DEFAULT_PASSPHRASE
+    _expect_error(archiver, "key", "remove", "--key", "")  # matches admin + xxx
+
+
+def test_key_export_rejects_ambiguous_key_selector(archivers, request):
+    # a --key prefix that matches more than one borg key (here: the empty prefix) must be rejected.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.environ["BORG_NEW_PASSPHRASE"] = "xxxpass"
+    cmd(archiver, "key", "add", "--label", "xxx")
+    out = archiver.output_path + "/exported"
+    _expect_error(archiver, "key", "export", "--key", "", out, exit_code=CommandError().exit_code)
+
+
+def _store_corrupted_borg_key(repository_path, repo_id):
+    """Store a borg key whose envelope is unparseable but which still passes the
+    keyfile header / repo-id check (so it is enumerated). Returns its key id."""
+    header = CHPOKeyfileKey.FILE_ID + " " + bin_to_hex(repo_id) + "\n"
+    body = binascii.b2a_base64(b"this is not a valid key envelope").decode()  # valid base64, not msgpack
+    blob = (header + body).encode("utf-8")
+    with Repository(repository_path) as repository:
+        return repository.store_key(blob)
+
+
+def test_key_list_and_remove_corrupted_key(archivers, request):
+    # a corrupted borg key must stay visible in "key list" and be removable by its id,
+    # instead of being silently dropped (which would make it invisible and unremovable).
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)  # good admin borg key (unlocks the repo)
+    repo_id = _extract_repository_id(archiver.repository_path)
+    bad_id = _store_corrupted_borg_key(archiver.repository_path, repo_id)
+
+    out = cmd(archiver, "key", "list")
+    assert "admin" in out  # the good borg key is listed
+    assert bad_id[:12] in out  # the corrupted borg key is still visible
+
+    cmd(archiver, "key", "remove", "--key", bad_id[:12])  # and removable
+    out = cmd(archiver, "key", "list")
+    assert bad_id[:12] not in out
+    assert "admin" in out

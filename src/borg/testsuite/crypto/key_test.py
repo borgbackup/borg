@@ -337,8 +337,8 @@ def test_key_file_roundtrip(monkeypatch):
     monkeypatch.setenv("BORG_PASSPHRASE", "hello, pass phrase")
 
     save_me = AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm="argon2"))
-    saved = repository.save_key.call_args.args[0]
-    repository.load_key.return_value = saved
+    saved = repository.store_key.call_args.args[0]
+    repository.load_keys.return_value = [("key0", saved)]
     load_me = AESOCBRepoKey.detect(repository, manifest_data=None)
 
     assert to_dict(load_me) == to_dict(save_me)
@@ -352,6 +352,6 @@ def test_argon2_wrong_passphrase_returns_none(monkeypatch):
     repository = MagicMock(id=b"repository_id")
     monkeypatch.setenv("BORG_PASSPHRASE", "correct passphrase")
     key = AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm="argon2"))
-    saved = repository.save_key.call_args.args[0]
+    saved = repository.store_key.call_args.args[0]
     _, saved_b64 = keyfile_parse(saved)
     assert key.decrypt_key_file(a2b_base64(saved_b64), "wrong passphrase") is None

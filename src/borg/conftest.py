@@ -21,7 +21,11 @@ from borg.testsuite.platform.platform_test import fakeroot_detected  # noqa: E40
 @pytest.fixture(autouse=True)
 def clean_env(tmpdir_factory, monkeypatch):
     # also avoid to use anything from the outside environment:
-    keys = [key for key in os.environ if key.startswith("BORG_") and key not in ("BORG_FUSE_IMPL",)]
+    keys = [
+        key
+        for key in os.environ
+        if key.startswith("BORG_") and key not in ("BORG_FUSE_IMPL", "BORG_TESTONLY_SHA256_PACK_ID")
+    ]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
     # avoid that we access / modify the user's normal .config / .cache directory:

@@ -710,6 +710,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     continue-on-error: true
+    concurrency:
+      group: sha256-pack-id-${{ github.head_ref || github.ref }}
+      cancel-in-progress: false
 
     steps:
     - uses: actions/checkout@v6

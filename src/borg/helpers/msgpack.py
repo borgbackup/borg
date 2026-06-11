@@ -145,7 +145,7 @@ def is_supported_msgpack():
     version_check = os.environ.get('BORG_MSGPACK_VERSION_CHECK', 'yes').strip().lower()
 
     return version_check == 'no' or (
-        (1, 0, 3) <= msgpack.version[:3] <= (1, 1, 2) and
+        (1, 0, 3) <= msgpack.version[:3] <= (1, 2, 0) and
         msgpack.version not in []
     )
 

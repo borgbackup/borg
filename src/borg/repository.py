@@ -439,18 +439,12 @@ class Repository:
         """ChunkIndex mapping every known chunk id to its pack location.
 
         Built lazily on first access if set_chunk_index() has not been called.
-        Current-session put() entries (which carry the precise pack_id, offset,
-        and size set by PackWriter) are overlaid on top of the store-built
-        entries so they always win.
         """
         if not self._chunks_initialized:
             from .cache import build_chunkindex_from_repo
 
-            built = build_chunkindex_from_repo(self)
-            for k, v in self._chunks.iteritems():
-                built[k] = v
-            self._chunks = built
-            self._pack_writer.chunks = built
+            self._chunks = build_chunkindex_from_repo(self)
+            self._pack_writer.chunks = self._chunks
             self._chunks_initialized = True
         return self._chunks
 
@@ -708,7 +702,8 @@ class Repository:
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
-        return self._pack_writer.add(id, data)  # PackWriter updates _chunks internally
+        _ = self.chunks  # ensure lazy build ran and PackWriter.chunks is current
+        return self._pack_writer.add(id, data)
 
     def delete(self, id, wait=True):
         """delete a repo object

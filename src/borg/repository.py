@@ -152,10 +152,12 @@ class PackWriter:
         #      (backward-compatible file naming: packs/{chunk_id_hex}).
         # N>1: the pack contains multiple chunks; use SHA256(pack_bytes) so the
         #      file is content-addressed and borgstore can verify/cache it.
-        if self.max_count == 1:
+        # BORG_TESTONLY_SHA256_PACK_ID: always use sha256 even at N=1, exposing code
+        #      that still assumes pack_id == chunk_id.
+        if self.max_count == 1 and os.environ.get("BORG_TESTONLY_SHA256_PACK_ID") != "1":
             pack_id = self._pieces[0][0]  # N=1: pack_id == chunk_id
         else:
-            pack_id = sha256(pack_data).digest()  # N>1: content-addressed
+            pack_id = sha256(pack_data).digest()
 
         # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
         results = []

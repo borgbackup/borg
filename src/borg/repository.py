@@ -117,16 +117,15 @@ class PackWriter:
     def __init__(self, store, *, max_count=1, chunks=None):
         self.store = store
         self.max_count = max_count
-        self.chunks = chunks  # ChunkIndex reference; may be None (e.g. in unit tests)
+        self.chunks = chunks if chunks is not None else ChunkIndex()
         self._pieces = []  # list of (chunk_id, cdata)
         self._current_offset = 0  # byte offset of the next chunk within the current pack
 
     def add(self, chunk_id, cdata):
         """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
-        if self.chunks is not None:
-            # Mark chunk as pending: real offset/size are known now; pack_id not yet.
-            self.chunks.add(chunk_id, 0)  # size filled in by cache layer
-            self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, self._current_offset, len(cdata))])
+        # Mark chunk as pending: real offset/size are known now; pack_id not yet.
+        self.chunks.add(chunk_id, 0)  # size filled in by cache layer
+        self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, self._current_offset, len(cdata))])
         self._pieces.append((chunk_id, cdata))
         self._current_offset += len(cdata)
         if len(self._pieces) >= self.max_count:
@@ -138,7 +137,7 @@ class PackWriter:
 
         Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples --
         one entry per chunk that was written.  Returns None if there was nothing
-        to flush.  Also updates the ChunkIndex (if set) with the real pack_id.
+        to flush.  Always updates the ChunkIndex with the real pack_id.
         """
         if not self._pieces:
             return None
@@ -173,8 +172,7 @@ class PackWriter:
         finally:
             self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
             self._current_offset = 0
-        if self.chunks is not None:
-            self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
+        self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
         return results
 
 
@@ -299,7 +297,8 @@ class Repository:
         self.lock_wait = lock_wait
         self.exclusive = exclusive
         self._pack_writer = None
-        self._chunks = None  # borrowed ChunkIndex reference, set by set_chunk_index()
+        self._chunks = None  # ChunkIndex; set by open(), replaced by set_chunk_index()
+        self._chunks_initialized = False
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self._location}>"
@@ -422,6 +421,7 @@ class Repository:
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._chunks = ChunkIndex()
+        self._chunks_initialized = False
         self._pack_writer = PackWriter(self.store, max_count=1, chunks=self._chunks)
         self.opened = True
 
@@ -432,6 +432,27 @@ class Repository:
         """
         self._chunks = chunks
         self._pack_writer.chunks = chunks  # keep PackWriter in sync
+        self._chunks_initialized = True
+
+    @property
+    def chunks(self):
+        """ChunkIndex mapping every known chunk id to its pack location.
+
+        Built lazily on first access if set_chunk_index() has not been called.
+        Current-session put() entries (which carry the precise pack_id, offset,
+        and size set by PackWriter) are overlaid on top of the store-built
+        entries so they always win.
+        """
+        if not self._chunks_initialized:
+            from .cache import build_chunkindex_from_repo
+
+            built = build_chunkindex_from_repo(self)
+            for k, v in self._chunks.iteritems():
+                built[k] = v
+            self._chunks = built
+            self._pack_writer.chunks = built
+            self._chunks_initialized = True
+        return self._chunks
 
     def flush(self):
         """Flush any buffered pack writer chunks."""
@@ -623,22 +644,17 @@ class Repository:
 
     def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
-        entry = self._chunks.get(id)
-        if entry is not None and entry.pack_id == UNKNOWN_BYTES32:
-            # chunk is buffered in PackWriter, not yet written to a pack file
+        entry = self.chunks.get(id)
+        if entry is None:
             if raise_missing:
                 raise self.ObjectNotFound(id, str(self._location))
             return None
-        if entry is not None:
-            pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
-        else:
-            # N=1 fallback for cross-session reads without a populated index.
-            # obj_size=None tells store.load() to fetch the full file; safe for N=1
-            # because each pack holds exactly one chunk.  Once a Repository.chunks
-            # lazy-build property lands, this branch will be unreachable.
-            pack_id = id  # N=1: pack_id == chunk_id
-            obj_offset = 0
-            obj_size = None
+        if entry.pack_id == UNKNOWN_BYTES32:
+            # chunk is buffered in PackWriter, not yet flushed to a pack file
+            if raise_missing:
+                raise self.ObjectNotFound(id, str(self._location))
+            return None
+        pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
         key = "packs/" + bin_to_hex(pack_id)
         try:
@@ -650,10 +666,8 @@ class Repository:
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
                 load_size = hdr_size + extra_size
-                # obj_size is None only via the N=1 fallback above; clamp when available
-                # so a corrupted or malicious obj_size cannot cause an oversized read.
-                if obj_size is not None:
-                    load_size = min(load_size, obj_size)
+                # clamp so a corrupted or malicious obj_size cannot cause an oversized read.
+                load_size = min(load_size, obj_size)
                 obj = self.store.load(key, offset=obj_offset, size=load_size)
                 hdr = obj[0:hdr_size]
                 if len(hdr) != hdr_size:
@@ -663,10 +677,8 @@ class Repository:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
                     retry_size = hdr_size + meta_size
-                    if obj_size is not None:
-                        # normally a no-op (meta_size <= obj_size - hdr_size for a healthy object);
-                        # guards against a corrupted meta_size producing an oversize read.
-                        retry_size = min(retry_size, obj_size)
+                    # normally a no-op; guards against a corrupted meta_size producing an oversize read.
+                    retry_size = min(retry_size, obj_size)
                     obj = self.store.load(key, offset=obj_offset, size=retry_size)
                 meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:

@@ -77,19 +77,15 @@ def pdchunk(chunk):
 
 
 def test_basic_operations(repo_fixtures, request):
-    chunks = ChunkIndex()
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
-            pack_results = repository.put(H(x), fchunk(b"SOMEDATA"))
-            if pack_results:
-                for chunk_id, *_ in pack_results:
-                    chunks.add(chunk_id, 0)
-                chunks.update_pack_info(pack_results)
+            repository.put(H(x), fchunk(b"SOMEDATA"))  # put() updates _chunks via PackWriter
         key50 = H(50)
         assert pdchunk(repository.get(key50)) == b"SOMEDATA"
         repository.delete(key50)
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
+        chunks = repository._chunks  # capture index before close
     with reopen(repository) as repository:
         repository.set_chunk_index(chunks)
         with pytest.raises(Repository.ObjectNotFound):

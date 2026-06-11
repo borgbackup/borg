@@ -103,8 +103,10 @@ class PackWriter:
     """Buffers chunks into a pack file and writes to the store when full.
 
     Collects (chunk_id, cdata) pairs in a list and flushes once max_count is
-    reached.  On flush it returns the location info for every chunk so the
-    caller can update the ChunkIndex with real values.
+    reached.  If a ChunkIndex is provided via the chunks parameter, PackWriter
+    maintains it directly: each add() marks the chunk as pending
+    (pack_id=UNKNOWN_BYTES32) with the correct offset and size; flush() then
+    updates all pending entries with the real pack_id once the pack is on disk.
 
     At max_count=1 (N=1 phase) each put() maps exactly one chunk to one pack,
     so pack_id == chunk_id and the naming scheme is unchanged from before.
@@ -112,14 +114,21 @@ class PackWriter:
     this class's interface.
     """
 
-    def __init__(self, store, *, max_count=1):
+    def __init__(self, store, *, max_count=1, chunks=None):
         self.store = store
         self.max_count = max_count
+        self.chunks = chunks  # ChunkIndex reference; may be None (e.g. in unit tests)
         self._pieces = []  # list of (chunk_id, cdata)
+        self._current_offset = 0  # byte offset of the next chunk within the current pack
 
     def add(self, chunk_id, cdata):
         """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
+        if self.chunks is not None:
+            # Mark chunk as pending: real offset/size are known now; pack_id not yet.
+            self.chunks.add(chunk_id, 0)  # size filled in by cache layer
+            self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, self._current_offset, len(cdata))])
         self._pieces.append((chunk_id, cdata))
+        self._current_offset += len(cdata)
         if len(self._pieces) >= self.max_count:
             return self.flush()
         return None
@@ -127,9 +136,9 @@ class PackWriter:
     def flush(self):
         """Write the current pack to the store.
 
-        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples —
+        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples --
         one entry per chunk that was written.  Returns None if there was nothing
-        to flush.
+        to flush.  Also updates the ChunkIndex (if set) with the real pack_id.
         """
         if not self._pieces:
             return None
@@ -161,6 +170,9 @@ class PackWriter:
             self.store.store(key, pack_data)
         finally:
             self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
+            self._current_offset = 0
+        if self.chunks is not None:
+            self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
         return results
 
 
@@ -407,8 +419,8 @@ class Repository:
         # important: lock *after* making sure that there actually is an existing, supported repository.
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
-        self._pack_writer = PackWriter(self.store, max_count=1)
         self._chunks = ChunkIndex()
+        self._pack_writer = PackWriter(self.store, max_count=1, chunks=self._chunks)
         self.opened = True
 
     def set_chunk_index(self, chunks):
@@ -417,13 +429,12 @@ class Repository:
         The caller retains ownership; Repository holds a borrowed reference.
         """
         self._chunks = chunks
+        self._pack_writer.chunks = chunks  # keep PackWriter in sync
 
     def flush(self):
         """Flush any buffered pack writer chunks."""
         if self._pack_writer is not None:
-            pack_results = self._pack_writer.flush()
-            if pack_results:
-                self._chunks.update_pack_info(pack_results)
+            self._pack_writer.flush()  # PackWriter updates _chunks internally
 
     def close(self):
         if self._pack_writer is not None:
@@ -611,11 +622,21 @@ class Repository:
     def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
         entry = self._chunks.get(id)
-        if entry is None or entry.pack_id == UNKNOWN_BYTES32:
+        if entry is not None and entry.pack_id == UNKNOWN_BYTES32:
+            # chunk is buffered in PackWriter, not yet written to a pack file
             if raise_missing:
                 raise self.ObjectNotFound(id, str(self._location))
             return None
-        pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
+        if entry is not None:
+            pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
+        else:
+            # N=1 fallback for cross-session reads without a populated index.
+            # obj_size=None tells store.load() to fetch the full file; safe for N=1
+            # because each pack holds exactly one chunk.  Once a Repository.chunks
+            # lazy-build property lands, this branch will be unreachable.
+            pack_id = id  # N=1: pack_id == chunk_id
+            obj_offset = 0
+            obj_size = None
         id_hex = bin_to_hex(id)
         key = "packs/" + bin_to_hex(pack_id)
         try:
@@ -627,6 +648,8 @@ class Repository:
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
                 load_size = hdr_size + extra_size
+                # obj_size is None only via the N=1 fallback above; clamp when available
+                # so a corrupted or malicious obj_size cannot cause an oversized read.
                 if obj_size is not None:
                     load_size = min(load_size, obj_size)
                 obj = self.store.load(key, offset=obj_offset, size=load_size)
@@ -671,11 +694,7 @@ class Repository:
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
-        pack_results = self._pack_writer.add(id, data)
-        self._chunks.add(id, 0)  # mark seen; uncompressed size filled in by cache layer
-        if pack_results:
-            self._chunks.update_pack_info(pack_results)
-        return pack_results
+        return self._pack_writer.add(id, data)  # PackWriter updates _chunks internally
 
     def delete(self, id, wait=True):
         """delete a repo object

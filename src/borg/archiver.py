@@ -1766,11 +1766,11 @@ class Archiver:
                 raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
-            if args.stats:
+            if args.stats or args.quick_stats:
                 log_multi(DASHES,
                           STATS_HEADER,
                           stats.summary.format(label='Deleted data:', stats=stats),
-                          str(cache),
+                          *([] if args.quick_stats else [str(cache)]),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
 
     @with_repository(fake=('tam', 'check_tam', 'disable_tam', 'archives_tam', 'check_archives_tam'), invert_fake=True, manifest=False, exclusive=True)
@@ -5169,6 +5169,9 @@ class Archiver:
         deleted - the "Deleted data" deduplicated size there is most interesting as
         that is how much your repository will shrink.
         Please note that the "All archives" stats refer to the state after pruning.
+        ``--stats`` can be slow - if you want something faster, use ``--quick-stats``
+        (this skips the repository-wide "All archives" statistics).
+        The ``--stats`` / ``--quick-stats`` and ``--dry-run`` options are mutually exclusive.
         """)
         subparser = subparsers.add_parser('prune', parents=[common_parser], add_help=False,
                                           description=self.do_prune.__doc__,
@@ -5183,6 +5186,8 @@ class Archiver:
                                     'use ``--force --force`` in case ``--force`` does not work.')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
+        subparser.add_argument('--quick-stats', dest='quick_stats', action='store_true',
+                               help='print only deletion statistics, skipping repository-wide statistics')
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of archives it keeps/prunes')
         subparser.add_argument('--keep-within', metavar='INTERVAL', dest='within', type=interval,

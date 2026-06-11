@@ -2561,6 +2561,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test1', output)
         self.assert_in('test2', output)
 
+    def test_prune_quick_stats(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd('create', self.repository_location + '::test2', src_dir)
+        output = self.cmd('prune', '--quick-stats', '--keep-daily=1', self.repository_location)
+        self.assert_in('Deleted data:', output)
+        assert 'All archives:' not in output
+        assert 'Chunk index:' not in output
+
+    def test_prune_stats_and_quick_stats_are_mutually_exclusive(self):
+        output = self.cmd('prune', '--stats', '--quick-stats', '--keep-daily=1',
+                          self.repository_location, exit_code=2)
+        self.assert_in('--stats and --quick-stats are mutually exclusive', output)
+
+    def test_prune_dry_run_ignores_quick_stats(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd('create', self.repository_location + '::test2', src_dir)
+        output = self.cmd('prune', '--dry-run', '--quick-stats', '--keep-daily=1', self.repository_location)
+        self.assert_in('Ignoring --quick-stats', output)
+        assert 'Deleted data:' not in output
+
     def test_prune_repository_prefix(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', src_dir)

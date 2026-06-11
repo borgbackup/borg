@@ -1791,6 +1791,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_path) as repository:
             self.assert_equal(len(repository), 1)
 
+    def test_delete_quick_stats(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd('create', self.repository_location + '::test2', src_dir)
+        output = self.cmd('delete', '--quick-stats', self.repository_location + '::test1')
+        self.assert_in('Deleted data:', output)
+        assert 'All archives:' not in output
+        assert 'Chunk index:' not in output
+
+    def test_delete_stats_and_quick_stats_are_mutually_exclusive(self):
+        output = self.cmd('delete', '--stats', '--quick-stats',
+                          self.repository_location + '::test', exit_code=2)
+        self.assert_in('--stats and --quick-stats are mutually exclusive', output)
+
+    def test_delete_dry_run_ignores_quick_stats(self):
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test1', src_dir)
+        self.cmd('create', self.repository_location + '::test2', src_dir)
+        output = self.cmd('delete', '--dry-run', '--quick-stats', self.repository_location + '::test1')
+        self.assert_in('Ignoring --quick-stats', output)
+        assert 'Deleted data:' not in output
+
     def test_delete_multiple(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)

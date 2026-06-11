@@ -1421,11 +1421,11 @@ class Archiver:
                 raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
-            if args.stats:
+            if args.stats or args.quick_stats:
                 log_multi(DASHES,
                           STATS_HEADER,
                           stats.summary.format(label='Deleted data:', stats=stats),
-                          str(cache),
+                          *([] if args.quick_stats else [str(cache)]),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
 
     def _delete_repository(self, args, repository):
@@ -4238,6 +4238,9 @@ class Archiver:
         deleted - the "Deleted data" deduplicated size there is most interesting as
         that is how much your repository will shrink.
         Please note that the "All archives" stats refer to the state after deletion.
+        ``--stats`` can be slow - if you want something faster, use ``--quick-stats``
+        (this skips the repository-wide "All archives" statistics).
+        The ``--stats`` / ``--quick-stats`` and ``--dry-run`` options are mutually exclusive.
 
         You can delete multiple archives by specifying a shell pattern to match
         multiple archives using the ``--glob-archives GLOB`` option (for more info on
@@ -4259,6 +4262,8 @@ class Archiver:
                                help='output verbose list of archives')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the deleted archive')
+        subparser.add_argument('--quick-stats', dest='quick_stats', action='store_true',
+                               help='print only deletion statistics, skipping repository-wide statistics')
         subparser.add_argument('--cache-only', dest='cache_only', action='store_true',
                                help='delete only the local cache for the given repository')
         subparser.add_argument('--force', dest='forced', action='count', default=0,

@@ -424,7 +424,7 @@ New features:
 
 - create/import-tar --quick-stats: faster than --stats by omitting "All archives"
   and repository chunk statistics, #9579
-- prune --quick-stats: faster than --stats by omitting "All archives" statistics, #9757
+- delete/prune --quick-stats: faster than --stats by omitting "All archives" statistics, #9757
 - prune: show total vs matching archives in output, #9262
 - Minimal implementation of "related repositories", #9645
 

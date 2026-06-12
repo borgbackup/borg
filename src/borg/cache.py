@@ -690,9 +690,24 @@ class ChunksMixin:
     @property
     def chunks(self):
         if self._chunks is None:
-            self._chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
-            self.repository.set_chunk_index(self._chunks)
+            # the repository owns the one and only chunk index; use it rather than
+            # building a second one and pushing it back into the repository.
+            self._chunks = self.repository.chunks
+            # repository.chunks must stay safe for read-only repositories (get() builds it too),
+            # so it never writes. consolidating the cached chunk index is a write-context job and
+            # belongs here in the cache: without it, each backup's incremental save would leave
+            # another cache/chunks.* fragment for the next run to merge, growing without bound.
+            self._consolidate_chunkindex_cache()
         return self._chunks
+
+    def _consolidate_chunkindex_cache(self):
+        # if the repo holds more than one cached chunk index fragment, replace them with a single
+        # consolidated one (the in-memory index already merged them all). incremental=False writes
+        # every entry regardless of its F_NEW flag, which the repository may have already cleared.
+        if len(list_chunkindex_hashes(self.repository)) > 1:
+            write_chunkindex_to_repo_cache(
+                self.repository, self._chunks, incremental=False, clear=False, force_write=True, delete_other=True
+            )
 
     def seen_chunk(self, id, size=None):
         entry = self.chunks.get(id)
@@ -879,7 +894,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def wipe_cache(self):
         logger.warning("Discarding incompatible cache and forcing a cache rebuild")
         self._chunks = ChunkIndex()
-        self.repository.set_chunk_index(self._chunks)
+        self.repository.chunks = self._chunks
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
 

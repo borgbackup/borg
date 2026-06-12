@@ -110,3 +110,29 @@ def test_read_chunkindex_from_repo_cache_missing(tmp_path):
         # Try to load a non-existent cache entry — should return None, not raise.
         result = read_chunkindex_from_repo_cache(repository, "f" * 64)
         assert result is None
+
+
+def test_chunkindex_cache_consolidated_on_access(tmp_path):
+    """ChunksMixin.chunks collapses multiple cached chunk-index fragments into a single one.
+
+    Without consolidation every backup's incremental save would leave another cache/chunks.*
+    behind for the next run to merge, so the fragments would grow without bound.
+    """
+    from ..cache import ChunksMixin, write_chunkindex_to_repo_cache, list_chunkindex_hashes
+    from ..hashindex import ChunkIndex, ChunkIndexEntry
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        # seed extra fragments on top of the empty one written at repo creation
+        for h in (H(1), H(2)):
+            ci = ChunkIndex()
+            ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
+            write_chunkindex_to_repo_cache(repository, ci, incremental=False, force_write=True)
+        assert len(list_chunkindex_hashes(repository)) > 1
+
+        cache = ChunksMixin()
+        cache.repository = repository
+        index = cache.chunks  # binds the repository index and consolidates the fragments
+
+        assert len(list_chunkindex_hashes(repository)) == 1
+        assert H(1) in index and H(2) in index

@@ -87,7 +87,7 @@ def test_basic_operations(repo_fixtures, request):
             repository.get(key50)
         chunks = repository._chunks  # capture index before close
     with reopen(repository) as repository:
-        repository.set_chunk_index(chunks)
+        repository.chunks = chunks
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
         for x in range(100):
@@ -216,7 +216,7 @@ def test_get_read_data_false_with_range(tmp_path):
         chunks.update_pack_info([(id1, pack_id, 0, len(chunk1))])
         chunks.add(id2, len(chunk2))
         chunks.update_pack_info([(id2, pack_id, len(chunk1), len(chunk2))])
-        repository.set_chunk_index(chunks)
+        repository.chunks = chunks
         assert repository.get(id1, read_data=False) == chunk1[:hdr_size]
         assert repository.get(id2, read_data=False) == chunk2[:hdr_size]
 
@@ -233,13 +233,13 @@ def test_get_read_data_false_large_meta(tmp_path):
         chunks = ChunkIndex()
         chunks.add(chunk_id, len(chunk))
         chunks.update_pack_info([(chunk_id, pack_id, 0, len(chunk))])
-        repository.set_chunk_index(chunks)
+        repository.chunks = chunks
         result = repository.get(chunk_id, read_data=False)
         assert result == chunk[: hdr_size + len(big_meta)]
 
 
 def test_get_uses_chunk_index_location(tmp_path):
-    # get() routes to the correct pack and offset when a ChunkIndex is set via set_chunk_index().
+    # get() routes to the correct pack and offset when a ChunkIndex is assigned via the chunks property.
     chunk1 = fchunk(b"FIRST")
     chunk2 = fchunk(b"SECOND")
     pack = chunk1 + chunk2
@@ -253,7 +253,7 @@ def test_get_uses_chunk_index_location(tmp_path):
         chunks.update_pack_info([(id1, pack_id, 0, len(chunk1))])
         chunks.add(id2, len(chunk2))
         chunks.update_pack_info([(id2, pack_id, len(chunk1), len(chunk2))])
-        repository.set_chunk_index(chunks)
+        repository.chunks = chunks
         assert repository.get(id1) == chunk1
         assert repository.get(id2) == chunk2
 

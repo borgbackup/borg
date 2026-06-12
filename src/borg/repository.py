@@ -103,10 +103,15 @@ class PackWriter:
     """Buffers chunks into a pack file and writes to the store when full.
 
     Collects (chunk_id, cdata) pairs in a list and flushes once max_count is
-    reached.  If a ChunkIndex is provided via the chunks parameter, PackWriter
-    maintains it directly: each add() marks the chunk as pending
-    (pack_id=UNKNOWN_BYTES32) with the correct offset and size; flush() then
-    updates all pending entries with the real pack_id once the pack is on disk.
+    reached.  PackWriter maintains the ChunkIndex directly: each add() marks the
+    chunk as pending (pack_id=UNKNOWN_BYTES32) with the correct offset and size;
+    flush() then updates all pending entries with the real pack_id once the pack
+    is on disk.
+
+    The index is not owned here.  When constructed with a repository, the writer
+    uses that repository's single, authoritative index (see the chunks property),
+    so there is never a second copy to keep in sync.  Constructing without a
+    repository (e.g. unit tests) gives the writer a private index.
 
     At max_count=1 (N=1 phase) each put() maps exactly one chunk to one pack,
     so pack_id == chunk_id and the naming scheme is unchanged from before.
@@ -114,12 +119,26 @@ class PackWriter:
     this class's interface.
     """
 
-    def __init__(self, store, *, max_count=1, chunks=None):
+    def __init__(self, store, *, max_count=1, chunks=None, repository=None):
         self.store = store
         self.max_count = max_count
-        self.chunks = chunks if chunks is not None else ChunkIndex()
+        self.repository = repository  # when set, the one and only index lives there
+        self._chunks = chunks  # private index for repository-less use (tests); built lazily
         self._pieces = []  # list of (chunk_id, cdata)
         self._current_offset = 0  # byte offset of the next chunk within the current pack
+
+    @property
+    def chunks(self):
+        """The ChunkIndex this writer updates.
+
+        With a repository, this is the repository's single index (shared, not copied).
+        Without one, the writer owns a private ChunkIndex built on first use.
+        """
+        if self.repository is not None:
+            return self.repository.chunks
+        if self._chunks is None:
+            self._chunks = ChunkIndex()
+        return self._chunks
 
     def add(self, chunk_id, cdata):
         """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
@@ -426,40 +445,40 @@ class Repository:
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._chunks = None
-        self._pack_writer = PackWriter(self.store, max_count=1)
+        self._pack_writer = PackWriter(self.store, max_count=1, repository=self)
         self.opened = True
-
-    def set_chunk_index(self, chunks):
-        """Set the ChunkIndex get() uses to resolve pack locations.
-
-        The caller retains ownership; Repository holds a borrowed reference.
-        To drop a stale index, use invalidate_chunk_index() instead.
-        """
-        self._chunks = chunks
-        self._pack_writer.chunks = chunks
-
-    def invalidate_chunk_index(self):
-        """Drop the in-memory chunk index so close() will not persist a stale copy.
-
-        Called when the on-disk chunk index cache is deleted; the next access to
-        .chunks rebuilds the index from actual repository contents.
-        """
-        self._chunks = None
-        if self._pack_writer is not None:
-            self._pack_writer.chunks = None
 
     @property
     def chunks(self):
         """ChunkIndex mapping every known chunk id to its pack location.
 
-        Built lazily on first access; persisted back to the repo cache at close().
+        This property is the single owner of the in-memory index: get() resolves
+        pack locations through it, PackWriter updates it, and the Cache reads it
+        from here rather than building its own.  Built lazily on first access and
+        persisted back to the repo cache at close().
         """
         if self._chunks is None:
             from .cache import build_chunkindex_from_repo
 
             self._chunks = build_chunkindex_from_repo(self)
-            self._pack_writer.chunks = self._chunks
         return self._chunks
+
+    @chunks.setter
+    def chunks(self, value):
+        # The index is normally built lazily; this setter exists for the few callers
+        # that must install a specific index (e.g. wiping the cache, or restoring an
+        # index captured before close()).  To drop a stale index so it rebuilds, do not
+        # assign None here -- call invalidate_chunk_index() instead.
+        self._chunks = value
+
+    def invalidate_chunk_index(self):
+        """Drop the in-memory chunk index so close() will not persist a stale copy.
+
+        Called when the on-disk chunk index cache is deleted; the next access to
+        .chunks rebuilds the index from actual repository contents.  PackWriter
+        reads the index through this Repository, so it follows automatically.
+        """
+        self._chunks = None
 
     def flush(self):
         """Flush any buffered pack writer chunks."""
@@ -469,9 +488,10 @@ class Repository:
     def close(self):
         if self._pack_writer is not None:
             assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
-        if self._chunks is not None and self.store_opened:
-            # incremental write: a no-op unless chunks were added this session (only F_NEW
-            # entries are serialized, and an empty incremental write is skipped downstream).
+        # close() may run again after the store was already closed (idempotent close), so we can
+        # only persist while the store is open. Persisting is also a no-op unless chunks were added
+        # this session (only F_NEW entries are serialized, and an empty incremental write is skipped).
+        if self.store_opened and self._chunks is not None:
             from .cache import write_chunkindex_to_repo_cache
 
             write_chunkindex_to_repo_cache(self, self._chunks, incremental=True)
@@ -724,7 +744,7 @@ class Repository:
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
-        _ = self.chunks  # ensure lazy build ran and PackWriter.chunks is current
+        # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
     def delete(self, id, wait=True):

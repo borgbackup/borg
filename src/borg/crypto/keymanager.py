@@ -4,7 +4,7 @@ import pkgutil
 import textwrap
 from hashlib import sha256
 
-from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open, get_keys_dir
+from ..helpers import Error, CommandError, yes, bin_to_hex, hex_to_bin, dash_open, get_keys_dir
 from ..repoobj import RepoObj
 
 
@@ -47,34 +47,60 @@ class KeyManager:
         self.repository = repository
         self.keyblob = None
         self.keyblob_storage = None
+        # id / label of the borg key that load_keyblob() selected (for logging by the caller):
+        self.loaded_key_id = None
+        self.loaded_label = None
 
         manifest_chunk = repository.get_manifest()
         manifest_data = RepoObj.extract_crypted_data(manifest_chunk)
-        key = identify_key(manifest_data)
-        self.keyblob_storage = key.STORAGE
+        self.key_cls = identify_key(manifest_data)
+        self.keyblob_storage = self.key_cls.STORAGE
         if self.keyblob_storage == KeyBlobStorage.NO_STORAGE:
             raise UnencryptedRepo()
 
-    def load_keyblob(self):
-        if self.keyblob_storage == KeyBlobStorage.KEYFILE:
-            from .key import CHPOKeyfileKey
+    def _list_borg_keys(self):
+        # enumerate all borg keys of this repository together with their plaintext labels,
+        # without unlocking them, reusing the same machinery as "borg key list".
+        flexikey = self.key_cls(self.repository)
+        result = []
+        for key_id, blob_text, _keyfile_path in flexikey._iter_keys():
+            if is_keyfile(blob_text):
+                try:
+                    _, b64 = keyfile_parse(blob_text, bin_to_hex(self.repository.id))
+                except ValueError:
+                    continue
+            else:
+                b64 = blob_text  # borg 1.x repokey: raw base64, no BORG_KEY header
+            try:
+                label = flexikey._key_envelope(blob_text).get("label")
+            except Exception:  # noqa: BLE001 - best-effort: a borg key without a parseable envelope has no label
+                label = None
+            result.append({"id": key_id, "label": label, "b64": b64})
+        return result
 
-            k = CHPOKeyfileKey(self.repository)
-            target = k.find_key()
-            with open(target) as fd:
-                key_data = fd.read()
-            _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
-            self.keyblob = key_data
-
-        elif self.keyblob_storage == KeyBlobStorage.REPO:
-            key_data = self.repository.load_key().decode()
-            if not key_data:
-                # if we got an empty key, it means there is no key.
-                loc = self.repository._location.canonical_path()
-                raise RepoKeyNotFoundError(loc) from None
-            if is_keyfile(key_data):
-                _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
-            self.keyblob = key_data
+    def load_keyblob(self, *, label=None, key_id=None):
+        candidates = self._list_borg_keys()
+        if not candidates:
+            loc = self.repository._location.canonical_path()
+            raise RepoKeyNotFoundError(loc) from None
+        if label is not None:
+            matches = [c for c in candidates if c["label"] == label]
+        elif key_id is not None:
+            matches = [c for c in candidates if c["id"].startswith(key_id)]
+        elif len(candidates) == 1:
+            matches = candidates  # no selector needed when there is only one borg key
+        else:
+            labels = ", ".join(repr(c["label"]) for c in candidates)
+            raise CommandError(
+                "This repository has multiple borg keys (%s); "
+                "select which one to export with --label or --key (see 'borg key list')." % labels
+            )
+        if len(matches) != 1:
+            raise CommandError("The selector needs to match precisely 1 key, but it matched %d keys." % len(matches))
+        selected = matches[0]
+        self.keyblob = selected["b64"]
+        self.loaded_key_id = selected["id"]
+        self.loaded_label = selected["label"]
 
     def store_keyblob(self, args):
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:

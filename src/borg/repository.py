@@ -342,40 +342,48 @@ class Repository:
         if self.lock is not None:
             self.lock.refresh()
 
+    def store_key(self, keydata):
+        # store a single repokey borg key (content-addressed). does NOT delete other borg keys,
+        # so a repository can have multiple borg keys (one per passphrase). returns the
+        # store object name (= borg key id) under which the borg key was stored.
+        digest = sha256(keydata).hexdigest()
+        self.store.store(f"keys/{digest}", keydata)
+        return digest
+
     def save_key(self, keydata):
-        # currently, there is only one repokey,
-        # thus we delete all old/outdated keys stored in this repository.
+        # additive: store this borg key, keeping any other borg keys of this repository.
+        # note: saving an empty key is a no-op here; use delete_key() to remove a borg key.
+        if keydata:
+            self.store_key(keydata)
+
+    def load_keys(self):
+        # return a list of (name, keydata) for all borg keys matching this repository's ID.
+        repo_id_hex = bin_to_hex(self.id)
+        result = []
         try:
             infos = list(self.store.list("keys"))
         except StoreObjectNotFound:
-            pass
-        else:
-            for info in infos:
-                try:
-                    self.store.delete(f"keys/{info.name}")
-                except StoreObjectNotFound:
-                    pass
-        # note: saving an empty key means that there is no repokey for this repo anymore.
-        if keydata:
-            digest = sha256(keydata).hexdigest()
-            self.store.store(f"keys/{digest}", keydata)
+            return result
+        for info in infos:
+            try:
+                keydata = self.store.load(f"keys/{info.name}")
+            except StoreObjectNotFound:
+                continue
+            if is_keyfile(keydata, repo_id_hex):
+                result.append((info.name, keydata))
+        return result
 
     def load_key(self):
-        repo_id_hex = bin_to_hex(self.id)
-        # search for a key matching this repository's ID in the keys/ namespace
+        # convenience: return the first borg key matching this repository's ID, or b"" if none.
+        keys = self.load_keys()
+        return keys[0][1] if keys else b""
+
+    def delete_key(self, name):
+        # delete a single borg key by its store object name (borg key id).
         try:
-            infos = list(self.store.list("keys"))
+            self.store.delete(f"keys/{name}")
         except StoreObjectNotFound:
             pass
-        else:
-            for info in infos:
-                try:
-                    keydata = self.store.load(f"keys/{info.name}")
-                    if is_keyfile(keydata, repo_id_hex):
-                        return keydata
-                except StoreObjectNotFound:
-                    pass
-        return b""
 
     def destroy(self):
         """Destroy the repository"""

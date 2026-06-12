@@ -31,10 +31,10 @@ class Pbkdf2FileMixin:
             return self.decrypt_key_file_pbkdf2(encrypted_key, passphrase)
         return super().decrypt_key_file(data, passphrase)
 
-    def encrypt_key_file(self, data, passphrase, algorithm):
+    def encrypt_key_file(self, data, passphrase, algorithm, label=None):
         if algorithm == "sha256":
             return self.encrypt_key_file_pbkdf2(data, passphrase)
-        return super().encrypt_key_file(data, passphrase, algorithm)
+        return super().encrypt_key_file(data, passphrase, algorithm, label=label)
 
     def decrypt_key_file_pbkdf2(self, encrypted_key, passphrase):
         key = self.pbkdf2(passphrase, encrypted_key.salt, encrypted_key.iterations, 32)

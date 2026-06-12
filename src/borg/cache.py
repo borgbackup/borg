@@ -553,15 +553,22 @@ def write_chunkindex_to_repo_cache(
     # but for simplicity, we do it anyway.
     for key, existing in chunks.iteritems(only_new=incremental):
         chunks_to_write[key] = existing._replace(flags=ChunkIndex.F_NONE, size=0)
+    num_to_write = len(chunks_to_write)
     with io.BytesIO() as f:
         chunks_to_write.write(f)
         data = f.getvalue()
-    logger.debug(f"caching {len(chunks_to_write)} chunks (incremental={incremental}).")
+    logger.debug(f"caching {num_to_write} chunks (incremental={incremental}).")
     chunks_to_write.clear()  # free memory of the temporary table
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately
     new_hash = hashlib.sha256(data + CHUNKINDEX_HASH_SEED).hexdigest()
+    if num_to_write == 0 and not force_write:
+        # don't persist an empty incremental index: if it became the only cache/chunks.* (e.g. right
+        # after delete_chunkindex_cache()), build_chunkindex_from_repo() would return it as-is instead
+        # of rebuilding from the repo. with nothing new, the existing cache is already up to date.
+        logger.debug("no new chunks to cache; not writing an empty incremental chunk index.")
+        return new_hash
     cached_hashes = list_chunkindex_hashes(repository)
     if force_write or new_hash not in cached_hashes:
         # when an updated chunks index is stored into the cache, we also store its hash as part of the name.

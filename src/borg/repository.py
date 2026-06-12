@@ -297,8 +297,7 @@ class Repository:
         self.lock_wait = lock_wait
         self.exclusive = exclusive
         self._pack_writer = None
-        self._chunks = None  # ChunkIndex; set by open(), replaced by set_chunk_index()
-        self._chunks_initialized = False
+        self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self._location}>"
@@ -420,32 +419,31 @@ class Repository:
         # important: lock *after* making sure that there actually is an existing, supported repository.
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
-        self._chunks = ChunkIndex()
-        self._chunks_initialized = False
-        self._pack_writer = PackWriter(self.store, max_count=1, chunks=self._chunks)
+        self._chunks = None
+        self._pack_writer = PackWriter(self.store, max_count=1)
         self.opened = True
 
     def set_chunk_index(self, chunks):
         """Set the ChunkIndex get() uses to resolve pack locations.
 
         The caller retains ownership; Repository holds a borrowed reference.
+        Pass None to drop the current index: the next access to .chunks then
+        rebuilds it lazily, and close() will not persist a stale index.
         """
         self._chunks = chunks
-        self._pack_writer.chunks = chunks  # keep PackWriter in sync
-        self._chunks_initialized = True
+        self._pack_writer.chunks = chunks
 
     @property
     def chunks(self):
         """ChunkIndex mapping every known chunk id to its pack location.
 
-        Built lazily on first access if set_chunk_index() has not been called.
+        Built lazily on first access; persisted back to the repo cache at close().
         """
-        if not self._chunks_initialized:
+        if self._chunks is None:
             from .cache import build_chunkindex_from_repo
 
             self._chunks = build_chunkindex_from_repo(self)
             self._pack_writer.chunks = self._chunks
-            self._chunks_initialized = True
         return self._chunks
 
     def flush(self):
@@ -456,6 +454,10 @@ class Repository:
     def close(self):
         if self._pack_writer is not None:
             assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
+        if self._chunks is not None and self.store_opened:
+            from .cache import write_chunkindex_to_repo_cache
+
+            write_chunkindex_to_repo_cache(self, self._chunks, incremental=True)
         if self.lock:
             self.lock.release()
             self.lock = None

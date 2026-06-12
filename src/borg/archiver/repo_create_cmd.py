@@ -77,7 +77,7 @@ class RepoCreateMixIn:
 
         ::
 
-            borg repo-create --encryption repokey-aes-ocb
+            borg repo-create --encryption aes-ocb --key-location repokey
 
         Borg will:
 
@@ -125,11 +125,17 @@ class RepoCreateMixIn:
         Depending on your hardware, hashing and crypto performance may vary widely.
         The easiest way to find out what is fastest is to run ``borg benchmark cpu``.
 
-        `repokey` modes: if you want ease-of-use and "passphrase" security is good enough -
-        the key will be stored in the repository (in ``repo_dir/config``).
+        The encryption mode (``--encryption``) only selects the crypto suite (id hash, encryption
+        and authentication). Where the key is stored is chosen separately with ``--key-location``:
 
-        `keyfile` modes: if you want "passphrase and having-the-key" security -
-        the key will be stored in your home directory (in ``~/.config/borg/keys``).
+        - ``repokey`` (default): the key is stored in the repository (under ``keys/``). Pick this
+          if you want ease-of-use and "passphrase" security is good enough.
+        - ``keyfile``: the key is stored in your home directory (in ``~/.config/borg/keys``). Pick
+          this if you want "passphrase and having-the-key" security.
+
+        You can move the key between these locations later with ``borg key change-location``.
+        ``--key-location`` is ignored for ``none`` and ``authenticated*`` modes (those have no
+        separate keyfile/repokey storage).
 
         The following table is roughly sorted in order of preference, the better ones are
         in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
@@ -137,17 +143,17 @@ class RepoCreateMixIn:
         .. nanorst: inline-fill
 
         +-----------------------------------+--------------+----------------+--------------------+
-        | Mode (K = keyfile or repokey)     | ID-Hash      | Encryption     | Authentication     |
+        | Encryption mode                   | ID-Hash      | Encryption     | Authentication     |
         +-----------------------------------+--------------+----------------+--------------------+
-        | K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           |
+        | blake3-chacha20-poly1305          | BLAKE3       | CHACHA20       | POLY1305           |
         +-----------------------------------+--------------+----------------+--------------------+
-        | K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           |
+        | chacha20-poly1305                 | HMAC-SHA-256 | CHACHA20       | POLY1305           |
         +-----------------------------------+--------------+----------------+--------------------+
-        | K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         |
+        | blake3-aes-ocb                    | BLAKE3       | AES256-OCB     | AES256-OCB         |
         +-----------------------------------+--------------+----------------+--------------------+
-        | K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         |
+        | aes-ocb                           | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         |
         +-----------------------------------+--------------+----------------+--------------------+
-        | authenticated-blake2              | BLAKE2b      | none           | BLAKE2b            |
+        | authenticated-blake3              | BLAKE3       | none           | BLAKE3             |
         +-----------------------------------+--------------+----------------+--------------------+
         | authenticated                     | HMAC-SHA-256 | none           | HMAC-SHA256        |
         +-----------------------------------+--------------+----------------+--------------------+
@@ -214,7 +220,17 @@ class RepoCreateMixIn:
             required=True,
             choices=key_argument_names(),
             action=Highlander,
-            help="select encryption key mode **(required)**",
+            help="select encryption crypto suite **(required)**",
+        )
+        subparser.add_argument(
+            "--key-location",
+            metavar="LOCATION",
+            dest="key_location",
+            choices=("repokey", "keyfile"),
+            default="repokey",
+            action=Highlander,
+            help="where to store the key: 'repokey' (in the repository, default) or 'keyfile' "
+            "(in the local keys directory). Ignored for 'none' and 'authenticated*' modes.",
         )
         subparser.add_argument(
             "--copy-crypt-key",

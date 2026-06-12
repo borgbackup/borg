@@ -7,7 +7,7 @@ from .hashindex_test import H
 from .crypto.key_test import TestKey
 from ..archive import Statistics
 from ..cache import AdHocWithFilesCache, FileCacheEntry, delete_chunkindex_cache, read_chunkindex_from_repo_cache
-from ..crypto.key import AESOCBRepoKey
+from ..crypto.key import AESOCBKey
 from ..helpers import safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
@@ -25,7 +25,7 @@ class TestAdHocWithFilesCache:
     @pytest.fixture
     def key(self, repository, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
-        key = AESOCBRepoKey.create(repository, TestKey.MockArgs())
+        key = AESOCBKey.create(repository, TestKey.MockArgs())
         return key
 
     @pytest.fixture

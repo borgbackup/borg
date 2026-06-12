@@ -92,40 +92,30 @@ class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):  # type: ign
     ARG_NAME = "authenticated-blake2"
 
 
-class KeyfileKey(Pbkdf2FileMixin, ID_HMAC_SHA_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
+# borg 1.x AES-CTR keys. keyfile and repokey are no longer separate classes - storage is a per-key
+# property (self.storage), tracked when the key is loaded. These classes are read-only (borg 2 only
+# reads borg 1.x repos, e.g. via borg transfer; it never creates them), so the canonical TYPE byte is
+# never written - only TYPES_ACCEPTABLE matters, and it keeps the historic keyfile/repokey/passphrase bytes.
+
+
+class AESCTRKey(Pbkdf2FileMixin, ID_HMAC_SHA_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
     TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.KEYFILE
-    NAME = "key file"
-    ARG_NAME = "keyfile"
-    STORAGE = KeyBlobStorage.KEYFILE
+    NAME = "AES-CTR HMAC-SHA256"
+    ARG_NAME = None  # not creatable: borg 1.x compatibility (read-only)
+    STORAGE = KeyBlobStorage.REPO  # seed default; actual per-key storage is tracked in self.storage on load
+    LOCATION_CONFIGURABLE = True  # borg 1.x had keyfile and repokey variants
     CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
 
-class RepoKey(Pbkdf2FileMixin, ID_HMAC_SHA_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
-    TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
-    TYPE = KeyType.REPO
-    NAME = "repokey"
-    ARG_NAME = "repokey"
-    STORAGE = KeyBlobStorage.REPO
-    CIPHERSUITE = AES256_CTR_HMAC_SHA256
-
-
-class Blake2KeyfileKey(Pbkdf2FileMixin, ID_BLAKE2b_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
+class Blake2AESCTRKey(Pbkdf2FileMixin, ID_BLAKE2b_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
     TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
     TYPE = KeyType.BLAKE2KEYFILE
-    NAME = "key file BLAKE2b"
-    ARG_NAME = "keyfile-blake2"
-    STORAGE = KeyBlobStorage.KEYFILE
+    NAME = "AES-CTR BLAKE2b"
+    ARG_NAME = None  # not creatable: borg 1.x compatibility (read-only)
+    STORAGE = KeyBlobStorage.REPO  # seed default; actual per-key storage is tracked in self.storage on load
+    LOCATION_CONFIGURABLE = True  # borg 1.x had keyfile and repokey variants
     CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-class Blake2RepoKey(Pbkdf2FileMixin, ID_BLAKE2b_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
-    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
-    TYPE = KeyType.BLAKE2REPO
-    NAME = "repokey BLAKE2b"
-    ARG_NAME = "repokey-blake2"
-    STORAGE = KeyBlobStorage.REPO
-    CIPHERSUITE = AES256_CTR_BLAKE2b
-
-
-LEGACY_KEY_TYPES = (KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey)
+LEGACY_KEY_TYPES = (AESCTRKey, Blake2AESCTRKey, Blake2AuthenticatedKey)

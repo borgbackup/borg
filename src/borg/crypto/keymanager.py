@@ -9,7 +9,7 @@ from ..repoobj import RepoObj
 
 
 from .key import keyfile_format, keyfile_parse, is_keyfile
-from .key import RepoKeyNotFoundError, KeyBlobStorage, identify_key, keyfile_name_for
+from .key import RepoKeyNotFoundError, KeyBlobStorage, KEY_LOCATIONS, identify_key, keyfile_name_for
 
 
 class NotABorgKeyFile(Error):
@@ -103,17 +103,19 @@ class KeyManager:
         self.loaded_label = selected["label"]
 
     def store_keyblob(self, args):
-        if self.keyblob_storage == KeyBlobStorage.KEYFILE:
-            from .key import CHPOKeyfileKey
+        # storage location for the imported key: --key-location wins, else the class default.
+        storage = KEY_LOCATIONS.get(getattr(args, "key_location", None), self.keyblob_storage)
+        if storage == KeyBlobStorage.KEYFILE:
+            from .key import CHPOKey
 
-            k = CHPOKeyfileKey(self.repository)
+            k = CHPOKey(self.repository)
             target = k.get_existing_or_new_target(args)
             keyfile_data = self.get_keyfile_data()
             if not os.environ.get("BORG_KEY_FILE") and os.path.samefile(target, get_keys_dir()):
                 target = os.path.join(target, keyfile_name_for(keyfile_data.encode()))
             with dash_open(target, "w") as fd:
                 fd.write(keyfile_data)
-        elif self.keyblob_storage == KeyBlobStorage.REPO:
+        elif storage == KeyBlobStorage.REPO:
             key_data = keyfile_format(bin_to_hex(self.repository.id), self.keyblob.strip())
             self.repository.save_key(key_data.encode("utf-8"))
 

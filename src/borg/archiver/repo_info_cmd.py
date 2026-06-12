@@ -25,9 +25,13 @@ class RepoInfoMixIn:
             if key.NAME in ("plaintext", "authenticated"):
                 encryption += "No"
             else:
-                encryption += "Yes (%s)" % key.NAME
-            if key.NAME.startswith("key file"):
-                encryption += "\nKey file: %s" % key.find_key()
+                # storage (keyfile/repokey) is a per-key property now; the crypto suite is key.NAME.
+                mode = {KeyBlobStorage.KEYFILE: "keyfile", KeyBlobStorage.REPO: "repokey"}.get(
+                    getattr(key, "storage", None)
+                )
+                encryption += "Yes (%s, %s)" % (mode, key.NAME) if mode else "Yes (%s)" % key.NAME
+                if getattr(key, "storage", None) == KeyBlobStorage.KEYFILE:
+                    encryption += "\nKey file: %s" % key.find_key()
             info["encryption"] = encryption
 
             output = (

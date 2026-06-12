@@ -1,8 +1,7 @@
 import os
 
 from ..constants import *  # NOQA
-from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake3AESOCBRepoKey, Blake3CHPORepoKey
-from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake3AESOCBKeyfileKey, Blake3CHPOKeyfileKey
+from ..crypto.key import KEY_LOCATIONS
 from ..crypto.keymanager import KeyManager
 from ..helpers import PathSpec, CommandError
 from ..helpers.argparsing import ArgumentParser
@@ -62,40 +61,24 @@ class KeysMixIn:
 
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_key_change_location(self, args, repository, manifest, cache):
-        """Changes the repository key location."""
+        """Changes the location of the borg key used to unlock this repository."""
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
             raise CommandError("This repository is not encrypted, cannot change the key location.")
+        if not getattr(key, "LOCATION_CONFIGURABLE", False):
+            raise CommandError("This key's location cannot be changed (it has no keyfile/repokey storage).")
 
-        if args.key_mode == "keyfile":
-            if isinstance(key, AESOCBRepoKey):
-                key_new = AESOCBKeyfileKey(repository)
-            elif isinstance(key, CHPORepoKey):
-                key_new = CHPOKeyfileKey(repository)
-            elif isinstance(key, Blake3AESOCBRepoKey):
-                key_new = Blake3AESOCBKeyfileKey(repository)
-            elif isinstance(key, Blake3CHPORepoKey):
-                key_new = Blake3CHPOKeyfileKey(repository)
-            else:
-                print("Change not needed or not supported.")
-                return
-        if args.key_mode == "repokey":
-            if isinstance(key, AESOCBKeyfileKey):
-                key_new = AESOCBRepoKey(repository)
-            elif isinstance(key, CHPOKeyfileKey):
-                key_new = CHPORepoKey(repository)
-            elif isinstance(key, Blake3AESOCBKeyfileKey):
-                key_new = Blake3AESOCBRepoKey(repository)
-            elif isinstance(key, Blake3CHPOKeyfileKey):
-                key_new = Blake3CHPORepoKey(repository)
-            else:
-                print("Change not needed or not supported.")
-                return
+        new_storage = KEY_LOCATIONS[args.key_mode]
+        if key.storage == new_storage:
+            print(f"The borg key is already stored as {args.key_mode}, nothing to do.")
+            return
 
+        # the crypto class / manifest key-type byte does not change - only the storage location does.
+        # build a same-class key with the same key material and store it at the new location.
+        key_new = type(key)(repository)
         for name in ("repository_id", "crypt_key", "id_key", "chunk_seed", "sessionid", "cipher"):
-            value = getattr(key, name)
-            setattr(key_new, name, value)
-
+            setattr(key_new, name, getattr(key, name))
+        key_new.storage = new_storage
         key_new.target = key_new.get_new_target(args)
         # save with same passphrase, algorithm and label (keep the unlocked borg key's label)
         key_new.save(
@@ -106,18 +89,16 @@ class KeysMixIn:
             label=key._loaded_label,
         )
 
-        # rewrite the manifest with the new key, so that the key-type byte of the manifest changes
+        # the new key (same crypto material, new storage) is the canonical key going forward
         manifest.key = key_new
         manifest.repo_objs.key = key_new
-        manifest.write()
-
         cache.key = key_new
 
-        loc = key_new.find_key() if hasattr(key_new, "find_key") else None
+        loc = key_new.find_key()
         if args.keep:
             logger.info(f"Key copied to {loc}")
         else:
-            key.remove(key.target)  # remove key from current location
+            key.remove(key.target)  # remove the borg key from its previous location only
             logger.info(f"Key moved to {loc}")
 
     @with_repository(lock=False, manifest=False, cache=False)
@@ -255,6 +236,15 @@ class KeysMixIn:
             dest="paper",
             action="store_true",
             help="interactively import from a backup done with ``--paper``",
+        )
+        subparser.add_argument(
+            "--key-location",
+            metavar="LOCATION",
+            dest="key_location",
+            choices=("repokey", "keyfile"),
+            default="repokey",
+            help="where to store the imported key: 'repokey' (in the repository, default) or "
+            "'keyfile' (in the local keys directory)",
         )
 
         change_passphrase_epilog = process_epilog(

@@ -2164,12 +2164,10 @@ class ArchiveChecker:
 
     def finish(self):
         if self.repair:
-            # we may have deleted chunks, remove the chunks index cache!
+            # we may have deleted chunks. delete_chunkindex_cache() removes the on-disk cache and
+            # drops the stale in-memory index, so the next repository access rebuilds it from the repo.
             logger.info("Deleting chunks cache in repository - next repository access will cause a rebuild.")
             delete_chunkindex_cache(self.repository)
-            # the in-memory index is stale too; drop it so close() does not re-cache it into the
-            # cache we just deleted. the next repository access rebuilds it from the repo.
-            self.repository.set_chunk_index(None)
             logger.info("Writing Manifest.")
             self.manifest.write()
 

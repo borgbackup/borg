@@ -535,6 +535,11 @@ def delete_chunkindex_cache(repository):
         except StoreObjectNotFound:
             pass
     logger.debug(f"cached chunk indexes deleted: {hashes}")
+    # the in-memory index is now stale; drop it so close() does not write it back into the
+    # cache we just deleted. the next .chunks access rebuilds it from actual repo contents.
+    invalidate = getattr(repository, "invalidate_chunk_index", None)
+    if invalidate is not None:
+        invalidate()
 
 
 CHUNKINDEX_HASH_SEED = b"0001"  # increment seed to invalidate old chunk indexes

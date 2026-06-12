@@ -219,6 +219,12 @@ class Repository:
                 id = bin_to_hex(id)
             super().__init__(id, repo)
 
+    class PackLocationUnknown(ObjectNotFound):
+        """Object with key {} is indexed but its pack location is unresolved in repository {}."""
+
+        # distinct from a genuine miss: the chunk is in the index but still buffered (not flushed).
+        # subclasses ObjectNotFound so existing "except ObjectNotFound" handlers still catch it.
+
     class ParentPathDoesNotExist(Error):
         """The parent path of the repository directory [{}] does not exist."""
 
@@ -427,11 +433,20 @@ class Repository:
         """Set the ChunkIndex get() uses to resolve pack locations.
 
         The caller retains ownership; Repository holds a borrowed reference.
-        Pass None to drop the current index: the next access to .chunks then
-        rebuilds it lazily, and close() will not persist a stale index.
+        To drop a stale index, use invalidate_chunk_index() instead.
         """
         self._chunks = chunks
         self._pack_writer.chunks = chunks
+
+    def invalidate_chunk_index(self):
+        """Drop the in-memory chunk index so close() will not persist a stale copy.
+
+        Called when the on-disk chunk index cache is deleted; the next access to
+        .chunks rebuilds the index from actual repository contents.
+        """
+        self._chunks = None
+        if self._pack_writer is not None:
+            self._pack_writer.chunks = None
 
     @property
     def chunks(self):
@@ -455,6 +470,8 @@ class Repository:
         if self._pack_writer is not None:
             assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
         if self._chunks is not None and self.store_opened:
+            # incremental write: a no-op unless chunks were added this session (only F_NEW
+            # entries are serialized, and an empty incremental write is skipped downstream).
             from .cache import write_chunkindex_to_repo_cache
 
             write_chunkindex_to_repo_cache(self, self._chunks, incremental=True)
@@ -646,9 +663,12 @@ class Repository:
                 raise self.ObjectNotFound(id, str(self._location))
             return None
         if entry.pack_id == UNKNOWN_BYTES32:
-            # chunk is buffered in PackWriter, not yet flushed to a pack file
+            # chunk is buffered in PackWriter, not yet flushed to a pack. at N=1 put() flushes
+            # immediately, so reaching here points at a flush / index-update ordering bug, not a
+            # genuinely missing object. surface it distinctly instead of a plain ObjectNotFound.
             if raise_missing:
-                raise self.ObjectNotFound(id, str(self._location))
+                logger.error(f"pack location for object {bin_to_hex(id)} is unresolved (chunk not flushed).")
+                raise self.PackLocationUnknown(id, str(self._location))
             return None
         pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)

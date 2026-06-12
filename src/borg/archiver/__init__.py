@@ -318,6 +318,155 @@ class Archiver(
         self.build_parser_version(subparsers, common_parser, mid_common_parser)
         return parser
 
+    @staticmethod
+    def _first_positional_index(args, parser):
+        option_actions = {}
+        for action in parser._actions:
+            for option_string in getattr(action, "option_strings", ()):
+                option_actions[option_string] = action
+
+        i = 0
+        while i < len(args):
+            token = args[i]
+            if token == "--":
+                return i + 1 if i + 1 < len(args) else len(args)
+            if not token.startswith("-") or token == "-":
+                return i
+
+            option_name, has_value, _ = token.partition("=")
+            action = option_actions.get(option_name)
+            if action is None:
+                return None
+            if has_value:
+                i += 1
+                continue
+
+            nargs = getattr(action, "nargs", None)
+            if nargs in (0, "0"):
+                i += 1
+            elif nargs == "?":
+                if i + 1 < len(args) and not args[i + 1].startswith("-"):
+                    i += 2
+                else:
+                    i += 1
+            elif isinstance(nargs, int):
+                i += 1 + nargs
+            else:
+                i += 2
+
+        return len(args)
+
+    @staticmethod
+    def _first_toplevel_command_index(args, parser):
+        index = Archiver._first_positional_index(args, parser)
+        if index is None or index == len(args):
+            return None
+        return index
+
+    def _legacy_command_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "init":
+            return None
+
+        corrected_args = list(args)
+        corrected_args[command_index] = "repo-create"
+        corrected_command = shlex.join([self.prog or "borg", *corrected_args])
+        return "\n".join(
+            [
+                "init is not a borg2 command; use repo-create.",
+                "Corrected command:",
+                corrected_command,
+                "Use `borg help` to see the list of valid commands.",
+            ]
+        )
+
+    def _legacy_option_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "list":
+            return None
+
+        if not any(arg == "--glob-archives" or arg.startswith("--glob-archives=") for arg in args[command_index + 1 :]):
+            return None
+
+        prog = self.prog or "borg"
+        example = shlex.join([prog, "list", "ARCHIVE", "--match-archives", "sh:my*"])
+        return "\n".join(
+            [
+                "--glob-archives is a borg1 option and is not used in borg2.",
+                "Use --match-archives in borg2. It defaults to exact `id:` matching, "
+                "so use `sh:` for borg1-style globbing.",
+                "Example:",
+                example,
+                f"tip: For details of accepted options run: {prog} list --help",
+            ]
+        )
+
+    @staticmethod
+    def _option_value(args, option_strings):
+        for i, arg in enumerate(args):
+            for option_string in option_strings:
+                if arg == option_string:
+                    return args[i + 1] if i + 1 < len(args) else None
+                if arg.startswith(option_string + "="):
+                    return arg.split("=", 1)[1]
+        return None
+
+    def _legacy_repo_archive_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "list":
+            return None
+
+        repo_value = self._option_value(args, ("-r", "--repo"))
+        if not repo_value or "::" not in repo_value:
+            return None
+
+        repo, archive = repo_value.split("::", 1)
+        if not repo or not archive:
+            return None
+
+        prog = self.prog or "borg"
+        corrected = shlex.join([prog, "--repo", repo, "list", f"::{archive}"])
+        export_cmd = f"export BORG_REPO={shlex.quote(repo)}"
+        positional = shlex.join([prog, "list", f"::{archive}"])
+        return "\n".join(
+            [
+                "Borg2 does not accept repo::archive in --repo.",
+                "Use one of these borg2 forms instead:",
+                corrected,
+                export_cmd,
+                positional,
+                f"tip: For details of accepted options run: {prog} list --help",
+            ]
+        )
+
+    def _missing_list_name_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "list":
+            return None
+
+        commands = getattr(parser, "_subcommands_action", None)
+        commands = commands._name_parser_map if commands else {}
+        list_parser = commands.get("list")
+        if list_parser is None:
+            return None
+
+        subcommand_args = args[command_index + 1 :]
+        positional_index = self._first_positional_index(subcommand_args, list_parser)
+        if positional_index is None or positional_index != len(subcommand_args):
+            return None
+
+        prog = self.prog or "borg"
+        repo_value = self._option_value(args, ("-r", "--repo")) or "REPO"
+        repo_list_command = shlex.join([prog, "-r", repo_value, "repo-list"])
+        return "\n".join(
+            [
+                "borg list NAME lists contents of an archive and needs an archive NAME.",
+                "If you meant to list archives in a repository, use repo-list:",
+                repo_list_command,
+                f"tip: For details of accepted options run: {prog} list --help",
+            ]
+        )
+
     def get_args(self, argv, cmd):
         """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
@@ -363,6 +512,19 @@ class Archiver(
         if args:
             args = self.preprocess_args(args)
         parser = self.build_parser()
+        if args:
+            legacy_hint = self._legacy_command_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
+            legacy_hint = self._legacy_option_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
+            legacy_hint = self._legacy_repo_archive_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
+            legacy_hint = self._missing_list_name_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
         args = parser.parse_args(args or ["-h"])
         args = flatten_namespace(args)
 

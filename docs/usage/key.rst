@@ -67,3 +67,9 @@ Examples
     borg key export --qr-html encrypted-key-backup.html
 
 .. include:: key_import.rst.inc
+
+.. include:: key_add.rst.inc
+
+.. include:: key_list.rst.inc
+
+.. include:: key_remove.rst.inc

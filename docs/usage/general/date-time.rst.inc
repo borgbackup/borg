@@ -10,9 +10,15 @@ Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
 
 
-.. rubric:: TIMESPAN
+.. rubric:: TIMESPAN / INTERVAL
 
-Some options accept a TIMESPAN parameter, which can be given as a number of
-years (e.g. ``2y``), months (e.g. ``12m``), weeks (e.g. ``2w``),
-days (e.g. ``7d``), hours (e.g. ``8H``), minutes (e.g. ``30M``),
-or seconds (e.g. ``150S``).
+Some options accept a TIMESPAN or an INTERVAL parameter, which can be given as
+a number of years (e.g. ``2y``), months (e.g. ``12m``), weeks (e.g. ``2w``),
+days (e.g. ``7d``), hours (e.g. ``8H``), minutes (e.g. ``30M``), or seconds
+(e.g. ``150S``).
+
+The ``borg prune`` ``--keep-*`` retention options accept either a plain count
+(e.g. ``--keep-daily 7``, keeping up to 7 daily archives) or a time interval
+(e.g. ``--keep-daily 7d``, keeping one daily archive per day within a 7-day window).
+When using interval-based retention, ``--since`` may be specified to set the
+reference timestamp for the interval (defaults to the current time).

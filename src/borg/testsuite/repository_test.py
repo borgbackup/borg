@@ -85,15 +85,41 @@ def test_basic_operations(repo_fixtures, request):
         repository.delete(key50)
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
-        chunks = repository._chunks  # capture index before close
+    # no manual hand-off of the index across reopen: close() persisted it to the repo cache,
+    # and the freshly opened repo rebuilds .chunks from there (or by listing the repo) on its own.
     with reopen(repository) as repository:
-        repository.chunks = chunks
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
         for x in range(100):
             if x == 50:
                 continue
             assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
+
+
+def test_chunk_index_persisted_on_close(tmp_path):
+    # close() must serialize the live chunk index into the repo cache, so a freshly opened
+    # repo can resolve pack locations without any manual hand-off. This proves the round-trip
+    # by reading the persisted index back directly (not via a repo rescan, which at N=1 would
+    # reconstruct the same entries and so could mask a broken persist step).
+    from ..cache import list_chunkindex_hashes, read_chunkindex_from_repo_cache
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(10):
+            repository.put(H(x), fchunk(b"DATA"))  # N=1: each put() flushes immediately
+    # reopen and read the cached fragments straight from disk
+    with Repository(location, exclusive=True) as repository:
+        persisted = ChunkIndex()
+        for hash in list_chunkindex_hashes(repository):
+            fragment = read_chunkindex_from_repo_cache(repository, hash)
+            if fragment is not None:
+                for k, v in fragment.items():
+                    persisted[k] = v
+        for x in range(10):
+            assert H(x) in persisted  # close() actually wrote this session's chunks
+        # and the reopened repo resolves them end to end
+        for x in range(10):
+            assert pdchunk(repository.get(H(x))) == b"DATA"
 
 
 def test_read_data(repo_fixtures, request):
@@ -162,12 +188,12 @@ class MockStore:
 
 
 def test_pack_writer_returns_none_when_not_full():
-    pw = PackWriter(MockStore(), max_count=2)
+    pw = PackWriter(MockStore(), max_count=2, chunks=ChunkIndex())
     assert pw.add(b"a" * 32, b"data") is None
 
 
 def test_pack_writer_flush_returns_none_when_empty():
-    pw = PackWriter(MockStore(), max_count=1)
+    pw = PackWriter(MockStore(), max_count=1, chunks=ChunkIndex())
     assert pw.flush() is None
 
 
@@ -175,7 +201,7 @@ def test_pack_writer_n1_flush():
     store = MockStore()
     chunk_id = b"c" * 32
     cdata = b"payload"
-    pw = PackWriter(store, max_count=1)
+    pw = PackWriter(store, max_count=1, chunks=ChunkIndex())
     results = pw.add(chunk_id, cdata)
     assert results is not None
     assert len(results) == 1
@@ -190,7 +216,7 @@ def test_pack_writer_n2_flush():
     store = MockStore()
     id1, id2 = b"a" * 32, b"b" * 32
     data1, data2 = b"first", b"second"
-    pw = PackWriter(store, max_count=2)
+    pw = PackWriter(store, max_count=2, chunks=ChunkIndex())
     assert pw.add(id1, data1) is None
     results = pw.add(id2, data2)
     assert results is not None
@@ -276,7 +302,7 @@ def test_pack_writer_final_partial_pack_uses_sha256():
     store = MockStore()
     chunk_id = b"d" * 32
     cdata = b"solo"
-    pw = PackWriter(store, max_count=3)
+    pw = PackWriter(store, max_count=3, chunks=ChunkIndex())
     assert pw.add(chunk_id, cdata) is None
     results = pw.flush()
     assert results is not None

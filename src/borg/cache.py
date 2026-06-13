@@ -537,9 +537,7 @@ def delete_chunkindex_cache(repository):
     logger.debug(f"cached chunk indexes deleted: {hashes}")
     # the in-memory index is now stale; drop it so close() does not write it back into the
     # cache we just deleted. the next .chunks access rebuilds it from actual repo contents.
-    invalidate = getattr(repository, "invalidate_chunk_index", None)
-    if invalidate is not None:
-        invalidate()
+    repository.invalidate_chunk_index()
 
 
 CHUNKINDEX_HASH_SEED = b"0001"  # increment seed to invalidate old chunk indexes
@@ -654,6 +652,13 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
     num_chunks = 0
     # The repo says it has these chunks, so we assume they are referenced/used chunks.
     # We do not know the plaintext size (!= stored_size), thus we set size = 0.
+    #
+    # IMPORTANT (N=1 only): listing yields pack_ids, not per-chunk locations. We can only
+    # reconstruct the index here under the N=1 assumption -- pack_id == chunk_id, one chunk per
+    # pack at offset 0 spanning the whole pack. At N>1 this is wrong: a cold rebuild would have to
+    # open each pack and read its header to recover the per-chunk offsets and sizes. Until that
+    # exists, Repository.get()'s range-load is only correct while a persisted/cached chunk index
+    # is available; a cold rebuild from a bare repo listing silently falls back to N=1 semantics.
     for pack_id, pack_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
         num_chunks += 1
         chunk_id = pack_id  # N=1: chunk_id == pack_id
@@ -693,21 +698,14 @@ class ChunksMixin:
             # the repository owns the one and only chunk index; use it rather than
             # building a second one and pushing it back into the repository.
             self._chunks = self.repository.chunks
-            # repository.chunks must stay safe for read-only repositories (get() builds it too),
-            # so it never writes. consolidating the cached chunk index is a write-context job and
-            # belongs here in the cache: without it, each backup's incremental save would leave
-            # another cache/chunks.* fragment for the next run to merge, growing without bound.
-            self._consolidate_chunkindex_cache()
+            # note: we deliberately do NOT consolidate the cached chunk index fragments here.
+            # each backup writes a small incremental cache/chunks.* fragment (only its new chunks),
+            # which is cheap. collapsing them all into one big fragment on every run would re-upload
+            # the whole index and, with delete_other, invalidate every other client's fragments --
+            # a multi-GB churn per run on a shared repo. fragment count is reclaimed by `borg compact`
+            # (build_chunkindex_from_repo with cache_immediately). a size/threshold-based policy that
+            # bounds the fragment count without re-uploading large fragments can be added later.
         return self._chunks
-
-    def _consolidate_chunkindex_cache(self):
-        # if the repo holds more than one cached chunk index fragment, replace them with a single
-        # consolidated one (the in-memory index already merged them all). incremental=False writes
-        # every entry regardless of its F_NEW flag, which the repository may have already cleared.
-        if len(list_chunkindex_hashes(self.repository)) > 1:
-            write_chunkindex_to_repo_cache(
-                self.repository, self._chunks, incremental=False, clear=False, force_write=True, delete_other=True
-            )
 
     def seen_chunk(self, id, size=None):
         entry = self.chunks.get(id)

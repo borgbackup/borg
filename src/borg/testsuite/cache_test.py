@@ -112,11 +112,12 @@ def test_read_chunkindex_from_repo_cache_missing(tmp_path):
         assert result is None
 
 
-def test_chunkindex_cache_consolidated_on_access(tmp_path):
-    """ChunksMixin.chunks collapses multiple cached chunk-index fragments into a single one.
+def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
+    """ChunksMixin.chunks binds the repository index without collapsing the cached fragments.
 
-    Without consolidation every backup's incremental save would leave another cache/chunks.*
-    behind for the next run to merge, so the fragments would grow without bound.
+    Each backup leaves a small incremental cache/chunks.* fragment; collapsing them all into one
+    on every access would re-upload the whole index and, with delete_other, invalidate every other
+    client's fragments. Fragment count is reclaimed by `borg compact`, not on every read here.
     """
     from ..cache import ChunksMixin, write_chunkindex_to_repo_cache, list_chunkindex_hashes
     from ..hashindex import ChunkIndex, ChunkIndexEntry
@@ -128,11 +129,14 @@ def test_chunkindex_cache_consolidated_on_access(tmp_path):
             ci = ChunkIndex()
             ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
             write_chunkindex_to_repo_cache(repository, ci, incremental=False, force_write=True)
-        assert len(list_chunkindex_hashes(repository)) > 1
+        before = len(list_chunkindex_hashes(repository))
+        assert before > 1
 
         cache = ChunksMixin()
         cache.repository = repository
-        index = cache.chunks  # binds the repository index and consolidates the fragments
+        index = cache.chunks  # binds the repository index; must NOT collapse the fragments
 
-        assert len(list_chunkindex_hashes(repository)) == 1
+        # fragments are left intact (no consolidation side effect) ...
+        assert len(list_chunkindex_hashes(repository)) == before
+        # ... and the in-memory index still resolves every seeded chunk
         assert H(1) in index and H(2) in index

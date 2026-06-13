@@ -168,6 +168,15 @@ above.
 
 New features:
 
+- key: unify keyfile/repokey key classes and locate the key independently of the
+  manifest key-type byte. Borg now tries keyfiles first and repokeys afterwards until
+  a passphrase unlocks a key, so where a key is stored (keyfile vs repokey) is a
+  per-key property rather than a separate key class. The key-type byte still selects
+  the crypto suite (id hash, MAC, cipher). ``borg repo-create --encryption`` now takes
+  only the crypto suite (e.g. ``aes-ocb``, ``chacha20-poly1305``, ``blake3-aes-ocb``);
+  choose the storage location with the new ``--key-location=repokey|keyfile`` option
+  (default: ``repokey``). The old combined modes (``repokey-aes-ocb`` etc.) were
+  removed. ``borg key import`` also gained ``--key-location``. #9743
 - WIP packs project, major repo format changes, you must create new repos! #8572
 - rest:// repository URLs - connect via ssh to remote borgstore REST server,
   talking http via stdio, #9593

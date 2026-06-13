@@ -121,6 +121,11 @@ class UnsupportedKeyFormatError(Error):
     exit_mcode = 49
 
 
+# map the user-facing key location names ("borg repo-create --key-location", "borg key change-location")
+# to the internal KeyBlobStorage values. Note "repokey" != KeyBlobStorage.REPO's string value.
+KEY_LOCATIONS = {"keyfile": KeyBlobStorage.KEYFILE, "repokey": KeyBlobStorage.REPO}
+
+
 def key_creator(repository, args, *, other_key=None):
     for key in AVAILABLE_KEY_TYPES:
         if key.ARG_NAME == args.encryption:
@@ -135,15 +140,14 @@ def key_argument_names():
 
 
 def identify_key(manifest_data):
+    # the key-type byte only identifies the crypto suite (id hash, MAC, cipher), NOT where the key is
+    # stored: keyfile and repokey share one class now and accept both historic type bytes. The legacy
+    # PASSPHRASE byte (0x01) is part of AESCTRKey.TYPES_ACCEPTABLE. All TYPES_ACCEPTABLE sets are disjoint.
     key_type = manifest_data[0]
-    if key_type == KeyType.PASSPHRASE:  # legacy, see comment in KeyType class.
-        return RepoKey
-
     for key in LEGACY_KEY_TYPES + AVAILABLE_KEY_TYPES:
-        if key.TYPE == key_type:
+        if key_type in key.TYPES_ACCEPTABLE:
             return key
-    else:
-        raise UnsupportedPayloadError(key_type)
+    raise UnsupportedPayloadError(key_type)
 
 
 def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
@@ -164,16 +168,10 @@ def uses_same_id_hash(other_key, key):
     # avoid breaking the deduplication by changing the id hash
     old_sha256_ids = (PlaintextKey,)
     new_sha256_ids = (PlaintextKey,)
-    old_hmac_sha256_ids = (RepoKey, KeyfileKey, AuthenticatedKey)
-    new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey, AuthenticatedKey)
+    old_hmac_sha256_ids = (AESCTRKey, AuthenticatedKey)
+    new_hmac_sha256_ids = (AESOCBKey, CHPOKey, AuthenticatedKey)
     # note: we do not support blake2b for new repos, see #8867
-    new_blake3_ids = (
-        Blake3AESOCBRepoKey,
-        Blake3AESOCBKeyfileKey,
-        Blake3CHPORepoKey,
-        Blake3CHPOKeyfileKey,
-        Blake3AuthenticatedKey,
-    )
+    new_blake3_ids = (Blake3AESOCBKey, Blake3CHPOKey, Blake3AuthenticatedKey)
     same_ids = (
         isinstance(other_key, old_hmac_sha256_ids + new_hmac_sha256_ids)
         and isinstance(key, new_hmac_sha256_ids)
@@ -197,8 +195,13 @@ class KeyBase:
     # Name used in command line / API (e.g. borg init --encryption=...)
     ARG_NAME = "UNDEFINED"
 
-    # Storage type (no key blob storage / keyfile / repo)
+    # Storage type (no key blob storage / keyfile / repo). This is only a default seed for the
+    # per-instance self.storage; keyfile vs repokey is a property of an individual key, not the class.
     STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE
+
+    # Whether a key of this class may be stored as a keyfile or as a repokey (configurable at
+    # repo creation via --key-location and changeable later via "borg key change-location").
+    LOCATION_CONFIGURABLE = False
 
     # Seed for the buzhash chunker (borg.algorithms.chunker.Chunker)
     # type is int
@@ -223,6 +226,9 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
+        # where this particular key is/will be stored (keyfile or repo); seeded from the class default,
+        # overwritten when a key is loaded (see FlexiKey._try_key) or created (see --key-location).
+        self.storage = self.STORAGE
         self.copy_crypt_key = False
 
     def id_hash(self, data):
@@ -546,7 +552,7 @@ class FlexiKey:
         # (for repokey) delete the previously-loaded borg key (keyfile mode auto-erases it in save()).
         old_id = self._loaded_key_id
         self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm, label=self._loaded_label)
-        if self.STORAGE == KeyBlobStorage.REPO and old_id and hasattr(self.repository, "delete_key"):
+        if self.storage == KeyBlobStorage.REPO and old_id and hasattr(self.repository, "delete_key"):
             if self._loaded_key_id != old_id:
                 self.repository.delete_key(old_id)
 
@@ -554,6 +560,9 @@ class FlexiKey:
     def create(cls, repository, args, *, other_key=None):
         key = cls(repository)
         key.repository_id = repository.id
+        if cls.LOCATION_CONFIGURABLE:
+            # choose initial storage (keyfile or repokey) from --key-location (default: repokey).
+            key.storage = KEY_LOCATIONS.get(getattr(args, "key_location", None), cls.STORAGE)
         if other_key is not None:
             if isinstance(other_key, PlaintextKey):
                 raise Error("Copying key material from an unencrypted repository is not possible.")
@@ -605,23 +614,18 @@ class FlexiKey:
         return filename
 
     def find_key(self):
-        if self.STORAGE == KeyBlobStorage.KEYFILE:
-            keyfile = self._find_key_file_from_environment()
-            if keyfile is not None:
-                return self.sanity_check(keyfile, self.repository.id)
-            keyfile = self._find_key_in_keys_dir()
-            if keyfile is not None:
-                return keyfile
-            raise KeyfileNotFoundError(self.repository._location.canonical_path(), get_keys_dir())
-        elif self.STORAGE == KeyBlobStorage.REPO:
-            loc = self.repository._location.canonical_path()
-            key = self.repository.load_key()
-            if not key:
-                # if we got an empty key, it means there is no key.
-                raise RepoKeyNotFoundError(loc) from None
+        # storage-agnostic: report the location of any existing borg key for this repo, preferring a
+        # keyfile (checked first) over a repokey. Used for the passphrase prompt and for logging.
+        env_keyfile = self._find_key_file_from_environment()
+        if env_keyfile is not None:
+            return self.sanity_check(env_keyfile, self.repository.id)
+        keyfile = self._find_key_in_keys_dir()
+        if keyfile is not None:
+            return keyfile
+        loc = self.repository._location.canonical_path()
+        if self.repository.load_key():
             return loc
-        else:
-            raise TypeError("Unsupported borg key storage type")
+        raise RepoKeyNotFoundError(loc) from None
 
     def get_existing_or_new_target(self, args):
         keyfile = self._find_key_file_from_environment()
@@ -659,12 +663,12 @@ class FlexiKey:
         return found
 
     def get_new_target(self, args):
-        if self.STORAGE == KeyBlobStorage.KEYFILE:
+        if self.storage == KeyBlobStorage.KEYFILE:
             keyfile = self._find_key_file_from_environment()
             if keyfile is not None:
                 return keyfile
             return get_keys_dir()
-        elif self.STORAGE == KeyBlobStorage.REPO:
+        elif self.storage == KeyBlobStorage.REPO:
             return self.repository
         else:
             raise TypeError("Unsupported borg key storage type")
@@ -703,12 +707,9 @@ class FlexiKey:
 
     def _iter_keys(self):
         # return [(key_id, blob_text, keyfile_path_or_None)] for all borg keys of this repo.
-        if self.STORAGE == KeyBlobStorage.KEYFILE:
-            return self._keyfile_candidates()
-        elif self.STORAGE == KeyBlobStorage.REPO:
-            return self._repo_candidates()
-        else:
-            raise TypeError("Unsupported borg key storage type")
+        # storage-agnostic: we look at keyfiles first and repokeys afterwards, regardless of the
+        # manifest key-type byte. The first key a passphrase unlocks wins (see load_any).
+        return self._keyfile_candidates() + self._repo_candidates()
 
     def _key_envelope(self, blob_text):
         # decode the (unencrypted) EncryptedKey envelope of a borg key without decrypting it.
@@ -738,7 +739,14 @@ class FlexiKey:
             logger.debug("Borg key %s could not be loaded (corrupted?), skipping it: %s", key_id[:12], exc)
             return False
         if loaded:
-            self.target = keyfile_path if self.STORAGE == KeyBlobStorage.KEYFILE else self.repository
+            # remember where this particular key actually lives (keyfile vs repokey), independent of
+            # the manifest key-type byte, so save/remove/list operate on the right storage afterwards.
+            self.storage = KeyBlobStorage.KEYFILE if keyfile_path is not None else KeyBlobStorage.REPO
+            self.target = keyfile_path if self.storage == KeyBlobStorage.KEYFILE else self.repository
+            if self.storage == KeyBlobStorage.REPO:
+                # While the repository is encrypted, we consider a repokey repository with a blank
+                # passphrase an unencrypted repository.
+                self.logically_encrypted = passphrase != ""  # nosec B105
             self._loaded_key_id = key_id
             self._loaded_label = self._encrypted_key_label
             return True
@@ -746,10 +754,6 @@ class FlexiKey:
 
     def load_any(self, passphrase):
         """Try the passphrase against every borg key of this repository."""
-        if self.STORAGE == KeyBlobStorage.REPO:
-            # While the repository is encrypted, we consider a repokey repository with a blank
-            # passphrase an unencrypted repository.
-            self.logically_encrypted = passphrase != ""  # nosec B105
         for key_id, blob_text, keyfile_path in self._iter_keys():
             if self._try_key(key_id, blob_text, keyfile_path, passphrase):
                 return True
@@ -758,23 +762,21 @@ class FlexiKey:
     def load(self, target, passphrase):
         # load a specific borg key: for keyfiles, the explicit file given as target; for repokey,
         # any of the repository's borg keys (which are addressed by passphrase, not by target).
-        if self.STORAGE == KeyBlobStorage.KEYFILE:
+        if self.storage == KeyBlobStorage.KEYFILE:
             try:
                 with open(target, "rb") as fd:
                     blob = fd.read()
             except OSError:
                 return False
             return self._try_key(sha256(blob).hexdigest(), blob.decode("utf-8"), str(target), passphrase)
-        elif self.STORAGE == KeyBlobStorage.REPO:
-            return self.load_any(passphrase)
         else:
-            raise TypeError("Unsupported borg key storage type")
+            return self.load_any(passphrase)
 
     def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
         # replace=True replaces the previously-loaded borg key (change-passphrase semantics);
         # replace=False adds an additional borg key, keeping the existing ones (key add).
         key_data = self._save(passphrase, algorithm, label=label)
-        if self.STORAGE == KeyBlobStorage.KEYFILE:
+        if self.storage == KeyBlobStorage.KEYFILE:
             old_target = getattr(self, "target", None)
             keys_dir = get_keys_dir()
             keyfile_data = keyfile_format(bin_to_hex(self.repository_id), key_data)
@@ -801,7 +803,7 @@ class FlexiKey:
                     except OSError as exc:
                         logger.debug('Could not remove previous keyfile "%s": %s', old_target, exc)
             self._loaded_key_id = sha256(keyfile_data.encode()).hexdigest()
-        elif self.STORAGE == KeyBlobStorage.REPO:
+        elif self.storage == KeyBlobStorage.REPO:
             self.logically_encrypted = passphrase != ""  # nosec B105
             key_data = keyfile_format(bin_to_hex(self.repository_id), key_data)
             key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes
@@ -814,13 +816,15 @@ class FlexiKey:
                 self._loaded_key_id = sha256(key_data).hexdigest()
         else:
             raise TypeError("Unsupported borg key storage type")
-        self.target = target if self.STORAGE != KeyBlobStorage.REPO else self.repository
+        self.target = target if self.storage != KeyBlobStorage.REPO else self.repository
         self._loaded_label = label
 
     def remove(self, target):
-        if self.STORAGE == KeyBlobStorage.KEYFILE:
-            os.remove(target)  # the keyfile of the borg key we unlocked; other borg keys are separate files
-        elif self.STORAGE == KeyBlobStorage.REPO:
+        if self.storage == KeyBlobStorage.KEYFILE:
+            # the keyfile of the borg key we unlocked; other borg keys are separate files.
+            # overwrite it with random data before unlinking (same as save() does for old keyfiles).
+            secure_erase(target, avoid_collateral_damage=True)
+        elif self.storage == KeyBlobStorage.REPO:
             # remove only the borg key we unlocked, leaving the repository's other borg keys alone.
             if hasattr(target, "delete_key") and self._loaded_key_id:
                 target.delete_key(self._loaded_key_id)
@@ -831,9 +835,11 @@ class FlexiKey:
 
     def list_keys(self):
         """Return metadata for all borg keys of this repository (no decryption)."""
-        mode = "keyfile" if self.STORAGE == KeyBlobStorage.KEYFILE else "repokey"
         result = []
         for key_id, blob_text, keyfile_path in self._iter_keys():
+            # storage is a per-key property now, so report each key's actual mode (a repository may
+            # hold a mix of keyfile- and repo-stored borg keys).
+            mode = "keyfile" if keyfile_path is not None else "repokey"
             try:
                 env = self._key_envelope(blob_text)
                 label, algorithm = env.get("label"), env.get("algorithm")
@@ -854,9 +860,9 @@ class FlexiKey:
 
     def add_key(self, passphrase=None, label=None):
         """Add an additional borg key protecting the same key material with a new passphrase."""
-        if self.STORAGE == KeyBlobStorage.REPO and not hasattr(self.repository, "store_key"):
+        if self.storage == KeyBlobStorage.REPO and not hasattr(self.repository, "store_key"):
             raise Error("This repository type does not support multiple borg keys.")
-        if self.STORAGE == KeyBlobStorage.KEYFILE and os.environ.get("BORG_KEY_FILE"):
+        if self.storage == KeyBlobStorage.KEYFILE and os.environ.get("BORG_KEY_FILE"):
             raise Error(
                 "Cannot add a borg key while BORG_KEY_FILE points to a single keyfile; "
                 "unset it so the new keyfile can be stored in the keys directory."
@@ -889,17 +895,21 @@ class FlexiKey:
         victim = matches[0]
         if victim["label"] == ADMIN_LABEL:
             raise Error('The "%s" borg key is protected and cannot be removed.' % ADMIN_LABEL)
-        if self.STORAGE == KeyBlobStorage.REPO:
+        # remove from the victim's own storage (which may differ from the unlocked key's storage)
+        if victim["mode"] == "repokey":
             self.repository.delete_key(victim["id"])
-        elif self.STORAGE == KeyBlobStorage.KEYFILE:
-            os.remove(victim["path"])
         else:
-            raise TypeError("Unsupported borg key storage type")
+            secure_erase(victim["path"], avoid_collateral_damage=True)  # overwrite the keyfile before unlinking
         return victim
 
 
 class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
+    # default storage; an individual key's actual storage is tracked per-instance in self.storage.
     STORAGE = KeyBlobStorage.REPO
+    # an authenticated-mode key has real key material (id/auth key) and a key blob, just no data
+    # encryption. The blob may live as a keyfile or inside the repository, like the encrypted modes
+    # (configurable via --key-location, changeable later via "borg key change-location").
+    LOCATION_CONFIGURABLE = True
 
     # It's only authenticated, not encrypted.
     logically_encrypted = False
@@ -944,8 +954,8 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
 
 # legacy imports placed after FlexiKey/AESKeyBase/KeyBase/AuthenticatedKeyBase so those names are already
 # in the partial module when legacy/crypto/key.py imports them back during circular load
-from ..legacy.crypto.key import KeyfileKey, RepoKey
-from ..legacy.crypto.key import Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey  # noqa: F401
+from ..legacy.crypto.key import AESCTRKey, Blake2AESCTRKey  # noqa: F401
+from ..legacy.crypto.key import Blake2AuthenticatedKey  # noqa: F401
 from ..legacy.crypto.key import LEGACY_KEY_TYPES  # noqa: E402
 from ..legacy.crypto.key import ID_BLAKE2b_256  # noqa: F401
 
@@ -987,7 +997,7 @@ class AEADKeyBase(KeyBase):
     Offsets:0                 1          2            8             32           48 [bytes]
 
     suite: 1010b for new AEAD crypto, 0000b is old crypto
-    keytype: see constants.KeyType (suite+keytype)
+    keytype: always 0 for new crypto (the key storage location is no longer encoded in the type byte)
     reserved: all-zero, for future use
     messageIV: a counter starting from 0 for all new encrypted messages of one session
     sessionID: 192bit random, computed once per session (the session key is derived from this)
@@ -1002,6 +1012,11 @@ class AEADKeyBase(KeyBase):
     logically_encrypted = True
 
     MAX_IV = 2**48 - 1
+
+    # default storage; an individual key's actual storage is tracked per-instance in self.storage.
+    STORAGE = KeyBlobStorage.REPO
+    # an AEAD key may be stored as a keyfile or inside the repository (see borg key change-location).
+    LOCATION_CONFIGURABLE = True
 
     def assert_id(self, id, data):
         # Comparing the id hash here would not be needed any more for the new AEAD crypto **IF** we
@@ -1087,75 +1102,41 @@ class AEADKeyBase(KeyBase):
         self.cipher = self._get_cipher(self.sessionid, iv=0)
 
 
-class AESOCBKeyfileKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.AESOCBKEYFILE, KeyType.AESOCBREPO}
-    TYPE = KeyType.AESOCBKEYFILE
-    NAME = "key file AES-OCB"
-    ARG_NAME = "keyfile-aes-ocb"
-    STORAGE = KeyBlobStorage.KEYFILE
+# Each of these is one unified key class per crypto suite. A key of this class may be stored either as
+# a keyfile or inside the repository (repokey) - that is a per-key storage property (self.storage), not
+# a class distinction. The class is selected from the manifest's key-type byte (see identify_key), which
+# only encodes the crypto suite (there is exactly one type byte per suite now).
+
+
+class AESOCBKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPE = KeyType.AESOCB
+    TYPES_ACCEPTABLE = {TYPE}
+    NAME = "AES-OCB"
+    ARG_NAME = "aes-ocb"
     CIPHERSUITE = AES256_OCB
 
 
-class AESOCBRepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.AESOCBKEYFILE, KeyType.AESOCBREPO}
-    TYPE = KeyType.AESOCBREPO
-    NAME = "repokey AES-OCB"
-    ARG_NAME = "repokey-aes-ocb"
-    STORAGE = KeyBlobStorage.REPO
-    CIPHERSUITE = AES256_OCB
-
-
-class CHPOKeyfileKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.CHPOKEYFILE, KeyType.CHPOREPO}
-    TYPE = KeyType.CHPOKEYFILE
-    NAME = "key file ChaCha20-Poly1305"
-    ARG_NAME = "keyfile-chacha20-poly1305"
-    STORAGE = KeyBlobStorage.KEYFILE
+class CHPOKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
+    TYPE = KeyType.CHPO
+    TYPES_ACCEPTABLE = {TYPE}
+    NAME = "ChaCha20-Poly1305"
+    ARG_NAME = "chacha20-poly1305"
     CIPHERSUITE = CHACHA20_POLY1305
 
 
-class CHPORepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.CHPOKEYFILE, KeyType.CHPOREPO}
-    TYPE = KeyType.CHPOREPO
-    NAME = "repokey ChaCha20-Poly1305"
-    ARG_NAME = "repokey-chacha20-poly1305"
-    STORAGE = KeyBlobStorage.REPO
-    CIPHERSUITE = CHACHA20_POLY1305
-
-
-class Blake3AESOCBKeyfileKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE3AESOCBKEYFILE, KeyType.BLAKE3AESOCBREPO}
-    TYPE = KeyType.BLAKE3AESOCBKEYFILE
-    NAME = "key file BLAKE3 AES-OCB"
-    ARG_NAME = "keyfile-blake3-aes-ocb"
-    STORAGE = KeyBlobStorage.KEYFILE
+class Blake3AESOCBKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
+    TYPE = KeyType.BLAKE3AESOCB
+    TYPES_ACCEPTABLE = {TYPE}
+    NAME = "BLAKE3 AES-OCB"
+    ARG_NAME = "blake3-aes-ocb"
     CIPHERSUITE = AES256_OCB
 
 
-class Blake3AESOCBRepoKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE3AESOCBKEYFILE, KeyType.BLAKE3AESOCBREPO}
-    TYPE = KeyType.BLAKE3AESOCBREPO
-    NAME = "repokey BLAKE3 AES-OCB"
-    ARG_NAME = "repokey-blake3-aes-ocb"
-    STORAGE = KeyBlobStorage.REPO
-    CIPHERSUITE = AES256_OCB
-
-
-class Blake3CHPOKeyfileKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE3CHPOKEYFILE, KeyType.BLAKE3CHPOREPO}
-    TYPE = KeyType.BLAKE3CHPOKEYFILE
-    NAME = "key file BLAKE3 ChaCha20-Poly1305"
-    ARG_NAME = "keyfile-blake3-chacha20-poly1305"
-    STORAGE = KeyBlobStorage.KEYFILE
-    CIPHERSUITE = CHACHA20_POLY1305
-
-
-class Blake3CHPORepoKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE3CHPOKEYFILE, KeyType.BLAKE3CHPOREPO}
-    TYPE = KeyType.BLAKE3CHPOREPO
-    NAME = "repokey BLAKE3 ChaCha20-Poly1305"
-    ARG_NAME = "repokey-blake3-chacha20-poly1305"
-    STORAGE = KeyBlobStorage.REPO
+class Blake3CHPOKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
+    TYPE = KeyType.BLAKE3CHPO
+    TYPES_ACCEPTABLE = {TYPE}
+    NAME = "BLAKE3 ChaCha20-Poly1305"
+    ARG_NAME = "blake3-chacha20-poly1305"
     CIPHERSUITE = CHACHA20_POLY1305
 
 
@@ -1166,12 +1147,8 @@ AVAILABLE_KEY_TYPES = (
     AuthenticatedKey,
     # new crypto
     Blake3AuthenticatedKey,
-    AESOCBKeyfileKey,
-    AESOCBRepoKey,
-    CHPOKeyfileKey,
-    CHPORepoKey,
-    Blake3AESOCBKeyfileKey,
-    Blake3AESOCBRepoKey,
-    Blake3CHPOKeyfileKey,
-    Blake3CHPORepoKey,
+    AESOCBKey,
+    CHPOKey,
+    Blake3AESOCBKey,
+    Blake3CHPOKey,
 )

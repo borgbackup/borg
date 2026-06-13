@@ -31,8 +31,12 @@ from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_suppor
 from ..platform.platform_test import is_win32
 from ...xattr import get_all
 
-RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
-KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
+# --encryption now selects only the crypto suite; key storage is chosen with --key-location
+# (default: repokey). RK_* stays a single token (repokey is the default); for keyfile storage,
+# pass KF_ENCRYPTION together with KF_LOCATION.
+RK_ENCRYPTION = "--encryption=aes-ocb"
+KF_ENCRYPTION = "--encryption=chacha20-poly1305"
+KF_LOCATION = "--key-location=keyfile"
 
 # This points to the ``src/borg/archiver`` directory (small, with only a few files).
 # There are quite a lot of files in there, because there is a __pycache__ subdirectory.

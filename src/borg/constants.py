@@ -182,7 +182,7 @@ class KeyType:
     # repos with PASSPHRASE mode could not be created any more since borg 1.0, see #97.
     # in borg 2. all of its code and also the "borg key migrate-to-repokey" command was removed.
     # if you still need to, you can use "borg key migrate-to-repokey" with borg 1.0, 1.1 and 1.2.
-    # Nowadays, we just dispatch this to RepoKey and assume the passphrase was migrated to a repokey.
+    # Nowadays, we just dispatch this to the legacy AES-CTR key and assume the passphrase was migrated.
     PASSPHRASE = 0x01  # legacy, borg < 1.0
     PLAINTEXT = 0x02
     REPO = 0x03
@@ -191,15 +191,13 @@ class KeyType:
     BLAKE2AUTHENTICATED = 0x06
     AUTHENTICATED = 0x07
     # new crypto
-    # upper 4 bits are ciphersuite, lower 4 bits are keytype
-    AESOCBKEYFILE = 0x10
-    AESOCBREPO = 0x11
-    CHPOKEYFILE = 0x20
-    CHPOREPO = 0x21
-    BLAKE3AESOCBKEYFILE = 0x30
-    BLAKE3AESOCBREPO = 0x31
-    BLAKE3CHPOKEYFILE = 0x40
-    BLAKE3CHPOREPO = 0x41
+    # upper 4 bits are ciphersuite, lower 4 bits are reserved (0).
+    # the type byte only identifies the crypto suite; where the key is stored (keyfile vs
+    # repokey) is not encoded here any more, so there is only one type byte per suite.
+    AESOCB = 0x10
+    CHPO = 0x20
+    BLAKE3AESOCB = 0x30
+    BLAKE3CHPO = 0x40
     BLAKE3AUTHENTICATED = 0x50
 
 

@@ -5,14 +5,23 @@ from hashlib import sha256
 import pytest
 
 from ...constants import *  # NOQA
-from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileKey, Passphrase, is_keyfile, keyfile_parse
+from ...constants import KeyBlobStorage
+from ...crypto.key import AESOCBKey, CHPOKey, Passphrase, is_keyfile, keyfile_parse
 from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
 from ...repository import Repository
 from ..crypto.key_test import TestKey
-from . import RK_ENCRYPTION, KF_ENCRYPTION, cmd, _extract_repository_id, _set_repository_id, generate_archiver_tests
+from . import (
+    RK_ENCRYPTION,
+    KF_ENCRYPTION,
+    KF_LOCATION,
+    cmd,
+    _extract_repository_id,
+    _set_repository_id,
+    generate_archiver_tests,
+)
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -34,24 +43,24 @@ def test_change_location_to_keyfile(archivers, request):
     assert "(repokey" in log
     cmd(archiver, "key", "change-location", "keyfile")
     log = cmd(archiver, "repo-info")
-    assert "(key file" in log
+    assert "(keyfile" in log
 
 
 def test_change_location_to_b3keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=repokey-blake3-aes-ocb")
+    cmd(archiver, "repo-create", "--encryption=blake3-aes-ocb")
     log = cmd(archiver, "repo-info")
-    assert "(repokey BLAKE3" in log
+    assert "(repokey, BLAKE3" in log
     cmd(archiver, "key", "change-location", "keyfile")
     log = cmd(archiver, "repo-info")
-    assert "(key file BLAKE3" in log
+    assert "(keyfile, BLAKE3" in log
 
 
 def test_change_location_to_repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     log = cmd(archiver, "repo-info")
-    assert "(key file" in log
+    assert "(keyfile" in log
     cmd(archiver, "key", "change-location", "repokey")
     log = cmd(archiver, "repo-info")
     assert "(repokey" in log
@@ -59,17 +68,42 @@ def test_change_location_to_repokey(archivers, request):
 
 def test_change_location_to_b3repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=keyfile-blake3-aes-ocb")
+    cmd(archiver, "repo-create", "--encryption=blake3-aes-ocb", KF_LOCATION)
     log = cmd(archiver, "repo-info")
-    assert "(key file BLAKE3" in log
+    assert "(keyfile, BLAKE3" in log
     cmd(archiver, "key", "change-location", "repokey")
     log = cmd(archiver, "repo-info")
-    assert "(repokey BLAKE3" in log
+    assert "(repokey, BLAKE3" in log
+
+
+def test_change_location_authenticated_to_keyfile(archivers, request):
+    # authenticated mode does not encrypt, but it still has a key whose location is configurable.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", "--encryption=authenticated")
+    log = cmd(archiver, "repo-info")
+    assert "(repokey, authenticated)" in log
+    cmd(archiver, "key", "change-location", "keyfile")
+    [key_filename] = os.listdir(archiver.keys_path)
+    assert key_filename  # key blob now lives as a keyfile
+    log = cmd(archiver, "repo-info")
+    assert "(keyfile, authenticated)" in log
+
+
+def test_change_location_authenticated_to_repokey(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", "--encryption=authenticated", KF_LOCATION)
+    assert os.listdir(archiver.keys_path)  # key blob created as a keyfile
+    log = cmd(archiver, "repo-info")
+    assert "(keyfile, authenticated)" in log
+    cmd(archiver, "key", "change-location", "repokey")
+    assert os.listdir(archiver.keys_path) == []  # keyfile removed after moving into the repo
+    log = cmd(archiver, "repo-info")
+    assert "(repokey, authenticated)" in log
 
 
 def test_keyfile_name_is_content_sha256(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     [key_filename] = os.listdir(archiver.keys_path)
     key_path = os.path.join(archiver.keys_path, key_filename)
     with open(key_path, "rb") as fd:
@@ -79,7 +113,7 @@ def test_keyfile_name_is_content_sha256(archivers, request):
 
 def test_change_passphrase_renames_keyfile_to_new_sha256(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     [old_key_filename] = os.listdir(archiver.keys_path)
     old_key_path = os.path.join(archiver.keys_path, old_key_filename)
     os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
@@ -99,7 +133,7 @@ def test_borg_key_file_env_keeps_explicit_path(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     explicit_key_path = os.path.join(archiver.output_path, "explicit-key")
     monkeypatch.setenv("BORG_KEY_FILE", explicit_key_path)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     assert os.path.isfile(explicit_key_path)
     assert os.listdir(archiver.keys_path) == []
 
@@ -107,7 +141,7 @@ def test_borg_key_file_env_keeps_explicit_path(archivers, request, monkeypatch):
 def test_key_export_keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_file = archiver.output_path + "/exported"
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     repo_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "key", "export", export_file)
 
@@ -125,7 +159,7 @@ def test_key_export_keyfile(archivers, request):
 
     os.unlink(key_file)
 
-    cmd(archiver, "key", "import", export_file)
+    cmd(archiver, "key", "import", export_file, "--key-location=keyfile")
 
     with open(key_file) as fd:
         key_contents2 = fd.read()
@@ -135,7 +169,7 @@ def test_key_export_keyfile(archivers, request):
 
 def test_key_import_keyfile_with_borg_key_file(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
 
     exported_key_file = os.path.join(archiver.output_path, "exported")
     cmd(archiver, "key", "export", exported_key_file)
@@ -147,7 +181,7 @@ def test_key_import_keyfile_with_borg_key_file(archivers, request, monkeypatch):
 
     imported_key_file = os.path.join(archiver.output_path, "imported")
     monkeypatch.setenv("BORG_KEY_FILE", imported_key_file)
-    cmd(archiver, "key", "import", exported_key_file)
+    cmd(archiver, "key", "import", exported_key_file, "--key-location=keyfile")
     assert not os.path.isfile(key_file), '"borg key import" should respect BORG_KEY_FILE'
 
     with open(imported_key_file) as fd:
@@ -168,10 +202,11 @@ def test_key_export_repokey(archivers, request):
     assert is_keyfile(export_contents, bin_to_hex(repo_id))
 
     with Repository(archiver.repository_path) as repository:
-        repo_key = AESOCBRepoKey(repository)
+        repo_key = AESOCBKey(repository)  # default storage (repokey): load_any finds the repo's key
         repo_key.load(None, Passphrase.env_passphrase())
 
-    backup_key = AESOCBKeyfileKey(TestKey.MockRepository(id=repo_id))
+    backup_key = AESOCBKey(TestKey.MockRepository(id=repo_id))
+    backup_key.storage = KeyBlobStorage.KEYFILE  # load explicitly from the exported keyfile
     backup_key.load(export_file, Passphrase.env_passphrase())
 
     assert repo_key.crypt_key == backup_key.crypt_key
@@ -182,7 +217,7 @@ def test_key_export_repokey(archivers, request):
     cmd(archiver, "key", "import", export_file)
 
     with Repository(archiver.repository_path) as repository:
-        repo_key2 = AESOCBRepoKey(repository)
+        repo_key2 = AESOCBKey(repository)
         repo_key2.load(None, Passphrase.env_passphrase())
 
     assert repo_key2.crypt_key == repo_key.crypt_key
@@ -232,7 +267,7 @@ def test_key_export_qr_directory(archivers, request):
 def test_key_import_errors(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_file = archiver.output_path + "/exported"
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     if archiver.FORK_DEFAULT:
         expected_ec = CommandError().exit_code
         cmd(archiver, "key", "import", export_file, exit_code=expected_ec)
@@ -265,12 +300,12 @@ def test_key_export_paperkey(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_id = "e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239"
     export_file = archiver.output_path + "/exported"
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     _set_repository_id(archiver.repository_path, hex_to_bin(repo_id))
     key_file = archiver.keys_path + "/" + os.listdir(archiver.keys_path)[0]
 
     with open(key_file, "w") as fd:
-        fd.write(CHPOKeyfileKey.FILE_ID + " " + repo_id + "\n")
+        fd.write(CHPOKey.FILE_ID + " " + repo_id + "\n")
         fd.write(binascii.b2a_base64(b"abcdefghijklmnopqrstu").decode())
 
     cmd(archiver, "key", "export", "--paper", export_file)
@@ -293,12 +328,12 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 def test_key_import_paperkey(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_id = "e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239"
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     _set_repository_id(archiver.repository_path, hex_to_bin(repo_id))
 
     key_file = archiver.keys_path + "/" + os.listdir(archiver.keys_path)[0]
     with open(key_file, "w") as fd:
-        fd.write(AESOCBKeyfileKey.FILE_ID + " " + repo_id + "\n")
+        fd.write(AESOCBKey.FILE_ID + " " + repo_id + "\n")
         fd.write(binascii.b2a_base64(b"abcdefghijklmnopqrstu").decode())
 
     typed_input = (
@@ -362,7 +397,7 @@ def test_change_passphrase_does_not_change_algorithm_argon2(archivers, request):
 
 def test_change_location_does_not_change_algorithm_argon2(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     cmd(archiver, "key", "change-location", "repokey")
 
     with Repository(archiver.repository_path) as repository:
@@ -408,23 +443,27 @@ def _key_id_for_label(archiver, label):
     raise AssertionError(f"label {label!r} not found in:\n{out}")
 
 
-@pytest.mark.parametrize("encryption", [RK_ENCRYPTION, KF_ENCRYPTION])
-def test_key_first_key_is_admin(archivers, request, encryption):
+# crypto suite + key storage combinations used to parametrize the multi-key tests below.
+ENC_ARGS_AND_MODE = [((RK_ENCRYPTION,), "repokey"), ((KF_ENCRYPTION, KF_LOCATION), "keyfile")]
+ENC_ARGS = [args for args, _mode in ENC_ARGS_AND_MODE]
+
+
+@pytest.mark.parametrize("enc_args, mode", ENC_ARGS_AND_MODE)
+def test_key_first_key_is_admin(archivers, request, enc_args, mode):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", encryption)
+    cmd(archiver, "repo-create", *enc_args)
     out = cmd(archiver, "key", "list")
     assert "admin" in out
-    mode = "keyfile" if encryption == KF_ENCRYPTION else "repokey"
     rows = [ln for ln in out.splitlines() if "argon2" in ln]
     assert len(rows) == 1
     assert rows[0].lstrip().startswith("*")
     assert mode in rows[0]
 
 
-@pytest.mark.parametrize("encryption", [RK_ENCRYPTION, KF_ENCRYPTION])
-def test_key_add(archivers, request, encryption):
+@pytest.mark.parametrize("enc_args", ENC_ARGS)
+def test_key_add(archivers, request, enc_args):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", encryption)  # admin = DEFAULT_PASSPHRASE
+    cmd(archiver, "repo-create", *enc_args)  # admin = DEFAULT_PASSPHRASE
     os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
     cmd(archiver, "key", "add", "--label", "alice")
 
@@ -450,10 +489,10 @@ def test_key_add_rejects_duplicate_and_reserved(archivers, request):
     _expect_error(archiver, "key", "add", "--label", "admin")  # reserved
 
 
-@pytest.mark.parametrize("encryption", [RK_ENCRYPTION, KF_ENCRYPTION])
-def test_key_remove_by_label(archivers, request, encryption):
+@pytest.mark.parametrize("enc_args", ENC_ARGS)
+def test_key_remove_by_label(archivers, request, enc_args):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", encryption)
+    cmd(archiver, "repo-create", *enc_args)
     os.environ["BORG_NEW_PASSPHRASE"] = "alicepass"
     cmd(archiver, "key", "add", "--label", "alice")
 
@@ -577,10 +616,12 @@ def test_key_change_location_keeps_label(archivers, request):
     cmd(archiver, "key", "change-location", "keyfile")
 
     out = cmd(archiver, "key", "list")  # still unlocked as xxx
-    rows = [ln for ln in out.splitlines() if "argon2" in ln]
-    assert len(rows) == 1
-    assert "keyfile" in rows[0]
-    assert "xxx" in rows[0]  # label preserved, not lost
+    # the migrated xxx key now lives in a keyfile; admin stays a repokey (mixed storage is allowed now)
+    xxx_rows = [ln for ln in out.splitlines() if "xxx" in ln]
+    assert len(xxx_rows) == 1
+    assert "keyfile" in xxx_rows[0]  # storage changed
+    assert "xxx" in xxx_rows[0]  # label preserved, not lost
+    assert "admin" in out  # the other borg key is untouched
 
 
 def _exported_label(path, repo_id):
@@ -649,7 +690,7 @@ def test_key_export_rejects_ambiguous_key_selector(archivers, request):
 def _store_corrupted_borg_key(repository_path, repo_id):
     """Store a borg key whose envelope is unparseable but which still passes the
     keyfile header / repo-id check (so it is enumerated). Returns its key id."""
-    header = CHPOKeyfileKey.FILE_ID + " " + bin_to_hex(repo_id) + "\n"
+    header = CHPOKey.FILE_ID + " " + bin_to_hex(repo_id) + "\n"
     body = binascii.b2a_base64(b"this is not a valid key envelope").decode()  # valid base64, not msgpack
     blob = (header + body).encode("utf-8")
     with Repository(repository_path) as repository:

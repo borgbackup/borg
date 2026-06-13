@@ -8,21 +8,21 @@ Examples
 
     # Local repository
     $ export BORG_REPO=/path/to/repo
-    # Recommended repokey AEAD cryptographic modes
-    $ borg repo-create --encryption=repokey-aes-ocb
-    $ borg repo-create --encryption=repokey-chacha20-poly1305
-    $ borg repo-create --encryption=repokey-blake2-aes-ocb
-    $ borg repo-create --encryption=repokey-blake2-chacha20-poly1305
+    # Recommended AEAD cryptographic modes (key stored in the repository by default)
+    $ borg repo-create --encryption=aes-ocb
+    $ borg repo-create --encryption=chacha20-poly1305
+    $ borg repo-create --encryption=blake3-aes-ocb
+    $ borg repo-create --encryption=blake3-chacha20-poly1305
     # No encryption (not recommended)
     $ borg repo-create --encryption=authenticated
-    $ borg repo-create --encryption=authenticated-blake2
+    $ borg repo-create --encryption=authenticated-blake3
     $ borg repo-create --encryption=none
 
-    # Remote repository (accesses a remote Borg via SSH)
-    $ export BORG_REPO=ssh://user@hostname/~/backup
-    # repokey: stores the encrypted key in <REPO_DIR>/config
-    $ borg repo-create --encryption=repokey-aes-ocb
+    # The crypto suite (--encryption) and where the key is stored (--key-location) are
+    # chosen independently. --key-location defaults to repokey.
+    # repokey: stores the encrypted key inside the repository
+    $ borg repo-create --encryption=aes-ocb --key-location=repokey
     # keyfile: stores the encrypted key in the config dir's keys/ subdir
     # (e.g. ~/.config/borg/keys/ on Linux, ~/Library/Application Support/borg/keys/ on macOS)
-    $ borg repo-create --encryption=keyfile-aes-ocb
+    $ borg repo-create --encryption=aes-ocb --key-location=keyfile
 

@@ -6,7 +6,7 @@ import pytest
 from ...helpers.errors import Error, CancelledByUser
 from ...constants import *  # NOQA
 from ...crypto.key import FlexiKey
-from . import cmd, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION
+from . import cmd, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION, KF_LOCATION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -42,11 +42,11 @@ def test_repo_create_refuse_to_overwrite_keyfile(archivers, request, monkeypatch
     monkeypatch.setenv("BORG_KEY_FILE", keyfile)
     original_location = archiver.repository_location
     archiver.repository_location = original_location + "0"
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     with open(keyfile) as file:
         before = file.read()
     archiver.repository_location = original_location + "1"
-    arg = ("repo-create", KF_ENCRYPTION)
+    arg = ("repo-create", KF_ENCRYPTION, KF_LOCATION)
     if archiver.FORK_DEFAULT:
         cmd(archiver, *arg, exit_code=2)
     else:

@@ -1,6 +1,6 @@
 1. Before a backup can be made, a repository has to be initialized::
 
-    $ borg -r /path/to/repo repo-create --encryption=repokey-aes-ocb
+    $ borg -r /path/to/repo repo-create --encryption=aes-ocb
 
 2. Back up the ``~/src`` and ``~/Documents`` directories into an archive called
    *docs*::

@@ -356,7 +356,7 @@ def test_extra_chunks(archivers, request):
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
-@pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])
+@pytest.mark.parametrize("init_args", [["--encryption=aes-ocb"], ["--encryption", "none"]])
 def test_verify_data(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() != "local":
@@ -392,7 +392,7 @@ def test_verify_data(archivers, request, init_args):
     assert f"{src_file}: Missing file chunk detected" in output
 
 
-@pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])
+@pytest.mark.parametrize("init_args", [["--encryption=aes-ocb"], ["--encryption", "none"]])
 def test_corrupted_file_chunk(archivers, request, init_args):
     ## similar to test_verify_data, but here we let the low level repository-only checks discover the issue.
 

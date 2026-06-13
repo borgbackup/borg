@@ -31,7 +31,7 @@ permissions:
 jobs:
   lint:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
 
     steps:
@@ -40,7 +40,7 @@ jobs:
 
   security:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
 
     steps:
@@ -59,7 +59,7 @@ jobs:
 
   asan_ubsan:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     needs: [lint]
 
@@ -141,19 +141,19 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "mypy"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "mypy"},
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "docs"},
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
+              {"os": "ubuntu-26.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
-              {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
+              {"os": "ubuntu-26.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-26.04", "python-version": "3.13", "toxenv": "py313-mfusepy"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc243-x86_64-gh"},
+              {"os": "ubuntu-26.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc243-arm64-gh"},
               {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
               {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"}
             ]
@@ -382,7 +382,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 180
     needs: [lint]
     continue-on-error: true

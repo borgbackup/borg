@@ -25,8 +25,8 @@ jobs:
             python-version: '3.12'
             toxenv: py312-pyfuse3
           - os: ubuntu-24.04
-            python-version: '3.15-dev'
-            toxenv: py315-mfusepy
+            python-version: '3.14'
+            toxenv: py314-mfusepy
           - os: macos-15
             python-version: '3.14'
             toxenv: py314-none

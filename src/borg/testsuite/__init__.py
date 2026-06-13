@@ -190,8 +190,8 @@ def is_utime_fully_supported():
         else:
             open(filepath, "w").close()
         try:
-            os.utime(filepath, (1000, 2000), follow_symlinks=False)
-            new_stats = os.stat(filepath, follow_symlinks=False)
+            os.utime(filepath, (1000, 2000), follow_symlinks=False if os.utime in os.supports_follow_symlinks else True)
+            new_stats = os.stat(filepath, follow_symlinks=False if os.stat in os.supports_follow_symlinks else True)
             if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
                 return True
         except OSError:

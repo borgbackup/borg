@@ -48,7 +48,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.11'
+        python-version: '3.14'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -73,7 +73,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.12'
+        python-version: '3.14'
 
     - name: Install system packages
       run: |
@@ -141,17 +141,16 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "mypy"},
-              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-26.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "mypy"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "docs"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-llfuse"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-pyfuse3"},
               {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-26.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-26.04", "python-version": "3.13", "toxenv": "py313-mfusepy"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-llfuse"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
               {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc243-x86_64-gh"},
               {"os": "ubuntu-26.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc243-arm64-gh"},
               {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
@@ -708,7 +707,7 @@ jobs:
         uses: codecov/codecov-action@v7
         env:
           OS: ${{ runner.os }}
-          python: '3.11'
+          python: '3.14'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
@@ -720,7 +719,7 @@ jobs:
         uses: codecov/codecov-action@v7
         env:
           OS: ${{ runner.os }}
-          python: '3.11'
+          python: '3.14'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: coverage

@@ -28,23 +28,23 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-key" "1" "2026-06-13" "" "borg backup tool"
+.TH "borg-key-list" "1" "2026-06-13" "" "borg backup tool"
 .SH Name
-borg-key \- Manage the keyfile or repokey of a repository
+borg-key-list \- List the borg keys of the repository.
 .SH SYNOPSIS
-.nf
-borg [common options] key export ...
-borg [common options] key import ...
-borg [common options] key change\-passphrase ...
-borg [common options] key add ...
-borg [common options] key remove ...
-borg [common options] key list ...
-borg [common options] key change\-location ...
-.fi
 .sp
+borg [common options] key list [options]
+.SH DESCRIPTION
+.sp
+List the borg keys of the repository, showing each borg key\(aqs id, mode (\fBrepokey\fP or
+\fBkeyfile\fP), label and key derivation/encryption algorithm. The borg key used to
+unlock the repository in this invocation is marked with \fB*\fP\&.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
 .SH SEE ALSO
 .sp
-\fIborg\-common(1)\fP, \fIborg\-key\-export(1)\fP, \fIborg\-key\-import(1)\fP, \fIborg\-key\-change\-passphrase(1)\fP, \fIborg\-key\-add(1)\fP, \fIborg\-key\-remove(1)\fP, \fIborg\-key\-list(1)\fP, \fIborg\-key\-change\-location(1)\fP
+\fIborg\-common(1)\fP
 .SH Author
 The Borg Collective
 .\" End of generated man page.

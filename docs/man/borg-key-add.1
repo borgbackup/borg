@@ -1,0 +1,66 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-key-add" "1" "2026-06-13" "" "borg backup tool"
+.SH Name
+borg-key-add \- Add a new borg key (protected by an independent passphrase) to the repository.
+.SH SYNOPSIS
+.sp
+borg [common options] key add [options]
+.SH DESCRIPTION
+.sp
+A repository can be protected by more than one borg key. Each borg key contains the
+same secret key material, but is protected by an independent (potentially different)
+passphrase, and any of them can be used to unlock the same repository. This is useful
+e.g. to give individual users their own passphrase while keeping a separate
+admin/recovery passphrase.
+.sp
+This command adds an additional borg key. It does not re\-encrypt any repository data
+and does not change the existing borg keys. The new passphrase is read from
+\fBBORG_NEW_PASSPHRASE\fP or queried interactively.
+.sp
+Each borg key has a label. The first borg key, created at repository creation time, has
+the reserved label \fBadmin\fP and is protected from deletion. Additionally added borg
+keys require a unique, user\-defined \fB\-\-label\fP\&.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.BI \-\-label \ LABEL
+label for the new borg key (must be unique)
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

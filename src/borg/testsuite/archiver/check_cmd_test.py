@@ -16,6 +16,19 @@ from . import cmd, src_file, create_src_archive, open_archive, generate_archiver
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
+def corrupt(data, position):
+    """Return data with the byte at position flipped, so the result is guaranteed to differ.
+
+    Overwriting a byte with a fixed value is not reliable: if the original byte already happens
+    to have that value, nothing changes and the "corruption" is a no-op. For encrypted/MACed
+    objects the bytes are ~random, so a fixed overwrite is a no-op ~1/256 of the time, which made
+    tests relying on it intermittently fail. Flipping all bits always changes the byte.
+    """
+    if position < 0:
+        position += len(data)
+    return data[:position] + bytes([data[position] ^ 0xFF]) + data[position + 1 :]
+
+
 def check_cmd_setup(archiver):
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
         cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -224,7 +237,7 @@ def test_corrupted_manifest(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get_manifest()
-        corrupted_manifest = manifest[:250] + b"x" + manifest[251:]
+        corrupted_manifest = corrupt(manifest, 250)
         repository.put_manifest(corrupted_manifest)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
@@ -272,10 +285,10 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get_manifest()
-        corrupted_manifest = manifest[:250] + b"x" + manifest[251:]
+        corrupted_manifest = corrupt(manifest, 250)
         repository.put_manifest(corrupted_manifest)
         chunk = repository.get(archive.id)
-        corrupted_chunk = chunk[:-1] + b"x"
+        corrupted_chunk = corrupt(chunk, -1)
         repository.put(archive.id, corrupted_chunk)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
@@ -311,7 +324,7 @@ def test_spoofed_archive(archivers, request):
     with repository:
         # attacker would corrupt or delete the manifest to trigger a rebuild of it:
         manifest = repository.get_manifest()
-        corrupted_manifest = manifest[:250] + b"x" + manifest[251:]
+        corrupted_manifest = corrupt(manifest, 250)
         repository.put_manifest(corrupted_manifest)
         archive_dict = {
             "command_line": "",
@@ -372,7 +385,7 @@ def test_verify_data(archivers, request, init_args):
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
                 data = repository.get(chunk.id)
-                data = data[0:123] + b"x" + data[123:]
+                data = corrupt(data, 123)
                 repository.put(chunk.id, data)
                 break
 
@@ -407,7 +420,7 @@ def test_corrupted_file_chunk(archivers, request, init_args):
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
                 data = repository.get(chunk.id)
-                data = data[0:123] + b"x" + data[123:]
+                data = corrupt(data, 123)
                 repository.put(chunk.id, data)
                 break
 

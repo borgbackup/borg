@@ -76,6 +76,31 @@ def test_change_location_to_b3repokey(archivers, request):
     assert "(repokey, BLAKE3" in log
 
 
+def test_change_location_authenticated_to_keyfile(archivers, request):
+    # authenticated mode does not encrypt, but it still has a key whose location is configurable.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", "--encryption=authenticated")
+    log = cmd(archiver, "repo-info")
+    assert "(repokey, authenticated)" in log
+    cmd(archiver, "key", "change-location", "keyfile")
+    [key_filename] = os.listdir(archiver.keys_path)
+    assert key_filename  # key blob now lives as a keyfile
+    log = cmd(archiver, "repo-info")
+    assert "(keyfile, authenticated)" in log
+
+
+def test_change_location_authenticated_to_repokey(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", "--encryption=authenticated", KF_LOCATION)
+    assert os.listdir(archiver.keys_path)  # key blob created as a keyfile
+    log = cmd(archiver, "repo-info")
+    assert "(keyfile, authenticated)" in log
+    cmd(archiver, "key", "change-location", "repokey")
+    assert os.listdir(archiver.keys_path) == []  # keyfile removed after moving into the repo
+    log = cmd(archiver, "repo-info")
+    assert "(repokey, authenticated)" in log
+
+
 def test_keyfile_name_is_content_sha256(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)

@@ -76,8 +76,10 @@ class KeysMixIn:
         # the crypto class / manifest key-type byte does not change - only the storage location does.
         # build a same-class key with the same key material and store it at the new location.
         key_new = type(key)(repository)
+        # sessionid/cipher only exist for the AEAD modes; authenticated keys do not have them.
         for name in ("repository_id", "crypt_key", "id_key", "chunk_seed", "sessionid", "cipher"):
-            setattr(key_new, name, getattr(key, name))
+            if hasattr(key, name):
+                setattr(key_new, name, getattr(key, name))
         key_new.storage = new_storage
         key_new.target = key_new.get_new_target(args)
         # save with same passphrase, algorithm and label (keep the unlocked borg key's label)

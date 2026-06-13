@@ -904,7 +904,12 @@ class FlexiKey:
 
 
 class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
+    # default storage; an individual key's actual storage is tracked per-instance in self.storage.
     STORAGE = KeyBlobStorage.REPO
+    # an authenticated-mode key has real key material (id/auth key) and a key blob, just no data
+    # encryption. The blob may live as a keyfile or inside the repository, like the encrypted modes
+    # (configurable via --key-location, changeable later via "borg key change-location").
+    LOCATION_CONFIGURABLE = True
 
     # It's only authenticated, not encrypted.
     logically_encrypted = False

@@ -22,16 +22,17 @@ class RepoInfoMixIn:
             json_print(info)
         else:
             encryption = "Encrypted: "
-            if key.NAME in ("plaintext", "authenticated"):
-                encryption += "No"
+            # storage (keyfile/repokey) is a per-key property now; the crypto suite is key.NAME.
+            storage = getattr(key, "storage", None)
+            mode = {KeyBlobStorage.KEYFILE: "keyfile", KeyBlobStorage.REPO: "repokey"}.get(storage)
+            if key.NAME in ("plaintext", "authenticated", "authenticated BLAKE3"):
+                # authenticated modes do not encrypt data, but (unlike plaintext) still have a key
+                # that is stored as a keyfile or repokey, so show that location when there is one.
+                encryption += "No (%s, %s)" % (mode, key.NAME) if mode else "No"
             else:
-                # storage (keyfile/repokey) is a per-key property now; the crypto suite is key.NAME.
-                mode = {KeyBlobStorage.KEYFILE: "keyfile", KeyBlobStorage.REPO: "repokey"}.get(
-                    getattr(key, "storage", None)
-                )
                 encryption += "Yes (%s, %s)" % (mode, key.NAME) if mode else "Yes (%s)" % key.NAME
-                if getattr(key, "storage", None) == KeyBlobStorage.KEYFILE:
-                    encryption += "\nKey file: %s" % key.find_key()
+            if storage == KeyBlobStorage.KEYFILE:
+                encryption += "\nKey file: %s" % key.find_key()
             info["encryption"] = encryption
 
             output = (

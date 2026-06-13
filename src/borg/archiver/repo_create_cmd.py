@@ -134,8 +134,10 @@ class RepoCreateMixIn:
           this if you want "passphrase and having-the-key" security.
 
         You can move the key between these locations later with ``borg key change-location``.
-        ``--key-location`` is ignored for ``none`` and ``authenticated*`` modes (those have no
-        separate keyfile/repokey storage).
+        This also applies to the ``authenticated*`` modes: they do not encrypt your data, but they
+        still have a key (used for the id hash and authentication), so ``--key-location`` selects
+        where that key is stored, just like for the encrypted modes.
+        ``--key-location`` is only ignored for the ``none`` mode, which has no key at all.
 
         The following table is roughly sorted in order of preference, the better ones are
         in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
@@ -230,7 +232,7 @@ class RepoCreateMixIn:
             default="repokey",
             action=Highlander,
             help="where to store the key: 'repokey' (in the repository, default) or 'keyfile' "
-            "(in the local keys directory). Ignored for 'none' and 'authenticated*' modes.",
+            "(in the local keys directory). Ignored for the 'none' mode (which has no key).",
         )
         subparser.add_argument(
             "--copy-crypt-key",

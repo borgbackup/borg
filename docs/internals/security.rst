@@ -241,7 +241,7 @@ on widely used libraries providing them:
   primitives implemented in libcrypto.
 - SHA-256, SHA-512 and BLAKE2b from Python's hashlib_ standard library module are used.
 - HMAC and a constant-time comparison from Python's hmac_ standard library module are used.
-- argon2 is used via argon2-cffi.
+- argon2 is used from OpenSSL (>= 3.2).
 
 .. _Horton principle: https://en.wikipedia.org/wiki/Horton_Principle
 .. _length extension: https://en.wikipedia.org/wiki/Length_extension_attack

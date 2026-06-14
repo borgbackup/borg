@@ -41,35 +41,36 @@ def borg_permissions(permissions):
 
     The namespaces match the borg repository layout (see Repository.__init__ ns_config).
     """
-    if permissions == "all":
-        return None  # permissions system will not be used
-    elif permissions == "no-delete":  # mostly no delete, no overwrite
-        return {
-            "": "lr",
-            "archives": "lrw",
-            "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
-            "config": "lrW",  # W for manifest
-            "keys": "lr",
-            "locks": "lrwD",  # borg needs to create/delete a shared lock here
-            "packs": "lrw",
-        }
-    elif permissions == "write-only":  # mostly no reading
-        return {
-            "": "l",
-            "archives": "lw",
-            "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
-            "config": "lrW",  # W for manifest
-            "keys": "lr",
-            "locks": "lrwD",  # borg needs to create/delete a shared lock here
-            "packs": "lw",  # no r!
-        }
-    elif permissions == "read-only":  # mostly r/o
-        return {"": "lr", "locks": "lrwD"}
-    else:
-        raise Error(
-            f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: "
-            f"all, no-delete, write-only, read-only."
-        )
+    match permissions:
+        case "all":
+            return None  # permissions system will not be used
+        case "no-delete":  # mostly no delete, no overwrite
+            return {
+                "": "lr",
+                "archives": "lrw",
+                "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
+                "config": "lrW",  # W for manifest
+                "keys": "lr",
+                "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "packs": "lrw",
+            }
+        case "write-only":  # mostly no reading
+            return {
+                "": "l",
+                "archives": "lw",
+                "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
+                "config": "lrW",  # W for manifest
+                "keys": "lr",
+                "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "packs": "lw",  # no r!
+            }
+        case "read-only":  # mostly r/o
+            return {"": "lr", "locks": "lrwD"}
+        case _:
+            raise Error(
+                f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: "
+                f"all, no-delete, write-only, read-only."
+            )
 
 
 def rest_serve_command(location):

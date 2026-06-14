@@ -4,7 +4,7 @@ import os
 import textwrap
 from hashlib import sha256
 from pathlib import Path
-from typing import Literal, ClassVar, Optional
+from typing import Literal, ClassVar
 from collections.abc import Callable
 
 from ..logger import create_logger
@@ -45,7 +45,7 @@ KEYFILE_ID = "BORG_KEY"
 ADMIN_LABEL = "admin"
 
 
-def is_keyfile(data: str | bytes, repoid: Optional[str] = None) -> bool:
+def is_keyfile(data: str | bytes, repoid: str | None = None) -> bool:
     # repoid is a hex str, if given. if given, we only accept keyfiles for that repo.
     header = f"{KEYFILE_ID} {repoid or ''}"
     if isinstance(data, str):
@@ -61,7 +61,7 @@ def keyfile_format(repoid: str, b64data: str) -> str:
     return f"{KEYFILE_ID} {repoid}\n{b64data}\n"
 
 
-def keyfile_parse(data: str | bytes, repoid: Optional[str] = None) -> tuple[str, str]:
+def keyfile_parse(data: str | bytes, repoid: str | None = None) -> tuple[str, str]:
     if repoid is None:
         if not is_keyfile(data):
             raise ValueError("Not a keyfile")

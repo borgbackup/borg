@@ -139,20 +139,21 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
             offset = int(match.group("offset"))
             offset *= -1 if earlier else 1
 
-            if unit == "y":
-                return from_ts.replace(year=from_ts.year + offset)
-            elif unit == "m":
-                return offset_n_months(from_ts, offset)
-            elif unit == "w":
-                return from_ts + timedelta(days=offset * 7)
-            elif unit == "d":
-                return from_ts + timedelta(days=offset)
-            elif unit == "H":
-                return from_ts + timedelta(seconds=offset * 60 * 60)
-            elif unit == "M":
-                return from_ts + timedelta(seconds=offset * 60)
-            elif unit == "S":
-                return from_ts + timedelta(seconds=offset)
+            match unit:
+                case "y":
+                    return from_ts.replace(year=from_ts.year + offset)
+                case "m":
+                    return offset_n_months(from_ts, offset)
+                case "w":
+                    return from_ts + timedelta(days=offset * 7)
+                case "d":
+                    return from_ts + timedelta(days=offset)
+                case "H":
+                    return from_ts + timedelta(seconds=offset * 60 * 60)
+                case "M":
+                    return from_ts + timedelta(seconds=offset * 60)
+                case "S":
+                    return from_ts + timedelta(seconds=offset)
 
     raise ValueError(f"Invalid relative ts offset format: {format_string}")
 

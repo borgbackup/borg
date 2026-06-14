@@ -176,71 +176,74 @@ class CompressionSpec:
             raise ArgumentTypeError("not enough arguments")
         # --compression algo[,level]
         self.name = values[0]
-        if self.name in ("none", "lz4"):
-            return
-        elif self.name in ("zlib", "lzma", "zlib_legacy"):  # zlib_legacy just for testing
-            if count < 2:
-                level = 6  # default compression level in py stdlib
-            elif count == 2:
-                level = int(values[1])
-                if not 0 <= level <= 9:
-                    raise ArgumentTypeError("level must be >= 0 and <= 9")
-            else:
-                raise ArgumentTypeError("too many arguments")
-            self.level = level
-        elif self.name in ("zstd",):
-            if count < 2:
-                level = 3  # default compression level in zstd
-            elif count == 2:
-                level = int(values[1])
-                if not 1 <= level <= 22:
-                    raise ArgumentTypeError("level must be >= 1 and <= 22")
-            else:
-                raise ArgumentTypeError("too many arguments")
-            self.level = level
-        elif self.name == "auto":
-            if 2 <= count <= 3:
-                compression = ",".join(values[1:])
-            else:
-                raise ArgumentTypeError("bad arguments")
-            self.inner = CompressionSpec(compression)
-        elif self.name == "obfuscate":
-            if 3 <= count <= 5:
-                level = int(values[1])
-                if not ((1 <= level <= 6) or (110 <= level <= 123) or (level == 250)):
-                    raise ArgumentTypeError("level must be (inclusively) within 1...6, 110...123 or equal to 250")
+        match self.name:
+            case "none" | "lz4":
+                return
+            case "zlib" | "lzma" | "zlib_legacy":  # zlib_legacy just for testing
+                if count < 2:
+                    level = 6  # default compression level in py stdlib
+                elif count == 2:
+                    level = int(values[1])
+                    if not 0 <= level <= 9:
+                        raise ArgumentTypeError("level must be >= 0 and <= 9")
+                else:
+                    raise ArgumentTypeError("too many arguments")
                 self.level = level
-                compression = ",".join(values[2:])
-            else:
-                raise ArgumentTypeError("bad arguments")
-            self.inner = CompressionSpec(compression)
-        else:
-            raise ArgumentTypeError("unsupported compression type")
+            case "zstd":
+                if count < 2:
+                    level = 3  # default compression level in zstd
+                elif count == 2:
+                    level = int(values[1])
+                    if not 1 <= level <= 22:
+                        raise ArgumentTypeError("level must be >= 1 and <= 22")
+                else:
+                    raise ArgumentTypeError("too many arguments")
+                self.level = level
+            case "auto":
+                if 2 <= count <= 3:
+                    compression = ",".join(values[1:])
+                else:
+                    raise ArgumentTypeError("bad arguments")
+                self.inner = CompressionSpec(compression)
+            case "obfuscate":
+                if 3 <= count <= 5:
+                    level = int(values[1])
+                    if not ((1 <= level <= 6) or (110 <= level <= 123) or (level == 250)):
+                        raise ArgumentTypeError("level must be (inclusively) within 1...6, 110...123 or equal to 250")
+                    self.level = level
+                    compression = ",".join(values[2:])
+                else:
+                    raise ArgumentTypeError("bad arguments")
+                self.inner = CompressionSpec(compression)
+            case _:
+                raise ArgumentTypeError("unsupported compression type")
 
     @property
     def compressor(self):
         from ..compress import get_compressor
 
-        if self.name in ("none", "lz4"):
-            return get_compressor(self.name)
-        elif self.name in ("zlib", "lzma", "zstd", "zlib_legacy"):
-            return get_compressor(self.name, level=self.level)
-        elif self.name == "auto":
-            return get_compressor(self.name, compressor=self.inner.compressor)
-        elif self.name == "obfuscate":
-            return get_compressor(self.name, level=self.level, compressor=self.inner.compressor)
+        match self.name:
+            case "none" | "lz4":
+                return get_compressor(self.name)
+            case "zlib" | "lzma" | "zstd" | "zlib_legacy":
+                return get_compressor(self.name, level=self.level)
+            case "auto":
+                return get_compressor(self.name, compressor=self.inner.compressor)
+            case "obfuscate":
+                return get_compressor(self.name, level=self.level, compressor=self.inner.compressor)
 
     def __str__(self):
-        if self.name in ("none", "lz4"):
-            return f"{self.name}"
-        elif self.name in ("zlib", "lzma", "zstd", "zlib_legacy"):
-            return f"{self.name},{self.level}"
-        elif self.name == "auto":
-            return f"auto,{self.inner}"
-        elif self.name == "obfuscate":
-            return f"obfuscate,{self.level},{self.inner}"
-        else:
-            raise ValueError(f"unsupported compression type: {self.name}")
+        match self.name:
+            case "none" | "lz4":
+                return f"{self.name}"
+            case "zlib" | "lzma" | "zstd" | "zlib_legacy":
+                return f"{self.name},{self.level}"
+            case "auto":
+                return f"auto,{self.inner}"
+            case "obfuscate":
+                return f"obfuscate,{self.level},{self.inner}"
+            case _:
+                raise ValueError(f"unsupported compression type: {self.name}")
 
 
 def ChunkerParams(s):

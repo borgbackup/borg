@@ -147,16 +147,17 @@ class StandardLog(Vertical):
                 status_panel = self.app.query_one("#status")
                 status_panel.files_count += 1
                 status = line[0]
-                if status == "E":
-                    status_panel.error_count += 1
-                elif status in "U-":
-                    status_panel.unchanged_count += 1
-                elif status in "M":
-                    status_panel.modified_count += 1
-                elif status in "A+":
-                    status_panel.added_count += 1
-                elif status in "dcbs":
-                    status_panel.other_count += 1
+                match status:
+                    case "E":
+                        status_panel.error_count += 1
+                    case "U" | "-":
+                        status_panel.unchanged_count += 1
+                    case "M":
+                        status_panel.modified_count += 1
+                    case "A" | "+":
+                        status_panel.added_count += 1
+                    case "d" | "c" | "b" | "s":
+                        status_panel.other_count += 1
 
                 markup_tag = {
                     "E": "red",  # Error

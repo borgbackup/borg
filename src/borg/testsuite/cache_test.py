@@ -110,3 +110,33 @@ def test_read_chunkindex_from_repo_cache_missing(tmp_path):
         # Try to load a non-existent cache entry — should return None, not raise.
         result = read_chunkindex_from_repo_cache(repository, "f" * 64)
         assert result is None
+
+
+def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
+    """ChunksMixin.chunks binds the repository index without collapsing the cached fragments.
+
+    Each backup leaves a small incremental cache/chunks.* fragment; collapsing them all into one
+    on every access would re-upload the whole index and, with delete_other, invalidate every other
+    client's fragments. Fragment count is reclaimed by `borg compact`, not on every read here.
+    """
+    from ..cache import ChunksMixin, write_chunkindex_to_repo_cache, list_chunkindex_hashes
+    from ..hashindex import ChunkIndex, ChunkIndexEntry
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        # seed extra fragments on top of the empty one written at repo creation
+        for h in (H(1), H(2)):
+            ci = ChunkIndex()
+            ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
+            write_chunkindex_to_repo_cache(repository, ci, incremental=False, force_write=True)
+        before = len(list_chunkindex_hashes(repository))
+        assert before > 1
+
+        cache = ChunksMixin()
+        cache.repository = repository
+        index = cache.chunks  # binds the repository index; must NOT collapse the fragments
+
+        # fragments are left intact (no consolidation side effect) ...
+        assert len(list_chunkindex_hashes(repository)) == before
+        # ... and the in-memory index still resolves every seeded chunk
+        assert H(1) in index and H(2) in index

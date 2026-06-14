@@ -3,7 +3,8 @@ import sys
 from hashlib import sha256
 
 import pytest
-from ..helpers import IntegrityError, Location
+from ..helpers import IntegrityError, Location, bin_to_hex
+from ..hashindex import ChunkIndex
 from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
@@ -78,12 +79,14 @@ def pdchunk(chunk):
 def test_basic_operations(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
-            repository.put(H(x), fchunk(b"SOMEDATA"))
+            repository.put(H(x), fchunk(b"SOMEDATA"))  # put() updates _chunks via PackWriter
         key50 = H(50)
         assert pdchunk(repository.get(key50)) == b"SOMEDATA"
         repository.delete(key50)
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
+    # no manual hand-off of the index across reopen: close() persisted it to the repo cache,
+    # and the freshly opened repo rebuilds .chunks from there (or by listing the repo) on its own.
     with reopen(repository) as repository:
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
@@ -91,6 +94,32 @@ def test_basic_operations(repo_fixtures, request):
             if x == 50:
                 continue
             assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
+
+
+def test_chunk_index_persisted_on_close(tmp_path):
+    # close() must serialize the live chunk index into the repo cache, so a freshly opened
+    # repo can resolve pack locations without any manual hand-off. This proves the round-trip
+    # by reading the persisted index back directly (not via a repo rescan, which at N=1 would
+    # reconstruct the same entries and so could mask a broken persist step).
+    from ..cache import list_chunkindex_hashes, read_chunkindex_from_repo_cache
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(10):
+            repository.put(H(x), fchunk(b"DATA"))  # N=1: each put() flushes immediately
+    # reopen and read the cached fragments straight from disk
+    with Repository(location, exclusive=True) as repository:
+        persisted = ChunkIndex()
+        for hash in list_chunkindex_hashes(repository):
+            fragment = read_chunkindex_from_repo_cache(repository, hash)
+            if fragment is not None:
+                for k, v in fragment.items():
+                    persisted[k] = v
+        for x in range(10):
+            assert H(x) in persisted  # close() actually wrote this session's chunks
+        # and the reopened repo resolves them end to end
+        for x in range(10):
+            assert pdchunk(repository.get(H(x))) == b"DATA"
 
 
 def test_read_data(repo_fixtures, request):
@@ -158,13 +187,20 @@ class MockStore:
         self.stored[key] = data
 
 
+class FailingStore:
+    """A store whose pack write always fails -- used to exercise flush()'s rollback path."""
+
+    def store(self, key, data):
+        raise OSError("simulated store failure")
+
+
 def test_pack_writer_returns_none_when_not_full():
-    pw = PackWriter(MockStore(), max_count=2)
+    pw = PackWriter(MockStore(), max_count=2, chunks=ChunkIndex())
     assert pw.add(b"a" * 32, b"data") is None
 
 
 def test_pack_writer_flush_returns_none_when_empty():
-    pw = PackWriter(MockStore(), max_count=1)
+    pw = PackWriter(MockStore(), max_count=1, chunks=ChunkIndex())
     assert pw.flush() is None
 
 
@@ -172,7 +208,7 @@ def test_pack_writer_n1_flush():
     store = MockStore()
     chunk_id = b"c" * 32
     cdata = b"payload"
-    pw = PackWriter(store, max_count=1)
+    pw = PackWriter(store, max_count=1, chunks=ChunkIndex())
     results = pw.add(chunk_id, cdata)
     assert results is not None
     assert len(results) == 1
@@ -187,7 +223,7 @@ def test_pack_writer_n2_flush():
     store = MockStore()
     id1, id2 = b"a" * 32, b"b" * 32
     data1, data2 = b"first", b"second"
-    pw = PackWriter(store, max_count=2)
+    pw = PackWriter(store, max_count=2, chunks=ChunkIndex())
     assert pw.add(id1, data1) is None
     results = pw.add(id2, data2)
     assert results is not None
@@ -198,13 +234,113 @@ def test_pack_writer_n2_flush():
     assert results[1] == (id2, expected_pack_id, len(data1), len(data2))
 
 
+def test_pack_writer_rolls_back_index_on_failed_store():
+    # If store.store() fails, flush() must drop the entries add() pre-marked, otherwise the index
+    # keeps a phantom (indexed but never stored) chunk that seen_chunk() reports as present and a
+    # later identical chunk would dedup against -- silent data loss (#9744 review).
+    chunks = ChunkIndex()
+    chunk_id = b"e" * 32
+    pw = PackWriter(FailingStore(), max_count=1, chunks=chunks)
+    with pytest.raises(OSError):
+        pw.add(chunk_id, b"payload")  # max_count=1 -> add() flushes immediately and fails
+    assert chunks.get(chunk_id) is None  # rolled back: no phantom entry left behind
+
+
+def test_failed_store_phantom_not_persisted(tmp_path):
+    # The phantom must not survive into the persisted repo cache either: close() can write the
+    # in-memory index on context exit, so the rollback has to happen before anything is serialized.
+    from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
+
+    chunk_id = H(60)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        # a PackWriter that shares the repository's index but writes to a store that always fails:
+        pw = PackWriter(FailingStore(), max_count=1, repository=repository)
+        with pytest.raises(OSError):
+            pw.add(chunk_id, fchunk(b"DATA"))
+        assert repository.chunks.get(chunk_id) is None  # gone from the in-memory index ...
+        # ... and persisting + reloading the cache does not bring it back:
+        write_chunkindex_to_repo_cache(repository, repository.chunks, incremental=True)
+        reloaded = build_chunkindex_from_repo(repository)
+        assert reloaded.get(chunk_id) is None
+
+
+def test_get_read_data_false_with_range(tmp_path):
+    # read_data=False with ChunkIndex entries limits the load to each object's boundary.
+    hdr_size = RepoObj.obj_header.size
+    chunk1 = fchunk(b"FIRST")
+    chunk2 = fchunk(b"SECOND")
+    pack = chunk1 + chunk2
+    pack_id = H(43)
+    id1, id2 = H(47), H(48)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
+        chunks = ChunkIndex()
+        chunks.add(id1, len(chunk1))
+        chunks.update_pack_info([(id1, pack_id, 0, len(chunk1))])
+        chunks.add(id2, len(chunk2))
+        chunks.update_pack_info([(id2, pack_id, len(chunk1), len(chunk2))])
+        repository.chunks = chunks
+        assert repository.get(id1, read_data=False) == chunk1[:hdr_size]
+        assert repository.get(id2, read_data=False) == chunk2[:hdr_size]
+
+
+def test_get_read_data_false_large_meta(tmp_path):
+    # When meta_size > extra_size (975 bytes), get() retries with a larger load.
+    hdr_size = RepoObj.obj_header.size
+    # the first try loads ~1KB, so use a meta clearly past that boundary to force the retry path.
+    big_meta = b"M" * 5000
+    chunk = fchunk(b"DATA", meta=big_meta)
+    pack_id = H(44)
+    chunk_id = H(49)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), chunk)
+        chunks = ChunkIndex()
+        chunks.add(chunk_id, len(chunk))
+        chunks.update_pack_info([(chunk_id, pack_id, 0, len(chunk))])
+        repository.chunks = chunks
+        result = repository.get(chunk_id, read_data=False)
+        assert result == chunk[: hdr_size + len(big_meta)]
+
+
+def test_get_uses_chunk_index_location(tmp_path):
+    # get() routes to the correct pack and offset when a ChunkIndex is assigned via the chunks property.
+    chunk1 = fchunk(b"FIRST")
+    chunk2 = fchunk(b"SECOND")
+    pack = chunk1 + chunk2
+    pack_id = H(55)
+    id1, id2 = H(56), H(57)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        # Inject the pack directly; bypasses PackWriter to test routing independently.
+        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
+        chunks = ChunkIndex()
+        chunks.add(id1, len(chunk1))
+        chunks.update_pack_info([(id1, pack_id, 0, len(chunk1))])
+        chunks.add(id2, len(chunk2))
+        chunks.update_pack_info([(id2, pack_id, len(chunk1), len(chunk2))])
+        repository.chunks = chunks
+        assert repository.get(id1) == chunk1
+        assert repository.get(id2) == chunk2
+
+
+def test_put_marks_id_in_chunk_index(tmp_path):
+    # put() immediately updates _chunks: add() marks the id as seen, then update_pack_info
+    # fills in the real pack location for the current session.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        id1 = H(1)
+        repository.put(id1, fchunk(b"ZEROS"))
+        entry = repository._chunks.get(id1)
+        assert entry is not None
+        assert entry.pack_id == id1  # N=1: pack_id == chunk_id, set by update_pack_info in put()
+        assert entry.size == 0  # uncompressed size filled in by cache layer
+
+
 def test_pack_writer_final_partial_pack_uses_sha256():
     # When max_count > 1, a final flush with only 1 piece must still use SHA256,
     # not the N=1 pack_id == chunk_id hack.
     store = MockStore()
     chunk_id = b"d" * 32
     cdata = b"solo"
-    pw = PackWriter(store, max_count=3)
+    pw = PackWriter(store, max_count=3, chunks=ChunkIndex())
     assert pw.add(chunk_id, cdata) is None
     results = pw.flush()
     assert results is not None

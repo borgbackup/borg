@@ -18,13 +18,31 @@ logger = create_logger()
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_SIGNAL_BASE, Error
 
 
+# Signals the background (grandchild) process uses to notify the foreground process that
+# it has started up (or failed to start up), see daemonizing(). These are blocked across
+# the fork in _daemonize() so that an early notification can not be delivered to the
+# foreground before it is ready to wait for it - otherwise the globally installed signal
+# handlers (see archiver.run) would raise at an unexpected, uncaught place.
+DAEMONIZE_NOTIFY_SIGNALS = [
+    sig for sig in (getattr(signal, name, None) for name in ("SIGTERM", "SIGHUP", "SIGINT")) if sig is not None
+]
+# The foreground process waits for the notify signals with signal.sigwait() (which, unlike
+# signal.sigtimedwait(), is also available on macOS). To still honor the timeout, we arm a
+# SIGALRM timer and wait for it as well, so it must be blocked and waited for, too.
+DAEMONIZE_WAIT_SIGNALS = DAEMONIZE_NOTIFY_SIGNALS + [signal.SIGALRM]
+
+
 @contextlib.contextmanager
 def _daemonize():
     from ..platform import get_process_id
 
     old_id = get_process_id()
+    # Block the notify (and timeout) signals before forking, see DAEMONIZE_WAIT_SIGNALS.
+    old_sigmask = signal.pthread_sigmask(signal.SIG_BLOCK, DAEMONIZE_WAIT_SIGNALS)
     pid = os.fork()
     if pid:
+        # The foreground process keeps the notify signals blocked - daemonizing() waits
+        # for them explicitly via signal.sigwait(), so it can not miss an early one.
         exit_code = EXIT_SUCCESS
         try:
             yield old_id, None
@@ -33,6 +51,8 @@ def _daemonize():
         finally:
             logger.debug("Daemonizing: Foreground process (%s, %s, %s) is now dying." % old_id)
             os._exit(exit_code)
+    # Background process: restore the original signal mask, we want normal handling here.
+    signal.pthread_sigmask(signal.SIG_SETMASK, old_sigmask)
     os.setsid()
     pid = os.fork()
     if pid:
@@ -81,47 +101,46 @@ def daemonizing(*, timeout=5, show_rc=False):
             # The original / parent process, waiting for a signal to die.
             logger.debug("Daemonizing: Foreground process (%s, %s, %s) is waiting for background process..." % old_id)
             exit_code = EXIT_SUCCESS
-            # Indeed, SIGHUP and SIGTERM handlers should have been set on archiver.run(). Just in case...
-            with (
-                signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)),
-                signal_handler("SIGHUP", raising_signal_handler(SigHup)),
-                signal_handler("SIGTERM", raising_signal_handler(SigTerm)),
-            ):
+            # The notify signals are blocked since before the fork in _daemonize(), so we can
+            # wait for them atomically here and will not miss an early signal from the background
+            # process (which could otherwise be delivered before we are ready to wait for it and
+            # then escape uncaught). See DAEMONIZE_WAIT_SIGNALS.
+            sighup = getattr(signal, "SIGHUP", None)
+            if timeout > 0:
+                # Arm a timer so we don't wait forever if the background never signals us.
+                # SIGALRM is blocked, too, so it does not run a handler but ends the sigwait().
+                signal.setitimer(signal.ITIMER_REAL, timeout)
                 try:
-                    if timeout > 0:
-                        time.sleep(timeout)
-                except SigTerm:
-                    # Normal termination; expected from grandchild, see 'os.kill()' below
-                    pass
-                except SigHup:
-                    # Background wants to indicate a problem; see 'os.kill()' below,
-                    # log message will come from grandchild.
-                    exit_code = EXIT_WARNING
-                except KeyboardInterrupt:
-                    # Manual termination.
-                    logger.debug("Daemonizing: Foreground process (%s, %s, %s) received SIGINT." % old_id)
-                    exit_code = EXIT_SIGNAL_BASE + 2
-                except BaseException as e:
-                    # Just in case...
-                    logger.warning(
-                        "Daemonizing: Foreground process received an exception while waiting:\n"
-                        + "".join(traceback.format_exception(e.__class__, e, e.__traceback__))
-                    )
-                    exit_code = EXIT_WARNING
-                else:
-                    logger.warning("Daemonizing: Background process did not respond (timeout). Is it alive?")
-                    exit_code = EXIT_WARNING
+                    sig = signal.sigwait(DAEMONIZE_WAIT_SIGNALS)
                 finally:
-                    # Before terminating the foreground process, honor --show-rc by logging the rc here as well.
-                    # This is mostly a consistency fix and not very useful considering that the main action
-                    # happens in the daemon process.
-                    if show_rc:
-                        from ..helpers import do_show_rc
+                    signal.setitimer(signal.ITIMER_REAL, 0)  # disarm
+            else:
+                sig = signal.SIGALRM  # no waiting: behave as if the timeout had elapsed
+            if sig == signal.SIGALRM:
+                # Timeout: the background process did not signal us in time.
+                logger.warning("Daemonizing: Background process did not respond (timeout). Is it alive?")
+                exit_code = EXIT_WARNING
+            elif sig == signal.SIGTERM:
+                # Normal termination; expected from grandchild, see 'os.kill()' below.
+                pass
+            elif sighup is not None and sig == sighup:
+                # Background wants to indicate a problem; see 'os.kill()' below,
+                # log message will come from grandchild.
+                exit_code = EXIT_WARNING
+            elif sig == signal.SIGINT:
+                # Manual termination.
+                logger.debug("Daemonizing: Foreground process (%s, %s, %s) received SIGINT." % old_id)
+                exit_code = EXIT_SIGNAL_BASE + 2
+            # Before terminating the foreground process, honor --show-rc by logging the rc here as well.
+            # This is mostly a consistency fix and not very useful considering that the main action
+            # happens in the daemon process.
+            if show_rc:
+                from ..helpers import do_show_rc
 
-                        do_show_rc(exit_code)
-                    # Don't call with-body, but die immediately!
-                    # return would be sufficient, but we want to pass the exit code.
-                    raise _ExitCodeException(exit_code)
+                do_show_rc(exit_code)
+            # Don't call with-body, but die immediately!
+            # return would be sufficient, but we want to pass the exit code.
+            raise _ExitCodeException(exit_code)
 
         # The background / grandchild process.
         sig_to_foreground = signal.SIGTERM

@@ -24,7 +24,7 @@ try:
     import os
     import shlex
     import signal
-    from datetime import datetime, timezone
+    from datetime import UTC, datetime
 
     from ..logger import create_logger, setup_logging
 
@@ -386,7 +386,7 @@ class Archiver(
         # thus we have to initialize replace_placeholders here and process all args that need placeholder replacement.
         if getattr(args, "timestamp", None):
             replace_placeholders.override("now", DatetimeWrapper(args.timestamp))
-            replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(timezone.utc)))
+            replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(UTC)))
             args.location = args.location.with_timestamp(args.timestamp)
         for name in "name", "other_name", "newname", "comment":
             value = getattr(args, name, None)

@@ -355,7 +355,7 @@ jobs:
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
-      uses: codecov/codecov-action@v6
+      uses: codecov/codecov-action@v7
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}
@@ -367,7 +367,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
-      uses: codecov/codecov-action@v6
+      uses: codecov/codecov-action@v7
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}
@@ -600,7 +600,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         env:
           OS: ${{ matrix.os }}
         with:
@@ -611,7 +611,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         env:
           OS: ${{ matrix.os }}
         with:
@@ -682,7 +682,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         env:
           OS: ${{ runner.os }}
           python: '3.11'
@@ -694,7 +694,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         env:
           OS: ${{ runner.os }}
           python: '3.11'

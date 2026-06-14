@@ -1,4 +1,5 @@
-from typing import NamedTuple, Tuple, Type, IO, Iterator, Any, MutableMapping
+from collections.abc import Iterator, MutableMapping
+from typing import IO, Any, NamedTuple
 
 PATH_OR_FILE = str | IO
 
@@ -11,7 +12,7 @@ class ChunkIndexEntry(NamedTuple):
     obj_offset: int
     obj_size: int
 
-CIE = Tuple[int, int, bytes, int, int] | Type[ChunkIndexEntry]
+CIE = tuple[int, int, bytes, int, int] | type[ChunkIndexEntry]
 
 class ChunkIndex:
     F_NONE: int
@@ -25,7 +26,7 @@ class ChunkIndex:
     def iteritems(self, *, only_new: bool = ...) -> Iterator: ...
     def clear_new(self) -> None: ...
     def __contains__(self, key: bytes) -> bool: ...
-    def __getitem__(self, key: bytes) -> Type[ChunkIndexEntry]: ...
+    def __getitem__(self, key: bytes) -> type[ChunkIndexEntry]: ...
     def __setitem__(self, key: bytes, value: CIE) -> None: ...
 
 class FuseVersionsIndexEntry(NamedTuple):

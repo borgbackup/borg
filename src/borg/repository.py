@@ -153,6 +153,8 @@ class PackWriter:
         # get() refuses a pending entry (PackLocationUnknown) before any offset would matter.
         # Precondition: callers add only chunks not already stored (the cache dedups via
         # seen_chunk() first), so add(chunk_id, 0) never resets a real size on an existing entry.
+        # This is also what keeps ChunkIndex.add's "v.size == 0 or v.size == size" assertion happy:
+        # a fresh id has no entry, so the size=0 we pass here is never compared against a real size.
         self.chunks.add(chunk_id, 0)  # size filled in by cache layer
         self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, 0, len(cdata))])
         self._pieces.append((chunk_id, cdata))
@@ -195,8 +197,22 @@ class PackWriter:
             offset += obj_size
 
         key = "packs/" + bin_to_hex(pack_id)
+        # ids this flush pre-marked in the index via add() (pack_id still UNKNOWN_BYTES32).
+        pending_ids = [chunk_id for chunk_id, _ in self._pieces]
         try:
             self.store.store(key, pack_data)
+        except Exception:
+            # The pack was not durably stored, so every entry add() pre-marked for it now
+            # points at data that does not exist.  Leaving them would make seen_chunk() report
+            # these ids as present, letting a later identical chunk dedup against bytes that were
+            # never written -- silent data loss.  These entries were created this session and never
+            # received a real pack_id, so dropping them restores the index to its pre-add() state
+            # (matching master, where the index only ever reflected successfully stored chunks).
+            for chunk_id in pending_ids:
+                entry = self.chunks.get(chunk_id)
+                if entry is not None and entry.pack_id == UNKNOWN_BYTES32:
+                    del self.chunks[chunk_id]
+            raise
         finally:
             self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
         self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
@@ -726,7 +742,10 @@ class Repository:
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
                 load_size = hdr_size + extra_size
-                # clamp so a corrupted or malicious obj_size cannot cause an oversized read.
+                # keep the read inside this object: at N>1 a pack holds neighbouring objects, so
+                # don't pull bytes past obj_size into the next one. (an overshoot would be harmless
+                # -- parse_meta uses the header's length and ignores trailing bytes -- this is just
+                # tidy.) obj_size comes from the same index we already route with.
                 load_size = min(load_size, obj_size)
                 obj = self.store.load(key, offset=obj_offset, size=load_size)
                 hdr = obj[0:hdr_size]
@@ -737,7 +756,7 @@ class Repository:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
                     retry_size = hdr_size + meta_size
-                    # normally a no-op; guards against a corrupted meta_size producing an oversize read.
+                    # same boundary as above: normally a no-op, just keeps the retry within this object.
                     retry_size = min(retry_size, obj_size)
                     obj = self.store.load(key, offset=obj_offset, size=retry_size)
                 meta = obj[hdr_size : hdr_size + meta_size]

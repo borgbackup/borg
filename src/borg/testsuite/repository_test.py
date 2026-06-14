@@ -187,6 +187,13 @@ class MockStore:
         self.stored[key] = data
 
 
+class FailingStore:
+    """A store whose pack write always fails -- used to exercise flush()'s rollback path."""
+
+    def store(self, key, data):
+        raise OSError("simulated store failure")
+
+
 def test_pack_writer_returns_none_when_not_full():
     pw = PackWriter(MockStore(), max_count=2, chunks=ChunkIndex())
     assert pw.add(b"a" * 32, b"data") is None
@@ -227,6 +234,36 @@ def test_pack_writer_n2_flush():
     assert results[1] == (id2, expected_pack_id, len(data1), len(data2))
 
 
+def test_pack_writer_rolls_back_index_on_failed_store():
+    # If store.store() fails, flush() must drop the entries add() pre-marked, otherwise the index
+    # keeps a phantom (indexed but never stored) chunk that seen_chunk() reports as present and a
+    # later identical chunk would dedup against -- silent data loss (#9744 review).
+    chunks = ChunkIndex()
+    chunk_id = b"e" * 32
+    pw = PackWriter(FailingStore(), max_count=1, chunks=chunks)
+    with pytest.raises(OSError):
+        pw.add(chunk_id, b"payload")  # max_count=1 -> add() flushes immediately and fails
+    assert chunks.get(chunk_id) is None  # rolled back: no phantom entry left behind
+
+
+def test_failed_store_phantom_not_persisted(tmp_path):
+    # The phantom must not survive into the persisted repo cache either: close() can write the
+    # in-memory index on context exit, so the rollback has to happen before anything is serialized.
+    from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
+
+    chunk_id = H(60)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        # a PackWriter that shares the repository's index but writes to a store that always fails:
+        pw = PackWriter(FailingStore(), max_count=1, repository=repository)
+        with pytest.raises(OSError):
+            pw.add(chunk_id, fchunk(b"DATA"))
+        assert repository.chunks.get(chunk_id) is None  # gone from the in-memory index ...
+        # ... and persisting + reloading the cache does not bring it back:
+        write_chunkindex_to_repo_cache(repository, repository.chunks, incremental=True)
+        reloaded = build_chunkindex_from_repo(repository)
+        assert reloaded.get(chunk_id) is None
+
+
 def test_get_read_data_false_with_range(tmp_path):
     # read_data=False with ChunkIndex entries limits the load to each object's boundary.
     hdr_size = RepoObj.obj_header.size
@@ -250,7 +287,8 @@ def test_get_read_data_false_with_range(tmp_path):
 def test_get_read_data_false_large_meta(tmp_path):
     # When meta_size > extra_size (975 bytes), get() retries with a larger load.
     hdr_size = RepoObj.obj_header.size
-    big_meta = b"M" * 1000  # 1000 > 975, forces the retry load
+    # the first try loads ~1KB, so use a meta clearly past that boundary to force the retry path.
+    big_meta = b"M" * 5000
     chunk = fchunk(b"DATA", meta=big_meta)
     pack_id = H(44)
     chunk_id = H(49)

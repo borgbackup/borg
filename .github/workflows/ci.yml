@@ -703,3 +703,57 @@ jobs:
           report_type: coverage
           env_vars: OS,python
           files: coverage.xml
+
+  sha256_pack_id_tests:
+    name: sha256 pack-id (informational)
+    needs: [lint]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    continue-on-error: true
+    concurrency:
+      group: sha256-pack-id-${{ github.head_ref || github.ref }}
+      cancel-in-progress: false
+
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+
+    - name: Cache pip
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-sha256-pack-id-${{ hashFiles('requirements.d/development.lock.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-pip-
+
+    - name: Cache tox environments
+      uses: actions/cache@v5
+      with:
+        path: .tox
+        key: ${{ runner.os }}-${{ runner.arch }}-tox-sha256-pack-id-${{ hashFiles('requirements.d/development.lock.txt', 'pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-tox-sha256-pack-id-
+
+    - name: Install Linux packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev
+
+    - name: Install Python requirements
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.d/development.lock.txt
+
+    - name: Install borgbackup
+      run: pip install -ve ".[cockpit,s3,sftp,rclone]"
+
+    - name: Run tests with sha256 pack-ids
+      run: tox -e sha256-pack-id

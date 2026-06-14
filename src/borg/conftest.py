@@ -80,6 +80,9 @@ def pytest_sessionfinish(session, exitstatus):
 @pytest.fixture(autouse=True)
 def clean_env(tmpdir_factory, monkeypatch):
     # also avoid to use anything from the outside environment:
+    # note: BORG_TESTONLY_SHA256_PACK_ID is intentionally NOT exempted here. The repository
+    # module captures it at import time (repository.FORCE_SHA256_PACK_ID), before this fixture
+    # runs, so wiping it per test is harmless and the env stays fully isolated.
     keys = [key for key in os.environ if key.startswith("BORG_") and key not in ("BORG_FUSE_IMPL",)]
     for key in keys:
         monkeypatch.delenv(key, raising=False)

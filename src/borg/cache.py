@@ -535,6 +535,9 @@ def delete_chunkindex_cache(repository):
         except StoreObjectNotFound:
             pass
     logger.debug(f"cached chunk indexes deleted: {hashes}")
+    # the in-memory index is now stale; drop it so close() does not write it back into the
+    # cache we just deleted. the next .chunks access rebuilds it from actual repo contents.
+    repository.invalidate_chunk_index()
 
 
 CHUNKINDEX_HASH_SEED = b"0001"  # increment seed to invalidate old chunk indexes
@@ -553,15 +556,22 @@ def write_chunkindex_to_repo_cache(
     # but for simplicity, we do it anyway.
     for key, existing in chunks.iteritems(only_new=incremental):
         chunks_to_write[key] = existing._replace(flags=ChunkIndex.F_NONE, size=0)
+    num_to_write = len(chunks_to_write)
     with io.BytesIO() as f:
         chunks_to_write.write(f)
         data = f.getvalue()
-    logger.debug(f"caching {len(chunks_to_write)} chunks (incremental={incremental}).")
+    logger.debug(f"caching {num_to_write} chunks (incremental={incremental}).")
     chunks_to_write.clear()  # free memory of the temporary table
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately
     new_hash = hashlib.sha256(data + CHUNKINDEX_HASH_SEED).hexdigest()
+    if num_to_write == 0 and not force_write:
+        # don't persist an empty incremental index: if it became the only cache/chunks.* (e.g. right
+        # after delete_chunkindex_cache()), build_chunkindex_from_repo() would return it as-is instead
+        # of rebuilding from the repo. with nothing new, the existing cache is already up to date.
+        logger.debug("no new chunks to cache; not writing an empty incremental chunk index.")
+        return new_hash
     cached_hashes = list_chunkindex_hashes(repository)
     if force_write or new_hash not in cached_hashes:
         # when an updated chunks index is stored into the cache, we also store its hash as part of the name.
@@ -642,6 +652,13 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
     num_chunks = 0
     # The repo says it has these chunks, so we assume they are referenced/used chunks.
     # We do not know the plaintext size (!= stored_size), thus we set size = 0.
+    #
+    # IMPORTANT (N=1 only): listing yields pack_ids, not per-chunk locations. We can only
+    # reconstruct the index here under the N=1 assumption -- pack_id == chunk_id, one chunk per
+    # pack at offset 0 spanning the whole pack. At N>1 this is wrong: a cold rebuild would have to
+    # open each pack and read its header to recover the per-chunk offsets and sizes. Until that
+    # exists, Repository.get()'s range-load is only correct while a persisted/cached chunk index
+    # is available; a cold rebuild from a bare repo listing silently falls back to N=1 semantics.
     for pack_id, pack_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
         num_chunks += 1
         chunk_id = pack_id  # N=1: chunk_id == pack_id
@@ -678,7 +695,16 @@ class ChunksMixin:
     @property
     def chunks(self):
         if self._chunks is None:
-            self._chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
+            # the repository owns the one and only chunk index; use it rather than
+            # building a second one and pushing it back into the repository.
+            self._chunks = self.repository.chunks
+            # note: we deliberately do NOT consolidate the cached chunk index fragments here.
+            # each backup writes a small incremental cache/chunks.* fragment (only its new chunks),
+            # which is cheap. collapsing them all into one big fragment on every run would re-upload
+            # the whole index and, with delete_other, invalidate every other client's fragments --
+            # a multi-GB churn per run on a shared repo. fragment count is reclaimed by `borg compact`
+            # (build_chunkindex_from_repo with cache_immediately). a size/threshold-based policy that
+            # bounds the fragment count without re-uploading large fragments can be added later.
         return self._chunks
 
     def seen_chunk(self, id, size=None):
@@ -831,11 +857,8 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def close(self):
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
-        # Flush any chunks still buffered in the pack writer and update the index
-        # so the last batch gets real pack location values instead of UNKNOWN_*.
         if self._chunks is not None:
-            pack_results = self.repository.flush()
-            self._chunks.update_pack_info(pack_results)
+            self.repository.flush()
         if self._files is not None:
             pi.output("Saving files cache")
             integrity_data = self._write_files_cache(self._files)
@@ -869,6 +892,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def wipe_cache(self):
         logger.warning("Discarding incompatible cache and forcing a cache rebuild")
         self._chunks = ChunkIndex()
+        self.repository.chunks = self._chunks
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
 

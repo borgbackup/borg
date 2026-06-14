@@ -100,12 +100,26 @@ def build_rest_backend(location):
     return REST(base_url="http://stdio-backend", command=rest_serve_command(location))
 
 
+# Test-only switch: force sha256 pack_ids even at N=1, to expose code that still assumes
+# pack_id == chunk_id. Read once here, at import time, on purpose:
+#  - it happens before the per-test clean_env fixture wipes BORG_* vars, so the tox env that
+#    sets this var does not need a clean_env exemption (the captured value survives the wipe);
+#  - flush() then checks a plain bool instead of touching os.environ on every write.
+FORCE_SHA256_PACK_ID = os.environ.get("BORG_TESTONLY_SHA256_PACK_ID") == "1"
+
+
 class PackWriter:
     """Buffers chunks into a pack file and writes to the store when full.
 
     Collects (chunk_id, cdata) pairs in a list and flushes once max_count is
-    reached.  On flush it returns the location info for every chunk so the
-    caller can update the ChunkIndex with real values.
+    reached.  PackWriter maintains the ChunkIndex directly: each add() marks the
+    chunk as pending (pack_id=UNKNOWN_BYTES32); flush() then assigns the real
+    pack_id, offset and size to every pending entry once the pack is on disk.
+
+    The index is not owned here.  Construction requires either a repository or an
+    explicit chunks index; there is no silent default.  With a repository, the writer
+    uses that repository's single, authoritative index (see the chunks property), so
+    there is never a second copy to keep in sync.  Unit tests pass an explicit index.
 
     At max_count=1 (N=1 phase) each put() maps exactly one chunk to one pack,
     so pack_id == chunk_id and the naming scheme is unchanged from before.
@@ -113,13 +127,37 @@ class PackWriter:
     this class's interface.
     """
 
-    def __init__(self, store, *, max_count=1):
+    def __init__(self, store, *, max_count=1, chunks=None, repository=None):
+        if repository is None and chunks is None:
+            raise ValueError("PackWriter requires either a repository or an explicit chunks index")
         self.store = store
         self.max_count = max_count
+        self.repository = repository  # when set, the one and only index lives there
+        self._chunks = chunks  # explicit index for repository-less use (tests)
         self._pieces = []  # list of (chunk_id, cdata)
+
+    @property
+    def chunks(self):
+        """The ChunkIndex this writer updates.
+
+        With a repository, this is the repository's single index (shared, not copied).
+        Without one, it is the explicit index passed at construction.
+        """
+        if self.repository is not None:
+            return self.repository.chunks
+        return self._chunks
 
     def add(self, chunk_id, cdata):
         """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
+        # Mark the chunk as pending (pack_id=UNKNOWN_BYTES32).  flush() assigns the real
+        # pack_id and offset for every piece, so the placeholder offset 0 here is never read:
+        # get() refuses a pending entry (PackLocationUnknown) before any offset would matter.
+        # Precondition: callers add only chunks not already stored (the cache dedups via
+        # seen_chunk() first), so add(chunk_id, 0) never resets a real size on an existing entry.
+        # This is also what keeps ChunkIndex.add's "v.size == 0 or v.size == size" assertion happy:
+        # a fresh id has no entry, so the size=0 we pass here is never compared against a real size.
+        self.chunks.add(chunk_id, 0)  # size filled in by cache layer
+        self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, 0, len(cdata))])
         self._pieces.append((chunk_id, cdata))
         if len(self._pieces) >= self.max_count:
             return self.flush()
@@ -128,9 +166,9 @@ class PackWriter:
     def flush(self):
         """Write the current pack to the store.
 
-        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples —
+        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples --
         one entry per chunk that was written.  Returns None if there was nothing
-        to flush.
+        to flush.  Always updates the ChunkIndex with the real pack_id.
         """
         if not self._pieces:
             return None
@@ -144,10 +182,12 @@ class PackWriter:
         #      (backward-compatible file naming: packs/{chunk_id_hex}).
         # N>1: the pack contains multiple chunks; use SHA256(pack_bytes) so the
         #      file is content-addressed and borgstore can verify/cache it.
-        if self.max_count == 1:
+        # BORG_TESTONLY_SHA256_PACK_ID (see FORCE_SHA256_PACK_ID): always use sha256 even at
+        #      N=1, exposing code that still assumes pack_id == chunk_id.
+        if self.max_count == 1 and not FORCE_SHA256_PACK_ID:
             pack_id = self._pieces[0][0]  # N=1: pack_id == chunk_id
         else:
-            pack_id = sha256(pack_data).digest()  # N>1: content-addressed
+            pack_id = sha256(pack_data).digest()
 
         # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
         results = []
@@ -158,10 +198,25 @@ class PackWriter:
             offset += obj_size
 
         key = "packs/" + bin_to_hex(pack_id)
+        # ids this flush pre-marked in the index via add() (pack_id still UNKNOWN_BYTES32).
+        pending_ids = [chunk_id for chunk_id, _ in self._pieces]
         try:
             self.store.store(key, pack_data)
+        except Exception:
+            # The pack was not durably stored, so every entry add() pre-marked for it now
+            # points at data that does not exist.  Leaving them would make seen_chunk() report
+            # these ids as present, letting a later identical chunk dedup against bytes that were
+            # never written -- silent data loss.  These entries were created this session and never
+            # received a real pack_id, so dropping them restores the index to its pre-add() state
+            # (matching master, where the index only ever reflected successfully stored chunks).
+            for chunk_id in pending_ids:
+                entry = self.chunks.get(chunk_id)
+                if entry is not None and entry.pack_id == UNKNOWN_BYTES32:
+                    del self.chunks[chunk_id]
+            raise
         finally:
             self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
+        self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
         return results
 
 
@@ -203,6 +258,19 @@ class Repository:
 
         exit_mcode = 17
 
+        def __init__(self, id, repo):
+            if isinstance(id, bytes):
+                id = bin_to_hex(id)
+            super().__init__(id, repo)
+
+    class PackLocationUnknown(ErrorWithTraceback):
+        """Object with key {} is indexed but its pack location is unresolved in repository {}."""
+
+        exit_mcode = 22
+
+        # this is a code bug, not a genuine miss: the chunk is in the index but still buffered
+        # (not flushed).  deliberately NOT a subclass of ObjectNotFound, so the usual
+        # "except ObjectNotFound" handlers do not swallow it -- it surfaces loudly with a traceback.
         def __init__(self, id, repo):
             if isinstance(id, bytes):
                 id = bin_to_hex(id)
@@ -286,6 +354,7 @@ class Repository:
         self.lock_wait = lock_wait
         self.exclusive = exclusive
         self._pack_writer = None
+        self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self._location}>"
@@ -415,23 +484,68 @@ class Repository:
         # important: lock *after* making sure that there actually is an existing, supported repository.
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
-        self._pack_writer = PackWriter(self.store, max_count=1)
+        self._chunks = None
+        self._pack_writer = PackWriter(self.store, max_count=1, repository=self)
         self.opened = True
 
-    def flush(self):
-        """Flush any buffered pack writer chunks. Returns pack_results (or None).
+    @property
+    def chunks(self):
+        """ChunkIndex mapping every known chunk id to its pack location.
 
-        Callers that maintain a ChunkIndex must call this and pass the result to
-        chunks.update_pack_info() before closing, so index entries for the last
-        batch of chunks get real pack location values instead of UNKNOWN_*.
+        This property is the single owner of the in-memory index: get() resolves
+        pack locations through it, PackWriter updates it, and the Cache reads it
+        from here rather than building its own.  Built lazily on first access and
+        persisted back to the repo cache at close().
         """
+        if self._chunks is None:
+            from .cache import build_chunkindex_from_repo
+
+            self._chunks = build_chunkindex_from_repo(self)
+        return self._chunks
+
+    @chunks.setter
+    def chunks(self, value):
+        # The index is normally built lazily; this setter exists for the few callers
+        # that must install a specific index (e.g. wiping the cache, or restoring an
+        # index captured before close()).  To drop a stale index so it rebuilds, do not
+        # assign None here -- call invalidate_chunk_index() instead.
+        self._chunks = value
+
+    def invalidate_chunk_index(self):
+        """Drop the in-memory chunk index so close() will not persist a stale copy.
+
+        Called when the on-disk chunk index cache is deleted; the next access to
+        .chunks rebuilds the index from actual repository contents.  PackWriter
+        reads the index through this Repository, so it follows automatically.
+        """
+        self._chunks = None
+
+    @property
+    def is_chunk_index_loaded(self):
+        """Whether the in-memory chunk index has been built/loaded this session.
+
+        Lets the few flag-style checks ask "is it loaded?" without going through the
+        .chunks property (which would build it on demand).  self._chunks should not be
+        read directly elsewhere; use .chunks for the index or this for the loaded flag.
+        """
+        return self._chunks is not None
+
+    def flush(self):
+        """Flush any buffered pack writer chunks."""
         if self._pack_writer is not None:
-            return self._pack_writer.flush()
-        return None
+            self._pack_writer.flush()  # PackWriter updates _chunks internally
 
     def close(self):
         if self._pack_writer is not None:
             assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
+        # close() may run again after the store was already closed (idempotent close), so we can
+        # only persist while the store is open. Persisting is also a no-op unless chunks were added
+        # this session (only F_NEW entries are serialized, and an empty incremental write is skipped).
+        # guard on is_chunk_index_loaded so we never trigger a lazy rebuild just to persist on close.
+        if self.store_opened and self.is_chunk_index_loaded:
+            from .cache import write_chunkindex_to_repo_cache
+
+            write_chunkindex_to_repo_cache(self, self.chunks, incremental=True)
         if self.lock:
             self.lock.release()
             self.lock = None
@@ -614,18 +728,35 @@ class Repository:
 
     def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
-        pack_id = id  # N=1: pack_id == chunk_id
+        entry = self.chunks.get(id)
+        if entry is None:
+            if raise_missing:
+                raise self.ObjectNotFound(id, str(self._location))
+            return None
+        if entry.pack_id == UNKNOWN_BYTES32:
+            # chunk is buffered in PackWriter, not yet flushed to a pack. at N=1 put() flushes
+            # immediately, so reaching here points at a flush / index-update ordering bug, not a
+            # genuinely missing object. this is a code bug, so we crash loudly regardless of
+            # raise_missing instead of pretending the object is absent.
+            raise self.PackLocationUnknown(id, str(self._location))
+        pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
         key = "packs/" + bin_to_hex(pack_id)
         try:
             if read_data:
-                return self.store.load(key)
+                return self.store.load(key, offset=obj_offset, size=obj_size)
             else:
                 # RepoObj layout supports separately encrypted metadata and data.
                 # We return enough bytes so the client can decrypt the metadata.
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
-                obj = self.store.load(key, size=hdr_size + extra_size)
+                load_size = hdr_size + extra_size
+                # keep the read inside this object: at N>1 a pack holds neighbouring objects, so
+                # don't pull bytes past obj_size into the next one. (an overshoot would be harmless
+                # -- parse_meta uses the header's length and ignores trailing bytes -- this is just
+                # tidy.) obj_size comes from the same index we already route with.
+                load_size = min(load_size, obj_size)
+                obj = self.store.load(key, offset=obj_offset, size=load_size)
                 hdr = obj[0:hdr_size]
                 if len(hdr) != hdr_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
@@ -633,7 +764,10 @@ class Repository:
                 if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
-                    obj = self.store.load(key, size=hdr_size + meta_size)
+                    retry_size = hdr_size + meta_size
+                    # same boundary as above: normally a no-op, just keeps the retry within this object.
+                    retry_size = min(retry_size, obj_size)
+                    obj = self.store.load(key, offset=obj_offset, size=retry_size)
                 meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
@@ -656,13 +790,13 @@ class Repository:
 
         Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples for
         every chunk written to disk this call.  At max_count=1 this is always
-        one entry.  Callers should pass these to ChunkIndex.update_pack_info()
-        so the index holds real location values rather than UNKNOWN_INT32 placeholders.
+        one entry.
         """
         self._lock_refresh()
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
+        # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
     def delete(self, id, wait=True):

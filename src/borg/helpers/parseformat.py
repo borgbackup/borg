@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import partial
 from hashlib import sha256
 from string import Formatter
@@ -364,7 +364,7 @@ def _replace_placeholders(text, overrides={}):
     """Replace placeholders in text with their values."""
     from ..platform import fqdn, hostname, getosusername
 
-    current_time = datetime.now(timezone.utc)
+    current_time = datetime.now(UTC)
     data = {
         "pid": os.getpid(),
         "fqdn": fqdn,
@@ -697,10 +697,7 @@ class Location:
         # note: this only affects the repository URL/path, not the archive name!
         return Location(
             self.raw,
-            overrides={
-                "now": DatetimeWrapper(timestamp),
-                "utcnow": DatetimeWrapper(timestamp.astimezone(timezone.utc)),
-            },
+            overrides={"now": DatetimeWrapper(timestamp), "utcnow": DatetimeWrapper(timestamp.astimezone(UTC))},
         )
 
 

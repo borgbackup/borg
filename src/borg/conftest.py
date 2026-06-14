@@ -1,3 +1,4 @@
+import contextlib
 import getpass
 import os
 import shutil
@@ -187,10 +188,8 @@ def archiver(tmp_path, set_env_variables):
         fd.write(b"input/file2\n# A comment line, then a blank line\n\n")
     with open(archiver.patterns_file_path, "wb") as fd:
         fd.write(b"+input/file_important\n- input/file*\n# A comment line, then a blank line\n\n")
-    old_wd = os.getcwd()
-    os.chdir(archiver.tmpdir)
-    yield archiver
-    os.chdir(old_wd)
+    with contextlib.chdir(archiver.tmpdir):
+        yield archiver
 
     def maybe_clear_flags_and_retry(func, path, _exc_info):
         if has_lchflags:

@@ -1,7 +1,7 @@
 import enum
 import re
 from collections import namedtuple
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from operator import attrgetter
 from collections.abc import Iterator, Sequence
 from typing import Protocol, runtime_checkable
@@ -430,7 +430,7 @@ class Archives:
 
 class Manifest:
     @enum.unique
-    class Operation(enum.Enum):
+    class Operation(enum.StrEnum):
         # The comments here only roughly describe the scope of each feature. In the end, additions need to be
         # based on potential problems older clients could produce when accessing newer repositories and the
         # trade-offs of locking version out or still allowing access. As all older versions and their exact
@@ -514,9 +514,9 @@ class Manifest:
             feature_flags = self.config.get("feature_flags", None)
             if feature_flags is None:
                 return
-            if operation.value not in feature_flags:
+            if operation not in feature_flags:
                 continue
-            requirements = feature_flags[operation.value]
+            requirements = feature_flags[operation]
             if "mandatory" in requirements:
                 unsupported = set(requirements["mandatory"]) - self.SUPPORTED_REPO_FEATURES
                 if unsupported:
@@ -538,10 +538,10 @@ class Manifest:
 
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
-            self.timestamp = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds")
+            self.timestamp = datetime.now(tz=UTC).isoformat(timespec="microseconds")
         else:
             incremented_ts = self.last_timestamp + timedelta(microseconds=1)
-            now_ts = datetime.now(tz=timezone.utc)
+            now_ts = datetime.now(tz=UTC)
             max_ts = max(incremented_ts, now_ts)
             self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())

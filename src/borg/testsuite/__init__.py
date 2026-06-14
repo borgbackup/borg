@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import chdir, contextmanager
 import functools
 import os
 
@@ -119,12 +119,8 @@ def unopened_tempfile():
         yield os.path.join(tempdir, "file")
 
 
-@contextmanager
-def changedir(dir):
-    cwd = os.getcwd()
-    os.chdir(dir)
-    yield
-    os.chdir(cwd)
+# alias for the stdlib (3.11+) context manager; kept for the existing importers
+changedir = chdir
 
 
 def is_root():

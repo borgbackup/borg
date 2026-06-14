@@ -6,7 +6,7 @@ import posixpath
 import stat
 import sys
 import time
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import timedelta
 from functools import partial
@@ -1036,8 +1036,8 @@ Duration: {0.duration}
                 can_compare_chunk_ids=can_compare_chunk_ids,
             )
 
-        orphans_archive1: OrderedDict[str, Item] = OrderedDict()
-        orphans_archive2: OrderedDict[str, Item] = OrderedDict()
+        orphans_archive1: dict[str, Item] = {}
+        orphans_archive2: dict[str, Item] = {}
 
         assert matcher is not None, "matcher must be set"
 

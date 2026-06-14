@@ -11,7 +11,6 @@ import stat
 import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
-from collections import OrderedDict
 from datetime import UTC, datetime
 from functools import partial
 from hashlib import sha256
@@ -1376,7 +1375,7 @@ def prepare_dump_dict(d):
         return res
 
     def decode(d):
-        res = OrderedDict()
+        res = {}
         for key, value in d.items():
             if isinstance(value, dict):
                 value = decode(value)

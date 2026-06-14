@@ -1,4 +1,3 @@
-import collections
 import textwrap
 
 from ..helpers.argparsing import ArgumentParser
@@ -7,7 +6,7 @@ from ..helpers.nanorst import rst_to_terminal
 
 
 class HelpMixIn:
-    helptext = collections.OrderedDict()
+    helptext = {}
     helptext["patterns"] = textwrap.dedent(
         """
         When specifying one or more file paths in a Borg command that supports

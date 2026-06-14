@@ -65,10 +65,7 @@ def rst_to_text(text, state_hook=None, references=None):
 
     inline_single = ("*", "`")
 
-    while True:
-        char = text.read(1)
-        if not char:
-            break
+    while char := text.read(1):
         next = text.peek(1)  # type: str
 
         if state == "text":

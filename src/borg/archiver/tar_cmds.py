@@ -293,10 +293,7 @@ class TarMixIn:
 
         tar = tarfile.open(fileobj=tarstream, mode="r|", ignore_zeros=args.ignore_zeros)
 
-        while True:
-            tarinfo = tar.next()
-            if not tarinfo:
-                break
+        while tarinfo := tar.next():
             if tarinfo.isreg():
                 status = tfo.process_file(tarinfo=tarinfo, status="A", type=stat.S_IFREG, tar=tar)
                 archive.stats.nfiles += 1

@@ -44,10 +44,7 @@ class BorgRunner:
             )
 
             async def read_stream(stream, stream_name):
-                while True:
-                    line = await stream.readline()
-                    if not line:
-                        break
+                while line := await stream.readline():
                     decoded_line = line.decode("utf-8", errors="replace").rstrip()
                     if decoded_line:
                         self.log_callback({"type": "stream_line", "stream": stream_name, "line": decoded_line})

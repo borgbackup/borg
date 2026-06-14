@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Optional, Callable, List
+from typing import Callable
 
 
 class BorgRunner:
@@ -14,10 +14,10 @@ class BorgRunner:
     Manages the execution of the borg subprocess and parses its JSON output.
     """
 
-    def __init__(self, command: List[str], log_callback: Callable[[dict], None]):
+    def __init__(self, command: list[str], log_callback: Callable[[dict], None]):
         self.command = command
         self.log_callback = log_callback
-        self.process: Optional[asyncio.subprocess.Process] = None
+        self.process: asyncio.subprocess.Process | None = None
         self.logger = logging.getLogger(__name__)
 
     async def start(self):

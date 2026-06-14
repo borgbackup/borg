@@ -19,8 +19,7 @@ def parse_version(version):
         (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)   # version, e.g. 1.2.33
         (?P<prerelease>\.?(?P<ptype>a|b|rc|dev)(?P<pnum>\d+))?  # optional prerelease, e.g. a1 or b2 or rc33 or .dev1
     """
-    m = re.match(version_re, version, re.VERBOSE)
-    if m is None:
+    if (m := re.match(version_re, version, re.VERBOSE)) is None:
         raise ValueError("Invalid version string %s" % version)
     gd = m.groupdict()
     version = [int(gd["major"]), int(gd["minor"]), int(gd["patch"])]

@@ -1,9 +1,9 @@
 import os
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 
-def parse_timestamp(timestamp, tzinfo=timezone.utc):
+def parse_timestamp(timestamp, tzinfo=UTC):
     """Parse an ISO 8601 timestamp string.
 
     For naive/unaware datetime objects, assume they are in the tzinfo timezone (default: UTC).
@@ -26,7 +26,7 @@ def parse_local_timestamp(timestamp, tzinfo=None):
     return dt
 
 
-_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 def utcfromtimestampns(ts_ns: int) -> datetime:
@@ -196,4 +196,4 @@ class OutputTimestamp:
 
 def archive_ts_now():
     """return tz-aware datetime obj for current time for usage as archive timestamp"""
-    return datetime.now(timezone.utc)  # utc time / utc timezone
+    return datetime.now(UTC)  # utc time / utc timezone

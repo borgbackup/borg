@@ -5,7 +5,7 @@ import os
 import shutil
 import stat
 from collections import namedtuple
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 
@@ -428,7 +428,7 @@ class FilesCacheMixin:
                         entries += 1
             integrity_data = fd.integrity_data
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {age_discarded} entries with age >= TTL [{ttl}]")
-        t_str = datetime.fromtimestamp(discard_after / 1e9, timezone.utc).isoformat()
+        t_str = datetime.fromtimestamp(discard_after / 1e9, UTC).isoformat()
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {race_discarded} entries with ctime/mtime >= {t_str}")
         files_cache_logger.debug(f"FILES-CACHE-SAVE: finished, {entries} remaining entries saved.")
         return integrity_data
@@ -670,9 +670,9 @@ class ChunksMixin:
 
     def __init__(self):
         self._chunks = None
-        self.last_refresh_dt = datetime.now(timezone.utc)
+        self.last_refresh_dt = datetime.now(UTC)
         self.refresh_td = timedelta(seconds=60)
-        self.chunks_cache_last_write = datetime.now(timezone.utc)
+        self.chunks_cache_last_write = datetime.now(UTC)
         self.chunks_cache_write_td = timedelta(seconds=600)
 
     @property
@@ -719,7 +719,7 @@ class ChunksMixin:
                 size = len(data)  # data is still uncompressed
             else:
                 raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self._maybe_write_chunks_cache(now)
         exists = self.seen_chunk(id, size)
         if exists:
@@ -845,7 +845,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
                 logger.debug(f"Chunks index stats: {key}: {value}")
             pi.output("Saving chunks cache")
             # note: cache/chunks.* in repo has a different integrity mechanism
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             self._maybe_write_chunks_cache(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
         pi.output("Saving cache config")

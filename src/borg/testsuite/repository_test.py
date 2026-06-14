@@ -187,11 +187,24 @@ class MockStore:
         self.stored[key] = data
 
 
-class FailingStore:
-    """A store whose pack write always fails -- used to exercise flush()'s rollback path."""
+class FailingPackStore:
+    """Wraps a store but fails packs/* writes; every other call passes through to the inner store.
+
+    Models the realistic failure where only a pack write broke while the rest of the repo (e.g. the
+    cache/chunks.* index) stays writable.  In production PackWriter and the chunk index cache share
+    one store, so a single object has to fail the pack write yet still let the index persist.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
 
     def store(self, key, data):
-        raise OSError("simulated store failure")
+        if key.startswith("packs/"):
+            raise OSError("simulated pack store failure")
+        return self._inner.store(key, data)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
 
 
 def test_pack_writer_returns_none_when_not_full():
@@ -240,7 +253,7 @@ def test_pack_writer_rolls_back_index_on_failed_store():
     # later identical chunk would dedup against -- silent data loss (#9744 review).
     chunks = ChunkIndex()
     chunk_id = b"e" * 32
-    pw = PackWriter(FailingStore(), max_count=1, chunks=chunks)
+    pw = PackWriter(FailingPackStore(MockStore()), max_count=1, chunks=chunks)
     with pytest.raises(OSError):
         pw.add(chunk_id, b"payload")  # max_count=1 -> add() flushes immediately and fails
     assert chunks.get(chunk_id) is None  # rolled back: no phantom entry left behind
@@ -253,12 +266,15 @@ def test_failed_store_phantom_not_persisted(tmp_path):
 
     chunk_id = H(60)
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        # a PackWriter that shares the repository's index but writes to a store that always fails:
-        pw = PackWriter(FailingStore(), max_count=1, repository=repository)
+        # fail only the pack write on the repository's own store; cache/chunks.* writes still work,
+        # so one store models "just the pack write broke" (PackWriter and the index cache share a
+        # store in production). the failing store is thus load-bearing for every assertion below.
+        repository.store = FailingPackStore(repository.store)
+        pw = PackWriter(repository.store, max_count=1, repository=repository)
         with pytest.raises(OSError):
             pw.add(chunk_id, fchunk(b"DATA"))
-        assert repository.chunks.get(chunk_id) is None  # gone from the in-memory index ...
-        # ... and persisting + reloading the cache does not bring it back:
+        assert repository.chunks.get(chunk_id) is None  # rolled back from the in-memory index ...
+        # ... and persisting + reloading the cache (through that same store) does not bring it back:
         write_chunkindex_to_repo_cache(repository, repository.chunks, incremental=True)
         reloaded = build_chunkindex_from_repo(repository)
         assert reloaded.get(chunk_id) is None

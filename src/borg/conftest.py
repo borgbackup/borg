@@ -15,6 +15,7 @@ from borg.logger import setup_logging  # noqa: E402
 setup_logging()
 
 from borg.archiver import Archiver  # noqa: E402
+from borg.platform import set_flags  # noqa: E402
 from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3, has_mfusepy  # noqa: E402
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported  # noqa: E402
 from borg.testsuite.archiver import BORG_EXES
@@ -196,8 +197,10 @@ def archiver(tmp_path, set_env_variables):
     def maybe_clear_flags_and_retry(func, path, _exc_info):
         if has_lchflags:
             # Clear any BSD flags (e.g. UF_APPEND) that may have prevented removal, then retry once.
+            # Note: use borg's cross-platform set_flags, not os.lchflags - the latter does not exist
+            # on Linux even though has_lchflags is True there (Linux clears flags via ioctl).
             try:
-                os.lchflags(path, 0)
+                set_flags(path, 0)
                 func(path)
             except OSError:
                 pass

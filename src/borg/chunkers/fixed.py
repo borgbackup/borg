@@ -1,4 +1,5 @@
-from typing import Iterator, BinaryIO
+from collections.abc import Iterator
+from typing import BinaryIO
 
 
 import time

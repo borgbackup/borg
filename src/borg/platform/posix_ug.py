@@ -1,9 +1,9 @@
 import grp
 import pwd
-from functools import lru_cache
+from functools import cache
 
 
-@lru_cache(maxsize=None)
+@cache
 def _uid2user(uid, default=None):
     try:
         return pwd.getpwuid(uid).pw_name
@@ -11,7 +11,7 @@ def _uid2user(uid, default=None):
         return default
 
 
-@lru_cache(maxsize=None)
+@cache
 def _user2uid(user, default=None):
     if not user:
         return default
@@ -21,7 +21,7 @@ def _user2uid(user, default=None):
         return default
 
 
-@lru_cache(maxsize=None)
+@cache
 def _gid2group(gid, default=None):
     try:
         return grp.getgrgid(gid).gr_name
@@ -29,7 +29,7 @@ def _gid2group(gid, default=None):
         return default
 
 
-@lru_cache(maxsize=None)
+@cache
 def _group2gid(group, default=None):
     if not group:
         return default

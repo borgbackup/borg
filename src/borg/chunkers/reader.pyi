@@ -1,16 +1,17 @@
-from typing import NamedTuple, Tuple, Dict, List, Any, Type, BinaryIO, Iterator
+from collections.abc import Iterator
+from typing import Any, BinaryIO, NamedTuple
 
 has_seek_hole: bool
 
 class _Chunk(NamedTuple):
     data: bytes | None
-    meta: Dict[str, Any]
+    meta: dict[str, Any]
 
-def Chunk(data: bytes | None, **meta) -> Type[_Chunk]: ...
+def Chunk(data: bytes | None, **meta) -> type[_Chunk]: ...
 
-fmap_entry = Tuple[int, int, bool]
+fmap_entry = tuple[int, int, bool]
 
-def sparsemap(fd: BinaryIO = None, fh: int = -1) -> List[fmap_entry]: ...
+def sparsemap(fd: BinaryIO = None, fh: int = -1) -> list[fmap_entry]: ...
 
 class FileFMAPReader:
     def __init__(
@@ -20,9 +21,9 @@ class FileFMAPReader:
         fh: int = -1,
         read_size: int = 0,
         sparse: bool = False,
-        fmap: List[fmap_entry] = None,
+        fmap: list[fmap_entry] = None,
     ) -> None: ...
-    def _build_fmap(self) -> List[fmap_entry]: ...
+    def _build_fmap(self) -> list[fmap_entry]: ...
     def blockify(self) -> Iterator: ...
 
 class FileReader:
@@ -33,7 +34,7 @@ class FileReader:
         fh: int = -1,
         read_size: int = 0,
         sparse: bool = False,
-        fmap: List[fmap_entry] = None,
+        fmap: list[fmap_entry] = None,
     ) -> None: ...
     def _fill_buffer(self) -> bool: ...
-    def read(self, size: int) -> Type[_Chunk]: ...
+    def read(self, size: int) -> type[_Chunk]: ...

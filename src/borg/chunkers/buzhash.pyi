@@ -1,4 +1,5 @@
-from typing import List, Iterator, BinaryIO
+from collections.abc import Iterator
+from typing import BinaryIO
 
 from .reader import fmap_entry
 
@@ -15,4 +16,4 @@ class Chunker:
         hash_window_size: int,
         sparse: bool = False,
     ) -> None: ...
-    def chunkify(self, fd: BinaryIO = None, fh: int = -1, fmap: List[fmap_entry] = None) -> Iterator: ...
+    def chunkify(self, fd: BinaryIO = None, fh: int = -1, fmap: list[fmap_entry] = None) -> Iterator: ...

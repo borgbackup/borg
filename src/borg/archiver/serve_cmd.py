@@ -42,7 +42,7 @@ class ServeMixIn:
             return
         if not backend.startswith("FILE:"):
             raise PathNotAllowed("only FILE: backends can be restricted")
-        path = os.path.realpath(os.path.expanduser(backend[len("FILE:") :]))
+        path = os.path.realpath(os.path.expanduser(backend.removeprefix("FILE:")))
         path_with_sep = os.path.join(path, "")  # ensure trailing slash for prefix checks
         if restrict_to_paths:
             for p in restrict_to_paths:

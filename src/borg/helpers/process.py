@@ -29,7 +29,8 @@ DAEMONIZE_NOTIFY_SIGNALS = [
 # The foreground process waits for the notify signals with signal.sigwait() (which, unlike
 # signal.sigtimedwait(), is also available on macOS). To still honor the timeout, we arm a
 # SIGALRM timer and wait for it as well, so it must be blocked and waited for, too.
-DAEMONIZE_WAIT_SIGNALS = DAEMONIZE_NOTIFY_SIGNALS + [signal.SIGALRM]
+# SIGALRM is not available on Windows (where daemonizing is not supported anyway).
+DAEMONIZE_WAIT_SIGNALS = DAEMONIZE_NOTIFY_SIGNALS + ([signal.SIGALRM] if hasattr(signal, "SIGALRM") else [])
 
 
 @contextlib.contextmanager

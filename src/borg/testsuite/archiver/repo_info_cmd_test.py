@@ -27,5 +27,6 @@ def test_info_json(archivers, request):
     assert "last_modified" in repository
 
     checkts(repository["last_modified"])
-    assert info_repo["encryption"]["mode"] == RK_ENCRYPTION[13:]
+    assert info_repo["encryption"]["encryption"] == RK_ENCRYPTION[13:]  # --encryption=aes256-ocb
+    assert info_repo["encryption"]["id_hash"] == "sha256"  # default id-hash
     assert "keyfile" not in info_repo["encryption"]

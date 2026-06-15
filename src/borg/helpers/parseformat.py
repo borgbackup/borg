@@ -1330,7 +1330,10 @@ class BorgJsonEncoder(json.JSONEncoder):
 def basic_json_data(manifest, *, cache=None, extra=None):
     key = manifest.key
     data = extra or {}
-    data |= {"repository": BorgJsonEncoder().default(manifest.repository), "encryption": {"mode": key.ARG_NAME}}
+    data |= {
+        "repository": BorgJsonEncoder().default(manifest.repository),
+        "encryption": {"encryption": key.ENC_NAME, "id_hash": key.IDHASH_NAME},
+    }
     data["repository"]["last_modified"] = OutputTimestamp(manifest.last_timestamp)
     if key.NAME.startswith("key file"):
         data["encryption"]["keyfile"] = key.find_key()

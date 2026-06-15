@@ -53,7 +53,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     F_USED = 2 ** 0  # chunk is used/referenced
     F_COMPRESS = 2 ** 1  # chunk shall get (re-)compressed
     # system flags (internal use, always 0 to user, not changeable by user):
-    F_NEW = 2 ** 24  # a new chunk that is not present in repo/cache/chunks.* yet.
+    F_NEW = 2 ** 24  # a new chunk that is not present in repo index/* yet.
 
     def __init__(self, capacity=1000, path=None, usable=None):
         if path:

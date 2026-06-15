@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ._common import with_repository
 from ..archive import Archive
-from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo, delete_chunkindex_cache
+from ..cache import write_chunkindex_to_repo, build_chunkindex_from_repo, delete_chunkindex_from_repo
 from ..cache import files_cache_name, discover_files_cache_names
 from ..helpers import get_cache_dir
 from ..helpers.argparsing import ArgumentParser
@@ -70,7 +70,7 @@ class ArchiveGarbageCollector:
         # and also remove all older cached chunk indexes.
         # write_chunkindex_to_repo now removes all flags and size infos.
         # we need this, as we put the wrong size in there to support --stats computations.
-        write_chunkindex_to_repo_cache(
+        write_chunkindex_to_repo(
             self.repository, self.chunks, incremental=False, clear=True, force_write=True, delete_other=True
         )
         self.chunks = None  # nothing there (cleared!)
@@ -179,13 +179,13 @@ class ArchiveGarbageCollector:
         logger.info(f"Deleting {len(unused)} unused objects...")
         if unused:
             # Before deleting any repository object, invalidate all centrally cached chunk indexes.
-            # Otherwise, if we get interrupted within the deletion loop, the still-existing cache/chunks.*
+            # Otherwise, if we get interrupted within the deletion loop, the still-existing index/*
             # would claim that already-deleted objects are still present. A later "borg create" would then
             # trust that stale index, not re-upload the affected chunks and silently create an archive with
             # dangling object references (see issue #9748). By removing the cached indexes first, an
             # interruption is conservative: clients must rebuild the index from actual repository contents
             # and will re-upload any deleted data. save_chunk_index() writes a fresh, valid index afterwards.
-            delete_chunkindex_cache(self.repository)
+            delete_chunkindex_from_repo(self.repository)
         pi = ProgressIndicatorPercent(
             total=len(unused), msg="Deleting unused objects %3.1f%%", step=0.1, msgid="compact.report_and_delete"
         )

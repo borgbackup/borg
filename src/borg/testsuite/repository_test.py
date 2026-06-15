@@ -101,7 +101,7 @@ def test_chunk_index_persisted_on_close(tmp_path):
     # repo can resolve pack locations without any manual hand-off. This proves the round-trip
     # by reading the persisted index back directly (not via a repo rescan, which at N=1 would
     # reconstruct the same entries and so could mask a broken persist step).
-    from ..cache import list_chunkindex_hashes, read_chunkindex_from_repo_cache
+    from ..cache import list_chunkindex_hashes, read_chunkindex_from_repo
 
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
@@ -111,7 +111,7 @@ def test_chunk_index_persisted_on_close(tmp_path):
     with Repository(location, exclusive=True) as repository:
         persisted = ChunkIndex()
         for hash in list_chunkindex_hashes(repository):
-            fragment = read_chunkindex_from_repo_cache(repository, hash)
+            fragment = read_chunkindex_from_repo(repository, hash)
             if fragment is not None:
                 for k, v in fragment.items():
                     persisted[k] = v
@@ -191,7 +191,7 @@ class FailingPackStore:
     """Wraps a store but fails packs/* writes; every other call passes through to the inner store.
 
     Models the realistic failure where only a pack write broke while the rest of the repo (e.g. the
-    cache/chunks.* index) stays writable.  In production PackWriter and the chunk index cache share
+    index/* objects) stay writable.  In production PackWriter and the chunk index share
     one store, so a single object has to fail the pack write yet still let the index persist.
     """
 
@@ -262,11 +262,11 @@ def test_pack_writer_rolls_back_index_on_failed_store():
 def test_failed_store_phantom_not_persisted(tmp_path):
     # The phantom must not survive into the persisted repo cache either: close() can write the
     # in-memory index on context exit, so the rollback has to happen before anything is serialized.
-    from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
+    from ..cache import write_chunkindex_to_repo, build_chunkindex_from_repo
 
     chunk_id = H(60)
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        # fail only the pack write on the repository's own store; cache/chunks.* writes still work,
+        # fail only the pack write on the repository's own store; index/* writes still work,
         # so one store models "just the pack write broke" (PackWriter and the index cache share a
         # store in production). the failing store is thus load-bearing for every assertion below.
         repository.store = FailingPackStore(repository.store)
@@ -275,7 +275,7 @@ def test_failed_store_phantom_not_persisted(tmp_path):
             pw.add(chunk_id, fchunk(b"DATA"))
         assert repository.chunks.get(chunk_id) is None  # rolled back from the in-memory index ...
         # ... and persisting + reloading the cache (through that same store) does not bring it back:
-        write_chunkindex_to_repo_cache(repository, repository.chunks, incremental=True)
+        write_chunkindex_to_repo(repository, repository.chunks, incremental=True)
         reloaded = build_chunkindex_from_repo(repository)
         assert reloaded.get(chunk_id) is None
 

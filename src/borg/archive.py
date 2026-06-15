@@ -23,7 +23,7 @@ logger = create_logger()
 
 from . import xattr
 from .chunkers import get_chunker, Chunk
-from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_cache
+from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_from_repo
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -2164,10 +2164,10 @@ class ArchiveChecker:
 
     def finish(self):
         if self.repair:
-            # we may have deleted chunks. delete_chunkindex_cache() removes the on-disk cache and
+            # we may have deleted chunks. delete_chunkindex_from_repo() removes the on-disk index and
             # drops the stale in-memory index, so the next repository access rebuilds it from the repo.
-            logger.info("Deleting chunks cache in repository - next repository access will cause a rebuild.")
-            delete_chunkindex_cache(self.repository)
+            logger.info("Deleting chunk indexes in repository - next repository access will cause a rebuild.")
+            delete_chunkindex_from_repo(self.repository)
             logger.info("Writing Manifest.")
             self.manifest.write()
 

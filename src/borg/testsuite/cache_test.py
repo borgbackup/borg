@@ -6,7 +6,7 @@ import pytest
 from .hashindex_test import H
 from .crypto.key_test import TestKey
 from ..archive import Statistics
-from ..cache import AdHocWithFilesCache, FileCacheEntry, delete_chunkindex_cache, read_chunkindex_from_repo_cache
+from ..cache import AdHocWithFilesCache, FileCacheEntry, delete_chunkindex_from_repo, read_chunkindex_from_repo
 from ..crypto.key import AESOCBKey
 from ..helpers import safe_ns
 from ..helpers.msgpack import int_to_timestamp
@@ -83,14 +83,14 @@ class TestAdHocWithFilesCache:
         assert path_hash in loaded
 
 
-def test_delete_chunkindex_cache_missing(tmp_path):
-    """delete_chunkindex_cache handles StoreObjectNotFound when cache entries do not exist."""
+def test_delete_chunkindex_from_repo_missing(tmp_path):
+    """delete_chunkindex_from_repo handles StoreObjectNotFound when index entries do not exist."""
     from borgstore.store import ObjectNotFound as StoreObjectNotFound
 
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
-        # Create a cache entry so list_chunkindex_hashes finds it.
-        repository.store_store(f"cache/chunks.{'a' * 64}", b"data")
+        # Create an index entry so list_chunkindex_hashes finds it.
+        repository.store_store(f"index/{'a' * 64}", b"data")
         # Patch store_delete to raise StoreObjectNotFound (simulates a race or already-deleted entry).
         original_store_delete = repository.store_delete
 
@@ -99,27 +99,27 @@ def test_delete_chunkindex_cache_missing(tmp_path):
 
         repository.store_delete = failing_store_delete
         # Should not raise — the except StoreObjectNotFound catches it.
-        delete_chunkindex_cache(repository)
+        delete_chunkindex_from_repo(repository)
         repository.store_delete = original_store_delete
 
 
-def test_read_chunkindex_from_repo_cache_missing(tmp_path):
-    """read_chunkindex_from_repo_cache handles StoreObjectNotFound when cache does not exist."""
+def test_read_chunkindex_from_repo_missing(tmp_path):
+    """read_chunkindex_from_repo handles StoreObjectNotFound when the index object does not exist."""
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
-        # Try to load a non-existent cache entry — should return None, not raise.
-        result = read_chunkindex_from_repo_cache(repository, "f" * 64)
+        # Try to load a non-existent index entry — should return None, not raise.
+        result = read_chunkindex_from_repo(repository, "f" * 64)
         assert result is None
 
 
 def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
     """ChunksMixin.chunks binds the repository index without collapsing the cached fragments.
 
-    Each backup leaves a small incremental cache/chunks.* fragment; collapsing them all into one
+    Each backup leaves a small incremental index/* fragment; collapsing them all into one
     on every access would re-upload the whole index and, with delete_other, invalidate every other
     client's fragments. Fragment count is reclaimed by `borg compact`, not on every read here.
     """
-    from ..cache import ChunksMixin, write_chunkindex_to_repo_cache, list_chunkindex_hashes
+    from ..cache import ChunksMixin, write_chunkindex_to_repo, list_chunkindex_hashes
     from ..hashindex import ChunkIndex, ChunkIndexEntry
 
     repository_location = os.fspath(tmp_path / "repository")
@@ -128,7 +128,7 @@ def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
         for h in (H(1), H(2)):
             ci = ChunkIndex()
             ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
-            write_chunkindex_to_repo_cache(repository, ci, incremental=False, force_write=True)
+            write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
         before = len(list_chunkindex_hashes(repository))
         assert before > 1
 

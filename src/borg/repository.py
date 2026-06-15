@@ -48,8 +48,9 @@ def borg_permissions(permissions):
             return {
                 "": "lr",
                 "archives": "lrw",
-                "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
+                "cache": "lrwWD",  # WD for last-key-checked, ...
                 "config": "lrW",  # W for manifest
+                "index": "lrwWD",  # WD for index/<HASH> (merge/compaction of incremental indexes)
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
                 "packs": "lrw",
@@ -58,8 +59,9 @@ def borg_permissions(permissions):
             return {
                 "": "l",
                 "archives": "lw",
-                "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
+                "cache": "lrwWD",  # TODO: check more restrictive permissions
                 "config": "lrW",  # W for manifest
+                "index": "lrwWD",  # read allowed so that borg create can check chunk presence for deduplication
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
                 "packs": "lw",  # no r!
@@ -318,6 +320,7 @@ class Repository:
             "archives/": {"levels": [0]},
             "cache/": {"levels": [0]},
             "config/": {"levels": [0]},
+            "index/": {"levels": [0]},
             "keys/": {"levels": [0]},
             "locks/": {"levels": [0]},
             "packs/": {"levels": [1]},
@@ -395,9 +398,9 @@ class Repository:
             # listing them all might be rather slow, so we better cache an empty
             # ChunkIndex from here so that the first repo operation does not have
             # to build the ChunkIndex the slow way by listing all the directories.
-            from borg.cache import write_chunkindex_to_repo_cache
+            from borg.cache import write_chunkindex_to_repo
 
-            write_chunkindex_to_repo_cache(self, ChunkIndex(), clear=True, force_write=True)
+            write_chunkindex_to_repo(self, ChunkIndex(), clear=True, force_write=True)
         finally:
             self.store.close()
 
@@ -543,9 +546,9 @@ class Repository:
         # this session (only F_NEW entries are serialized, and an empty incremental write is skipped).
         # guard on is_chunk_index_loaded so we never trigger a lazy rebuild just to persist on close.
         if self.store_opened and self.is_chunk_index_loaded:
-            from .cache import write_chunkindex_to_repo_cache
+            from .cache import write_chunkindex_to_repo
 
-            write_chunkindex_to_repo_cache(self, self.chunks, incremental=True)
+            write_chunkindex_to_repo(self, self.chunks, incremental=True)
         if self.lock:
             self.lock.release()
             self.lock = None
@@ -679,9 +682,9 @@ class Repository:
                     pass
                 if not partial:
                     # if we did a full pass in one go, we built a complete, up-to-date ChunkIndex, cache it!
-                    from .cache import write_chunkindex_to_repo_cache
+                    from .cache import write_chunkindex_to_repo
 
-                    write_chunkindex_to_repo_cache(
+                    write_chunkindex_to_repo(
                         self, chunks, incremental=False, clear=True, force_write=True, delete_other=True
                     )
         except StoreObjectNotFound:

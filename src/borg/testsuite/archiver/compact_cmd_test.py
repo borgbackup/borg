@@ -93,7 +93,7 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
     """Regression test for issue #9748.
 
     If a compact is interrupted after it deleted repository objects but before it wrote the
-    updated chunk index, the still-existing cache/chunks.* must not claim that the deleted
+    updated chunk index, the still-existing index/* must not claim that the deleted
     objects are still present. Otherwise a later "borg create" trusts the stale index, does
     not re-upload the affected chunks and silently produces an archive with dangling object
     references (which extracts to zero bytes).

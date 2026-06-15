@@ -110,7 +110,6 @@ def set_rst_settings(app):
 
 
 def setup(app):
-    app.setup_extension("sphinxcontrib.jquery")
     app.add_css_file("css/borg.css")
     app.connect("builder-inited", set_rst_settings)
 
@@ -156,7 +155,16 @@ html_use_smartypants = True
 smartquotes_action = "qe"  # no D in there means "do not transform -- and ---"
 
 # Custom sidebar templates, maps document names to template names.
-html_sidebars = {"**": ["logo-text.html", "versionselector.html", "searchbox.html", "downloads.html", "globaltoc.html"]}
+
+html_sidebars = {
+    "**": [
+        "logo-text.html",
+        "versionselector.html",
+        "searchbox.html",
+        "downloads.html",
+        "globaltoc.html",
+    ]
+}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
@@ -248,4 +256,9 @@ extensions = [
     "guzzle_sphinx_theme",  # register the theme as an extension to generate a sitemap.xml
 ]
 
-extlinks = {"issue": ("https://github.com/borgbackup/borg/issues/%s", "#%s")}
+extlinks = {
+    "issue": (
+        "https://github.com/borgbackup/borg/issues/%s",
+        "#%s",
+    )
+}

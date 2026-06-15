@@ -90,7 +90,6 @@ class ID_BLAKE2b_256:
 class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):  # type: ignore[misc]
     TYPE = KeyType.BLAKE2AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "authenticated BLAKE2b"
     ENC_NAME = "authenticated"  # IDHASH_NAME = "blake2" via ID_BLAKE2b_256 mix-in; read-only (borg 1.x)
 
 
@@ -103,7 +102,6 @@ class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):  # type: ign
 class AESCTRKey(Pbkdf2FileMixin, ID_HMAC_SHA_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
     TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.KEYFILE
-    NAME = "AES-CTR HMAC-SHA256"
     ENC_NAME = "aes256-ctr"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in; read-only (borg 1.x)
     STORAGE = KeyBlobStorage.REPO  # seed default; actual per-key storage is tracked in self.storage on load
     LOCATION_CONFIGURABLE = True  # borg 1.x had keyfile and repokey variants
@@ -113,7 +111,6 @@ class AESCTRKey(Pbkdf2FileMixin, ID_HMAC_SHA_256, AESKeyBase, FlexiKey):  # type
 class Blake2AESCTRKey(Pbkdf2FileMixin, ID_BLAKE2b_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
     TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
     TYPE = KeyType.BLAKE2KEYFILE
-    NAME = "AES-CTR BLAKE2b"
     ENC_NAME = "aes256-ctr"  # IDHASH_NAME = "blake2" via ID_BLAKE2b_256 mix-in; read-only (borg 1.x)
     STORAGE = KeyBlobStorage.REPO  # seed default; actual per-key storage is tracked in self.storage on load
     LOCATION_CONFIGURABLE = True  # borg 1.x had keyfile and repokey variants

@@ -38,13 +38,13 @@ def test_repo_create_requires_encryption_option(archivers, request):
     "extra_args, expected",
     [
         # --encryption x --id-hash -> crypto suite shown by "borg repo-info"
-        (["--encryption=aes256-ocb"], "Yes (repokey, SHA256 AES256-OCB)"),  # default id-hash is sha256
-        (["--encryption=aes256-ocb", "--id-hash=sha256"], "Yes (repokey, SHA256 AES256-OCB)"),
-        (["--encryption=aes256-ocb", "--id-hash=blake3"], "Yes (repokey, BLAKE3 AES256-OCB)"),
-        (["--encryption=chacha20-poly1305"], "Yes (repokey, SHA256 ChaCha20-Poly1305)"),
-        (["--encryption=chacha20-poly1305", "--id-hash=blake3"], "Yes (repokey, BLAKE3 ChaCha20-Poly1305)"),
-        (["--encryption=authenticated"], "No (repokey, authenticated SHA256)"),
-        (["--encryption=authenticated", "--id-hash=blake3"], "No (repokey, authenticated BLAKE3)"),
+        (["--encryption=aes256-ocb"], "Yes (repokey, aes256-ocb, sha256)"),  # default id-hash is sha256
+        (["--encryption=aes256-ocb", "--id-hash=sha256"], "Yes (repokey, aes256-ocb, sha256)"),
+        (["--encryption=aes256-ocb", "--id-hash=blake3"], "Yes (repokey, aes256-ocb, blake3)"),
+        (["--encryption=chacha20-poly1305"], "Yes (repokey, chacha20-poly1305, sha256)"),
+        (["--encryption=chacha20-poly1305", "--id-hash=blake3"], "Yes (repokey, chacha20-poly1305, blake3)"),
+        (["--encryption=authenticated"], "No (repokey, authenticated, sha256)"),
+        (["--encryption=authenticated", "--id-hash=blake3"], "No (repokey, authenticated, blake3)"),
         (["--encryption=none"], "No"),
     ],
 )

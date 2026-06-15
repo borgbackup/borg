@@ -210,9 +210,6 @@ class KeyBase:
     # set of key type IDs the class can handle as input
     TYPES_ACCEPTABLE: set[int] = None  # override in subclasses
 
-    # Human-readable name
-    NAME = "UNDEFINED"
-
     # The two orthogonal dimensions a creatable crypto suite is selected by on the command line:
     # ENC_NAME -> "borg repo-create --encryption" (cipher / AE algorithm)
     # IDHASH_NAME -> "borg repo-create --id-hash" (id hash function)
@@ -322,7 +319,6 @@ class KeyBase:
 class PlaintextKey(KeyBase):
     TYPE = KeyType.PLAINTEXT
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "plaintext"
     ENC_NAME = "none"
     IDHASH_NAME = "sha256"  # plain sha256(data), no key; blake3 is not supported for "none"
 
@@ -992,7 +988,6 @@ from ..legacy.crypto.key import ID_BLAKE2b_256  # noqa: F401
 class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
     TYPE = KeyType.AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "authenticated SHA256"
     ENC_NAME = "authenticated"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
 
 
@@ -1015,7 +1010,6 @@ class ID_BLAKE3_256:
 class Blake3AuthenticatedKey(ID_BLAKE3_256, AuthenticatedKeyBase):
     TYPE = KeyType.BLAKE3AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "authenticated BLAKE3"
     ENC_NAME = "authenticated"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
 
 
@@ -1142,7 +1136,6 @@ class AEADKeyBase(KeyBase):
 class AESOCBKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.AESOCB
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "SHA256 AES256-OCB"
     ENC_NAME = "aes256-ocb"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
     CIPHERSUITE = AES256_OCB
 
@@ -1150,7 +1143,6 @@ class AESOCBKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
 class CHPOKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.CHPO
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "SHA256 ChaCha20-Poly1305"
     ENC_NAME = "chacha20-poly1305"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
     CIPHERSUITE = CHACHA20_POLY1305
 
@@ -1158,7 +1150,6 @@ class CHPOKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
 class Blake3AESOCBKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.BLAKE3AESOCB
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "BLAKE3 AES256-OCB"
     ENC_NAME = "aes256-ocb"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
     CIPHERSUITE = AES256_OCB
 
@@ -1166,7 +1157,6 @@ class Blake3AESOCBKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
 class Blake3CHPOKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.BLAKE3CHPO
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "BLAKE3 ChaCha20-Poly1305"
     ENC_NAME = "chacha20-poly1305"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
     CIPHERSUITE = CHACHA20_POLY1305
 

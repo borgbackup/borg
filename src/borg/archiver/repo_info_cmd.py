@@ -25,9 +25,10 @@ class RepoInfoMixIn:
             # storage (keyfile/repokey) is a per-key property now; the crypto suite is key.NAME.
             storage = getattr(key, "storage", None)
             mode = {KeyBlobStorage.KEYFILE: "keyfile", KeyBlobStorage.REPO: "repokey"}.get(storage)
-            if key.NAME in ("plaintext", "authenticated", "authenticated BLAKE3"):
-                # authenticated modes do not encrypt data, but (unlike plaintext) still have a key
-                # that is stored as a keyfile or repokey, so show that location when there is one.
+            if key.ENC_NAME in ("none", "authenticated"):
+                # the "none" and "authenticated" encryptions do not encrypt data; "authenticated"
+                # (unlike "none"/plaintext) still has a key stored as a keyfile or repokey, so show
+                # that location when there is one.
                 encryption += "No (%s, %s)" % (mode, key.NAME) if mode else "No"
             else:
                 encryption += "Yes (%s, %s)" % (mode, key.NAME) if mode else "Yes (%s)" % key.NAME

@@ -21,13 +21,13 @@ locations and passphrases first:
 
     # 1. Create a new "related" repository:
     # Here, the existing Borg 1.x repository used repokey (and AES-CTR mode),
-    # thus we use aes-ocb for the new Borg 2.0 repository.
+    # thus we use aes256-ocb for the new Borg 2.0 repository.
     # Staying with the same chunk ID algorithm (hmac-sha256) and with the same
     # key material (via BORG_OTHER_REPO) will make deduplication work
     # between old archives (copied with borg transfer) and future ones.
     # The AEAD cipher does not matter (everything must be re-encrypted and
     # re-authenticated anyway); you could also choose chacha20-poly1305.
-    $ borg repo-create -e aes-ocb
+    $ borg repo-create -e aes256-ocb
 
     # 2. Check what and how much it would transfer:
     $ borg transfer --from-borg1 --dry-run
@@ -46,15 +46,15 @@ locations and passphrases first:
 
     # 1. Create a new "related" repository:
     # Here, the existing Borg 1.x repository used repokey-blake2 (and AES-CTR mode),
-    # thus we use blake3-aes-ocb for the new Borg 2.0 repository.
+    # thus we use aes256-ocb with --id-hash blake3 for the new Borg 2.0 repository.
     # We need to change from blake2 to blake3, because blake2 is not supported
     # for borg2 repos (blake3 is much faster). Because we change how chunk IDs are
     # computed, we need to re-chunk everything while doing the transfer.
     # The chunker parameters you provide here should be the same as you will
     # use for all future Borg 2.0 archives.
     # The AEAD cipher does not matter (everything must be re-encrypted and
-    # re-authenticated anyway); you could also choose blake3-chacha20-poly1305.
-    $ borg repo-create -e blake3-aes-ocb
+    # re-authenticated anyway); you could also choose -e chacha20-poly1305 -i blake3.
+    $ borg repo-create -e aes256-ocb -i blake3
     $ export CHUNKER_PARAMS="buzhash64,19,23,21,4095"
 
     # 2. Check what and how much it would transfer:

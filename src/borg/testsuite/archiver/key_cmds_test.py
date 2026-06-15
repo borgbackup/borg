@@ -48,7 +48,7 @@ def test_change_location_to_keyfile(archivers, request):
 
 def test_change_location_to_b3keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=blake3-aes-ocb")
+    cmd(archiver, "repo-create", "--encryption=aes256-ocb", "--id-hash=blake3")
     log = cmd(archiver, "repo-info")
     assert "(repokey, BLAKE3" in log
     cmd(archiver, "key", "change-location", "keyfile")
@@ -68,7 +68,7 @@ def test_change_location_to_repokey(archivers, request):
 
 def test_change_location_to_b3repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=blake3-aes-ocb", KF_LOCATION)
+    cmd(archiver, "repo-create", "--encryption=aes256-ocb", "--id-hash=blake3", KF_LOCATION)
     log = cmd(archiver, "repo-info")
     assert "(keyfile, BLAKE3" in log
     cmd(archiver, "key", "change-location", "repokey")
@@ -81,12 +81,12 @@ def test_change_location_authenticated_to_keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", "--encryption=authenticated")
     log = cmd(archiver, "repo-info")
-    assert "(repokey, authenticated)" in log
+    assert "(repokey, authenticated SHA256)" in log
     cmd(archiver, "key", "change-location", "keyfile")
     [key_filename] = os.listdir(archiver.keys_path)
     assert key_filename  # key blob now lives as a keyfile
     log = cmd(archiver, "repo-info")
-    assert "(keyfile, authenticated)" in log
+    assert "(keyfile, authenticated SHA256)" in log
 
 
 def test_change_location_authenticated_to_repokey(archivers, request):
@@ -94,11 +94,11 @@ def test_change_location_authenticated_to_repokey(archivers, request):
     cmd(archiver, "repo-create", "--encryption=authenticated", KF_LOCATION)
     assert os.listdir(archiver.keys_path)  # key blob created as a keyfile
     log = cmd(archiver, "repo-info")
-    assert "(keyfile, authenticated)" in log
+    assert "(keyfile, authenticated SHA256)" in log
     cmd(archiver, "key", "change-location", "repokey")
     assert os.listdir(archiver.keys_path) == []  # keyfile removed after moving into the repo
     log = cmd(archiver, "repo-info")
-    assert "(repokey, authenticated)" in log
+    assert "(repokey, authenticated SHA256)" in log
 
 
 def test_keyfile_name_is_content_sha256(archivers, request):

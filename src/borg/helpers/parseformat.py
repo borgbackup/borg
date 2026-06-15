@@ -1335,7 +1335,7 @@ def basic_json_data(manifest, *, cache=None, extra=None):
         "encryption": {"encryption": key.ENC_NAME, "id_hash": key.IDHASH_NAME},
     }
     data["repository"]["last_modified"] = OutputTimestamp(manifest.last_timestamp)
-    if key.NAME.startswith("key file"):
+    if getattr(key, "storage", None) == KeyBlobStorage.KEYFILE:
         data["encryption"]["keyfile"] = key.find_key()
     if cache:
         data["cache"] = cache

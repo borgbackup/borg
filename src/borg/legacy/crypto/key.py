@@ -74,6 +74,8 @@ class ID_BLAKE2b_256:
     The id_key length must be 32 bytes.
     """
 
+    IDHASH_NAME = "blake2"
+
     def id_hash(self, data):
         return blake2b_256(self.id_key, data)
 
@@ -89,7 +91,7 @@ class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):  # type: ign
     TYPE = KeyType.BLAKE2AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
     NAME = "authenticated BLAKE2b"
-    ARG_NAME = "authenticated-blake2"
+    ENC_NAME = "authenticated"  # IDHASH_NAME = "blake2" via ID_BLAKE2b_256 mix-in; read-only (borg 1.x)
 
 
 # borg 1.x AES-CTR keys. keyfile and repokey are no longer separate classes - storage is a per-key
@@ -102,7 +104,7 @@ class AESCTRKey(Pbkdf2FileMixin, ID_HMAC_SHA_256, AESKeyBase, FlexiKey):  # type
     TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.KEYFILE
     NAME = "AES-CTR HMAC-SHA256"
-    ARG_NAME = None  # not creatable: borg 1.x compatibility (read-only)
+    ENC_NAME = "aes256-ctr"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in; read-only (borg 1.x)
     STORAGE = KeyBlobStorage.REPO  # seed default; actual per-key storage is tracked in self.storage on load
     LOCATION_CONFIGURABLE = True  # borg 1.x had keyfile and repokey variants
     CIPHERSUITE = AES256_CTR_HMAC_SHA256
@@ -112,7 +114,7 @@ class Blake2AESCTRKey(Pbkdf2FileMixin, ID_BLAKE2b_256, AESKeyBase, FlexiKey):  #
     TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
     TYPE = KeyType.BLAKE2KEYFILE
     NAME = "AES-CTR BLAKE2b"
-    ARG_NAME = None  # not creatable: borg 1.x compatibility (read-only)
+    ENC_NAME = "aes256-ctr"  # IDHASH_NAME = "blake2" via ID_BLAKE2b_256 mix-in; read-only (borg 1.x)
     STORAGE = KeyBlobStorage.REPO  # seed default; actual per-key storage is tracked in self.storage on load
     LOCATION_CONFIGURABLE = True  # borg 1.x had keyfile and repokey variants
     CIPHERSUITE = AES256_CTR_BLAKE2b

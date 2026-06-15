@@ -234,7 +234,7 @@ def test_fuse_allow_damaged_files(archivers, request):
     with repository:
         for item in archive.iter_items():
             if item.path.endswith(src_file):
-                repository.delete(item.chunks[-1].id)
+                repository.delete_pack(item.chunks[-1].id)  # N=1: pack_id == chunk_id
                 path = item.path  # store full path for later
                 break
         else:

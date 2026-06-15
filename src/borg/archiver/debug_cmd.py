@@ -293,7 +293,10 @@ class DebugMixIn:
                 print("object id %s is invalid." % hex_id)
             else:
                 try:
-                    repository.delete(id)
+                    # N=1: pack_id == chunk_id, so the given object id names its pack file and we
+                    # drop that pack whole. N>1 TODO: this should mark the object deleted in the
+                    # index instead, since a pack then holds more than one object.
+                    repository.delete_pack(id)
                     print("object %s deleted." % hex_id)
                 except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)

@@ -530,6 +530,15 @@ class Repository:
         """
         return self._chunks is not None
 
+    @property
+    def pack_max_count(self):
+        """How many objects a freshly written pack may bundle (the N in "N objects per pack").
+
+        N=1 today, so every pack holds one object; raising this later enables real packing.
+        compact reads this to size the pack writer it uses for copy-forward.
+        """
+        return self._pack_writer.max_count
+
     def flush(self):
         """Flush any buffered pack writer chunks."""
         if self._pack_writer is not None:
@@ -799,24 +808,30 @@ class Repository:
         # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
-    def delete(self, id, wait=True):
-        """delete a repo object
+    def delete_pack(self, pack_id, wait=True):
+        """delete a whole pack file from the store, addressed by its pack_id.
 
-        Note: when doing calls with wait=False this gets async and caller must
-              deal with async results / exceptions later.
+        This is the only space-reclaiming primitive: the store is append-only and
+        content-addressed, so the smallest unit it can remove is a whole pack file.
+        There is deliberately no per-object delete -- removing a single object out of a
+        pack that still holds referenced neighbours is done by copy-forward (compact
+        rewrites the survivors into a fresh pack, then drops the old pack as a whole).
+
+        At N=1 a pack holds exactly one object and pack_id == chunk_id, so dropping the
+        pack is the same as dropping that one object; callers that still think in object
+        ids pass the id as the pack_id and that stays correct until N>1 lands.
         """
         self._lock_refresh()
-        pack_id = id  # N=1: pack_id == chunk_id
         key = "packs/" + bin_to_hex(pack_id)
         try:
             self.store.delete(key)
         except StoreObjectNotFound:
-            raise self.ObjectNotFound(id, str(self._location)) from None
+            raise self.ObjectNotFound(pack_id, str(self._location)) from None
 
     def async_response(self, wait=True):
         """Get one async result (only applies to remote repositories).
 
-        async commands (== calls with wait=False, e.g. delete and put) have no results,
+        async commands (== calls with wait=False, e.g. put) have no results,
         but may raise exceptions. These async exceptions must get collected later via
         async_response() calls. Repeat the call until it returns None.
         The previous calls might either return one (non-None) result or raise an exception.

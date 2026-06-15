@@ -1861,9 +1861,14 @@ class ArchiveChecker:
                         # we must decompress, so it'll call assert_id() in there:
                         self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
                     except IntegrityErrorBase:
-                        # failed twice -> get rid of this chunk
+                        # failed twice -> get rid of this chunk by dropping the pack file it lives in.
+                        # At N=1 a pack holds exactly this one object (pack_id == chunk_id), so this
+                        # removes only the defect. N>1 TODO: a defect inside a shared pack needs
+                        # copy-forward of the good neighbours (see
+                        # ArchiveGarbageCollector._copy_forward_pack); until then we address by chunk id.
+                        pack_id = self.chunks[defect_chunk].pack_id
                         del self.chunks[defect_chunk]
-                        self.repository.delete(defect_chunk)
+                        self.repository.delete_pack(pack_id)
                         logger.debug("chunk %s deleted.", bin_to_hex(defect_chunk))
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))

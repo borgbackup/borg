@@ -800,7 +800,7 @@ def test_extract_file_with_missing_chunk(archivers, request):
         for item in archive.iter_items():
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
-                repository.delete(chunk.id)
+                repository.delete_pack(chunk.id)  # N=1: pack_id == chunk_id
                 break
         else:
             assert False  # missed the file

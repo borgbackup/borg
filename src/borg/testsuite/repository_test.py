@@ -82,7 +82,7 @@ def test_basic_operations(repo_fixtures, request):
             repository.put(H(x), fchunk(b"SOMEDATA"))  # put() updates _chunks via PackWriter
         key50 = H(50)
         assert pdchunk(repository.get(key50)) == b"SOMEDATA"
-        repository.delete(key50)
+        repository.delete_pack(key50)  # N=1: pack_id == chunk_id
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
     # no manual hand-off of the index across reopen: close() persisted it to the repo cache,
@@ -142,7 +142,7 @@ def test_consistency(repo_fixtures, request):
         assert pdchunk(repository.get(H(0))) == b"foo2"
         repository.put(H(0), fchunk(b"bar"))
         assert pdchunk(repository.get(H(0))) == b"bar"
-        repository.delete(H(0))
+        repository.delete_pack(H(0))  # N=1: pack_id == chunk_id
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(H(0))
 
@@ -169,7 +169,7 @@ def test_max_data_size(repo_fixtures, request):
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):
             repository.put(H(1), fchunk(max_data + b"x"))
-        repository.delete(H(0))
+        repository.delete_pack(H(0))  # N=1: pack_id == chunk_id
 
 
 def check(repository, repo_path, repair=False, status=True):

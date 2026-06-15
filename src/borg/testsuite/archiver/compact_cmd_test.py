@@ -4,11 +4,16 @@ from pathlib import Path
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import get_cache_dir
+from ...archiver.compact_cmd import ArchiveGarbageCollector
+from ...hashindex import ChunkIndex
+from ...helpers import get_cache_dir, bin_to_hex
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
 from ...manifest import Manifest
+from ...repository import Repository
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
+from ..hashindex_test import H
+from ..repository_test import fchunk, pdchunk
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -193,3 +198,87 @@ def test_compact_files_cache_cleanup(archivers, request):
     # Get expected cache files for remaining archives
     expected_cache_files = {files_cache_name(name) for name in ["archive1", "archive3"]}
     assert expected_cache_files == remaining_cache_files, "Unexpected cache files found"
+
+
+def _pack_names(repo):
+    # set of pack file names (hex pack_ids) currently present in the store.
+    return {info.name for info in repo.store.list("packs")}
+
+
+def _load_obj(repo, index, chunk_id):
+    # read an object's stored bytes via its current index location (same range-load get() does).
+    entry = index[chunk_id]
+    return repo.store.load("packs/" + bin_to_hex(entry.pack_id), offset=entry.obj_offset, size=entry.obj_size)
+
+
+def test_compact_drops_whole_unused_packs(tmp_path):
+    """N=1: each pack holds exactly one object, so compact reclaims space by dropping whole
+    unused pack files -- there is no per-object delete. The used object's pack stays; the
+    unused ones are removed as a whole."""
+    repo_location = os.fspath(tmp_path / "repo")
+    with Repository(repo_location, exclusive=True, create=True) as repo:
+        # default max_count == 1: one object per pack.
+        for i in range(3):
+            repo.put(H(i), fchunk(b"data%d" % i))
+        repo.flush()
+        index = repo.chunks
+        assert len(_pack_names(repo)) == 3
+
+        # simulate analyze_archives(): start from "unused" (put() marks new chunks F_USED), then
+        # mark only H(0) as referenced; H(1) and H(2) stay unused.
+        gc = ArchiveGarbageCollector(repo, manifest=None, stats=False, iec=False)
+        gc.chunks = index
+        for i in range(3):
+            entry = index[H(i)]
+            flags = ChunkIndex.F_USED if i == 0 else ChunkIndex.F_NONE
+            index[H(i)] = entry._replace(flags=flags)
+
+        gc.compact_packs()
+
+        # only the used object's pack survives; the two unused single-object packs are gone.
+        assert _pack_names(repo) == {bin_to_hex(index[H(0)].pack_id)}
+        assert H(0) in index
+        assert H(1) not in index and H(2) not in index
+        assert pdchunk(_load_obj(repo, index, H(0))) == b"data0"
+
+
+def test_compact_copy_forward_mixed_pack(tmp_path):
+    """N>1: a single pack can hold both used and unused objects. compact must keep the used
+    ones by copying them into a fresh pack and drop the old pack as a whole -- never delete a
+    single object in place. We force max_count > 1 to build such a mixed pack, since the N=1
+    production path never produces one. This proves the copy-forward design ahead of N>1."""
+    repo_location = os.fspath(tmp_path / "repo")
+    with Repository(repo_location, exclusive=True, create=True) as repo:
+        # build ONE pack holding three objects by bundling (max_count = 3).
+        repo._pack_writer.max_count = 3
+        repo.put(H(0), fchunk(b"data0"))
+        repo.put(H(1), fchunk(b"data1"))
+        repo.put(H(2), fchunk(b"data2"))  # third add fills the pack and flushes it
+        repo.flush()
+
+        index = repo.chunks
+        old_pack_id = index[H(0)].pack_id
+        assert {index[H(i)].pack_id for i in range(3)} == {old_pack_id}  # all three share one pack
+        assert _pack_names(repo) == {bin_to_hex(old_pack_id)}
+
+        # simulate analyze_archives(): start from "unused" (put() marks new chunks F_USED), then
+        # mark H(0) and H(2) as referenced; H(1) stays unused.
+        gc = ArchiveGarbageCollector(repo, manifest=None, stats=False, iec=False)
+        gc.chunks = index
+        for i in range(3):
+            entry = index[H(i)]
+            flags = ChunkIndex.F_USED if i in (0, 2) else ChunkIndex.F_NONE
+            index[H(i)] = entry._replace(flags=flags)
+
+        gc.compact_packs()
+
+        # the unused object is gone from the index; the survivors moved into a new pack.
+        assert H(1) not in index
+        new_pack_id = index[H(0)].pack_id
+        assert new_pack_id != old_pack_id
+        assert index[H(2)].pack_id == new_pack_id
+
+        # old pack dropped whole, new pack present, survivors still hold their original bytes.
+        assert _pack_names(repo) == {bin_to_hex(new_pack_id)}
+        assert pdchunk(_load_obj(repo, index, H(0))) == b"data0"
+        assert pdchunk(_load_obj(repo, index, H(2))) == b"data2"

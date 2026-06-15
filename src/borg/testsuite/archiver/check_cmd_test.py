@@ -162,7 +162,7 @@ def test_missing_file_chunk(archivers, request):
             if item.path.endswith(src_file):
                 valid_chunks = item.chunks
                 killed_chunk = valid_chunks[-1]
-                repository.delete(killed_chunk.id)
+                repository.delete_pack(killed_chunk.id)  # N=1: pack_id == chunk_id
                 break
         else:
             pytest.fail("should not happen")  # convert 'fail'
@@ -198,7 +198,7 @@ def test_missing_archive_item_chunk(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        repository.delete(archive.metadata.items[0])
+        repository.delete_pack(archive.metadata.items[0])  # N=1: pack_id == chunk_id
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -209,7 +209,7 @@ def test_missing_archive_metadata(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        repository.delete(archive.id)
+        repository.delete_pack(archive.id)  # N=1: pack_id == chunk_id
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -446,5 +446,5 @@ def test_empty_repository(archivers, request):
     check_cmd_setup(archiver)
     with Repository(archiver.repository_location, exclusive=True) as repository:
         for id, _ in repository.list():
-            repository.delete(id)
+            repository.delete_pack(id)  # N=1: pack_id == chunk_id
     cmd(archiver, "check", exit_code=1)

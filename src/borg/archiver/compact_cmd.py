@@ -11,7 +11,7 @@ from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
-from ..repository import Repository, repo_lister
+from ..repository import Repository, PackWriter, repo_lister
 
 from ..logger import create_logger
 
@@ -171,29 +171,7 @@ class ArchiveGarbageCollector:
                 logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
 
         repo_size_before = self.repository_size
-        logger.info("Determining unused objects...")
-        unused = set()
-        for id, entry in self.chunks.iteritems():
-            if not (entry.flags & ChunkIndex.F_USED):
-                unused.add(id)
-        logger.info(f"Deleting {len(unused)} unused objects...")
-        if unused:
-            # Before deleting any repository object, invalidate all centrally cached chunk indexes.
-            # Otherwise, if we get interrupted within the deletion loop, the still-existing cache/chunks.*
-            # would claim that already-deleted objects are still present. A later "borg create" would then
-            # trust that stale index, not re-upload the affected chunks and silently create an archive with
-            # dangling object references (see issue #9748). By removing the cached indexes first, an
-            # interruption is conservative: clients must rebuild the index from actual repository contents
-            # and will re-upload any deleted data. save_chunk_index() writes a fresh, valid index afterwards.
-            delete_chunkindex_cache(self.repository)
-        pi = ProgressIndicatorPercent(
-            total=len(unused), msg="Deleting unused objects %3.1f%%", step=0.1, msgid="compact.report_and_delete"
-        )
-        for i, id in enumerate(unused):
-            pi.show(i)
-            self.repository.delete(id)
-            del self.chunks[id]
-        pi.finish()
+        self.compact_packs()
         repo_size_after = self.repository_size
 
         count = len(self.chunks)
@@ -213,6 +191,94 @@ class ArchiveGarbageCollector:
             )
         else:
             logger.info(f"Repository has data stored in {count} objects.")
+
+    def compact_packs(self):
+        """Reclaim space at the granularity the store supports: whole pack files.
+
+        The store is append-only and content-addressed, so we never delete a single object in
+        place. Instead we look at each pack file as a unit, using the F_USED flags that
+        analyze_archives() set on the index:
+
+        - all objects unused  -> drop the whole pack file.
+        - all objects used    -> leave it untouched.
+        - mixed (some used)   -> copy the still-used objects forward into a fresh pack, repoint
+                                 their index entries, then drop the old pack whole. The unused
+                                 objects are simply never copied -- that is how their space goes.
+
+        At N=1 a pack holds exactly one object, so a pack is always either all-used or all-unused
+        and the mixed branch is unreachable; the observable result is identical to deleting the
+        unused single-object packs. The mixed branch is the N>1 copy-forward path; it is proven
+        here by tests that force max_count > 1.
+        """
+        logger.info("Determining unused objects...")
+        # Group every known object by the pack file it lives in. We collect into a plain dict
+        # first (fully draining the iterator) so we can mutate self.chunks afterwards.
+        packs: dict[bytes, dict[str, list[bytes]]] = {}
+        for id, entry in self.chunks.iteritems():
+            bucket = packs.setdefault(entry.pack_id, {"used": [], "unused": []})
+            if entry.flags & ChunkIndex.F_USED:
+                bucket["used"].append(id)
+            else:
+                bucket["unused"].append(id)
+
+        unused = [id for bucket in packs.values() for id in bucket["unused"]]
+        packs_to_drop = [pid for pid, b in packs.items() if b["unused"] and not b["used"]]
+        packs_to_rewrite = [pid for pid, b in packs.items() if b["unused"] and b["used"]]
+
+        logger.info(f"Deleting {len(unused)} unused objects...")
+        if unused:
+            # Before mutating the store, invalidate all centrally cached chunk indexes.
+            # Otherwise, if we get interrupted partway through, the still-existing cache/chunks.*
+            # would claim that already-removed objects are still present. A later "borg create" would
+            # then trust that stale index, not re-upload the affected chunks and silently create an
+            # archive with dangling object references (see issue #9748). By removing the cached indexes
+            # first, an interruption is conservative: clients must rebuild the index from actual
+            # repository contents and will re-upload any removed data. save_chunk_index() writes a
+            # fresh, valid index afterwards.
+            delete_chunkindex_cache(self.repository)
+
+        pi = ProgressIndicatorPercent(
+            total=len(packs_to_drop) + len(packs_to_rewrite),
+            msg="Compacting packs %3.1f%%",
+            step=0.1,
+            msgid="compact.report_and_delete",
+        )
+        progress = 0
+        for pack_id in packs_to_drop:
+            pi.show(progress)
+            progress += 1
+            # every object in this pack is unused -> the file goes as a whole.
+            self.repository.delete_pack(pack_id)
+            for id in packs[pack_id]["unused"]:
+                del self.chunks[id]
+        for pack_id in packs_to_rewrite:
+            pi.show(progress)
+            progress += 1
+            # N>1 only: keep the referenced objects by rewriting them into a fresh pack.
+            self._copy_forward_pack(pack_id, packs[pack_id]["used"])
+            for id in packs[pack_id]["unused"]:
+                del self.chunks[id]
+        pi.finish()
+
+    def _copy_forward_pack(self, pack_id, used_ids):
+        """Rewrite a mixed pack's still-used objects into a fresh pack, then drop the old pack.
+
+        Only reached at N>1 (a pack holding more than one object). Reads each survivor's stored
+        bytes via the current index location, writes them through a PackWriter bound to this
+        collector's index (so the new pack location lands in the index we persist), then drops
+        the old pack whole. Reading/writing goes through the local store, which is why this path
+        is exercised by local tests; routing it through repository RPC for remote N>1 is left to
+        the N>1 PR (it never runs at N=1, the only mode that exists today).
+        """
+        store = self.repository.store
+        writer = PackWriter(store, max_count=self.repository.pack_max_count, chunks=self.chunks)
+        for id in used_ids:
+            entry = self.chunks[id]
+            key = "packs/" + bin_to_hex(entry.pack_id)
+            cdata = store.load(key, offset=entry.obj_offset, size=entry.obj_size)
+            writer.add(id, cdata)
+        writer.flush()
+        self.repository.delete_pack(pack_id)
 
 
 class CompactMixIn:

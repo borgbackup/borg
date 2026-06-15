@@ -32,7 +32,7 @@ class RepoCreateMixIn:
         manifest.write()
         with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
-        if key.NAME != "plaintext":
+        if key.ENC_NAME != "none":  # any key-bearing suite (everything except plaintext "none")
             logger.warning(
                 "\n"
                 "IMPORTANT: you will need both KEY AND PASSPHRASE to access this repository!\n"

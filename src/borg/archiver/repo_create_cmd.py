@@ -1,7 +1,7 @@
 from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..crypto.key import key_creator, key_argument_names
+from ..crypto.key import key_creator, encryption_argument_names, id_hash_argument_names
 from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
 from ..helpers.argparsing import ArgumentParser
@@ -32,7 +32,7 @@ class RepoCreateMixIn:
         manifest.write()
         with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
-        if key.NAME != "plaintext":
+        if key.ENC_NAME != "none":  # any key-bearing suite (everything except plaintext "none")
             logger.warning(
                 "\n"
                 "IMPORTANT: you will need both KEY AND PASSPHRASE to access this repository!\n"
@@ -77,7 +77,7 @@ class RepoCreateMixIn:
 
         ::
 
-            borg repo-create --encryption aes-ocb --key-location repokey
+            borg repo-create --encryption aes256-ocb --key-location repokey
 
         Borg will:
 
@@ -119,14 +119,29 @@ class RepoCreateMixIn:
         You can change your passphrase for existing repositories at any time; it will not affect
         the encryption/decryption key or other secrets.
 
-        Choosing an encryption mode
-        +++++++++++++++++++++++++++
+        Choosing a crypto suite
+        +++++++++++++++++++++++
 
         Depending on your hardware, hashing and crypto performance may vary widely.
         The easiest way to find out what is fastest is to run ``borg benchmark cpu``.
 
-        The encryption mode (``--encryption``) only selects the crypto suite (id hash, encryption
-        and authentication). Where the key is stored is chosen separately with ``--key-location``:
+        A crypto suite is selected by three orthogonal options:
+
+        ``--encryption`` (**required**) selects the cipher / authenticated-encryption algorithm:
+
+        - ``aes256-ocb``: AES256 in OCB mode (encryption + authentication).
+        - ``chacha20-poly1305``: ChaCha20 + Poly1305 (encryption + authentication).
+        - ``authenticated``: no encryption, but still authenticates your data (tamper detection).
+        - ``none``: no encryption and no authentication (see the warning below).
+
+        ``--id-hash`` selects the id hash function (used for chunk ids and authentication):
+
+        - ``sha256`` (default): HMAC-SHA-256 (or plain SHA-256 for the ``none`` encryption).
+        - ``blake3``: BLAKE3. Often faster on CPUs without SHA hardware acceleration.
+
+        The ``none`` encryption has no key, so it only supports the ``sha256`` id hash.
+
+        ``--key-location`` selects where the key is stored (orthogonal to the crypto suite):
 
         - ``repokey`` (default): the key is stored in the repository (under ``keys/``). Pick this
           if you want ease-of-use and "passphrase" security is good enough.
@@ -134,43 +149,19 @@ class RepoCreateMixIn:
           this if you want "passphrase and having-the-key" security.
 
         You can move the key between these locations later with ``borg key change-location``.
-        This also applies to the ``authenticated*`` modes: they do not encrypt your data, but they
-        still have a key (used for the id hash and authentication), so ``--key-location`` selects
-        where that key is stored, just like for the encrypted modes.
-        ``--key-location`` is only ignored for the ``none`` mode, which has no key at all.
+        This also applies to the ``authenticated`` encryption: it does not encrypt your data, but it
+        still has a key (used for the id hash and authentication), so ``--key-location`` selects
+        where that key is stored, just like for the encrypted suites.
+        ``--key-location`` is only ignored for the ``none`` encryption, which has no key at all.
 
-        The following table is roughly sorted in order of preference, the better ones are
-        in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
-
-        .. nanorst: inline-fill
-
-        +-----------------------------------+--------------+----------------+--------------------+
-        | Encryption mode                   | ID-Hash      | Encryption     | Authentication     |
-        +-----------------------------------+--------------+----------------+--------------------+
-        | blake3-chacha20-poly1305          | BLAKE3       | CHACHA20       | POLY1305           |
-        +-----------------------------------+--------------+----------------+--------------------+
-        | chacha20-poly1305                 | HMAC-SHA-256 | CHACHA20       | POLY1305           |
-        +-----------------------------------+--------------+----------------+--------------------+
-        | blake3-aes-ocb                    | BLAKE3       | AES256-OCB     | AES256-OCB         |
-        +-----------------------------------+--------------+----------------+--------------------+
-        | aes-ocb                           | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         |
-        +-----------------------------------+--------------+----------------+--------------------+
-        | authenticated-blake3              | BLAKE3       | none           | BLAKE3             |
-        +-----------------------------------+--------------+----------------+--------------------+
-        | authenticated                     | HMAC-SHA-256 | none           | HMAC-SHA256        |
-        +-----------------------------------+--------------+----------------+--------------------+
-        | none                              | SHA-256      | none           | none               |
-        +-----------------------------------+--------------+----------------+--------------------+
-
-        .. nanorst: inline-replace
-
-        `none` mode uses no encryption and no authentication. You are advised NOT to use this mode
+        `none` encryption uses no encryption and no authentication. You are advised NOT to use this
         as it would expose you to a Denial-of-Service risk (due to how the :ref:`internals_hashindex`
         works) and other issues (confidentiality, tampering, ...) in case of malicious activity
         in the repository.
 
         If you do **not** want to encrypt the contents of your backups, but still want to detect
-        malicious tampering, use an `authenticated` mode. It is like `repokey` minus encryption.
+        malicious tampering, use ``--encryption authenticated``. It is like an encrypted suite
+        minus the data encryption.
         To normally work with ``authenticated`` repositories, you will need the passphrase, but
         there is an emergency workaround; see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 
@@ -217,12 +208,24 @@ class RepoCreateMixIn:
         subparser.add_argument(
             "-e",
             "--encryption",
-            metavar="MODE",
+            metavar="ENCRYPTION",
             dest="encryption",
             required=True,
-            choices=key_argument_names(),
+            choices=encryption_argument_names(),
             action=Highlander,
-            help="select encryption crypto suite **(required)**",
+            help="select cipher / AE algorithm: 'none', 'authenticated', 'aes256-ocb' or "
+            "'chacha20-poly1305' **(required)**",
+        )
+        subparser.add_argument(
+            "-i",
+            "--id-hash",
+            metavar="HASH",
+            dest="id_hash",
+            choices=id_hash_argument_names(),
+            default="sha256",
+            action=Highlander,
+            help="select the id hash function: 'sha256' (default) or 'blake3'. "
+            "The 'none' encryption only supports 'sha256'.",
         )
         subparser.add_argument(
             "--key-location",

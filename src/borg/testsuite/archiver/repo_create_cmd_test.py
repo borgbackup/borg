@@ -34,6 +34,44 @@ def test_repo_create_requires_encryption_option(archivers, request):
     cmd(archiver, "repo-create", exit_code=2)
 
 
+@pytest.mark.parametrize(
+    "extra_args, expected",
+    [
+        # --encryption x --id-hash -> crypto suite shown by "borg repo-info"
+        (["--encryption=aes256-ocb"], "Yes (repokey, aes256-ocb, sha256)"),  # default id-hash is sha256
+        (["--encryption=aes256-ocb", "--id-hash=sha256"], "Yes (repokey, aes256-ocb, sha256)"),
+        (["--encryption=aes256-ocb", "--id-hash=blake3"], "Yes (repokey, aes256-ocb, blake3)"),
+        (["--encryption=chacha20-poly1305"], "Yes (repokey, chacha20-poly1305, sha256)"),
+        (["--encryption=chacha20-poly1305", "--id-hash=blake3"], "Yes (repokey, chacha20-poly1305, blake3)"),
+        (["--encryption=authenticated"], "No (repokey, authenticated, sha256)"),
+        (["--encryption=authenticated", "--id-hash=blake3"], "No (repokey, authenticated, blake3)"),
+        (["--encryption=none"], "No"),
+    ],
+)
+def test_repo_create_encryption_id_hash_combinations(archivers, request, extra_args, expected):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", *extra_args)
+    info = cmd(archiver, "repo-info")
+    assert expected in info
+
+
+def test_repo_create_none_rejects_blake3(archivers, request):
+    # "none" (plaintext) has no key, so it only supports the sha256 id-hash.
+    archiver = request.getfixturevalue(archivers)
+    arg = ("repo-create", "--encryption=none", "--id-hash=blake3")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, *arg, exit_code=2)
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, *arg)
+
+
+def test_repo_create_rejects_legacy_combined_mode(archivers, request):
+    # clean break: the old combined "--encryption" names are no longer accepted (argparse choices).
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", "--encryption=blake3-aes-ocb", exit_code=2)
+
+
 def test_repo_create_refuse_to_overwrite_keyfile(archivers, request, monkeypatch):
     #  BORG_KEY_FILE=something borg repo-create should quit if "something" already exists.
     #  See: https://github.com/borgbackup/borg/pull/6046

@@ -31,10 +31,10 @@ from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_suppor
 from ..platform.platform_test import is_win32
 from ...xattr import get_all
 
-# --encryption now selects only the crypto suite; key storage is chosen with --key-location
-# (default: repokey). RK_* stays a single token (repokey is the default); for keyfile storage,
-# pass KF_ENCRYPTION together with KF_LOCATION.
-RK_ENCRYPTION = "--encryption=aes-ocb"
+# --encryption selects only the cipher / AE algorithm; the id hash is chosen with --id-hash
+# (default: sha256) and key storage with --key-location (default: repokey). RK_* stays a single
+# token (defaults apply); for keyfile storage, pass KF_ENCRYPTION together with KF_LOCATION.
+RK_ENCRYPTION = "--encryption=aes256-ocb"
 KF_ENCRYPTION = "--encryption=chacha20-poly1305"
 KF_LOCATION = "--key-location=keyfile"
 

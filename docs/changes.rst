@@ -168,12 +168,22 @@ above.
 
 New features:
 
+- repo-create: split ``--encryption`` into orthogonal options. ``--encryption`` now
+  selects only the cipher / AE algorithm (``none``, ``authenticated``, ``aes256-ocb``
+  or ``chacha20-poly1305``), the new ``--id-hash`` selects the id hash function
+  (``sha256`` (default) or ``blake3``), and ``--key-location`` (already present) selects
+  the key storage. The old combined names were removed: select a BLAKE3 suite via
+  ``--encryption ... --id-hash blake3`` instead of ``blake3-*``, and note that
+  ``aes-ocb`` was renamed to ``aes256-ocb``. The JSON output (``--json``) reflects this
+  too: the ``encryption.mode`` field was replaced by separate ``encryption.encryption``
+  (cipher / AE algorithm) and ``encryption.id_hash`` fields. #9168
 - key: unify keyfile/repokey key classes and locate the key independently of the
   manifest key-type byte. Borg now tries keyfiles first and repokeys afterwards until
   a passphrase unlocks a key, so where a key is stored (keyfile vs repokey) is a
   per-key property rather than a separate key class. The key-type byte still selects
   the crypto suite (id hash, MAC, cipher). ``borg repo-create --encryption`` now takes
-  only the crypto suite (e.g. ``aes-ocb``, ``chacha20-poly1305``, ``blake3-aes-ocb``);
+  only the crypto suite (e.g. ``aes256-ocb``, ``chacha20-poly1305``; see #9168 above for
+  the further split into ``--encryption`` and ``--id-hash``);
   choose the storage location with the new ``--key-location=repokey|keyfile`` option
   (default: ``repokey``). The old combined modes (``repokey-aes-ocb`` etc.) were
   removed. ``borg key import`` also gained ``--key-location``. #9743

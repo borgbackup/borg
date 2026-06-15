@@ -127,16 +127,37 @@ KEY_LOCATIONS = {"keyfile": KeyBlobStorage.KEYFILE, "repokey": KeyBlobStorage.RE
 
 
 def key_creator(repository, args, *, other_key=None):
+    # the crypto suite is selected by two orthogonal dimensions: the cipher / AE algorithm
+    # (--encryption) and the id hash function (--id-hash). id-hash is always significant, so e.g.
+    # "--encryption none --id-hash blake3" finds no match and is rejected (none only supports sha256).
+    enc = args.encryption
+    id_hash = getattr(args, "id_hash", "sha256")
     for key in AVAILABLE_KEY_TYPES:
-        if key.ARG_NAME == args.encryption:
-            assert key.ARG_NAME is not None
+        if key.ENC_NAME == enc and key.IDHASH_NAME == id_hash:
             return key.create(repository, args, other_key=other_key)
-    else:
-        raise ValueError('Invalid encryption mode "%s"' % args.encryption)
+    raise Error(
+        f'Unsupported --encryption "{enc}" / --id-hash "{id_hash}" combination '
+        f'(the "none" encryption only supports the "sha256" id-hash).'
+    )
 
 
-def key_argument_names():
-    return [key.ARG_NAME for key in AVAILABLE_KEY_TYPES if key.ARG_NAME]
+def encryption_argument_names():
+    # distinct cipher / AE algorithm names offered by "borg repo-create --encryption", in the
+    # order the key types are listed in AVAILABLE_KEY_TYPES (deduplicated, sha256/blake3 variants merge).
+    names = []
+    for key in AVAILABLE_KEY_TYPES:
+        if key.ENC_NAME and key.ENC_NAME not in names:
+            names.append(key.ENC_NAME)
+    return names
+
+
+def id_hash_argument_names():
+    # distinct id hash function names offered by "borg repo-create --id-hash".
+    names = []
+    for key in AVAILABLE_KEY_TYPES:
+        if key.IDHASH_NAME and key.IDHASH_NAME not in names:
+            names.append(key.IDHASH_NAME)
+    return names
 
 
 def identify_key(manifest_data):
@@ -189,11 +210,13 @@ class KeyBase:
     # set of key type IDs the class can handle as input
     TYPES_ACCEPTABLE: set[int] = None  # override in subclasses
 
-    # Human-readable name
-    NAME = "UNDEFINED"
-
-    # Name used in command line / API (e.g. borg init --encryption=...)
-    ARG_NAME = "UNDEFINED"
+    # The two orthogonal dimensions a creatable crypto suite is selected by on the command line:
+    # ENC_NAME -> "borg repo-create --encryption" (cipher / AE algorithm)
+    # IDHASH_NAME -> "borg repo-create --id-hash" (id hash function)
+    # (key location is the third dimension, handled separately via --key-location).
+    # None means "not creatable this way" (e.g. legacy read-only classes).
+    ENC_NAME: ClassVar[str] = None  # override in creatable subclasses
+    IDHASH_NAME: ClassVar[str] = None  # override in creatable subclasses (or via id-hash mix-in)
 
     # Storage type (no key blob storage / keyfile / repo). This is only a default seed for the
     # per-instance self.storage; keyfile vs repokey is a property of an individual key, not the class.
@@ -296,8 +319,8 @@ class KeyBase:
 class PlaintextKey(KeyBase):
     TYPE = KeyType.PLAINTEXT
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "plaintext"
-    ARG_NAME = "none"
+    ENC_NAME = "none"
+    IDHASH_NAME = "sha256"  # plain sha256(data), no key; blake3 is not supported for "none"
 
     chunk_seed = 0
     crypt_key = b""  # makes .derive_key() work, nothing secret here
@@ -331,6 +354,8 @@ class ID_HMAC_SHA_256:
 
     The id_key length must be 32 bytes.
     """
+
+    IDHASH_NAME = "sha256"
 
     def id_hash(self, data):
         return hmac_sha256(self.id_key, data)
@@ -963,8 +988,7 @@ from ..legacy.crypto.key import ID_BLAKE2b_256  # noqa: F401
 class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
     TYPE = KeyType.AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "authenticated"
-    ARG_NAME = "authenticated"
+    ENC_NAME = "authenticated"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
 
 
 # ------------ new crypto ------------
@@ -977,6 +1001,8 @@ class ID_BLAKE3_256:
     The id_key length must be 32 bytes.
     """
 
+    IDHASH_NAME = "blake3"
+
     def id_hash(self, data):
         return blake3(data, key=self.id_key).digest(length=32)
 
@@ -984,8 +1010,7 @@ class ID_BLAKE3_256:
 class Blake3AuthenticatedKey(ID_BLAKE3_256, AuthenticatedKeyBase):
     TYPE = KeyType.BLAKE3AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "authenticated BLAKE3"
-    ARG_NAME = "authenticated-blake3"
+    ENC_NAME = "authenticated"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
 
 
 class AEADKeyBase(KeyBase):
@@ -1111,32 +1136,28 @@ class AEADKeyBase(KeyBase):
 class AESOCBKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.AESOCB
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "AES-OCB"
-    ARG_NAME = "aes-ocb"
+    ENC_NAME = "aes256-ocb"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
     CIPHERSUITE = AES256_OCB
 
 
 class CHPOKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.CHPO
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "ChaCha20-Poly1305"
-    ARG_NAME = "chacha20-poly1305"
+    ENC_NAME = "chacha20-poly1305"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
     CIPHERSUITE = CHACHA20_POLY1305
 
 
 class Blake3AESOCBKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.BLAKE3AESOCB
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "BLAKE3 AES-OCB"
-    ARG_NAME = "blake3-aes-ocb"
+    ENC_NAME = "aes256-ocb"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
     CIPHERSUITE = AES256_OCB
 
 
 class Blake3CHPOKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.BLAKE3CHPO
     TYPES_ACCEPTABLE = {TYPE}
-    NAME = "BLAKE3 ChaCha20-Poly1305"
-    ARG_NAME = "blake3-chacha20-poly1305"
+    ENC_NAME = "chacha20-poly1305"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
     CIPHERSUITE = CHACHA20_POLY1305
 
 

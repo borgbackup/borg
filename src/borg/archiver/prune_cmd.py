@@ -127,7 +127,7 @@ def prune(
     archives: list[ArchiveInfo],
     rule: PruningRule,
     n_or_interval: int | timedelta,
-    since_timestamp: datetime | None,
+    base_timestamp: datetime | None,
     keep_oldest: bool,
     previously_kept: frozenset[ArchiveInfo] = frozenset(),
 ) -> dict[ArchiveInfo, KeepResult]:
@@ -137,9 +137,9 @@ def prune(
     if isinstance(n_or_interval, int):
         n, earliest_timestamp = n_or_interval, None
     else:
-        if since_timestamp is None:
-            raise ValueError("since_timestamp is required when using interval-based pruning")
-        n, earliest_timestamp = None, since_timestamp - n_or_interval
+        if base_timestamp is None:
+            raise ValueError("base_timestamp is required when using interval-based pruning")
+        n, earliest_timestamp = None, base_timestamp - n_or_interval
 
     keep: dict[ArchiveInfo, KeepResult] = {}
 
@@ -185,6 +185,8 @@ class PruneMixIn:
         candidate_archives = archives
 
         if since is not None:
+            base_timestamp = since
+
             # `--since` is a prefilter: Archives from after this time are kept by default. They are not considered for
             # pruning at all. They won't falsely occupy an active retention period.
             for archive in archives:
@@ -192,6 +194,8 @@ class PruneMixIn:
                     break
                 keep[archive] = KeepResult(rule=PRUNE_SINCE, idx=len(keep))
             candidate_archives = archives[len(keep) :]
+        else:
+            base_timestamp = datetime.now().astimezone()
 
         # Apply each retention rule to all candidate archives. The
         # `previously_kept` parameter prevents later (coarser-grained) rules
@@ -204,7 +208,7 @@ class PruneMixIn:
                 archives=candidate_archives,
                 rule=rule,
                 n_or_interval=n_or_interval,
-                since_timestamp=(since if since is not None else datetime.now().astimezone()),
+                base_timestamp=base_timestamp,
                 keep_oldest=(
                     rule == active_rules[-1][0]
                 ),  # Activate keep_oldest rule only for the largest active interval

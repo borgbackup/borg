@@ -145,14 +145,13 @@ def test_timestamp_parsing(monkeypatch, isoformat, expected):
 
 class MockCache:
     class MockRepo:
-        def async_response(self, wait=True):
-            pass
+        pass
 
     def __init__(self):
         self.objects = {}
         self.repository = self.MockRepo()
 
-    def add_chunk(self, id, meta, data, stats=None, wait=True, ro_type=None):
+    def add_chunk(self, id, meta, data, stats=None, ro_type=None):
         assert ro_type is not None
         self.objects[id] = data
         return id, len(data)

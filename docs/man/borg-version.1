@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-version" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-version" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-version \- Displays the Borg client and server versions.
 .SH SYNOPSIS
@@ -38,11 +38,11 @@ borg [common options] version [options]
 .sp
 This command displays the Borg client and server versions.
 .sp
-If a local repository is given, the client code directly accesses the repository,
-so the client version is also shown as the server version.
+For current repositories the client code directly accesses the repository (also for
+rest:// repositories), so the client version is shown as the server version, too.
 .sp
-If a remote repository is given (e.g., ssh:), the remote Borg is queried, and
-its version is displayed as the server version.
+If a legacy (borg 1.x / v1) repository is given via ssh: together with \-\-from\-borg1,
+the remote Borg is queried, and its version is displayed as the server version.
 .sp
 Examples:
 .INDENT 0.0
@@ -53,8 +53,8 @@ Examples:
 $ borg version /mnt/backup
 1.4.0a / 1.4.0a
 
-# remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
-$ borg version ssh://borg@borgbackup:repo
+# legacy remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
+$ borg version \-\-from\-borg1 ssh://borg@borgbackup:repo
 1.4.0a / 1.2.7
 .EE
 .UNINDENT

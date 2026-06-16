@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-check" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-check" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-check \- Checks repository consistency.
 .SH SYNOPSIS
@@ -84,13 +84,12 @@ repository files. Enabling partial repository checks excludes archive checks
 for the same reason. Therefore, partial checks may be useful only with very large
 repositories where a full check would take too long.
 .sp
-The \fB\-\-verify\-data\fP option will perform a full integrity verification (as
-opposed to checking just the xxh64) of data, which means reading the
-data from the repository, decrypting and decompressing it. It is a complete
-cryptographic verification and hence very time\-consuming, but will detect any
-accidental and malicious corruption. Tamper\-resistance is only guaranteed for
-encrypted repositories against attackers without access to the keys. You cannot
-use \fB\-\-verify\-data\fP with \fB\-\-repository\-only\fP\&.
+The \fB\-\-verify\-data\fP option will perform a full integrity verification of data,
+which means reading the data from the repository, decrypting and decompressing it.
+It is a complete cryptographic verification and hence very time\-consuming, but
+will detect any accidental and malicious corruption. Tamper\-resistance is only
+guaranteed for encrypted repositories against attackers without access to the keys.
+You cannot use \fB\-\-verify\-data\fP with \fB\-\-repository\-only\fP\&.
 .sp
 The \fB\-\-find\-lost\-archives\fP option will also scan the whole repository, but
 tells Borg to search for lost archive metadata. If Borg encounters any archive

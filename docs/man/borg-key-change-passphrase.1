@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-key-change-passphrase" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-key-change-passphrase" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-key-change-passphrase \- Changes the repository key file passphrase.
 .SH SYNOPSIS
@@ -52,7 +52,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .sp
 .EX
 # Create a key file protected repository
-$ borg repo\-create \-\-encryption=keyfile\-aes\-ocb \-v
+$ borg repo\-create \-\-encryption=aes\-ocb \-\-key\-location=keyfile \-v
 Initializing repository at \(dq/path/to/repo\(dq
 Enter new passphrase:
 Enter same passphrase again:
@@ -100,7 +100,7 @@ Fully automated using environment variables:
 .INDENT 3.5
 .sp
 .EX
-$ BORG_NEW_PASSPHRASE=old borg repo\-create \-\-encryption=repokey\-aes\-ocb
+$ BORG_NEW_PASSPHRASE=old borg repo\-create \-\-encryption=aes\-ocb
 # now \(dqold\(dq is the current passphrase.
 $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change\-passphrase
 # now \(dqnew\(dq is the current passphrase.

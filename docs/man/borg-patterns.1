@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-patterns" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-patterns" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -71,6 +71,10 @@ start with \fBsrc\fP\&.
 .IP \(bu 2
 On native Windows, archived absolute paths look like \fBC/Windows/System32\fP\&.
 .UNINDENT
+.IP \(bu 2
+When using the slashdot hack, patterns match against the unstripped path,
+i.e., when you back up \fB/this/gets/stripped/./this/gets/archived\fP,
+patterns must match \fBthis/gets/stripped/this/gets/archived\fP\&.
 .UNINDENT
 .sp
 Borg supports different pattern styles. To define a non\-default

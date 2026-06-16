@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-transfer" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-transfer" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -71,15 +71,15 @@ borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-dry\-run  # check! 
 .EE
 .UNINDENT
 .UNINDENT
-.SS Data migration / upgrade from borg 1.x
+.SS Data migration / upgrade from Borg 1.x
 .sp
-To migrate your borg 1.x archives into a related, new borg2 repository, usage is quite similar
+To migrate your Borg 1.x archives into a related, new Borg 2 repository, usage is quite similar
 to the above, but you need the \fB\-\-from\-borg1\fP option:
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .EX
-borg \-\-repo=DST_REPO repocreate \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO \-\-from\-borg1
+borg \-\-repo=DST_REPO repo\-create \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO \-\-from\-borg1
 
 # to continue using lz4 compression as you did in SRC_REPO:
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
@@ -150,55 +150,98 @@ consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH EXAMPLES
+.sp
+To keep the following examples short and readable, we export the repository
+locations and passphrases first:
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .EX
-# 0. Have Borg 2.0 installed on the client AND server; have a b12 repository copy for testing.
-
-# 1. Create a new \(dqrelated\(dq repository:
-# Here, the existing Borg 1.2 repository used repokey\-blake2 (and AES\-CTR mode),
-# thus we use repokey\-blake2\-aes\-ocb for the new Borg 2.0 repository.
-# Staying with the same chunk ID algorithm (BLAKE2) and with the same
-# key material (via \-\-other\-repo <oldrepo>) will make deduplication work
-# between old archives (copied with borg transfer) and future ones.
-# The AEAD cipher does not matter (everything must be re\-encrypted and
-# re\-authenticated anyway); you could also choose repokey\-blake2\-chacha20\-poly1305.
-# In case your old Borg repository did not use BLAKE2, just remove the \(dq\-blake2\(dq.
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 repo\-create \e
-       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-e repokey\-blake2\-aes\-ocb
-
-# 2. Check what and how much it would transfer:
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
-       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
-
-# 3. Transfer (copy) archives from the old repository into the new repository (takes time and space!):
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
-       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12
-
-# 4. Check whether we have everything (same as step 2):
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
-       \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
+export BORG_REPO=ssh://borg2@borgbackup/./tests/b20
+export BORG_PASSPHRASE=\(aqyour\-borg2\-repo\-passphrase\(aq
+export BORG_OTHER_REPO=ssh://borg2@borgbackup/./tests/b1x
+export BORG_OTHER_PASSPHRASE=\(aqyour\-borg1\-repo\-passphrase\(aq
 .EE
 .UNINDENT
 .UNINDENT
-.SS Keyfile considerations when upgrading from borg 1.x
+.INDENT 0.0
+.INDENT 3.5
 .sp
-If you are using a \fBkeyfile\fP encryption mode (not \fBrepokey\fP), borg 2
-may not automatically find your borg 1.x key file, because the default
+.EX
+# Borg 1.x repository \-> Borg 2.0 repository (hmac\-sha256 \-> hmac\-sha256, keeping the same chunk ID algorithm)
+
+# 0. Have Borg 2.0 installed on the client AND server; have a Borg 1.x repository copy for testing.
+
+# 1. Create a new \(dqrelated\(dq repository:
+# Here, the existing Borg 1.x repository used repokey (and AES\-CTR mode),
+# thus we use aes256\-ocb for the new Borg 2.0 repository.
+# Staying with the same chunk ID algorithm (hmac\-sha256) and with the same
+# key material (via BORG_OTHER_REPO) will make deduplication work
+# between old archives (copied with borg transfer) and future ones.
+# The AEAD cipher does not matter (everything must be re\-encrypted and
+# re\-authenticated anyway); you could also choose chacha20\-poly1305.
+$ borg repo\-create \-e aes256\-ocb
+
+# 2. Check what and how much it would transfer:
+$ borg transfer \-\-from\-borg1 \-\-dry\-run
+
+# 3. Transfer (copy) archives from the old repository into the new repository (takes time and space!):
+$ borg transfer \-\-from\-borg1
+
+# 4. Check whether we have everything (same as step 2):
+$ borg transfer \-\-from\-borg1 \-\-dry\-run
+.EE
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+# Borg 1.x repository \-> Borg 2.0 repository (blake2 \-> blake3, changing the chunk ID algorithm)
+
+# 0. Have Borg 2.0 installed on the client AND server; have a Borg 1.x repository copy for testing.
+
+# 1. Create a new \(dqrelated\(dq repository:
+# Here, the existing Borg 1.x repository used repokey\-blake2 (and AES\-CTR mode),
+# thus we use aes256\-ocb with \-\-id\-hash blake3 for the new Borg 2.0 repository.
+# We need to change from blake2 to blake3, because blake2 is not supported
+# for borg2 repos (blake3 is much faster). Because we change how chunk IDs are
+# computed, we need to re\-chunk everything while doing the transfer.
+# The chunker parameters you provide here should be the same as you will
+# use for all future Borg 2.0 archives.
+# The AEAD cipher does not matter (everything must be re\-encrypted and
+# re\-authenticated anyway); you could also choose \-e chacha20\-poly1305 \-i blake3.
+$ borg repo\-create \-e aes256\-ocb \-i blake3
+$ export CHUNKER_PARAMS=\(dqbuzhash64,19,23,21,4095\(dq
+
+# 2. Check what and how much it would transfer:
+$ borg transfer \-\-from\-borg1 \-\-chunker\-params=$CHUNKER_PARAMS \-\-dry\-run
+
+# 3. Transfer (copy) archives from the old repository into the new repository (takes time and space!):
+$ borg transfer \-\-from\-borg1 \-\-chunker\-params=$CHUNKER_PARAMS
+
+# 4. Check whether we have everything (same as step 2):
+$ borg transfer \-\-from\-borg1 \-\-chunker\-params=$CHUNKER_PARAMS \-\-dry\-run
+.EE
+.UNINDENT
+.UNINDENT
+.SS Keyfile considerations when upgrading from Borg 1.x
+.sp
+If you are using a \fBkeyfile\fP encryption mode (not \fBrepokey\fP), Borg 2
+may not automatically find your Borg 1.x key file, because the default
 key file directory has changed on some platforms due to the switch to
 the platformdirs \%<https://\:pypi\:.org/\:project/\:platformdirs/> library.
 .sp
-On \fBLinux\fP, there is typically no change \-\- both borg 1.x and borg 2
+On \fBLinux\fP, there is typically no change \-\- both Borg 1.x and Borg 2
 use \fB~/.config/borg/keys/\fP\&.
 .sp
-On \fBmacOS\fP, borg 1.x stored key files in \fB~/.config/borg/keys/\fP,
-but borg 2 defaults to \fB~/Library/Application Support/borg/keys/\fP\&.
+On \fBmacOS\fP, Borg 1.x stored key files in \fB~/.config/borg/keys/\fP,
+but Borg 2 defaults to \fB~/Library/Application Support/borg/keys/\fP\&.
 .sp
-On \fBWindows\fP, borg 1.x used XDG\-style paths (e.g. \fB~/.config/borg/keys/\fP),
-while borg 2 defaults to \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\ekeys\e\fP\&.
+On \fBWindows\fP, Borg 1.x used XDG\-style paths (e.g. \fB~/.config/borg/keys/\fP),
+while Borg 2 defaults to \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\ekeys\e\fP\&.
 .sp
-If borg 2 cannot find your key file, you have several options:
+If Borg 2 cannot find your key file, you have several options:
 .INDENT 0.0
 .IP 1. 3
 \fBCopy the key file\fP from the old location to the new one.
@@ -223,8 +266,8 @@ export BORG_KEY_FILE=~/.config/borg/keys/your_key_file
 .UNINDENT
 .UNINDENT
 .IP 4. 3
-\fBSet BORG_BASE_DIR\fP to force borg 2 to use the same base directory
-as borg 1.x:
+\fBSet BORG_BASE_DIR\fP to force Borg 2 to use the same base directory
+as Borg 1.x:
 .INDENT 3.0
 .INDENT 3.5
 .sp
@@ -234,8 +277,8 @@ export BORG_BASE_DIR=$HOME
 .UNINDENT
 .UNINDENT
 .sp
-This makes borg 2 use \fB$HOME/.config/borg\fP, \fB$HOME/.cache/borg\fP,
-etc., matching borg 1.x behaviour on all platforms.
+This makes Borg 2 use \fB$HOME/.config/borg\fP, \fB$HOME/.cache/borg\fP,
+etc., matching Borg 1.x behavior on all platforms.
 .UNINDENT
 .sp
 See \fIenv_vars\fP for more details on directory environment variables.

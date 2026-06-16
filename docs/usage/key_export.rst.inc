@@ -12,21 +12,25 @@ borg key export
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    | **positional arguments**                                                                                                                       |
-    +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    |                                                       | ``PATH``      | where to store the backup                                              |
-    +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    | **options**                                                                                                                                    |
-    +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    |                                                       | ``--paper``   | Create an export suitable for printing and later type-in               |
-    +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    |                                                       | ``--qr-html`` | Create an HTML file suitable for printing and later type-in or QR scan |
-    +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                                                 |
-    |                                                                                                                                                |
-    | :ref:`common_options`                                                                                                                          |
-    +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                           |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    |                                                       | ``PATH``          | where to store the backup                                              |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    | **options**                                                                                                                                        |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    |                                                       | ``--label LABEL`` | export the borg key with this label                                    |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    |                                                       | ``--key ID``      | export the borg key with this id (or unique id prefix)                 |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    |                                                       | ``--paper``       | Create an export suitable for printing and later type-in               |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    |                                                       | ``--qr-html``     | Create an HTML file suitable for printing and later type-in or QR scan |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                     |
+    |                                                                                                                                                    |
+    | :ref:`common_options`                                                                                                                              |
+    +-------------------------------------------------------+-------------------+------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -43,6 +47,8 @@ borg key export
 
 
     options
+        --label LABEL    export the borg key with this label
+        --key ID      export the borg key with this id (or unique id prefix)
         --paper       Create an export suitable for printing and later type-in
         --qr-html     Create an HTML file suitable for printing and later type-in or QR scan
 
@@ -74,6 +80,12 @@ Note that the backup produced does not include the passphrase itself
 (i.e. the exported key stays encrypted). In order to regain access to a
 repository, one needs both the exported key and the original passphrase.
 Keep the exported key and the passphrase at safe places.
+
+A repository may have more than one borg key (each protected by its own
+passphrase, see ``borg key add``). Select which borg key to export with
+``--label`` or ``--key`` (its key id or a unique prefix, see
+``borg key list``). If the repository has only a single borg key, no
+selector is required.
 
 There are three backup formats. The normal backup format is suitable for
 digital storage as a file. The ``--paper`` backup format is optimized

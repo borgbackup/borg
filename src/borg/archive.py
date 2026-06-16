@@ -382,11 +382,8 @@ class CacheChunkBuffer(ChunkBuffer):
         self.stats = stats
 
     def write_chunk(self, chunk):
-        id_, _ = self.cache.add_chunk(
-            self.key.id_hash(chunk), {}, chunk, stats=self.stats, wait=False, ro_type=ROBJ_ARCHIVE_STREAM
-        )
+        id_, _ = self.cache.add_chunk(self.key.id_hash(chunk), {}, chunk, stats=self.stats, ro_type=ROBJ_ARCHIVE_STREAM)
         logger.debug(f"writing item metadata stream chunk {bin_to_hex(id_)}")
-        self.cache.repository.async_response(wait=False)
         return id_
 
 
@@ -688,8 +685,6 @@ Duration: {0.duration}
                 raise Error("%s - archive too big (issue #1473)!" % err_msg)
             else:
                 raise
-        while self.repository.async_response(wait=True) is not None:
-            pass
         self.manifest.archives.create(name, self.id, metadata.time)
         self.manifest.write()
         return metadata
@@ -1176,8 +1171,7 @@ class ChunksProcessor:
                 started_hashing = time.monotonic()
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 stats.hashing_time += time.monotonic() - started_hashing
-                chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False, ro_type=ROBJ_FILE_STREAM)
-                self.cache.repository.async_response(wait=False)
+                chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, ro_type=ROBJ_FILE_STREAM)
                 return chunk_entry
 
         item.chunks = []
@@ -2271,8 +2265,7 @@ class ArchiveRecreater:
         size = len(data)
         if chunk_id in self.seen_chunks:
             return self.cache.reuse_chunk(chunk_id, size, target.stats)
-        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, wait=False, ro_type=ROBJ_FILE_STREAM)
-        self.cache.repository.async_response(wait=False)
+        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, ro_type=ROBJ_FILE_STREAM)
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry
 

@@ -785,11 +785,8 @@ class Repository:
         for id_ in ids:
             yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
 
-    def put(self, id, data, wait=True):
+    def put(self, id, data):
         """put a repo object
-
-        Note: when doing calls with wait=False this gets async and caller must
-              deal with async results / exceptions later.
 
         Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples for
         every chunk written to disk this call.  At max_count=1 this is always
@@ -802,12 +799,8 @@ class Repository:
         # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
-    def delete(self, id, wait=True):
-        """delete a repo object
-
-        Note: when doing calls with wait=False this gets async and caller must
-              deal with async results / exceptions later.
-        """
+    def delete(self, id):
+        """delete a repo object"""
         self._lock_refresh()
         pack_id = id  # N=1: pack_id == chunk_id
         key = "packs/" + bin_to_hex(pack_id)
@@ -815,17 +808,6 @@ class Repository:
             self.store.delete(key)
         except StoreObjectNotFound:
             raise self.ObjectNotFound(id, str(self._location)) from None
-
-    def async_response(self, wait=True):
-        """Get one async result (only applies to remote repositories).
-
-        async commands (== calls with wait=False, e.g. delete and put) have no results,
-        but may raise exceptions. These async exceptions must get collected later via
-        async_response() calls. Repeat the call until it returns None.
-        The previous calls might either return one (non-None) result or raise an exception.
-        If wait=True is given and there are outstanding responses, it will wait for them
-        to arrive. With wait=False, it will only return already received responses.
-        """
 
     def break_lock(self):
         Lock(self.store).break_lock()

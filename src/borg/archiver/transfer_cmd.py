@@ -62,10 +62,7 @@ def transfer_chunks(
                     present += size
                 else:
                     # Add the new chunk to the repository
-                    chunk_entry = cache.add_chunk(
-                        chunk_id, {}, data, stats=archive.stats, wait=False, ro_type=ROBJ_FILE_STREAM
-                    )
-                    cache.repository.async_response(wait=False)
+                    chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=archive.stats, ro_type=ROBJ_FILE_STREAM)
                     transfer += size
                 chunks.append(chunk_entry)
             else:
@@ -101,7 +98,6 @@ def transfer_chunks(
                                 meta,
                                 data,
                                 stats=archive.stats,
-                                wait=False,
                                 compress=False,
                                 size=size,
                                 ctype=meta["ctype"],
@@ -112,11 +108,10 @@ def transfer_chunks(
                             # always decompress and re-compress file data chunks
                             meta, data = other_manifest.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_FILE_STREAM)
                             chunk_entry = cache.add_chunk(
-                                chunk_id, meta, data, stats=archive.stats, wait=False, ro_type=ROBJ_FILE_STREAM
+                                chunk_id, meta, data, stats=archive.stats, ro_type=ROBJ_FILE_STREAM
                             )
                         else:
                             raise ValueError(f"unsupported recompress mode: {recompress}")
-                    cache.repository.async_response(wait=False)
                     chunks.append(chunk_entry)
                 transfer += size
             else:

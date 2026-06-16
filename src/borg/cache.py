@@ -722,18 +722,7 @@ class ChunksMixin:
         return ChunkListEntry(id, size)
 
     def add_chunk(
-        self,
-        id,
-        meta,
-        data,
-        *,
-        stats,
-        wait=True,
-        compress=True,
-        size=None,
-        ctype=None,
-        clevel=None,
-        ro_type=ROBJ_FILE_STREAM,
+        self, id, meta, data, *, stats, compress=True, size=None, ctype=None, clevel=None, ro_type=ROBJ_FILE_STREAM
     ):
         assert ro_type is not None
         if size is None:
@@ -752,7 +741,7 @@ class ChunksMixin:
         cdata = self.repo_objs.format(
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
-        pack_results = self.repository.put(id, cdata, wait=wait)
+        pack_results = self.repository.put(id, cdata)
         self.last_refresh_dt = now  # .put also refreshed the lock
         self.chunks.add(id, size)
         self.chunks.update_pack_info(pack_results)

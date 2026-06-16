@@ -33,6 +33,10 @@ Be careful, your patterns must match the archived paths:
     start with ``src``.
   - On native Windows, archived absolute paths look like ``C/Windows/System32``.
 
+- When using the slashdot hack, patterns match against the unstripped path,
+  i.e., when you back up ``/this/gets/stripped/./this/gets/archived``,
+  patterns must match ``this/gets/stripped/this/gets/archived``.
+
 Borg supports different pattern styles. To define a non-default
 style for a specific pattern, prefix it with two characters followed
 by a colon ':' (i.e. ``fm:path/*``, ``sh:path/**``).
@@ -368,11 +372,11 @@ and ``--remote-path`` values support these placeholders:
 
 {now}
     The current local date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.10/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.11/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
 {utcnow}
     The current UTC date and time, by default in ISO-8601 format.
-    You can also supply your own `format string <https://docs.python.org/3.10/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
+    You can also supply your own `format string <https://docs.python.org/3.11/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
 {user}
     The user name (or UID, if no name is available) of the user running borg.

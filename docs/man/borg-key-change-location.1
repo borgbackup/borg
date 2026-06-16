@@ -28,9 +28,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-key-change-location" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-key-change-location" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
-borg-key-change-location \- Changes the repository key location.
+borg-key-change-location \- Changes the location of the borg key used to unlock this repository.
 .SH SYNOPSIS
 .sp
 borg [common options] key change\-location [options] KEY_LOCATION
@@ -41,7 +41,7 @@ Change the location of a Borg key. The key can be stored at different locations:
 .IP \(bu 2
 keyfile: locally, usually in the home directory
 .IP \(bu 2
-repokey: inside the repository (in the repository config)
+repokey: inside the repository
 .UNINDENT
 .sp
 Please note:

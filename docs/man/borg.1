@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -61,7 +61,7 @@ Before a backup can be made, a repository has to be initialized:
 .INDENT 3.5
 .sp
 .EX
-$ borg \-r /path/to/repo repo\-create \-\-encryption=repokey\-aes\-ocb
+$ borg \-r /path/to/repo repo\-create \-\-encryption=aes\-ocb
 .EE
 .UNINDENT
 .UNINDENT
@@ -210,7 +210,13 @@ expanded by your shell).
 .sp
 Note: You may also prepend \fBfile://\fP to a filesystem path to use URL style.
 .sp
-\fBRemote repositories\fP accessed via SSH \%<user@\:host>:
+\fBRemote repositories\fP accessed via SSH \%<user@\:host> (REST http over stdio):
+.sp
+\fBrest://user@host:port//abs/path/to/repo\fP — absolute path
+.sp
+\fBrest://user@host:port/rel/path/to/repo\fP — path relative to the current directory
+.sp
+\fBRemote repositories\fP accessed via SSH \%<user@\:host> (legacy borg RPC protocol):
 .sp
 \fBssh://user@host:port//abs/path/to/repo\fP — absolute path
 .sp
@@ -410,7 +416,7 @@ If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
 When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
 This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
 be checked.
-Main use case for this is to fully automate \fBborg change\-passphrase\fP\&.
+Main use case for this is to fully automate \fBborg key change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the \(dqdisplay the passphrase for verification\(dq question when defining a new passphrase for encrypted repositories.
@@ -600,8 +606,8 @@ default directory locations. This means that default paths are \fBplatform\-spec
 \fBLinux\fP: Uses XDG Base Directory Specification paths (e.g., \fB~/.config/borg\fP,
 \fB~/.cache/borg\fP, \fB~/.local/share/borg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are honoured.
 .IP \(bu 2
-\fBmacOS\fP: Uses native macOS directories (e.g., \fB~/Library/Application Support/borg\fP,
-\fB~/Library/Caches/borg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are \fBnot\fP honoured.
+\fBmacOS\fP: Uses native macOS directories by default (e.g., \fB~/Library/Application Support/borg\fP,
+\fB~/Library/Caches/borg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are honoured if set.
 .IP \(bu 2
 \fBWindows\fP: Uses Windows AppData directories (e.g., \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\fP,
 \fBC:\eUsers\e<user>\eAppData\eLocal\eborg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are \fBnot\fP honoured.
@@ -698,7 +704,7 @@ to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt
 .B BORG_CACHE_DIR
 Defaults to the platform\-specific cache directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&.
-On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CACHE_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CACHE_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains the local cache and might need a lot
 of space for dealing with big repositories. Make sure you\(aqre aware of the associated
 security aspects of the cache location: \fIcache_security\fP
@@ -706,21 +712,21 @@ security aspects of the cache location: \fIcache_security\fP
 .B BORG_CONFIG_DIR
 Defaults to the platform\-specific config directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&.
-On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CONFIG_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CONFIG_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains all borg configuration directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
 .B BORG_DATA_DIR
 Defaults to the platform\-specific data directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.local/share/borg\fP\&.
-On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_DATA_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_DATA_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains all borg data directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_data_borg\fP
 .TP
 .B BORG_RUNTIME_DIR
 Defaults to the platform\-specific runtime directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&.
-On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_RUNTIME_DIR\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_RUNTIME_DIR\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains borg runtime files, like e.g. the socket file.
 .TP
 .B BORG_SECURITY_DIR

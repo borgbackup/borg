@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-serve" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-serve" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-serve \- Starts in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -36,23 +36,25 @@ borg-serve \- Starts in server mode. This command is usually not used manually.
 borg [common options] serve [options]
 .SH DESCRIPTION
 .sp
-This command starts a repository server process.
+This command starts a repository server process. It is usually started automatically via
+SSH by a borg client and runs until that SSH connection is terminated.
 .sp
-\fIborg serve\fP currently supports:
+It operates in one of two modes:
 .INDENT 0.0
 .IP \(bu 2
-Being automatically started via SSH when the borg client uses an \%<ssh://>\&...
-remote repository. In this mode, \fIborg serve\fP will run until that SSH connection
-is terminated.
+default (no option): serve a \fBlegacy\fP (borg 1.x / v1) repository using the legacy
+RPC protocol. This is used e.g. for \fBborg transfer \-\-from\-borg1\fP and is command\-line
+compatible with borg 1.x \fBborg serve\fP\&.
 .IP \(bu 2
-Being started by some other means (not by the borg client) as a long\-running socket
-server to be used for borg clients using a socket://... repository (see the \fI\-\-socket\fP
-option if you do not want to use the default path for the socket and PID file).
+\fB\-\-rest\fP: serve a \fBcurrent\fP (non\-legacy) repository as the server\-side component of
+a \fBrest://\fP repository, talking HTTP over stdio. The repository to serve is given via
+\fB\-\-backend FILE:<path>\fP\&. A borg client using a \fBrest://\fP repository starts this
+automatically (over SSH if a host is given).
 .UNINDENT
 .sp
-Please note that \fIborg serve\fP does not support providing a specific repository via the
-\fI\-\-repo\fP option or the \fIBORG_REPO\fP environment variable. It is always the borg client that
-specifies the repository to use when communicating with \fIborg serve\fP\&.
+Please note that, in legacy mode, \fIborg serve\fP does not support providing a specific
+repository via the \fI\-\-repo\fP option or the \fIBORG_REPO\fP environment variable \- it is the
+borg client that specifies the repository to use.
 .sp
 The \-\-permissions option enforces repository permissions:
 .INDENT 0.0
@@ -75,6 +77,12 @@ Existing archives can be read, but no archives can be created or deleted.
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS options
 .INDENT 0.0
+.TP
+.B  \-\-rest
+serve a current (non\-legacy) repository as a rest:// server (HTTP over stdio). Requires \-\-backend. Without this option, a legacy (borg 1.x) repository is served.
+.TP
+.BI \-\-backend \ BACKEND_URL
+(with \-\-rest) backend URL of the repository to serve, e.g. \%<FILE:/\:path/\:to/\:repo>\&.
 .TP
 .BI \-\-restrict\-to\-path \ PATH
 Restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all subdirectories is granted implicitly; PATH does not need to point directly to a repository.

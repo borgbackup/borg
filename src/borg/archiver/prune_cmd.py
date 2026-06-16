@@ -147,7 +147,7 @@ def prune(
         if n is not None:
             return n == -1 or len(keep) < n
         else:
-            return a.ts > earliest_timestamp
+            return a.ts >= earliest_timestamp
 
     prev_period = None
     for archive in archives:
@@ -187,10 +187,10 @@ class PruneMixIn:
         if since is not None:
             base_timestamp = since
 
-            # `--since` is a prefilter: Archives from after this time are kept by default. They are not considered for
-            # pruning at all. They won't falsely occupy an active retention period.
+            # `--since` is a prefilter: Archives made at or after this time are kept by default. They are not considered
+            # for pruning at all and thus won't falsely occupy an active retention period.
             for archive in archives:
-                if archive.ts <= since:
+                if archive.ts < since:
                     break
                 keep[archive] = KeepResult(rule=PRUNE_SINCE, idx=len(keep))
             candidate_archives = archives[len(keep) :]
@@ -385,23 +385,21 @@ class PruneMixIn:
         keeps nothing.
 
         The ``--since`` option restricts pruning to archives older than the given
-        TIMESTAMP. Archives newer than this timestamp are kept unconditionally
+        TIMESTAMP. Archives made at or after this timestamp are kept unconditionally
         as a pre-filter. When ``--since`` is used together with interval-based
-        ``--keep-*`` options (e.g. ``--keep-daily 7d``), the interval is
-        measured backwards from the given timestamp rather than from the
-        current time. Count-based retention does not count the unconditionally
-        kept archives.
+        ``--keep-*`` options (e.g. ``--keep-daily 7d``), the interval is measured
+        backwards from the given timestamp rather than from the current time.
+        Count-based retention does not count the unconditionally kept archives.
 
         The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
         strategies for keeping archives every quarter year.
 
-        The oldest archive is kept as long as the coarsest retention rule
-        covers it -- ``--keep-yearly=3`` will keep the oldest archive if it
-        couldn't otherwise find three candidates, ``--keep-yearly=5y`` will
-        keep the oldest archive as long as it is within the 5y interval. This
-        is useful for rolling tiered backup schemes, where the earliest backup
-        in a retention window should survive until the next tier's interval
-        naturally replaces it.
+        The oldest archive is kept as long as the coarsest retention rule covers it --
+        ``--keep-yearly=3`` will keep the oldest archive if it couldn't otherwise find
+        three candidates, ``--keep-yearly=5y`` will keep the oldest archive as long as
+        it is at or within the 5y interval. This is useful for rolling tiered backup
+        schemes, where the earliest backup in a retention window should survive until
+        the next tier's interval naturally replaces it.
 
         When using interval-based pruning with multiple ``--keep-*`` options,
         the intervals must be specified in increasing length matching the

@@ -708,7 +708,7 @@ def test_prune_no_args(archivers, request):
         assert f"keep-{flag}" in output
 
 
-@pytest.mark.parametrize("keep_arg,value", product([rule.key for rule in PRUNING_RULES], ["0", "0S"]))
+@pytest.mark.parametrize("keep_arg,value", list(product([rule.key for rule in PRUNING_RULES], ["0", "0S"])))
 def test_prune_all_zero_args_one(archivers, request, keep_arg, value):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

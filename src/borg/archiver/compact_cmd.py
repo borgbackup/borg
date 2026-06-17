@@ -7,11 +7,11 @@ from ..cache import files_cache_name, discover_files_cache_names
 from ..helpers import get_cache_dir
 from ..helpers.argparsing import ArgumentParser
 from ..constants import *  # NOQA
-from ..hashindex import ChunkIndex, ChunkIndexEntry
+from ..hashindex import ChunkIndex
 from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
-from ..repository import Repository, repo_lister
+from ..repository import Repository
 
 from ..logger import create_logger
 
@@ -49,17 +49,11 @@ class ArchiveGarbageCollector:
 
     def get_repository_chunks(self) -> ChunkIndex:
         """return a chunks index"""
-        if self.stats:  # slow method: build a fresh chunks index, with stored chunk sizes.
+        if self.stats:
+            # slow but thorough: scan the pack headers for real sizes/locations and to catch objects
+            # missing from the cached index. Start unused (F_NONE); analyze_archives marks used ones.
             logger.info("Getting object IDs present in the repository...")
-            chunks = ChunkIndex()
-            for pack_id, pack_size in repo_lister(self.repository, limit=LIST_SCAN_LIMIT):
-                # we add this id to the chunks index (as unused chunk), because
-                # we do not know yet whether it is actually referenced from some archives.
-                chunk_id = pack_id  # N=1: chunk_id == pack_id
-                obj_size = pack_size  # true for N=1
-                chunks[chunk_id] = ChunkIndexEntry(
-                    flags=ChunkIndex.F_NONE, size=0, pack_id=pack_id, obj_offset=0, obj_size=obj_size
-                )
+            chunks = build_chunkindex_from_repo(self.repository, disable_caches=True, init_flags=ChunkIndex.F_NONE)
         else:  # faster: rely on existing chunks index (with flags F_NONE and size 0).
             logger.info("Getting object IDs from cached chunks index...")
             chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
@@ -191,7 +185,8 @@ class ArchiveGarbageCollector:
         )
         for i, id in enumerate(unused):
             pi.show(i)
-            self.repository.delete(id)
+            # N=1: the chunk is alone in its pack, so dropping the pack frees just it; N>1 needs compaction.
+            self.repository.store_delete("packs/" + bin_to_hex(self.chunks[id].pack_id))
             del self.chunks[id]
         pi.finish()
         repo_size_after = self.repository_size

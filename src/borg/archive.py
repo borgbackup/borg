@@ -1844,12 +1844,11 @@ class ArchiveChecker:
         pi.finish()
         if defect_chunks:
             if self.repair:
-                # if we kill the defect chunk here, subsequent actions within this "borg check"
-                # run will find missing chunks.
-                logger.warning(
-                    "Found defect chunks and will delete them now. "
-                    "Reading files referencing these chunks will result in an I/O error."
-                )
+                # We would remove the defect chunks here, but single-object delete is not implemented
+                # yet (Repository.delete is a no-op: dropping a chunk means dropping its whole pack,
+                # which at N>1 takes good chunks with it). So we recheck each chunk and only report
+                # the ones that keep failing; real removal will come via compact once delete works at N>1.
+                logger.warning("Found defect chunks. They can not be removed yet and are only reported.")
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
@@ -1861,14 +1860,18 @@ class ArchiveChecker:
                         # we must decompress, so it'll call assert_id() in there:
                         self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
                     except IntegrityErrorBase:
-                        # failed twice -> get rid of this chunk
-                        del self.chunks[defect_chunk]
+                        # failed twice -> we would like to get rid of this defect chunk. We must not
+                        # drop its whole pack here: at N>1 the pack holds other, good chunks too.
+                        # Repository.delete is a no-op for now (it just logs); real single-object
+                        # removal will happen via compact.
+                        # TODO: actually remove the defect chunk once delete works at N>1.
                         self.repository.delete(defect_chunk)
-                        logger.debug("chunk %s deleted.", bin_to_hex(defect_chunk))
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
             else:
-                logger.warning("Found defect chunks. With --repair, they would get deleted.")
+                logger.warning(
+                    "Found defect chunks. Run with --repair to recheck them (removal is not implemented yet)."
+                )
                 for defect_chunk in defect_chunks:
                     logger.debug("chunk %s is defect.", bin_to_hex(defect_chunk))
         log = logger.error if errors else logger.info

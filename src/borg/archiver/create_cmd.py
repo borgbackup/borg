@@ -10,6 +10,7 @@ from io import TextIOWrapper
 
 from ._common import with_repository, Highlander
 from .. import helpers
+from .. import monitoring
 from ..archive import Archive, is_special, SF_DATALESS
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
@@ -270,6 +271,15 @@ class CreateMixIn:
                     files_changed=args.files_changed,
                 )
                 create_inner(archive, cache, fso)
+
+                monitoring.publish_command_report(
+                    repository,
+                    manifest.key,
+                    "create",
+                    archive=archive.name,
+                    archive_id=archive.id,
+                    stats=archive.stats.as_dict(),
+                )
             args.stats |= args.json
             if args.stats:
                 # Cache.close() writes the chunks index to the repo; sample after it so that traffic is counted.
@@ -278,7 +288,7 @@ class CreateMixIn:
                     json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
                 else:
                     log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
-        else:
+        else:  # dry-run
             create_inner(None, None, None)
 
     def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix):

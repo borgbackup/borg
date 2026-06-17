@@ -256,6 +256,12 @@ Directories and files:
         - the key file must either exist (for most commands) or will be created (``borg repo-create``).
         - you need to give a different path for different repositories.
         - you need to point to the correct key file matching the repository the command will operate on.
+    BORG_MONITORING_KEY
+        Used by ``borg monitor`` (without ``--key``) on the monitoring host to verify and
+        decrypt the report a backup client published into the repository. Obtain its value
+        once, on a host that has the borg key, via ``borg monitor --key``. It only allows
+        verifying and decrypting reports, not creating them, and it does not grant access
+        to the backup data.
     TMPDIR
         This is where temporary files are stored (might need a lot of temporary space for some
         operations), see tempfile_ for details.

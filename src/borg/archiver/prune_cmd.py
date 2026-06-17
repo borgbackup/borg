@@ -232,6 +232,21 @@ class PruneMixIn:
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")
 
+        if not args.dry_run:
+            # Publish the monitoring report as the last action while the store is open.
+            from .. import monitoring
+
+            monitoring.publish_command_report(
+                repository,
+                manifest.key,
+                "prune",
+                stats={
+                    "archives_pruned": archives_deleted,
+                    "archives_kept": len(keep),
+                    "archives_considered": len(archives),
+                },
+            )
+
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
         from ._common import define_archive_filters_group

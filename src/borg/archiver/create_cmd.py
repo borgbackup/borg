@@ -287,6 +287,19 @@ class CreateMixIn:
                     files_changed=args.files_changed,
                 )
                 create_inner(archive, cache, fso)
+                # Publish the monitoring report as the last action while the store is
+                # still open. The RC is only best-known here (a failure after this point
+                # won't be reflected); see borg/monitoring.py.
+                from .. import monitoring
+
+                monitoring.publish_command_report(
+                    repository,
+                    manifest.key,
+                    "create",
+                    archive=archive.name,
+                    archive_id=archive.id,
+                    stats=archive.stats.as_dict(),
+                )
         else:
             create_inner(None, None, None)
 

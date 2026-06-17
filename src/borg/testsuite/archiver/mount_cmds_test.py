@@ -20,6 +20,7 @@ from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import fakeroot_detected
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
+from . import delete_chunk
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -234,7 +235,7 @@ def test_fuse_allow_damaged_files(archivers, request):
     with repository:
         for item in archive.iter_items():
             if item.path.endswith(src_file):
-                repository.delete(item.chunks[-1].id)
+                delete_chunk(repository, item.chunks[-1].id)
                 path = item.path  # store full path for later
                 break
         else:

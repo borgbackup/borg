@@ -29,6 +29,7 @@ from . import (
     generate_archiver_tests,
     create_src_archive,
     open_archive,
+    delete_chunk,
     src_file,
 )
 
@@ -800,7 +801,7 @@ def test_extract_file_with_missing_chunk(archivers, request):
         for item in archive.iter_items():
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
-                repository.delete(chunk.id)
+                delete_chunk(repository, chunk.id)
                 break
         else:
             assert False  # missed the file

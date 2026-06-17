@@ -32,7 +32,8 @@ from .item import ChunkListEntry
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .manifest import Manifest
 from .platform import SaveFile
-from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound, repo_lister
+from .repoobj import RepoObj
+from .repository import Repository, StoreObjectNotFound
 from .security import SecurityManager, assert_secure  # noqa: F401
 
 
@@ -619,7 +620,9 @@ def read_chunkindex_from_repo(repository, hash):
             logger.debug(f"{index_name} is invalid.")
 
 
-def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immediately=False):
+def build_chunkindex_from_repo(
+    repository, *, disable_caches=False, cache_immediately=False, init_flags=ChunkIndex.F_USED
+):
     # first, try to build a fresh, mostly complete chunk index from centrally cached chunk indexes:
     if not disable_caches:
         hashes = list_chunkindex_hashes(repository)
@@ -642,29 +645,29 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
                     chunks.clear_new()
                 return chunks
     # if we didn't get anything from the cache, compute the ChunkIndex the slow way:
-    logger.debug("querying the chunk IDs list from the repo...")
+    logger.debug("rebuilding the chunk index from the repo the slow way...")
     chunks = ChunkIndex()
     t0 = perf_counter()
     num_chunks = 0
-    # The repo says it has these chunks, so we assume they are referenced/used chunks.
-    # We do not know the plaintext size (!= stored_size), thus we set size = 0.
-    #
-    # IMPORTANT (N=1 only): listing yields pack_ids, not per-chunk locations. We can only
-    # reconstruct the index here under the N=1 assumption -- pack_id == chunk_id, one chunk per
-    # pack at offset 0 spanning the whole pack. At N>1 this is wrong: a cold rebuild would have to
-    # open each pack and read its header to recover the per-chunk offsets and sizes. Until that
-    # exists, Repository.get()'s range-load is only correct while a persisted/cached chunk index
-    # is available; a cold rebuild from a bare repo listing silently falls back to N=1 semantics.
-    for pack_id, pack_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
-        num_chunks += 1
-        chunk_id = pack_id  # N=1: chunk_id == pack_id
-        obj_size = pack_size  # true for N=1
-        chunks[chunk_id] = ChunkIndexEntry(
-            flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=0, obj_size=obj_size
-        )
-    # Cache does not contain the manifest.
-    if not isinstance(repository, Repository):
-        del chunks[Manifest.MANIFEST_ID]
+    # By default we assume the repo's chunks are used; callers that compute usage themselves
+    # (e.g. compact) pass init_flags=F_NONE. Plaintext size is unknown here (!= stored size), so size=0.
+    # Every caller passes a (modern) Repository; legacy borg 1.x repos never reach here (transfer reads
+    # their archives directly and never builds a chunk index for them), so there is no legacy branch.
+    assert isinstance(repository, Repository)
+    # Read each pack's object headers with borgstore range requests, fetching only the fixed-size
+    # headers and skipping the (much larger) encrypted payloads. Don't call Repository.list() here:
+    # it iterates this same index we are building, so it would recurse. The headers also give each
+    # object's real (chunk_id, offset, size), so this is not limited to one object per pack.
+    for info in repository.store_list("packs"):
+        pack_id = hex_to_bin(info.name)
+        pack_name = "packs/" + info.name
+        for chunk_id, obj_offset, obj_size in RepoObj.iter_object_headers_partial(
+            lambda offset, size: repository.store_load(pack_name, offset=offset, size=size)
+        ):
+            num_chunks += 1
+            chunks[chunk_id] = ChunkIndexEntry(
+                flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+            )
     duration = perf_counter() - t0 or 0.001
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
     # Protocol overhead is neglected in this calculation.

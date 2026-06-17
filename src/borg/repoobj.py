@@ -38,6 +38,37 @@ class RepoObj:
             raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(data)}")
         return data[hdr_size + hdr.meta_size :]  # crypted data
 
+    @classmethod
+    def iter_object_headers(cls, pack: bytes):
+        """Yield (chunk_id, obj_offset, obj_size) for each object in an in-memory pack.
+
+        For callers that already hold the whole pack (repository check). To read only the headers
+        from the store instead, use iter_object_headers_partial.
+        """
+        yield from cls.iter_object_headers_partial(lambda offset, size: pack[offset : offset + size])
+
+    @classmethod
+    def iter_object_headers_partial(cls, read):
+        """Yield (chunk_id, obj_offset, obj_size), reading only the object headers.
+
+        read(offset, size) returns up to size bytes of the pack at offset. Only the fixed headers
+        are read, never the payloads. The scan is sequential: each header gives the size needed to
+        reach the next one.
+
+        The payloads are skipped only while packs/ is uncached; a borgstore cache would load the
+        whole object and slice locally.
+        """
+        hdr_size = cls.obj_header.size
+        offset = 0
+        while True:
+            hdr_data = read(offset, hdr_size)
+            if len(hdr_data) < hdr_size:
+                break  # no further complete header: clean EOF or trailing partial bytes
+            hdr = cls.ObjHeader(*cls.obj_header.unpack(hdr_data))
+            obj_size = hdr_size + hdr.meta_size + hdr.data_size
+            yield hdr.chunk_id, offset, obj_size
+            offset += obj_size
+
     def __init__(self, key):
         self.key = key
         # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates

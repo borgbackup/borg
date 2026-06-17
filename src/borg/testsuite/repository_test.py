@@ -5,7 +5,7 @@ from hashlib import sha256
 import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
-from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter
+from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, FORCE_SHA256_PACK_ID
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
 
@@ -54,7 +54,9 @@ def reopen(repository, exclusive: bool | None = True, create=False):
 
 
 def fchunk(data, meta=b"", chunk_id=b"\x00" * 32):
-    # Format chunk: create a raw chunk that has a valid RepoObj layout, but does not use encryption or compression.
+    # Build a raw chunk with a valid RepoObj layout but no encryption or compression. Pass a unique
+    # chunk_id when objects must not share a pack: identical bytes hash to the same sha256 pack id,
+    # so under BORG_TESTONLY_SHA256_PACK_ID they would otherwise collapse into one pack.
     hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, chunk_id, len(meta), len(data))
     assert isinstance(data, bytes)
     chunk = hdr + meta + data
@@ -79,20 +81,13 @@ def pdchunk(chunk):
 def test_basic_operations(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
-            repository.put(H(x), fchunk(b"SOMEDATA"))  # put() updates _chunks via PackWriter
+            repository.put(H(x), fchunk(b"SOMEDATA", chunk_id=H(x)))  # put() updates _chunks via PackWriter
         key50 = H(50)
         assert pdchunk(repository.get(key50)) == b"SOMEDATA"
-        repository.delete(key50)
-        with pytest.raises(Repository.ObjectNotFound):
-            repository.get(key50)
     # no manual hand-off of the index across reopen: close() persisted it to the repo cache,
     # and the freshly opened repo rebuilds .chunks from there (or by listing the repo) on its own.
     with reopen(repository) as repository:
-        with pytest.raises(Repository.ObjectNotFound):
-            repository.get(key50)
         for x in range(100):
-            if x == 50:
-                continue
             assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
 
 
@@ -142,15 +137,15 @@ def test_consistency(repo_fixtures, request):
         assert pdchunk(repository.get(H(0))) == b"foo2"
         repository.put(H(0), fchunk(b"bar"))
         assert pdchunk(repository.get(H(0))) == b"bar"
+        # delete is a no-op for now (see Repository.delete): the latest put still wins.
         repository.delete(H(0))
-        with pytest.raises(Repository.ObjectNotFound):
-            repository.get(H(0))
+        assert pdchunk(repository.get(H(0))) == b"bar"
 
 
 def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
-            repository.put(H(x), fchunk(b"SOMEDATA"))
+            repository.put(H(x), fchunk(b"SOMEDATA", chunk_id=H(x)))  # unique bytes -> unique pack id
         repo_list = repository.list()
         assert len(repo_list) == 100
         first_half = repository.list(limit=50)
@@ -227,7 +222,10 @@ def test_pack_writer_n1_flush():
     assert len(results) == 1
     stored_id, pack_id, obj_offset, obj_size = results[0]
     assert stored_id == chunk_id
-    assert pack_id == chunk_id  # N=1: pack_id == chunk_id
+    if FORCE_SHA256_PACK_ID:
+        assert pack_id == sha256(cdata).digest()  # sha256 switch: pack is named by its content
+    else:
+        assert pack_id == chunk_id  # N=1: pack_id == chunk_id
     assert obj_offset == 0
     assert obj_size == len(cdata)
 
@@ -346,8 +344,31 @@ def test_put_marks_id_in_chunk_index(tmp_path):
         repository.put(id1, fchunk(b"ZEROS"))
         entry = repository._chunks.get(id1)
         assert entry is not None
-        assert entry.pack_id == id1  # N=1: pack_id == chunk_id, set by update_pack_info in put()
+        if FORCE_SHA256_PACK_ID:
+            # sha256 switch: the pack is named by its content, not by the chunk_id.
+            assert entry.pack_id == sha256(fchunk(b"ZEROS")).digest()
+        else:
+            assert entry.pack_id == id1  # N=1: pack_id == chunk_id, set by update_pack_info in put()
         assert entry.size == 0  # uncompressed size filled in by cache layer
+
+
+def test_check_detects_corruption_in_later_object(tmp_path):
+    # A pack stores its objects back to back, so check must validate every object, not only the
+    # first. This guards the N>1 case: corruption in a later object has to be caught too. The old
+    # first-object-only check would pass this pack and miss the damage.
+    chunk1 = fchunk(b"FIRST", chunk_id=H(1))
+    chunk2 = fchunk(b"SECOND", chunk_id=H(2))
+    pack = chunk1 + chunk2
+    pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store(pack_name, pack)
+        assert repository.check(repair=False) is True  # both objects are intact
+
+        # flip a byte of the SECOND object's OBJ_MAGIC; the first object stays valid.
+        corrupted = bytearray(pack)
+        corrupted[len(chunk1)] ^= 0xFF
+        repository.store_store(pack_name, bytes(corrupted))
+        assert repository.check(repair=False) is False  # corruption past object 1 is detected
 
 
 def test_pack_writer_final_partial_pack_uses_sha256():

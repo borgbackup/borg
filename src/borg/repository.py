@@ -573,23 +573,37 @@ class Repository:
             logger.error(f"Repo object {info.name} is corrupted: {msg}")
 
         def check_object(obj):
-            """Check if obj looks valid."""
+            """Check one object; return its size (header + meta + data), or None if it is corrupted."""
             hdr_size = RepoObj.obj_header.size
             if len(obj) < hdr_size:
                 log_error("too small.")
-                return
+                return None
             hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
             if hdr.magic != OBJ_MAGIC:
                 log_error("invalid object magic.")
-            elif hdr.version != OBJ_VERSION:
+                return None
+            if hdr.version != OBJ_VERSION:
                 log_error(f"unsupported object version: {hdr.version}.")
-            else:
-                meta = obj[hdr_size : hdr_size + hdr.meta_size]
-                if hdr.meta_size != len(meta):
-                    log_error("metadata size mismatch.")
-                data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
-                if hdr.data_size != len(data):
-                    log_error("data size mismatch.")
+                return None
+            meta = obj[hdr_size : hdr_size + hdr.meta_size]
+            if hdr.meta_size != len(meta):
+                log_error("metadata size mismatch.")
+                return None
+            data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
+            if hdr.data_size != len(data):
+                log_error("data size mismatch.")
+                return None
+            return hdr_size + hdr.meta_size + hdr.data_size
+
+        def check_pack(pack):
+            """Check all objects in a pack, following each object's header to the next."""
+            pack = memoryview(pack)  # slice without copying the tail each step
+            offset = 0
+            while offset < len(pack):
+                obj_size = check_object(pack[offset:])
+                if obj_size is None:
+                    break  # header is bad, so offsets past here are not trustworthy
+                offset += obj_size
 
         # TODO: progress indicator, ...
         partial = bool(max_duration)
@@ -630,41 +644,46 @@ class Repository:
                 if key <= last_key_checked:  # needs sorted keys
                     continue
                 try:
-                    obj = self.store.load(key)
+                    pack = self.store.load(key)
                 except StoreObjectNotFound:
                     # looks like object vanished since store.list(), ignore that.
                     continue
                 obj_corrupted = False
-                check_object(obj)
+                check_pack(pack)
                 objs_checked += 1
                 if obj_corrupted:
                     objs_errors += 1
                     if repair:
-                        # if it is corrupted, we can't do much except getting rid of it.
-                        # but let's just retry loading it, in case the error goes away.
+                        # retry the load first, in case the error was transient (network / NIC / RAM).
                         try:
-                            obj = self.store.load(key)
+                            pack = self.store.load(key)
                         except StoreObjectNotFound:
                             log_error("existing object vanished.")
                         else:
                             obj_corrupted = False
-                            check_object(obj)
+                            check_pack(pack)
                             if obj_corrupted:
-                                log_error("reloading did not help, deleting it!")
-                                self.store.delete(key)
+                                # Don't delete the pack: it may hold other, good objects, and dropping
+                                # the whole file to get rid of one bad object is data loss at N>1 (it
+                                # was only safe because an N=1 pack holds a single object). Report it
+                                # for now, like Repository.delete and the --verify-data path.
+                                # TODO: salvage the good objects into a new pack and update the index.
+                                log_error("reloading did not help; leaving it in place (repair not implemented yet).")
                             else:
                                 log_error("reloading did help, inconsistent behaviour detected!")
                 if not (obj_corrupted and repair):
                     # add all existing objects to the index.
                     # borg check: the index may have corrupted objects (we did not delete them)
                     # borg check --repair: the index will only have non-corrupted objects.
+                    # the pack file name is the pack_id (sha256(pack) at N>1 or with the
+                    # BORG_TESTONLY_SHA256_PACK_ID switch), which is not the chunk_id, so recover
+                    # each object's real (chunk_id, offset, size) from its on-disk header rather
+                    # than assuming pack file name == chunk_id.
                     pack_id = hex_to_bin(info.name)
-                    pack_size = info.size
-                    chunk_id = pack_id  # N=1: chunk_id == pack_id
-                    obj_size = pack_size  # correct for N=1
-                    chunks[chunk_id] = ChunkIndexEntry(
-                        flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=0, obj_size=obj_size
-                    )
+                    for chunk_id, obj_offset, obj_size in RepoObj.iter_object_headers(pack):
+                        chunks[chunk_id] = ChunkIndexEntry(
+                            flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+                        )
                 now = time.monotonic()
                 if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
                     t_last_checkpoint = now
@@ -705,28 +724,22 @@ class Repository:
         list <limit> infos starting from after id <marker>.
         each info is a tuple (id, storage_size).
         """
-        collect = True if marker is None else False
+        # Yield chunk_ids from the chunk index. (Listing the packs/ dir would yield pack file names,
+        # i.e. pack_ids, which are not chunk_ids.) iteritems() has no marker arg, so we skip to
+        # <marker> ourselves; index order is stable unless the index is mutated, which is all the
+        # marker pagination needs.
+        self._lock_refresh()
+        collect = marker is None
         result = []
-        infos = self.store.list("packs")  # generator yielding ItemInfos
-        while True:
-            self._lock_refresh()
-            try:
-                info = next(infos)
-            except StoreObjectNotFound:
-                break  # can happen e.g. if "packs" does not exist, pointless to continue in that case
-            except StopIteration:
-                break
-            else:
-                pack_id = hex_to_bin(info.name)
-                chunk_id = pack_id  # N=1: chunk_id == pack_id
-                if collect:
-                    chunk_size = info.size  # only correct for N=1
-                    result.append((chunk_id, chunk_size))
-                    if len(result) == limit:
-                        break
-                elif chunk_id == marker:
-                    collect = True
-                    # note: do not collect the marker id
+        for chunk_id, entry in self.chunks.iteritems():
+            if entry.pack_id == UNKNOWN_BYTES32:
+                continue  # buffered in PackWriter, not flushed to a pack yet
+            if collect:
+                result.append((chunk_id, entry.obj_size))
+                if len(result) == limit:
+                    break
+            elif chunk_id == marker:
+                collect = True  # start collecting after the marker; do not include the marker itself
         return result
 
     def get(self, id, read_data=True, raise_missing=True):
@@ -802,12 +815,14 @@ class Repository:
     def delete(self, id):
         """delete a repo object"""
         self._lock_refresh()
-        pack_id = id  # N=1: pack_id == chunk_id
-        key = "packs/" + bin_to_hex(pack_id)
-        try:
-            self.store.delete(key)
-        except StoreObjectNotFound:
-            raise self.ObjectNotFound(id, str(self._location)) from None
+        # We can not remove one object by dropping its whole pack without losing the pack's other
+        # objects; real removal is store_delete at the pack level (compact). For now just check the
+        # object exists (ObjectNotFound contract), log, and do nothing.
+        # TODO: delete a single object once a pack can hold more than one (N>1).
+        entry = self.chunks.get(id)
+        if entry is None:
+            raise self.ObjectNotFound(id, str(self._location))
+        logger.warning("ignoring deletion of %s in %s", bin_to_hex(id), bin_to_hex(entry.pack_id))
 
     def break_lock(self):
         Lock(self.store).break_lock()
@@ -835,9 +850,9 @@ class Repository:
         except StoreObjectNotFound:
             return []
 
-    def store_load(self, name):
+    def store_load(self, name, *, size=None, offset=0):
         self._lock_refresh()
-        return self.store.load(name)
+        return self.store.load(name, size=size, offset=offset)
 
     def store_store(self, name, value):
         self._lock_refresh()

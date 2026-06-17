@@ -5,6 +5,8 @@ import math
 from functools import partial, wraps
 import os
 from itertools import count, combinations
+
+from .. import monitoring
 from ._common import with_repository, Highlander, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
@@ -303,6 +305,18 @@ class PruneMixIn:
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")
+
+        if not args.dry_run:
+            monitoring.publish_command_report(
+                repository,
+                manifest.key,
+                "prune",
+                stats={
+                    "archives_pruned": num_archives_deleted,
+                    "archives_kept": len(keep),
+                    "archives_considered": len(archives),
+                },
+            )
 
     def _compute_keep(self, archives, args, base_timestamp):
         """

@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pytest
@@ -24,6 +25,23 @@ setup_logging()
 from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3  # noqa: E402
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported  # noqa: E402
 from borg.testsuite.platform import fakeroot_detected  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def reset_progress_logger():
+    # ProgressIndicatorBase installs a handler on the process-global
+    # 'borg.output.progress' logger and only removes it in __del__, and in-process
+    # (fork=False) command execution leaves this logger at level INFO / propagate=False.
+    # This state leaks across tests and makes the progress tests flaky (the progress
+    # output ends up in the logging system instead of on the stderr captured by capfd).
+    # Reset it after each test to keep tests isolated.
+    yield
+    logger = logging.getLogger('borg.output.progress')
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        handler.close()
+    logger.setLevel(logging.NOTSET)
+    logger.propagate = True
 
 
 @pytest.fixture(autouse=True)

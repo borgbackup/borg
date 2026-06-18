@@ -102,14 +102,6 @@ def build_rest_backend(location):
     return REST(base_url="http://stdio-backend", command=rest_serve_command(location))
 
 
-# Test-only switch: force sha256 pack_ids even at N=1, to expose code that still assumes
-# pack_id == chunk_id. Read once here, at import time, on purpose:
-#  - it happens before the per-test clean_env fixture wipes BORG_* vars, so the tox env that
-#    sets this var does not need a clean_env exemption (the captured value survives the wipe);
-#  - flush() then checks a plain bool instead of touching os.environ on every write.
-FORCE_SHA256_PACK_ID = os.environ.get("BORG_TESTONLY_SHA256_PACK_ID") == "1"
-
-
 class PackWriter:
     """Buffers chunks into a pack file and writes to the store when full.
 
@@ -123,10 +115,8 @@ class PackWriter:
     uses that repository's single, authoritative index (see the chunks property), so
     there is never a second copy to keep in sync.  Unit tests pass an explicit index.
 
-    At max_count=1 (N=1 phase) each put() maps exactly one chunk to one pack,
-    so pack_id == chunk_id and the naming scheme is unchanged from before.
-    Raising max_count later (N>1 phase) enables real packing without touching
-    this class's interface.
+    max_count bounds how many chunks a pack accumulates before flush() writes it.
+    Raising it produces larger packs without changing this class's interface.
     """
 
     def __init__(self, store, *, max_count=1, chunks=None, repository=None):
@@ -179,17 +169,9 @@ class PackWriter:
         # that incremental string concatenation would cause in Python).
         pack_data = b"".join(cdata for _, cdata in self._pieces)
 
-        # Determine pack_id.
-        # N=1: the pack contains exactly one chunk, so we keep pack_id == chunk_id
-        #      (backward-compatible file naming: packs/{chunk_id_hex}).
-        # N>1: the pack contains multiple chunks; use SHA256(pack_bytes) so the
-        #      file is content-addressed and borgstore can verify/cache it.
-        # BORG_TESTONLY_SHA256_PACK_ID (see FORCE_SHA256_PACK_ID): always use sha256 even at
-        #      N=1, exposing code that still assumes pack_id == chunk_id.
-        if self.max_count == 1 and not FORCE_SHA256_PACK_ID:
-            pack_id = self._pieces[0][0]  # N=1: pack_id == chunk_id
-        else:
-            pack_id = sha256(pack_data).digest()
+        # Name the pack by the SHA-256 of its bytes: the name commits to the stored content,
+        # so borgstore can verify and cache the file.
+        pack_id = sha256(pack_data).digest()
 
         # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
         results = []
@@ -675,10 +657,8 @@ class Repository:
                     # add all existing objects to the index.
                     # borg check: the index may have corrupted objects (we did not delete them)
                     # borg check --repair: the index will only have non-corrupted objects.
-                    # the pack file name is the pack_id (sha256(pack) at N>1 or with the
-                    # BORG_TESTONLY_SHA256_PACK_ID switch), which is not the chunk_id, so recover
-                    # each object's real (chunk_id, offset, size) from its on-disk header rather
-                    # than assuming pack file name == chunk_id.
+                    # the pack file name is the pack_id; each object's chunk_id, offset and size
+                    # come from its on-disk header, so scan the headers to rebuild the index.
                     pack_id = hex_to_bin(info.name)
                     for chunk_id, obj_offset, obj_size in RepoObj.iter_object_headers(pack):
                         chunks[chunk_id] = ChunkIndexEntry(

@@ -71,12 +71,13 @@ Blobs follow one another contiguously with no padding::
 Pack ID
 ~~~~~~~
 
-The pack ID equals the ``chunk_id`` of the blob it contains::
+The pack ID is the SHA-256 of the pack file's bytes::
 
-    pack_id = chunk_id
+    pack_id = sha256(pack_bytes)
 
-Since ``chunk_id`` is the ID hash of the plaintext, the filename commits to the
-content. ``borg check`` can detect silent corruption without decrypting any blob.
+Content-addressing the file by its own bytes makes the name commit to the
+content, so borgstore can verify and cache it and ``borg check`` can detect
+silent corruption of the stored file.
 
 Namespace
 ~~~~~~~~~

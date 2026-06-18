@@ -449,7 +449,7 @@ def test_empty_repository(archivers, request):
     with Repository(archiver.repository_location, exclusive=True) as repository:
         # empty the repo by dropping every pack file directly via the store. We iterate the actual
         # packs/ listing (the file names are the pack_ids), so this does not depend on what list()
-        # yields or on pack_id == chunk_id.
+        # yields.
         for info in repository.store_list("packs"):
             repository.store_delete("packs/" + info.name)
     cmd(archiver, "check", exit_code=1)

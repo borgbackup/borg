@@ -5,7 +5,7 @@ from hashlib import sha256
 import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
-from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, FORCE_SHA256_PACK_ID
+from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
 
@@ -55,8 +55,8 @@ def reopen(repository, exclusive: bool | None = True, create=False):
 
 def fchunk(data, meta=b"", chunk_id=b"\x00" * 32):
     # Build a raw chunk with a valid RepoObj layout but no encryption or compression. Pass a unique
-    # chunk_id when objects must not share a pack: identical bytes hash to the same sha256 pack id,
-    # so under BORG_TESTONLY_SHA256_PACK_ID they would otherwise collapse into one pack.
+    # chunk_id when objects must not share a pack: identical bytes hash to the same sha256 pack id
+    # and would otherwise collapse into one pack.
     hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, chunk_id, len(meta), len(data))
     assert isinstance(data, bytes)
     chunk = hdr + meta + data
@@ -222,10 +222,8 @@ def test_pack_writer_n1_flush():
     assert len(results) == 1
     stored_id, pack_id, obj_offset, obj_size = results[0]
     assert stored_id == chunk_id
-    if FORCE_SHA256_PACK_ID:
-        assert pack_id == sha256(cdata).digest()  # sha256 switch: pack is named by its content
-    else:
-        assert pack_id == chunk_id  # N=1: pack_id == chunk_id
+    assert pack_id == sha256(cdata).digest()
+    assert pack_id != chunk_id
     assert obj_offset == 0
     assert obj_size == len(cdata)
 
@@ -344,11 +342,8 @@ def test_put_marks_id_in_chunk_index(tmp_path):
         repository.put(id1, fchunk(b"ZEROS"))
         entry = repository._chunks.get(id1)
         assert entry is not None
-        if FORCE_SHA256_PACK_ID:
-            # sha256 switch: the pack is named by its content, not by the chunk_id.
-            assert entry.pack_id == sha256(fchunk(b"ZEROS")).digest()
-        else:
-            assert entry.pack_id == id1  # N=1: pack_id == chunk_id, set by update_pack_info in put()
+        assert entry.pack_id == sha256(fchunk(b"ZEROS")).digest()
+        assert entry.pack_id != id1
         assert entry.size == 0  # uncompressed size filled in by cache layer
 
 
@@ -372,8 +367,7 @@ def test_check_detects_corruption_in_later_object(tmp_path):
 
 
 def test_pack_writer_final_partial_pack_uses_sha256():
-    # When max_count > 1, a final flush with only 1 piece must still use SHA256,
-    # not the N=1 pack_id == chunk_id hack.
+    # A final flush with fewer pieces than max_count must still use SHA256(pack_bytes).
     store = MockStore()
     chunk_id = b"d" * 32
     cdata = b"solo"

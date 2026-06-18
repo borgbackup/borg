@@ -1,4 +1,5 @@
 from ._common import with_repository, with_other_repository, Highlander
+from .. import monitoring
 from ..archive import Archive, cached_hash, DownloadPipeline
 from ..chunkers import get_chunker
 from ..constants import *  # NOQA
@@ -186,6 +187,9 @@ class TransferMixIn:
 
         upgrader = UpgraderCls(cache=cache, args=args)
 
+        transferred_count = 0
+        skipped_count = 0
+        transferred_size = 0
         for archive_info in archive_infos:
             name, id, ts = archive_info.name, archive_info.id, archive_info.ts
             id_hex, ts_str = bin_to_hex(id), ts.isoformat()
@@ -201,9 +205,11 @@ class TransferMixIn:
                 # Useful for Borg 1.x -> 2 transfers; we have unique names in Borg 1.x.
                 # Also useful for Borg 2 -> 2 transfers with metadata changes (ID changes).
                 print(f"{name} {ts_str}: archive is already present in destination repo, skipping.")
+                skipped_count += 1
             elif not dry_run and manifest.archives.exists_name_and_id(name, id):
                 # Useful for Borg 2 -> 2 transfers without changes (ID stays the same)
                 print(f"{name} {id_hex}: archive is already present in destination repo, skipping.")
+                skipped_count += 1
             else:
                 if not dry_run:
                     print(f"{name} {ts_str} {id_hex}: copying archive to destination repo...")
@@ -253,6 +259,8 @@ class TransferMixIn:
                         archive.stats.show_progress(final=True)
                     additional_metadata = upgrader.upgrade_archive_metadata(metadata=other_archive.metadata)
                     archive.save(additional_metadata=additional_metadata)
+                    transferred_count += 1
+                    transferred_size += transfer_size
                     print(
                         f"{name} {ts_str} {id_hex}: finished. "
                         f"transfer_size: {format_file_size(transfer_size)} "
@@ -266,6 +274,19 @@ class TransferMixIn:
                         f"transfer_size: {format_file_size(transfer_size)} "
                         f"present_size: {format_file_size(present_size)}"
                     )
+
+        if not dry_run:
+            monitoring.publish_command_report(
+                repository,
+                manifest.key,
+                "transfer",
+                stats={
+                    "archives_transferred": transferred_count,
+                    "archives_skipped": skipped_count,
+                    "archives_considered": count,
+                    "transferred_size": transferred_size,
+                },
+            )
 
     def build_parser_transfer(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

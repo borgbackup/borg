@@ -1,6 +1,7 @@
 import logging
 
 from ._common import with_repository
+from .. import monitoring
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
 from ..helpers.argparsing import ArgumentParser
@@ -29,7 +30,7 @@ class UnDeleteMixIn:
         if not args.name and not args.match_archives and args.first == 0 and args.last == 0:
             raise CommandError("Aborting: if you really want to undelete all archives, please use -a 'sh:*'.")
 
-        undeleted = False
+        undeleted_count = 0
         logger_list = logging.getLogger("borg.output.list")
         for i, archive_info in enumerate(archive_infos, 1):
             name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
@@ -39,17 +40,24 @@ class UnDeleteMixIn:
             except KeyError:
                 self.print_warning(f"Archive {name} {hex_id} not found ({i}/{count}).")
             else:
-                undeleted = True
+                undeleted_count += 1
                 if self.output_list:
                     msg = "Would undelete: {} ({}/{})" if dry_run else "Undeleted archive: {} ({}/{})"
                     logger_list.info(msg.format(format_archive(archive_info), i, count))
         if dry_run:
             logger.info("Finished dry-run.")
-        elif undeleted:
+        elif undeleted_count:
             manifest.write()
             self.print_warning("Done.", wc=None)
         else:
             self.print_warning("Aborted.", wc=None)
+        if not dry_run:
+            monitoring.publish_command_report(
+                repository,
+                manifest.key,
+                "undelete",
+                stats={"archives_undeleted": undeleted_count, "archives_considered": count},
+            )
         return
 
     def build_parser_undelete(self, subparsers, common_parser, mid_common_parser):

@@ -108,6 +108,40 @@ def test_prune_publishes_its_own_report(archivers, request, monkeypatch):
     assert prune["stats"]["archives_kept"] == 1
 
 
+def test_delete_and_undelete_publish_reports(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"some data")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "a1", "input")
+    cmd(archiver, "create", "a2", "input")
+    cmd(archiver, "delete", "a2")
+    cmd(archiver, "undelete", "a2")
+    monkeypatch.setenv("BORG_MONITORING_KEY", _monitoring_key(archiver))
+
+    entries = _entries(archiver)
+    assert {"delete", "undelete"} <= set(entries)
+    assert entries["delete"]["report"]["stats"]["archives_deleted"] == 1
+    assert entries["undelete"]["report"]["stats"]["archives_undeleted"] == 1
+
+
+def test_transfer_publishes_report(archivers, request, monkeypatch):
+    from .transfer_cmd_test import setup_repos
+
+    archiver = request.getfixturevalue(archivers)
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        create_regular_file(archiver.input_path, "file1", contents=b"some data")
+        cmd(archiver, "create", "arch1", "input")
+        cmd(archiver, "create", "arch2", "input")
+    cmd(archiver, "transfer", other_repo1)
+    monkeypatch.setenv("BORG_MONITORING_KEY", _monitoring_key(archiver))
+
+    entries = _entries(archiver)
+    assert "transfer" in entries
+    stats = entries["transfer"]["report"]["stats"]
+    assert stats["archives_transferred"] == 2
+    assert stats["archives_considered"] == 2
+
+
 def test_keep_evicts_old_objects(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", contents=b"some data")

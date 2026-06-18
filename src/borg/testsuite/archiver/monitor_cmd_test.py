@@ -15,10 +15,10 @@ def _monitoring_key(archiver):
     return keys[0]
 
 
-def _entries(archiver):
-    """Run `borg monitor --json` and return {unit: entry}."""
-    data = json.loads(cmd(archiver, "monitor", "--json"))
-    return {e["unit"]: e for e in data["entries"]}
+def _entries(archiver, *extra):
+    """Run `borg monitor --json` and return {archive-or-command: entry}."""
+    data = json.loads(cmd(archiver, "monitor", "--json", *extra))
+    return {(e["archive"] or e["command"]): e for e in data["entries"]}
 
 
 def _monitoring_object_count(archiver):
@@ -44,6 +44,9 @@ def test_create_publishes_report_and_monitor_reads_it(archivers, request, monkey
     assert e["report"]["command"] == "create"
     assert e["report"]["status"] == "success"
     assert "archive_id" in e["report"]
+    # host/user metadata is recorded and surfaced on the entry
+    assert e["hostname"] and e["hostname"] == e["report"]["hostname"]
+    assert e["username"] and e["username"] == e["report"]["username"]
 
 
 def test_multiple_series_are_not_masked(archivers, request, monkeypatch):
@@ -61,7 +64,29 @@ def test_multiple_series_are_not_masked(archivers, request, monkeypatch):
 
     # --name restricts to a single series
     data = json.loads(cmd(archiver, "monitor", "--name", "backup-home", "--json"))
-    assert [e["unit"] for e in data["entries"]] == ["backup-home"]
+    assert [e["archive"] for e in data["entries"]] == ["backup-home"]
+
+
+def test_same_series_from_different_hosts_kept_separate(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"some data")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # same archive series name, but backed up from two different hosts to the same repo
+    cmd(archiver, "create", "--hostname", "host-a", "shared", "input")
+    cmd(archiver, "create", "--hostname", "host-b", "shared", "input")
+    monkeypatch.setenv("BORG_MONITORING_KEY", _monitoring_key(archiver))
+
+    data = json.loads(cmd(archiver, "monitor", "--json"))
+    assert sorted(e["hostname"] for e in data["entries"]) == ["host-a", "host-b"]
+    assert all(e["archive"] == "shared" for e in data["entries"])
+
+    # --host narrows to a single host
+    data = json.loads(cmd(archiver, "monitor", "--host", "host-a", "--json"))
+    assert [e["hostname"] for e in data["entries"]] == ["host-a"]
+
+    # an unknown host matches nothing -> dead man's switch fires
+    out = cmd(archiver, "monitor", "--host", "nope", exit_code=EXIT_ERROR)
+    assert "No monitoring report" in out
 
 
 def test_prune_publishes_its_own_report(archivers, request, monkeypatch):

@@ -293,6 +293,8 @@ class CreateMixIn:
                     repository,
                     manifest.key,
                     "create",
+                    hostname=archive.hostname,
+                    username=archive.username,
                     archive=archive.name,
                     archive_id=archive.id,
                     stats=archive.stats.as_dict(),

@@ -22,11 +22,13 @@ import logging
 import os
 import time
 from binascii import hexlify
+from getpass import getuser
 
 from borgstore.store import ItemInfo
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
 
 from . import __version__
+from . import platform
 from .constants import EXIT_SUCCESS, EXIT_WARNING, EXIT_WARNING_BASE, EXIT_SIGNAL_BASE
 from .crypto import monitoring as mon_crypto
 from .helpers import bin_to_hex, get_ec
@@ -69,7 +71,9 @@ def status_from_rc(rc):
     return "error"
 
 
-def build_report(*, command, repo_id, time, rc, archive=None, archive_id=None, stats=None):
+def build_report(
+    *, command, repo_id, time, rc, hostname=None, username=None, archive=None, archive_id=None, stats=None
+):
     """Assemble the report dict. *repo_id*/*archive_id* are hex strings, *time* is ISO."""
     report = {
         "borg_version": __version__,
@@ -79,6 +83,10 @@ def build_report(*, command, repo_id, time, rc, archive=None, archive_id=None, s
         "status": status_from_rc(rc),
         "rc": rc,
     }
+    if hostname is not None:
+        report["hostname"] = hostname
+    if username is not None:
+        report["username"] = username
     if archive is not None:
         report["archive"] = archive
     if archive_id is not None:
@@ -133,18 +141,24 @@ def publish(repository, key, report):
         logger.warning("Could not publish monitoring report: %s", exc)
 
 
-def publish_command_report(repository, key, command, *, archive=None, archive_id=None, stats=None):
+def publish_command_report(
+    repository, key, command, *, hostname=None, username=None, archive=None, archive_id=None, stats=None
+):
     """Build and publish a report for a finished command.
 
     Captures the best-known return code at call time (the true process rc is only final
     after the store is closed; see borg/monitoring.py). Call this as the last action while
     the store is still open. *archive_id* is binary; it is hex-encoded for the report.
+    *hostname*/*username* default to the local host and user (e.g. for repo-wide commands
+    like prune); callers with an archive should pass the archive's own host/user.
     """
     report = build_report(
         command=command,
         repo_id=bin_to_hex(repository.id),
         time=archive_ts_now().isoformat(timespec="microseconds"),
         rc=get_ec(),
+        hostname=hostname if hostname is not None else platform.hostname,
+        username=username if username is not None else getuser(),
         archive=archive,
         archive_id=bin_to_hex(archive_id) if archive_id is not None else None,
         stats=stats,

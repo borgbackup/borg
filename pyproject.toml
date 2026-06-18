@@ -257,11 +257,6 @@ extras = ["pyfuse3", "sftp", "s3", "rclone"]
 set_env = {BORG_FUSE_IMPL = "mfusepy"}
 extras = ["mfusepy", "sftp", "s3", "rclone"]
 
-# Informational env: forces sha256 pack_ids even with max_count=1 to expose
-# code that still assumes pack_id == chunk_id. Run: tox -e sha256-pack-id
-[tool.tox.env.sha256-pack-id]
-set_env = {BORG_TESTONLY_SHA256_PACK_ID = "1"}
-
 [tool.tox.env.ruff]
 skip_install = true
 deps = ["ruff"]

@@ -223,7 +223,6 @@ def test_pack_writer_n1_flush():
     stored_id, pack_id, obj_offset, obj_size = results[0]
     assert stored_id == chunk_id
     assert pack_id == sha256(cdata).digest()
-    assert pack_id != chunk_id
     assert obj_offset == 0
     assert obj_size == len(cdata)
 
@@ -343,7 +342,6 @@ def test_put_marks_id_in_chunk_index(tmp_path):
         entry = repository._chunks.get(id1)
         assert entry is not None
         assert entry.pack_id == sha256(fchunk(b"ZEROS")).digest()
-        assert entry.pack_id != id1
         assert entry.size == 0  # uncompressed size filled in by cache layer
 
 

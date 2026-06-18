@@ -115,9 +115,8 @@ class PackWriter:
     uses that repository's single, authoritative index (see the chunks property), so
     there is never a second copy to keep in sync.  Unit tests pass an explicit index.
 
-    At max_count=1 (N=1 phase) each put() maps exactly one chunk to one pack.
-    Raising max_count later (N>1 phase) enables real packing without touching
-    this class's interface.
+    max_count bounds how many chunks a pack accumulates before flush() writes it.
+    Raising it produces larger packs without changing this class's interface.
     """
 
     def __init__(self, store, *, max_count=1, chunks=None, repository=None):
@@ -170,9 +169,8 @@ class PackWriter:
         # that incremental string concatenation would cause in Python).
         pack_data = b"".join(cdata for _, cdata in self._pieces)
 
-        # Name the pack by the hash of its bytes (content-addressing), independent of how many
-        # chunks it holds or what their ids are. This is why a single-chunk pack's name is not its
-        # chunk_id: the pack and the chunk are different objects with different identities.
+        # Name the pack by the SHA-256 of its bytes: the name commits to the stored content,
+        # so borgstore can verify and cache the file.
         pack_id = sha256(pack_data).digest()
 
         # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
@@ -659,9 +657,8 @@ class Repository:
                     # add all existing objects to the index.
                     # borg check: the index may have corrupted objects (we did not delete them)
                     # borg check --repair: the index will only have non-corrupted objects.
-                    # the pack file name is the pack_id (sha256(pack_bytes)), which is not the
-                    # chunk_id, so recover each object's real (chunk_id, offset, size) from its
-                    # on-disk header rather than assuming pack file name == chunk_id.
+                    # the pack file name is the pack_id; each object's chunk_id, offset and size
+                    # come from its on-disk header, so scan the headers to rebuild the index.
                     pack_id = hex_to_bin(info.name)
                     for chunk_id, obj_offset, obj_size in RepoObj.iter_object_headers(pack):
                         chunks[chunk_id] = ChunkIndexEntry(

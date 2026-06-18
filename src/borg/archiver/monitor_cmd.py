@@ -111,7 +111,7 @@ class MonitorMixIn:
 
     @staticmethod
     def _unit_label(report):
-        who = f"{report.get('hostname', '?')}/{report.get('username', '?')}"
+        who = f"{report.get('username', '?')}@{report.get('hostname', '?')}"
         return f"{who} {report.get('archive') or report.get('command')}"
 
     def _monitor_output(self, args, entries):
@@ -153,7 +153,7 @@ class MonitorMixIn:
             print(f"{self._unit_label(report)}:")
             print(f"    command:    {report.get('command')}")
             print(f"    status:     {report.get('status')} (rc {report.get('rc')})")
-            print(f"    host/user:  {report.get('hostname', '-')} / {report.get('username', '-')}")
+            print(f"    user@host:  {report.get('username', '-')}@{report.get('hostname', '-')}")
             print(f"    archive:    {report.get('archive', '-')}")
             print(f"    time:       {report.get('time')}")
             print(f"    age:        {int(e['age'])}s (max {args.max_age}s){'  STALE' if e['stale'] else ''}")

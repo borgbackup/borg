@@ -224,6 +224,7 @@ Fixes:
 
 Other changes:
 
+- msgpack: also allow 1.2.1
 - Location: simplify parsing/validation, #9678.
   For sftp/http(s)/s3/b2/rclone repositories, borg now only detects the scheme and hands the raw
   URL to borgstore, which parses and validates it (removing the duplicate parsing borg did before).

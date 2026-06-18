@@ -1035,22 +1035,35 @@ Utilization of max. archive size: {csize_max:.0%}
                 data = self.key.decrypt(items_id, data)
                 unpacker.feed(data)
                 chunk_decref(items_id, stats)
-                try:
-                    for item in unpacker:
+                while True:
+                    try:
+                        item = next(unpacker)
+                    except StopIteration:
+                        # no more (complete) items in the buffer, feed the next chunk
+                        break
+                    except msgpack.UnpackException:
+                        # items metadata corrupted. the unpacker can't be reused after an
+                        # unpacking failure, so create a fresh one and skip the rest of this chunk.
+                        if forced == 0:
+                            raise
+                        error = True
+                        unpacker = msgpack.Unpacker(use_list=False)
+                        break
+                    try:
                         item = Item(internal_dict=item)
                         if 'chunks' in item:
                             part = not self.consider_part_files and 'part' in item
                             for chunk_id, size, csize in item.chunks:
                                 chunk_decref(chunk_id, stats, part=part)
-                except (TypeError, ValueError):
-                    # if items metadata spans multiple chunks and one chunk got dropped somehow,
-                    # it could be that unpacker yields bad types
-                    if forced == 0:
-                        raise
-                    error = True
+                    except (TypeError, ValueError):
+                        # if items metadata spans multiple chunks and one chunk got dropped somehow,
+                        # it could be that unpacker yields bad types
+                        if forced == 0:
+                            raise
+                        error = True
             if progress:
                 pi.finish()
-        except (msgpack.UnpackException, Repository.ObjectNotFound):
+        except Repository.ObjectNotFound:
             # items metadata corrupted
             if forced == 0:
                 raise

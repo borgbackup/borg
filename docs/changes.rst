@@ -473,7 +473,7 @@ Note: Many of the fixed issues listed below relate to rather rare or theoretical
 
 Other changes:
 
-- msgpack: allow 1.2.0
+- msgpack: also allow 1.2.0 and 1.2.1
 - use F_FULLFSYNC on macOS for SyncFile data durability, #9383
 - mount: improve error msg when uid/gid cannot be resolved, #9574
 - docs:

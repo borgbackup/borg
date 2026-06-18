@@ -59,7 +59,7 @@ jobs:
 
   asan_ubsan:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     needs: [lint]
 
@@ -73,7 +73,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.12'
+        python-version: '3.14'
 
     - name: Install system packages
       run: |
@@ -141,21 +141,13 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "mypy"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "mypy"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "docs"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
+              {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
-              {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
-              {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
-              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"}
             ]
           }'
         ) }}
@@ -392,16 +384,11 @@ jobs:
       matrix:
         include:
           - os: freebsd
-            version: '14.3'
+            version: '15.0'
             display_name: FreeBSD
             # Controls binary build and provenance attestation on tags
             do_binaries: true
-            artifact_prefix: borg-freebsd-14-x86_64-gh
-
-          - os: netbsd
-            version: '10.1'
-            display_name: NetBSD
-            do_binaries: false
+            artifact_prefix: borg-freebsd-15-x86_64-gh
 
           - os: openbsd
             version: '7.8'

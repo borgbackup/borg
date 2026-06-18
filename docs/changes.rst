@@ -168,20 +168,7 @@ above.
 
 New features:
 
-- monitoring: ``borg create`` and ``borg prune`` now append a signed-and-encrypted state
-  report into the repository's ``monitoring/`` namespace (append-only, one object per run,
-  named by publish time). The new ``borg monitor`` command reads, verifies and decrypts
-  the reports from the (untrusted) repository server without the repository passphrase and
-  prints, per archive series and per maintenance command, the latest status and freshness
-  - so a later successful backup of one series cannot mask an earlier failed backup of
-  another. Restrict with ``--name`` (one series) or ``--command``. It exits non-zero if any
-  unit is missing, stale (older than ``--max-age``), unsigned or unsuccessful - so it can
-  drive alerting like a dead man's switch. ``--keep=N`` (default 500) deletes all but the N
-  newest report objects after reading (needs delete permission on the monitoring
-  namespace). All key material is derived from the existing borg key; run ``borg monitor
-  --key`` once on a host that has the key to obtain ``BORG_MONITORING_KEY`` for the
-  monitoring host. Reports are signed with Ed25519 and sealed with HPKE (RFC 9180), so the
-  server can neither forge nor read them, only relay them. Requires OpenSSL >= 3.2.
+- monitor: access encrypted/signed monitoring data in the repository, #9788
 - repo-create: split ``--encryption`` into orthogonal options. ``--encryption`` now
   selects only the cipher / AE algorithm (``none``, ``authenticated``, ``aes256-ocb``
   or ``chacha20-poly1305``), the new ``--id-hash`` selects the id hash function

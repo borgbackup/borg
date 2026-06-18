@@ -23,9 +23,14 @@ import os
 import time
 from binascii import hexlify
 
+from borgstore.store import ItemInfo
+from borgstore.store import ObjectNotFound as StoreObjectNotFound
+
 from . import __version__
 from .constants import EXIT_SUCCESS, EXIT_WARNING, EXIT_WARNING_BASE, EXIT_SIGNAL_BASE
 from .crypto import monitoring as mon_crypto
+from .helpers import bin_to_hex, get_ec
+from .helpers.time import archive_ts_now
 
 logger = logging.getLogger(__name__)
 
@@ -135,9 +140,6 @@ def publish_command_report(repository, key, command, *, archive=None, archive_id
     after the store is closed; see borg/monitoring.py). Call this as the last action while
     the store is still open. *archive_id* is binary; it is hex-encoded for the report.
     """
-    from .helpers import bin_to_hex, get_ec
-    from .helpers.time import archive_ts_now
-
     report = build_report(
         command=command,
         repo_id=bin_to_hex(repository.id),
@@ -152,8 +154,6 @@ def publish_command_report(repository, key, command, *, archive=None, archive_id
 
 def list_names(repository):
     """Return all monitoring object names, oldest first (names sort chronologically)."""
-    from borgstore.store import ItemInfo
-
     names = [ItemInfo(*info).name for info in repository.store_list(STORE_NAMESPACE)]
     names.sort()
     return names
@@ -165,8 +165,6 @@ def iter_reports(repository, monitor_key):
     Each report is verified and decrypted; an unverifiable one raises (it is not silently
     skipped) so tampering surfaces.
     """
-    from borgstore.store import ObjectNotFound as StoreObjectNotFound
-
     for name in list_names(repository):
         try:
             data = repository.store_load(f"{STORE_NAMESPACE}/{name}")
@@ -181,8 +179,6 @@ def prune_reports(repository, keep):
     Needs delete permission on the monitoring namespace; on a permission error (e.g. a
     read-only monitoring host) it warns and stops rather than failing the command.
     """
-    from borgstore.store import ObjectNotFound as StoreObjectNotFound
-
     if keep is None or keep <= 0:
         return 0  # 0 (or negative) disables cleanup
     names = list_names(repository)

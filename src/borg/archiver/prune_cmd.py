@@ -4,6 +4,7 @@ import logging
 from operator import attrgetter
 import os
 
+from .. import monitoring
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
@@ -233,9 +234,6 @@ class PruneMixIn:
             raise Error("Got Ctrl-C / SIGINT.")
 
         if not args.dry_run:
-            # Publish the monitoring report as the last action while the store is open.
-            from .. import monitoring
-
             monitoring.publish_command_report(
                 repository,
                 manifest.key,

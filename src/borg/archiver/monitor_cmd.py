@@ -34,10 +34,9 @@ class MonitorMixIn:
         series) or --command (e.g. create or prune). Neither the repository passphrase nor
         the borg key is needed for reading.
 
-        Reports accumulate as append-only objects; --keep=N deletes all but the N newest
-        after reading (this needs delete permission on the monitoring namespace).
+        Reports accumulate over time; --keep=N deletes all but the N newest after reading.
 
-        With --key (which does need the borg key) it instead derives and prints the
+        With --key (which does need the borg key), it derives and prints the
         BORG_MONITORING_KEY value for this repository, to be configured on the monitoring
         host. The printed value only allows verifying and decrypting reports, not creating
         them.
@@ -138,21 +137,19 @@ class MonitorMixIn:
 
         monitor_epilog = process_epilog(
             """
-        Read or export trusted monitoring state of a repository.
+        Read trusted monitoring state of a repository.
 
-        Backup-side commands publish a small signed-and-encrypted state report into the
-        repository after each run. Because each report is signed with a key derived from
-        the borg key, the (untrusted) repository server can neither forge nor read it - it
-        can only relay it. A monitoring system can therefore pull and verify the reports
-        from the same server without the repository passphrase.
+        Borg client commands publish a signed-and-encrypted state report into the
+        repository after each run. Only borg monitor can read these reports using
+        the monitoring key.
 
         Setup (once, on a host that has the borg key)::
 
-            BORG_MONITORING_KEY=$(borg monitor --key)
+            borg monitor --key  # this outputs the monitoring key
 
-        Then, on the monitoring host, with that value exported as BORG_MONITORING_KEY::
+        Then, on the monitoring host::
 
-            borg monitor
+            BORG_MONITORING_KEY=<that key> borg monitor
 
         This verifies and decrypts the reports and prints, per archive series (and per
         maintenance command), the latest status and its age. It exits with a non-zero code
@@ -199,6 +196,6 @@ class MonitorMixIn:
             default=monitoring.DEFAULT_KEEP,
             metavar="N",
             help="after reading, delete all but the N newest report objects "
-            f"(needs delete permission; 0 = do not clean up; default: {monitoring.DEFAULT_KEEP})",
+            f"(0 = do not clean up; default: {monitoring.DEFAULT_KEEP})",
         )
         subparser.add_argument("--json", action="store_true", help="format output as JSON")

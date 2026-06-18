@@ -50,8 +50,8 @@ def _derive_seed(key, domain):
 def client_material(key):
     """Client half: (ed25519_sign_seed, hpke_recipient_public).
 
-    Used by the publishing side to sign with the Ed25519 secret seed and seal to the
-    monitor's HPKE public key.
+    Used by the publishing side to sign with the Ed25519 secret seed and seal
+    to the monitor's HPKE public key.
     """
     sign_seed = _derive_seed(key, SIGN_DOMAIN)
     seal_seed = _derive_seed(key, SEAL_DOMAIN)
@@ -62,8 +62,8 @@ def client_material(key):
 def monitor_material(key):
     """Monitor half: (ed25519_verify_public, hpke_recipient_secret).
 
-    This is everything the monitoring system needs to verify + decrypt and nothing more:
-    it cannot derive the signing secret or the borg key from it.
+    This is everything the monitoring system needs to verify and decrypt and
+    nothing more: it cannot derive the signing secret or the borg key from it.
     """
     sign_seed = _derive_seed(key, SIGN_DOMAIN)
     seal_seed = _derive_seed(key, SEAL_DOMAIN)

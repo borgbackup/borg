@@ -40,11 +40,11 @@ def is_signed_repo(key):
     return not isinstance(key, PlaintextKey)
 
 
-def _derive_seed(key, domain):
+def _derive_seed(key, domain, size):
     # Same one-step KDF as session keys (sha256(crypt_key + salt + domain)), but with a
     # fixed label and NO random salt, so the result is deterministic. Derived from
     # crypt_key (not id_key, which related repos share).
-    return key.derive_key(salt=b"", domain=domain, size=32)
+    return key.derive_key(salt=b"", domain=domain, size=size)
 
 
 def client_material(key):
@@ -53,8 +53,8 @@ def client_material(key):
     Used by the publishing side to sign with the Ed25519 secret seed and seal
     to the monitor's HPKE public key.
     """
-    sign_seed = _derive_seed(key, SIGN_DOMAIN)
-    seal_seed = _derive_seed(key, SEAL_DOMAIN)
+    sign_seed = _derive_seed(key, SIGN_DOMAIN, low_level.ED25519_SEED_SIZE)
+    seal_seed = _derive_seed(key, SEAL_DOMAIN, low_level.X25519_SEED_SIZE)
     hpke_public = low_level.x25519_public_from_seed(seal_seed)
     return sign_seed, hpke_public
 
@@ -65,8 +65,8 @@ def monitor_material(key):
     This is everything the monitoring system needs to verify and decrypt and
     nothing more: it cannot derive the signing secret or the borg key from it.
     """
-    sign_seed = _derive_seed(key, SIGN_DOMAIN)
-    seal_seed = _derive_seed(key, SEAL_DOMAIN)
+    sign_seed = _derive_seed(key, SIGN_DOMAIN, low_level.ED25519_SEED_SIZE)
+    seal_seed = _derive_seed(key, SEAL_DOMAIN, low_level.X25519_SEED_SIZE)
     ed_public = low_level.ed25519_public_from_seed(sign_seed)
     return ed_public, seal_seed
 

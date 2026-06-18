@@ -777,7 +777,7 @@ def x25519_public_from_seed(bytes seed):
 
 def ed25519_sign(bytes seed, bytes data):
     """Sign *data* with the Ed25519 secret *seed* (32 bytes), returning a 64-byte signature."""
-    if len(seed) != 32:
+    if len(seed) != ED25519_SEED_SIZE:
         raise ValueError("ed25519 seed must be 32 bytes")
     cdef EVP_PKEY *pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, NULL, <const unsigned char *> PyBytes_AsString(seed), 32)
     if pkey == NULL:
@@ -804,7 +804,7 @@ def ed25519_verify(bytes public, bytes data, bytes signature):
 
     Returns None on success, raises IntegrityError on a bad signature.
     """
-    if len(public) != 32:
+    if len(public) != ED25519_PUBLIC_SIZE:
         raise ValueError("ed25519 public key must be 32 bytes")
     cdef EVP_PKEY *pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, NULL, <const unsigned char *> PyBytes_AsString(public), 32)
     if pkey == NULL:
@@ -831,7 +831,7 @@ def hpke_seal(bytes recipient_public, bytes info, bytes aad, bytes plaintext):
 
     Returns enc || ciphertext (the encapsulated key prepended to the AEAD ciphertext).
     """
-    if len(recipient_public) != 32:
+    if len(recipient_public) != X25519_PUBLIC_SIZE:
         raise ValueError("recipient public key must be 32 bytes")
     cdef OSSL_HPKE_SUITE suite = _hpke_suite()
     cdef OSSL_HPKE_CTX *ctx = OSSL_HPKE_CTX_new(OSSL_HPKE_MODE_BASE, suite, OSSL_HPKE_ROLE_SENDER, NULL, NULL)
@@ -865,7 +865,7 @@ def hpke_open(bytes recipient_secret, bytes info, bytes aad, bytes blob):
 
     Returns the plaintext, raises IntegrityError if opening/authentication fails.
     """
-    if len(recipient_secret) != 32:
+    if len(recipient_secret) != X25519_SEED_SIZE:
         raise ValueError("recipient secret key must be 32 bytes")
     cdef OSSL_HPKE_SUITE suite = _hpke_suite()
     cdef size_t enclen = OSSL_HPKE_get_public_encap_size(suite)

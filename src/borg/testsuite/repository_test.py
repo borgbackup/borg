@@ -346,9 +346,8 @@ def test_put_marks_id_in_chunk_index(tmp_path):
 
 
 def test_check_detects_corruption_in_later_object(tmp_path):
-    # A pack stores its objects back to back, so check must validate every object, not only the
-    # first. This guards the N>1 case: corruption in a later object has to be caught too. The old
-    # first-object-only check would pass this pack and miss the damage.
+    # Corruption anywhere in a multi-object pack must be caught, not just in the first object: the pack
+    # is named by sha256(content), so flipping any byte makes its stored hash differ from its name.
     chunk1 = fchunk(b"FIRST", chunk_id=H(1))
     chunk2 = fchunk(b"SECOND", chunk_id=H(2))
     pack = chunk1 + chunk2
@@ -362,6 +361,67 @@ def test_check_detects_corruption_in_later_object(tmp_path):
         corrupted[len(chunk1)] ^= 0xFF
         repository.store_store(pack_name, bytes(corrupted))
         assert repository.check(repair=False) is False  # corruption past object 1 is detected
+
+
+def test_check_detects_index_corruption(tmp_path):
+    # index/ objects are named by sha256(content) like packs, so check verifies them the same way.
+    content = b"pretend this is a serialized chunk index"
+    index_name = "index/" + bin_to_hex(sha256(content).digest())
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store(index_name, content)
+        assert repository.check(repair=False) is True  # index object intact (name == sha256(content))
+
+        corrupted = bytearray(content)
+        corrupted[0] ^= 0xFF
+        repository.store_store(index_name, bytes(corrupted))  # same name, rotted content
+        assert repository.check(repair=False) is False  # mismatch between content hash and name detected
+
+
+def test_check_intact_multi_object_pack_passes(tmp_path):
+    # An intact pack with several objects (the N>1 case) passes: it is hashed as a whole, so the
+    # object count does not matter.
+    pack = fchunk(b"A", chunk_id=H(1)) + fchunk(b"BB", chunk_id=H(2)) + fchunk(b"CCC", chunk_id=H(3))
+    pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store(pack_name, pack)
+        assert repository.check(repair=False) is True
+
+
+def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):
+    # check() uses a separate progress indicator for index/ and for packs/. Each one is sized to its own
+    # namespace and driven to 100% by a final show(current=total). A fake indicator records the wiring
+    # without depending on log output.
+    indicators = []
+
+    class FakePI:
+        def __init__(self, total=0, **kwargs):
+            self.total = total
+            self.position = 0
+            indicators.append(self)
+
+        def show(self, current=None, increase=0, *args, **kwargs):
+            self.position = current if current is not None else self.position + increase
+
+        def finish(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr("borg.repository.ProgressIndicatorPercent", FakePI)
+    pack = fchunk(b"A", chunk_id=H(1))
+    pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
+    index_content = b"serialized chunk index"
+    index_name = "index/" + bin_to_hex(sha256(index_content).digest())
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store(pack_name, pack)
+        repository.store_store(index_name, index_content)
+        # create() already wrote a chunk index, so don't assume a count: derive it from the store.
+        n_packs = len(repository.store_list("packs"))
+        n_index = len(repository.store_list("index"))
+        assert repository.check(repair=False) is True
+    # one indicator per namespace, each sized to its own object count ...
+    assert sorted(pi.total for pi in indicators) == sorted([n_index, n_packs])
+    # ... and each driven all the way to 100%.
+    for pi in indicators:
+        assert pi.position == pi.total
 
 
 def test_pack_writer_final_partial_pack_uses_sha256():

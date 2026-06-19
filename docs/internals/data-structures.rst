@@ -31,9 +31,9 @@ config/
     the repository version encoded as decimal number text
   manifest
     some data about the repository, binary
-  last-key-checked
+  last-pack-checked
     repository check progress (partial checks, full checks' checkpointing),
-    path of last object checked as text
+    key of last pack checked as text
   space-reserve.N
     purely random binary data to reserve space, e.g. for disk-full emergencies
 

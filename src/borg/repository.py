@@ -12,14 +12,15 @@ from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNot
 from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
 
 from .constants import *  # NOQA
-from .hashindex import ChunkIndex, ChunkIndexEntry
+from .hashindex import ChunkIndex
 from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
+from .helpers import ProgressIndicatorPercent
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
-from .repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
+from .repoobj import RepoObj
 from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
@@ -48,7 +49,7 @@ def borg_permissions(permissions):
             return {
                 "": "lr",
                 "archives": "lrw",
-                "cache": "lrwWD",  # WD for last-key-checked, ...
+                "cache": "lrwWD",  # WD for last-pack-checked, ...
                 "config": "lrW",  # W for manifest
                 "index": "lrwWD",  # WD for index/<HASH> (merge/compaction of incremental indexes)
                 "keys": "lr",
@@ -547,156 +548,126 @@ class Repository:
         return info
 
     def check(self, repair=False, max_duration=0):
-        """Check repository consistency"""
+        """Check repository consistency.
 
-        def log_error(msg):
-            nonlocal obj_corrupted
-            obj_corrupted = True
-            logger.error(f"Repo object {info.name} is corrupted: {msg}")
+        packs/ and index/ objects are named by the sha256 of their content, so a pack or index file
+        is intact iff store.hash(name) still equals name. The whole pack is hashed; the REST backend
+        computes the hash server-side, so for it nothing is downloaded.
 
-        def check_object(obj):
-            """Check one object; return its size (header + meta + data), or None if it is corrupted."""
-            hdr_size = RepoObj.obj_header.size
-            if len(obj) < hdr_size:
-                log_error("too small.")
-                return None
-            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
-            if hdr.magic != OBJ_MAGIC:
-                log_error("invalid object magic.")
-                return None
-            if hdr.version != OBJ_VERSION:
-                log_error(f"unsupported object version: {hdr.version}.")
-                return None
-            meta = obj[hdr_size : hdr_size + hdr.meta_size]
-            if hdr.meta_size != len(meta):
-                log_error("metadata size mismatch.")
-                return None
-            data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
-            if hdr.data_size != len(data):
-                log_error("data size mismatch.")
-                return None
-            return hdr_size + hdr.meta_size + hdr.data_size
+        The index is hashed first and the packs only if it is intact. The packs could be hashed even
+        with a corrupt index, but a corrupt index already means the user has to repair it, and that
+        rebuild re-reads every pack anyway - so a read-only check just stops and reports it instead of
+        continuing. The index is never rebuilt here in any case: reading every pack to do so would be
+        far too slow and expensive for a routine (e.g. cron) check. Salvaging good objects out of
+        corrupt packs and dropping those packs is left to repair, refs #8572.
+        """
 
-        def check_pack(pack):
-            """Check all objects in a pack, following each object's header to the next."""
-            pack = memoryview(pack)  # slice without copying the tail each step
-            offset = 0
-            while offset < len(pack):
-                obj_size = check_object(pack[offset:])
-                if obj_size is None:
-                    break  # header is bad, so offsets past here are not trustworthy
-                offset += obj_size
+        def verify(namespace, name):
+            # name is the sha256 of the object's content, so it is intact iff store.hash() matches.
+            key = f"{namespace}/{name}"
+            try:
+                ok = self.store.hash(key) == name
+            except StoreObjectNotFound:
+                return True  # vanished since store.list(); not an error
+            if not ok:
+                logger.error(f"Store object {key} is corrupted: content does not match its name (sha256).")
+            return ok
 
-        # TODO: progress indicator, ...
+        def store_list(namespace):
+            try:
+                return list(self.store.list(namespace))
+            except StoreObjectNotFound:
+                return []  # namespace does not exist
+
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"
-        LAST_KEY_CHECKED = "cache/last-key-checked"
+        LAST_PACK_CHECKED = "cache/last-pack-checked"
         logger.info(f"Starting {mode} repository check")
         if partial:
             # continue a past partial check (if any) or from a checkpoint or start one from beginning
             try:
-                last_key_checked = self.store.load(LAST_KEY_CHECKED).decode()
+                last_pack_checked = self.store.load(LAST_PACK_CHECKED).decode()
             except StoreObjectNotFound:
-                last_key_checked = ""
+                last_pack_checked = ""
         else:
             # start from the beginning and also forget about any potential past partial checks
-            last_key_checked = ""
+            last_pack_checked = ""
             try:
-                self.store.delete(LAST_KEY_CHECKED)
+                self.store.delete(LAST_PACK_CHECKED)
             except StoreObjectNotFound:
                 pass
-        if last_key_checked:
-            logger.info(f"Skipping to keys after {last_key_checked}.")
+        if last_pack_checked:
+            logger.info(f"Skipping to packs after {last_pack_checked}.")
         else:
             logger.info("Starting from beginning.")
         t_start = time.monotonic()
         t_last_checkpoint = t_start
-        objs_checked = objs_errors = 0
-        chunks = ChunkIndex()
-        # we don't do refcounting anymore, neither we can know here whether any archive
-        # is using this object, but we assume that this is the case.
-        # As we don't do garbage collection here, this is not a problem.
-        # We also don't know the plaintext size, so we set it to 0.
-        infos = self.store.list("packs")
-        try:
-            for info in infos:
+        index_files = index_errors = 0
+        pack_files = pack_errors = 0
+        # check index and packs with separate progress indicators, each running from 0% to 100%.
+        # hash the index first, on full and partial checks alike: it is small, and a corrupt index
+        # already means the user must repair it (rebuilding the index re-reads all packs anyway), so we
+        # stop and report that rather than continue. matters for partial checks too, whose runs can be
+        # days apart (e.g. a weekend cron job).
+        index_infos = store_list("index")
+        index_pi = ProgressIndicatorPercent(total=len(index_infos), msg="Checking index %3.0f%%", msgid="check.index")
+        for info in index_infos:
+            self._lock_refresh()
+            index_pi.show(increase=1)
+            index_files += 1
+            if not verify("index", info.name):
+                index_errors += 1
+        if index_infos:
+            index_pi.show(current=len(index_infos))  # finish at 100%
+        index_pi.finish()
+        if index_errors == 0:
+            # list the packs only now: a corrupt index skips this entirely. packs are the bulk of the
+            # work and the part --max-duration splits.
+            pack_infos = store_list("packs")
+            pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
+            for info in pack_infos:
                 self._lock_refresh()
+                pack_pi.show(increase=1)  # advance for every pack, including ones a partial resume skips below
                 key = "packs/%s" % info.name
-                if key <= last_key_checked:  # needs sorted keys
+                if key <= last_pack_checked:  # needs sorted keys
                     continue
-                try:
-                    pack = self.store.load(key)
-                except StoreObjectNotFound:
-                    # looks like object vanished since store.list(), ignore that.
-                    continue
-                obj_corrupted = False
-                check_pack(pack)
-                objs_checked += 1
-                if obj_corrupted:
-                    objs_errors += 1
-                    if repair:
-                        # retry the load first, in case the error was transient (network / NIC / RAM).
-                        try:
-                            pack = self.store.load(key)
-                        except StoreObjectNotFound:
-                            log_error("existing object vanished.")
-                        else:
-                            obj_corrupted = False
-                            check_pack(pack)
-                            if obj_corrupted:
-                                # Don't delete the pack: it may hold other, good objects, and dropping
-                                # the whole file to get rid of one bad object is data loss at N>1 (it
-                                # was only safe because an N=1 pack holds a single object). Report it
-                                # for now, like Repository.delete and the --verify-data path.
-                                # TODO: salvage the good objects into a new pack and update the index.
-                                log_error("reloading did not help; leaving it in place (repair not implemented yet).")
-                            else:
-                                log_error("reloading did help, inconsistent behaviour detected!")
-                if not (obj_corrupted and repair):
-                    # add all existing objects to the index.
-                    # borg check: the index may have corrupted objects (we did not delete them)
-                    # borg check --repair: the index will only have non-corrupted objects.
-                    # the pack file name is the pack_id; each object's chunk_id, offset and size
-                    # come from its on-disk header, so scan the headers to rebuild the index.
-                    pack_id = hex_to_bin(info.name)
-                    for chunk_id, obj_offset, obj_size in RepoObj.iter_object_headers(pack):
-                        chunks[chunk_id] = ChunkIndexEntry(
-                            flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
-                        )
+                pack_files += 1
+                if not verify("packs", info.name):
+                    pack_errors += 1  # repair (salvage into a new pack, fix index) is not implemented yet
                 now = time.monotonic()
                 if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
                     t_last_checkpoint = now
-                    logger.info(f"Checkpointing at key {key}.")
-                    self.store.store(LAST_KEY_CHECKED, key.encode())
+                    logger.info(f"Checkpointing at pack {key}.")
+                    self.store.store(LAST_PACK_CHECKED, key.encode())
                 if partial and now > t_start + max_duration:
-                    logger.info(f"Finished partial repository check, last key checked is {key}.")
-                    self.store.store(LAST_KEY_CHECKED, key.encode())
+                    logger.info(f"Finished partial repository check, last pack checked is {key}.")
+                    self.store.store(LAST_PACK_CHECKED, key.encode())
                     break
             else:
-                logger.info("Finished repository check.")
+                # the pack scan reached the end (no partial timeout): the check is complete, drop the checkpoint.
+                if pack_infos:
+                    pack_pi.show(current=len(pack_infos))  # finish at 100%
+                logger.info("Finished checking packs.")
                 try:
-                    self.store.delete(LAST_KEY_CHECKED)
+                    self.store.delete(LAST_PACK_CHECKED)
                 except StoreObjectNotFound:
                     pass
-                if not partial:
-                    # if we did a full pass in one go, we built a complete, up-to-date ChunkIndex, cache it!
-                    from .cache import write_chunkindex_to_repo
-
-                    write_chunkindex_to_repo(
-                        self, chunks, incremental=False, clear=True, force_write=True, delete_other=True
-                    )
-        except StoreObjectNotFound:
-            # it can be that there is no "packs/" at all, then it crashes when iterating infos.
-            pass
-        logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
+            pack_pi.finish()
+        else:
+            # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).
+            logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
+        objs_errors = index_errors + pack_errors
+        logger.info(
+            f"Checked {index_files} index files ({index_errors} errors) "
+            f"and {pack_files} packs ({pack_errors} errors)."
+        )
         if objs_errors == 0:
             logger.info(f"Finished {mode} repository check, no problems found.")
+        elif repair:
+            logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
         else:
-            if repair:
-                logger.info(f"Finished {mode} repository check, errors found and repaired.")
-            else:
-                logger.error(f"Finished {mode} repository check, errors found.")
+            logger.error(f"Finished {mode} repository check, errors found.")
         return objs_errors == 0 or repair
 
     def list(self, limit=None, marker=None):

@@ -1735,9 +1735,12 @@ class ArchiveChecker:
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
-        # Repository.check already did a full repository-level check and has built and cached a fresh chunkindex -
-        # we can use that here, so we don't disable the caches (also no need to cache immediately, again):
-        self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=False, cache_immediately=False)
+        # A normal (non-repair) archives check trusts the in-repo index: the repository check verified
+        # each index object's sha256, and the index is the authoritative record of which chunks exist,
+        # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
+        # --repair does rebuild from the packs (disable_caches=repair), working from the real packs so it
+        # can detect and fix archives that reference chunks whose pack has gone missing.
+        self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=repair, cache_immediately=False)
         if self.key is None:
             self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)

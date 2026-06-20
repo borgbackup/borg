@@ -206,33 +206,33 @@ class PackWriter:
 
 
 class PackReader:
-    """Walks the object headers of a pack, the read-side counterpart to PackWriter.
+    """Reads pack files, the read-side counterpart to PackWriter.
 
-    Reads only the fixed headers, not the payloads, so locating every object in a pack
-    costs one short range read per object.
+    Pass pack_id to read from the store, or pack_contents for a pack already in memory.
     """
 
-    def __init__(self, store, key):
+    def __init__(self, store=None, pack_id=None, pack_contents=None):
         self.store = store
-        self.key = key  # "packs/<pack_id hex>"
+        self.pack_id = pack_id
+        self.key = "packs/" + bin_to_hex(pack_id) if pack_id is not None else None
+        self.pack_contents = pack_contents
+
+    def _read(self, offset, size):
+        # read from the in-memory pack if we have it, else range-read from the store
+        if self.pack_contents is not None:
+            return self.pack_contents[offset : offset + size]
+        return self.store.load(self.key, offset=offset, size=size)
 
     def iter_headers(self):
-        """Yield (chunk_id, offset, size) for each object, reading the headers from the store."""
-        return self._iter_headers(lambda offset, size: self.store.load(self.key, offset=offset, size=size))
+        """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
-    @classmethod
-    def from_bytes(cls, pack):
-        """Like iter_headers(), but for a pack already held in memory."""
-        return cls._iter_headers(lambda offset, size: pack[offset : offset + size])
-
-    @staticmethod
-    def _iter_headers(read):
-        # read(offset, size) returns pack bytes from the store or from memory; each header gives the
-        # object size, hence the offset of the next one.
+        Only the headers are read, not the payloads, so locating every object costs one short
+        range read per object (or just a slice, when the pack is already in memory).
+        """
         hdr_size = RepoObj.obj_header.size
         offset = 0
         while True:
-            hdr_data = read(offset, hdr_size)
+            hdr_data = self._read(offset, hdr_size)
             if len(hdr_data) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
             hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))

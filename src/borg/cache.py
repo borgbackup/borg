@@ -661,8 +661,7 @@ def build_chunkindex_from_repo(
         # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
         repository._lock_refresh()
         pack_id = hex_to_bin(info.name)
-        pack_name = "packs/" + info.name
-        for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_name).iter_headers():
+        for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_id).iter_headers():
             num_chunks += 1
             chunks[chunk_id] = ChunkIndexEntry(
                 flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size

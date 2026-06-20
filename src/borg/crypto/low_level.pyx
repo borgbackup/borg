@@ -42,7 +42,7 @@ from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AsString
 from libc.stdlib cimport malloc, free
-from libc.stdint cimport uint8_t, uint32_t, uint64_t
+from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t
 from libc.string cimport memset, memcpy
 
 
@@ -87,6 +87,66 @@ cdef extern from "openssl/evp.h":
     int EVP_CTRL_AEAD_GET_TAG
     int EVP_CTRL_AEAD_SET_TAG
     int EVP_CTRL_AEAD_SET_IVLEN
+
+
+cdef extern from "openssl/evp.h":
+    # asymmetric keys (Ed25519 signing, X25519 key agreement for HPKE)
+    ctypedef struct EVP_PKEY:
+        pass
+    ctypedef struct EVP_PKEY_CTX:
+        pass
+    ctypedef struct EVP_MD_CTX:
+        pass
+
+    int EVP_PKEY_ED25519
+    int EVP_PKEY_X25519
+
+    EVP_PKEY *EVP_PKEY_new_raw_private_key(int type, ENGINE *e, const unsigned char *key, size_t keylen)
+    EVP_PKEY *EVP_PKEY_new_raw_public_key(int type, ENGINE *e, const unsigned char *key, size_t keylen)
+    int EVP_PKEY_get_raw_public_key(const EVP_PKEY *pkey, unsigned char *pub, size_t *len)
+    void EVP_PKEY_free(EVP_PKEY *key)
+
+    EVP_MD_CTX *EVP_MD_CTX_new()
+    void EVP_MD_CTX_free(EVP_MD_CTX *ctx)
+    int EVP_DigestSignInit(EVP_MD_CTX *ctx, EVP_PKEY_CTX **pctx, const EVP_MD *type, ENGINE *e, EVP_PKEY *pkey)
+    int EVP_DigestSign(EVP_MD_CTX *ctx, unsigned char *sig, size_t *siglen, const unsigned char *tbs, size_t tbslen)
+    int EVP_DigestVerifyInit(EVP_MD_CTX *ctx, EVP_PKEY_CTX **pctx, const EVP_MD *type, ENGINE *e, EVP_PKEY *pkey)
+    int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen)
+
+
+cdef extern from "openssl/hpke.h":
+    ctypedef struct OSSL_HPKE_SUITE:
+        uint16_t kem_id
+        uint16_t kdf_id
+        uint16_t aead_id
+    ctypedef struct OSSL_HPKE_CTX:
+        pass
+    ctypedef struct OSSL_LIB_CTX:
+        pass
+
+    int OSSL_HPKE_MODE_BASE
+    int OSSL_HPKE_ROLE_SENDER
+    int OSSL_HPKE_ROLE_RECEIVER
+    uint16_t OSSL_HPKE_KEM_ID_X25519
+    uint16_t OSSL_HPKE_KDF_ID_HKDF_SHA256
+    uint16_t OSSL_HPKE_AEAD_ID_AES_GCM_256
+
+    OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite, int role,
+                                     OSSL_LIB_CTX *libctx, const char *propq)
+    void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
+    int OSSL_HPKE_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
+                        const unsigned char *pub, size_t publen,
+                        const unsigned char *info, size_t infolen)
+    int OSSL_HPKE_seal(OSSL_HPKE_CTX *ctx, unsigned char *ct, size_t *ctlen,
+                       const unsigned char *aad, size_t aadlen,
+                       const unsigned char *pt, size_t ptlen)
+    int OSSL_HPKE_decap(OSSL_HPKE_CTX *ctx, const unsigned char *enc, size_t enclen,
+                        EVP_PKEY *recippriv, const unsigned char *info, size_t infolen)
+    int OSSL_HPKE_open(OSSL_HPKE_CTX *ctx, unsigned char *pt, size_t *ptlen,
+                       const unsigned char *aad, size_t aadlen,
+                       const unsigned char *ct, size_t ctlen)
+    size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite)
+    size_t OSSL_HPKE_get_ciphertext_size(OSSL_HPKE_SUITE suite, size_t clearlen)
 
 
 import struct
@@ -667,6 +727,174 @@ def blake2b_256(key, data):
 
 def blake2b_128(data):
     return hashlib.blake2b(data, digest_size=16).digest()
+
+
+# Asymmetric primitives used for monitoring reports: Ed25519 signatures (authenticity)
+# and HPKE (RFC 9180) sealing (confidentiality from the untrusted repo server). Both are
+# provided by OpenSSL >= 3.2; key material is 32-byte seeds derived from the borg key.
+
+ED25519_SEED_SIZE = 32
+ED25519_PUBLIC_SIZE = 32
+ED25519_SIGNATURE_SIZE = 64
+X25519_SEED_SIZE = 32
+X25519_PUBLIC_SIZE = 32
+
+
+cdef OSSL_HPKE_SUITE _hpke_suite():
+    # DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM
+    cdef OSSL_HPKE_SUITE suite
+    suite.kem_id = OSSL_HPKE_KEM_ID_X25519
+    suite.kdf_id = OSSL_HPKE_KDF_ID_HKDF_SHA256
+    suite.aead_id = OSSL_HPKE_AEAD_ID_AES_GCM_256
+    return suite
+
+
+cdef bytes _raw_public_key(int pkey_type, bytes seed):
+    if len(seed) != 32:
+        raise ValueError("raw key seed must be 32 bytes")
+    cdef EVP_PKEY *pkey = EVP_PKEY_new_raw_private_key(pkey_type, NULL, <const unsigned char *> PyBytes_AsString(seed), 32)
+    if pkey == NULL:
+        raise CryptoError("EVP_PKEY_new_raw_private_key failed")
+    cdef unsigned char pub[32]
+    cdef size_t publen = 32
+    try:
+        if not EVP_PKEY_get_raw_public_key(pkey, pub, &publen):
+            raise CryptoError("EVP_PKEY_get_raw_public_key failed")
+        return PyBytes_FromStringAndSize(<char *> pub, publen)
+    finally:
+        EVP_PKEY_free(pkey)
+
+
+def ed25519_public_from_seed(bytes seed):
+    """Return the 32-byte Ed25519 public key for a 32-byte secret seed."""
+    return _raw_public_key(EVP_PKEY_ED25519, seed)
+
+
+def x25519_public_from_seed(bytes seed):
+    """Return the 32-byte X25519 (HPKE) public key for a 32-byte secret seed."""
+    return _raw_public_key(EVP_PKEY_X25519, seed)
+
+
+def ed25519_sign(bytes seed, bytes data):
+    """Sign *data* with the Ed25519 secret *seed* (32 bytes), returning a 64-byte signature."""
+    if len(seed) != ED25519_SEED_SIZE:
+        raise ValueError("ed25519 seed must be 32 bytes")
+    cdef EVP_PKEY *pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, NULL, <const unsigned char *> PyBytes_AsString(seed), 32)
+    if pkey == NULL:
+        raise CryptoError("EVP_PKEY_new_raw_private_key(ED25519) failed")
+    cdef EVP_MD_CTX *mdctx = EVP_MD_CTX_new()
+    cdef unsigned char sig[64]
+    cdef size_t siglen = 64
+    try:
+        if mdctx == NULL:
+            raise CryptoError("EVP_MD_CTX_new failed")
+        if not EVP_DigestSignInit(mdctx, NULL, NULL, NULL, pkey):
+            raise CryptoError("EVP_DigestSignInit failed")
+        if not EVP_DigestSign(mdctx, sig, &siglen, <const unsigned char *> PyBytes_AsString(data), len(data)):
+            raise CryptoError("EVP_DigestSign failed")
+        return PyBytes_FromStringAndSize(<char *> sig, siglen)
+    finally:
+        if mdctx != NULL:
+            EVP_MD_CTX_free(mdctx)
+        EVP_PKEY_free(pkey)
+
+
+def ed25519_verify(bytes public, bytes data, bytes signature):
+    """Verify an Ed25519 *signature* over *data* with the 32-byte *public* key.
+
+    Returns None on success, raises IntegrityError on a bad signature.
+    """
+    if len(public) != ED25519_PUBLIC_SIZE:
+        raise ValueError("ed25519 public key must be 32 bytes")
+    cdef EVP_PKEY *pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, NULL, <const unsigned char *> PyBytes_AsString(public), 32)
+    if pkey == NULL:
+        raise CryptoError("EVP_PKEY_new_raw_public_key(ED25519) failed")
+    cdef EVP_MD_CTX *mdctx = EVP_MD_CTX_new()
+    cdef int rc
+    try:
+        if mdctx == NULL:
+            raise CryptoError("EVP_MD_CTX_new failed")
+        if not EVP_DigestVerifyInit(mdctx, NULL, NULL, NULL, pkey):
+            raise CryptoError("EVP_DigestVerifyInit failed")
+        rc = EVP_DigestVerify(mdctx, <const unsigned char *> PyBytes_AsString(signature), len(signature),
+                              <const unsigned char *> PyBytes_AsString(data), len(data))
+        if rc != 1:
+            raise IntegrityError("Ed25519 signature verification failed")
+    finally:
+        if mdctx != NULL:
+            EVP_MD_CTX_free(mdctx)
+        EVP_PKEY_free(pkey)
+
+
+def hpke_seal(bytes recipient_public, bytes info, bytes aad, bytes plaintext):
+    """HPKE-seal *plaintext* to the recipient's 32-byte X25519 *public* key.
+
+    Returns enc || ciphertext (the encapsulated key prepended to the AEAD ciphertext).
+    """
+    if len(recipient_public) != X25519_PUBLIC_SIZE:
+        raise ValueError("recipient public key must be 32 bytes")
+    cdef OSSL_HPKE_SUITE suite = _hpke_suite()
+    cdef OSSL_HPKE_CTX *ctx = OSSL_HPKE_CTX_new(OSSL_HPKE_MODE_BASE, suite, OSSL_HPKE_ROLE_SENDER, NULL, NULL)
+    cdef size_t enclen = OSSL_HPKE_get_public_encap_size(suite)
+    cdef size_t ctlen = OSSL_HPKE_get_ciphertext_size(suite, len(plaintext))
+    cdef unsigned char *enc = <unsigned char *> malloc(enclen)
+    cdef unsigned char *ct = <unsigned char *> malloc(ctlen)
+    try:
+        if ctx == NULL or enc == NULL or ct == NULL:
+            raise CryptoError("HPKE sender setup failed")
+        if not OSSL_HPKE_encap(ctx, enc, &enclen,
+                               <const unsigned char *> PyBytes_AsString(recipient_public), 32,
+                               <const unsigned char *> PyBytes_AsString(info), len(info)):
+            raise CryptoError("OSSL_HPKE_encap failed")
+        if not OSSL_HPKE_seal(ctx, ct, &ctlen,
+                              <const unsigned char *> PyBytes_AsString(aad), len(aad),
+                              <const unsigned char *> PyBytes_AsString(plaintext), len(plaintext)):
+            raise CryptoError("OSSL_HPKE_seal failed")
+        return PyBytes_FromStringAndSize(<char *> enc, enclen) + PyBytes_FromStringAndSize(<char *> ct, ctlen)
+    finally:
+        if enc != NULL:
+            free(enc)
+        if ct != NULL:
+            free(ct)
+        if ctx != NULL:
+            OSSL_HPKE_CTX_free(ctx)
+
+
+def hpke_open(bytes recipient_secret, bytes info, bytes aad, bytes blob):
+    """HPKE-open a *blob* (enc || ciphertext) with the recipient's 32-byte X25519 secret.
+
+    Returns the plaintext, raises IntegrityError if opening/authentication fails.
+    """
+    if len(recipient_secret) != X25519_SEED_SIZE:
+        raise ValueError("recipient secret key must be 32 bytes")
+    cdef OSSL_HPKE_SUITE suite = _hpke_suite()
+    cdef size_t enclen = OSSL_HPKE_get_public_encap_size(suite)
+    if len(blob) < enclen:
+        raise IntegrityError("HPKE blob too short")
+    cdef bytes enc = blob[:enclen]
+    cdef bytes ct = blob[enclen:]
+    cdef EVP_PKEY *recippriv = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, <const unsigned char *> PyBytes_AsString(recipient_secret), 32)
+    cdef OSSL_HPKE_CTX *ctx = OSSL_HPKE_CTX_new(OSSL_HPKE_MODE_BASE, suite, OSSL_HPKE_ROLE_RECEIVER, NULL, NULL)
+    cdef size_t ptlen = len(ct) + 1
+    cdef unsigned char *pt = <unsigned char *> malloc(ptlen)
+    try:
+        if recippriv == NULL or ctx == NULL or pt == NULL:
+            raise CryptoError("HPKE receiver setup failed")
+        if not OSSL_HPKE_decap(ctx, <const unsigned char *> PyBytes_AsString(enc), len(enc),
+                               recippriv, <const unsigned char *> PyBytes_AsString(info), len(info)):
+            raise IntegrityError("OSSL_HPKE_decap failed")
+        if not OSSL_HPKE_open(ctx, pt, &ptlen,
+                              <const unsigned char *> PyBytes_AsString(aad), len(aad),
+                              <const unsigned char *> PyBytes_AsString(ct), len(ct)):
+            raise IntegrityError("OSSL_HPKE_open failed")
+        return PyBytes_FromStringAndSize(<char *> pt, ptlen)
+    finally:
+        if pt != NULL:
+            free(pt)
+        if ctx != NULL:
+            OSSL_HPKE_CTX_free(ctx)
+        if recippriv != NULL:
+            EVP_PKEY_free(recippriv)
 
 
 cdef class CSPRNG:

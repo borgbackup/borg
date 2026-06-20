@@ -168,6 +168,7 @@ above.
 
 New features:
 
+- monitor: access encrypted/signed monitoring data in the repository, #9788
 - repo-create: split ``--encryption`` into orthogonal options. ``--encryption`` now
   selects only the cipher / AE algorithm (``none``, ``authenticated``, ``aes256-ocb``
   or ``chacha20-poly1305``), the new ``--id-hash`` selects the id hash function

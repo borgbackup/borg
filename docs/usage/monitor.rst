@@ -1,0 +1,1 @@
+.. include:: monitor.rst.inc

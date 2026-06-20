@@ -4,6 +4,7 @@ import logging
 from operator import attrgetter
 import os
 
+from .. import monitoring
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
@@ -231,6 +232,18 @@ class PruneMixIn:
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")
+
+        if not args.dry_run:
+            monitoring.publish_command_report(
+                repository,
+                manifest.key,
+                "prune",
+                stats={
+                    "archives_pruned": archives_deleted,
+                    "archives_kept": len(keep),
+                    "archives_considered": len(archives),
+                },
+            )
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

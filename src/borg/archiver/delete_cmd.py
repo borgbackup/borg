@@ -1,6 +1,7 @@
 import logging
 
 from ._common import with_repository
+from .. import monitoring
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
 from ..helpers.argparsing import ArgumentParser
@@ -32,7 +33,7 @@ class DeleteMixIn:
                 "or just delete the whole repository (might be much faster)."
             )
 
-        deleted = False
+        deleted_count = 0
         logger_list = logging.getLogger("borg.output.list")
         for i, archive_info in enumerate(archive_infos, 1):
             name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
@@ -46,17 +47,24 @@ class DeleteMixIn:
             except KeyError:
                 self.print_warning(f"Archive {name} {hex_id} not found ({i}/{count}).")
             else:
-                deleted = True
+                deleted_count += 1
                 if self.output_list:
                     msg = "Would delete: {} ({}/{})" if dry_run else "Deleted archive: {} ({}/{})"
                     logger_list.info(msg.format(archive_formatted, i, count))
         if dry_run:
             logger.info("Finished dry-run.")
-        elif deleted:
+        elif deleted_count:
             manifest.write()
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         else:
             self.print_warning("Aborted.", wc=None)
+        if not dry_run:
+            monitoring.publish_command_report(
+                repository,
+                manifest.key,
+                "delete",
+                stats={"archives_deleted": deleted_count, "archives_considered": count},
+            )
         return
 
     def build_parser_delete(self, subparsers, common_parser, mid_common_parser):

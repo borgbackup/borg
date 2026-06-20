@@ -54,6 +54,7 @@ def borg_permissions(permissions):
                 "index": "lrwWD",  # WD for index/<HASH> (merge/compaction of incremental indexes)
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "monitoring": "lrw",  # append new report objects (cleanup is done by borg monitor)
                 "packs": "lrw",
             }
         case "write-only":  # mostly no reading
@@ -65,10 +66,13 @@ def borg_permissions(permissions):
                 "index": "lrwWD",  # read allowed so that borg create can check chunk presence for deduplication
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "monitoring": "lw",  # append new report objects (cleanup is done by borg monitor)
                 "packs": "lw",  # no r!
             }
         case "read-only":  # mostly r/o
-            return {"": "lr", "locks": "lrwD"}
+            # "monitoring": lrD lets a restricted monitoring host run "borg monitor --keep"
+            # (read all reports, delete old ones) without any other write access.
+            return {"": "lr", "locks": "lrwD", "monitoring": "lrD"}
         case _:
             raise Error(
                 f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: "
@@ -342,6 +346,7 @@ class Repository:
             "index/": {"levels": [0]},
             "keys/": {"levels": [0]},
             "locks/": {"levels": [0]},
+            "monitoring/": {"levels": [0]},
             "packs/": {"levels": [1]},
         }
         # Get permissions from parameter or environment variable

@@ -10,6 +10,7 @@ from io import TextIOWrapper
 
 from ._common import with_repository, Highlander
 from .. import helpers
+from .. import monitoring
 from ..archive import Archive, is_special, SF_DATALESS
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
@@ -287,7 +288,18 @@ class CreateMixIn:
                     files_changed=args.files_changed,
                 )
                 create_inner(archive, cache, fso)
-        else:
+
+                monitoring.publish_command_report(
+                    repository,
+                    manifest.key,
+                    "create",
+                    hostname=archive.hostname,
+                    username=archive.username,
+                    archive=archive.name,
+                    archive_id=archive.id,
+                    stats=archive.stats.as_dict(),
+                )
+        else:  # dry-run
             create_inner(None, None, None)
 
     def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix):

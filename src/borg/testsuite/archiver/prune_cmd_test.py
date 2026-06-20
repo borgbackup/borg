@@ -526,20 +526,6 @@ def test_prune_keep_int_or_interval(archivers, request, backup_files, keep_arg):
     assert re.search(r"Would prune:\s+test-4", output)
 
 
-@pytest.mark.parametrize("keep_arg", ["--keep-daily=-1", "--keep-daily=all"])
-def test_prune_keep_all(archivers, request, backup_files, keep_arg):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=1))
-    _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(days=2))
-    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
-    assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
-    assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
-    assert re.search(r"Keeping archive \(rule: daily #3\):\s+test-3", output)
-
-
 @pytest.mark.parametrize("keep_arg", ["--keep-secondly=2", "--keep-secondly=2S"])
 def test_prune_keep_secondly_int_or_interval(archivers, request, backup_files, keep_arg):
     archiver = request.getfixturevalue(archivers)
@@ -700,6 +686,20 @@ def test_prune_keep_yearly_int_or_interval(archivers, request, backup_files, kee
     assert re.search(r"Would prune:\s+test-3", output)
     assert re.search(r"Keeping archive \(rule: yearly #3\):\s+test-4", output)
     assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-daily=-1", "--keep-daily=all"])
+def test_prune_keep_all(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=1))
+    _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(days=2))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
+    assert re.search(r"Keeping archive \(rule: daily #3\):\s+test-3", output)
 
 
 def _cmd_prune_error(archiver, *args):

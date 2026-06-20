@@ -304,7 +304,9 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
         corrupted_manifest = corrupt(manifest, 250)
         repository.put_manifest(corrupted_manifest)
         chunk = repository.get(archive.id)
-        corrupted_chunk = corrupt(chunk, -1)
+        # corrupt a byte in the middle of the object: the last byte can land on store-level
+        # framing rather than the authenticated payload, which made the repair flaky on Windows.
+        corrupted_chunk = corrupt(chunk, len(chunk) // 2)
         repository.put(archive.id, corrupted_chunk)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)

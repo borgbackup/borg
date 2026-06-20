@@ -27,7 +27,7 @@ The ``--keep-*`` options accept either a **count** (e.g. ``--keep-daily 7``) or
 a **time interval** (e.g. ``--keep-daily 7d``). A count keeps up to *N* archives
 per period (e.g. the last 7 daily archives), while an interval keeps one
 archive per period within that time span (e.g. one daily archive per day in the
-last 7-day window). When using intervals, you may also specify ``--since`` to
+last 7-day window). When using intervals, you may also specify ``--from`` to
 set the reference timestamp for interval calculation.
 
 ::
@@ -55,7 +55,7 @@ set the reference timestamp for interval calculation.
     $ borg prune -v --list --dry-run --keep-daily=7d
 
     # Same as above, but with a fixed reference timestamp:
-    $ borg prune -v --list --dry-run --since 2025-12-01T00:00:00+02:00 --keep-daily=7d
+    $ borg prune -v --list --dry-run --from 2025-12-01T00:00:00+02:00 --keep-daily=7d
 
     # Keep the last 14 archives using `--keep`:
     $ borg prune -v --list --dry-run --keep 14

@@ -20,7 +20,7 @@ days (e.g. ``7d``), hours (e.g. ``8H``), minutes (e.g. ``30M``), or seconds
 The ``borg prune`` ``--keep-*`` retention options accept either a plain count
 (e.g. ``--keep-daily 7``, keeping up to 7 daily archives) or a time interval
 (e.g. ``--keep-daily 7d``, keeping one daily archive per day within a 7-day window).
-When using interval-based retention, ``--since`` may be specified to set the
+When using interval-based retention, ``--from`` may be specified to set the
 reference timestamp for the interval (defaults to the current time).
 
 Please note that Borg treats months (e.g. ``12m``) as fixed 31-day periods

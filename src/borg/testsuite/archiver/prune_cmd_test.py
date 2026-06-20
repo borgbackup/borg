@@ -154,14 +154,14 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
         "prune",
         "--list",
         "--dry-run",
-        "--since=2026-06-04T16:00:00+00:00",
+        "--from=2026-06-04T16:00:00+00:00",
         "--keep-daily=1w",
         "--keep-weekly=4",
         "--keep-monthly=5m",
         "--keep-yearly=2",
     )
 
-    # 2026-06-04 is kept unconditionally by the --since prefilter.
+    # 2026-06-04 is kept unconditionally by the --from prefilter.
     assert re.search(r"Keeping archive \(rule: skip #1\):\s+backup_2026-06-04", output)
 
     daily_kept = [
@@ -530,14 +530,14 @@ def test_prune_keep_int_or_interval(archivers, request, backup_files, keep_arg):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-    # Two archives at the --since boundary prove the inclusive timestamp check.
+    # Two archives at the --from since boundary prove the inclusive timestamp check.
     _create_archive_dt(archiver, backup_files, "test-1", dt)
     _create_archive_dt(
         archiver, backup_files, "test-2", dt - timedelta(microseconds=999999)
     )  # Would be pruned if `secondly`-rule was active.
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(seconds=1))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(seconds=1, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: skip #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: keep #1\):\s+test-2", output)
     assert re.search(r"Keeping archive \(rule: keep #2\):\s+test-3", output)
@@ -553,7 +553,7 @@ def test_prune_keep_secondly_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(seconds=1, microseconds=999999))
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(seconds=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(seconds=2, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: secondly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: secondly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -570,7 +570,7 @@ def test_prune_keep_minutely_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(minutes=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(minutes=3))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(minutes=3, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: minutely #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: minutely #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -588,7 +588,7 @@ def test_prune_keep_hourly_int_or_interval(archivers, request, backup_files, kee
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(hours=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(hours=3))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(hours=3, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: hourly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: hourly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -606,7 +606,7 @@ def test_prune_keep_daily_int_or_interval(archivers, request, backup_files, keep
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=3))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=3, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -624,7 +624,7 @@ def test_prune_keep_weekly_int_or_interval(archivers, request, backup_files, kee
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=14))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=21))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=21, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: weekly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: weekly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -642,7 +642,7 @@ def test_prune_keep_monthly_int_or_interval(archivers, request, backup_files, ke
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=62))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=93))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=93, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: monthly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: monthly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -661,7 +661,7 @@ def test_prune_keep_13weekly_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=182))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=273))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=273, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: quarterly_13weekly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: quarterly_13weekly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -680,7 +680,7 @@ def test_prune_keep_3monthly_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=275))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=275, microseconds=1))
     # 275d is the interval from dt to the oldest kept monthly archive
-    output = cmd(archiver, "prune", "--list", "--short", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--short", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: quarterly_3monthly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: quarterly_3monthly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -698,7 +698,7 @@ def test_prune_keep_yearly_int_or_interval(archivers, request, backup_files, kee
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=730))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=1095))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=1095, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: yearly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: yearly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -714,7 +714,7 @@ def test_prune_keep_daily_all(archivers, request, backup_files, keep_arg):
     _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=1))
     _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(days=2))
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
     assert re.search(r"Keeping archive \(rule: daily #3\):\s+test-3", output)
@@ -730,7 +730,7 @@ def test_prune_keep_flat_all(archivers, request, backup_files, keep_arg):
     _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(microseconds=2))
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=33333))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: keep #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: keep #2\):\s+test-2", output)
     assert re.search(r"Keeping archive \(rule: keep #3\):\s+test-3", output)
@@ -824,7 +824,7 @@ def test_prune_int_rolling_schedule_oldest_retention():
     assert archives[-1].ts.strftime("%m-%d") == "01-31"
 
 
-def test_prune_since_prefiltered_archives_ignored_in_pruning(archivers, request, backup_files):
+def test_prune_from_prefiltered_archives_ignored_in_pruning(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     dt = datetime(2024, 6, 6, 12, 0, 0, tzinfo=timezone.utc)
@@ -833,7 +833,7 @@ def test_prune_since_prefiltered_archives_ignored_in_pruning(archivers, request,
     _create_archive_dt(archiver, backup_files, "test-b", dt - timedelta(hours=1))
     _create_archive_dt(archiver, backup_files, "test-c", dt - timedelta(days=1))
 
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), "--keep-daily=1")
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), "--keep-daily=1")
 
     # 'test-b' is kept, meaning 'test-a' was entirely skipped for pruning consideration.
     # They would otherwise have occupied the same period.

@@ -107,8 +107,8 @@ PRUNE_QUARTERLY_13WEEKLY = PruningRule("quarterly_13weekly", quarterly_13weekly_
 PRUNE_QUARTERLY_3MONTHLY = PruningRule("quarterly_3monthly", quarterly_3monthly_period_func)
 PRUNE_YEARLY = PruningRule("yearly", pattern_period_func("%Y"))
 
-# Fake rule used to indicate archives skipped by --since
-PRUNE_SINCE = PruningRule("skip", unique_period_func())
+# Fake rule used to indicate archives skipped by --from
+PRUNE_FROM = PruningRule("skip", unique_period_func())
 
 PRUNING_RULES = [
     PRUNE_KEEP,
@@ -182,18 +182,18 @@ class PruneMixIn:
         # Archives to keep along with the rule that ensured them being kept
         keep = {}
 
-        since = getattr(args, PRUNE_SINCE.key)
+        from_timestamp = getattr(args, PRUNE_FROM.key)
         candidate_archives = archives
 
-        if since is not None:
-            base_timestamp = since
+        if from_timestamp is not None:
+            base_timestamp = from_timestamp
 
-            # `--since` is a prefilter: Archives made at or after this time are kept by default. They are not considered
+            # `--from` is a prefilter: Archives made at or after this time are kept by default. They are not considered
             # for pruning at all and thus won't falsely occupy an active retention period.
             for archive in archives:
-                if archive.ts < since:
+                if archive.ts < from_timestamp:
                     break
-                keep[archive] = KeepResult(rule=PRUNE_SINCE, idx=len(keep))
+                keep[archive] = KeepResult(rule=PRUNE_FROM, idx=len(keep))
             candidate_archives = archives[len(keep) :]
         else:
             base_timestamp = datetime.now().astimezone()
@@ -366,7 +366,7 @@ class PruneMixIn:
         policy. It accepts a count or a time interval for retention (e.g.
         ``10`` or ``7d``, ``4w``). With a count it keeps at most that many
         recent archives; with an interval it keeps all archives created within
-        that time window. When ``--since`` is given together with an interval
+        that time window. When ``--from`` is given together with an interval
         retention, the interval is measured backwards from that timestamp
         instead of from the current time. See ``Date and Time`` docs for exact
         INTERVAL format.
@@ -380,14 +380,14 @@ class PruneMixIn:
         period, e.g. one per day or one per month until the retention count is
         met). With a retention interval, they keep one archive per period
         within that time span (e.g. at most one per day in a span of seven
-        days, even if some days had none) -- measured from ``--since`` if given,
+        days, even if some days had none) -- measured from ``--from`` if given,
         otherwise from the current time. Specifying a count of ``-1`` (or the
         word ``all``) means no limit. A zero count or zero-length interval
         keeps nothing.
 
-        The ``--since`` option restricts pruning to archives older than the given
+        The ``--from`` option restricts pruning to archives older than the given
         TIMESTAMP. Archives made at or after this timestamp are kept unconditionally
-        as a pre-filter. When ``--since`` is used together with interval-based
+        as a pre-filter. When ``--from`` is used together with interval-based
         ``--keep-*`` options (e.g. ``--keep-daily 7d``), the interval is measured
         backwards from the given timestamp rather than from the current time.
         Count-based retention does not count the unconditionally kept archives.
@@ -417,10 +417,10 @@ class PruneMixIn:
         older history gradually thins out with time. For example,
         ``--keep-daily 7d --keep-weekly 4w --keep-monthly 6`` keeps an
         archive per day for the past week, per week for the past month, and
-        one per month for six months after that. Combine this with ``--since``
+        one per month for six months after that. Combine this with ``--from``
         to align time windows to calendar boundaries rather than the exact
         moment you run prune for more predictable behavior of coarser rules:
-        ``--keep-daily 7d --keep-weekly 4w --since $(date +%F)``.
+        ``--keep-daily 7d --keep-weekly 4w --from $(date +%F)``.
 
         Count-based retention keeps archives less bound to time. For instance,
         ``--keep-yearly 3`` retains 3 yearly archives however far back they
@@ -476,9 +476,9 @@ class PruneMixIn:
             "Some keys are always present. Note: JSON can only represent text.",
         )
         subparser.add_argument(
-            "--since",
+            "--from",
             metavar="TIMESTAMP",
-            dest=PRUNE_SINCE.key,
+            dest=PRUNE_FROM.key,
             type=timestamp,
             action=Highlander,
             help="only consider archives older than this for pruning",

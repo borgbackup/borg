@@ -21,20 +21,20 @@ borg prune \
   --keep-weekly 4 \
   --keep-monthly 5m \
   --keep-yearly 2 \
-  --since '2026-06-04 16:00'
+  --from '2026-06-04 16:00'
 ```
 
 The `--keep-*` options reflect the intended retention policy exactly. Note the
 different wording in the retention policy for weekly and yearly archives: They
 aren't *interval*-based, but *count*-based.
 
-Another important detail here is `--since`. Without it, intervals would be
+Another important detail here is `--from`. Without it, intervals would be
 calculated relative to the actual start time of `prune` - in this case 16:12.
 Since your backups are always created at 16:00, this 12-minute shift would move
 the cutoff point of intervals and could cause archives near the boundary to
 unexpectedly fall outside the expected time window.
 
-By specifying `--since '2026-06-04 16:00'`, all intervals are anchored to the
+By specifying `--from '2026-06-04 16:00'`, all intervals are anchored to the
 intended reference time (16:00), not the moment `prune` happens to run. This
 ensures stable and predictable retention behavior, independent of when `prune`
 actually runs.
@@ -48,7 +48,7 @@ Archives kept by the `--keep-daily` rule are marked by a "d" to the right,
 archives kept by the `--keep-weekly` rule are marked by a "w" to the right,
 archives kept by the `--keep-monthly` rule are marked by a "m" to the right,
 archives kept by the `--keep-yearly` rule are marked by a "y" to the right, and
-archives kept by the `--since` rule are marked by a "x" to the right.
+archives kept by the `--from` rule are marked by a "x" to the right.
 
 
 Calendar view
@@ -91,25 +91,25 @@ List view
 5. 2026-05-29                           5. 2025-12-31
 6. 2026-05-28
 
-2026-06-04 is additionally kept due to `--since`.
+2026-06-04 is additionally kept due to `--from`.
 
 
 Notes
 -----
 
 The current day's archive is always kept, because `create` ran after the date
-given with `--since`. For `prune`, it's as if this archive doesn't exist (yet).
+given with `--from`. For `prune`, it's as if this archive doesn't exist (yet).
 
 2026-06-03 was skipped, so no archive can be kept with `--keep-daily` for that
 day. Other than with a *count*-based policy, no compensation is made for an
 *interval* like `--keep-daily 1w`, so the rule simply keeps one archive fewer.
 
-2026-05-28 16:00 is exactly one week before `--since`. Since `create` always
+2026-05-28 16:00 is exactly one week before `--from`. Since `create` always
 runs after 16:00, the archive created on 2026-05-28 is kept, too. Without
-`--since`, Borg would cut off at 2026-05-28 16:12 instead, which would likely
-mean that the archive created on 2026-05-28 would be pruned. `--since` ensures
+`--from`, Borg would cut off at 2026-05-28 16:12 instead, which would likely
+mean that the archive created on 2026-05-28 would be pruned. `--from` ensures
 that 2026-05-28 is consistently kept. If you want it consistently pruned, try a
-later reference time, e.g. `--since '2026-06-04 23:59:59'`.
+later reference time, e.g. `--from '2026-06-04 23:59:59'`.
 
 2026-05-31 is considered not only by `--keep-daily`, but by `--keep-weekly`
 and `--keep-monthly`, too. The archive is effectively kept by `--keep-daily`,

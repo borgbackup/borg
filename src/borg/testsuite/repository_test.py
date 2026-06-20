@@ -5,7 +5,7 @@ from hashlib import sha256
 import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
-from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter
+from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, PackReader
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
 
@@ -437,3 +437,32 @@ def test_pack_writer_final_partial_pack_uses_sha256():
     _, pack_id, _, _ = results[0]
     assert pack_id == sha256(cdata).digest()
     assert pack_id != chunk_id
+
+
+def test_pack_reader_from_bytes_walks_objects():
+    obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))
+    obj2 = fchunk(b"d2", meta=b"m2", chunk_id=H(2))
+    pack = obj1 + obj2
+    assert list(PackReader.from_bytes(pack)) == [(H(1), 0, len(obj1)), (H(2), len(obj1), len(obj2))]
+
+
+def test_pack_reader_empty_pack():
+    assert list(PackReader.from_bytes(b"")) == []
+
+
+def test_pack_reader_stops_on_trailing_partial_header():
+    # a truncated trailing header is a clean stop, not an error
+    obj = fchunk(b"data", meta=b"meta", chunk_id=H(3))
+    pack = obj + b"\x00\x00\x00"
+    assert list(PackReader.from_bytes(pack)) == [(H(3), 0, len(obj))]
+
+
+def test_pack_reader_iter_headers_reads_through_store(tmp_path):
+    obj1 = fchunk(b"FIRST", chunk_id=H(47))
+    obj2 = fchunk(b"SECOND", chunk_id=H(48))
+    pack = obj1 + obj2
+    pack_key = "packs/" + bin_to_hex(H(43))
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store(pack_key, pack)
+        reader = PackReader(repository.store, pack_key)
+        assert list(reader.iter_headers()) == [(H(47), 0, len(obj1)), (H(48), len(obj1), len(obj2))]

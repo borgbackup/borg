@@ -32,8 +32,7 @@ from .item import ChunkListEntry
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .manifest import Manifest
 from .platform import SaveFile
-from .repoobj import RepoObj
-from .repository import Repository, StoreObjectNotFound
+from .repository import Repository, StoreObjectNotFound, PackReader
 from .security import SecurityManager, assert_secure  # noqa: F401
 
 
@@ -659,11 +658,11 @@ def build_chunkindex_from_repo(
     # it iterates this same index we are building, so it would recurse. The headers also give each
     # object's real (chunk_id, offset, size), so this is not limited to one object per pack.
     for info in repository.store_list("packs"):
+        # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
+        repository._lock_refresh()
         pack_id = hex_to_bin(info.name)
         pack_name = "packs/" + info.name
-        for chunk_id, obj_offset, obj_size in RepoObj.iter_object_headers_partial(
-            lambda offset, size: repository.store_load(pack_name, offset=offset, size=size)
-        ):
+        for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_name).iter_headers():
             num_chunks += 1
             chunks[chunk_id] = ChunkIndexEntry(
                 flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size

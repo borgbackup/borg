@@ -205,6 +205,42 @@ class PackWriter:
         return results
 
 
+class PackReader:
+    """Walks the object headers of a pack, the read-side counterpart to PackWriter.
+
+    Reads only the fixed headers, not the payloads, so locating every object in a pack
+    costs one short range read per object.
+    """
+
+    def __init__(self, store, key):
+        self.store = store
+        self.key = key  # "packs/<pack_id hex>"
+
+    def iter_headers(self):
+        """Yield (chunk_id, offset, size) for each object, reading the headers from the store."""
+        return self._iter_headers(lambda offset, size: self.store.load(self.key, offset=offset, size=size))
+
+    @classmethod
+    def from_bytes(cls, pack):
+        """Like iter_headers(), but for a pack already held in memory."""
+        return cls._iter_headers(lambda offset, size: pack[offset : offset + size])
+
+    @staticmethod
+    def _iter_headers(read):
+        # read(offset, size) returns pack bytes from the store or from memory; each header gives the
+        # object size, hence the offset of the next one.
+        hdr_size = RepoObj.obj_header.size
+        offset = 0
+        while True:
+            hdr_data = read(offset, hdr_size)
+            if len(hdr_data) < hdr_size:
+                break  # clean EOF, or trailing partial bytes
+            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+            obj_size = hdr_size + hdr.meta_size + hdr.data_size
+            yield hdr.chunk_id, offset, obj_size
+            offset += obj_size
+
+
 class Repository:
     """borgstore-based key/value store."""
 

@@ -7,9 +7,9 @@ to "thin out" over time while retaining most recent archives. Your backup
 script runs `borg create`, immediately followed by `borg prune`.
 
 Assume today is 2026-06-04 and you always start your backups at 16:00. You have
-been creating backup archives starting at 16:00 on most days going back to late
-2025. Today, `borg create` took a little longer than usual. It's 16:12 now and
-you run `borg prune`.
+been creating backup archives starting at 16:00, followed by pruning, on most
+days going back to late 2025. Today, `borg create` took a little longer than
+usual. It's 16:12 now and you run `borg prune`.
 
 You want Borg to keep one archive per day for one week, four weekly archives,
 one archive per month for five months, and two yearly backups. For that, you
@@ -115,16 +115,22 @@ later reference time, e.g. `--since '2026-06-04 23:59:59'`.
 and `--keep-monthly`, too. The archive is effectively kept by `--keep-daily`,
 but how this affects other rules differs between *count*- and *interval*-based
 policies. For *interval*-based rules like `--keep-monthly 5m` it has no effect:
-The rule simply keeps one archive fewer.
+The rule simply keeps one archive fewer in that case.
 
 For *count*-based rules like `--keep-weekly 4` it has an effect: The policy
-tells Borg to keep 4 weekly archives, and if 2026-05-31 is kept by another
-rule already, Borg compensates by keeping an older archive instead.
-Consequently, Borg will also keep the 2026-05-03 archive.
+tells Borg to keep 4 weekly archives. Weekly slots are identified by ISO week
+number; in this example the four kept archives cover weeks 18 through 21. If
+2026-05-31 is kept by another rule already, Borg compensates by keeping an
+older archive instead. Consequently, Borg will also keep the 2026-05-03 archive.
 
-Since 2026-05-24 and 2026-03-31 were skipped, there are no perfect candidates
-for that week and month. Borg chooses the next best candidate, so it keeps
-2026-05-23 as the weekly and 2026-03-30 as the monthly candidate.
+The week 22 slot is consumed by that same 2026-05-31 archive. Any other
+archive from that week is not kept by weekly, even if it falls within the
+daily window boundary. This is why 2026-05-27 is pruned: it has just fallen
+out of the daily window, and no other rule covers it.
+
+Since 2026-05-24 and 2026-03-31 were skipped, Borg substitutes the next best
+candidate for each: 2026-05-23 fills the week 21 weekly slot, and 2026-03-30
+fills the March monthly slot.
 
 The implementation of `--keep-monthly 5m` is somewhat special: Borg defines a
 month as a fixed 31-day period, independent of the actual calendar dates
@@ -144,6 +150,6 @@ Intervals and counts can be mixed freely. Yearly retention in this example is
 done by retention count instead of intervals. A count rule paired with interval
 rules behaves just as it would if all preceding rules were also counts:
 Archives already kept by earlier rules are excluded from consideration. In this
-example there is only one "true" yearly candidate, so the oldest archive at
-2025-11-15 is kept. This oldest archive will be kept until the rolling backup
-scheme reaches "steady state" (when all retention rules are fully satisfied).
+example, every yearly slot is consumed by earlier rules; no true yearly
+candidate remains, so the oldest archive at 2025-11-15 is kept to preserve
+rolling backup semantics.

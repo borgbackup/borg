@@ -123,9 +123,7 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
 
     # All timestamps are at exactly 16:00 UTC (matching the example).
     # Backups on most days from 2025-11-15 to 2026-06-04, with skips on
-    # 2026-03-31 and 2026-06-03. At the inclusive interval boundaries,
-    # 2026-05-28 (1w before --since) and 2025-12-31 (155d before --since)
-    # are kept.
+    # 2026-03-31, 2026-05-24, and 2026-06-03.
     archive_dates = [
         (2025, 11, 15),
         (2025, 12, 31),
@@ -133,6 +131,11 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
         (2026, 2, 28),
         (2026, 3, 30),
         (2026, 4, 30),
+        (2026, 5, 3),
+        (2026, 5, 10),
+        (2026, 5, 17),
+        (2026, 5, 23),
+        (2026, 5, 27),
         (2026, 5, 28),
         (2026, 5, 29),
         (2026, 5, 30),
@@ -153,6 +156,7 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
         "--dry-run",
         "--since=2026-06-04T16:00:00+00:00",
         "--keep-daily=1w",
+        "--keep-weekly=4",
         "--keep-monthly=5m",
         "--keep-yearly=2",
     )
@@ -166,18 +170,27 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
         "backup_2026-05-31",
         "backup_2026-05-30",
         "backup_2026-05-29",
-        # 2026-05-28 is at the inclusive boundary (exactly 1w before --since).
         "backup_2026-05-28",
     ]
     for i, name in enumerate(daily_kept, 1):
         assert re.search(rf"Keeping archive \(rule: daily #{i}\):\s+{name}", output)
+
+    # Weekly W22 slot is consumed by 05-31 (already kept by daily),
+    # so weekly reaches back to W18 to fill all 4 slots.
+    weekly_kept = [
+        "backup_2026-05-23",  # W21 — no Sunday candidate (05-24 skipped)
+        "backup_2026-05-17",  # W20
+        "backup_2026-05-10",  # W19
+        "backup_2026-05-03",  # W18
+    ]
+    for i, name in enumerate(weekly_kept, 1):
+        assert re.search(rf"Keeping archive \(rule: weekly #{i}\):\s+{name}", output)
 
     monthly_kept = [
         "backup_2026-04-30",
         "backup_2026-03-30",
         "backup_2026-02-28",
         "backup_2026-01-31",
-        # 2025-12-31 is at the inclusive boundary (exactly 155d before --since).
         "backup_2025-12-31",
     ]
     for i, name in enumerate(monthly_kept, 1):
@@ -185,6 +198,11 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
 
     # No true yearly candidates remain; only the oldest archive fills the slot.
     assert re.search(r"Keeping archive \(rule: yearly\[oldest\] #1\):\s+backup_2025-11-15", output)
+
+    # 05-27 was kept by daily yesterday (window started 05-26) but falls out
+    # today (window shifted to 05-28). W22 slot is consumed by daily-held 05-31,
+    # so weekly doesn't save it either.
+    assert re.search(r"Would prune:\s+backup_2026-05-27", output)
 
 
 def test_prune_quarterly(archivers, request, backup_files):

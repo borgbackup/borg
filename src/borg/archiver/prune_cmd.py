@@ -64,6 +64,7 @@ def unique_period_func():
     @archive_datetime_dispatch
     def unique_values(_dt):
         """Group archives by an incrementing counter, practically making each archive a group of 1"""
+        # zfill ensures lexicographic ordering matches number ordering in case of comparisons
         return str(next(counter)).zfill(max_digits)
 
     return unique_values

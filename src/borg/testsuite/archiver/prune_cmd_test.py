@@ -729,7 +729,7 @@ def test_prune_keep_flat_all(archivers, request, backup_files, keep_arg):
     _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(microseconds=1))
     _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(microseconds=2))
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
-    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=33333))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=3333))
     output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: keep #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: keep #2\):\s+test-2", output)

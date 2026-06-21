@@ -1,26 +1,36 @@
+from itertools import product
 import json
-import re
-from datetime import datetime, timezone, timedelta
-
 import pytest
-
+import re
+from operator import attrgetter
+from datetime import datetime, timezone, timedelta
 from ...constants import *  # NOQA
-from ...archiver.prune_cmd import prune_split, prune_within
+from ...archiver.prune_cmd import (
+    PRUNING_RULES,
+    prune,
+    PRUNE_DAILY,
+    PRUNE_HOURLY,
+    PRUNE_MINUTELY,
+    PRUNE_MONTHLY,
+    PRUNE_SECONDLY,
+    PRUNE_WEEKLY,
+    PRUNE_YEARLY,
+)
+from ...helpers import CommandError
+from ...manifest import ArchiveInfo
 from . import cmd, RK_ENCRYPTION, generate_archiver_tests
-from ...helpers import interval
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
-def _create_archive_ts(archiver, backup_files, name, y, m, d, H=0, M=0, S=0):
-    cmd(
-        archiver,
-        "create",
-        "--timestamp",
-        datetime(y, m, d, H, M, S, 0).strftime(ISO_FORMAT_NO_USECS),  # naive == local time / local tz
-        name,
-        backup_files,
-    )
+def _create_archive_dt(archiver, backup_files, name, dt, tzinfo=timezone.utc):
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=tzinfo)
+    cmd(archiver, "create", "--timestamp", dt.isoformat(timespec="microseconds"), name, backup_files)
+
+
+def _create_archive_ts(archiver, backup_files, name, y, m, d, H=0, M=0, S=0, us=0, tzinfo=timezone.utc):
+    _create_archive_dt(archiver, backup_files, name, datetime(y, m, d, H, M, S, us, tzinfo=tzinfo))
 
 
 def test_prune_repository(archivers, request, backup_files):
@@ -35,7 +45,8 @@ def test_prune_repository(archivers, request, backup_files):
     output = cmd(archiver, "repo-list")
     assert "test1" in output
     assert "test2" in output
-    cmd(archiver, "prune", "--keep-daily=1")
+    output = cmd(archiver, "prune", "--list", "--keep-daily=1")
+    assert re.search(r"Pruning archive \(1/1\):\s+test1", output)
     output = cmd(archiver, "repo-list")
     assert "test1" not in output
     # The latest archive must still be there:
@@ -103,6 +114,95 @@ def test_prune_repository_example(archivers, request, backup_files):
     # Other backups have been pruned
     for i in range(22, 25):
         assert "test%02d" % i not in output
+
+
+# This test must match docs/misc/prune-example-interval.txt
+def test_prune_repository_example_interval(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # All timestamps are at exactly 16:00 UTC (matching the example).
+    # Backups on most days from 2025-11-15 to 2026-06-04, with skips on
+    # 2026-03-31, 2026-05-24, and 2026-06-03.
+    archive_dates = [
+        (2025, 11, 15),
+        (2025, 12, 31),
+        (2026, 1, 31),
+        (2026, 2, 28),
+        (2026, 3, 30),
+        (2026, 4, 30),
+        (2026, 5, 3),
+        (2026, 5, 10),
+        (2026, 5, 17),
+        (2026, 5, 23),
+        (2026, 5, 27),
+        (2026, 5, 28),
+        (2026, 5, 29),
+        (2026, 5, 30),
+        (2026, 5, 31),
+        (2026, 6, 1),
+        (2026, 6, 2),
+        (2026, 6, 4),
+    ]
+
+    names = [f"backup_{y:04d}-{m:02d}-{d:02d}" for y, m, d in archive_dates]
+    for (y, m, d), name in zip(archive_dates, names):
+        _create_archive_ts(archiver, backup_files, name, y, m, d, H=16)
+
+    output = cmd(
+        archiver,
+        "prune",
+        "--list",
+        "--dry-run",
+        "--from=2026-06-04T16:00:00+00:00",
+        "--keep-daily=1w",
+        "--keep-weekly=4",
+        "--keep-monthly=5m",
+        "--keep-yearly=2",
+    )
+
+    # 2026-06-04 is kept unconditionally by the --from prefilter.
+    assert re.search(r"Keeping archive \(rule: skip #1\):\s+backup_2026-06-04", output)
+
+    daily_kept = [
+        "backup_2026-06-02",
+        "backup_2026-06-01",
+        "backup_2026-05-31",
+        "backup_2026-05-30",
+        "backup_2026-05-29",
+        "backup_2026-05-28",
+    ]
+    for i, name in enumerate(daily_kept, 1):
+        assert re.search(rf"Keeping archive \(rule: daily #{i}\):\s+{name}", output)
+
+    # Weekly W22 slot is consumed by 05-31 (already kept by daily),
+    # so weekly reaches back to W18 to fill all 4 slots.
+    weekly_kept = [
+        "backup_2026-05-23",  # W21 — no Sunday candidate (05-24 skipped)
+        "backup_2026-05-17",  # W20
+        "backup_2026-05-10",  # W19
+        "backup_2026-05-03",  # W18
+    ]
+    for i, name in enumerate(weekly_kept, 1):
+        assert re.search(rf"Keeping archive \(rule: weekly #{i}\):\s+{name}", output)
+
+    monthly_kept = [
+        "backup_2026-04-30",
+        "backup_2026-03-30",
+        "backup_2026-02-28",
+        "backup_2026-01-31",
+        "backup_2025-12-31",
+    ]
+    for i, name in enumerate(monthly_kept, 1):
+        assert re.search(rf"Keeping archive \(rule: monthly #{i}\):\s+{name}", output)
+
+    # No true yearly candidates remain; only the oldest archive fills the slot.
+    assert re.search(r"Keeping archive \(rule: yearly\[oldest\] #1\):\s+backup_2025-11-15", output)
+
+    # 05-27 was kept by daily yesterday (window started 05-26) but falls out
+    # today (window shifted to 05-28). W22 slot is consumed by daily-held 05-31,
+    # so weekly doesn't save it either.
+    assert re.search(r"Would prune:\s+backup_2026-05-27", output)
 
 
 def test_prune_quarterly(archivers, request, backup_files):
@@ -255,152 +355,102 @@ def test_prune_ignore_protected(archivers, request):
     cmd(archiver, "tag", "--set=@PROT", "archive1")  # do not delete archive1!
     cmd(archiver, "create", "archive2", archiver.input_path)
     cmd(archiver, "create", "archive3", archiver.input_path)
-    output = cmd(archiver, "prune", "--list", "--keep-last=1", "--match-archives=sh:archive*")
+    output = cmd(archiver, "prune", "--list", "--keep=1", "--match-archives=sh:archive*")
     assert "archive1" not in output  # @PROT archives are completely ignored.
-    assert re.search(r"Keeping archive \(rule: secondly #1\):\s+archive3", output)
+    assert re.search(r"Keeping archive \(rule: keep #1\):\s+archive3", output)
     assert re.search(r"Pruning archive \(.*?\):\s+archive2", output)
     output = cmd(archiver, "repo-list")
     assert "archive1" in output  # @PROT protected archive1 from deletion
     assert "archive3" in output  # last one
 
 
-class MockArchive:
-    def __init__(self, ts, id):
-        self.ts = ts
-        self.id = id
-
-    def __repr__(self):
-        return f"{self.id}: {self.ts.isoformat()}"
+mock_id = 0
 
 
-# This is the local timezone of the system running the tests.
-# We need this e.g. to construct archive timestamps for the prune tests,
-# because borg prune operates in the local timezone (it first converts the
-# archive timestamp to the local timezone). So, if we want the y/m/d/h/m/s
-# values which prune uses to be exactly the ones we give [and NOT shift them
-# by tzoffset], we need to give the timestamps in the same local timezone.
-# Please note that the timestamps in a real borg archive or manifest are
-# stored in UTC timezone.
-local_tz = datetime.now(tz=timezone.utc).astimezone(tz=None).tzinfo
-
-
-def test_prune_within():
-    def subset(lst, indices):
-        return {lst[i] for i in indices}
-
-    def dotest(test_archives, within, indices):
-        for ta in test_archives, reversed(test_archives):
-            kept_because = {}
-            keep = prune_within(ta, interval(within), kept_because)
-            assert set(keep) == subset(test_archives, indices)
-            assert all("within" == kept_because[a.id][0] for a in keep)
-
-    # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
-    test_offsets = [60, 90 * 60, 150 * 60, 210 * 60, 25 * 60 * 60, 49 * 60 * 60]
-    now = datetime.now(timezone.utc)
-    test_dates = [now - timedelta(seconds=s) for s in test_offsets]
-    test_archives = [MockArchive(date, i) for i, date in enumerate(test_dates)]
-
-    dotest(test_archives, "15S", [])
-    dotest(test_archives, "2M", [0])
-    dotest(test_archives, "1H", [0])
-    dotest(test_archives, "2H", [0, 1])
-    dotest(test_archives, "3H", [0, 1, 2])
-    dotest(test_archives, "24H", [0, 1, 2, 3])
-    dotest(test_archives, "26H", [0, 1, 2, 3, 4])
-    dotest(test_archives, "2d", [0, 1, 2, 3, 4])
-    dotest(test_archives, "50H", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "3d", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1w", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1m", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1y", [0, 1, 2, 3, 4, 5])
+def mock_archive(ts, id=None):
+    """Create an ArchiveInfo with mocked/default values."""
+    global mock_id
+    if id is None:
+        id = mock_id
+        mock_id += 1
+    return ArchiveInfo(name="", id=id, ts=ts.replace(tzinfo=timezone.utc), tags=(), host="", user="")
 
 
 @pytest.mark.parametrize(
-    "rule,num_to_keep,expected_ids",
+    "rule,num_to_keep,expected_indices",
     [
-        ("yearly", 3, (13, 2, 1)),
-        ("monthly", 3, (13, 8, 4)),
-        ("weekly", 2, (13, 8)),
-        ("daily", 3, (13, 8, 7)),
-        ("hourly", 3, (13, 10, 8)),
-        ("minutely", 3, (13, 10, 9)),
-        ("secondly", 4, (13, 12, 11, 10)),
-        ("daily", 0, []),
+        (PRUNE_YEARLY, 3, (12, 1, 0)),
+        (PRUNE_MONTHLY, 3, (12, 7, 3)),
+        (PRUNE_WEEKLY, 2, (12, 7)),
+        (PRUNE_DAILY, 3, (12, 7, 6)),
+        (PRUNE_HOURLY, 3, (12, 9, 7)),
+        (PRUNE_MINUTELY, 3, (12, 9, 8)),
+        (PRUNE_SECONDLY, 4, (12, 11, 10, 9)),
+        (PRUNE_DAILY, 0, []),
+        (PRUNE_DAILY, -1, (12, 7, 6, 5, 4, 3, 2, 1, 0)),
     ],
 )
-def test_prune_split(rule, num_to_keep, expected_ids):
-    def subset(lst, ids):
-        return {i for i in lst if i.id in ids}
-
+def test_prune(rule, num_to_keep, expected_indices):
     archives = [
         # years apart
-        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
-        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=local_tz), 2),
-        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=local_tz), 3),
+        mock_archive(datetime(2015, 1, 1, 10, 0, 0)),
+        mock_archive(datetime(2016, 1, 1, 10, 0, 0)),
+        mock_archive(datetime(2017, 1, 1, 10, 0, 0)),
         # months apart
-        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=local_tz), 4),
-        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=local_tz), 5),
+        mock_archive(datetime(2017, 2, 1, 10, 0, 0)),
+        mock_archive(datetime(2017, 3, 1, 10, 0, 0)),
         # days apart
-        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=local_tz), 6),
-        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=local_tz), 7),
-        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=local_tz), 8),
+        mock_archive(datetime(2017, 3, 2, 10, 0, 0)),
+        mock_archive(datetime(2017, 3, 3, 10, 0, 0)),
+        mock_archive(datetime(2017, 3, 4, 10, 0, 0)),
         # minutes apart
-        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=local_tz), 9),
-        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=local_tz), 10),
+        mock_archive(datetime(2017, 10, 1, 9, 45, 0)),
+        mock_archive(datetime(2017, 10, 1, 9, 55, 0)),
         # seconds apart
-        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=local_tz), 11),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=local_tz), 12),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=local_tz), 13),
+        mock_archive(datetime(2017, 10, 1, 10, 0, 1)),
+        mock_archive(datetime(2017, 10, 1, 10, 0, 3)),
+        mock_archive(datetime(2017, 10, 1, 10, 0, 5)),
     ]
-    kept_because = {}
-    keep = prune_split(archives, rule, num_to_keep, kept_because)
+    keep = prune(sorted(archives, key=attrgetter("ts"), reverse=True), rule, num_to_keep, None, False)
 
-    assert set(keep) == subset(archives, expected_ids)
-    for item in keep:
-        assert kept_because[item.id][0] == rule
+    assert set(keep) == {archives[i] for i in expected_indices}
+    assert all(result.rule == rule for _, result in keep.items())
 
 
-def test_prune_split_keep_oldest():
-    def subset(lst, ids):
-        return {i for i in lst if i.id in ids}
-
+def test_prune_keep_oldest():
     archives = [
         # oldest backup, but not last in its year
-        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
+        mock_archive(datetime(2018, 1, 1, 10, 0, 0)),
         # an interim backup
-        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=local_tz), 2),
+        mock_archive(datetime(2018, 12, 30, 10, 0, 0)),
         # year-end backups
-        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=local_tz), 3),
-        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=local_tz), 4),
+        mock_archive(datetime(2018, 12, 31, 10, 0, 0)),
+        mock_archive(datetime(2019, 12, 31, 10, 0, 0)),
     ]
+    sorted_archives = sorted(archives, key=attrgetter("ts"), reverse=True)
 
     # Keep oldest when retention target can't otherwise be met
-    kept_because = {}
-    keep = prune_split(archives, "yearly", 3, kept_because)
+    keep = prune(sorted_archives, PRUNE_YEARLY, 3, None, True)
 
-    assert set(keep) == subset(archives, [1, 3, 4])
-    assert kept_because[1][0] == "yearly[oldest]"
-    assert kept_because[3][0] == "yearly"
-    assert kept_because[4][0] == "yearly"
+    assert keep[archives[0]].rule.key == "yearly" and keep[archives[0]].oldest is True
+    assert keep[archives[2]].rule.key == "yearly" and keep[archives[2]].oldest is False
+    assert keep[archives[3]].rule.key == "yearly" and keep[archives[3]].oldest is False
+    assert len(keep) == 3
 
     # Otherwise, prune it
-    kept_because = {}
-    keep = prune_split(archives, "yearly", 2, kept_because)
+    keep = prune(sorted_archives, PRUNE_YEARLY, 2, None, True)
 
-    assert set(keep) == subset(archives, [3, 4])
-    assert kept_because[3][0] == "yearly"
-    assert kept_because[4][0] == "yearly"
+    assert keep[archives[2]].rule.key == "yearly" and keep[archives[2]].oldest is False
+    assert keep[archives[3]].rule.key == "yearly" and keep[archives[3]].oldest is False
+    assert len(keep) == 2
 
 
-def test_prune_split_no_archives():
+def test_prune_no_archives():
     archives = []
 
-    kept_because = {}
-    keep = prune_split(archives, "yearly", 3, kept_because)
+    keep = prune(archives, PRUNE_YEARLY, 3, None, False)
 
-    assert keep == []
-    assert kept_because == {}
+    assert keep == {}
 
 
 def test_prune_list_with_metadata_format(archivers, request, backup_files):
@@ -437,6 +487,7 @@ def test_prune_json(archivers, request, backup_files):
     assert kept[0]["name"] == "test2"
     assert kept[0]["keep_rule"] == "daily"
     assert kept[0]["kept_archive_number"] == 1
+    assert not kept[0]["kept_oldest"]
     assert "deleted_archive_number" not in kept[0]
     assert pruned[0]["name"] == "test1"
     assert pruned[0]["deleted_archive_number"] == 1
@@ -460,3 +511,368 @@ def test_prune_json_list_pruned(archivers, request, backup_files):
     assert archives[0]["name"] == "test1"
     assert archives[0]["kept"] is False
     assert archives[0]["deleted_archive_number"] == 1
+
+
+def test_prune_keep_same_second(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", backup_files)
+    cmd(archiver, "create", "test2", backup_files)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep=2")
+    # Both archives are kept even though they have the same timestamp to the second. Would previously have failed with
+    # old behavior of --keep-last. Archives sorted on seconds, order is undefined.
+    assert re.search(r"Keeping archive \(rule: keep #\d\):\s+test1", output)
+    assert re.search(r"Keeping archive \(rule: keep #\d\):\s+test2", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep=2", "--keep=1S"])
+def test_prune_keep_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    # Two archives at the --from since boundary prove the inclusive timestamp check.
+    _create_archive_dt(archiver, backup_files, "test-1", dt)
+    _create_archive_dt(
+        archiver, backup_files, "test-2", dt - timedelta(microseconds=999999)
+    )  # Would be pruned if `secondly`-rule was active.
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(seconds=1))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(seconds=1, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: skip #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: keep #1\):\s+test-2", output)
+    assert re.search(r"Keeping archive \(rule: keep #2\):\s+test-3", output)
+    assert re.search(r"Would prune:\s+test-4", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-secondly=2", "--keep-secondly=2S"])
+def test_prune_keep_secondly_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(seconds=1))
+    _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(seconds=1, microseconds=999999))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(seconds=2))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(seconds=2, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: secondly #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: secondly #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Would prune:\s+test-4", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-minutely=3", "--keep-minutely=3M"])
+def test_prune_keep_minutely_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 23, 59, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(minutes=1))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(minutes=2)).replace(second=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(minutes=2))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(minutes=3))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(minutes=3, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: minutely #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: minutely #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: minutely #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-hourly=3", "--keep-hourly=3H"])
+def test_prune_keep_hourly_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 23, 0, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(hours=1))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(hours=2)).replace(microsecond=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(hours=2))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(hours=3))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(hours=3, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: hourly #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: hourly #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: hourly #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-daily=3", "--keep-daily=3d"])
+def test_prune_keep_daily_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=1))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(days=2)).replace(second=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=2))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=3))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=3, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: daily #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-weekly=3", "--keep-weekly=3w"])
+def test_prune_keep_weekly_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=7))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(days=14)).replace(microsecond=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=14))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=21))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=21, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: weekly #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: weekly #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: weekly #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-monthly=3", "--keep-monthly=3m"])
+def test_prune_keep_monthly_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=31))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(days=62)).replace(microsecond=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=62))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=93))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=93, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: monthly #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: monthly #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: monthly #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+# 2023-12-31 is Sunday, week 52. Makes these week calculations a little easier.
+@pytest.mark.parametrize("keep_arg", ["--keep-13weekly=3", "--keep-13weekly=39w"])
+def test_prune_keep_13weekly_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=91))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(days=182)).replace(microsecond=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=182))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=273))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=273, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: quarterly_13weekly #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: quarterly_13weekly #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: quarterly_13weekly #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-3monthly=3", "--keep-3monthly=275d"])
+def test_prune_keep_3monthly_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=92))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(days=184)).replace(microsecond=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=184))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=275))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=275, microseconds=1))
+    # 275d is the interval from dt to the oldest kept monthly archive
+    output = cmd(archiver, "prune", "--list", "--short", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: quarterly_3monthly #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: quarterly_3monthly #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: quarterly_3monthly #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-yearly=3", "--keep-yearly=3y"])
+def test_prune_keep_yearly_int_or_interval(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=365))
+    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(days=730)).replace(microsecond=1))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=730))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=1095))
+    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=1095, microseconds=1))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: yearly #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: yearly #2\):\s+test-2", output)
+    assert re.search(r"Would prune:\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: yearly #3\):\s+test-4", output)
+    assert re.search(r"Would prune:\s+test-5", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep-daily=-1", "--keep-daily=all"])
+def test_prune_keep_daily_all(archivers, request, backup_files, keep_arg):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=1))
+    _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(days=2))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
+    assert re.search(r"Keeping archive \(rule: daily #3\):\s+test-3", output)
+
+
+@pytest.mark.parametrize("keep_arg", ["--keep=-1", "--keep=all"])
+def test_prune_keep_flat_all(archivers, request, backup_files, keep_arg):
+    """--keep=all / --keep=-1 keeps every archive."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(microseconds=1))
+    _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(microseconds=2))
+    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
+    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=3333))
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    assert re.search(r"Keeping archive \(rule: keep #1\):\s+test-1", output)
+    assert re.search(r"Keeping archive \(rule: keep #2\):\s+test-2", output)
+    assert re.search(r"Keeping archive \(rule: keep #3\):\s+test-3", output)
+    assert re.search(r"Keeping archive \(rule: keep #4\):\s+test-4", output)
+
+
+def _cmd_prune_error(archiver, *args):
+    """Run prune expecting a CommandError. Returns error string for assertions."""
+    if archiver.FORK_DEFAULT:
+        return cmd(archiver, "prune", *args, exit_code=CommandError().exit_code)
+    with pytest.raises(CommandError) as error:
+        cmd(archiver, "prune", *args)
+    return str(error.value)
+
+
+def test_prune_no_args(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = _cmd_prune_error(archiver)
+
+    assert re.search(r"At least one of the .* settings must be specified.", output)
+    assert re.search(r"keep(?!-)", output)
+    flags = ["secondly", "minutely", "hourly", "daily", "weekly", "monthly", "yearly", "13weekly", "3monthly"]
+    for flag in flags:
+        assert f"keep-{flag}" in output
+
+
+@pytest.mark.parametrize("keep_arg,value", list(product([rule.key for rule in PRUNING_RULES], ["0", "0S"])))
+def test_prune_all_zero_args_one(archivers, request, keep_arg, value):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    arg_with_prefix = "--keep" if keep_arg == "keep" else f"--keep-{keep_arg.replace('quarterly_', '')}"
+    output = _cmd_prune_error(archiver, f"{arg_with_prefix}={value}")
+    assert re.search(r"None of the .* settings have a positive value. At least one must be non-zero.", output)
+
+
+def test_prune_all_zero_multiple_multiple(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    output = _cmd_prune_error(archiver, "--keep-secondly=0S", "--keep-daily=0")
+    assert re.search(r"None of the .* settings have a positive value. At least one must be non-zero.", output)
+
+
+@pytest.mark.parametrize(
+    "lo_val,hi_val",
+    [("14d", "7d"), ("-1", "7d"), ("-1", "1"), ("-1", "-1"), ("all", "7d"), ("all", "1"), ("all", "-1")],
+)
+def test_prune_warns_on_redundant_interval_flags(archivers, request, lo_val, hi_val):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = _cmd_prune_error(archiver, "--dry-run", f"--keep-hourly={lo_val}", f"--keep-daily={hi_val}")
+    assert "hourly=" in output
+    assert "daily=" in output
+    assert "effectively useless" in output
+
+
+@pytest.mark.parametrize("lo_val,hi_val", [("7d", "14d"), ("7d", "-1"), ("1", "-1"), ("7d", "all"), ("1", "all")])
+def test_prune_does_not_warn_on_normal_interval_flags(archivers, request, lo_val, hi_val):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "prune", "--dry-run", f"--keep-hourly={lo_val}", f"--keep-daily={hi_val}")
+    assert "effectively useless" not in output
+
+
+def test_prune_int_rolling_schedule_oldest_retention():
+    daily_n = 6
+    monthly_n = 3
+    start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+    previous_archives = []
+    archives = []
+
+    for day_offset in range(97):
+        backup_ts = start_date + timedelta(days=day_offset)
+        previous_archives = archives
+        archives = [mock_archive(backup_ts, day_offset), *archives]
+
+        keep = {}
+        keep |= prune(archives, PRUNE_DAILY, daily_n, None, False, keep)
+        keep |= prune(archives, PRUNE_MONTHLY, monthly_n, None, True, keep)
+
+        archives = sorted(keep.keys(), key=lambda a: a.ts, reverse=True)
+
+    # It is now 2024-04-06. The last run should have just pruned the jan-01
+    # archive since the monthly retention count is now satisfied at jan-31. It
+    # was kept until now to satisfy the oldest-rule.
+
+    assert previous_archives[-1].ts.strftime("%m-%d") == "01-01"
+    assert archives[-1].ts.strftime("%m-%d") == "01-31"
+
+
+def test_prune_from_prefiltered_archives_ignored_in_pruning(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2024, 6, 6, 12, 0, 0, tzinfo=timezone.utc)
+
+    _create_archive_dt(archiver, backup_files, "test-a", dt + timedelta(hours=1))
+    _create_archive_dt(archiver, backup_files, "test-b", dt - timedelta(hours=1))
+    _create_archive_dt(archiver, backup_files, "test-c", dt - timedelta(days=1))
+
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), "--keep-daily=1")
+
+    # 'test-b' is kept, meaning 'test-a' was entirely skipped for pruning consideration.
+    # They would otherwise have occupied the same period.
+    assert re.search(r"Keeping archive \(rule: skip #1\):\s+test-a", output)
+    assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-b", output)
+
+    assert re.search(r"Would prune:\s+test-c", output)
+
+
+def test_prune_interval_rolling_schedule_oldest_retention():
+    daily_interval = timedelta(days=6)
+    monthly_interval = timedelta(days=31 * 3)  # Matching --keep-monthly=3m after argument parsing
+    start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+    previous_archives = []
+    archives = []
+
+    for day_offset in range(95):
+        backup_ts = start_date + timedelta(days=day_offset)
+        previous_archives = archives
+        archives = [mock_archive(backup_ts, day_offset), *archives]
+
+        keep = {}
+        keep |= prune(archives, PRUNE_DAILY, daily_interval, backup_ts, False, keep)
+        keep |= prune(archives, PRUNE_MONTHLY, monthly_interval, backup_ts, True, keep)
+
+        print(
+            f"For backup+prune at {backup_ts.strftime('%m-%d')} ({day_offset})"
+            f" the following {len(archives)} archives are kept:"
+        )
+        for a, result in keep.items():
+            print(f"    {a.id}: {a.ts.strftime('%Y-%m-%d')} {result}")
+
+        archives = sorted(keep.keys(), key=lambda a: a.ts, reverse=True)
+
+    # It is now 2024-04-04. On this final run jan-01 falls outside the
+    # 93d monthly interval and is pruned. It was kept until now by the
+    # oldest-retention rule — on 2024-04-03 it was exactly at the
+    # inclusive boundary and retained as oldest.
+
+    assert previous_archives[-1].ts.strftime("%m-%d") == "01-01"
+    assert archives[-1].ts.strftime("%m-%d") == "01-31"

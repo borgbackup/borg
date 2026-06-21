@@ -813,10 +813,15 @@ class Repository:
     def replace_pack(self, old_pack_id, keep_ids):
         """Rewrite pack <old_pack_id> to keep only the objects in <keep_ids>, then delete the old pack.
 
-        Returns the new pack_id, or None when <keep_ids> is empty (the pack is dropped, not replaced).
+        Returns the new pack_id, None when <keep_ids> is empty (the pack is dropped, not replaced),
+        or <old_pack_id> when the kept objects reproduce the old pack exactly (nothing changes on disk).
         The kept objects are copied into the new pack via store.defrag and their chunk index entries are
         updated to point at it. The caller must delete the index entries of the dropped objects --
         replace_pack only ever sees the survivors.
+
+        Only the in-memory chunk index is updated here. The caller runs under an exclusive lock and owns
+        index durability: it must invalidate any cached on-disk index before calling, so an interrupted
+        run rebuilds the index from the actual packs, and write the index back when done, as compact does.
         """
         self._lock_refresh()
         old_key = "packs/" + bin_to_hex(old_pack_id)
@@ -844,10 +849,10 @@ class Repository:
             offset += size
         self.chunks.update_pack_info(results)
 
-        # we stored the new pack and repointed the index before this, so an interrupted call never
-        # leaves the index pointing at a pack we already deleted. if defrag reproduced the old pack
-        # (every object kept, in order) its name equals old_pack_id, and deleting it would drop what
-        # we just kept, so skip the delete in that case.
+        # delete the old pack only after the new one is stored and the index repointed, so the kept
+        # bytes always live in at least one pack on the store and an interrupted run can lose nothing.
+        # when defrag reproduces the old pack exactly (every object kept, in order) the new name equals
+        # old_pack_id, and deleting it would drop what we just kept, so skip the delete in that case.
         if new_pack_id != old_pack_id:
             self.store_delete(old_key)
         return new_pack_id

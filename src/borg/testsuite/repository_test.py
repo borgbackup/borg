@@ -184,6 +184,24 @@ def test_replace_pack_drops_whole_pack(repo_fixtures, request):
         assert bin_to_hex(old_pack_id) not in [info.name for info in repository.store_list("packs")]
 
 
+def test_replace_pack_keep_all_is_noop(repo_fixtures, request):
+    # Keeping every object in stored order reproduces the same pack, so its sha256 name is unchanged
+    # and the old pack must not be deleted. Passing the ids out of order must give the same result,
+    # since replace_pack sorts the survivors by offset before copying them forward.
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # buffer 2 objects into one pack
+        repository.put(H(0), fchunk(b"DATA0", chunk_id=H(0)))
+        repository.put(H(1), fchunk(b"DATA1", chunk_id=H(1)))  # 2nd put reaches max_count and flushes
+        old_pack_id = repository.chunks[H(0)].pack_id
+
+        new_pack_id = repository.replace_pack(old_pack_id, [H(1), H(0)])  # out of order on purpose
+
+        assert new_pack_id == old_pack_id  # reproduced pack keeps its name, the delete was skipped
+        assert pdchunk(repository.get(H(0))) == b"DATA0"
+        assert pdchunk(repository.get(H(1))) == b"DATA1"
+        assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
+
+
 def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):

@@ -810,51 +810,68 @@ class Repository:
             raise self.ObjectNotFound(id, str(self._location))
         logger.warning("ignoring deletion of %s in %s", bin_to_hex(id), bin_to_hex(entry.pack_id))
 
-    def replace_pack(self, old_pack_id, keep_ids):
-        """Rewrite pack <old_pack_id> to keep only the objects in <keep_ids>, then delete the old pack.
+    def compact_pack(self, pack_id, keep_ids, drop_ids):
+        """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
-        Returns the new pack_id, None when <keep_ids> is empty (the pack is dropped, not replaced),
-        or <old_pack_id> when the kept objects reproduce the old pack exactly (nothing changes on disk).
-        The kept objects are copied into the new pack via store.defrag and their chunk index entries are
-        updated to point at it. The caller must delete the index entries of the dropped objects --
-        replace_pack only ever sees the survivors.
+        keep_ids and drop_ids must together cover the whole pack (asserted: their ranges tile it with no
+        gap or overlap). Kept objects are copied into a new pack via store.defrag and repointed in the
+        chunk index; dropped objects' index entries are removed.
 
-        Only the in-memory chunk index is updated here. The caller runs under an exclusive lock and owns
-        index durability: it must invalidate any cached on-disk index before calling, so an interrupted
-        run rebuilds the index from the actual packs, and write the index back when done, as compact does.
+        Returns the new pack_id, None if nothing is kept (pack dropped), or <pack_id> unchanged if the
+        kept objects reproduce the old pack (same sha256 name, nothing to delete).
+
+        Updates the in-memory chunk index only. The caller holds the exclusive lock and owns index
+        durability: invalidate the cached index before calling, write it back after, as compact does.
         """
         self._lock_refresh()
-        old_key = "packs/" + bin_to_hex(old_pack_id)
-        if not keep_ids:  # whole pack unused: drop it, nothing to copy forward
-            self.store_delete(old_key)
-            return None
+        pack_key = "packs/" + bin_to_hex(pack_id)
 
-        # look up each survivor's location, ordered by offset so defrag copies the old pack sequentially
-        survivors = []
+        # collect every object's range, tagged with whether it is kept, ordered by offset.
+        located = []  # (obj_offset, obj_id, obj_size, keep)
         for keep_id in keep_ids:
             entry = self.chunks[keep_id]
-            assert entry.pack_id == old_pack_id, f"{bin_to_hex(keep_id)} is not in pack {bin_to_hex(old_pack_id)}"
-            survivors.append((entry.obj_offset, keep_id, entry.obj_size))
-        survivors.sort()
+            assert entry.pack_id == pack_id, f"{bin_to_hex(keep_id)} is not in pack {bin_to_hex(pack_id)}"
+            located.append((entry.obj_offset, keep_id, entry.obj_size, True))
+        for drop_id in drop_ids:
+            entry = self.chunks[drop_id]
+            assert entry.pack_id == pack_id, f"{bin_to_hex(drop_id)} is not in pack {bin_to_hex(pack_id)}"
+            located.append((entry.obj_offset, drop_id, entry.obj_size, False))
+        located.sort()
 
-        # defrag concatenates the survivor ranges into a new pack named sha256(content), like PackWriter
-        sources = [(bin_to_hex(old_pack_id), offset, size) for offset, _, size in survivors]
+        # keep + drop must tile the whole pack; pick out the survivors in the same pass.
+        survivors = []  # (obj_offset, obj_id, obj_size), offset-ordered
+        covered = 0
+        for offset, obj_id, size, keep in located:
+            assert offset == covered, f"gap or overlap in pack {bin_to_hex(pack_id)} at offset {covered}"
+            covered += size
+            if keep:
+                survivors.append((offset, obj_id, size))
+        assert covered == self.store.info(pack_key).size, f"pack {bin_to_hex(pack_id)} not fully covered"
+
+        for drop_id in drop_ids:  # remove dropped objects from the index; their bytes are not copied forward
+            del self.chunks[drop_id]
+
+        if not survivors:  # nothing kept: drop the pack, no replacement
+            self.store_delete(pack_key)
+            return None
+
+        # copy survivors into a new pack (named sha256 of its content)
+        sources = [(bin_to_hex(pack_id), offset, size) for offset, _, size in survivors]
         new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
 
-        # point the kept objects at the new pack; each new offset is the running sum of the kept sizes
-        results = []
+        # repoint survivors at the new pack; new offset is the running sum of kept sizes
+        new_locations = []
         offset = 0
         for _, keep_id, size in survivors:
-            results.append((keep_id, new_pack_id, offset, size))
+            new_locations.append((keep_id, new_pack_id, offset, size))
             offset += size
-        self.chunks.update_pack_info(results)
+        self.chunks.update_pack_info(new_locations)
 
-        # delete the old pack only after the new one is stored and the index repointed, so the kept
-        # bytes always live in at least one pack on the store and an interrupted run can lose nothing.
-        # when defrag reproduces the old pack exactly (every object kept, in order) the new name equals
-        # old_pack_id, and deleting it would drop what we just kept, so skip the delete in that case.
-        if new_pack_id != old_pack_id:
-            self.store_delete(old_key)
+        # delete the old pack last, after the new one is stored and indexed, so kept bytes are never the
+        # only copy. if every object was kept in order, defrag reproduced the pack (new_pack_id == pack_id)
+        # and deleting it would drop what we kept, so skip.
+        if new_pack_id != pack_id:
+            self.store_delete(pack_key)
         return new_pack_id
 
     def break_lock(self):

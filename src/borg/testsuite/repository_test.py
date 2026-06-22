@@ -142,61 +142,67 @@ def test_consistency(repo_fixtures, request):
         assert pdchunk(repository.get(H(0))) == b"bar"
 
 
-def test_replace_pack_copy_forward(repo_fixtures, request):
-    # Force several objects into one pack (N>1), keep a subset, and check the survivors still read
-    # back correctly while the removed object and its bytes are gone.
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        repository._pack_writer.max_count = 3  # buffer 3 objects into one pack
-        chunk0 = fchunk(b"DATA0", chunk_id=H(0))
-        chunk2 = fchunk(b"DATA2", chunk_id=H(2))
-        repository.put(H(0), chunk0)
-        repository.put(H(1), fchunk(b"DATA1", chunk_id=H(1)))
-        repository.put(H(2), chunk2)  # 3rd put reaches max_count and flushes the pack
+def build_one_pack(repository, objects):
+    # Bundle several objects (N>1) into one pack: max_count == object count makes the last put flush the
+    # whole batch as a single pack. Caller reopens afterwards to read it back from disk.
+    with repository:
+        repository._pack_writer.max_count = len(objects)
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+
+
+def test_compact_pack_copy_forward(repo_fixtures, request):
+    # Keep a subset of a multi-object pack: survivors must read back, the dropped object and its bytes gone.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    chunk2 = fchunk(b"DATA2", chunk_id=H(2))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1), (H(2), chunk2)])
+    with reopen(repository) as repository:
         old_pack_id = repository.chunks[H(0)].pack_id
         assert repository.chunks[H(1)].pack_id == old_pack_id
         assert repository.chunks[H(2)].pack_id == old_pack_id
 
-        new_pack_id = repository.replace_pack(old_pack_id, [H(0), H(2)])
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids=[H(0), H(2)], drop_ids=[H(1)])
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
-        # survivors read back intact, proving the repointed pack_id and recomputed offsets
         assert pdchunk(repository.get(H(0))) == b"DATA0"
         assert pdchunk(repository.get(H(2))) == b"DATA2"
-        # the caller drops the removed object's index entry; it is no longer resolvable afterwards
-        del repository.chunks[H(1)]
-        assert repository.get(H(1), raise_missing=False) is None
-        # old pack gone, new pack holds only the two survivors' bytes
+        assert repository.get(H(1), raise_missing=False) is None  # compact_pack removed its index entry
         packs = {info.name: info.size for info in repository.store_list("packs")}
         assert bin_to_hex(old_pack_id) not in packs
-        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk2)
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk2)  # only the survivors' bytes
 
 
-def test_replace_pack_drops_whole_pack(repo_fixtures, request):
-    # An empty keep list drops the pack outright, without writing a replacement.
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        repository.put(H(0), fchunk(b"DATA", chunk_id=H(0)))  # N=1: one object per pack
+def test_compact_pack_drops_whole_pack(repo_fixtures, request):
+    # Dropping every object removes the pack and clears its index entries. N>1 pack, not the max_count default.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    with reopen(repository) as repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        assert repository.replace_pack(old_pack_id, []) is None
+        assert repository.compact_pack(old_pack_id, keep_ids=[], drop_ids=[H(0), H(1)]) is None
 
-        del repository.chunks[H(0)]
         assert repository.get(H(0), raise_missing=False) is None
+        assert repository.get(H(1), raise_missing=False) is None
         assert bin_to_hex(old_pack_id) not in [info.name for info in repository.store_list("packs")]
 
 
-def test_replace_pack_keep_all_is_noop(repo_fixtures, request):
-    # Keeping every object in stored order reproduces the same pack, so its sha256 name is unchanged
-    # and the old pack must not be deleted. Passing the ids out of order must give the same result,
-    # since replace_pack sorts the survivors by offset before copying them forward.
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        repository._pack_writer.max_count = 2  # buffer 2 objects into one pack
-        repository.put(H(0), fchunk(b"DATA0", chunk_id=H(0)))
-        repository.put(H(1), fchunk(b"DATA1", chunk_id=H(1)))  # 2nd put reaches max_count and flushes
+def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
+    # Keeping every object reproduces the same pack: same sha256 name, old pack not deleted. Ids passed
+    # out of order must give the same result, since compact_pack sorts survivors by offset.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    with reopen(repository) as repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        new_pack_id = repository.replace_pack(old_pack_id, [H(1), H(0)])  # out of order on purpose
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids=[H(1), H(0)], drop_ids=[])  # out of order
 
-        assert new_pack_id == old_pack_id  # reproduced pack keeps its name, the delete was skipped
+        assert new_pack_id == old_pack_id
         assert pdchunk(repository.get(H(0))) == b"DATA0"
         assert pdchunk(repository.get(H(1))) == b"DATA1"
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]

@@ -695,8 +695,7 @@ class Repository:
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
         objs_errors = index_errors + pack_errors
         logger.info(
-            f"Checked {index_files} index files ({index_errors} errors) "
-            f"and {pack_files} packs ({pack_errors} errors)."
+            f"Checked {index_files} index files ({index_errors} errors) and {pack_files} packs ({pack_errors} errors)."
         )
         if objs_errors == 0:
             logger.info(f"Finished {mode} repository check, no problems found.")
@@ -810,6 +809,70 @@ class Repository:
         if entry is None:
             raise self.ObjectNotFound(id, str(self._location))
         logger.warning("ignoring deletion of %s in %s", bin_to_hex(id), bin_to_hex(entry.pack_id))
+
+    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set):
+        """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
+
+        keep_ids and drop_ids are sets of chunk ids that must together cover the whole pack (asserted:
+        their ranges tile it with no gap or overlap, and their intersection is empty). Kept objects are
+        copied into a new pack via store.defrag and repointed in the chunk index; dropped objects' index
+        entries are removed.
+
+        Returns the new pack_id, None if nothing is kept (pack dropped), or <pack_id> unchanged if the
+        kept objects reproduce the old pack (same sha256 name, nothing to delete).
+
+        Updates the in-memory chunk index only. The caller holds the exclusive lock and owns index
+        durability: invalidate the cached index before calling, write it back after, as compact does.
+        """
+        self._lock_refresh()
+        pack_key = "packs/" + bin_to_hex(pack_id)
+
+        assert keep_ids & drop_ids == set(), "an id cannot appear in both keep_ids and drop_ids"
+
+        # collect every object's range, tagged with whether it is kept, ordered by offset.
+        located = []  # (obj_offset, obj_id, obj_size, keep)
+        for obj_id in keep_ids | drop_ids:
+            keep = obj_id in keep_ids
+            entry = self.chunks[obj_id]
+            assert entry.pack_id == pack_id, f"{bin_to_hex(obj_id)} is not in pack {bin_to_hex(pack_id)}"
+            located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
+        located.sort()
+
+        # keep + drop must tile the whole pack; collect the objects to keep in the same pass.
+        kept = []  # (obj_offset, obj_id, obj_size), offset-ordered
+        covered = 0
+        for offset, obj_id, size, keep in located:
+            assert offset == covered, f"gap or overlap in pack {bin_to_hex(pack_id)} at offset {covered}"
+            covered += size
+            if keep:
+                kept.append((offset, obj_id, size))
+        assert covered == self.store.info(pack_key).size, f"pack {bin_to_hex(pack_id)} not fully covered"
+
+        for drop_id in drop_ids:  # remove dropped objects from the index; their bytes are not copied forward
+            del self.chunks[drop_id]
+
+        if not kept:  # nothing kept: drop the pack, no replacement
+            self.store_delete(pack_key)
+            return None
+
+        # copy kept objects into a new pack (named sha256 of its content)
+        sources = [(bin_to_hex(pack_id), offset, size) for offset, _, size in kept]
+        new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+
+        # repoint kept objects at the new pack; new offset is the running sum of kept sizes
+        new_locations = []
+        offset = 0
+        for _, keep_id, size in kept:
+            new_locations.append((keep_id, new_pack_id, offset, size))
+            offset += size
+        self.chunks.update_pack_info(new_locations)
+
+        # delete the old pack last, after the new one is stored and indexed, so kept bytes are never the
+        # only copy. if every object was kept in order, defrag reproduced the pack (new_pack_id == pack_id)
+        # and deleting it would drop what we kept, so skip.
+        if new_pack_id != pack_id:
+            self.store_delete(pack_key)
+        return new_pack_id
 
     def break_lock(self):
         Lock(self.store).break_lock()

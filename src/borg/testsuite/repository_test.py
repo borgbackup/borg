@@ -143,12 +143,11 @@ def test_consistency(repo_fixtures, request):
 
 
 def build_one_pack(repository, objects):
-    # Bundle several objects (N>1) into one pack: max_count == object count makes the last put flush the
-    # whole batch as a single pack. Caller reopens afterwards to read it back from disk.
     with repository:
-        repository._pack_writer.max_count = len(objects)
+        repository._pack_writer.max_count = len(objects) + 1  # prevent per-put flush; one pack on flush()
         for chunk_id, chunk in objects:
             repository.put(chunk_id, chunk)
+        repository.flush()
 
 
 def test_compact_pack_copy_forward(repo_fixtures, request):
@@ -158,12 +157,12 @@ def test_compact_pack_copy_forward(repo_fixtures, request):
     chunk2 = fchunk(b"DATA2", chunk_id=H(2))
     repository = get_repository_from_fixture(repo_fixtures, request)
     build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1), (H(2), chunk2)])
-    with reopen(repository) as repository:
+    with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
         assert repository.chunks[H(1)].pack_id == old_pack_id
         assert repository.chunks[H(2)].pack_id == old_pack_id
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids=[H(0), H(2)], drop_ids=[H(1)])
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids={H(1)})
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert pdchunk(repository.get(H(0))) == b"DATA0"
@@ -171,19 +170,19 @@ def test_compact_pack_copy_forward(repo_fixtures, request):
         assert repository.get(H(1), raise_missing=False) is None  # compact_pack removed its index entry
         packs = {info.name: info.size for info in repository.store_list("packs")}
         assert bin_to_hex(old_pack_id) not in packs
-        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk2)  # only the survivors' bytes
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk2)  # only the kept objects' bytes
 
 
 def test_compact_pack_drops_whole_pack(repo_fixtures, request):
-    # Dropping every object removes the pack and clears its index entries. N>1 pack, not the max_count default.
+    # Dropping every object removes the pack and clears its index entries.
     chunk0 = fchunk(b"DATA0", chunk_id=H(0))
     chunk1 = fchunk(b"DATA1", chunk_id=H(1))
     repository = get_repository_from_fixture(repo_fixtures, request)
     build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
-    with reopen(repository) as repository:
+    with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        assert repository.compact_pack(old_pack_id, keep_ids=[], drop_ids=[H(0), H(1)]) is None
+        assert repository.compact_pack(old_pack_id, keep_ids=set(), drop_ids={H(0), H(1)}) is None
 
         assert repository.get(H(0), raise_missing=False) is None
         assert repository.get(H(1), raise_missing=False) is None
@@ -192,15 +191,15 @@ def test_compact_pack_drops_whole_pack(repo_fixtures, request):
 
 def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
     # Keeping every object reproduces the same pack: same sha256 name, old pack not deleted. Ids passed
-    # out of order must give the same result, since compact_pack sorts survivors by offset.
+    # out of order must give the same result, since compact_pack sorts by offset.
     chunk0 = fchunk(b"DATA0", chunk_id=H(0))
     chunk1 = fchunk(b"DATA1", chunk_id=H(1))
     repository = get_repository_from_fixture(repo_fixtures, request)
     build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
-    with reopen(repository) as repository:
+    with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids=[H(1), H(0)], drop_ids=[])  # out of order
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(1), H(0)}, drop_ids=set())  # out of order
 
         assert new_pack_id == old_pack_id
         assert pdchunk(repository.get(H(0))) == b"DATA0"

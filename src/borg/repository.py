@@ -810,12 +810,13 @@ class Repository:
             raise self.ObjectNotFound(id, str(self._location))
         logger.warning("ignoring deletion of %s in %s", bin_to_hex(id), bin_to_hex(entry.pack_id))
 
-    def compact_pack(self, pack_id, keep_ids, drop_ids):
+    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
-        keep_ids and drop_ids must together cover the whole pack (asserted: their ranges tile it with no
-        gap or overlap). Kept objects are copied into a new pack via store.defrag and repointed in the
-        chunk index; dropped objects' index entries are removed.
+        keep_ids and drop_ids are sets of chunk ids that must together cover the whole pack (asserted:
+        their ranges tile it with no gap or overlap, and their intersection is empty). Kept objects are
+        copied into a new pack via store.defrag and repointed in the chunk index; dropped objects' index
+        entries are removed.
 
         Returns the new pack_id, None if nothing is kept (pack dropped), or <pack_id> unchanged if the
         kept objects reproduce the old pack (same sha256 name, nothing to delete).
@@ -826,43 +827,42 @@ class Repository:
         self._lock_refresh()
         pack_key = "packs/" + bin_to_hex(pack_id)
 
+        assert keep_ids & drop_ids == set(), "an id cannot appear in both keep_ids and drop_ids"
+
         # collect every object's range, tagged with whether it is kept, ordered by offset.
         located = []  # (obj_offset, obj_id, obj_size, keep)
-        for keep_id in keep_ids:
-            entry = self.chunks[keep_id]
-            assert entry.pack_id == pack_id, f"{bin_to_hex(keep_id)} is not in pack {bin_to_hex(pack_id)}"
-            located.append((entry.obj_offset, keep_id, entry.obj_size, True))
-        for drop_id in drop_ids:
-            entry = self.chunks[drop_id]
-            assert entry.pack_id == pack_id, f"{bin_to_hex(drop_id)} is not in pack {bin_to_hex(pack_id)}"
-            located.append((entry.obj_offset, drop_id, entry.obj_size, False))
+        for obj_id in keep_ids | drop_ids:
+            keep = obj_id in keep_ids
+            entry = self.chunks[obj_id]
+            assert entry.pack_id == pack_id, f"{bin_to_hex(obj_id)} is not in pack {bin_to_hex(pack_id)}"
+            located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
 
-        # keep + drop must tile the whole pack; pick out the survivors in the same pass.
-        survivors = []  # (obj_offset, obj_id, obj_size), offset-ordered
+        # keep + drop must tile the whole pack; collect the objects to keep in the same pass.
+        kept = []  # (obj_offset, obj_id, obj_size), offset-ordered
         covered = 0
         for offset, obj_id, size, keep in located:
             assert offset == covered, f"gap or overlap in pack {bin_to_hex(pack_id)} at offset {covered}"
             covered += size
             if keep:
-                survivors.append((offset, obj_id, size))
+                kept.append((offset, obj_id, size))
         assert covered == self.store.info(pack_key).size, f"pack {bin_to_hex(pack_id)} not fully covered"
 
         for drop_id in drop_ids:  # remove dropped objects from the index; their bytes are not copied forward
             del self.chunks[drop_id]
 
-        if not survivors:  # nothing kept: drop the pack, no replacement
+        if not kept:  # nothing kept: drop the pack, no replacement
             self.store_delete(pack_key)
             return None
 
-        # copy survivors into a new pack (named sha256 of its content)
-        sources = [(bin_to_hex(pack_id), offset, size) for offset, _, size in survivors]
+        # copy kept objects into a new pack (named sha256 of its content)
+        sources = [(bin_to_hex(pack_id), offset, size) for offset, _, size in kept]
         new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
 
-        # repoint survivors at the new pack; new offset is the running sum of kept sizes
+        # repoint kept objects at the new pack; new offset is the running sum of kept sizes
         new_locations = []
         offset = 0
-        for _, keep_id, size in survivors:
+        for _, keep_id, size in kept:
             new_locations.append((keep_id, new_pack_id, offset, size))
             offset += size
         self.chunks.update_pack_info(new_locations)

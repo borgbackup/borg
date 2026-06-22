@@ -1,17 +1,12 @@
-setuptools >=82.0.1
-setuptools_scm
 pip !=24.2
-wheel
 virtualenv
 build
-pkgconfig
 tox
 pytest
 pytest-xdist
 coverage[toml]
 pytest-cov
 pytest-benchmark
-Cython
 pre-commit
 bandit[toml]
 types-PyYAML

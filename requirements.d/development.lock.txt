@@ -1,16 +1,11 @@
-setuptools==82.0.1
-setuptools-scm==9.2.2
 pip==26.1.2
-wheel==0.47.0
 virtualenv==21.3.3
 build==1.5.0
-pkgconfig==1.6.0
 tox==4.54.0
 pytest==9.0.3
 pytest-xdist==3.8.0
 coverage[toml]==7.14.3
 pytest-cov==7.1.0
 pytest-benchmark==5.2.3
-Cython==3.2.5
 pre-commit==4.6.0
 types-PyYAML==6.0.12.20260518

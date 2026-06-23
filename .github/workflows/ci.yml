@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: astral-sh/ruff-action@v3
 
   security:
@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
@@ -64,7 +64,7 @@ jobs:
     needs: [lint]
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
@@ -167,7 +167,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
@@ -415,14 +415,14 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Test on ${{ matrix.display_name }}
         id: cross_os
-        uses: cross-platform-actions/action@v1.2.0
+        uses: cross-platform-actions/action@v1.3.0
         env:
           DO_BINARIES: ${{ matrix.do_binaries }}
         with:
@@ -637,7 +637,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

@@ -46,7 +46,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0

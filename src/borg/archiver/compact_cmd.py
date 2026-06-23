@@ -19,7 +19,7 @@ logger = create_logger()
 
 
 class ArchiveGarbageCollector:
-    def __init__(self, repository, manifest, *, stats, iec):
+    def __init__(self, repository, manifest, *, stats, iec, threshold):
         self.repository = repository
         assert isinstance(repository, Repository)
         self.manifest = manifest
@@ -28,6 +28,7 @@ class ArchiveGarbageCollector:
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
+        self.threshold = threshold  # rewrite a mixed pack only when its wasted-bytes fraction reaches this percent
         self.iec = iec  # formats statistics using IEC units (1KiB = 1024B)
 
     @property
@@ -165,30 +166,7 @@ class ArchiveGarbageCollector:
                 logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
 
         repo_size_before = self.repository_size
-        logger.info("Determining unused objects...")
-        unused = set()
-        for id, entry in self.chunks.iteritems():
-            if not (entry.flags & ChunkIndex.F_USED):
-                unused.add(id)
-        logger.info(f"Deleting {len(unused)} unused objects...")
-        if unused:
-            # Before deleting any repository object, invalidate all centrally cached chunk indexes.
-            # Otherwise, if we get interrupted within the deletion loop, the still-existing index/*
-            # would claim that already-deleted objects are still present. A later "borg create" would then
-            # trust that stale index, not re-upload the affected chunks and silently create an archive with
-            # dangling object references (see issue #9748). By removing the cached indexes first, an
-            # interruption is conservative: clients must rebuild the index from actual repository contents
-            # and will re-upload any deleted data. save_chunk_index() writes a fresh, valid index afterwards.
-            delete_chunkindex_from_repo(self.repository)
-        pi = ProgressIndicatorPercent(
-            total=len(unused), msg="Deleting unused objects %3.1f%%", step=0.1, msgid="compact.report_and_delete"
-        )
-        for i, id in enumerate(unused):
-            pi.show(i)
-            # N=1: the chunk is alone in its pack, so dropping the pack frees just it; N>1 needs compaction.
-            self.repository.store_delete("packs/" + bin_to_hex(self.chunks[id].pack_id))
-            del self.chunks[id]
-        pi.finish()
+        self.compact_packs()
         repo_size_after = self.repository_size
 
         count = len(self.chunks)
@@ -209,13 +187,91 @@ class ArchiveGarbageCollector:
         else:
             logger.info(f"Repository has data stored in {count} objects.")
 
+    def compact_packs(self):
+        """Free space one pack at a time (the store can only delete whole packs).
+
+        analyze_archives() has flagged the used objects F_USED. Per pack:
+
+        - all objects unused -> delete the pack.
+        - all objects used   -> keep it.
+        - mixed              -> rewrite only if the unused bytes reach --threshold percent: copy the
+                                used objects into a new pack via compact_pack and drop the old one.
+                                Below the threshold keep the pack, so we don't rewrite a large pack
+                                to reclaim little.
+
+        Two passes bound the memory use: the first keeps only per-pack byte counts to pick the packs
+        to change, the second collects object ids for just those packs, not the whole index.
+        """
+        # Pass 1: one index scan, keep only per-pack byte tallies (two ints per pack, no id lists).
+        pack_total, pack_unused = {}, {}
+        for id, entry in self.chunks.iteritems():
+            pid = entry.pack_id
+            pack_total[pid] = pack_total.get(pid, 0) + entry.obj_size
+            if not (entry.flags & ChunkIndex.F_USED):
+                pack_unused[pid] = pack_unused.get(pid, 0) + entry.obj_size
+
+        # decide each pack's fate from the tallies
+        drop_packs, rewrite_packs = set(), set()
+        for pid, total in pack_total.items():
+            unused = pack_unused.get(pid, 0)
+            if unused == 0:
+                continue  # all used -> leave alone
+            if unused == total:
+                drop_packs.add(pid)  # all unused -> drop the whole file
+            elif unused / total * 100 >= self.threshold:
+                rewrite_packs.add(pid)  # mixed and wasteful enough -> copy survivors forward
+            # else: mixed but below threshold -> leave alone
+
+        if not drop_packs and not rewrite_packs:
+            logger.info("Deleting 0 unused objects...")
+            return  # nothing to reclaim; do not touch the cached chunk indexes
+
+        # crash-safety (#9748): invalidate cached chunk indexes before the first store change
+        delete_chunkindex_from_repo(self.repository)
+
+        # Pass 2: collect object ids only for the affected packs (a subset, not the whole index)
+        keep = {pid: set() for pid in rewrite_packs}  # survivors to copy forward, per pack
+        drop = {pid: set() for pid in rewrite_packs}  # unused objects in those same packs
+        forget = []  # ids living in fully-unused packs we delete outright
+        for id, entry in self.chunks.iteritems():
+            pid = entry.pack_id
+            if pid in rewrite_packs:
+                (keep if entry.flags & ChunkIndex.F_USED else drop)[pid].add(id)
+            elif pid in drop_packs:
+                forget.append(id)
+
+        # count what we remove: every object of a dropped pack, plus the unused objects cut from
+        # rewritten packs. unused objects in below-threshold packs stay, so they don't count.
+        deleted = len(forget) + sum(len(ids) for ids in drop.values())
+        logger.info(f"Deleting {deleted} unused objects...")
+        pi = ProgressIndicatorPercent(
+            total=len(drop_packs) + len(rewrite_packs),
+            msg="Compacting packs %3.1f%%",
+            step=0.1,
+            msgid="compact.compact_packs",
+        )
+        progress = 0
+        for pid in drop_packs:
+            pi.show(progress)
+            progress += 1
+            self.repository.store_delete("packs/" + bin_to_hex(pid))
+        for id in forget:
+            del self.chunks[id]  # their pack file is gone, so drop their index entries too
+        for pid in rewrite_packs:
+            pi.show(progress)
+            progress += 1
+            self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid])  # helper owns index update
+        pi.finish()
+
 
 class CompactMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_compact(self, args, repository, manifest):
         """Collects garbage in the repository."""
         if not args.dry_run:  # support --dry-run to simplify scripting
-            ArchiveGarbageCollector(repository, manifest, stats=args.stats, iec=args.iec).garbage_collect()
+            ArchiveGarbageCollector(
+                repository, manifest, stats=args.stats, iec=args.iec, threshold=args.threshold
+            ).garbage_collect()
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -269,4 +325,12 @@ class CompactMixIn:
         )
         subparser.add_argument(
             "-s", "--stats", dest="stats", action="store_true", help="print statistics (might be much slower)"
+        )
+        subparser.add_argument(
+            "--threshold",
+            metavar="PERCENT",
+            dest="threshold",
+            type=float,
+            default=40.0,
+            help="rewrite a pack when at least PERCENT of its bytes are unused (default: 40)",
         )

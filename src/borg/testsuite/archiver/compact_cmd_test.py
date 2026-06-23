@@ -4,11 +4,14 @@ from pathlib import Path
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import get_cache_dir
+from ...helpers import get_cache_dir, bin_to_hex
+from ...hashindex import ChunkIndex
+from ...repository import Repository
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
 from ...manifest import Manifest
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
+from ..repository_test import H, fchunk, pdchunk, build_one_pack, reopen
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -119,7 +122,7 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
     repository = open_repository(archiver)
     with repository:
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
-        gc = ArchiveGarbageCollector(repository, manifest, stats=stats, iec=False)
+        gc = ArchiveGarbageCollector(repository, manifest, stats=stats, iec=False, threshold=40.0)
 
         def interrupt():
             raise KeyboardInterrupt("simulated interruption before save_chunk_index")
@@ -141,6 +144,48 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
         assert "missing" not in output
         with open(os.path.join("input", "file1"), "rb") as fd:
             assert fd.read() == content
+
+
+def test_compact_packs_respects_threshold(tmp_path):
+    # Build two multi-object packs, then run pack-level compaction with a 40% threshold. The pack that
+    # wastes 2/3 of its bytes is rewritten down to its single survivor (and its old file deleted); the
+    # pack that wastes only 1/3 stays untouched, because copying its survivors to reclaim that little
+    # is not worth it. This exercises the rewrite, leave-alone and keep/drop split that N=1 can't reach.
+    from ...archiver.compact_cmd import ArchiveGarbageCollector
+
+    location = os.fspath(tmp_path / "repo")
+    wasteful = [(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i))) for i in range(3)]  # H0..H2 in one pack
+    frugal = [(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i))) for i in range(3, 6)]  # H3..H5 in another
+
+    repository = Repository(location, exclusive=True, create=True)
+    build_one_pack(repository, wasteful)
+    repository = reopen(repository)
+    build_one_pack(repository, frugal)
+
+    with reopen(repository) as repository:
+        wasteful_pack = repository.chunks[H(0)].pack_id
+        frugal_pack = repository.chunks[H(3)].pack_id
+        # mark usage: wasteful pack keeps only H0 (2/3 wasted), frugal pack keeps H3 and H4 (1/3 wasted)
+        used = {H(0), H(3), H(4)}
+        for i in range(6):
+            entry = repository.chunks[H(i)]
+            flags = ChunkIndex.F_USED if H(i) in used else ChunkIndex.F_NONE
+            repository.chunks[H(i)] = entry._replace(flags=flags)
+
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=40.0)
+        gc.chunks = repository.chunks
+        gc.compact_packs()
+
+        # wasteful pack was rewritten: the survivor reads back, the dropped objects and the old file are gone
+        assert pdchunk(repository.get(H(0))) == b"DATA0"
+        assert repository.get(H(1), raise_missing=False) is None
+        assert repository.get(H(2), raise_missing=False) is None
+        # frugal pack stayed below threshold: untouched, every object (even the unused H5) still present
+        for i in range(3, 6):
+            assert pdchunk(repository.get(H(i))) == f"DATA{i}".encode()
+        pack_names = [info.name for info in repository.store_list("packs")]
+        assert bin_to_hex(wasteful_pack) not in pack_names
+        assert bin_to_hex(frugal_pack) in pack_names
 
 
 def test_compact_files_cache_cleanup(archivers, request):

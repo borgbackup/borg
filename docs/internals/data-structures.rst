@@ -51,9 +51,14 @@ data/
       0000... .. ffff...
 
 keys/
-    When using encryption in repokey mode, the encrypted, passphrase protected
-    key is stored here as a base64 encoded text. The sha256 content hash is
-    used for the name.
+    When using repokey mode, the encrypted, passphrase protected borg keys are
+    stored here as a base64 encoded text. The sha256 content hash of the
+    stored borg key is used for the name.
+
+    A repository may contain *multiple* such borg keys (one per passphrase) to
+    support the :ref:`multiple borg keys <borgcrypto_multiple_keys>` feature.
+    keyfile and repokey borg keys use the same format and naming (only the
+    storage location differs).
 
 locks/
   used by the locking system to manage shared and exclusive locks.
@@ -67,7 +72,10 @@ byte strings of fixed length (256-bit, 32 bytes), computed like this::
 
   key = id = id_hash(plaintext_data)  # plain = not encrypted, not compressed, not obfuscated
 
-The id_hash function depends on the :ref:`encryption mode <borg_repo-create>`.
+The id_hash function is selected via ``borg repo-create --id-hash`` (independently
+of ``--encryption``). For encrypted repositories it is a keyed MAC over the
+plaintext (keyed by ``id_key``): ``sha256`` selects HMAC-SHA256, ``blake3``
+selects a keyed BLAKE3. The unencrypted ``none`` mode uses a plain ``sha256``.
 
 As the id / key is used for deduplication, id_hash must be a cryptographically
 strong hash or MAC.
@@ -718,11 +726,15 @@ Both modes
 
 Encryption keys (and other secrets) are kept either in the keys directory on
 the client ('keyfile' mode) or under the keys/ namespace in the repository
-('repokey' mode) using the sha256 of the file content as the name.
+('repokey' mode) using the sha256 of the borg key content as the name.
 
 In both cases, the secrets are generated from random and then encrypted by a
 key derived from your passphrase (this happens on the client before the key
-is stored into the keyfile or as repokey).
+is stored as keyfile or repokey).
+
+keyfile and repokey borg keys use the **same** format; only the storage location
+differs. Borg finds the correct key by trying each key against the supplied
+passphrase. See :ref:`borgcrypto_multiple_keys`.
 
 The passphrase is passed through the ``BORG_PASSPHRASE`` environment variable
 or prompted for interactive usage.

@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: psf/black@87928e6d6761a4a6d22250e1fee5601b3998086e  # 26.5.1
         with:
             version: "~= 24.0"

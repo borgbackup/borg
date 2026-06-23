@@ -32,7 +32,7 @@ jobs:
             toxenv: py314-none
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
         fetch-tags: true
@@ -111,7 +111,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

@@ -53,14 +53,10 @@ class ArchiveGarbageCollector:
 
     def get_repository_chunks(self) -> ChunkIndex:
         """return a chunks index"""
-        if self.stats:
-            # slow but thorough: scan the pack headers for real sizes/locations and to catch objects
-            # missing from the cached index. Start unused (F_NONE); analyze_archives marks used ones.
-            logger.info("Getting object IDs present in the repository...")
-            chunks = build_chunkindex_from_repo(self.repository, disable_caches=True, init_flags=ChunkIndex.F_NONE)
-        else:  # faster: rely on existing chunks index (with flags F_NONE and size 0).
-            logger.info("Getting object IDs from cached chunks index...")
-            chunks = build_chunkindex_from_repo(self.repository, cache_immediately=not self.dry_run)
+        # The cached index already has each object's obj_size and starts entries as F_NONE, so it
+        # serves both GC and --stats; no need to force the slow pack-header scan just to get sizes.
+        logger.info("Getting object IDs from the cached chunks index...")
+        chunks = build_chunkindex_from_repo(self.repository, cache_immediately=not self.dry_run)
         return chunks
 
     def save_chunk_index(self):
@@ -316,15 +312,8 @@ class CompactMixIn:
             seeing fatal errors when creating backups or when archives are missing in
             ``borg repo-list``).
 
-            When using the ``--stats`` option, borg will internally list all repository
-            objects to determine their existence and stored size. It will build a fresh
-            chunks index from that information and cache it in the repository. For some
-            types of repositories, this might be very slow. It will tell you the sum of
-            stored object sizes, before and after compaction.
-
-            Without ``--stats``, borg will rely on the cached chunks index to determine
-            existing object IDs (but there is no stored size information in the index,
-            thus it cannot compute before/after compaction size statistics).
+            With ``--stats``, borg additionally reports the sum of stored object sizes
+            before and after compaction.
             """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_compact.__doc__, epilog=compact_epilog)
@@ -337,7 +326,7 @@ class CompactMixIn:
             help="do not change the repository, just show what compact would free",
         )
         subparser.add_argument(
-            "-s", "--stats", dest="stats", action="store_true", help="print statistics (might be much slower)"
+            "-s", "--stats", dest="stats", action="store_true", help="print repository size statistics"
         )
         subparser.add_argument(
             "--threshold",

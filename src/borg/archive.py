@@ -27,6 +27,7 @@ from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError
+from .helpers import BackupSymlinkParentError, BackupPathTraversalError
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Manifest
@@ -441,6 +442,9 @@ class Archive:
         self.cache = cache
         self.manifest = manifest
         self.hard_links = {}
+        # cache of parent directory paths verified (during extraction) to be real
+        # directories and not symlinks, so we do not have to lstat them again and again.
+        self.safe_dirs = set()
         self.stats = Statistics(output_json=log_json, iec=iec)
         self.iec = iec
         self.show_progress = progress
@@ -738,6 +742,44 @@ Utilization of max. archive size: {csize_max:.0%}
                 stats.csize = self.metadata.csize
         return stats
 
+    def _check_safe_parent(self, archived_path):
+        """Refuse *archived_path* if its parent directory chain is not safe for extraction.
+
+        *archived_path* is a path as stored in the archive, relative to self.cwd. As elsewhere
+        in borg, it is split on os.sep (the supported platforms are POSIX, where os.sep == "/").
+        borg create never produces a path containing ".." or a path below a symlinked directory,
+        so such a path can only come from a malicious or corrupted archive and could be used to
+        access a location outside the extraction directory.
+
+        Raises BackupPathTraversalError if a parent component is "..", or
+        BackupSymlinkParentError if an existing parent component is a symlink (or other
+        non-directory). Directories verified to be safe are cached in self.safe_dirs, so each
+        directory is only lstat'ed once per extraction.
+        """
+        parent_components = [c for c in archived_path.split(os.sep)[:-1] if c not in ('', '.')]
+        # Reject ".." up front: this keeps the lstat walk below from climbing above self.cwd,
+        # and makes the early "break" on a not-yet-existing component safe (it can not skip a
+        # later "..").
+        if '..' in parent_components:
+            raise BackupPathTraversalError(archived_path)
+        # Every *existing* parent directory component must be a real directory, not a symlink.
+        current = self.cwd
+        for component in parent_components:
+            current = os.path.join(current, component)
+            if current in self.safe_dirs:
+                continue
+            try:
+                st = os.lstat(current)
+            except FileNotFoundError:
+                # parent does not exist yet, it will be created (as a real directory) below an
+                # already-verified-safe chain.
+                break
+            if not stat.S_ISDIR(st.st_mode):
+                # os.lstat does not follow symlinks, so a symlinked parent shows up here as a
+                # non-directory. Refuse to follow it out of the extraction directory.
+                raise BackupSymlinkParentError(archived_path)
+            self.safe_dirs.add(current)  # verified real directory, skip re-stat for later items
+
     @contextmanager
     def extract_helper(self, dest, item, path, stripped_components, original_path, hardlink_masters):
         hardlink_set = False
@@ -806,6 +848,12 @@ Utilization of max. archive size: {csize_max:.0%}
         if item.path.startswith(('/', '../')):
             raise Exception('Path should be relative and local')
         path = os.path.join(dest, item.path)
+        # Refuse to extract items whose parent directory path is not safe (a symlinked parent or
+        # a path containing ".."). Without this check, the "remove existing file" block and the
+        # open()/mkdir()/symlink() calls below would follow such a parent path and could delete or
+        # overwrite files outside the extraction directory (e.g. /etc/passwd).
+        self.safe_dirs.discard(path)  # path is about to be (re)created; never trust a stale entry for it
+        self._check_safe_parent(item.path)
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.stat(path, follow_symlinks=False)
@@ -820,8 +868,15 @@ Utilization of max. archive size: {csize_max:.0%}
 
         def make_parent(path):
             parent_dir = os.path.dirname(path)
+            if parent_dir in self.safe_dirs:
+                # the parent path guard above already verified (this extraction) that parent_dir
+                # exists and is a real directory, so there is nothing to do and no need to stat it.
+                return
             if not os.path.exists(parent_dir):
                 os.makedirs(parent_dir)
+            # remember parent_dir as a real directory (it either existed - e.g. dest - or we just
+            # created it below an already-verified-safe chain), so later items can skip the stat.
+            self.safe_dirs.add(parent_dir)
 
         mode = item.mode
         if stat.S_ISREG(mode):

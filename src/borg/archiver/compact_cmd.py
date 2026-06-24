@@ -131,7 +131,6 @@ class ArchiveGarbageCollector:
         )
         total_size, total_files = 0, 0
         for i, info in enumerate(archive_infos):
-            pi.show(i)
             logger.info(
                 f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
             )
@@ -149,6 +148,7 @@ class ArchiveGarbageCollector:
                     for id, size in item.chunks:
                         total_size += size  # original, uncompressed file content size
                         use_it(id)
+            pi.show(i + 1)  # report after each archive, so the last one lands on 100%
         pi.finish()
         return missing_chunks, total_files, total_size, num_archives
 
@@ -158,7 +158,7 @@ class ArchiveGarbageCollector:
             for id in sorted(self.missing_chunks):
                 logger.debug(f"Missing object {bin_to_hex(id)}")
             set_ec(EXIT_ERROR)
-        if not self.dry_run:  # nuking soft-deleted archives mutates the manifest; skip on a dry run
+        if not self.dry_run:  # nuking removes the soft-deleted archives from the archives directory; skip on a dry run
             logger.info("Cleaning archives directory from soft-deleted archives...")
             archive_infos = self.manifest.archives.list(sort_by=["ts"], deleted=True)
             for archive_info in archive_infos:
@@ -262,15 +262,15 @@ class ArchiveGarbageCollector:
         )
         progress = 0
         for pid in drop_packs:
-            pi.show(progress)
-            progress += 1
             self.repository.store_delete("packs/" + bin_to_hex(pid))
+            progress += 1
+            pi.show(progress)  # report after the work, so the final pack lands on 100%
         for id in forget:
             del self.chunks[id]  # their pack file is gone, so drop their index entries too
         for pid in rewrite_packs:
-            pi.show(progress)
-            progress += 1
             self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid])  # helper owns index update
+            progress += 1
+            pi.show(progress)
         pi.finish()
 
 

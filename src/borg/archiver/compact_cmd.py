@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pathlib import Path
 
 from ._common import with_repository
@@ -19,7 +20,7 @@ logger = create_logger()
 
 
 class ArchiveGarbageCollector:
-    def __init__(self, repository, manifest, *, stats, iec, threshold):
+    def __init__(self, repository, manifest, *, stats, iec, threshold, dry_run=False):
         self.repository = repository
         assert isinstance(repository, Repository)
         self.manifest = manifest
@@ -30,6 +31,7 @@ class ArchiveGarbageCollector:
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
         self.threshold = threshold  # rewrite a mixed pack only when its wasted-bytes fraction reaches this percent
         self.iec = iec  # formats statistics using IEC units (1KiB = 1024B)
+        self.dry_run = dry_run
 
     @property
     def repository_size(self):
@@ -44,8 +46,9 @@ class ArchiveGarbageCollector:
         logger.info("Computing object IDs used by archives...")
         (self.missing_chunks, self.total_files, self.total_size, self.archives_count) = self.analyze_archives()
         self.report_and_delete()
-        self.save_chunk_index()
-        self.cleanup_files_cache()
+        if not self.dry_run:
+            self.save_chunk_index()
+            self.cleanup_files_cache()
         logger.info("Finished compaction / garbage collection...")
 
     def get_repository_chunks(self) -> ChunkIndex:
@@ -57,7 +60,7 @@ class ArchiveGarbageCollector:
             chunks = build_chunkindex_from_repo(self.repository, disable_caches=True, init_flags=ChunkIndex.F_NONE)
         else:  # faster: rely on existing chunks index (with flags F_NONE and size 0).
             logger.info("Getting object IDs from cached chunks index...")
-            chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
+            chunks = build_chunkindex_from_repo(self.repository, cache_immediately=not self.dry_run)
         return chunks
 
     def save_chunk_index(self):
@@ -155,15 +158,15 @@ class ArchiveGarbageCollector:
             for id in sorted(self.missing_chunks):
                 logger.debug(f"Missing object {bin_to_hex(id)}")
             set_ec(EXIT_ERROR)
-
-        logger.info("Cleaning archives directory from soft-deleted archives...")
-        archive_infos = self.manifest.archives.list(sort_by=["ts"], deleted=True)
-        for archive_info in archive_infos:
-            name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
-            try:
-                self.manifest.archives.nuke_by_id(id)
-            except self.repository.ObjectNotFound:
-                logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
+        if not self.dry_run:  # nuking soft-deleted archives mutates the manifest; skip on a dry run
+            logger.info("Cleaning archives directory from soft-deleted archives...")
+            archive_infos = self.manifest.archives.list(sort_by=["ts"], deleted=True)
+            for archive_info in archive_infos:
+                name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
+                try:
+                    self.manifest.archives.nuke_by_id(id)
+                except self.repository.ObjectNotFound:
+                    logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
 
         repo_size_before = self.repository_size
         self.compact_packs()
@@ -180,10 +183,11 @@ class ArchiveGarbageCollector:
                 f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "
                 f"in {count} objects."
             )
-            logger.info(
-                f"Compaction saved "
-                f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
-            )
+            if not self.dry_run:  # nothing was deleted on a dry run, so before == after
+                logger.info(
+                    f"Compaction saved "
+                    f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
+                )
         else:
             logger.info(f"Repository has data stored in {count} objects.")
 
@@ -203,25 +207,31 @@ class ArchiveGarbageCollector:
         to change, the second collects object ids for just those packs, not the whole index.
         """
         # Pass 1: one index scan, keep only per-pack byte tallies (two ints per pack, no id lists).
-        pack_total, pack_unused = {}, {}
+        pack_total, pack_unused = defaultdict(int), defaultdict(int)
         for id, entry in self.chunks.iteritems():
             pid = entry.pack_id
-            pack_total[pid] = pack_total.get(pid, 0) + entry.obj_size
+            pack_total[pid] += entry.obj_size
             if not (entry.flags & ChunkIndex.F_USED):
-                pack_unused[pid] = pack_unused.get(pid, 0) + entry.obj_size
+                pack_unused[pid] += entry.obj_size
 
         # decide each pack's fate from the tallies
         drop_packs, rewrite_packs = set(), set()
         for pid, total in pack_total.items():
-            unused = pack_unused.get(pid, 0)
+            unused = pack_unused.get(pid, 0)  # .get, not [pid]: don't insert all-used packs into the dict
             if unused == 0:
                 continue  # all used -> leave alone
             if unused == total:
                 drop_packs.add(pid)  # all unused -> drop the whole file
-            elif unused / total * 100 >= self.threshold:
+            elif 100 * unused / total >= self.threshold:
                 rewrite_packs.add(pid)  # mixed and wasteful enough -> copy survivors forward
             # else: mixed but below threshold -> leave alone
-
+        if self.dry_run:
+            freed = sum(pack_unused[pid] for pid in drop_packs) + sum(pack_unused[pid] for pid in rewrite_packs)
+            logger.info(
+                f"Would free {format_file_size(freed, iec=self.iec)} "
+                f"by dropping {len(drop_packs)} packs and rewriting {len(rewrite_packs)} packs."
+            )
+            return  # dry run: report only, change nothing
         if not drop_packs and not rewrite_packs:
             logger.info("Deleting 0 unused objects...")
             return  # nothing to reclaim; do not touch the cached chunk indexes
@@ -268,10 +278,9 @@ class CompactMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_compact(self, args, repository, manifest):
         """Collects garbage in the repository."""
-        if not args.dry_run:  # support --dry-run to simplify scripting
-            ArchiveGarbageCollector(
-                repository, manifest, stats=args.stats, iec=args.iec, threshold=args.threshold
-            ).garbage_collect()
+        ArchiveGarbageCollector(
+            repository, manifest, stats=args.stats, iec=args.iec, threshold=args.threshold, dry_run=args.dry_run
+        ).garbage_collect()
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -321,7 +330,11 @@ class CompactMixIn:
         subparser = ArgumentParser(parents=[common_parser], description=self.do_compact.__doc__, epilog=compact_epilog)
         subparsers.add_subcommand("compact", subparser, help="compact the repository")
         subparser.add_argument(
-            "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
+            "-n",
+            "--dry-run",
+            dest="dry_run",
+            action="store_true",
+            help="do not change the repository, just show what compact would free",
         )
         subparser.add_argument(
             "-s", "--stats", dest="stats", action="store_true", help="print statistics (might be much slower)"
@@ -330,7 +343,7 @@ class CompactMixIn:
             "--threshold",
             metavar="PERCENT",
             dest="threshold",
-            type=float,
-            default=40.0,
-            help="rewrite a pack when at least PERCENT of its bytes are unused (default: 40)",
+            type=int,
+            default=10,
+            help="rewrite a pack when at least PERCENT of its bytes are unused (default: 10)",
         )

@@ -11,7 +11,7 @@ from ...cache import files_cache_name, discover_files_cache_names, list_chunkind
 from ...manifest import Manifest
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
-from ..repository_test import H, fchunk, pdchunk, build_one_pack, reopen
+from ..repository_test import H, fchunk, pdchunk
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -147,32 +147,32 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
 
 
 def test_compact_packs_respects_threshold(tmp_path):
-    # Build two multi-object packs, then run pack-level compaction with a 40% threshold. The pack that
+    # Two multi-object packs in one repo, then pack-level compaction at a 40% threshold. The pack that
     # wastes 2/3 of its bytes is rewritten down to its single survivor (and its old file deleted); the
-    # pack that wastes only 1/3 stays untouched, because copying its survivors to reclaim that little
-    # is not worth it. This exercises the rewrite, leave-alone and keep/drop split that N=1 can't reach.
+    # pack that wastes only 1/3 stays untouched, since copying its survivors to reclaim that little is
+    # not worth it. This covers the rewrite, leave-alone and keep/drop split that N=1 can't reach.
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
-    wasteful = [(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i))) for i in range(3)]  # H0..H2 in one pack
-    frugal = [(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i))) for i in range(3, 6)]  # H3..H5 in another
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository._pack_writer.max_count = 4  # buffer several objects, so each flush() writes one pack
+        for i in range(3):  # H0..H2 -> wasteful pack
+            repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
+        repository.flush()
+        for i in range(3, 6):  # H3..H5 -> frugal pack
+            repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
+        repository.flush()
 
-    repository = Repository(location, exclusive=True, create=True)
-    build_one_pack(repository, wasteful)
-    repository = reopen(repository)
-    build_one_pack(repository, frugal)
-
-    with reopen(repository) as repository:
         wasteful_pack = repository.chunks[H(0)].pack_id
         frugal_pack = repository.chunks[H(3)].pack_id
-        # mark usage: wasteful pack keeps only H0 (2/3 wasted), frugal pack keeps H3 and H4 (1/3 wasted)
+        # wasteful pack keeps only H0 (2/3 wasted), frugal pack keeps H3 and H4 (1/3 wasted)
         used = {H(0), H(3), H(4)}
         for i in range(6):
             entry = repository.chunks[H(i)]
             flags = ChunkIndex.F_USED if H(i) in used else ChunkIndex.F_NONE
             repository.chunks[H(i)] = entry._replace(flags=flags)
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=40.0)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=40)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -186,6 +186,21 @@ def test_compact_packs_respects_threshold(tmp_path):
         pack_names = [info.name for info in repository.store_list("packs")]
         assert bin_to_hex(wasteful_pack) not in pack_names
         assert bin_to_hex(frugal_pack) in pack_names
+
+
+def test_compact_dry_run_reports_and_changes_nothing(archivers, request):
+    # --dry-run prints the would-free estimate (issue #9379) and must not touch the repository.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive")
+    cmd(archiver, "delete", "-a", "archive")
+
+    out = cmd(archiver, "compact", "--dry-run", "-v", exit_code=0)
+    assert "Would free" in out  # the estimate is reported
+
+    # proof nothing was removed: a real compact afterwards still finds the unused objects to delete
+    out2 = cmd(archiver, "compact", "-v", exit_code=0)
+    assert "Deleting 0 unused objects" not in out2
 
 
 def test_compact_files_cache_cleanup(archivers, request):

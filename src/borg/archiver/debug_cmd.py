@@ -13,7 +13,7 @@ from ..helpers import CommandError, RTError
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..platform import get_process_id
-from ..repository import Repository, LIST_SCAN_LIMIT, StoreObjectNotFound, repo_lister
+from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
 from ..repoobj import RepoObj
 
 from ._common import with_repository, Highlander
@@ -297,16 +297,10 @@ class DebugMixIn:
                 if entry is None:
                     print("object %s not found." % hex_id)
                 else:
-                    # Drops the whole pack holding this object, so any other objects in it go too.
-                    # A debug tool; for a surgical single-object removal, use compact.
-                    try:
-                        repository.store_delete("packs/" + bin_to_hex(entry.pack_id))
-                    except StoreObjectNotFound:
-                        # index points at an already-gone pack (stale entry)
-                        print("object %s not found." % hex_id)
-                    else:
-                        del repository.chunks[id]
-                        print("object %s deleted." % hex_id)
+                    # We can not drop a single object by removing its whole pack without losing the
+                    # pack's other objects, so do nothing for now, same as Repository.delete().
+                    # TODO: implement single-object delete (today removal only happens at the pack level, via compact).
+                    print("ignoring deletion of object %s (single-object delete not implemented yet)." % hex_id)
         print("Done.")
 
     def do_debug_convert_profile(self, args):

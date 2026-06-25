@@ -68,11 +68,13 @@ def test_debug_put_get_delete_obj(archivers, request):
         data_read = f.read()
     assert data == data_read
 
+    # delete-obj is a no-op for now: a single object can't be dropped without dropping its whole pack.
     output = cmd(archiver, "debug", "delete-obj", id_hash)
-    assert "deleted" in output
+    assert "ignoring deletion" in output
 
-    output = cmd(archiver, "debug", "delete-obj", id_hash)
-    assert "not found" in output
+    # the object is still there: the no-op did not remove it
+    output = cmd(archiver, "debug", "get-obj", id_hash, "output/file")
+    assert id_hash in output
 
     output = cmd(archiver, "debug", "delete-obj", "invalid")
     assert "is invalid" in output

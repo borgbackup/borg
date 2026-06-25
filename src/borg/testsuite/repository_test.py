@@ -83,6 +83,7 @@ def test_basic_operations(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA", chunk_id=H(x)))  # put() updates _chunks via PackWriter
+        repository.flush()  # don't rely on the put count filling whole packs; flush before get()/close()
         key50 = H(50)
         assert pdchunk(repository.get(key50)) == b"SOMEDATA"
     # no manual hand-off of the index across reopen: close() persisted it to the repo cache,
@@ -103,6 +104,7 @@ def test_chunk_index_persisted_on_close(tmp_path):
     with Repository(location, exclusive=True, create=True) as repository:
         for x in range(10):
             repository.put(H(x), fchunk(b"DATA"))
+        repository.flush()  # don't rely on the put count filling whole packs; flush before close()
     # reopen and read the cached fragments straight from disk
     with Repository(location, exclusive=True) as repository:
         persisted = ChunkIndex()

@@ -1298,6 +1298,33 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 cached_ids = {id for id, entry in cache.chunks.iteritems()}
         assert cached_ids == referenced_ids
 
+    def test_create_erroneous_file_read_retry_rolls_back_chunks(self):
+        # a read error after we already read+added some chunks must roll those chunks back, so we do
+        # not end up with bad (too high) chunk refcounts. note: the re-read chunks dedup to the same
+        # ids, so a leak shows up as an inflated refcount (not as an orphan id), hence we check refcounts.
+        from collections import Counter
+        chunk_size = 1000
+        # distinct content per block, so each block maps to its own (unique) chunk id:
+        self.create_regular_file('file', contents=b'A' * chunk_size + b'B' * chunk_size)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        # rErr: read 1st block ok, 2nd block fails -> retry; on the retry both blocks read ok.
+        out = self.cmd('create', f'--chunker-params=fail,{chunk_size},rErr', '--list',
+                       self.repository_location + '::test', 'input')
+        assert 'retry: 1 of ' in out
+        assert 'E input/file' not in out  # it was backed up ok on the retry
+
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            archive = Archive(repository, key, manifest, 'test')
+            item = [item for item in archive.iter_items() if item.path == 'input/file'][0]
+            item_chunk_refs = Counter(chunk.id for chunk in item.chunks)
+            with Cache(repository, key, manifest) as cache:
+                refcounts = {id: entry.refcount for id, entry in cache.chunks.iteritems()}
+        # each data chunk of the file must be referenced exactly as often as it occurs in the item -
+        # a leaked chunk from the failed read attempt would show up here as a too high refcount:
+        for chunk_id, refs in item_chunk_refs.items():
+            assert refcounts[chunk_id] == refs
+
     def test_create_erroneous_file_with_part_files(self):
         # if we have already written part files (checkpoints) for a file, a later read error must
         # NOT trigger a retry: re-reading the file from the start would create duplicate / inconsistent

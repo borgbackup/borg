@@ -1324,24 +1324,34 @@ class ChunksProcessor:
             del item.chunks_healthy
         from_chunk = 0
         part_number = 1
-        for chunk in chunk_iter:
-            item.chunks.append(chunk_processor(chunk))
-            if show_progress:
-                stats.show_progress(item=item, dt=0.2)
-            from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
-        else:
-            if part_number > 1:
-                if item.chunks[from_chunk:]:
-                    # if we already have created a part item inside this file, we want to put the final
-                    # chunks (if any) into a part item also (so all parts can be concatenated to get
-                    # the complete file):
-                    from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=True)
+        try:
+            for chunk in chunk_iter:
+                item.chunks.append(chunk_processor(chunk))
+                if show_progress:
+                    stats.show_progress(item=item, dt=0.2)
+                from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
+            else:
+                if part_number > 1:
+                    if item.chunks[from_chunk:]:
+                        # if we already have created a part item inside this file, we want to put the final
+                        # chunks (if any) into a part item also (so all parts can be concatenated to get
+                        # the complete file):
+                        from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=True)
 
-                # if we created part files, we have referenced all chunks from the part files,
-                # but we also will reference the same chunks also from the final, complete file:
-                for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
-                stats.nfiles_parts += part_number - 1
+                    # if we created part files, we have referenced all chunks from the part files,
+                    # but we also will reference the same chunks also from the final, complete file:
+                    for chunk in item.chunks:
+                        cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
+                    stats.nfiles_parts += part_number - 1
+        except BackupOSError:
+            # a read error happened after we already read (and added to the repo/cache) some chunks.
+            # the chunks we added since the last checkpoint (item.chunks[from_chunk:]) are not referenced
+            # by any (committed) part item, so they would leak (bad refcount / orphan chunk) - roll them
+            # back. the chunks before from_chunk are referenced by part items we already wrote, keep them.
+            for chunk in item.chunks[from_chunk:]:
+                cache.chunk_decref(chunk.id, stats)
+            item.chunks = item.chunks[:from_chunk]
+            raise
         # part_number > 1 means we wrote part files (checkpoints) for this file:
         return part_number
 

@@ -308,6 +308,7 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
         # framing rather than the authenticated payload, which made the repair flaky on Windows.
         corrupted_chunk = corrupt(chunk, len(chunk) // 2)
         repository.put(archive.id, corrupted_chunk)
+        repository.flush()  # N>1: make the put durable before close()/the check below
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive2" in output
@@ -366,6 +367,7 @@ def test_spoofed_archive(archivers, request):
                 ro_type=ROBJ_FILE_STREAM,  # a real archive is stored with ROBJ_ARCHIVE_META
             ),
         )
+        repository.flush()  # N>1: make the put durable before close()/the check below
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", "--debug", exit_code=0)
     output = cmd(archiver, "repo-list")
@@ -384,6 +386,7 @@ def test_extra_chunks(archivers, request):
         key = b"01234567890123456789012345678901"
         chunk = fchunk(b"xxxx", chunk_id=key)
         repository.put(key, chunk)
+        repository.flush()  # N>1: make the put durable before close()/the check below
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 

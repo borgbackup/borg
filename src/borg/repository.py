@@ -507,7 +507,7 @@ class Repository:
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._chunks = None
-        self._pack_writer = PackWriter(self.store, max_count=1, repository=self)
+        self._pack_writer = PackWriter(self.store, max_count=2, repository=self)
         self.opened = True
 
     @property

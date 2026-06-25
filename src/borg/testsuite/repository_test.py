@@ -5,6 +5,7 @@ from hashlib import sha256
 import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
+from ..constants import UNKNOWN_BYTES32
 from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, PackReader
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
@@ -124,6 +125,7 @@ def test_read_data(repo_fixtures, request):
         chunk_complete = hdr + meta + data
         chunk_short = hdr + meta
         repository.put(H(0), chunk_complete)
+        repository.flush()  # N>1: make the buffered pack durable before get()
         assert repository.get(H(0)) == chunk_complete
         assert repository.get(H(0), read_data=True) == chunk_complete
         assert repository.get(H(0), read_data=False) == chunk_short
@@ -132,14 +134,46 @@ def test_read_data(repo_fixtures, request):
 def test_consistency(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
+        repository.flush()  # N>1: flush before reading the just-put chunk back
         assert pdchunk(repository.get(H(0))) == b"foo"
         repository.put(H(0), fchunk(b"foo2"))
+        repository.flush()
         assert pdchunk(repository.get(H(0))) == b"foo2"
         repository.put(H(0), fchunk(b"bar"))
+        repository.flush()
         assert pdchunk(repository.get(H(0))) == b"bar"
         # delete is a no-op for now (see Repository.delete): the latest put still wins.
         repository.delete(H(0))
         assert pdchunk(repository.get(H(0))) == b"bar"
+
+
+def test_multi_object_pack_roundtrip(repo_fixtures, request):
+    # Two objects fill one pack and must both read back: the second from a non-zero offset, and
+    # read_data=False returning only its header+meta. The test pins max_count=2 so it does not depend
+    # on the Repository.open() default; the compact tests override max_count via build_one_pack() too.
+    meta0, data0 = b"meta0", b"the-first-object"
+    meta1, data1 = b"m1", b"second"
+    chunk0 = fchunk(data0, meta=meta0, chunk_id=H(0))
+    chunk1 = fchunk(data1, meta=meta1, chunk_id=H(1))
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # this test is written for exactly two objects per pack
+        repository.put(H(0), chunk0)
+        assert repository.chunks[H(0)].pack_id == UNKNOWN_BYTES32  # buffered: the pack is not full yet
+        repository.put(H(1), chunk1)  # fills the pack, flushing both objects at once
+        # both objects share one pack, written exactly once, laid out in put() order
+        pack_id = repository.chunks[H(0)].pack_id
+        assert pack_id != UNKNOWN_BYTES32
+        assert repository.chunks[H(1)].pack_id == pack_id
+        assert [info.name for info in repository.store_list("packs")] == [bin_to_hex(pack_id)]
+        assert repository.chunks[H(0)].obj_offset == 0
+        assert repository.chunks[H(1)].obj_offset == len(chunk0)  # second object read from a non-zero offset
+        # full reads return each object's exact bytes, the second one resolved from its non-zero offset
+        assert repository.get(H(0)) == chunk0
+        assert repository.get(H(1)) == chunk1
+        # read_data=False returns header+meta only and stays inside the requested object
+        hdr_size = RepoObj.obj_header.size
+        assert repository.get(H(0), read_data=False) == chunk0[: hdr_size + len(meta0)]
+        assert repository.get(H(1), read_data=False) == chunk1[: hdr_size + len(meta1)]
 
 
 def build_one_pack(repository, objects):
@@ -226,6 +260,7 @@ def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)
         repository.put(H(0), fchunk(max_data))
+        repository.flush()  # N>1: make the buffered pack durable before get()
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):
             repository.put(H(1), fchunk(max_data + b"x"))
@@ -399,13 +434,16 @@ def test_get_uses_chunk_index_location(tmp_path):
 
 
 def test_put_marks_id_in_chunk_index(tmp_path):
-    # put() immediately updates _chunks: add() marks the id as seen, then update_pack_info
-    # fills in the real pack location for the current session.
+    # At N>1, put() marks the id pending (pack_id=UNKNOWN_BYTES32); flush() then fills in the
+    # real pack location for the current session.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         id1 = H(1)
         repository.put(id1, fchunk(b"ZEROS"))
         entry = repository._chunks.get(id1)
         assert entry is not None
+        assert entry.pack_id == UNKNOWN_BYTES32  # buffered, not yet flushed
+        repository.flush()
+        entry = repository._chunks.get(id1)
         assert entry.pack_id == sha256(fchunk(b"ZEROS")).digest()
         assert entry.size == 0  # uncompressed size filled in by cache layer
 

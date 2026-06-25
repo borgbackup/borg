@@ -95,14 +95,14 @@ def test_basic_operations(repo_fixtures, request):
 def test_chunk_index_persisted_on_close(tmp_path):
     # close() must serialize the live chunk index into the repo cache, so a freshly opened
     # repo can resolve pack locations without any manual hand-off. This proves the round-trip
-    # by reading the persisted index back directly (not via a repo rescan, which at N=1 would
-    # reconstruct the same entries and so could mask a broken persist step).
+    # by reading the persisted index back directly (not via a repo rescan, which would reconstruct
+    # the same entries from the pack headers and so could mask a broken persist step).
     from ..cache import list_chunkindex_hashes, read_chunkindex_from_repo
 
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         for x in range(10):
-            repository.put(H(x), fchunk(b"DATA"))  # N=1: each put() flushes immediately
+            repository.put(H(x), fchunk(b"DATA"))
     # reopen and read the cached fragments straight from disk
     with Repository(location, exclusive=True) as repository:
         persisted = ChunkIndex()
@@ -125,7 +125,7 @@ def test_read_data(repo_fixtures, request):
         chunk_complete = hdr + meta + data
         chunk_short = hdr + meta
         repository.put(H(0), chunk_complete)
-        repository.flush()  # N>1: make the buffered pack durable before get()
+        repository.flush()  # make the buffered pack durable before get()
         assert repository.get(H(0)) == chunk_complete
         assert repository.get(H(0), read_data=True) == chunk_complete
         assert repository.get(H(0), read_data=False) == chunk_short
@@ -134,7 +134,7 @@ def test_read_data(repo_fixtures, request):
 def test_consistency(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
-        repository.flush()  # N>1: flush before reading the just-put chunk back
+        repository.flush()  # flush before reading the just-put chunk back
         assert pdchunk(repository.get(H(0))) == b"foo"
         repository.put(H(0), fchunk(b"foo2"))
         repository.flush()
@@ -260,7 +260,7 @@ def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)
         repository.put(H(0), fchunk(max_data))
-        repository.flush()  # N>1: make the buffered pack durable before get()
+        repository.flush()  # make the buffered pack durable before get()
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):
             repository.put(H(1), fchunk(max_data + b"x"))
@@ -434,7 +434,7 @@ def test_get_uses_chunk_index_location(tmp_path):
 
 
 def test_put_marks_id_in_chunk_index(tmp_path):
-    # At N>1, put() marks the id pending (pack_id=UNKNOWN_BYTES32); flush() then fills in the
+    # put() marks the id pending (pack_id=UNKNOWN_BYTES32); flush() then fills in the
     # real pack location for the current session.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         id1 = H(1)
@@ -481,8 +481,8 @@ def test_check_detects_index_corruption(tmp_path):
 
 
 def test_check_intact_multi_object_pack_passes(tmp_path):
-    # An intact pack with several objects (the N>1 case) passes: it is hashed as a whole, so the
-    # object count does not matter.
+    # An intact pack with several objects passes: it is hashed as a whole, so the object count
+    # does not matter.
     pack = fchunk(b"A", chunk_id=H(1)) + fchunk(b"BB", chunk_id=H(2)) + fchunk(b"CCC", chunk_id=H(3))
     pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:

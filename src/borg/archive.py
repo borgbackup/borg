@@ -1842,9 +1842,9 @@ class ArchiveChecker:
         if defect_chunks:
             if self.repair:
                 # We would remove the defect chunks here, but single-object delete is not implemented
-                # yet (Repository.delete is a no-op: dropping a chunk means dropping its whole pack,
-                # which at N>1 takes good chunks with it). So we recheck each chunk and only report
-                # the ones that keep failing; real removal will come via compact once delete works at N>1.
+                # yet (Repository.delete is a no-op: a pack holds multiple objects, so dropping the
+                # whole pack to drop one chunk would take the good ones with it). So we recheck each
+                # chunk and only report the ones that keep failing; real removal will come via compact.
                 logger.warning("Found defect chunks. They can not be removed yet and are only reported.")
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
@@ -1858,10 +1858,10 @@ class ArchiveChecker:
                         self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
                     except IntegrityErrorBase:
                         # failed twice -> we would like to get rid of this defect chunk. We must not
-                        # drop its whole pack here: at N>1 the pack holds other, good chunks too.
+                        # drop its whole pack here: the pack holds other, good chunks too.
                         # Repository.delete is a no-op for now (it just logs); real single-object
                         # removal will happen via compact.
-                        # TODO: actually remove the defect chunk once delete works at N>1.
+                        # TODO: actually remove the defect chunk once single-object delete exists.
                         self.repository.delete(defect_chunk)
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))

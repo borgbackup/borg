@@ -329,7 +329,7 @@ class Archives:
         if isinstance(ts, datetime):
             ts = ts.isoformat(timespec="microseconds")
         assert isinstance(ts, str)
-        # flush buffered packs first: the pointer must not reference objects still buffered at N>1.
+        # flush buffered packs first: the pointer must not reference objects still sitting in the pack writer.
         self.repository.flush()
         # we only create a directory entry, its name points to the archive item:
         self.repository.store_store(f"archives/{bin_to_hex(id)}", b"")

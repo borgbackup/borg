@@ -736,10 +736,10 @@ class Repository:
                 raise self.ObjectNotFound(id, str(self._location))
             return None
         if entry.pack_id == UNKNOWN_BYTES32:
-            # chunk is buffered in PackWriter, not yet flushed to a pack. at N=1 put() flushes
-            # immediately, so reaching here points at a flush / index-update ordering bug, not a
-            # genuinely missing object. this is a code bug, so we crash loudly regardless of
-            # raise_missing instead of pretending the object is absent.
+            # chunk is buffered in PackWriter, not yet flushed to a pack. Everything must be flushed
+            # before it can be read back, so reaching here points at a flush / index-update ordering
+            # bug, not a genuinely missing object. this is a code bug, so we crash loudly regardless
+            # of raise_missing instead of pretending the object is absent.
             raise self.PackLocationUnknown(id, str(self._location))
         pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
@@ -753,10 +753,10 @@ class Repository:
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
                 load_size = hdr_size + extra_size
-                # keep the read inside this object: at N>1 a pack holds neighbouring objects, so
-                # don't pull bytes past obj_size into the next one. (an overshoot would be harmless
-                # -- parse_meta uses the header's length and ignores trailing bytes -- this is just
-                # tidy.) obj_size comes from the same index we already route with.
+                # keep the read inside this object: a pack holds neighbouring objects, so don't pull
+                # bytes past obj_size into the next one. (an overshoot would be harmless -- parse_meta
+                # uses the header's length and ignores trailing bytes -- this is just tidy.) obj_size
+                # comes from the same index we already route with.
                 load_size = min(load_size, obj_size)
                 obj = self.store.load(key, offset=obj_offset, size=load_size)
                 hdr = obj[0:hdr_size]
@@ -787,9 +787,9 @@ class Repository:
     def put(self, id, data):
         """put a repo object
 
-        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples for
-        every chunk written to disk this call.  At max_count=1 this is always
-        one entry.
+        Buffers the chunk in the pack writer.  When the chunk fills the pack and
+        triggers a flush, returns a list of (chunk_id, pack_id, obj_offset, obj_size)
+        tuples, one per chunk written to disk by that flush; otherwise returns None.
         """
         self._lock_refresh()
         data_size = len(data)
@@ -804,7 +804,7 @@ class Repository:
         # We can not remove one object by dropping its whole pack without losing the pack's other
         # objects; real removal is store_delete at the pack level (compact). For now just check the
         # object exists (ObjectNotFound contract), log, and do nothing.
-        # TODO: delete a single object once a pack can hold more than one (N>1).
+        # TODO: implement single-object delete (today removal only happens at the pack level, via compact).
         entry = self.chunks.get(id)
         if entry is None:
             raise self.ObjectNotFound(id, str(self._location))

@@ -184,8 +184,8 @@ def delete_chunk(repository, id):
     """Drop the pack holding chunk `id` (test damage helper).
 
     Repository.delete is a no-op now, so tests that need a chunk to really vanish drop its whole
-    pack at the store level. Works at N=1 (one chunk per pack). The pack is resolved through the
-    chunk index, since the pack file name is the pack_id, which need not equal the chunk_id.
+    pack at the store level (any other chunks sharing that pack go too). The pack is resolved
+    through the chunk index, which maps the chunk to its pack file.
     """
     entry = repository.chunks.get(id)
     if entry is not None:

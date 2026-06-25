@@ -150,7 +150,7 @@ def test_compact_packs_respects_threshold(tmp_path):
     # Two multi-object packs in one repo, then pack-level compaction at a 40% threshold. The pack that
     # wastes 2/3 of its bytes is rewritten down to its single survivor (and its old file deleted); the
     # pack that wastes only 1/3 stays untouched, since copying its survivors to reclaim that little is
-    # not worth it. This covers the rewrite, leave-alone and keep/drop split that N=1 can't reach.
+    # not worth it. This covers the rewrite, leave-alone and keep/drop split unique to multi-object packs.
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")

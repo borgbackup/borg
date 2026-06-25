@@ -297,7 +297,8 @@ class DebugMixIn:
                 if entry is None:
                     print("object %s not found." % hex_id)
                 else:
-                    # N=1: one chunk per pack, so dropping the pack removes just this object; N>1 needs compaction.
+                    # Drops the whole pack holding this object, so any other objects in it go too.
+                    # A debug tool; for a surgical single-object removal, use compact.
                     try:
                         repository.store_delete("packs/" + bin_to_hex(entry.pack_id))
                     except StoreObjectNotFound:

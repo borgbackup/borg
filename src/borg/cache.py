@@ -656,7 +656,7 @@ def build_chunkindex_from_repo(
     # Read each pack's object headers with borgstore range requests, fetching only the fixed-size
     # headers and skipping the (much larger) encrypted payloads. Don't call Repository.list() here:
     # it iterates this same index we are building, so it would recurse. The headers also give each
-    # object's real (chunk_id, offset, size), so this is not limited to one object per pack.
+    # object's real (chunk_id, offset, size), so every object in a pack is indexed individually.
     for info in repository.store_list("packs"):
         # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
         repository._lock_refresh()

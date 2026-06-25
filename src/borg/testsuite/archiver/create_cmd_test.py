@@ -887,13 +887,17 @@ def test_create_json(archivers, request):
     assert "stats" in archive
 
 
-def test_explicit_hostname_and_username(archivers, request):
+def test_hostname_and_username_override(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "--hostname", "foo_host", "--username", "bar_user", "test", "input")
-    info = json.loads(cmd(archiver, "info", "--json", "test"))
+    monkeypatch.setenv("BORG_HOSTNAME", "foo_host")
+    monkeypatch.setenv("BORG_USERNAME", "bar_user")
+    # the override is also used to fill the {hostname}/{user} placeholders in the archive name:
+    cmd(archiver, "create", "{hostname}-{user}", "input")
+    info = json.loads(cmd(archiver, "info", "--json", "foo_host-bar_user"))
     archive = info["archives"][0]
+    assert archive["name"] == "foo_host-bar_user"
     assert archive["hostname"] == "foo_host"
     assert archive["username"] == "bar_user"
 

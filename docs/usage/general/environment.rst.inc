@@ -49,6 +49,14 @@ General:
         So, if you have an all-zero MAC address or other reasons to better control the host id externally, just set this
         environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
         use FQDN@uniqueid.
+    BORG_HOSTNAME
+        When set, use this value as the hostname (instead of the auto-detected one), e.g. to run borg
+        on one host, but impersonate another host. This affects the hostname stored in newly created
+        archives as well as the ``{hostname}`` placeholder.
+    BORG_USERNAME
+        When set, use this value as the username (instead of the auto-detected one), e.g. to run borg
+        as one user, but impersonate another user. This affects the username stored in newly created
+        archives as well as the ``{user}`` placeholder.
     BORG_LOCK_WAIT
         You can set the default value for the ``--lock-wait`` option with this, so
         you do not need to give it as a command line option.

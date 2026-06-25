@@ -475,8 +475,6 @@ class Archive:
         log_json=False,
         iec=False,
         deleted=False,
-        hostname=None,
-        username=None,
     ):
         name_is_id = isinstance(name, bytes)
         if not name_is_id:
@@ -495,8 +493,6 @@ class Archive:
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
         self.tags = None
-        self.hostname = hostname if hostname is not None else platform.hostname
-        self.username = username if username is not None else getuser()
         self.numeric_ids = numeric_ids
         self.noatime = noatime
         self.noctime = noctime
@@ -658,8 +654,8 @@ Duration: {0.duration}
             "item_ptrs": item_ptrs,  # see #1473
             "command_line": join_cmd(sys.argv),
             "cwd": self.cwd,
-            "hostname": self.hostname,
-            "username": self.username,
+            "hostname": os.environ.get("BORG_HOSTNAME") or platform.hostname,
+            "username": os.environ.get("BORG_USERNAME") or getuser(),
             "time": nominal.isoformat(timespec="microseconds"),
             "start": start.isoformat(timespec="microseconds"),
             "end": end.isoformat(timespec="microseconds"),

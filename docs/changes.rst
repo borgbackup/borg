@@ -426,6 +426,8 @@ New features:
   and repository chunk statistics, #9579, #9757
 - prune: show total vs matching archives in output, #9262
 - create --exclude-dataless: macOS: skip cloud files not materialized locally, #9746
+- create: add --hostname and --username to explicitly set hostname/username
+  stored in the archive, #9651
 - Minimal implementation of "related repositories", #9645
 
   This feature allows multiple repositories to share deduplication-relevant secrets

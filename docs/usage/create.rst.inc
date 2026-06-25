@@ -119,6 +119,10 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                                  |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--hostname HOSTNAME``                           | explicitly set hostname for the archive (default: current hostname)                                                                                               |
+    +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--username USERNAME``                           | explicitly set username for the archive (default: current username)                                                                                               |
+    +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -193,6 +197,8 @@ borg create
         -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
         --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
+        --hostname HOSTNAME                           explicitly set hostname for the archive (default: current hostname)
+        --username USERNAME                           explicitly set username for the archive (default: current username)
 
 
 Description

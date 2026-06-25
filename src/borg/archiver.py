@@ -722,7 +722,8 @@ class Archiver:
                                   numeric_ids=args.numeric_ids, noatime=not args.atime, noctime=args.noctime,
                                   progress=args.progress,
                                   chunker_params=args.chunker_params, start=t0, start_monotonic=t0_monotonic,
-                                  log_json=args.log_json, iec=args.iec)
+                                  log_json=args.log_json, iec=args.iec,
+                                  hostname=args.hostname, username=args.username)
                 metadata_collector = MetadataCollector(noatime=not args.atime, noctime=args.noctime,
                     noflags=args.nobsdflags or args.noflags, noacls=args.noacls, noxattrs=args.noxattrs,
                     numeric_ids=args.numeric_ids, nobirthtime=args.nobirthtime)
@@ -4002,6 +4003,12 @@ class Archiver:
                                    type=CompressionSpec, default=CompressionSpec('lz4'),
                                    help='select compression algorithm, see the output of the '
                                         '"borg help compression" command for details.')
+        archive_group.add_argument('--hostname', metavar='HOSTNAME', dest='hostname',
+                                   type=str, default=None, action=Highlander,
+                                   help='explicitly set hostname for the archive (default: current hostname)')
+        archive_group.add_argument('--username', metavar='USERNAME', dest='username',
+                                   type=str, default=None, action=Highlander,
+                                   help='explicitly set username for the archive (default: current username)')
 
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),

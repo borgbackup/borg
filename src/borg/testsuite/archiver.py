@@ -2251,6 +2251,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert len(archive['id']) == 64
         assert 'stats' in archive
 
+    def test_create_explicit_hostname_and_username(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', '--hostname', 'foo_host', '--username', 'bar_user',
+                 self.repository_location + '::test', 'input')
+        info = json.loads(self.cmd('info', '--json', self.repository_location + '::test'))
+        archive = info['archives'][0]
+        assert archive['hostname'] == 'foo_host'
+        assert archive['username'] == 'bar_user'
+
     def test_create_topical(self):
         self.create_regular_file('file1', size=1024 * 80)
         time.sleep(1)  # file2 must have newer timestamps than file1

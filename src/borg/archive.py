@@ -49,7 +49,8 @@ from .helpers import utcnow
 from .lrucache import LRUCache
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
-from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
+from . import platform
+from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .remote import cache_if_remote
 from .repository import Repository, LIST_SCAN_LIMIT
 
@@ -434,7 +435,8 @@ class Archive:
                  checkpoint_interval=1800, numeric_ids=False, noatime=False, noctime=False,
                  noflags=False, noacls=False, noxattrs=False,
                  progress=False, chunker_params=CHUNKER_PARAMS, start=None, start_monotonic=None, end=None,
-                 consider_part_files=False, log_json=False, iec=False):
+                 consider_part_files=False, log_json=False, iec=False,
+                 hostname=None, username=None):
         self.cwd = os.getcwd()
         self.key = key
         self.repository = repository
@@ -447,6 +449,8 @@ class Archive:
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
+        self.hostname = hostname if hostname is not None else platform.hostname
+        self.username = username if username is not None else getuser()
         self.tam_verified = False
         self.checkpoint_interval = checkpoint_interval
         self.numeric_ids = numeric_ids
@@ -632,8 +636,8 @@ Utilization of max. archive size: {csize_max:.0%}
             'comment': comment or '',
             'items': self.items_buffer.chunks,
             'cmdline': sys.argv,
-            'hostname': hostname,
-            'username': getuser(),
+            'hostname': self.hostname,
+            'username': self.username,
             'time': start.strftime(ISO_FORMAT),
             'time_end': end.strftime(ISO_FORMAT),
             'cwd': self.cwd,

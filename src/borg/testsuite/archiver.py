@@ -30,7 +30,7 @@ import pytest
 import borg
 import borg.helpers.errors
 from .. import xattr, helpers, platform
-from ..archive import Archive, ChunkBuffer
+from ..archive import Archive, ChunkBuffer, ChunksProcessor
 from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
 from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
@@ -1236,6 +1236,106 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         assert paths == ['input/file1', 'input/dir1', 'input/file4']
+
+    def test_create_erroneous_file(self):
+        chunk_size = 1000  # fixed chunker with this block size, fail chunker reads same size blocks
+        self.create_regular_file('file1', size=chunk_size * 2)
+        self.create_regular_file('file2', size=chunk_size * 2)
+        self.create_regular_file('file3', size=chunk_size * 2)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        flist = ''.join(f'input/file{n}\n' for n in range(1, 4))
+        out = self.cmd(
+            'create',
+            f'--chunker-params=fail,{chunk_size},rrrEEErrrr',
+            '--paths-from-stdin',
+            '--list',
+            self.repository_location + '::test',
+            input=flist.encode(),
+            exit_code=0,
+        )
+        assert 'retry: 3 of ' in out
+        assert 'E input/file2' not in out  # we managed to read it in the 3rd retry (after 3 failed reads)
+        # repo looking good overall? checks for rc == 0.
+        self.cmd('check', '--debug', self.repository_location)
+        # check files in created archive
+        out = self.cmd('list', self.repository_location + '::test')
+        assert 'input/file1' in out
+        assert 'input/file2' in out
+        assert 'input/file3' in out
+
+    def test_create_erroneous_file_with_part_files(self):
+        # if we have already written part files (checkpoints) for a file, a later read error must
+        # NOT trigger a retry: re-reading the file from the start would create duplicate / inconsistent
+        # part files (concatenating all part files would then not yield the complete file any more).
+        # so such a file must be skipped (status "E") instead of being retried.
+        chunk_size = 1000
+        self.create_regular_file('file1', size=chunk_size * 2)
+        self.create_regular_file('file2', size=chunk_size * 2)
+        self.create_regular_file('file3', size=chunk_size * 2)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        flist = ''.join(f'input/file{n}\n' for n in range(1, 4))
+
+        orig_maybe_checkpoint = ChunksProcessor.maybe_checkpoint
+
+        def always_checkpoint(self, item, from_chunk, part_number, forced=False):
+            # force writing a checkpoint part file after every chunk
+            return orig_maybe_checkpoint(self, item, from_chunk, part_number, forced=True)
+
+        with patch.object(ChunksProcessor, 'maybe_checkpoint', always_checkpoint):
+            # file2: 1st block reads ok (a part file gets written for it), 2nd block fails with an
+            # I/O error. as a part file was already written, file2 must not be retried, but skipped.
+            out = self.cmd(
+                'create',
+                f'--chunker-params=fail,{chunk_size},rrrErr',
+                '--paths-from-stdin',
+                '--list',
+                self.repository_location + '::test',
+                input=flist.encode(),
+                exit_code=1,
+            )
+        assert 'retry: ' not in out  # the read error happened after a part file was written -> no retry
+        assert 'E input/file2' in out  # file2 was skipped, not retried into success
+        # repo looking good overall? checks for rc == 0.
+        self.cmd('check', '--debug', self.repository_location)
+        # file1 and file3 were backed up ok; file2 only exists as an orphan part file (hidden by default):
+        out = self.cmd('list', self.repository_location + '::test')
+        assert 'input/file1' in out
+        assert 'input/file2' not in out
+        assert 'input/file3' in out
+
+    @pytest.mark.skipif(not is_win32 and os.getuid() == 0, reason='test must not be run as (fake)root')
+    def test_create_no_permission_file(self):
+        # retries are pointless for permission errors (they will not get better), so a file we have
+        # no read permission for must NOT be retried, but skipped right away (status "E").
+        self.create_regular_file('file1', size=1000)
+        self.create_regular_file('file2', size=1000)
+        self.create_regular_file('file3', size=1000)
+        file2 = os.path.join(self.input_path, 'file2')
+        # revoke read permissions on file2 for everybody, including us:
+        if is_win32:
+            subprocess.run(['icacls.exe', file2, '/deny', 'everyone:(R)'])
+        else:
+            # note: this will NOT take away read permissions for root
+            os.chmod(file2, 0o000)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        flist = ''.join(f'input/file{n}\n' for n in range(1, 4))
+        out = self.cmd(
+            'create',
+            '--paths-from-stdin',
+            '--list',
+            self.repository_location + '::test',
+            input=flist.encode(),
+            exit_code=EXIT_WARNING,  # WARNING status: could not back up file2.
+        )
+        assert 'retry: 1 of ' not in out  # retries were NOT attempted!
+        assert 'E input/file2' in out  # no permissions!
+        # repo looking good overall? checks for rc == 0.
+        self.cmd('check', '--debug', self.repository_location)
+        # check files in created archive
+        out = self.cmd('list', self.repository_location + '::test')
+        assert 'input/file1' in out
+        assert 'input/file2' not in out  # it skipped file2
+        assert 'input/file3' in out
 
     def test_create_paths_from_command(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

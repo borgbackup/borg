@@ -20,7 +20,9 @@ class TestAdHocWithFilesCache:
         self.repository_location = os.path.join(str(tmpdir), "repository")
         with Repository(self.repository_location, exclusive=True, create=True) as repository:
             repository.put(H(1), b"1234")
+            repository.flush()  # N>1: the lone put would stay buffered; make it durable
             yield repository
+            repository.flush()  # flush anything a test buffered via the cache before close()
 
     @pytest.fixture
     def key(self, repository, monkeypatch):

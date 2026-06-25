@@ -685,6 +685,11 @@ Duration: {0.duration}
                 raise Error("%s - archive too big (issue #1473)!" % err_msg)
             else:
                 raise
+        # Flush buffered packs before writing the archives/* pointer (the "commit"). At N>1 the
+        # archive metadata and the file/item chunks may still be buffered in the pack writer; the
+        # pointer must never reference objects that are not yet durable on disk, otherwise a crash
+        # (or a read-back within the same session, e.g. borg transfer) sees a dangling reference.
+        self.repository.flush()
         self.manifest.archives.create(name, self.id, metadata.time)
         self.manifest.write()
         return metadata

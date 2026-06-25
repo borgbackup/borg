@@ -281,6 +281,7 @@ class DebugMixIn:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
 
         repository.put(id, data)
+        repository.flush()  # no cache wraps this command, so flush the buffered pack before close()
         print("object %s put." % hex_id)
 
     @with_repository(manifest=False, exclusive=True)

@@ -583,6 +583,49 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(victim_file) as fd:
             assert fd.read() == 'original'
 
+    def test_extract_hardlink_through_symlinked_source(self):
+        # Security: a hardlink whose source traverses a symlink (here "evil" -> victim dir,
+        # source "evil/secret") must NOT link an external file into the extracted tree.
+        if self.prefix:
+            pytest.skip('malicious archive is crafted via direct (local) repository access')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        victim_dir = os.path.join(self.tmpdir, 'victim')
+        os.mkdir(victim_dir)
+        secret = os.path.join(victim_dir, 'secret')
+        with open(secret, 'w') as fd:
+            fd.write('secret')
+        attrs = dict(mtime=0, uid=0, gid=0, user='root', group='root')
+        self._create_malicious_archive('evil', [
+            Item(path='evil', mode=stat.S_IFLNK | 0o777, source=victim_dir, **attrs),
+            Item(path='pwned', mode=stat.S_IFREG | 0o644, source='evil/secret', **attrs),
+        ])
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::evil', exit_code=EXIT_WARNING)
+        assert 'hardlink source path is unsafe' in output
+        # no hardlink to the external file was created
+        assert not os.path.exists(os.path.join(self.output_path, 'pwned'))
+        with open(secret) as fd:
+            assert fd.read() == 'secret'
+
+    def test_extract_hardlink_source_with_embedded_dotdot(self):
+        # Security: a hardlink whose source contains ".." must not be linked.
+        if self.prefix:
+            pytest.skip('malicious archive is crafted via direct (local) repository access')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        victim_dir = os.path.join(self.tmpdir, 'victim')
+        os.mkdir(victim_dir)
+        secret = os.path.join(victim_dir, 'secret')
+        with open(secret, 'w') as fd:
+            fd.write('secret')
+        attrs = dict(mtime=0, uid=0, gid=0, user='root', group='root')
+        self._create_malicious_archive('evil', [
+            Item(path='pwned', mode=stat.S_IFREG | 0o644, source='a/../../victim/secret', **attrs),
+        ])
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::evil', exit_code=EXIT_WARNING)
+        assert 'hardlink source path is unsafe' in output
+        assert not os.path.exists(os.path.join(self.output_path, 'pwned'))
+
     def test_extract_deep_tree_ok(self):
         # The parent-path guard (and its safe_dirs cache) must not break normal extraction of a
         # deep tree where many files share the same parent directories.

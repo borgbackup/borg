@@ -2251,6 +2251,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert len(archive['id']) == 64
         assert 'stats' in archive
 
+    def test_create_hostname_username_override(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file('file1', size=1024 * 80)
+        with environment_variable(BORG_HOSTNAME='foo_host', BORG_USERNAME='bar_user'):
+            # the override is also used to fill the {hostname}/{user} placeholders in the archive name:
+            self.cmd('create', self.repository_location + '::{hostname}-{user}', 'input')
+        info = json.loads(self.cmd('info', '--json', self.repository_location + '::foo_host-bar_user'))
+        archive = info['archives'][0]
+        assert archive['name'] == 'foo_host-bar_user'
+        assert archive['hostname'] == 'foo_host'
+        assert archive['username'] == 'bar_user'
+
     def test_create_topical(self):
         self.create_regular_file('file1', size=1024 * 80)
         time.sleep(1)  # file2 must have newer timestamps than file1

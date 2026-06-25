@@ -25,6 +25,8 @@ borg prune
     +-----------------------------------------------------------------------------+---------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``-s``, ``--stats``                               | print statistics for the deleted archive                                                                                          |
     +-----------------------------------------------------------------------------+---------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--quick-stats``                                 | print only deletion statistics, skipping repository-wide statistics                                                               |
+    +-----------------------------------------------------------------------------+---------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--list``                                        | output verbose list of archives it keeps/prunes                                                                                   |
     +-----------------------------------------------------------------------------+---------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--keep-within INTERVAL``                        | keep all archives within this time interval                                                                                       |
@@ -80,6 +82,7 @@ borg prune
         -n, --dry-run         do not change repository
         --force               force pruning of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
         -s, --stats           print statistics for the deleted archive
+        --quick-stats         print only deletion statistics, skipping repository-wide statistics
         --list                output verbose list of archives it keeps/prunes
         --keep-within INTERVAL    keep all archives within this time interval
         --keep-last, --keep-secondly    number of secondly archives to keep
@@ -163,3 +166,6 @@ When using ``--stats``, you will get some statistics about how much data was
 deleted - the "Deleted data" deduplicated size there is most interesting as
 that is how much your repository will shrink.
 Please note that the "All archives" stats refer to the state after pruning.
+``--stats`` can be slow - if you want something faster, use ``--quick-stats``
+(this skips the repository-wide "All archives" statistics).
+The ``--stats`` / ``--quick-stats`` and ``--dry-run`` options are mutually exclusive.

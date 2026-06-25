@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-patterns" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-patterns" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -52,6 +52,10 @@ start with \fBsrc\fP\&.
 When you back up relative paths like \fB\&../../src\fP, the archived paths
 start with \fBsrc\fP\&.
 .UNINDENT
+.IP \(bu 2
+When using the slashdot hack, patterns match against the unstripped path,
+i.e., when you back up \fB/this/gets/stripped/./this/gets/archived\fP,
+patterns must match \fBthis/gets/stripped/this/gets/archived\fP\&.
 .UNINDENT
 .sp
 A directory exclusion pattern can end either with or without a slash (\(aq/\(aq).

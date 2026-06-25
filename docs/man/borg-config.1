@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-config" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-config" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg-config \- get, set, and delete values in a repository or cache config file
 .SH SYNOPSIS
@@ -97,6 +97,12 @@ $ borg config /path/to/repo additional_free_space 2G
 
 # make a repo append\-only
 $ borg config /path/to/repo append_only 1
+
+# set storage quota to 50 GB
+$ borg config /path/to/repo storage_quota 50G
+
+# set maximum segment size to 100 MiB (see \(dqAdjusting segment size\(dq in Usage Notes)
+$ borg config /path/to/repo max_segment_size 104857600
 .EE
 .UNINDENT
 .UNINDENT

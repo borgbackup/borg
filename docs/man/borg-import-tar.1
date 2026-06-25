@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-import-tar" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-import-tar" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -95,6 +95,9 @@ filter program to pipe data through
 .TP
 .B  \-s\fP,\fB  \-\-stats
 print statistics for the created archive
+.TP
+.B  \-\-quick\-stats
+print only archive statistics, skipping repository\-wide statistics
 .TP
 .B  \-\-list
 output verbose list of items (files, dirs, ...)

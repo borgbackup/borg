@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-prune" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-prune" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -93,6 +93,9 @@ When using \fB\-\-stats\fP, you will get some statistics about how much data was
 deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting as
 that is how much your repository will shrink.
 Please note that the \(dqAll archives\(dq stats refer to the state after pruning.
+\fB\-\-stats\fP can be slow \- if you want something faster, use \fB\-\-quick\-stats\fP
+(this skips the repository\-wide \(dqAll archives\(dq statistics).
+The \fB\-\-stats\fP / \fB\-\-quick\-stats\fP and \fB\-\-dry\-run\fP options are mutually exclusive.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -113,6 +116,9 @@ force pruning of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-
 .TP
 .B  \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
+.TP
+.B  \-\-quick\-stats
+print only deletion statistics, skipping repository\-wide statistics
 .TP
 .B  \-\-list
 output verbose list of archives it keeps/prunes

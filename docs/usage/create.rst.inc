@@ -25,6 +25,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-s``, ``--stats``                               | print statistics for the created archive                                                                                                                          |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--quick-stats``                                 | print only archive statistics, skipping repository-wide statistics                                                                                                |
+    +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--list``                                        | output verbose list of items (files, dirs, ...)                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--filter STATUSCHARS``                          | only display items with the given status characters (see description)                                                                                             |
@@ -70,6 +72,8 @@ borg create
     |                                                       | ``--keep-exclude-tags``                           | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                                         |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-nodump``                              | exclude files flagged NODUMP                                                                                                                                      |
+    +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--exclude-dataless``                            | exclude files flagged DATALESS (macOS: placeholder files whose content is not materialized locally, e.g. not-downloaded cloud storage files)                      |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -135,6 +139,7 @@ borg create
     options
         -n, --dry-run    do not create a backup archive
         -s, --stats     print statistics for the created archive
+        --quick-stats    print only archive statistics, skipping repository-wide statistics
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
@@ -161,6 +166,7 @@ borg create
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
         --exclude-nodump                  exclude files flagged NODUMP
+        --exclude-dataless                exclude files flagged DATALESS (macOS: placeholder files whose content is not materialized locally, e.g. not-downloaded cloud storage files)
 
 
     Filesystem options
@@ -273,7 +279,9 @@ the currently processed path.
 When using ``--stats``, you will get some statistics about how much data was
 added - the "This Archive" deduplicated size there is most interesting as that is
 how much your repository will grow. Please note that the "All archives" stats refer to
-the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
+the state after creation. ``--stats`` can be slow - if you want something faster, use
+``--quick-stats`` (this skips the repository-wide "All archives" and chunk index statistics).
+The ``--stats`` / ``--quick-stats`` and ``--dry-run`` options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 
 For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
@@ -306,6 +314,20 @@ subvolumes of a Btrfs file system (different device numbers from the parent but 
 macOS examples are the APFS mounts of a typical macOS installation.
 Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
+
+Error handling
+++++++++++++++
+
+When Borg encounters a file or directory it cannot read (e.g., due to permission
+denied, or another process holding an exclusive lock on Windows), it will:
+
+- Log a warning message.
+- Skip that file or directory and continue backing up the remaining files.
+- Exit with a Warning RC at the end of the operation.
+
+This ensures that a single problematic file does not abort your entire backup.
+You should check your logs for these warnings to ensure that all important data
+is being backed up.
 
 .. _list_item_flags:
 

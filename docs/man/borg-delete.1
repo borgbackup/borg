@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-delete" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-delete" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg-delete \- Delete an existing repository or archives
 .SH SYNOPSIS
@@ -52,6 +52,9 @@ When using \fB\-\-stats\fP, you will get some statistics about how much data was
 deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting as
 that is how much your repository will shrink.
 Please note that the \(dqAll archives\(dq stats refer to the state after deletion.
+\fB\-\-stats\fP can be slow \- if you want something faster, use \fB\-\-quick\-stats\fP
+(this skips the repository\-wide \(dqAll archives\(dq statistics).
+The \fB\-\-stats\fP / \fB\-\-quick\-stats\fP and \fB\-\-dry\-run\fP options are mutually exclusive.
 .sp
 You can delete multiple archives by specifying a shell pattern to match
 multiple archives using the \fB\-\-glob\-archives GLOB\fP option (for more info on
@@ -83,6 +86,9 @@ output verbose list of archives
 .TP
 .B  \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
+.TP
+.B  \-\-quick\-stats
+print only deletion statistics, skipping repository\-wide statistics
 .TP
 .B  \-\-cache\-only
 delete only the local cache for the given repository

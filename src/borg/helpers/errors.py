@@ -142,6 +142,14 @@ class BackupPathTraversalError(BackupError):
     exit_mcode = 109
 
 
+class BackupHardlinkSourceError(BackupError):
+    """{}: not extracted, hardlink source path is unsafe (malicious or corrupted archive)"""
+    # Refusing to create a hardlink whose source path contains ".." or is below a symlinked
+    # directory (it could point outside the extraction directory). borg create never produces
+    # such items.
+    exit_mcode = 110
+
+
 class BackupOSError(BackupError):
     """{}: {}"""
     # Wrapper for OSError raised while accessing backup files.

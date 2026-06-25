@@ -27,7 +27,7 @@ from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError
-from .helpers import BackupSymlinkParentError, BackupPathTraversalError
+from .helpers import BackupSymlinkParentError, BackupPathTraversalError, BackupHardlinkSourceError
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Manifest
@@ -785,12 +785,26 @@ Utilization of max. archive size: {csize_max:.0%}
         hardlink_set = False
         # Hard link?
         if 'source' in item:
-            source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
+            # item.source is attacker-controlled and used as the hardlink target below. Refuse
+            # to follow a symlinked parent or ".." out of the extraction directory - otherwise a
+            # crafted archive could os.link() an arbitrary external file (e.g. /etc/shadow) into
+            # the extracted tree. Split on os.sep, consistent with the rest of borg.
+            source_components = item.source.split(os.sep)[stripped_components:]
+            try:
+                self._check_safe_parent(os.sep.join(source_components))
+            except BackupError:
+                raise BackupHardlinkSourceError(item.path) from None
+            source = os.path.join(dest, *source_components)
             chunks, link_target = hardlink_masters.get(item.source, (None, source))
             if link_target and has_link:
-                # Hard link was extracted previously, just link
+                # Hard link was extracted previously, just link.
+                # follow_symlinks=False: if the final source component is a symlink, link the
+                # symlink itself (a faithful restore) rather than the external file it targets.
                 with backup_io('link'):
-                    os.link(link_target, path)
+                    if os.link in os.supports_follow_symlinks:
+                        os.link(link_target, path, follow_symlinks=False)
+                    else:
+                        os.link(link_target, path)
                     hardlink_set = True
             elif chunks is not None:
                 # assign chunks to this item, since the item which had the chunks was not extracted

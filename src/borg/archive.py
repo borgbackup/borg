@@ -1565,6 +1565,9 @@ class FilesystemObjectProcessors:
                                 # not the last try and no part files written yet: trigger a retry by raising,
                                 # hoping that re-reading the file gives us a consistent copy. the retry is
                                 # done by the caller (Archiver._process_any).
+                                for chunk in item.chunks:
+                                    cache.chunk_decref(chunk.id, self.stats)
+                                item.chunks = []
                                 raise BackupError('file changed while we read it!')
                         if not is_special_file and not changed_while_backup:
                             # we must not memorize special files, because the contents of e.g. a

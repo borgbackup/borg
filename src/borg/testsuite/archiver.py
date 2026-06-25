@@ -1263,6 +1263,41 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'input/file2' in out
         assert 'input/file3' in out
 
+    def test_create_changed_file_retry_rolls_back_chunks(self):
+        self.create_regular_file('file1', contents=b'a' * 1000)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        orig_fstat = os.fstat
+        fstat_count = 0
+
+        def change_file_on_post_read_fstat(fd):
+            nonlocal fstat_count
+            st = orig_fstat(fd)
+            if stat.S_ISREG(st.st_mode):
+                fstat_count += 1
+            if fstat_count == 2:
+                with open('input/file1', 'wb') as file_fd:
+                    file_fd.write(b'b' * 1000)
+                os.utime('input/file1', ns=(st.st_atime_ns, st.st_mtime_ns + 1000**3))
+                return orig_fstat(fd)
+            return st
+
+        with patch('borg.archive.os.fstat', change_file_on_post_read_fstat):
+            out = self.cmd('create', '--list', self.repository_location + '::test', 'input')
+
+        assert 'retry: 1 of ' in out
+        assert 'E input/file1' not in out
+
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            archive = Archive(repository, key, manifest, 'test')
+            referenced_ids = {archive.id, *archive.metadata.items}
+            for item in archive.iter_items():
+                referenced_ids.update(chunk.id for chunk in item.get('chunks', []))
+            with Cache(repository, key, manifest) as cache:
+                cached_ids = {id for id, entry in cache.chunks.iteritems()}
+        assert cached_ids == referenced_ids
+
     def test_create_erroneous_file_with_part_files(self):
         # if we have already written part files (checkpoints) for a file, a later read error must
         # NOT trigger a retry: re-reading the file from the start would create duplicate / inconsistent

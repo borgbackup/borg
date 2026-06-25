@@ -822,9 +822,9 @@ class Archiver:
                 logger.warning(
                     f'{path}: {err}, slept {sleep_s:.3f}s, next: retry: {retry + 1} of {MAX_RETRIES - 1}...'
                 )
-                # we better do a fresh stat on the file, just to make sure to get the current file
-                # mode right (which could have changed due to a race condition and is important for
-                # dispatching) and also to get current inode number of that file.
+                # We retry by source path, assuming that this path or symlink target has not been
+                # exchanged against a different filesystem object while processing. Refresh the stat
+                # before dispatching again, so temporary changes are reflected in the next attempt.
                 with backup_io('stat'):
                     st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
 

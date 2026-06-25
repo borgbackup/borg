@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-serve" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-serve" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -53,7 +53,7 @@ restrict repository access. Only the repository located at PATH (no sub\-directo
 only allow appending to repository segment files. Note that this only affects the low level structure of the repository, and running \fIdelete\fP or \fIprune\fP or reading from the repository will still be allowed. See \fIappend_only_mode\fP in Additional Notes for more details.
 .TP
 .BI \-\-storage\-quota \ QUOTA
-Override storage quota of the repository (e.g. 5G, 1.5T). When a new repository is initialized, sets the storage quota on the new repository as well. Default: no quota.
+Set storage quota of the repository (has priority over the repository\(aqs own quota setting) (e.g. 5G, 1.5T). When a new repository is initialized, sets the storage quota on the new repository as well. Default: no quota.
 .UNINDENT
 .SH EXAMPLES
 .sp

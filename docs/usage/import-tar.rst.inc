@@ -25,6 +25,8 @@ borg import-tar
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-s``, ``--stats``                               | print statistics for the created archive                                                                                              |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--quick-stats``                                 | print only archive statistics, skipping repository-wide statistics                                                                    |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--list``                                        | output verbose list of items (files, dirs, ...)                                                                                       |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--filter STATUSCHARS``                          | only display items with the given status characters                                                                                   |
@@ -69,6 +71,7 @@ borg import-tar
     options
         --tar-filter    filter program to pipe data through
         -s, --stats     print statistics for the created archive
+        --quick-stats    print only archive statistics, skipping repository-wide statistics
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters
         --json          output stats as JSON (implies --stats)

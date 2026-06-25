@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-create" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-create" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -132,7 +132,9 @@ the currently processed path.
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
 added \- the \(dqThis Archive\(dq deduplicated size there is most interesting as that is
 how much your repository will grow. Please note that the \(dqAll archives\(dq stats refer to
-the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
+the state after creation. \fB\-\-stats\fP can be slow \- if you want something faster, use
+\fB\-\-quick\-stats\fP (this skips the repository\-wide \(dqAll archives\(dq and chunk index statistics).
+The \fB\-\-stats\fP / \fB\-\-quick\-stats\fP and \fB\-\-dry\-run\fP options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 .sp
 For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
@@ -158,6 +160,9 @@ do not create a backup archive
 .TP
 .B  \-s\fP,\fB  \-\-stats
 print statistics for the created archive
+.TP
+.B  \-\-quick\-stats
+print only archive statistics, skipping repository\-wide statistics
 .TP
 .B  \-\-list
 output verbose list of items (files, dirs, ...)
@@ -221,6 +226,9 @@ if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit 
 .TP
 .B  \-\-exclude\-nodump
 exclude files flagged NODUMP
+.TP
+.B  \-\-exclude\-dataless
+exclude files flagged DATALESS (macOS: placeholder files whose content is not materialized locally, e.g. not\-downloaded cloud storage files)
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -405,6 +413,22 @@ Linux examples for this are bind mounts (possibly same device number, but always
 subvolumes of a Btrfs file system (different device numbers from the parent but not necessarily mount points).
 macOS examples are the APFS mounts of a typical macOS installation.
 Therefore, when using \fB\-\-one\-file\-system\fP, you should double\-check that the backup works as intended.
+.SS Error handling
+.sp
+When Borg encounters a file or directory it cannot read (e.g., due to permission
+denied, or another process holding an exclusive lock on Windows), it will:
+.INDENT 0.0
+.IP \(bu 2
+Log a warning message.
+.IP \(bu 2
+Skip that file or directory and continue backing up the remaining files.
+.IP \(bu 2
+Exit with a Warning RC at the end of the operation.
+.UNINDENT
+.sp
+This ensures that a single problematic file does not abort your entire backup.
+You should check your logs for these warnings to ensure that all important data
+is being backed up.
 .SS Item flags
 .sp
 \fB\-\-list\fP outputs a list of all files, directories and other

@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg" "1" "2026-06-25" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -412,7 +412,7 @@ If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
 When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
 This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
 be checked.
-Main usecase for this is to fully automate \fBborg change\-passphrase\fP\&.
+Main usecase for this is to fully automate \fBborg key change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the \(dqdisplay the passphrase for verification\(dq question when defining a new passphrase for encrypted repositories.

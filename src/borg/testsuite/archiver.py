@@ -5008,6 +5008,14 @@ class RemoteArchiverTestCase(ArchiverTestCase):
     def test_debug_put_get_delete_obj(self):
         pass
 
+    @unittest.skip('only works locally')  # inspects cache chunk refcounts via a local Cache/Repository
+    def test_create_changed_file_retry_rolls_back_chunks(self):
+        pass
+
+    @unittest.skip('only works locally')  # inspects cache chunk refcounts via a local Cache/Repository
+    def test_create_erroneous_file_read_retry_rolls_back_chunks(self):
+        pass
+
     @unittest.skip('only works locally')
     def test_config(self):
         pass

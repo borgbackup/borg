@@ -144,9 +144,10 @@ def test_consistency(repo_fixtures, request):
         repository.put(H(0), fchunk(b"bar"))
         repository.flush()
         assert pdchunk(repository.get(H(0))) == b"bar"
-        # delete is a no-op for now (see Repository.delete): the latest put still wins.
+        # delete removes the object the index points at; the stale earlier copies are not resurrected.
         repository.delete(H(0))
-        assert pdchunk(repository.get(H(0))) == b"bar"
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(H(0))
 
 
 def test_multi_object_pack_roundtrip(repo_fixtures, request):

@@ -17,7 +17,6 @@ import pytest
 from ... import xattr, platform
 from ...archive import Archive
 from ...archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
-from ...cache import delete_chunkindex_from_repo, write_chunkindex_to_repo
 from ...constants import *  # NOQA
 from ...helpers import Location, umount
 from ...helpers import EXIT_SUCCESS
@@ -181,23 +180,8 @@ def open_archive(repo_path, name):
 
 
 def delete_chunk(repository, id):
-    """Remove a single chunk from the repo, leaving the rest of its pack intact (test damage helper).
-
-    A pack holds several objects, so dropping the whole pack would take innocent neighbours with it.
-    Route through Repository.compact_pack, which rewrites the pack without the target and re-points the
-    survivors, then persist the index the way `borg compact` does (invalidate the cached index before
-    the store change, write it back after) so a following borg process, e.g. `borg check`, sees it.
-    """
-    entry = repository.chunks.get(id)
-    if entry is None:
-        raise Repository.ObjectNotFound(id, repository)
-    pack_id = entry.pack_id
-    delete_chunkindex_from_repo(repository)  # invalidate the cached index before changing the store
-    # the index now rebuilds from the packs; keep every object in this pack except the target
-    keep_ids = {cid for cid, e in repository.chunks.iteritems() if e.pack_id == pack_id}
-    keep_ids.discard(id)
-    repository.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id})
-    write_chunkindex_to_repo(repository, repository.chunks, incremental=False, force_write=True, delete_other=True)
+    """Remove a single chunk from the repo, leaving the rest of its pack intact (test damage helper)."""
+    repository.delete(id)
 
 
 def open_repository(archiver):

@@ -293,14 +293,12 @@ class DebugMixIn:
             except ValueError:
                 print("object id %s is invalid." % hex_id)
             else:
-                entry = repository.chunks.get(id)
-                if entry is None:
+                try:
+                    repository.delete(id)
+                except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
                 else:
-                    # We can not drop a single object by removing its whole pack without losing the
-                    # pack's other objects, so do nothing for now, same as Repository.delete().
-                    # TODO: implement single-object delete (today removal only happens at the pack level, via compact).
-                    print("ignoring deletion of object %s (single-object delete not implemented yet)." % hex_id)
+                    print("object %s deleted." % hex_id)
         print("Done.")
 
     def do_debug_convert_profile(self, args):

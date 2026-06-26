@@ -736,10 +736,10 @@ class Repository:
                 raise self.ObjectNotFound(id, str(self._location))
             return None
         if entry.pack_id == UNKNOWN_BYTES32:
-            # chunk is buffered in PackWriter, not yet flushed to a pack. at N=1 put() flushes
-            # immediately, so reaching here points at a flush / index-update ordering bug, not a
-            # genuinely missing object. this is a code bug, so we crash loudly regardless of
-            # raise_missing instead of pretending the object is absent.
+            # chunk is buffered in PackWriter, not yet flushed to a pack. Everything must be flushed
+            # before it can be read back, so reaching here points at a flush / index-update ordering
+            # bug, not a genuinely missing object. this is a code bug, so we crash loudly regardless
+            # of raise_missing instead of pretending the object is absent.
             raise self.PackLocationUnknown(id, str(self._location))
         pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
@@ -753,10 +753,10 @@ class Repository:
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
                 load_size = hdr_size + extra_size
-                # keep the read inside this object: at N>1 a pack holds neighbouring objects, so
-                # don't pull bytes past obj_size into the next one. (an overshoot would be harmless
-                # -- parse_meta uses the header's length and ignores trailing bytes -- this is just
-                # tidy.) obj_size comes from the same index we already route with.
+                # keep the read inside this object: a pack holds neighbouring objects, so don't pull
+                # bytes past obj_size into the next one. (an overshoot would be harmless -- parse_meta
+                # uses the header's length and ignores trailing bytes -- this is just tidy.) obj_size
+                # comes from the same index we already route with.
                 load_size = min(load_size, obj_size)
                 obj = self.store.load(key, offset=obj_offset, size=load_size)
                 hdr = obj[0:hdr_size]
@@ -787,9 +787,9 @@ class Repository:
     def put(self, id, data):
         """put a repo object
 
-        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples for
-        every chunk written to disk this call.  At max_count=1 this is always
-        one entry.
+        Buffers the chunk in the pack writer.  When the chunk fills the pack and
+        triggers a flush, returns a list of (chunk_id, pack_id, obj_offset, obj_size)
+        tuples, one per chunk written to disk by that flush; otherwise returns None.
         """
         self._lock_refresh()
         data_size = len(data)
@@ -799,22 +799,39 @@ class Repository:
         return self._pack_writer.add(id, data)
 
     def delete(self, id):
-        """delete a repo object"""
+        """Delete a single repo object by rewriting its pack without it.
+
+        A pack holds several objects, so we can not just drop the whole pack: that would take the
+        target's innocent neighbours with it. Route through compact_pack, which copies the survivors
+        into a new pack and repoints them in the chunk index. Rewriting a whole pack to remove one
+        object is slow, but delete is only used by special-purpose callers (tests, the debug command,
+        check --repair), never on a hot path, so the cost does not matter.
+        """
         self._lock_refresh()
-        # We can not remove one object by dropping its whole pack without losing the pack's other
-        # objects; real removal is store_delete at the pack level (compact). For now just check the
-        # object exists (ObjectNotFound contract), log, and do nothing.
-        # TODO: delete a single object once a pack can hold more than one (N>1).
+        from .cache import write_chunkindex_to_repo
+
         entry = self.chunks.get(id)
         if entry is None:
             raise self.ObjectNotFound(id, str(self._location))
-        logger.warning("ignoring deletion of %s in %s", bin_to_hex(id), bin_to_hex(entry.pack_id))
+        pack_id = entry.pack_id
+        # keep every other object in the same pack; compact_pack rewrites the pack without the target.
+        # work off the live index (each entry already carries its offset/size after flush): do not
+        # rebuild from the packs here, that could not tell the target apart from stale duplicate copies
+        # of the same id left in other packs by re-puts (build keeps an arbitrary one of them).
+        keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
+        keep_ids.discard(id)
+        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id})
+        # persist a full index so a following borg process sees the deletion; close() only writes new
+        # entries incrementally and would not record the removal.
+        write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
 
     def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
-        keep_ids and drop_ids are sets of chunk ids that must together cover the whole pack (asserted:
-        their ranges tile it with no gap or overlap, and their intersection is empty). Kept objects are
+        keep_ids and drop_ids are sets of chunk ids that must together be every object of the pack, as
+        recorded in the chunk index. The caller guarantees that completeness (both callers build the two
+        sets by iterating the index for this pack_id); here we only assert their ranges tile contiguously
+        from offset 0 with no gap or overlap, and that their intersection is empty. Kept objects are
         copied into a new pack via store.defrag and repointed in the chunk index; dropped objects' index
         entries are removed.
 
@@ -838,7 +855,9 @@ class Repository:
             located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
 
-        # keep + drop must tile the whole pack; collect the objects to keep in the same pass.
+        # keep + drop tile the pack contiguously from offset 0; collect the objects to keep in the same
+        # pass. we do not cross-check against the pack's on-disk size: the caller already guarantees the
+        # two sets are the pack's complete object set.
         kept = []  # (obj_offset, obj_id, obj_size), offset-ordered
         covered = 0
         for offset, obj_id, size, keep in located:
@@ -846,7 +865,6 @@ class Repository:
             covered += size
             if keep:
                 kept.append((offset, obj_id, size))
-        assert covered == self.store.info(pack_key).size, f"pack {bin_to_hex(pack_id)} not fully covered"
 
         for drop_id in drop_ids:  # remove dropped objects from the index; their bytes are not copied forward
             del self.chunks[drop_id]

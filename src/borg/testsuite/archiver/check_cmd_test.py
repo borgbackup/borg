@@ -11,7 +11,7 @@ from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
 from ...repository import Repository
 from ..repository_test import fchunk
-from . import cmd, src_file, create_src_archive, open_archive, delete_chunk, generate_archiver_tests, RK_ENCRYPTION
+from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -151,12 +151,6 @@ def test_date_matching(archivers, request):
         assert archive not in output
 
 
-@pytest.mark.skip(
-    reason="TODO: a non-repair check verifies index and packs by sha256, then runs the archive checks "
-    "(--archives-only) against that verified index instead of rebuilding it from the packs. A real missing "
-    "chunk would be a corrupted pack (caught by the sha256 pack check) or a borg index bug; detecting this "
-    "artificial one needs the index rebuild that --repair does. Rework with the index/repair redesign, refs #8572."
-)
 def test_missing_file_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
@@ -168,7 +162,7 @@ def test_missing_file_chunk(archivers, request):
             if item.path.endswith(src_file):
                 valid_chunks = item.chunks
                 killed_chunk = valid_chunks[-1]
-                delete_chunk(repository, killed_chunk.id)
+                repository.delete(killed_chunk.id)
                 break
         else:
             pytest.fail("should not happen")  # convert 'fail'
@@ -199,33 +193,23 @@ def test_missing_file_chunk(archivers, request):
     assert "Missing file chunk detected" not in output
 
 
-@pytest.mark.skip(
-    reason="TODO: a non-repair check verifies index and packs by sha256 and uses that verified index (it "
-    "does not rebuild it); the index still lists chunks whose pack was removed here, so reading them raises "
-    "ObjectNotFound instead of being reported as missing. Needs the index/repair redesign, refs #8572."
-)
 def test_missing_archive_item_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        delete_chunk(repository, archive.metadata.items[0])
+        repository.delete(archive.metadata.items[0])
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
 
 
-@pytest.mark.skip(
-    reason="TODO: a non-repair check verifies index and packs by sha256 and uses that verified index (it "
-    "does not rebuild it); the index still lists chunks whose pack was removed here, so reading them raises "
-    "ObjectNotFound instead of being reported as missing. Needs the index/repair redesign, refs #8572."
-)
 def test_missing_archive_metadata(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        delete_chunk(repository, archive.id)
+        repository.delete(archive.id)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -308,7 +292,7 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
         # framing rather than the authenticated payload, which made the repair flaky on Windows.
         corrupted_chunk = corrupt(chunk, len(chunk) // 2)
         repository.put(archive.id, corrupted_chunk)
-        repository.flush()  # N>1: make the put durable before close()/the check below
+        repository.flush()  # make the put durable before close()/the check below
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive2" in output
@@ -367,7 +351,7 @@ def test_spoofed_archive(archivers, request):
                 ro_type=ROBJ_FILE_STREAM,  # a real archive is stored with ROBJ_ARCHIVE_META
             ),
         )
-        repository.flush()  # N>1: make the put durable before close()/the check below
+        repository.flush()  # make the put durable before close()/the check below
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", "--debug", exit_code=0)
     output = cmd(archiver, "repo-list")
@@ -386,7 +370,7 @@ def test_extra_chunks(archivers, request):
         key = b"01234567890123456789012345678901"
         chunk = fchunk(b"xxxx", chunk_id=key)
         repository.put(key, chunk)
-        repository.flush()  # N>1: make the put durable before close()/the check below
+        repository.flush()  # make the put durable before close()/the check below
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 

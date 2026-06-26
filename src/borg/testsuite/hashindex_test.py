@@ -45,7 +45,7 @@ def test_chunkindex_update_pack_info():
     assert chunks[x2].obj_offset == UNKNOWN_INT32
 
     pack_id = H2(3)
-    # Both chunks land in the same pack (N>1 scenario): batch update in one call.
+    # Both chunks land in the same pack: batch update in one call.
     chunks.update_pack_info([(x1, pack_id, 0, 50), (x2, pack_id, 50, 60)])
     # Location fields updated; flags and size must be unchanged.
     assert chunks[x1] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=10, pack_id=pack_id, obj_offset=0, obj_size=50)

@@ -20,7 +20,6 @@ from ...archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
 from ...constants import *  # NOQA
 from ...helpers import Location, umount
 from ...helpers import EXIT_SUCCESS
-from ...helpers import bin_to_hex
 from ...helpers import init_ec_warnings
 from ...logger import flush_logging
 from ...manifest import Manifest
@@ -178,20 +177,6 @@ def open_archive(repo_path, name):
         archive_info = manifest.archives.get_one([name])
         archive = Archive(manifest, archive_info.id)
     return archive, repository
-
-
-def delete_chunk(repository, id):
-    """Drop the pack holding chunk `id` (test damage helper).
-
-    Repository.delete is a no-op now, so tests that need a chunk to really vanish drop its whole
-    pack at the store level. Works at N=1 (one chunk per pack). The pack is resolved through the
-    chunk index, since the pack file name is the pack_id, which need not equal the chunk_id.
-    """
-    entry = repository.chunks.get(id)
-    if entry is not None:
-        repository.store_delete("packs/" + bin_to_hex(entry.pack_id))
-    else:
-        raise Repository.ObjectNotFound(id, repository)
 
 
 def open_repository(archiver):

@@ -13,7 +13,7 @@ from ..helpers import CommandError, RTError
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..platform import get_process_id
-from ..repository import Repository, LIST_SCAN_LIMIT, StoreObjectNotFound, repo_lister
+from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
 from ..repoobj import RepoObj
 
 from ._common import with_repository, Highlander
@@ -293,19 +293,12 @@ class DebugMixIn:
             except ValueError:
                 print("object id %s is invalid." % hex_id)
             else:
-                entry = repository.chunks.get(id)
-                if entry is None:
+                try:
+                    repository.delete(id)
+                except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
                 else:
-                    # N=1: one chunk per pack, so dropping the pack removes just this object; N>1 needs compaction.
-                    try:
-                        repository.store_delete("packs/" + bin_to_hex(entry.pack_id))
-                    except StoreObjectNotFound:
-                        # index points at an already-gone pack (stale entry)
-                        print("object %s not found." % hex_id)
-                    else:
-                        del repository.chunks[id]
-                        print("object %s deleted." % hex_id)
+                    print("object %s deleted." % hex_id)
         print("Done.")
 
     def do_debug_convert_profile(self, args):

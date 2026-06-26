@@ -179,11 +179,6 @@ def open_archive(repo_path, name):
     return archive, repository
 
 
-def delete_chunk(repository, id):
-    """Remove a single chunk from the repo, leaving the rest of its pack intact (test damage helper)."""
-    repository.delete(id)
-
-
 def open_repository(archiver):
     if archiver.get_kind() == "remote":
         return Repository(Location(archiver.repository_location), exclusive=True)

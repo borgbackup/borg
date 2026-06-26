@@ -856,9 +856,8 @@ class Repository:
         located.sort()
 
         # keep + drop tile the pack contiguously from offset 0; collect the objects to keep in the same
-        # pass. we do not cross-check against the pack's on-disk size: that needs a store.info() HEAD,
-        # which the stdio rest backend mishandles (it blocks reading a body the HEAD response never
-        # carries), and the caller already guarantees the two sets are the pack's complete object set.
+        # pass. we do not cross-check against the pack's on-disk size: the caller already guarantees the
+        # two sets are the pack's complete object set.
         kept = []  # (obj_offset, obj_id, obj_size), offset-ordered
         covered = 0
         for offset, obj_id, size, keep in located:

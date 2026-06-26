@@ -114,6 +114,29 @@ Are there other known limitations?
   remove files which are in the destination, but not in the archive.
   See :issue:`4598` for a workaround and more details.
 
+Is Borg recommended for large amounts of data?
+----------------------------------------------
+
+Borg is generally capable of handling large amounts of data. However, there are
+several things to keep in mind for scalability:
+
+- **Large datasets:** Success depends on the number of files, system resources
+  (RAM, CPU), and network performance. For very large datasets, ensure you have
+  enough RAM.
+- **Multiple repositories:** If you have multiple clients or a huge amount of
+  data, it is often better to use one repository per client or per data set.
+  This can improve performance, especially if deduplication across clients or
+  data sets is not a priority.
+- **Archive count:** Avoid having a very large number of archives in a single
+  repository, as some operations (like ``borg check`` or ``borg mount``) may become
+  slow or memory-intensive when they need to read metadata for all archives.
+- **Network filesystems:** For best performance and reliability, run the Borg
+  client on the machine where the source data is local, and the Borg server
+  on the machine where the repository storage is local. Avoid using NFS or
+  other network filesystems for repository storage if possible.
+- **Incremental backups:** Borg always creates a new full archive, but only
+  transfers and stores new/changed chunks.
+
 .. _interrupted_backup:
 
 If a backup stops mid-way, does the already-backed-up data stay there?
@@ -146,6 +169,11 @@ How can I restore huge file(s) over an unstable connection?
 Try using ``borg mount`` and ``rsync`` (or a similar tool that supports
 resuming a partial file copy from what's already copied).
 
+My SSH connection breaks during a long borg operation. What now?
+----------------------------------------------------------------
+
+See the `Vorta documentation <https://docs.borgbase.com/faq/#my-ssh-connection-breaks-after-a-long-backup-or-prune-operation>`_.
+
 My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------
 
@@ -166,6 +194,66 @@ then use ``tar`` to perform the comparison:
 
     borg export-tar archive-name - | tar --compare -f - -C /path/to/compare/to
 
+Repository filesystem is full. What now?
+----------------------------------------
+
+If your repository filesystem is full (ENOSPC error), don't panic. Borg is
+designed to be robust and usually doesn't corrupt data in this situation.
+
+To fix this, you need to free up some space on that filesystem.
+
+Increasing available space
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Delete unrelated files**: If there are other files on the same filesystem
+  (e.g., temporary files, logs), delete them to get some free space.
+- **Reserved space (ext2/3/4)**: On Linux ext-filesystems, some space (usually 5%)
+  is reserved for the root user. If you run borg as a normal user, you might hit
+  this limit while root could still write. You can reduce this reserve to 1% to
+  gain some space for Borg::
+
+    sudo tune2fs -m 1 /dev/sdXN  # Replace with your device
+
+- **Increase filesystem size**: If you're using LVM, cloud volumes, or a virtual
+  disk, increasing the partition and filesystem size is the easiest way.
+- **Move to a larger disk**: Move the entire repository to a larger disk
+  (e.g., using ``rsync -aH /old/repo /new/repo``) and perform the cleanup there.
+
+Freeing space using Borg
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want to free space by deleting Borg archives, keep in mind that
+``borg delete`` and ``borg compact`` need some free space themselves to work,
+as they write new data before deleting old data.
+
+If you have really zero bytes free and ``borg delete`` fails:
+
+1. **Free reserved space**: If you have previously reserved space via
+   ``borg repo-space --reserve``, you can now free it::
+
+    borg repo-space --free
+
+2. **Prune/Delete and Compact**: Now that you have some space, use
+   ``borg prune`` or ``borg delete`` to remove unneeded archives, and
+   **must** run ``borg compact`` to actually free up the space.
+
+How to avoid that it happens again?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Reserve space via Borg**: You can reserve space for emergencies by using the
+  ``borg repo-space --reserve`` command. For example, to reserve 2 GB::
+
+    borg repo-space --reserve 2G
+
+- **Emergency space file**: Manually create a large "space reserve" file in the
+  repository filesystem that you can delete if you ever run out of space again.
+  This ensures you have enough room for ``borg delete`` and ``borg compact`` to
+  function::
+
+    dd if=/dev/zero of=/path/to/repo/reserve_file bs=1M count=2048
+
+- **Monitoring**: Set up disk space monitoring and alerts for your backup
+  storage to be notified before it runs out of space.
 
 Can Borg add redundancy to the backup data to deal with hardware malfunction?
 -----------------------------------------------------------------------------
@@ -187,6 +275,32 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 ``check`` operation. It will notice corruption using CRCs and hashes.
 If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
+
+Can a previous bad backup spoil future backups?
+-----------------------------------------------
+
+In general, no. If a backup was interrupted or failed for some reason, Borg's
+transactional nature and journaling system ensure that the repository remains
+consistent. Data that was successfully stored in a partial backup
+(checkpoints) will even be reused to speed up the next attempt.
+
+However, there is one specific case where a past "bad" backup can affect
+future ones due to how deduplication works:
+
+If data was corrupted **before** reaching Borg or while being processed by
+Borg (for example, due to a hardware failure like bad RAM), and this
+corrupted data was successfully stored in the repository with a valid
+checksum (MAC), Borg will assume this is the correct data for that chunk ID.
+Any future backup of the same content will then deduplicate against this
+corrupted version.
+
+This is not a Borg-specific issue, but a general property of deduplicating
+storage systems. To avoid or detect such issues, you should:
+
+- Use reliable hardware (ECC RAM is recommended).
+- Periodically run ``borg check --verify-data REPO`` to verify that the
+  stored data still matches its checksums. Note that this cannot detect
+  if the data was already "garbage" when it was first stored.
 
 .. _faq-integrityerror:
 
@@ -350,8 +464,6 @@ are calculated *before* compression. New compression settings
 will only be applied to new chunks, not existing chunks. So it's safe
 to change them.
 
-Use ``borg repo-compress`` to efficiently recompress a complete repository.
-
 Why is backing up an unmodified FAT filesystem slow on Linux?
 -------------------------------------------------------------
 
@@ -493,14 +605,24 @@ Using ``BORG_PASSCOMMAND`` with macOS Keychain
   the built-in ``security`` command, you can access it from the command line,
   making it useful for ``BORG_PASSCOMMAND``.
 
-  First generate a passphrase and use ``security`` to save it to your login
-  (default) keychain::
+  To store an existing passphrase in your login (default) keychain::
 
-    security add-generic-password -D secret -U -a $USER -s borg-passphrase -w $(head -c 32 /dev/urandom | base64 -w 0)
+    security add-generic-password -a $USER -s borg-passphrase -w YOUR_PASSPHRASE
+
+  Alternatively, to generate a new random passphrase and store it::
+
+    security add-generic-password -a $USER -s borg-passphrase -w $(head -c 32 /dev/urandom | base64 -w 0)
 
   In your backup script retrieve it in the ``BORG_PASSCOMMAND``::
 
     export BORG_PASSCOMMAND="security find-generic-password -a $USER -s borg-passphrase -w"
+
+  .. note::
+    If you run ``borg`` using ``sudo``, you must use the ``-E`` (preserve environment)
+    flag to ensure ``BORG_PASSCOMMAND`` is available and executed as the correct
+    user to access the keychain::
+
+      sudo -E borg create ...
 
 Using ``BORG_PASSCOMMAND`` with GNOME Keyring
   GNOME also has a keyring daemon that can be used to store a Borg passphrase.
@@ -724,8 +846,7 @@ and disk space on subsequent runs. Here what Borg does when you run ``borg creat
 - Transmits to repo. If the repo is remote, this usually involves an SSH connection
   (does its own encryption / authentication).
 - Stores the chunk into a key/value store (the key is the chunk id, the value
-  is the data). While doing that, it computes XXH64 of the data (repo low-level
-  checksum, used by borg check --repository).
+  is the data).
 
 Subsequent backups are usually very fast if most files are unchanged and only
 a few are new or modified. The high performance on unchanged files primarily depends

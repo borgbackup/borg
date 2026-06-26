@@ -13,7 +13,7 @@ from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked
 from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
 from ..helpers import msgpack
 from ..item import Item, ArchiveItem
-from ..manifest import Manifest
+from ..manifest import Archives, Manifest
 from ..platform import uid2user, gid2group, is_win32
 
 
@@ -145,14 +145,13 @@ def test_timestamp_parsing(monkeypatch, isoformat, expected):
 
 class MockCache:
     class MockRepo:
-        def async_response(self, wait=True):
-            pass
+        pass
 
     def __init__(self):
         self.objects = {}
         self.repository = self.MockRepo()
 
-    def add_chunk(self, id, meta, data, stats=None, wait=True, ro_type=None):
+    def add_chunk(self, id, meta, data, stats=None, ro_type=None):
         assert ro_type is not None
         self.objects[id] = data
         return id, len(data)
@@ -427,3 +426,11 @@ def test_reject_non_sanitized_item():
     for path in rejected_dotdot_paths:
         with pytest.raises(ValueError, match="unexpected '..' element in path"):
             Item(path=path, user="root", group="root")
+
+
+def test_archives_get_by_id_missing_returns_none():
+    repo = Mock()
+    repo.store_list.return_value = []  # empty store — id will not be found
+    manifest = Mock()
+    archives = Archives(repo, manifest)
+    assert archives.get_by_id(b"\x01" * 32) is None

@@ -298,10 +298,12 @@ last_modified
 
 The *encryption* key, if present, contains:
 
-mode
-    Textual encryption mode name (same as :ref:`borg_repo-create` ``--encryption`` names)
+encryption
+    Textual cipher / AE algorithm name (same as :ref:`borg_repo-create` ``--encryption`` names)
+id_hash
+    Textual id hash function name (same as :ref:`borg_repo-create` ``--id-hash`` names)
 keyfile
-    Path to the local key file used for access. Depending on *mode* this key may be absent.
+    Path to the local key file used for access. Depending on the key location this may be absent.
 
 The *cache* key, if present, contains:
 
@@ -334,7 +336,8 @@ Example *borg info* output::
             }
         },
         "encryption": {
-            "mode": "repokey"
+            "encryption": "aes256-ocb",
+            "id_hash": "sha256"
         },
         "repository": {
             "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
@@ -410,7 +413,8 @@ Example of a simple archive listing (``borg list --last 1 --json``)::
             }
         ],
         "encryption": {
-            "mode": "repokey"
+            "encryption": "aes256-ocb",
+            "id_hash": "sha256"
         },
         "repository": {
             "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
@@ -463,7 +467,8 @@ The same archive with more information (``borg info --last 1 --json``)::
             }
         },
         "encryption": {
-            "mode": "repokey"
+            "encryption": "aes256-ocb",
+            "id_hash": "sha256"
         },
         "repository": {
             "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",

@@ -10,7 +10,7 @@ from io import TextIOWrapper
 
 from ._common import with_repository, Highlander
 from .. import helpers
-from ..archive import Archive, is_special
+from ..archive import Archive, is_special, SF_DATALESS
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
@@ -32,7 +32,7 @@ from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
-from ..platform import is_win32
+from ..platform import is_win32, get_flags
 
 from ..logger import create_logger
 
@@ -56,7 +56,7 @@ class CreateMixIn:
             except OSError:
                 pass
             # Add local repository dir to inode_skip list
-            if not args.location.host:
+            if args.location.proto == "file":
                 try:
                     st = os.stat(args.location.path)
                     skip_inodes.add((st.st_ino, st.st_dev))
@@ -225,6 +225,7 @@ class CreateMixIn:
         self.noflags = args.noflags
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
+        self.exclude_dataless = args.exclude_dataless
         dry_run = args.dry_run
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
@@ -475,6 +476,15 @@ class CreateMixIn:
             # but we WILL save the mountpoint directory (or more precise: the root
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
+
+            if self.exclude_dataless:
+                # this needs to be done BEFORE opening the file, as opening
+                # would otherwise materialize the file contents.
+                with backup_io("flags"):
+                    flags = get_flags(path=path, st=st)
+                if flags & SF_DATALESS:
+                    self.print_file_status("x", path)
+                    return
 
             if not stat.S_ISDIR(st.st_mode):
                 # directories cannot go in this branch because they can be excluded based on tag
@@ -736,6 +746,22 @@ class CreateMixIn:
         - 'i' = backup data was read from standard input (stdin)
         - '?' = missing status code (if you see this, please file a bug report!)
 
+        Errors and (incomplete) archives
+        ++++++++++++++++++++++++++++++++
+
+        If an error happens during archive creation (e.g. some file could not be read
+        due to a permission error or some other OS error), borg will log a warning or
+        an error (depending on the type of issue) and continue with the next item.
+
+        At the end of the backup, if there were any such issues, borg will exit with
+        a non-zero exit code (usually 1 for warnings).
+
+        **The archive is still saved even if warnings or errors occurred**, but it will
+        only contain the data borg was able to read successfully. It is like a
+        checkpoint (see below), but with a user-given name.
+
+        You should always check the backup logs and the exit code of the borg command.
+
         Reading backup data from stdin
         ++++++++++++++++++++++++++++++
 
@@ -870,7 +896,14 @@ class CreateMixIn:
             help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
 
-        define_exclusion_group(subparser, tag_files=True)
+        exclude_group = define_exclusion_group(subparser, tag_files=True)
+        exclude_group.add_argument(
+            "--exclude-dataless",
+            dest="exclude_dataless",
+            action="store_true",
+            help="exclude files flagged DATALESS (macOS: placeholder files whose content "
+            "is not materialized locally, e.g. not-downloaded cloud storage files)",
+        )
 
         fs_group = subparser.add_argument_group("Filesystem options")
         fs_group.add_argument(

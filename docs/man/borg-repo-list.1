@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-list" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-repo-list" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-repo-list \- List the archives contained in a repository.
 .SH SYNOPSIS
@@ -45,6 +45,9 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .TP
 .B  \-\-short
 only print the archive IDs, nothing else
+.TP
+.B  \-\-from\-borg1
+repository is Borg 1.x
 .TP
 .BI \-\-format \ FORMAT
 specify format for archive listing (default: \(dq{archive:<36} {time} [{id}]{NL}\(dq)
@@ -101,7 +104,7 @@ ba56c4a5  Thu, 2024\-09\-26 10:12:45 +0200  src              tw          MacBook
 .SH NOTES
 .SS The FORMAT specifier syntax
 .sp
-The \fB\-\-format\fP option uses Python\(aqs format string syntax \%<https://\:docs\:.python\:.org/\:3\:.10/\:library/\:string\:.html#\:formatstrings>\&.
+The \fB\-\-format\fP option uses Python\(aqs format string syntax \%<https://\:docs\:.python\:.org/\:3\:.11/\:library/\:string\:.html#\:formatstrings>\&.
 .sp
 Examples:
 .INDENT 0.0

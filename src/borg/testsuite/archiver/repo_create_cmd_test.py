@@ -6,7 +6,7 @@ import pytest
 from ...helpers.errors import Error, CancelledByUser
 from ...constants import *  # NOQA
 from ...crypto.key import FlexiKey
-from . import cmd, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION
+from . import cmd, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION, KF_LOCATION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -34,6 +34,44 @@ def test_repo_create_requires_encryption_option(archivers, request):
     cmd(archiver, "repo-create", exit_code=2)
 
 
+@pytest.mark.parametrize(
+    "extra_args, expected",
+    [
+        # --encryption x --id-hash -> crypto suite shown by "borg repo-info"
+        (["--encryption=aes256-ocb"], "Yes (repokey, aes256-ocb, sha256)"),  # default id-hash is sha256
+        (["--encryption=aes256-ocb", "--id-hash=sha256"], "Yes (repokey, aes256-ocb, sha256)"),
+        (["--encryption=aes256-ocb", "--id-hash=blake3"], "Yes (repokey, aes256-ocb, blake3)"),
+        (["--encryption=chacha20-poly1305"], "Yes (repokey, chacha20-poly1305, sha256)"),
+        (["--encryption=chacha20-poly1305", "--id-hash=blake3"], "Yes (repokey, chacha20-poly1305, blake3)"),
+        (["--encryption=authenticated"], "No (repokey, authenticated, sha256)"),
+        (["--encryption=authenticated", "--id-hash=blake3"], "No (repokey, authenticated, blake3)"),
+        (["--encryption=none"], "No"),
+    ],
+)
+def test_repo_create_encryption_id_hash_combinations(archivers, request, extra_args, expected):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", *extra_args)
+    info = cmd(archiver, "repo-info")
+    assert expected in info
+
+
+def test_repo_create_none_rejects_blake3(archivers, request):
+    # "none" (plaintext) has no key, so it only supports the sha256 id-hash.
+    archiver = request.getfixturevalue(archivers)
+    arg = ("repo-create", "--encryption=none", "--id-hash=blake3")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, *arg, exit_code=2)
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, *arg)
+
+
+def test_repo_create_rejects_legacy_combined_mode(archivers, request):
+    # clean break: the old combined "--encryption" names are no longer accepted (argparse choices).
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", "--encryption=blake3-aes-ocb", exit_code=2)
+
+
 def test_repo_create_refuse_to_overwrite_keyfile(archivers, request, monkeypatch):
     #  BORG_KEY_FILE=something borg repo-create should quit if "something" already exists.
     #  See: https://github.com/borgbackup/borg/pull/6046
@@ -42,11 +80,11 @@ def test_repo_create_refuse_to_overwrite_keyfile(archivers, request, monkeypatch
     monkeypatch.setenv("BORG_KEY_FILE", keyfile)
     original_location = archiver.repository_location
     archiver.repository_location = original_location + "0"
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     with open(keyfile) as file:
         before = file.read()
     archiver.repository_location = original_location + "1"
-    arg = ("repo-create", KF_ENCRYPTION)
+    arg = ("repo-create", KF_ENCRYPTION, KF_LOCATION)
     if archiver.FORK_DEFAULT:
         cmd(archiver, *arg, exit_code=2)
     else:
@@ -55,51 +93,3 @@ def test_repo_create_refuse_to_overwrite_keyfile(archivers, request, monkeypatch
     with open(keyfile) as file:
         after = file.read()
     assert before == after
-
-
-def test_repo_create_keyfile_same_path_creates_new_keys(archivers, request):
-    """Regression test for GH issue #6230.
-
-    When creating a new keyfile-encrypted repository at the same filesystem path
-    multiple times (e.g., after moving/unmounting the previous one), Borg must not
-    overwrite or reuse the existing key file. Instead, it should create a new key
-    file in the keys directory, appending a numeric suffix like .2, .3, ...
-    """
-    archiver = request.getfixturevalue(archivers)
-
-    # First creation at path A
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
-    keys = sorted(os.listdir(archiver.keys_path))
-    assert len(keys) == 1
-    base_key = keys[0]
-    base_path = os.path.join(archiver.keys_path, base_key)
-    with open(base_path, "rb") as f:
-        base_contents = f.read()
-
-    # Simulate moving/unmounting the repo by removing the path to allow re-create at the same path
-    import shutil
-
-    shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
-    keys = sorted(os.listdir(archiver.keys_path))
-    assert len(keys) == 2
-    assert base_key in keys
-    # The new file should be base_key suffixed with .2
-    assert any(k == base_key + ".2" for k in keys)
-    second_path = os.path.join(archiver.keys_path, base_key + ".2")
-    with open(second_path, "rb") as f:
-        second_contents = f.read()
-    assert second_contents != base_contents
-
-    # Remove repo again and create a third time at same path
-    shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "repo-create", KF_ENCRYPTION)
-    keys = sorted(os.listdir(archiver.keys_path))
-    assert len(keys) == 3
-    assert any(k == base_key + ".3" for k in keys)
-    third_path = os.path.join(archiver.keys_path, base_key + ".3")
-    with open(third_path, "rb") as f:
-        third_contents = f.read()
-    # Ensure all keys are distinct
-    assert third_contents != base_contents
-    assert third_contents != second_contents

@@ -1,29 +1,42 @@
 from collections import namedtuple
 from struct import Struct
 
-from xxhash import xxh64
-
 from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
 from .helpers.errors import IntegrityError
-from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
+from .compress import Compressor, LZ4_COMPRESSOR
 
 # Workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
+OBJ_MAGIC = b"BORG_OBJ"
+OBJ_VERSION = 0x01
+
+# Fixed header size per blob: OBJ_MAGIC(8) + version(1) + chunk_id(32) + meta_size(4) + data_size(4)
+REPOOBJ_HEADER_SIZE = 49
+
+
 class RepoObj:
-    # Object header format includes size information for parsing the object into meta and data,
-    # as well as hashes to enable checking consistency without having the borg key.
-    obj_header = Struct("<II8s8s")  # meta size (32b), data size (32b), meta hash (64b), data hash (64b)
-    ObjHeader = namedtuple("ObjHeader", "meta_size data_size meta_hash data_hash")
+    # Object header: magic (8b), format version (1b), chunk_id (32b), meta size (4b), data size (4b).
+    obj_header = Struct("<8sB32sII")
+    ObjHeader = namedtuple("ObjHeader", "magic version chunk_id meta_size data_size")
 
     @classmethod
     def extract_crypted_data(cls, data: bytes) -> bytes:
         # used for crypto type detection
         hdr_size = cls.obj_header.size
+        if len(data) < hdr_size:
+            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(data)}")
         hdr = cls.ObjHeader(*cls.obj_header.unpack(data[:hdr_size]))
-        return data[hdr_size + hdr.meta_size :]
+        if hdr.magic != OBJ_MAGIC:
+            raise IntegrityError("invalid object magic")
+        if hdr.version != OBJ_VERSION:
+            raise IntegrityError(f"unsupported object version: {hdr.version}")
+        overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
+        if overall_expected_size != len(data):
+            raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(data)}")
+        return data[hdr_size + hdr.meta_size :]  # crypted data
 
     def __init__(self, key):
         self.key = key
@@ -67,9 +80,7 @@ class RepoObj:
         data_encrypted = self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
-        hdr = self.ObjHeader(
-            len(meta_encrypted), len(data_encrypted), xxh64(meta_encrypted).digest(), xxh64(data_encrypted).digest()
-        )
+        hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, id, len(meta_encrypted), len(data_encrypted))
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
 
@@ -81,8 +92,17 @@ class RepoObj:
         assert isinstance(ro_type, str)
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
+        if len(obj) < hdr_size:
+            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(obj)}")
         hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
-        assert hdr_size + hdr.meta_size <= len(obj)
+        if hdr.magic != OBJ_MAGIC:
+            raise IntegrityError("invalid object magic")
+        if hdr.version != OBJ_VERSION:
+            raise IntegrityError(f"unsupported object version: {hdr.version}")
+        if hdr_size + hdr.meta_size > len(obj):
+            raise IntegrityError(
+                f"object too small: expected at least {hdr_size + hdr.meta_size} bytes, got {len(obj)}"
+            )
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)
@@ -109,14 +129,21 @@ class RepoObj:
         assert isinstance(cdata, bytes)
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
+        if len(obj) < hdr_size:
+            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(obj)}")
         hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
-        assert hdr_size + hdr.meta_size <= len(obj)
+        if hdr.magic != OBJ_MAGIC:
+            raise IntegrityError("invalid object magic")
+        if hdr.version != OBJ_VERSION:
+            raise IntegrityError(f"unsupported object version: {hdr.version}")
+        overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
+        if overall_expected_size != len(obj):
+            raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(obj)}")
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
         if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
-        assert hdr_size + hdr.meta_size + hdr.data_size <= len(obj)
         data_encrypted = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
         data_compressed = self.key.decrypt(id, data_encrypted)  # does not include the type/level bytes
         if decompress:
@@ -139,65 +166,5 @@ class RepoObj:
         return meta_compressed if want_compressed else meta, data_compressed if want_compressed else data
 
 
-class RepoObj1:  # legacy
-    @classmethod
-    def extract_crypted_data(cls, data: bytes) -> bytes:
-        # used for crypto type detection
-        return data
-
-    def __init__(self, key):
-        self.key = key
-        self.compressor = get_compressor("lz4", legacy_mode=True)
-
-    def id_hash(self, data: bytes) -> bytes:
-        return self.key.id_hash(data)
-
-    def format(
-        self,
-        id: bytes,
-        meta: dict,
-        data: bytes,
-        compress: bool = True,
-        size: int = None,
-        ctype: int = None,
-        clevel: int = None,
-        ro_type: str = None,
-    ) -> bytes:
-        assert isinstance(id, bytes)
-        assert meta == {}
-        assert isinstance(data, (bytes, memoryview))
-        assert ro_type is not None
-        assert compress or size is not None and ctype is not None and clevel is not None
-        if compress:
-            assert size is None or size == len(data)
-            meta, data_compressed = self.compressor.compress(meta, data)
-        else:
-            assert isinstance(size, int)
-            data_compressed = data  # is already compressed, must include type/level bytes
-        data_encrypted = self.key.encrypt(id, data_compressed)
-        return data_encrypted
-
-    def parse_meta(self, id: bytes, cdata: bytes) -> dict:
-        raise NotImplementedError("parse_meta is not available for RepoObj1")
-
-    def parse(
-        self, id: bytes, cdata: bytes, decompress: bool = True, want_compressed: bool = False, ro_type: str = None
-    ) -> tuple[dict, bytes]:
-        assert not (not decompress and not want_compressed), "invalid parameter combination!"
-        assert isinstance(id, bytes)
-        assert isinstance(cdata, bytes)
-        assert ro_type is not None
-        data_compressed = self.key.decrypt(id, cdata)
-        compressor_cls, compression_level = Compressor.detect(data_compressed[:2])
-        compressor = compressor_cls(level=compression_level, legacy_mode=True)
-        meta_compressed = {}
-        meta_compressed["ctype"] = compressor.ID
-        meta_compressed["clevel"] = compressor.level
-        meta_compressed["csize"] = len(data_compressed)
-        if decompress:
-            meta, data = compressor.decompress(None, data_compressed)
-            if not AUTHENTICATED_NO_KEY:
-                self.key.assert_id(id, data)
-        else:
-            meta, data = None, None
-        return meta_compressed if want_compressed else meta, data_compressed if want_compressed else data
+# Backward compatibility: RepoObj1 has moved to borg.legacy.repoobj
+from .legacy.repoobj import RepoObj1  # noqa: F401

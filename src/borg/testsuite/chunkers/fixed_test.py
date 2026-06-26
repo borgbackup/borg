@@ -4,13 +4,42 @@ import random
 
 import pytest
 
-from . import cf, cf_expand, make_sparsefile, make_content, fs_supports_sparse
+from . import cf, cf_expand, make_sparsefile, make_content
 from . import BS, map_sparse1, map_sparse2, map_onlysparse, map_notsparse
 from ...chunkers import ChunkerFixed
 from ...constants import *  # NOQA
 
 
-@pytest.mark.skipif(not fs_supports_sparse(), reason="filesystem does not support sparse files")
+def pretty_print(msg, items):
+    """
+    Pretty-print the result of get_chunks.
+
+    For each element in the sequence:
+    - If it's a bytes object consisting solely of b"H", print "header length: X" where X is its length.
+    - If it's a bytes object consisting solely of b"X", print "body length: X" where X is its length.
+    - If it's an int, print "sparse: length: X" where X is the integer value (interpreted as a length).
+    """
+    print(msg)
+    print("-" * len(msg))
+    for item in items:
+        if isinstance(item, bytes):
+            # Detect sequences of only 'H' (header) or only 'X' (body)
+            if item.replace(b"H", b"") == b"":
+                print(f"header({len(item)})")
+            elif item.replace(b"X", b"") == b"":
+                print(f"body({len(item)})")
+            elif item.replace(b"\0", b"") == b"":
+                print(f"zeros({len(item)})")
+            else:
+                # Fallback: unknown content, print as body with its length
+                print(f"other({len(item)})")
+        elif isinstance(item, int):
+            print(f"sparse({item})")
+        else:
+            # Unexpected element type, just print a generic line.
+            print(f"???({item})")
+
+
 @pytest.mark.parametrize(
     "fname, sparse_map, header_size, sparse",
     [
@@ -34,13 +63,19 @@ from ...constants import *  # NOQA
 )
 def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
     def get_chunks(fname, sparse, header_size):
-        chunker = ChunkerFixed(4096, header_size=header_size, sparse=sparse)
+        chunker = ChunkerFixed(BS, header_size=header_size, sparse=sparse)
         with open(fname, "rb") as fd:
             return cf(chunker.chunkify(fd))
 
+    # this only works if sparse map blocks are same size as fixed chunker blocks
     fn = str(tmpdir / fname)
     make_sparsefile(fn, sparse_map, header_size=header_size)
-    get_chunks(fn, sparse=sparse, header_size=header_size) == make_content(sparse_map, header_size=header_size)
+    expected_content = make_content(sparse_map, header_size=header_size)
+    got_chunks = get_chunks(fn, sparse=sparse, header_size=header_size)
+    print(f"sparse: {sparse}")
+    pretty_print("expected", expected_content)
+    pretty_print("got", got_chunks)
+    assert expected_content == got_chunks
 
 
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")

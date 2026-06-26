@@ -1,6 +1,5 @@
 import os
 import shutil
-from unittest.mock import patch
 
 import pytest
 
@@ -9,7 +8,6 @@ from ...constants import *  # NOQA
 from ...helpers import Location, get_security_dir, bin_to_hex
 from ...helpers import EXIT_ERROR
 from ...manifest import Manifest, MandatoryFeatureUnsupported
-from ...remote import RemoteRepository, PathNotAllowed
 from ...repository import Repository
 from .. import llfuse
 from .. import changedir
@@ -277,45 +275,6 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
 
 
 # Begin Remote Tests
-def test_remote_repo_restrict_to_path(remote_archiver):
-    original_location, repo_path = remote_archiver.repository_location, remote_archiver.repository_path
-    # restricted to repo directory itself:
-    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", repo_path]):
-        cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
-    # restricted to repo directory itself, fail for other directories with same prefix:
-    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", repo_path]):
-        with pytest.raises(PathNotAllowed):
-            remote_archiver.repository_location = original_location + "_0"
-            cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
-    # restricted to a completely different path:
-    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", "/foo"]):
-        with pytest.raises(PathNotAllowed):
-            remote_archiver.repository_location = original_location + "_1"
-            cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
-    path_prefix = os.path.dirname(repo_path)
-    # restrict to repo directory's parent directory:
-    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", path_prefix]):
-        remote_archiver.repository_location = original_location + "_2"
-        cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
-    # restrict to repo directory's parent directory and another directory:
-    with patch.object(
-        RemoteRepository, "extra_test_args", ["--restrict-to-path", "/foo", "--restrict-to-path", path_prefix]
-    ):
-        remote_archiver.repository_location = original_location + "_3"
-        cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
-
-
-def test_remote_repo_restrict_to_repository(remote_archiver):
-    repo_path = remote_archiver.repository_path
-    # restricted to repo directory itself:
-    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-repository", repo_path]):
-        cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
-    parent_path = os.path.join(repo_path, "..")
-    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-repository", parent_path]):
-        with pytest.raises(PathNotAllowed):
-            cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
-
-
 def test_remote_repo_strip_components_doesnt_leak(remote_archiver):
     cmd(remote_archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(remote_archiver.input_path, "dir/file", contents=b"test file contents 1")

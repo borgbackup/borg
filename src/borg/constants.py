@@ -51,10 +51,15 @@ ROBJ_DONTCARE = "*"  # used to parse without type assertion (= accept any type)
 # the header, and the total size was set to precisely 20 MiB for borg < 1.3).
 MAX_DATA_SIZE = 20971479
 
-# MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT2 header)
-# note: for borg >= 1.3, this makes the MAX_OBJECT_SIZE grow slightly over the precise 20 MiB used by
-# borg < 1.3, but this is not expected to cause any issues.
-MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
+# Placeholder for pack location fields (obj_offset, obj_size) when the value is not yet known.
+# Grep for UNKNOWN_INT32 to find every site that still needs updating.
+UNKNOWN_INT32 = 0xFFFFFFFF
+
+# Placeholder for pack_id (32-byte field) when the value is not yet known.
+UNKNOWN_BYTES32 = b"\xff" * 32
+
+# MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
+MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module
 
 # How many segment files Borg puts into a single directory by default.
 DEFAULT_SEGMENTS_PER_DIR = 1000
@@ -75,7 +80,7 @@ IDS_PER_CHUNK = MAX_DATA_SIZE // 40
 # we use it in all places where we need to detect or create all-zero buffers
 zeros = bytes(MAX_DATA_SIZE)
 
-# borg.remote read() buffer size
+# borg serve (borg.legacy.remote) read() buffer size
 BUFSIZE = 10 * 1024 * 1024
 
 # To use a safe, limited unpacker, we need to set an upper limit to the archive count in the manifest.
@@ -177,7 +182,7 @@ class KeyType:
     # repos with PASSPHRASE mode could not be created any more since borg 1.0, see #97.
     # in borg 2. all of its code and also the "borg key migrate-to-repokey" command was removed.
     # if you still need to, you can use "borg key migrate-to-repokey" with borg 1.0, 1.1 and 1.2.
-    # Nowadays, we just dispatch this to RepoKey and assume the passphrase was migrated to a repokey.
+    # Nowadays, we just dispatch this to the legacy AES-CTR key and assume the passphrase was migrated.
     PASSPHRASE = 0x01  # legacy, borg < 1.0
     PLAINTEXT = 0x02
     REPO = 0x03
@@ -186,15 +191,14 @@ class KeyType:
     BLAKE2AUTHENTICATED = 0x06
     AUTHENTICATED = 0x07
     # new crypto
-    # upper 4 bits are ciphersuite, lower 4 bits are keytype
-    AESOCBKEYFILE = 0x10
-    AESOCBREPO = 0x11
-    CHPOKEYFILE = 0x20
-    CHPOREPO = 0x21
-    BLAKE2AESOCBKEYFILE = 0x30
-    BLAKE2AESOCBREPO = 0x31
-    BLAKE2CHPOKEYFILE = 0x40
-    BLAKE2CHPOREPO = 0x41
+    # upper 4 bits are ciphersuite, lower 4 bits are reserved (0).
+    # the type byte only identifies the crypto suite; where the key is stored (keyfile vs
+    # repokey) is not encoded here any more, so there is only one type byte per suite.
+    AESOCB = 0x10
+    CHPO = 0x20
+    BLAKE3AESOCB = 0x30
+    BLAKE3CHPO = 0x40
+    BLAKE3AUTHENTICATED = 0x50
 
 
 CACHE_TAG_NAME = "CACHEDIR.TAG"

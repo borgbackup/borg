@@ -40,7 +40,7 @@ class CheckMixIn:
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
         if args.max_duration and not args.repo_only:
-            # when doing a partial repo check, we can only check xxh64 hashes in repository files.
+            # when doing a partial repo check, we can only do a low-level check of the repository files.
             # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.
             # also, there is no max_duration support in the archives check code anyway.
             raise CommandError("--repository-only is required for --max-duration support.")
@@ -123,13 +123,12 @@ class CheckMixIn:
         for the same reason. Therefore, partial checks may be useful only with very large
         repositories where a full check would take too long.
 
-        The ``--verify-data`` option will perform a full integrity verification (as
-        opposed to checking just the xxh64) of data, which means reading the
-        data from the repository, decrypting and decompressing it. It is a complete
-        cryptographic verification and hence very time-consuming, but will detect any
-        accidental and malicious corruption. Tamper-resistance is only guaranteed for
-        encrypted repositories against attackers without access to the keys. You cannot
-        use ``--verify-data`` with ``--repository-only``.
+        The ``--verify-data`` option will perform a full integrity verification of data,
+        which means reading the data from the repository, decrypting and decompressing it.
+        It is a complete cryptographic verification and hence very time-consuming, but
+        will detect any accidental and malicious corruption. Tamper-resistance is only
+        guaranteed for encrypted repositories against attackers without access to the keys.
+        You cannot use ``--verify-data`` with ``--repository-only``.
 
         The ``--find-lost-archives`` option will also scan the whole repository, but
         tells Borg to search for lost archive metadata. If Borg encounters any archive

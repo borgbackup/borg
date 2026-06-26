@@ -234,15 +234,25 @@ cdef class AES256_CTR_BASE:
         assert hlen == self.header_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len_short +
-                                                                  ilen + self.cipher_blk_len)  # play safe, 1 extra blk
-        if not odata:
-            raise MemoryError
-        cdef int olen = 0
+        cdef Py_buffer idata
+        cdef bint idata_acquired = False
+        cdef Py_buffer hdata
+        cdef bint hdata_acquired = False
+        cdef unsigned char *odata = NULL
+        cdef int olen
         cdef int offset
-        cdef Py_buffer idata = ro_buffer(data)
-        cdef Py_buffer hdata = ro_buffer(header)
+
         try:
+            odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len + self.iv_len_short +
+                                                  ilen + self.cipher_blk_len)  # play safe, 1 extra blk
+            if not odata:
+                raise MemoryError
+
+            idata = ro_buffer(data)
+            idata_acquired = True
+            hdata = ro_buffer(header)
+            hdata_acquired = True
+
             offset = 0
             for i in range(hlen):
                 odata[offset+i] = header[i]
@@ -264,9 +274,12 @@ cdef class AES256_CTR_BASE:
             self.blocks += self.block_count(ilen)
             return odata[:offset]
         finally:
-            PyMem_Free(odata)
-            PyBuffer_Release(&hdata)
-            PyBuffer_Release(&idata)
+            if odata:
+                PyMem_Free(odata)
+            if hdata_acquired:
+                PyBuffer_Release(&hdata)
+            if idata_acquired:
+                PyBuffer_Release(&idata)
 
     def decrypt(self, envelope, aad=None):
         """
@@ -276,15 +289,22 @@ cdef class AES256_CTR_BASE:
         cdef int hlen = self.header_len
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)  # play safe, 1 extra blk
-        if not odata:
-            raise MemoryError
-        cdef int olen = 0
+        cdef Py_buffer idata
+        cdef bint idata_acquired = False
+        cdef unsigned char *odata = NULL
+        cdef int olen
         cdef int offset
         cdef unsigned char mac_buf[32]
         assert sizeof(mac_buf) == self.mac_len
-        cdef Py_buffer idata = ro_buffer(envelope)
+
         try:
+            odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)  # play safe, 1 extra blk
+            if not odata:
+                raise MemoryError
+
+            idata = ro_buffer(envelope)
+            idata_acquired = True
+
             self.mac_verify(<const unsigned char *> idata.buf+aoffset, alen,
                              <const unsigned char *> idata.buf+hlen+self.mac_len, ilen-hlen-self.mac_len,
                              mac_buf, <const unsigned char *> idata.buf+hlen)
@@ -304,8 +324,10 @@ cdef class AES256_CTR_BASE:
             self.blocks += self.block_count(offset)
             return odata[:offset]
         finally:
-            PyMem_Free(odata)
-            PyBuffer_Release(&idata)
+            if odata:
+                PyMem_Free(odata)
+            if idata_acquired:
+                PyBuffer_Release(&idata)
 
     def block_count(self, length):
         return num_cipher_blocks(length, self.cipher_blk_len)
@@ -470,16 +492,28 @@ cdef class _AEAD_BASE:
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef int aadlen = len(aad)
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
-                                                                  ilen + self.cipher_blk_len)
-        if not odata:
-            raise MemoryError
-        cdef int olen = 0
+        cdef Py_buffer idata
+        cdef bint idata_acquired = False
+        cdef Py_buffer hdata
+        cdef bint hdata_acquired = False
+        cdef Py_buffer aadata
+        cdef bint aadata_acquired = False
+        cdef unsigned char *odata = NULL
+        cdef int olen
         cdef int offset
-        cdef Py_buffer idata = ro_buffer(data)
-        cdef Py_buffer hdata = ro_buffer(header)
-        cdef Py_buffer aadata = ro_buffer(aad)
+
         try:
+            odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
+                                                  ilen + self.cipher_blk_len)
+            if not odata:
+                raise MemoryError
+
+            idata = ro_buffer(data)
+            idata_acquired = True
+            hdata = ro_buffer(header)
+            hdata_acquired = True
+            aadata = ro_buffer(aad)
+            aadata_acquired = True
             offset = 0
             for i in range(hlen):
                 odata[offset+i] = header[i]
@@ -506,10 +540,14 @@ cdef class _AEAD_BASE:
             self.blocks = block_count
             return odata[:offset]
         finally:
-            PyMem_Free(odata)
-            PyBuffer_Release(&hdata)
-            PyBuffer_Release(&idata)
-            PyBuffer_Release(&aadata)
+            if odata:
+                PyMem_Free(odata)
+            if hdata_acquired:
+                PyBuffer_Release(&hdata)
+            if idata_acquired:
+                PyBuffer_Release(&idata)
+            if aadata_acquired:
+                PyBuffer_Release(&aadata)
 
     def decrypt(self, envelope, aad=b''):
         """
@@ -526,14 +564,23 @@ cdef class _AEAD_BASE:
         cdef int aoffset = self.aad_offset
         cdef int alen = hlen - aoffset
         cdef int aadlen = len(aad)
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
-        if not odata:
-            raise MemoryError
-        cdef int olen = 0
+        cdef Py_buffer idata
+        cdef bint idata_acquired = False
+        cdef Py_buffer aadata
+        cdef bint aadata_acquired = False
+        cdef unsigned char *odata = NULL
+        cdef int olen
         cdef int offset
-        cdef Py_buffer idata = ro_buffer(envelope)
-        cdef Py_buffer aadata = ro_buffer(aad)
+
         try:
+            odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
+            if not odata:
+                raise MemoryError
+
+            idata = ro_buffer(envelope)
+            idata_acquired = True
+            aadata = ro_buffer(aad)
+            aadata_acquired = True
             if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, NULL, NULL):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_IVLEN, self.iv_len, NULL):
@@ -559,9 +606,12 @@ cdef class _AEAD_BASE:
             self.blocks = self.block_count(offset)
             return odata[:offset]
         finally:
-            PyMem_Free(odata)
-            PyBuffer_Release(&idata)
-            PyBuffer_Release(&aadata)
+            if odata:
+                PyMem_Free(odata)
+            if idata_acquired:
+                PyBuffer_Release(&idata)
+            if aadata_acquired:
+                PyBuffer_Release(&aadata)
 
     def block_count(self, length):
         return num_cipher_blocks(length, self.cipher_blk_len)
@@ -605,107 +655,6 @@ cdef class CHACHA20_POLY1305(_AEAD_BASE):
         self.cipher = EVP_chacha20_poly1305
         self.cipher_blk_len = 64
         super().__init__(key, iv=iv, header_len=header_len, aad_offset=aad_offset)
-
-
-cdef class AES:  # legacy
-    """A thin wrapper around the OpenSSL EVP cipher API - for legacy code, like key file encryption"""
-    cdef CIPHER cipher
-    cdef EVP_CIPHER_CTX *ctx
-    cdef unsigned char enc_key[32]
-    cdef int cipher_blk_len
-    cdef int iv_len
-    cdef unsigned char iv[16]
-    cdef long long blocks
-
-    def __init__(self, enc_key, iv=None):
-        assert isinstance(enc_key, bytes) and len(enc_key) == 32
-        self.enc_key = enc_key
-        self.iv_len = 16
-        assert sizeof(self.iv) == self.iv_len
-        self.cipher = EVP_aes_256_ctr
-        self.cipher_blk_len = 16
-        if iv is not None:
-            self.set_iv(iv)
-        else:
-            self.blocks = -1  # make sure set_iv is called before encrypt
-
-    def __cinit__(self, enc_key, iv=None):
-        self.ctx = EVP_CIPHER_CTX_new()
-
-    def __dealloc__(self):
-        EVP_CIPHER_CTX_free(self.ctx)
-
-    def encrypt(self, data, iv=None):
-        if iv is not None:
-            self.set_iv(iv)
-        assert self.blocks == 0, 'iv needs to be set before encrypt is called'
-        cdef Py_buffer idata = ro_buffer(data)
-        cdef int ilen = len(data)
-        cdef int offset
-        cdef int olen = 0
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
-        if not odata:
-            raise MemoryError
-        try:
-            if not EVP_EncryptInit_ex(self.ctx, self.cipher(), NULL, self.enc_key, self.iv):
-                raise Exception('EVP_EncryptInit_ex failed')
-            offset = 0
-            if not EVP_EncryptUpdate(self.ctx, odata, &olen, <const unsigned char*> idata.buf, ilen):
-                raise Exception('EVP_EncryptUpdate failed')
-            offset += olen
-            if not EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen):
-                raise Exception('EVP_EncryptFinal failed')
-            offset += olen
-            self.blocks = self.block_count(offset)
-            return odata[:offset]
-        finally:
-            PyMem_Free(odata)
-            PyBuffer_Release(&idata)
-
-    def decrypt(self, data):
-        cdef Py_buffer idata = ro_buffer(data)
-        cdef int ilen = len(data)
-        cdef int offset
-        cdef int olen = 0
-        cdef unsigned char *odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
-        if not odata:
-            raise MemoryError
-        try:
-            # Set cipher type and mode
-            if not EVP_DecryptInit_ex(self.ctx, self.cipher(), NULL, self.enc_key, self.iv):
-                raise Exception('EVP_DecryptInit_ex failed')
-            offset = 0
-            if not EVP_DecryptUpdate(self.ctx, odata, &olen, <const unsigned char*> idata.buf, ilen):
-                raise Exception('EVP_DecryptUpdate failed')
-            offset += olen
-            if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
-                # this error check is very important for modes with padding or
-                # authentication. for them, a failure here means corrupted data.
-                # CTR mode does not use padding nor authentication.
-                raise Exception('EVP_DecryptFinal failed')
-            offset += olen
-            self.blocks = self.block_count(ilen)
-            return odata[:offset]
-        finally:
-            PyMem_Free(odata)
-            PyBuffer_Release(&idata)
-
-    def block_count(self, length):
-        return num_cipher_blocks(length, self.cipher_blk_len)
-
-    def set_iv(self, iv):
-        # set_iv needs to be called before each encrypt() call,
-        # because encrypt does a full initialisation of the cipher context.
-        if isinstance(iv, int):
-            iv = iv.to_bytes(self.iv_len, byteorder='big')
-        assert isinstance(iv, bytes) and len(iv) == self.iv_len
-        self.iv = iv
-        self.blocks = 0  # number of cipher blocks encrypted with this IV
-
-    def next_iv(self):
-        # call this after encrypt() to get the next iv (int) for the next encrypt() call
-        iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
-        return iv + self.blocks
 
 
 def hmac_sha256(key, data):

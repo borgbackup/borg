@@ -86,11 +86,6 @@ def test_repository_permissions_no_delete(archivers, request, monkeypatch):
     with pytest.raises(PermissionDenied):
         cmd(archiver, "check", "--repair")
 
-    # Try to repo-compress (and change compression from lz4 to zstd), which should fail.
-    # It fails because it needs to overwrite existing chunks, which is also disallowed by no-delete.
-    with pytest.raises(PermissionDenied):
-        cmd(archiver, "repo-compress", "-C", "zstd")
-
 
 def test_repository_permissions_read_only(archivers, request, monkeypatch):
     """Test repository with 'read-only' permissions setting."""

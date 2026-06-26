@@ -53,7 +53,7 @@ Description
 Change the location of a Borg key. The key can be stored at different locations:
 
 - keyfile: locally, usually in the home directory
-- repokey: inside the repository (in the repository config)
+- repokey: inside the repository
 
 Please note:
 

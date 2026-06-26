@@ -1,6 +1,7 @@
 import os
 import errno
-from typing import BinaryIO, Iterator
+from collections.abc import Iterator
+from typing import BinaryIO
 
 from ..constants import CH_DATA
 from .reader import Chunk

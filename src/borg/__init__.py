@@ -8,7 +8,7 @@ __version_tuple__ = parse_version(__version__).release
 # assert that all semver components are integers
 # this is mainly to show errors when people repackage poorly
 # and setuptools_scm determines a 0.1.dev... version
-assert all(isinstance(v, int) for v in __version_tuple__), (
+assert not __version__.startswith("0.1.dev") and all(isinstance(v, int) for v in __version_tuple__), (
     """\
 Broken BorgBackup version metadata: %r
 

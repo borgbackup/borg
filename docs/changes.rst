@@ -156,8 +156,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b21 (2026-03-16)
------------------------------
+Version 2.0.0b22 (not released yet)
+-----------------------------------
 
 Please note:
 
@@ -165,6 +165,111 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- repo-create: split ``--encryption`` into orthogonal options. ``--encryption`` now
+  selects only the cipher / AE algorithm (``none``, ``authenticated``, ``aes256-ocb``
+  or ``chacha20-poly1305``), the new ``--id-hash`` selects the id hash function
+  (``sha256`` (default) or ``blake3``), and ``--key-location`` (already present) selects
+  the key storage. The old combined names were removed: select a BLAKE3 suite via
+  ``--encryption ... --id-hash blake3`` instead of ``blake3-*``, and note that
+  ``aes-ocb`` was renamed to ``aes256-ocb``. The JSON output (``--json``) reflects this
+  too: the ``encryption.mode`` field was replaced by separate ``encryption.encryption``
+  (cipher / AE algorithm) and ``encryption.id_hash`` fields. #9168
+- key: unify keyfile/repokey key classes and locate the key independently of the
+  manifest key-type byte. Borg now tries keyfiles first and repokeys afterwards until
+  a passphrase unlocks a key, so where a key is stored (keyfile vs repokey) is a
+  per-key property rather than a separate key class. The key-type byte still selects
+  the crypto suite (id hash, MAC, cipher). ``borg repo-create --encryption`` now takes
+  only the crypto suite (e.g. ``aes256-ocb``, ``chacha20-poly1305``; see #9168 above for
+  the further split into ``--encryption`` and ``--id-hash``);
+  choose the storage location with the new ``--key-location=repokey|keyfile`` option
+  (default: ``repokey``). The old combined modes (``repokey-aes-ocb`` etc.) were
+  removed. ``borg key import`` also gained ``--key-location``. #9743
+- WIP packs project, major repo format changes, you must create new repos! #8572
+- rest:// repository URLs - connect via ssh to remote borgstore REST server,
+  talking http via stdio, #9593
+- ``borg serve --rest`` serves a (non-legacy) repository as the remote-side
+  component of a rest:// repository (HTTP over stdio). A rest:// client then
+  starts ``borg serve --rest`` on the remote.
+  ``borg serve`` (without --rest) serves legacy borg 1.x repositories.
+- removed ssh:// and socket:// support for current repositories; use a rest://
+  repository instead (it can tunnel over ssh). ssh:// and ``borg serve`` remain
+  available only for legacy (borg 1.x / v1) repositories, e.g. for
+  ``borg transfer --from-borg1 --other-repo ssh://...``.
+- prune: show total vs matching archives in output, #9262
+- prune: add --json option, #9222
+- archive: preserve cwd archive metadata, #9495
+
+Fixes:
+
+- compact: invalidate cached chunk indexes before deleting objects, #9748.
+  An interrupted compact no longer leaves a stale cache/chunks.* that claims
+  deleted objects still exist, which could cause a later create to skip
+  re-uploading data and silently produce an archive with dangling references.
+- files cache: fix no-change backup emptying the files cache, #9749
+- fix canonical_path() missing ':' before port number
+- fix: xattr xdg backup exclusion should be on 'false'
+- fix slashdot hack excluding source directory metadata, #9534
+- macOS: fix TypeError when _get_birthtime_ns gets called with an FD
+- fix ChunkerFixed sparse handling and update tests
+- chunkers: check return value of malloc, raise MemoryError
+- crypto low_level: fix freeing of memory
+- extract: resolve memory leak on abandoned async requests in RemoteRepository
+- helpers: get_base_dir: avoid using HOME when it incorrectly points to root's home for non-root users (fstab borgfs), #3395
+- mount: improve error msg when uid/gid cannot be resolved, #9574
+- fix: properly handle invalid and dev versions in version parser, #9014
+- patterns: allow backslashes in paths, #9518
+
+Other changes:
+
+- msgpack: also allow 1.2.1
+- Location: simplify parsing/validation, #9678.
+  For sftp/http(s)/s3/b2/rclone repositories, borg now only detects the scheme and hands the raw
+  URL to borgstore, which parses and validates it (removing the duplicate parsing borg did before).
+  Note: for these repositories the canonical location string changed slightly, so on the first run
+  against an existing such repository borg may warn once that it "was previously located at ..." -
+  this is harmless and can be confirmed.
+- remove leftover socket: protocol code (the unix-socket transport and the --socket option were
+  never part of a stable borg 2 release).
+- keyfile: name key files by sha256(keyfile_contents).
+  Existing legacy-named keyfiles continue to work.
+- repokey: use same format as with external keyfile
+- repo-compress: remove this command for now
+- list: remove xxh64 hash support
+- benchmark: remove xxh64 and crc32 benchmarking
+- benchmark cpu: drop KDF section
+- separate a lot of legacy code into borg.legacy package, #9556
+- archiver: warn about MSYS2 path translation, #9339
+- tests / CI:
+
+  - remote archiver tests: use rest:/// rather than ssh://
+  - remove workaround for cross-platform-actions < v1.0.0, #9565
+  - CI: fix Haiku git safe.directory issue, #9562
+  - CI: canary: avoid MSYS2 arg/env conversions, #9513
+  - Fixes cleanup of append-only test tempfiles on macOS/BSD
+  - Fixes tests/docs assuming XDG_* vars not used on macOS
+  - add more tests
+- docs:
+
+  - add pack file format design and internals documentation, #8572
+  - update to 'borg key change-passphrase' in env help, #9697
+  - document the impact of the slashdot hack to pattern matching
+  - contributing guide incl. AI policy, #9409
+  - sshfs + chroot does not support different CPU architectures, #6878
+  - DoS warning for none mode, #6715
+  - error handling documentation for create, #4912
+  - FAQ entry for full repository filesystem, #9573
+  - FAQ entry for SSH connection timeouts, #5629
+  - FAQ entry for bad backups and deduplication, #4744
+  - FAQ entry about scalability, #4742
+  - improve macOS Keychain instructions, #5156
+  - pull-backup.rst minor fixes
+
+
+Version 2.0.0b21 (2026-03-16)
+-----------------------------
 
 New features:
 

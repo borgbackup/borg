@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-prune" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-prune" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-prune \- Prune archives according to specified rules.
 .SH SYNOPSIS
@@ -127,6 +127,9 @@ output verbose list of archives it keeps
 .TP
 .BI \-\-format \ FORMAT
 specify format for the archive part (default: \(dq{archive:<36} {time} [{id}]\(dq)
+.TP
+.B  \-\-json
+Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
 .TP
 .BI \-\-keep\-within \ INTERVAL
 keep all archives within this time interval

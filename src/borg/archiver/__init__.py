@@ -24,7 +24,7 @@ try:
     import os
     import shlex
     import signal
-    from datetime import datetime, timezone
+    from datetime import UTC, datetime
 
     from ..logger import create_logger, setup_logging
 
@@ -47,7 +47,7 @@ try:
     from ..helpers import sig_int
     from ..helpers import get_config_dir
     from ..platformflags import is_msystem
-    from ..remote import RemoteRepository
+    from ..legacy.remote import LegacyRemoteRepository
     from ..selftest import selftest
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
@@ -81,7 +81,6 @@ from .list_cmd import ListMixIn
 from .lock_cmds import LocksMixIn
 from .mount_cmds import MountMixIn
 from .prune_cmd import PruneMixIn
-from .repo_compress_cmd import RepoCompressMixIn
 from .recreate_cmd import RecreateMixIn
 from .rename_cmd import RenameMixIn
 from .repo_create_cmd import RepoCreateMixIn
@@ -117,7 +116,6 @@ class Archiver(
     PruneMixIn,
     RecreateMixIn,
     RenameMixIn,
-    RepoCompressMixIn,
     RepoCreateMixIn,
     RepoDeleteMixIn,
     RepoInfoMixIn,
@@ -246,14 +244,27 @@ class Archiver(
             self.define_common_options(add_argument)
 
     def build_parser(self):
-        from ._common import define_common_options
+        from ._common import define_common_options, process_epilog
 
+        additional_help = process_epilog(
+            """
+        Description of additional help topics:
+
+        Use ``borg help <topic>`` to get help on:
+
+          patterns            selection patterns for including/excluding paths
+          match-archives      selection patterns for matching archives
+          placeholders        placeholders in repository URLs, archive names, etc.
+          compression         options and specifications for data compression
+        """
+        )
         parser = ArgumentParser(
             prog=self.prog,
             description="Borg - Deduplicated Backups",
             default_config_files=[os.path.join(get_config_dir(), "default.yaml")],
             default_env=True,
             env_prefix="BORG",
+            epilog=additional_help,
         )
         parser.add_argument("--config", action="config")
         # paths and patterns must have an empty list as default everywhere
@@ -292,7 +303,6 @@ class Archiver(
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)
         self.build_parser_prune(subparsers, common_parser, mid_common_parser)
-        self.build_parser_repo_compress(subparsers, common_parser, mid_common_parser)
         self.build_parser_repo_create(subparsers, common_parser, mid_common_parser)
         self.build_parser_repo_delete(subparsers, common_parser, mid_common_parser)
         self.build_parser_repo_info(subparsers, common_parser, mid_common_parser)
@@ -329,7 +339,15 @@ class Archiver(
                 # everything else comes from the forced "borg serve" command (or the defaults).
                 # stuff from denylist must never be used from the client.
                 denylist = {"restrict_to_paths", "restrict_to_repositories", "umask", "permissions"}
-                allowlist = {"debug_topics", "lock_wait", "log_level"}
+                # "backend" is given by the client to the REST server to contruct a posixfs backend
+                # that shall be used as a repository (borg serve --rest --backend FILE:<path>).
+                # Like the legacy repository path (transmitted via the RPC protocol),
+                # the client chooses *which* repository it wants to use; the ssh forced command pins the
+                # restrictions, and do_serve_rest validates the client backend against restrict_to_paths
+                # and restrict_to_repositories.
+                # The --rest mode flag itself is intentionally NOT allowlisted, so the forced command
+                # keeps pinning the mode (legacy/rpc vs. non-legacy/rest).
+                allowlist = {"debug_topics", "lock_wait", "log_level", "backend"}
                 not_present = object()
                 for attr_name in allowlist:
                     assert attr_name not in denylist, "allowlist has denylisted attribute name %s" % attr_name
@@ -368,7 +386,7 @@ class Archiver(
         # thus we have to initialize replace_placeholders here and process all args that need placeholder replacement.
         if getattr(args, "timestamp", None):
             replace_placeholders.override("now", DatetimeWrapper(args.timestamp))
-            replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(timezone.utc)))
+            replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(UTC)))
             args.location = args.location.with_timestamp(args.timestamp)
         for name in "name", "other_name", "newname", "comment":
             value = getattr(args, name, None)
@@ -528,7 +546,7 @@ def sig_trace_handler(sig_no, stack):  # pragma: no cover
 
 def format_tb(exc):
     qualname = type(exc).__qualname__
-    remote = isinstance(exc, RemoteRepository.RPCError)
+    remote = isinstance(exc, LegacyRemoteRepository.RPCError)
     if remote:
         prefix = "Borg server: "
         trace_back = "\n".join(prefix + line for line in exc.exception_full.splitlines())
@@ -622,7 +640,7 @@ def main():  # pragma: no cover
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
             tb = format_tb(e)
             exit_code = e.exit_code
-        except RemoteRepository.RPCError as e:
+        except LegacyRemoteRepository.RPCError as e:
             important = e.traceback
             msg = e.exception_full if important else e.get_message()
             msgid = e.exception_class

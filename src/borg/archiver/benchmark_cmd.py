@@ -6,7 +6,6 @@ import tempfile
 import time
 
 from ..constants import *  # NOQA
-from ..crypto.key import FlexiKey
 from ..helpers import format_file_size, CompressionSpec
 from ..helpers import json_print
 from ..helpers import msgpack
@@ -170,7 +169,6 @@ class BenchmarkMixIn:
         # Use minimal iterations and data size in test mode to keep CI fast.
         number_default = 1 if is_test else 100
         number_compression = 1 if is_test else 10
-        number_kdf = 1 if is_test else 5
         data_size = 100 * 1000 if is_test else 10 * 1000 * 1000
 
         random_10M = os.urandom(data_size)
@@ -215,33 +213,21 @@ class BenchmarkMixIn:
             else:
                 print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
 
-        from xxhash import xxh64
-        from ..checksums import crc32
-
-        if not args.json:
-            print("Non-cryptographic checksums / hashes ===========================")
-        else:
-            result["checksums"] = []
-        size = 1000000000
-        tests = [("xxh64", lambda: xxh64(random_10M).digest()), ("crc32 (zlib)", lambda: crc32(random_10M))]
-        for spec, func in tests:
-            dt = timeit(func, number=number_default)
-            if args.json:
-                result["checksums"].append({"algo": spec, "size": size, "time": dt})
-            else:
-                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
-
         from ..crypto.low_level import hmac_sha256, blake2b_256
+        import blake3
 
         if not args.json:
             print("Cryptographic hashes / MACs ====================================")
         else:
             result["hashes"] = []
         size = 1000000000
-        for spec, func in [
+        hashes_tests = [
             ("hmac-sha256", lambda: hmac_sha256(key_256, random_10M)),
             ("blake2b-256", lambda: blake2b_256(key_256, random_10M)),
-        ]:
+            ("blake3", lambda: blake3.blake3(random_10M, key=key_256).digest()),
+            ("blake3-mt", lambda: blake3.blake3(random_10M, key=key_256, max_threads=blake3.blake3.AUTO).digest()),
+        ]
+        for spec, func in hashes_tests:
             dt = timeit(func, number=number_default)
             if args.json:
                 result["hashes"].append({"algo": spec, "size": size, "time": dt})
@@ -287,20 +273,6 @@ class BenchmarkMixIn:
                 result["encryption"].append({"algo": spec, "size": size, "time": dt})
             else:
                 print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
-
-        if not args.json:
-            print("KDFs (slow is GOOD, use argon2!) ===============================")
-        else:
-            result["kdf"] = []
-        for spec, func in [
-            ("pbkdf2", lambda: FlexiKey.pbkdf2("mypassphrase", b"salt" * 8, PBKDF2_ITERATIONS, 32)),
-            ("argon2", lambda: FlexiKey.argon2("mypassphrase", 64, b"S" * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
-        ]:
-            dt = timeit(func, number=number_kdf)
-            if args.json:
-                result["kdf"].append({"algo": spec, "count": number_kdf, "time": dt})
-            else:
-                print(f"{spec:<24} {number_kdf:<10} {dt:.3f}s")
 
         if not args.json:
             print("Compression ====================================================")

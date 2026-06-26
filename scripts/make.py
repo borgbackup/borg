@@ -299,6 +299,9 @@ class BuildMan:
         "key_change-location": "key",
         "key_export": "key",
         "key_import": "key",
+        "key_add": "key",
+        "key_list": "key",
+        "key_remove": "key",
         "export-tar": "tar",
         "import-tar": "tar",
         "benchmark_crud": "benchmark",
@@ -561,7 +564,6 @@ src/borg/chunkers/buzhash64.pyx
 src/borg/chunkers/reader.pyx
 src/borg/hashindex.pyx
 src/borg/item.pyx
-src/borg/checksums.pyx
 src/borg/platform/posix.pyx
 src/borg/platform/linux.pyx
 src/borg/platform/syncfilerange.pyx

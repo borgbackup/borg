@@ -1,5 +1,8 @@
+import contextlib
+import getpass
 import os
 import shutil
+import tempfile
 
 import pytest
 
@@ -16,6 +19,62 @@ from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3, has_mfusepy  #
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported  # noqa: E402
 from borg.testsuite.archiver import BORG_EXES
 from borg.testsuite.platform.platform_test import fakeroot_detected  # noqa: E402
+from borg.helpers import umount  # noqa: E402
+
+
+def _pytest_tmp_root():
+    # Mirror the parent of pytest's basetemp: <temproot>/pytest-of-<user>.
+    # Old (already-removed-from-retention) run dirs live here too, which is where
+    # FUSE mounts orphaned by aborted runs hide.
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = "unknown"
+    return os.path.join(tempfile.gettempdir(), f"pytest-of-{user}")
+
+
+def _looks_mounted(path):
+    # A live FUSE mount reports as a mount point; a dead/stale one makes the
+    # directory inaccessible (os.path.ismount swallows that and returns False).
+    if os.path.ismount(path):
+        return True
+    try:
+        os.listdir(path)
+    except OSError:
+        return True
+    return False
+
+
+def _sweep_stale_fuse_mounts():
+    # The fuse test helper always mounts at a directory named "mountpoint" under the
+    # pytest temp tree and unmounts it in a finally block.  If a run is aborted, that
+    # cleanup is skipped and the mount lingers, so the next run's temp-dir GC (rm_rf)
+    # trips over it ("Resource busy" etc.).  Walk the temp tree, find such leftover
+    # mountpoints and unmount them with borg's own (cross-platform) umount helper.
+    root = _pytest_tmp_root()
+    for dirpath, dirnames, filenames in os.walk(root, onerror=lambda err: None):
+        if "mountpoint" not in dirnames:
+            continue
+        dirnames.remove("mountpoint")  # never descend into a (possibly stale) mount
+        mountpoint = os.path.join(dirpath, "mountpoint")
+        if _looks_mounted(mountpoint):
+            try:
+                umount(mountpoint)
+            except Exception:  # nosec B110
+                pass  # best-effort: never let cleanup break the test session
+
+
+def pytest_sessionstart(session):
+    # Run once in the main process (not in each xdist worker), before any temp-dir
+    # GC, to clear mounts left behind by a previous, aborted session.
+    if not hasattr(session.config, "workerinput"):
+        _sweep_stale_fuse_mounts()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    # Safety net for anything stranded by this session (e.g. a hard interrupt).
+    if not hasattr(session.config, "workerinput"):
+        _sweep_stale_fuse_mounts()
 
 
 @pytest.fixture(autouse=True)
@@ -96,7 +155,7 @@ class ArchiverSetup:
         self.patterns_file_path: str | None = None
 
     def get_kind(self) -> str:
-        if self.repository_location.startswith("ssh://__testsuite__"):
+        if self.repository_location.startswith("rest://"):
             return "remote"
         elif self.EXE == "borg.exe":
             return "binary"
@@ -129,10 +188,8 @@ def archiver(tmp_path, set_env_variables):
         fd.write(b"input/file2\n# A comment line, then a blank line\n\n")
     with open(archiver.patterns_file_path, "wb") as fd:
         fd.write(b"+input/file_important\n- input/file*\n# A comment line, then a blank line\n\n")
-    old_wd = os.getcwd()
-    os.chdir(archiver.tmpdir)
-    yield archiver
-    os.chdir(old_wd)
+    with contextlib.chdir(archiver.tmpdir):
+        yield archiver
 
     def maybe_clear_flags_and_retry(func, path, _exc_info):
         if has_lchflags:
@@ -152,7 +209,7 @@ def archiver(tmp_path, set_env_variables):
 
 @pytest.fixture()
 def remote_archiver(archiver):
-    archiver.repository_location = "ssh://__testsuite__/" + str(archiver.repository_path)
+    archiver.repository_location = "rest://" + "/" + str(archiver.repository_path)
     yield archiver
 
 

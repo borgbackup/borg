@@ -1,15 +1,16 @@
+import os
 import tempfile
 from binascii import a2b_base64
 from unittest.mock import MagicMock
 
 import pytest
 
-from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
-from ...crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
+from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey, keyfile_parse
+from ...crypto.key import AESCTRKey, Blake2AESCTRKey
 from ...crypto.key import AEADKeyBase
-from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
-from ...crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey
-from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
+from ...crypto.key import AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey
+from ...crypto.key import Blake3AuthenticatedKey
+from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
 from ...crypto.key import identify_key
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -24,6 +25,14 @@ class TestKey:
     class MockArgs:
         location = Location(tempfile.mkstemp()[1])
         key_algorithm = "argon2"
+        key_location = "repokey"  # default storage; tests that want a keyfile use kf_args() below
+
+    @classmethod
+    def kf_args(cls):
+        # like MockArgs(), but selects keyfile storage (the unified key classes default to repokey).
+        args = cls.MockArgs()
+        args.key_location = "keyfile"
+        return args
 
     keyfile2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
@@ -73,24 +82,21 @@ class TestKey:
 
     @pytest.fixture(
         params=(
+            # keyfile and repokey are no longer separate classes (storage is a per-key property),
+            # so each crypto suite appears once here.
             # not encrypted
             PlaintextKey,
             AuthenticatedKey,
-            Blake2AuthenticatedKey,
+            Blake3AuthenticatedKey,
             # legacy crypto
-            KeyfileKey,
-            Blake2KeyfileKey,
-            RepoKey,
-            Blake2RepoKey,
+            AESCTRKey,
+            Blake2AESCTRKey,
+            Blake2AuthenticatedKey,
             # new crypto
-            AESOCBKeyfileKey,
-            AESOCBRepoKey,
-            Blake2AESOCBKeyfileKey,
-            Blake2AESOCBRepoKey,
-            CHPOKeyfileKey,
-            CHPORepoKey,
-            Blake2CHPOKeyfileKey,
-            Blake2CHPORepoKey,
+            AESOCBKey,
+            Blake3AESOCBKey,
+            CHPOKey,
+            Blake3CHPOKey,
         )
     )
     def key(self, request, monkeypatch):
@@ -104,16 +110,20 @@ class TestKey:
             def canonical_path(self):
                 return self.processed
 
+        def __init__(self, id=bytes(32)):
+            self.id = id
+            self.id_str = bin_to_hex(id)
+
         _location = _Location()
-        id = bytes(32)
-        id_str = bin_to_hex(id)
         version = 2
 
         def save_key(self, data):
             self.key_data = data
 
         def load_key(self):
-            return self.key_data
+            # mirror a real repository: no repokey stored yet -> empty bytes (not an error). Detection
+            # is storage-agnostic now and always probes repo candidates, even for keyfile keys.
+            return getattr(self, "key_data", b"")
 
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
@@ -124,7 +134,7 @@ class TestKey:
 
     def test_keyfile(self, monkeypatch, keys_dir):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
-        key = KeyfileKey.create(self.MockRepository(), self.MockArgs())
+        key = AESCTRKey.create(self.MockRepository(), self.kf_args())
         assert key.cipher.next_iv() == 0
         chunk = b"ABC"
         id = key.id_hash(chunk)
@@ -135,8 +145,8 @@ class TestKey:
         assert key.decrypt(id, manifest) == key.decrypt(id, manifest2)
         assert key.cipher.extract_iv(manifest2) == 1
         iv = key.cipher.extract_iv(manifest)
-        key2 = KeyfileKey.detect(self.MockRepository(), manifest)
-        assert key2.cipher.next_iv() >= iv + key2.cipher.block_count(len(manifest) - KeyfileKey.PAYLOAD_OVERHEAD)
+        key2 = AESCTRKey.detect(self.MockRepository(), manifest)
+        assert key2.cipher.next_iv() >= iv + key2.cipher.block_count(len(manifest) - AESCTRKey.PAYLOAD_OVERHEAD)
         # Key data sanity check
         assert len({key2.id_key, key2.crypt_key}) == 2
         assert key2.chunk_seed != 0
@@ -149,22 +159,22 @@ class TestKey:
         monkeypatch.setenv("BORG_KEY_FILE", str(keyfile))
         monkeypatch.setenv("BORG_PASSPHRASE", "testkf")
         assert not keyfile.exists()
-        key = CHPOKeyfileKey.create(self.MockRepository(), self.MockArgs())
+        key = CHPOKey.create(self.MockRepository(), self.kf_args())
         assert keyfile.exists()
         chunk = b"ABC"
         chunk_id = key.id_hash(chunk)
         chunk_cdata = key.encrypt(chunk_id, chunk)
-        key = CHPOKeyfileKey.detect(self.MockRepository(), chunk_cdata)
+        key = CHPOKey.detect(self.MockRepository(), chunk_cdata)
         assert chunk == key.decrypt(chunk_id, chunk_cdata)
         keyfile.remove()
         with pytest.raises(FileNotFoundError):
-            CHPOKeyfileKey.detect(self.MockRepository(), chunk_cdata)
+            CHPOKey.detect(self.MockRepository(), chunk_cdata)
 
     def test_keyfile2(self, monkeypatch, keys_dir):
         with keys_dir.join("keyfile").open("w") as fd:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
-        key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+        key = AESCTRKey.detect(self.MockRepository(), self.keyfile2_cdata)
         assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata) == b"payload"
 
     def test_keyfile2_kfenv(self, tmpdir, monkeypatch):
@@ -173,15 +183,24 @@ class TestKey:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv("BORG_KEY_FILE", str(keyfile))
         monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
-        key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+        key = AESCTRKey.detect(self.MockRepository(), self.keyfile2_cdata)
         assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata) == b"payload"
 
     def test_keyfile_blake2(self, monkeypatch, keys_dir):
         with keys_dir.join("keyfile").open("w") as fd:
             fd.write(self.keyfile_blake2_key_file)
         monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
-        key = Blake2KeyfileKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
+        key = Blake2AESCTRKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
         assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata) == b"payload"
+
+    def test_legacy_named_keyfile_still_loads(self, monkeypatch, keys_dir):
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = CHPOKey.create(self.MockRepository(), self.kf_args())
+        hashed_keyfile = key.target
+        legacy_keyfile = str(keys_dir.join("legacy-name"))
+        os.replace(hashed_keyfile, legacy_keyfile)
+        key2 = CHPOKey.detect(self.MockRepository(), key.encrypt(b"", b"payload"))
+        assert key2.target == legacy_keyfile
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
@@ -195,7 +214,7 @@ class TestKey:
         with keys_dir.join("keyfile").open("w") as fd:
             fd.write(self.keyfile2_key_file)
         monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
-        key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
+        key = AESCTRKey.detect(self.MockRepository(), self.keyfile2_cdata)
 
         data = self.keyfile2_cdata
         for i in range(len(data)):
@@ -254,12 +273,23 @@ class TestKey:
         # 0x06 is the key TYPE.
         assert authenticated == b"\x06" + plaintext
 
+    def test_blake3_authenticated_encrypt(self, monkeypatch):
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = Blake3AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
+        assert Blake3AuthenticatedKey.id_hash is ID_BLAKE3_256.id_hash
+        assert len(key.id_key) == 32
+        plaintext = b"123456789"
+        id = key.id_hash(plaintext)
+        authenticated = key.encrypt(id, plaintext)
+        # 0x50 is the key TYPE.
+        assert authenticated == b"\x50" + plaintext
+
 
 class TestTAM:
     @pytest.fixture
     def key(self, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
-        return CHPOKeyfileKey.create(TestKey.MockRepository(), TestKey.MockArgs())
+        return CHPOKey.create(TestKey.MockRepository(), TestKey.MockArgs())
 
     def test_unpack_future(self, key):
         blob = b"\xc1\xc1\xc1\xc1foobar"
@@ -287,7 +317,7 @@ class TestTAM:
 
 def test_decrypt_key_file_unsupported_algorithm():
     """We will add more algorithms in the future. We should raise a helpful error."""
-    key = CHPOKeyfileKey(None)
+    key = CHPOKey(None)
     encrypted = msgpack.packb({"algorithm": "THIS ALGORITHM IS NOT SUPPORTED", "version": 1})
 
     with pytest.raises(UnsupportedKeyFormatError):
@@ -296,7 +326,7 @@ def test_decrypt_key_file_unsupported_algorithm():
 
 def test_decrypt_key_file_v2_is_unsupported():
     """There may eventually be a version 2 of the format. For now we should raise a helpful error."""
-    key = CHPOKeyfileKey(None)
+    key = CHPOKey(None)
     encrypted = msgpack.packb({"version": 2})
 
     with pytest.raises(UnsupportedKeyFormatError):
@@ -311,10 +341,22 @@ def test_key_file_roundtrip(monkeypatch):
     repository = MagicMock(id=b"repository_id")
     monkeypatch.setenv("BORG_PASSPHRASE", "hello, pass phrase")
 
-    save_me = AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm="argon2"))
-    saved = repository.save_key.call_args.args[0]
-    repository.load_key.return_value = saved
-    load_me = AESOCBRepoKey.detect(repository, manifest_data=None)
+    save_me = AESOCBKey.create(repository, args=MagicMock(key_algorithm="argon2"))
+    saved = repository.store_key.call_args.args[0]
+    repository.load_keys.return_value = [("key0", saved)]
+    load_me = AESOCBKey.detect(repository, manifest_data=None)
 
     assert to_dict(load_me) == to_dict(save_me)
-    assert msgpack.unpackb(a2b_base64(saved))["algorithm"] == KEY_ALGORITHMS["argon2"]
+    _, saved_b64 = keyfile_parse(saved)
+    assert msgpack.unpackb(a2b_base64(saved_b64))["algorithm"] == KEY_ALGORITHMS["argon2"]
+
+
+def test_argon2_wrong_passphrase_returns_none(monkeypatch):
+    # a wrong passphrase derives a different key, so the Argon2 integrity check fails;
+    # decrypt_key_file signals this by returning None, not by raising (refs #8036)
+    repository = MagicMock(id=b"repository_id")
+    monkeypatch.setenv("BORG_PASSPHRASE", "correct passphrase")
+    key = AESOCBKey.create(repository, args=MagicMock(key_algorithm="argon2"))
+    saved = repository.store_key.call_args.args[0]
+    _, saved_b64 = keyfile_parse(saved)
+    assert key.decrypt_key_file(a2b_base64(saved_b64), "wrong passphrase") is None

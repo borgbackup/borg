@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-key-import" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-key-import" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-key-import \- Imports the repository key from backup.
 .SH SYNOPSIS
@@ -64,6 +64,9 @@ path to the backup (\(aq\-\(aq to read from stdin)
 .TP
 .B  \-\-paper
 interactively import from a backup done with \fB\-\-paper\fP
+.TP
+.BI \-\-key\-location \ LOCATION
+where to store the imported key: \(aqrepokey\(aq (in the repository, default) or \(aqkeyfile\(aq (in the local keys directory)
 .UNINDENT
 .SH SEE ALSO
 .sp

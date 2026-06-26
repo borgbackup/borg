@@ -83,10 +83,12 @@ cdef extern from *:
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)  # Deactivate negative indexing.
-cdef uint32_t* buzhash_init_table(uint32_t seed):
+cdef uint32_t* buzhash_init_table(uint32_t seed) except NULL:
     """Initialize the buzhash table with the given seed."""
     cdef int i
     cdef uint32_t* table = <uint32_t*>malloc(1024)  # 256 * sizeof(uint32_t)
+    if table == NULL:
+        raise MemoryError("Failed to allocate buzhash table")
     for i in range(256):
         table[i] = table_base[i] ^ seed
     return table
@@ -99,6 +101,8 @@ cdef uint32_t _buzhash(const unsigned char* data, size_t len, const uint32_t* h)
     """Calculate the buzhash of the given data."""
     cdef uint32_t i
     cdef uint32_t sum = 0, imod
+    if len == 0:
+        return 0
     for i in range(len - 1, 0, -1):
         imod = i & 0x1f
         sum ^= BARREL_SHIFT(h[data[0]], imod)
@@ -141,6 +145,8 @@ cdef class Chunker:
     cdef bint sparse
 
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
+        self.table = NULL
+        self.data = NULL
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         assert max_size <= len(zeros)
@@ -153,6 +159,8 @@ cdef class Chunker:
         self.table = buzhash_init_table(seed & 0xffffffff)
         self.buf_size = max_size
         self.data = <uint8_t*>malloc(self.buf_size)
+        if self.data == NULL:
+            raise MemoryError("Failed to allocate chunker buffer")
         self.fh = -1
         self.done = 0
         self.eof = 0

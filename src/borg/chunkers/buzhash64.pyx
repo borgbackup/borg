@@ -40,7 +40,7 @@ cdef extern from *:
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)  # Deactivate negative indexing.
-cdef uint64_t* buzhash64_init_table(bytes key):
+cdef uint64_t* buzhash64_init_table(bytes key) except NULL:
     """
     Generate a balanced pseudo-random table deterministically from a 256-bit key.
     Balanced means that for each bit position 0..63, exactly 50% of the table values have the bit set to 1.
@@ -50,6 +50,8 @@ cdef uint64_t* buzhash64_init_table(bytes key):
 
     cdef int i, j, bit_pos
     cdef uint64_t* table = <uint64_t*>malloc(2048)  # 256 * sizeof(uint64_t)
+    if table == NULL:
+        raise MemoryError("Failed to allocate buzhash64 table")
 
     # Initialize all values to 0
     for i in range(256):
@@ -76,6 +78,8 @@ cdef uint64_t _buzhash64(const unsigned char* data, size_t len, const uint64_t* 
     """Calculate the buzhash of the given data."""
     cdef uint64_t i
     cdef uint64_t sum = 0, imod
+    if len == 0:
+        return 0
     for i in range(len - 1, 0, -1):
         imod = i & 0x3f
         sum ^= BARREL_SHIFT64(h[data[0]], imod)
@@ -118,6 +122,8 @@ cdef class ChunkerBuzHash64:
     cdef bint sparse
 
     def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
+        self.table = NULL
+        self.data = NULL
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         assert max_size <= len(zeros)
@@ -130,6 +136,8 @@ cdef class ChunkerBuzHash64:
         self.table = buzhash64_init_table(key)
         self.buf_size = max_size
         self.data = <uint8_t*>malloc(self.buf_size)
+        if self.data == NULL:
+            raise MemoryError("Failed to allocate chunker buffer")
         self.fh = -1
         self.done = 0
         self.eof = 0

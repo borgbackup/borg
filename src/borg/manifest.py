@@ -1,9 +1,10 @@
 import enum
 import re
 from collections import namedtuple
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from operator import attrgetter
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from typing import Protocol, runtime_checkable
 
 from borgstore.store import ObjectNotFound, ItemInfo
 
@@ -16,6 +17,7 @@ from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex, hex_to_bin
 from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
 from .helpers.errors import Error, CommandError
+from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .item import ArchiveItem
 from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
@@ -69,91 +71,128 @@ def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newes
     return archives
 
 
+@runtime_checkable
+class ArchivesInterface(Protocol):  # pragma: no cover
+    """
+    Structural interface that both Archives and LegacyArchives must satisfy.
+
+    Manifest.__init__ assigns one of these two classes to self.archives depending
+    on whether the repository is a LegacyRepository (Borg 1.x) or a modern one.
+    All callers go through this interface without knowing which class they got.
+
+    When Borg 1.x support is dropped, delete LegacyArchives and this Protocol
+    can either be removed or kept as documentation of the Archives public API.
+    """
+
+    def prepare(self, manifest, m) -> None: ...
+    def finish(self, manifest) -> dict: ...
+    def ids(self, *, deleted: bool = False) -> Iterator: ...
+    def count(self) -> int: ...
+    def names(self) -> Iterator: ...
+    def exists(self, name: str) -> bool: ...
+    def exists_id(self, id: bytes, *, deleted: bool = False) -> bool: ...
+    def exists_name_and_id(self, name: str, id: bytes) -> bool: ...
+    def exists_name_and_ts(self, name: str, ts) -> bool: ...
+    def get(self, name: str, raw: bool = False): ...
+    def get_by_id(self, id: bytes, raw: bool = False, *, deleted: bool = False): ...
+    def create(self, name: str, id: bytes, ts, *, overwrite: bool = False) -> None: ...
+    def delete_by_id(self, id: bytes) -> None: ...
+    def undelete_by_id(self, id: bytes) -> None: ...
+    def nuke_by_id(self, id: bytes) -> None: ...
+    def list(
+        self,
+        *,
+        match=None,
+        match_end=r"\Z",
+        sort_by=(),
+        reverse=False,
+        first=None,
+        last=None,
+        older=None,
+        newer=None,
+        oldest=None,
+        newest=None,
+        deleted=False,
+    ): ...
+    def list_considering(self, args): ...
+    def get_one(self, match, *, match_end=r"\Z", deleted=False): ...
+
+
 class Archives:
     """
-    Manage the list of archives.
+    Manage the list of archives for a Borg 2.x repository.
 
-    We still need to support the borg 1.x manifest-with-list-of-archives,
-    so borg transfer can work.
-    borg2 has separate items archives/* in the borgstore.
+    Each archive has a separate entry in borgstore at archives/<hex-id>.
     """
 
     def __init__(self, repository, manifest):
-        from .repository import Repository
-        from .remote import RemoteRepository
-
         self.repository = repository
-        self.legacy = not isinstance(repository, (Repository, RemoteRepository))
-        # key: str archive name, value: dict('id': bytes_id, 'time': str_iso_ts)
-        self._archives = {}
         self.manifest = manifest
 
     def prepare(self, manifest, m):
-        if not self.legacy:
-            pass
-        else:
-            self._set_raw_dict(m.archives)
+        pass  # borgstore manages the archive directory; nothing to load from the manifest blob
 
     def finish(self, manifest):
-        if not self.legacy:
-            manifest_archives = {}
-        else:
-            manifest_archives = StableDict(self._get_raw_dict())
-        return manifest_archives
+        return {}  # manifest["archives"] is always empty in Borg 2
 
     def ids(self, *, deleted=False):
         # yield the binary IDs of all archives
-        if not self.legacy:
-            try:
-                infos = list(self.repository.store_list("archives", deleted=deleted))
-            except ObjectNotFound:
-                infos = []
-            for info in infos:
-                info = ItemInfo(*info)  # RPC does not give us a NamedTuple
-                yield hex_to_bin(info.name)
-        else:
-            for archive_info in self._archives.values():
-                yield archive_info["id"]
+        try:
+            infos = list(self.repository.store_list("archives", deleted=deleted))
+        except ObjectNotFound:
+            infos = []
+        for info in infos:
+            info = ItemInfo(*info)  # RPC does not give us a NamedTuple
+            yield hex_to_bin(info.name)
 
     def _get_archive_meta(self, id: bytes) -> dict:
         # get all metadata directly from the ArchiveItem in the repo.
-        from .legacyrepository import LegacyRepository
         from .repository import Repository
 
         try:
             cdata = self.repository.get(id)
-        except (Repository.ObjectNotFound, LegacyRepository.ObjectNotFound):
+        except Repository.ObjectNotFound:
             metadata = dict(
                 id=id,
                 name="archive-does-not-exist",
                 time="1970-01-01T00:00:00.000000",
-                # new:
                 exists=False,  # we have the pointer, but the repo does not have an archive item
                 username="",
                 hostname="",
                 tags=(),
             )
         else:
-            _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
-            archive_dict = self.manifest.key.unpack_archive(data)
-            archive_item = ArchiveItem(internal_dict=archive_dict)
-            if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
-                raise Exception("Unknown archive metadata version")
-            # callers expect a dict with dict["key"] access, not ArchiveItem.key access.
-            # also, we need to put the id in there.
-            metadata = dict(
-                id=id,
-                name=archive_item.name,
-                time=archive_item.time,
-                # new:
-                exists=True,  # repo has a valid archive item
-                username=archive_item.username,
-                hostname=archive_item.hostname,
-                size=archive_item.get("size", 0),
-                nfiles=archive_item.get("nfiles", 0),
-                comment=archive_item.get("comment", ""),
-                tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
-            )
+            try:
+                _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
+            except IntegrityErrorBase:
+                metadata = dict(
+                    id=id,
+                    name="archive-metadata-has-integrity-error",
+                    time="1970-01-01T00:00:00.000000",
+                    exists=False,  # we have the pointer, but the repo does not have an archive item
+                    username="",
+                    hostname="",
+                    tags=(),
+                )
+            else:
+                archive_dict = self.manifest.key.unpack_archive(data)
+                archive_item = ArchiveItem(internal_dict=archive_dict)
+                if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
+                    raise Exception("Unknown archive metadata version")
+                # callers expect a dict with dict["key"] access, not ArchiveItem.key access.
+                # also, we need to put the id in there.
+                metadata = dict(
+                    id=id,
+                    name=archive_item.name,
+                    time=archive_item.time,
+                    exists=True,  # repo has a valid archive item
+                    username=archive_item.username,
+                    hostname=archive_item.hostname,
+                    size=archive_item.get("size", 0),
+                    nfiles=archive_item.get("nfiles", 0),
+                    comment=archive_item.get("comment", ""),
+                    tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
+                )
         return metadata
 
     def _infos(self, *, deleted=False):
@@ -211,48 +250,35 @@ class Archives:
     def exists(self, name):
         # check if an archive with this name exists
         assert isinstance(name, str)
-        if not self.legacy:
-            return name in self.names()
-        else:
-            return name in self._archives
+        return name in self.names()
 
     def exists_id(self, id, *, deleted=False):
         # check if an archive with this id exists
         assert isinstance(id, bytes)
-        if not self.legacy:
-            return id in self.ids(deleted=deleted)
-        else:
-            raise NotImplementedError
+        return id in self.ids(deleted=deleted)
 
     def exists_name_and_id(self, name, id):
         # check if an archive with this name AND id exists
         assert isinstance(name, str)
         assert isinstance(id, bytes)
-        if not self.legacy:
-            for archive_info in self._infos():
-                if archive_info["name"] == name and archive_info["id"] == id:
-                    return True
-            else:
-                return False
+        for archive_info in self._infos():
+            if archive_info["name"] == name and archive_info["id"] == id:
+                return True
         else:
-            raise NotImplementedError
+            return False
 
     def exists_name_and_ts(self, name, ts):
         # check if an archive with this name AND timestamp exists
         assert isinstance(name, str)
         assert isinstance(ts, datetime)
-        if not self.legacy:
-            for archive_info in self._info_tuples():
-                if archive_info.name == name and archive_info.ts == ts:
-                    return True
-            else:
-                return False
+        for archive_info in self._info_tuples():
+            if archive_info.name == name and archive_info.ts == ts:
+                return True
         else:
-            raise NotImplementedError
+            return False
 
     def _lookup_name(self, name, raw=False):
         assert isinstance(name, str)
-        assert not self.legacy
         for archive_info in self._infos():
             if archive_info["exists"] and archive_info["name"] == name:
                 if not raw:
@@ -272,51 +298,30 @@ class Archives:
 
     def get(self, name, raw=False):
         assert isinstance(name, str)
-        if not self.legacy:
-            try:
-                return self._lookup_name(name, raw=raw)
-            except KeyError:
-                return None
-        else:
-            values = self._archives.get(name)
-            if values is None:
-                return None
-            if not raw:
-                ts = parse_timestamp(values["time"])
-                return ArchiveInfo(name=name, id=values["id"], ts=ts)
-            else:
-                return dict(name=name, id=values["id"], time=values["time"])
+        try:
+            return self._lookup_name(name, raw=raw)
+        except KeyError:
+            return None
 
     def get_by_id(self, id, raw=False, *, deleted=False):
         assert isinstance(id, bytes)
-        if not self.legacy:
-            if id in self.ids(deleted=deleted):  # check directory
-                # looks like this archive id is in the archives directory, thus it is NOT deleted.
-                # OR we have explicitly requested a soft-deleted archive via deleted=True.
-                archive_info = self._get_archive_meta(id)
-                if archive_info["exists"]:  # True means we have found Archive metadata in the repo.
-                    if not raw:
-                        ts = parse_timestamp(archive_info["time"])
-                        archive_info = ArchiveInfo(
-                            name=archive_info["name"],
-                            id=archive_info["id"],
-                            ts=ts,
-                            tags=archive_info["tags"],
-                            user=archive_info["username"],
-                            host=archive_info["hostname"],
-                        )
-                    return archive_info
-        else:
-            for name, values in self._archives.items():
-                if id == values["id"]:
-                    break
-            else:
-                return None
-            if not raw:
-                ts = parse_timestamp(values["time"])
-                return ArchiveInfo(name=name, id=values["id"], ts=ts)
-            else:
-                return dict(name=name, id=values["id"], time=values["time"])
+        if id in self.ids(deleted=deleted):  # check directory
+            # looks like this archive id is in the archives directory, thus it is NOT deleted.
+            # OR we have explicitly requested a soft-deleted archive via deleted=True.
+            archive_info = self._get_archive_meta(id)
+            if archive_info["exists"]:  # True means we have found Archive metadata in the repo.
+                if not raw:
+                    ts = parse_timestamp(archive_info["time"])
+                    archive_info = ArchiveInfo(
+                        name=archive_info["name"],
+                        id=archive_info["id"],
+                        ts=ts,
+                        tags=archive_info["tags"],
+                        user=archive_info["username"],
+                        host=archive_info["hostname"],
+                    )
+                return archive_info
+        return None  # id not in store, or archive metadata blob missing from repo
 
     def create(self, name, id, ts, *, overwrite=False):
         assert isinstance(name, str)
@@ -324,30 +329,24 @@ class Archives:
         if isinstance(ts, datetime):
             ts = ts.isoformat(timespec="microseconds")
         assert isinstance(ts, str)
-        if not self.legacy:
-            # we only create a directory entry, its name points to the archive item:
-            self.repository.store_store(f"archives/{bin_to_hex(id)}", b"")
-        else:
-            if self.exists(name) and not overwrite:
-                raise KeyError("archive already exists")
-            self._archives[name] = {"id": id, "time": ts}
+        # flush buffered packs first: the pointer must not reference objects still sitting in the pack writer.
+        self.repository.flush()
+        # we only create a directory entry, its name points to the archive item:
+        self.repository.store_store(f"archives/{bin_to_hex(id)}", b"")
 
     def delete_by_id(self, id):
         # soft-delete an archive
         assert isinstance(id, bytes)
-        assert not self.legacy
         self.repository.store_move(f"archives/{bin_to_hex(id)}", delete=True)  # soft-delete
 
     def undelete_by_id(self, id):
         # undelete an archive
         assert isinstance(id, bytes)
-        assert not self.legacy
         self.repository.store_move(f"archives/{bin_to_hex(id)}", undelete=True)
 
     def nuke_by_id(self, id):
         # really delete an already soft-deleted archive
         assert isinstance(id, bytes)
-        assert not self.legacy
         self.repository.store_delete(f"archives/{bin_to_hex(id)}", deleted=True)
 
     def list(
@@ -430,21 +429,10 @@ class Archives:
             raise CommandError(f"{match} needed to match precisely one archive, but matched {len(archive_infos)}.")
         return archive_infos[0]
 
-    def _set_raw_dict(self, d):
-        """set the dict we get from the msgpack unpacker"""
-        for k, v in d.items():
-            assert isinstance(k, str)
-            assert isinstance(v, dict) and "id" in v and "time" in v
-            self._archives[k] = v
-
-    def _get_raw_dict(self):
-        """get the dict we can give to the msgpack packer"""
-        return self._archives
-
 
 class Manifest:
     @enum.unique
-    class Operation(enum.Enum):
+    class Operation(enum.StrEnum):
         # The comments here only roughly describe the scope of each feature. In the end, additions need to be
         # based on potential problems older clients could produce when accessing newer repositories and the
         # trade-offs of locking version out or still allowing access. As all older versions and their exact
@@ -474,7 +462,14 @@ class Manifest:
     MANIFEST_ID = b"\0" * 32
 
     def __init__(self, key, repository, item_keys=None, ro_cls=RepoObj):
-        self.archives = Archives(repository, self)
+        from .legacy.repository import LegacyRepository
+        from .legacy.remote import LegacyRemoteRepository
+        from .legacy.archives import LegacyArchives
+
+        if isinstance(repository, (LegacyRepository, LegacyRemoteRepository)):
+            self.archives: ArchivesInterface = LegacyArchives(repository, self)
+        else:
+            self.archives: ArchivesInterface = Archives(repository, self)
         self.config = {}
         self.key = key
         self.repo_objs = ro_cls(key)
@@ -521,9 +516,9 @@ class Manifest:
             feature_flags = self.config.get("feature_flags", None)
             if feature_flags is None:
                 return
-            if operation.value not in feature_flags:
+            if operation not in feature_flags:
                 continue
-            requirements = feature_flags[operation.value]
+            requirements = feature_flags[operation]
             if "mandatory" in requirements:
                 unsupported = set(requirements["mandatory"]) - self.SUPPORTED_REPO_FEATURES
                 if unsupported:
@@ -545,10 +540,10 @@ class Manifest:
 
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
-            self.timestamp = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds")
+            self.timestamp = datetime.now(tz=UTC).isoformat(timespec="microseconds")
         else:
             incremented_ts = self.last_timestamp + timedelta(microseconds=1)
-            now_ts = datetime.now(tz=timezone.utc)
+            now_ts = datetime.now(tz=UTC)
             max_ts = max(incremented_ts, now_ts)
             self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())

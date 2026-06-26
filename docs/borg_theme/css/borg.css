@@ -178,6 +178,7 @@ cite {
 #common-options .option {
     white-space: nowrap;
 }
+
 /* Remove the right-column max-width cap so content fills the full available width. */
 #right-column {
     max-width: none;
@@ -219,4 +220,18 @@ readthedocs-flyout {
 /* Reduce the separator margin below the search block to 7px. */
 .sphinxsidebar > .sidebar-block:has(#main-search):after {
     margin: 7px 22px 0 22px;
+}
+/* Downloads line in the sidebar: a single line, left-aligned with the boxes
+   above it and the table of contents below it. */
+.borg-downloads {
+    padding: 0 22px;
+    margin: 7px 0 7px 0;
+    font-size: 14px;
+    color: #000;
+}
+.borg-downloads:after {
+    content: '';
+    display: block;
+    border-top: 1px solid #ccc;
+    margin: 7px 0 0 0;
 }

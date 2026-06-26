@@ -71,6 +71,7 @@ def test_debug_put_get_delete_obj(archivers, request):
     output = cmd(archiver, "debug", "delete-obj", id_hash)
     assert "deleted" in output
 
+    # the object is gone now: deleting it again reports it is not there
     output = cmd(archiver, "debug", "delete-obj", id_hash)
     assert "not found" in output
 

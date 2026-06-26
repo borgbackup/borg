@@ -46,16 +46,19 @@ cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing
 on_rtd = os.environ.get("READTHEDOCS")
 
 # Extra cflags for all extensions, usually just warnings we want to enable explicitly
-cflags = ["-Wall", "-Wextra", "-Wpointer-arith", "-Wno-unreachable-code-fallthrough"]
+cflags = ["-Wall", "-Wextra", "-Wpointer-arith"]
+
+if not is_win32:
+    cflags.extend(["-Wstrict-prototypes"])
 
 compress_source = "src/borg/compress.pyx"
 crypto_ll_source = "src/borg/crypto/low_level.pyx"
+crypto_legacy_ll_source = "src/borg/legacy/crypto/low_level.pyx"
 buzhash_source = "src/borg/chunkers/buzhash.pyx"
 buzhash64_source = "src/borg/chunkers/buzhash64.pyx"
 reader_source = "src/borg/chunkers/reader.pyx"
 hashindex_source = "src/borg/hashindex.pyx"
 item_source = "src/borg/item.pyx"
-checksums_source = "src/borg/checksums.pyx"
 platform_posix_source = "src/borg/platform/posix.pyx"
 platform_linux_source = "src/borg/platform/linux.pyx"
 platform_syncfilerange_source = "src/borg/platform/syncfilerange.pyx"
@@ -67,12 +70,12 @@ platform_windows_source = "src/borg/platform/windows.pyx"
 cython_sources = [
     compress_source,
     crypto_ll_source,
+    crypto_legacy_ll_source,
     buzhash_source,
     buzhash64_source,
     reader_source,
     hashindex_source,
     item_source,
-    checksums_source,
     platform_posix_source,
     platform_linux_source,
     platform_syncfilerange_source,
@@ -157,13 +160,15 @@ if not on_rtd:
         dict(sources=[crypto_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)
     )
 
+    crypto_legacy_ext_kwargs = members_appended(
+        dict(sources=[crypto_legacy_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)
+    )
+
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
         lib_ext_kwargs(pc, "BORG_LIBLZ4_PREFIX", "lz4", "liblz4", ">= 1.7.0"),
         dict(extra_compile_args=cflags),
     )
-
-    checksums_ext_kwargs = members_appended(dict(sources=[checksums_source]), dict(extra_compile_args=cflags))
 
     if sys.platform == "linux":
         linux_ext_kwargs = members_appended(
@@ -178,13 +183,13 @@ if not on_rtd:
 
     ext_modules += [
         Extension("borg.crypto.low_level", **crypto_ext_kwargs),
+        Extension("borg.legacy.crypto.low_level", **crypto_legacy_ext_kwargs),
         Extension("borg.compress", **compress_ext_kwargs),
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash", [buzhash_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash64", [buzhash64_source], extra_compile_args=cflags),
         Extension("borg.chunkers.reader", [reader_source], extra_compile_args=cflags),
-        Extension("borg.checksums", **checksums_ext_kwargs),
     ]
 
     posix_ext = Extension("borg.platform.posix", [platform_posix_source], extra_compile_args=cflags)
@@ -223,7 +228,8 @@ if not on_rtd:
     if cythonize and cythonizing:
         # 3str is the default in Cython3 and we do not support older Cython releases.
         # we only set this to avoid the related FutureWarning from Cython3.
-        cython_opts = dict(compiler_directives={"language_level": "3str"})
+        cython_opts = dict(compiler_directives={"language_level": "3str", "warn.unreachable": True})
+
         if not is_win32:
             # Compile .pyx extensions to .c in parallel; does not work on Windows
             cython_opts["nthreads"] = cpu_threads

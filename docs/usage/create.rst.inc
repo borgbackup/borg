@@ -69,6 +69,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--keep-exclude-tags``                           | if tag objects are specified with ``--exclude-if-present``, do not omit the tag objects themselves from the backup archive                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--exclude-dataless``                            | exclude files flagged DATALESS (macOS: placeholder files whose content is not materialized locally, e.g. not-downloaded cloud storage files)                                                      |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems - this might behave different from your expectations, see the description below.                                 |
@@ -156,6 +158,7 @@ borg create
         --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (https://www.bford.info/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, do not omit the tag objects themselves from the backup archive
+        --exclude-dataless                exclude files flagged DATALESS (macOS: placeholder files whose content is not materialized locally, e.g. not-downloaded cloud storage files)
 
 
     Filesystem options
@@ -343,6 +346,22 @@ Other flags used include:
 - '-' = excluded, item would not be / was not backed up
 - 'i' = backup data was read from standard input (stdin)
 - '?' = missing status code (if you see this, please file a bug report!)
+
+Errors and (incomplete) archives
+++++++++++++++++++++++++++++++++
+
+If an error happens during archive creation (e.g. some file could not be read
+due to a permission error or some other OS error), borg will log a warning or
+an error (depending on the type of issue) and continue with the next item.
+
+At the end of the backup, if there were any such issues, borg will exit with
+a non-zero exit code (usually 1 for warnings).
+
+**The archive is still saved even if warnings or errors occurred**, but it will
+only contain the data borg was able to read successfully. It is like a
+checkpoint (see below), but with a user-given name.
+
+You should always check the backup logs and the exit code of the borg command.
 
 Reading backup data from stdin
 ++++++++++++++++++++++++++++++

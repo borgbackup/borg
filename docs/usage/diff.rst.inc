@@ -100,7 +100,7 @@ The FORMAT specifier syntax
 +++++++++++++++++++++++++++
 
 The ``--format`` option uses Python's `format string syntax
-<https://docs.python.org/3.10/library/string.html#formatstrings>`_.
+<https://docs.python.org/3.11/library/string.html#formatstrings>`_.
 
 Examples:
 ::

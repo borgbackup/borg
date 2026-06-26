@@ -281,6 +281,7 @@ class DebugMixIn:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
 
         repository.put(id, data)
+        repository.flush()  # no cache wraps this command, so flush the buffered pack before close()
         print("object %s put." % hex_id)
 
     @with_repository(manifest=False, exclusive=True)
@@ -294,9 +295,10 @@ class DebugMixIn:
             else:
                 try:
                     repository.delete(id)
-                    print("object %s deleted." % hex_id)
                 except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
+                else:
+                    print("object %s deleted." % hex_id)
         print("Done.")
 
     def do_debug_convert_profile(self, args):

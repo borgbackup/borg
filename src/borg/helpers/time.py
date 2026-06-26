@@ -1,9 +1,9 @@
 import os
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 
-def parse_timestamp(timestamp, tzinfo=timezone.utc):
+def parse_timestamp(timestamp, tzinfo=UTC):
     """Parse an ISO 8601 timestamp string.
 
     For naive/unaware datetime objects, assume they are in the tzinfo timezone (default: UTC).
@@ -26,7 +26,7 @@ def parse_local_timestamp(timestamp, tzinfo=None):
     return dt
 
 
-_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 def utcfromtimestampns(ts_ns: int) -> datetime:
@@ -139,20 +139,21 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
             offset = int(match.group("offset"))
             offset *= -1 if earlier else 1
 
-            if unit == "y":
-                return from_ts.replace(year=from_ts.year + offset)
-            elif unit == "m":
-                return offset_n_months(from_ts, offset)
-            elif unit == "w":
-                return from_ts + timedelta(days=offset * 7)
-            elif unit == "d":
-                return from_ts + timedelta(days=offset)
-            elif unit == "H":
-                return from_ts + timedelta(seconds=offset * 60 * 60)
-            elif unit == "M":
-                return from_ts + timedelta(seconds=offset * 60)
-            elif unit == "S":
-                return from_ts + timedelta(seconds=offset)
+            match unit:
+                case "y":
+                    return from_ts.replace(year=from_ts.year + offset)
+                case "m":
+                    return offset_n_months(from_ts, offset)
+                case "w":
+                    return from_ts + timedelta(days=offset * 7)
+                case "d":
+                    return from_ts + timedelta(days=offset)
+                case "H":
+                    return from_ts + timedelta(seconds=offset * 60 * 60)
+                case "M":
+                    return from_ts + timedelta(seconds=offset * 60)
+                case "S":
+                    return from_ts + timedelta(seconds=offset)
 
     raise ValueError(f"Invalid relative ts offset format: {format_string}")
 
@@ -196,4 +197,4 @@ class OutputTimestamp:
 
 def archive_ts_now():
     """return tz-aware datetime obj for current time for usage as archive timestamp"""
-    return datetime.now(timezone.utc)  # utc time / utc timezone
+    return datetime.now(UTC)  # utc time / utc timezone

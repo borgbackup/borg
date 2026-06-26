@@ -242,6 +242,7 @@ def test_get_runtime_dir(monkeypatch):
             os.path.join("/var/run/user", uid, "borg"),
             os.path.join(f"/tmp/runtime-{uid}", "borg"),
             os.path.join(f"/mnt/eafs/tmp/runtime-{uid}", "borg"),  # CI netbsd
+            os.path.join(f"/var/tmp/borg-ci/runtime-{uid}", "borg"),  # CI omnios (TMPDIR)
         ]
         monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
         assert get_runtime_dir(create=False) == os.path.join("/var/tmp/.cache", "borg")

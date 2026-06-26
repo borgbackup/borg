@@ -41,12 +41,6 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     This automatically blocks potentially dangerous SSH features, even when
     they are added in a future update. Thus, this option should be preferred.
 
-    If you are using OpenSSH server < 7.2, however, you must explicitly
-    specify the SSH features to restrict and cannot simply use the ``restrict`` option, as it
-    was introduced in v7.2. We recommend using
-    ``no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc``
-    in this case.
-
 Details about sshd usage: `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 
 .. _ssh_configuration:

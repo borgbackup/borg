@@ -7,7 +7,6 @@ from ..helpers import PathSpec
 from ..helpers import umount
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
-from ..remote import cache_if_remote
 
 from ..logger import create_logger
 
@@ -51,14 +50,13 @@ class MountMixIn:
             # Use llfuse/pyfuse3 implementation
             from ..fuse import FuseOperations
 
-            with cache_if_remote(repository, decrypted_cache=manifest.repo_objs) as cached_repo:
-                operations = FuseOperations(manifest, args, cached_repo)
-                logger.info("Mounting filesystem")
-                try:
-                    operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
-                except RuntimeError:
-                    # Relevant error message already printed to stderr by FUSE
-                    raise RTError("FUSE mount failed")
+            operations = FuseOperations(manifest, args, repository)
+            logger.info("Mounting filesystem")
+            try:
+                operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
+            except RuntimeError:
+                # Relevant error message already printed to stderr by FUSE
+                raise RTError("FUSE mount failed")
 
     def do_umount(self, args):
         """Unmounts the FUSE filesystem."""

@@ -1,4 +1,3 @@
-'\" t
 .\" Man page generated from reStructuredText
 .\" by the Docutils 0.22.4 manpage writer.
 .
@@ -29,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-create" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-repo-create" "1" "2026-06-16" "" "borg backup tool"
 .SH Name
 borg-repo-create \- Creates a new, empty repository.
 .SH SYNOPSIS
@@ -53,7 +52,7 @@ tips will come below):
 .INDENT 3.5
 .sp
 .EX
-borg repo\-create \-\-encryption repokey\-aes\-ocb
+borg repo\-create \-\-encryption aes256\-ocb \-\-key\-location repokey
 .EE
 .UNINDENT
 .UNINDENT
@@ -106,113 +105,59 @@ a different keyboard layout.
 .sp
 You can change your passphrase for existing repositories at any time; it will not affect
 the encryption/decryption key or other secrets.
-.SS Choosing an encryption mode
+.SS Choosing a crypto suite
 .sp
 Depending on your hardware, hashing and crypto performance may vary widely.
 The easiest way to find out what is fastest is to run \fBborg benchmark cpu\fP\&.
 .sp
-\fIrepokey\fP modes: if you want ease\-of\-use and \(dqpassphrase\(dq security is good enough \-
-the key will be stored in the repository (in \fBrepo_dir/config\fP).
+A crypto suite is selected by three orthogonal options:
 .sp
-\fIkeyfile\fP modes: if you want \(dqpassphrase and having\-the\-key\(dq security \-
-the key will be stored in your home directory (in \fB~/.config/borg/keys\fP).
+\fB\-\-encryption\fP (\fBrequired\fP) selects the cipher / authenticated\-encryption algorithm:
+.INDENT 0.0
+.IP \(bu 2
+\fBaes256\-ocb\fP: AES256 in OCB mode (encryption + authentication).
+.IP \(bu 2
+\fBchacha20\-poly1305\fP: ChaCha20 + Poly1305 (encryption + authentication).
+.IP \(bu 2
+\fBauthenticated\fP: no encryption, but still authenticates your data (tamper detection).
+.IP \(bu 2
+\fBnone\fP: no encryption and no authentication (see the warning below).
+.UNINDENT
 .sp
-The following table is roughly sorted in order of preference, the better ones are
-in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
-.\" nanorst: inline-fill
-.
-.TS
-box center;
-l|l|l|l.
-T{
-Mode (K = keyfile or repokey)
-T}	T{
-ID\-Hash
-T}	T{
-Encryption
-T}	T{
-Authentication
-T}
-_
-T{
-K\-blake2\-chacha20\-poly1305
-T}	T{
-BLAKE2b
-T}	T{
-CHACHA20
-T}	T{
-POLY1305
-T}
-_
-T{
-K\-chacha20\-poly1305
-T}	T{
-HMAC\-SHA\-256
-T}	T{
-CHACHA20
-T}	T{
-POLY1305
-T}
-_
-T{
-K\-blake2\-aes\-ocb
-T}	T{
-BLAKE2b
-T}	T{
-AES256\-OCB
-T}	T{
-AES256\-OCB
-T}
-_
-T{
-K\-aes\-ocb
-T}	T{
-HMAC\-SHA\-256
-T}	T{
-AES256\-OCB
-T}	T{
-AES256\-OCB
-T}
-_
-T{
-authenticated\-blake2
-T}	T{
-BLAKE2b
-T}	T{
-none
-T}	T{
-BLAKE2b
-T}
-_
-T{
-authenticated
-T}	T{
-HMAC\-SHA\-256
-T}	T{
-none
-T}	T{
-HMAC\-SHA256
-T}
-_
-T{
-none
-T}	T{
-SHA\-256
-T}	T{
-none
-T}	T{
-none
-T}
-.TE
-.\" nanorst: inline-replace
-.
+\fB\-\-id\-hash\fP selects the id hash function (used for chunk ids and authentication):
+.INDENT 0.0
+.IP \(bu 2
+\fBsha256\fP (default): HMAC\-SHA\-256 (or plain SHA\-256 for the \fBnone\fP encryption).
+.IP \(bu 2
+\fBblake3\fP: BLAKE3. Often faster on CPUs without SHA hardware acceleration.
+.UNINDENT
 .sp
-\fInone\fP mode uses no encryption and no authentication. You are advised NOT to use this mode
-as it would expose you to all sorts of issues (DoS, confidentiality, tampering, ...) in
-case of malicious activity in the repository.
+The \fBnone\fP encryption has no key, so it only supports the \fBsha256\fP id hash.
+.sp
+\fB\-\-key\-location\fP selects where the key is stored (orthogonal to the crypto suite):
+.INDENT 0.0
+.IP \(bu 2
+\fBrepokey\fP (default): the key is stored in the repository (under \fBkeys/\fP). Pick this
+if you want ease\-of\-use and \(dqpassphrase\(dq security is good enough.
+.IP \(bu 2
+\fBkeyfile\fP: the key is stored in your home directory (in \fB~/.config/borg/keys\fP). Pick
+this if you want \(dqpassphrase and having\-the\-key\(dq security.
+.UNINDENT
+.sp
+You can move the key between these locations later with \fBborg key change\-location\fP\&.
+This also applies to the \fBauthenticated\fP encryption: it does not encrypt your data, but it
+still has a key (used for the id hash and authentication), so \fB\-\-key\-location\fP selects
+where that key is stored, just like for the encrypted suites.
+\fB\-\-key\-location\fP is only ignored for the \fBnone\fP encryption, which has no key at all.
+.sp
+\fInone\fP encryption uses no encryption and no authentication. You are advised NOT to use this
+as it would expose you to a Denial\-of\-Service risk (due to how the \fIinternals_hashindex\fP
+works) and other issues (confidentiality, tampering, ...) in case of malicious activity
+in the repository.
 .sp
 If you do \fBnot\fP want to encrypt the contents of your backups, but still want to detect
-malicious tampering, use an \fIauthenticated\fP mode. It is like \fIrepokey\fP minus encryption.
+malicious tampering, use \fB\-\-encryption authenticated\fP\&. It is like an encrypted suite
+minus the data encryption.
 To normally work with \fBauthenticated\fP repositories, you will need the passphrase, but
 there is an emergency workaround; see \fBBORG_WORKAROUNDS=authenticated_no_key\fP docs.
 .SS Creating a related repository
@@ -246,8 +191,14 @@ reuse the key material from the other repository
 .B  \-\-from\-borg1
 other repository is Borg 1.x
 .TP
-.BI \-e \ MODE\fR,\fB \ \-\-encryption \ MODE
-select encryption key mode \fB(required)\fP
+.BI \-e \ ENCRYPTION\fR,\fB \ \-\-encryption \ ENCRYPTION
+select cipher / AE algorithm: \(aqnone\(aq, \(aqauthenticated\(aq, \(aqaes256\-ocb\(aq or \(aqchacha20\-poly1305\(aq \fB(required)\fP
+.TP
+.BI \-i \ HASH\fR,\fB \ \-\-id\-hash \ HASH
+select the id hash function: \(aqsha256\(aq (default) or \(aqblake3\(aq. The \(aqnone\(aq encryption only supports \(aqsha256\(aq.
+.TP
+.BI \-\-key\-location \ LOCATION
+where to store the key: \(aqrepokey\(aq (in the repository, default) or \(aqkeyfile\(aq (in the local keys directory). Ignored for the \(aqnone\(aq mode (which has no key).
 .TP
 .B  \-\-copy\-crypt\-key
 copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key).
@@ -259,23 +210,23 @@ copy the crypt_key (used for authenticated encryption) from the key of the other
 .EX
 # Local repository
 $ export BORG_REPO=/path/to/repo
-# Recommended repokey AEAD cryptographic modes
-$ borg repo\-create \-\-encryption=repokey\-aes\-ocb
-$ borg repo\-create \-\-encryption=repokey\-chacha20\-poly1305
-$ borg repo\-create \-\-encryption=repokey\-blake2\-aes\-ocb
-$ borg repo\-create \-\-encryption=repokey\-blake2\-chacha20\-poly1305
+# Recommended AEAD cryptographic modes (key stored in the repository by default)
+$ borg repo\-create \-\-encryption=aes\-ocb
+$ borg repo\-create \-\-encryption=chacha20\-poly1305
+$ borg repo\-create \-\-encryption=blake3\-aes\-ocb
+$ borg repo\-create \-\-encryption=blake3\-chacha20\-poly1305
 # No encryption (not recommended)
 $ borg repo\-create \-\-encryption=authenticated
-$ borg repo\-create \-\-encryption=authenticated\-blake2
+$ borg repo\-create \-\-encryption=authenticated\-blake3
 $ borg repo\-create \-\-encryption=none
 
-# Remote repository (accesses a remote Borg via SSH)
-$ export BORG_REPO=ssh://user@hostname/~/backup
-# repokey: stores the encrypted key in <REPO_DIR>/config
-$ borg repo\-create \-\-encryption=repokey\-aes\-ocb
+# The crypto suite (\-\-encryption) and where the key is stored (\-\-key\-location) are
+# chosen independently. \-\-key\-location defaults to repokey.
+# repokey: stores the encrypted key inside the repository
+$ borg repo\-create \-\-encryption=aes\-ocb \-\-key\-location=repokey
 # keyfile: stores the encrypted key in the config dir\(aqs keys/ subdir
 # (e.g. ~/.config/borg/keys/ on Linux, ~/Library/Application Support/borg/keys/ on macOS)
-$ borg repo\-create \-\-encryption=keyfile\-aes\-ocb
+$ borg repo\-create \-\-encryption=aes\-ocb \-\-key\-location=keyfile
 .EE
 .UNINDENT
 .UNINDENT

@@ -31,9 +31,9 @@ config/
     the repository version encoded as decimal number text
   manifest
     some data about the repository, binary
-  last-key-checked
+  last-pack-checked
     repository check progress (partial checks, full checks' checkpointing),
-    path of last object checked as text
+    key of last pack checked as text
   space-reserve.N
     purely random binary data to reserve space, e.g. for disk-full emergencies
 
@@ -51,9 +51,14 @@ data/
       0000... .. ffff...
 
 keys/
-  repokey
-    When using encryption in repokey mode, the encrypted, passphrase protected
-    key is stored here as a base64 encoded text.
+    When using repokey mode, the encrypted, passphrase protected borg keys are
+    stored here as a base64 encoded text. The sha256 content hash of the
+    stored borg key is used for the name.
+
+    A repository may contain *multiple* such borg keys (one per passphrase) to
+    support the :ref:`multiple borg keys <borgcrypto_multiple_keys>` feature.
+    keyfile and repokey borg keys use the same format and naming (only the
+    storage location differs).
 
 locks/
   used by the locking system to manage shared and exclusive locks.
@@ -67,7 +72,10 @@ byte strings of fixed length (256-bit, 32 bytes), computed like this::
 
   key = id = id_hash(plaintext_data)  # plain = not encrypted, not compressed, not obfuscated
 
-The id_hash function depends on the :ref:`encryption mode <borg_repo-create>`.
+The id_hash function is selected via ``borg repo-create --id-hash`` (independently
+of ``--encryption``). For encrypted repositories it is a keyed MAC over the
+plaintext (keyed by ``id_key``): ``sha256`` selects HMAC-SHA256, ``blake3``
+selects a keyed BLAKE3. The unencrypted ``none`` mode uses a plain ``sha256``.
 
 As the id / key is used for deduplication, id_hash must be a cryptographically
 strong hash or MAC.
@@ -81,13 +89,8 @@ A repo object has a structure like this:
 
 * 32-bit meta size
 * 32-bit data size
-* 64-bit xxh64(meta)
-* 64-bit xxh64(data)
 * meta
 * data
-
-The size and xxh64 hashes can be used for server-side corruption checks without
-needing to decrypt anything (which would require the borg key).
 
 The overall size of repository objects varies from very small (a small source
 file will be stored as a single repository object) to medium (big source files will
@@ -614,6 +617,8 @@ b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
    You'll save some memory, but it will need to read / chunk all the files as
    it can not skip unmodified files then.
 
+.. _internals_hashindex:
+
 HashIndex
 ---------
 
@@ -719,11 +724,17 @@ removed in a future release.
 Both modes
 ~~~~~~~~~~
 
-Encryption keys (and other secrets) are kept either in a key file on the client
-('keyfile' mode) or in the repository under keys/repokey ('repokey' mode).
+Encryption keys (and other secrets) are kept either in the keys directory on
+the client ('keyfile' mode) or under the keys/ namespace in the repository
+('repokey' mode) using the sha256 of the borg key content as the name.
+
 In both cases, the secrets are generated from random and then encrypted by a
 key derived from your passphrase (this happens on the client before the key
-is stored into the keyfile or as repokey).
+is stored as keyfile or repokey).
+
+keyfile and repokey borg keys use the **same** format; only the storage location
+differs. Borg finds the correct key by trying each key against the supplied
+passphrase. See :ref:`borgcrypto_multiple_keys`.
 
 The passphrase is passed through the ``BORG_PASSPHRASE`` environment variable
 or prompted for interactive usage.
@@ -893,8 +904,7 @@ Data corruption in the files cache could create incorrect archives, e.g. due
 to wrong object IDs or sizes in the files cache.
 
 Therefore, Borg calculates checksums when writing these files and tests checksums
-when reading them. Checksums are generally 64-bit XXH64 hashes.
-The canonical xxHash representation is used, i.e. big-endian.
+when reading them. Checksums are generally 256-bit sha256 hashes.
 Checksums are stored as hexadecimal ASCII strings.
 
 For compatibility, checksums are not required and absent checksums do not trigger errors.
@@ -905,19 +915,7 @@ Checksums are a data safety mechanism. They are not a security mechanism.
 
 .. rubric:: Choice of algorithm
 
-XXH64 has been chosen for its high speed on all platforms, which avoids performance
-degradation in CPU-limited parts (e.g. cache synchronization).
-Unlike CRC32, it neither requires hardware support (crc32c or CLMUL)
-nor vectorized code nor large, cache-unfriendly lookup tables to achieve good performance.
-This simplifies deployment of it considerably (cf. src/borg/algorithms/crc32...).
-
-Further, XXH64 is a non-linear hash function and thus has a "more or less" good
-chance to detect larger burst errors, unlike linear CRCs where the probability
-of detection decreases with error size.
-
-The 64-bit checksum length is considered sufficient for the file sizes typically
-checksummed (individual files up to a few GB, usually less).
-xxHash was expressly designed for data blocks of these sizes.
+sha256 has been chosen for its wide availability on all platforms and hw acceleration on some.
 
 Lower layer — file_integrity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -955,10 +953,10 @@ All checksums are compiled into a simple JSON structure called *integrity data*:
 .. code-block:: json
 
     {
-        "algorithm": "XXH64",
+        "algorithm": "SHA256",
         "digests": {
-            "HashHeader": "eab6802590ba39e3",
-            "final": "e2a7f132fc2e8b24"
+            "HashHeader": "eab6802590ba39e3...",
+            "final": "e2a7f132fc2e8b24..."
         }
     }
 
@@ -992,7 +990,7 @@ The ``[integrity]`` section is used:
 
     [integrity]
     manifest = 10e...21c
-    files = {"algorithm": "XXH64", "digests": {"HashHeader": "eab...39e3", "final": "e2a...b24"}}
+    files = {"algorithm": "SHA256", "digests": {"HashHeader": "eab...39e3", "final": "e2a...b24"}}
 
 The manifest ID is duplicated in the integrity section due to the way all Borg
 versions handle the config file. Instead of creating a "new" config file from

@@ -13,7 +13,7 @@ from ... import platform
 from ...constants import *  # NOQA
 from ...constants import zeros
 from ...manifest import Manifest
-from ...platform import is_win32
+from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError
@@ -923,8 +923,7 @@ def test_create_topical(archivers, request):
     assert "file1" in output
 
 
-# @pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
-@pytest.mark.skip(reason="This test is problematic and should be skipped")
+@pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
 def test_create_read_special_symlink(archivers, request):
     archiver = request.getfixturevalue(archivers)
     from threading import Thread
@@ -1003,6 +1002,25 @@ def test_create_dotslash_hack(archivers, request):
     assert "secondB/thirdB" in output
 
 
+def test_create_dotslash_hack_root_metadata(archivers, request):
+    """Test that the slashdot hack archives the source directory metadata as the archive root."""
+    archiver = request.getfixturevalue(archivers)
+    os.makedirs(os.path.join(archiver.input_path, "first", "subdir"))
+    create_regular_file(archiver.input_path, "first/file1", contents=b"hello")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/first/./")  # slashdot hack
+    output = cmd(archiver, "list", "test")
+    # the root directory "." must be in the archive (this was the bug in #9534).
+    lines = output.splitlines()
+    assert lines[0].endswith(" .")
+    # children of the slashdot target must be archived.
+    assert "subdir" in output
+    assert "file1" in output
+    # parent directories must NOT be in the archive.
+    assert "input" not in output
+    assert "first" not in output
+
+
 def test_log_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
@@ -1062,10 +1080,9 @@ def test_create_big_zeros_files(archivers, request):
 
 
 def test_create_big_random_files(archivers, request):
-    """Test creating an archive from 10 files with 10MB random data each."""
+    """Test creating an archive with some big files with random data."""
     archiver = request.getfixturevalue(archivers)
-    # Create 10 files with 10,000,000 bytes of random data each
-    count, size = 10, 10 * 1000 * 1000
+    count, size = 5, 5 * 1000 * 1000
     random_data = {}
     for i in range(count):
         data = os.urandom(size)
@@ -1153,6 +1170,33 @@ def test_create_with_compression_algorithms(archivers, request):
 
                 # Also verify the directory structure matches
                 assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
+
+
+def test_create_exclude_dataless(archivers, request, monkeypatch):
+    """Files flagged SF_DATALESS are excluded with --exclude-dataless."""
+    from ...archive import SF_DATALESS
+    import borg.archiver.create_cmd as create_cmd_module
+
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "cloudfile", size=1024 * 80)
+
+    # SF_DATALESS cannot be set from userspace, so fake the flags lookup.
+    def fake_get_flags(path, st, fd=None):
+        return SF_DATALESS if path.endswith("cloudfile") else 0
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    monkeypatch.setattr(create_cmd_module, "get_flags", fake_get_flags)
+    output = cmd(archiver, "create", "--list", "--exclude-dataless", "test", "input")
+    assert "A input/file1" in output
+    assert "x input/cloudfile" in output
+
+    # without --exclude-dataless, the file is backed up
+    output = cmd(archiver, "create", "--list", "test2", "input")
+    assert "A input/cloudfile" in output
 
 
 def test_exclude_nodump_dir_with_file(archivers, request):

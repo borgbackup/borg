@@ -13,11 +13,11 @@ from ..constants import *  # NOQA
 
 from .datastruct import StableDict, Buffer, EfficientCollectionQueue
 from .errors import Error, ErrorWithTraceback, IntegrityError, DecompressionError, CancelledByUser, CommandError
-from .errors import RTError, modern_ec
+from .errors import RTError, PathNotAllowed, modern_ec
 from .errors import BorgWarning, FileChangedWarning, BackupWarning, IncludePatternNeverMatchedWarning
 from .errors import BackupError, BackupOSError, BackupRaceConditionError, BackupItemExcluded
 from .errors import BackupPermissionError, BackupIOError, BackupFileNotFoundError
-from .fs import ensure_dir, join_base_dir, get_socket_filename
+from .fs import ensure_dir, join_base_dir
 from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get_config_dir, get_runtime_dir
 from .fs import dir_is_tagged, dir_is_cachedir, remove_dotdot_prefixes, make_path_safe, scandir_inorder
 from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, get_strip_prefix, umount, slashify
@@ -27,7 +27,7 @@ from .misc import sysinfo, log_multi, consume
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
 from .parseformat import octal_int, bin_to_hex, hex_to_bin, safe_encode, safe_decode
 from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_cmd
-from .parseformat import eval_escapes, decode_dict, interval
+from .parseformat import eval_escapes, decode_dict, interval, int_or_interval
 from .parseformat import (
     PathSpec,
     FilesystemPathSpec,

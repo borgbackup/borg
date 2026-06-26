@@ -42,7 +42,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "Borg - Deduplicating Archiver"
-copyright = "2010-2014 Jonas Borgström, 2015-2025 The Borg Collective (see AUTHORS file)"
+copyright = "2010-2014 Jonas Borgström, 2015-2026 The Borg Collective (see AUTHORS file)"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -156,7 +156,7 @@ html_use_smartypants = True
 smartquotes_action = "qe"  # no D in there means "do not transform -- and ---"
 
 # Custom sidebar templates, maps document names to template names.
-html_sidebars = {"**": ["logo-text.html", "versionselector.html", "searchbox.html", "globaltoc.html"]}
+html_sidebars = {"**": ["logo-text.html", "versionselector.html", "searchbox.html", "downloads.html", "globaltoc.html"]}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
@@ -218,7 +218,7 @@ latex_show_urls = "footnote"
 # latex_preamble = ''
 
 # Documents to append as an appendix to all manuals.
-latex_appendices = ["support", "resources", "changes", "authors"]
+latex_appendices = ["support", "changes", "authors"]
 
 # If false, no module index is generated.
 # latex_domain_indices = True

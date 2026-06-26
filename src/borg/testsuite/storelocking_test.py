@@ -13,7 +13,7 @@ ID2 = "bar", 2, 2
 
 @pytest.fixture()
 def lockstore(tmp_path):
-    store = Store(Path(tmp_path / "lockstore").as_uri(), levels={"locks/": [0]})
+    store = Store(Path(tmp_path / "lockstore").as_uri(), config={"locks/": {"levels": [0]}})
     store.create()
     with store:
         yield store

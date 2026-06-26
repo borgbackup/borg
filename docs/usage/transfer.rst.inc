@@ -123,13 +123,13 @@ Transfer borg2 archives into a related other borg2 repository::
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-Data migration / upgrade from borg 1.x
+Data migration / upgrade from Borg 1.x
 ++++++++++++++++++++++++++++++++++++++
 
-To migrate your borg 1.x archives into a related, new borg2 repository, usage is quite similar
+To migrate your Borg 1.x archives into a related, new Borg 2 repository, usage is quite similar
 to the above, but you need the ``--from-borg1`` option::
 
-    borg --repo=DST_REPO repocreate --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
+    borg --repo=DST_REPO repo-create --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
 
     # to continue using lz4 compression as you did in SRC_REPO:
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \

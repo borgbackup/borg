@@ -174,24 +174,21 @@ Now, let's see how to restore some LVs from such a backup.
 Separate compaction
 ~~~~~~~~~~~~~~~~~~~
 
-Borg does not auto-compact the segment files in the repository at commit time
-(at the end of each repository-writing command) any more (since borg 1.2.0).
+Borg does not automatically compact the files in the repository when doing
+borg operations.
 
 This has some notable consequences:
 
 - repository space is not freed immediately when deleting / pruning archives
-- commands finish quicker
-- repository is more robust and might be easier to recover after damages (as
-  it contains data in a more sequential manner, historic manifests, multiple
-  commits - until you run ``borg compact``)
+- commands finish quicker, less I/O
+- it is possible to undelete deleted archives as long as no compaction has been
+  invoked.
 - user can choose when to run compaction (it should be done regularly, but not
   necessarily after each single borg command)
-- user can choose from where to invoke ``borg compact`` to do the compaction
-  (from client or from server, it does not need a key)
 - less repo sync data traffic in case you create a copy of your repository by
   using a sync tool (like rsync, rclone, ...)
 
-You can manually run compaction by invoking the ``borg compact`` command.
+You can run compaction by invoking the ``borg compact`` command.
 
 SSH batch mode
 ~~~~~~~~~~~~~~

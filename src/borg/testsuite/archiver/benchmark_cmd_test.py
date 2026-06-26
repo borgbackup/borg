@@ -50,10 +50,8 @@ def test_benchmark_cpu(archiver, monkeypatch):
     output = cmd(archiver, "benchmark", "cpu")
     # verify all section headers appear in the plain-text output
     assert "Chunkers" in output
-    assert "Non-cryptographic checksums / hashes" in output
     assert "Cryptographic hashes / MACs" in output
     assert "Encryption" in output
-    assert "KDFs" in output
     assert "Compression" in output
     assert "msgpack" in output
 
@@ -64,7 +62,7 @@ def test_benchmark_cpu_json(archiver, monkeypatch):
     result = json.loads(output)
     assert isinstance(result, dict)
     # categories with "size" field (bytes)
-    for category in ["chunkers", "checksums", "hashes", "encryption"]:
+    for category in ["chunkers", "hashes", "encryption"]:
         assert isinstance(result[category], list)
         assert len(result[category]) > 0
         for entry in result[category]:
@@ -76,7 +74,7 @@ def test_benchmark_cpu_json(archiver, monkeypatch):
         for entry in result[category]:
             assert "algo_params" in entry
     # categories with "count" field
-    for category in ["kdf", "msgpack"]:
+    for category in ["msgpack"]:
         assert isinstance(result[category], list)
         assert len(result[category]) > 0
         for entry in result[category]:

@@ -6,7 +6,7 @@ import posixpath
 import stat
 import sys
 import time
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import timedelta
 from functools import partial
@@ -23,7 +23,7 @@ logger = create_logger()
 
 from . import xattr
 from .chunkers import get_chunker, Chunk
-from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_cache
+from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_from_repo
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -50,9 +50,13 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from . import platform
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
-from .remote import RemoteRepository, cache_if_remote
 from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
+
+# macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
+# Reading such files triggers downloading their content. stat.SF_DATALESS is only available
+# from Python 3.13 on, thus we fall back to the value from macOS' sys/stat.h.
+SF_DATALESS = getattr(stat, "SF_DATALESS", 0x40000000)
 
 has_link = hasattr(os, "link")
 
@@ -272,7 +276,6 @@ class DownloadPipeline:
     def __init__(self, repository, repo_objs):
         self.repository = repository
         self.repo_objs = repo_objs
-        self.hlids_preloaded = None
 
     def unpack_many(self, ids, *, filter=None):
         """
@@ -281,7 +284,6 @@ class DownloadPipeline:
         *ids* is a chunk ID list of an item content data stream.
         *filter* is an optional callable to decide whether an item will be yielded, default: yield all items.
         """
-        self.hlids_preloaded = set()
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids, ro_type=ROBJ_ARCHIVE_STREAM, replacement_chunk=False):
             if data is None:
@@ -296,35 +298,7 @@ class DownloadPipeline:
                         item.chunks_healthy = [ChunkListEntry(*e) for e in item.chunks_healthy]
                     yield item
 
-    def preload_item_chunks(self, item, optimize_hardlinks=False):
-        """
-        Preloads the content data chunks of an item (if any).
-        optimize_hardlinks can be set to True if item chunks only need to be preloaded for
-        1st hard link, but not for any further hard link to same inode / with same hlid.
-        Returns True if chunks were preloaded.
-
-        Warning: if data chunks are preloaded then all data chunks have to be retrieved,
-        otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
-        """
-        preload_chunks = False
-        if "chunks" in item:
-            if optimize_hardlinks:
-                hlid = item.get("hlid", None)
-                if hlid is None:
-                    preload_chunks = True
-                elif hlid in self.hlids_preloaded:
-                    preload_chunks = False
-                else:
-                    # not having the hard link's chunks already preloaded for other hard link to same inode
-                    preload_chunks = True
-                    self.hlids_preloaded.add(hlid)
-            else:
-                preload_chunks = True
-            if preload_chunks:
-                self.repository.preload([c.id for c in item.chunks])
-        return preload_chunks
-
-    def fetch_many(self, chunks, is_preloaded=False, ro_type=None, replacement_chunk=True):
+    def fetch_many(self, chunks, ro_type=None, replacement_chunk=True):
         assert ro_type is not None
         ids = []
         sizes = []
@@ -337,9 +311,7 @@ class DownloadPipeline:
             sizes = [None] * len(ids)
         else:
             raise TypeError(f"unsupported or mixed element types: {chunks}")
-        for id, size, cdata in zip(
-            ids, sizes, self.repository.get_many(ids, is_preloaded=is_preloaded, raise_missing=False)
-        ):
+        for id, size, cdata in zip(ids, sizes, self.repository.get_many(ids, raise_missing=False)):
             if cdata is None:
                 if replacement_chunk and size is not None:
                     logger.error(f"repository object {bin_to_hex(id)} missing, returning {size} zero bytes.")
@@ -410,11 +382,8 @@ class CacheChunkBuffer(ChunkBuffer):
         self.stats = stats
 
     def write_chunk(self, chunk):
-        id_, _ = self.cache.add_chunk(
-            self.key.id_hash(chunk), {}, chunk, stats=self.stats, wait=False, ro_type=ROBJ_ARCHIVE_STREAM
-        )
+        id_, _ = self.cache.add_chunk(self.key.id_hash(chunk), {}, chunk, stats=self.stats, ro_type=ROBJ_ARCHIVE_STREAM)
         logger.debug(f"writing item metadata stream chunk {bin_to_hex(id_)}")
-        self.cache.repository.async_response(wait=False)
         return id_
 
 
@@ -664,15 +633,6 @@ Duration: {0.duration}
     def iter_items(self, filter=None):
         yield from self.pipeline.unpack_many(self.metadata.items, filter=lambda item: self.item_filter(item, filter))
 
-    def preload_item_chunks(self, item, optimize_hardlinks=False):
-        """
-        Preloads item content data chunks from the repository.
-
-        Warning: if data chunks are preloaded then all data chunks have to be retrieved,
-        otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
-        """
-        return self.pipeline.preload_item_chunks(item, optimize_hardlinks=optimize_hardlinks)
-
     def add_item(self, item, show_progress=True, stats=None):
         if show_progress and self.show_progress:
             if stats is None:
@@ -725,8 +685,6 @@ Duration: {0.duration}
                 raise Error("%s - archive too big (issue #1473)!" % err_msg)
             else:
                 raise
-        while self.repository.async_response(wait=True) is not None:
-            pass
         self.manifest.archives.create(name, self.id, metadata.time)
         self.manifest.write()
         return metadata
@@ -812,12 +770,10 @@ Duration: {0.duration}
         if dry_run or stdout:
             with self.extract_helper(item, "", hlm, dry_run=dry_run or stdout) as hardlink_set:
                 if not hardlink_set:
-                    # it does not really set hard links due to dry_run, but we need to behave same
-                    # as non-dry_run concerning fetching preloaded chunks from the pipeline or
-                    # it would get stuck.
+                    # it does not really set hard links due to dry_run, but behave the same as non-dry_run.
                     if "chunks" in item:
                         item_chunks_size = 0
-                        for data in self.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
+                        for data in self.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
                             if pi:
                                 pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                             if stdout:
@@ -873,7 +829,7 @@ Duration: {0.duration}
                     fd = open(path, "wb")
                 with fd:
                     trailing_hole = False
-                    for data in self.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
+                    for data in self.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
                         if pi:
                             pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                         with backup_io("write"):
@@ -1075,8 +1031,8 @@ Duration: {0.duration}
                 can_compare_chunk_ids=can_compare_chunk_ids,
             )
 
-        orphans_archive1: OrderedDict[str, Item] = OrderedDict()
-        orphans_archive2: OrderedDict[str, Item] = OrderedDict()
+        orphans_archive1: dict[str, Item] = {}
+        orphans_archive2: dict[str, Item] = {}
 
         assert matcher is not None, "matcher must be set"
 
@@ -1215,8 +1171,7 @@ class ChunksProcessor:
                 started_hashing = time.monotonic()
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 stats.hashing_time += time.monotonic() - started_hashing
-                chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False, ro_type=ROBJ_FILE_STREAM)
-                self.cache.repository.async_response(wait=False)
+                chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, ro_type=ROBJ_FILE_STREAM)
                 return chunk_entry
 
         item.chunks = []
@@ -1230,8 +1185,8 @@ class ChunksProcessor:
 def maybe_exclude_by_attr(item):
     if xattrs := item.get("xattrs"):
         apple_excluded = xattrs.get(b"com.apple.metadata:com_apple_backup_excludeItem")
-        linux_excluded = xattrs.get(b"user.xdg.robots.backup")
-        if apple_excluded is not None or linux_excluded == b"true":
+        linux_included = xattrs.get(b"user.xdg.robots.backup")
+        if apple_excluded is not None or linux_included == b"false":
             raise BackupItemExcluded
 
     if flags := item.get("bsdflags"):
@@ -1277,12 +1232,16 @@ class FilesystemObjectProcessors:
     def create_helper(self, path, st, status=None, hardlinkable=True, strip_prefix=None):
         if strip_prefix is not None:
             assert not path.endswith("/")
-            if strip_prefix.startswith(path + "/"):
+            if path + "/" == strip_prefix:
+                # this is the directory the slashdot hack points to - archive it as the root.
+                path = "."
+            elif strip_prefix.startswith(path + "/"):
                 # still on a directory level that shall be stripped - do not create an item for this!
                 yield None, "x", False, None
                 return
-            # adjust path, remove stripped directory levels
-            path = path.removeprefix(strip_prefix)
+            else:
+                # adjust path, remove stripped directory levels
+                path = path.removeprefix(strip_prefix)
 
         sanitized_path = remove_dotdot_prefixes(path)
         item = Item(path=sanitized_path)
@@ -1769,16 +1728,19 @@ class ArchiveChecker:
         :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
         """
-        if not isinstance(repository, (Repository, RemoteRepository)):
+        if not isinstance(repository, Repository):
             logger.error("Checking legacy repositories is not supported.")
             return False
         logger.info("Starting archive consistency check...")
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
-        # Repository.check already did a full repository-level check and has built and cached a fresh chunkindex -
-        # we can use that here, so we don't disable the caches (also no need to cache immediately, again):
-        self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=False, cache_immediately=False)
+        # A normal (non-repair) archives check trusts the in-repo index: the repository check verified
+        # each index object's sha256, and the index is the authoritative record of which chunks exist,
+        # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
+        # --repair does rebuild from the packs (disable_caches=repair), working from the real packs so it
+        # can detect and fix archives that reference chunks whose pack has gone missing.
+        self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=repair, cache_immediately=False)
         if self.key is None:
             self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
@@ -1879,12 +1841,11 @@ class ArchiveChecker:
         pi.finish()
         if defect_chunks:
             if self.repair:
-                # if we kill the defect chunk here, subsequent actions within this "borg check"
-                # run will find missing chunks.
-                logger.warning(
-                    "Found defect chunks and will delete them now. "
-                    "Reading files referencing these chunks will result in an I/O error."
-                )
+                # We would remove the defect chunks here, but single-object delete is not implemented
+                # yet (Repository.delete is a no-op: a pack holds multiple objects, so dropping the
+                # whole pack to drop one chunk would take the good ones with it). So we recheck each
+                # chunk and only report the ones that keep failing; real removal will come via compact.
+                logger.warning("Found defect chunks. They can not be removed yet and are only reported.")
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
@@ -1896,14 +1857,18 @@ class ArchiveChecker:
                         # we must decompress, so it'll call assert_id() in there:
                         self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
                     except IntegrityErrorBase:
-                        # failed twice -> get rid of this chunk
-                        del self.chunks[defect_chunk]
+                        # failed twice -> we would like to get rid of this defect chunk. We must not
+                        # drop its whole pack here: the pack holds other, good chunks too.
+                        # Repository.delete is a no-op for now (it just logs); real single-object
+                        # removal will happen via compact.
+                        # TODO: actually remove the defect chunk once single-object delete exists.
                         self.repository.delete(defect_chunk)
-                        logger.debug("chunk %s deleted.", bin_to_hex(defect_chunk))
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
             else:
-                logger.warning("Found defect chunks. With --repair, they would get deleted.")
+                logger.warning(
+                    "Found defect chunks. Run with --repair to recheck them (removal is not implemented yet)."
+                )
                 for defect_chunk in defect_chunks:
                     logger.debug("chunk %s is defect.", bin_to_hex(defect_chunk))
         log = logger.error if errors else logger.info
@@ -2009,9 +1974,16 @@ class ArchiveChecker:
             # either we already have this chunk in repo and chunks index or we add it now
             if id_ not in self.chunks:
                 assert cdata is not None
-                self.chunks[id_] = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=size)
+                self.chunks[id_] = ChunkIndexEntry(
+                    flags=ChunkIndex.F_USED,
+                    size=size,
+                    pack_id=UNKNOWN_BYTES32,
+                    obj_offset=UNKNOWN_INT32,
+                    obj_size=UNKNOWN_INT32,
+                )
                 if self.repair:
-                    self.repository.put(id_, cdata)
+                    pack_results = self.repository.put(id_, cdata)
+                    self.chunks.update_pack_info(pack_results)
 
         def verify_file_chunks(archive_name, item):
             """Verifies that all file chunks are present. Missing file chunks will be logged."""
@@ -2075,7 +2047,7 @@ class ArchiveChecker:
                 return True, ""
 
             i = 0
-            archive_items = archive_get_items(archive, repo_objs=self.repo_objs, repository=repository)
+            archive_items = archive_get_items(archive, repo_objs=self.repo_objs, repository=self.repository)
             for state, items in groupby(archive_items, missing_chunk_detector):
                 items = list(items)
                 if state % 2:
@@ -2085,7 +2057,7 @@ class ArchiveChecker:
                     continue
                 if state > 0:
                     unpacker.resync()
-                for chunk_id, cdata in zip(items, repository.get_many(items)):
+                for chunk_id, cdata in zip(items, self.repository.get_many(items)):
                     try:
                         _, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_ARCHIVE_STREAM)
                         unpacker.feed(data)
@@ -2137,65 +2109,65 @@ class ArchiveChecker:
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Checking archives %3.1f%%", step=0.1, msgid="check.rebuild_archives"
         )
-        with cache_if_remote(self.repository) as repository:
-            for i, info in enumerate(archive_infos):
-                pi.show(i)
-                archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
-                logger.info(
-                    f"Analyzing archive {info.name} {info.ts.astimezone()} {archive_id_hex} ({i + 1}/{num_archives})"
-                )
-                if archive_id not in self.chunks:
-                    logger.error(f"Archive metadata block {archive_id_hex} is missing!")
-                    self.error_found = True
-                    if self.repair:
-                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                        self.manifest.archives.delete_by_id(archive_id)
-                    else:
-                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                    continue
-                cdata = self.repository.get(archive_id)
-                try:
-                    _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
-                except IntegrityError as integrity_error:
-                    logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
-                    self.error_found = True
-                    if self.repair:
-                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                        self.manifest.archives.delete_by_id(archive_id)
-                    else:
-                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                    continue
-                archive = self.key.unpack_archive(data)
-                archive = ArchiveItem(internal_dict=archive)
-                if archive.version != 2:
-                    raise Exception("Unknown archive metadata version")
-                items_buffer = ChunkBuffer(self.key)
-                items_buffer.write_chunk = add_callback
-                for item in robust_iterator(archive):
-                    if "chunks" in item:
-                        verify_file_chunks(info.name, item)
-                    items_buffer.add(item)
-                items_buffer.flush(flush=True)
+        for i, info in enumerate(archive_infos):
+            pi.show(i)
+            archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
+            logger.info(
+                f"Analyzing archive {info.name} {info.ts.astimezone()} {archive_id_hex} ({i + 1}/{num_archives})"
+            )
+            if archive_id not in self.chunks:
+                logger.error(f"Archive metadata block {archive_id_hex} is missing!")
+                self.error_found = True
                 if self.repair:
-                    archive.item_ptrs = archive_put_items(
-                        items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
-                    )
-                    data = self.key.pack_metadata(archive.as_dict())
-                    new_archive_id = self.key.id_hash(data)
-                    logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
-                    logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
-                    cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
-                    add_reference(new_archive_id, len(data), cdata)
-                    self.manifest.archives.create(info.name, new_archive_id, info.ts)
-                    if archive_id != new_archive_id:
-                        self.manifest.archives.delete_by_id(archive_id)
-            pi.finish()
+                    logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                    self.manifest.archives.delete_by_id(archive_id)
+                else:
+                    logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                continue
+            cdata = self.repository.get(archive_id)
+            try:
+                _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
+            except IntegrityErrorBase as integrity_error:
+                logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
+                self.error_found = True
+                if self.repair:
+                    logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                    self.manifest.archives.delete_by_id(archive_id)
+                else:
+                    logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                continue
+            archive = self.key.unpack_archive(data)
+            archive = ArchiveItem(internal_dict=archive)
+            if archive.version != 2:
+                raise Exception("Unknown archive metadata version")
+            items_buffer = ChunkBuffer(self.key)
+            items_buffer.write_chunk = add_callback
+            for item in robust_iterator(archive):
+                if "chunks" in item:
+                    verify_file_chunks(info.name, item)
+                items_buffer.add(item)
+            items_buffer.flush(flush=True)
+            if self.repair:
+                archive.item_ptrs = archive_put_items(
+                    items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
+                )
+                data = self.key.pack_metadata(archive.as_dict())
+                new_archive_id = self.key.id_hash(data)
+                logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
+                logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
+                cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
+                add_reference(new_archive_id, len(data), cdata)
+                self.manifest.archives.create(info.name, new_archive_id, info.ts)
+                if archive_id != new_archive_id:
+                    self.manifest.archives.delete_by_id(archive_id)
+        pi.finish()
 
     def finish(self):
         if self.repair:
-            # we may have deleted chunks, remove the chunks index cache!
-            logger.info("Deleting chunks cache in repository - next repository access will cause a rebuild.")
-            delete_chunkindex_cache(self.repository)
+            # we may have deleted chunks. delete_chunkindex_from_repo() removes the on-disk index and
+            # drops the stale in-memory index, so the next repository access rebuilds it from the repo.
+            logger.info("Deleting chunk indexes in repository - next repository access will cause a rebuild.")
+            delete_chunkindex_from_repo(self.repository)
             logger.info("Writing Manifest.")
             self.manifest.write()
 
@@ -2299,8 +2271,7 @@ class ArchiveRecreater:
         size = len(data)
         if chunk_id in self.seen_chunks:
             return self.cache.reuse_chunk(chunk_id, size, target.stats)
-        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, wait=False, ro_type=ROBJ_FILE_STREAM)
-        self.cache.repository.async_response(wait=False)
+        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, ro_type=ROBJ_FILE_STREAM)
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry
 

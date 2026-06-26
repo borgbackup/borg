@@ -35,12 +35,13 @@ hash table of all chunks that already exist.
     The "key" object provides both compression and authenticated
     encryption used by the data access layer. The "key" object represents
     the sole trust boundary in Borg.
-    The lowest layer is the repository, either accessed directly
-    (Repository) or remotely (RemoteRepository).
+    The lowest layer is the repository accessed via class Repository.
+    Repository uses ``borgstore`` internally.
 
 .. toctree::
     :caption: Internals contents
 
     internals/security
     internals/data-structures
+    internals/packs
     internals/frontends

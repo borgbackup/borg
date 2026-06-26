@@ -1,0 +1,67 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-key-remove" "1" "2026-06-16" "" "borg backup tool"
+.SH Name
+borg-key-remove \- Remove a borg key from the repository.
+.SH SYNOPSIS
+.sp
+borg [common options] key remove [options]
+.SH DESCRIPTION
+.sp
+Remove a borg key from the repository.
+.sp
+The borg key to remove is selected by exactly one of: \fB\-\-label\fP (its label),
+\fB\-\-key\fP (its key id or a unique prefix, see \fBborg key list\fP), or
+\fB\-\-passphrase\fP (remove the borg key that was used to unlock the repository now).
+.sp
+The \fBadmin\fP borg key is protected and cannot be removed, and the last remaining
+borg key of a repository cannot be removed either.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.BI \-\-label \ LABEL
+remove the borg key with this label
+.TP
+.BI \-\-key \ ID
+remove the borg key with this id (or unique id prefix)
+.TP
+.B  \-\-passphrase
+remove the borg key that was used to unlock the repository
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

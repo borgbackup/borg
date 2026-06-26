@@ -10,7 +10,6 @@ from ..helpers import ChunkerParams, ChunkIteratorFileWrapper, CompressionSpec
 from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 from ..item import ChunkListEntry
 from ..manifest import Manifest
-from ..legacyrepository import LegacyRepository
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -35,6 +34,8 @@ def transfer_chunks(
 
     If chunker_params is provided, the chunks will be re-chunked using the specified parameters.
     """
+    from ..legacy.repository import LegacyRepository
+
     transfer = 0
     present = 0
     chunks = []
@@ -61,10 +62,7 @@ def transfer_chunks(
                     present += size
                 else:
                     # Add the new chunk to the repository
-                    chunk_entry = cache.add_chunk(
-                        chunk_id, {}, data, stats=archive.stats, wait=False, ro_type=ROBJ_FILE_STREAM
-                    )
-                    cache.repository.async_response(wait=False)
+                    chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=archive.stats, ro_type=ROBJ_FILE_STREAM)
                     transfer += size
                 chunks.append(chunk_entry)
             else:
@@ -100,7 +98,6 @@ def transfer_chunks(
                                 meta,
                                 data,
                                 stats=archive.stats,
-                                wait=False,
                                 compress=False,
                                 size=size,
                                 ctype=meta["ctype"],
@@ -111,11 +108,10 @@ def transfer_chunks(
                             # always decompress and re-compress file data chunks
                             meta, data = other_manifest.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_FILE_STREAM)
                             chunk_entry = cache.add_chunk(
-                                chunk_id, meta, data, stats=archive.stats, wait=False, ro_type=ROBJ_FILE_STREAM
+                                chunk_id, meta, data, stats=archive.stats, ro_type=ROBJ_FILE_STREAM
                             )
                         else:
                             raise ValueError(f"unsupported recompress mode: {recompress}")
-                    cache.repository.async_response(wait=False)
                     chunks.append(chunk_entry)
                 transfer += size
             else:
@@ -134,12 +130,11 @@ class TransferMixIn:
         """archives transfer from other repository, optionally upgrade data format"""
         key = manifest.key
         other_key = other_manifest.key
-        if not uses_same_id_hash(other_key, key):
-            raise Error(
-                "You must keep the same ID hash ([HMAC-]SHA256 or BLAKE2b) or deduplication will break. "
-                "Use a related repository!"
-            )
-        if not uses_same_chunker_secret(other_key, key):
+        using_same_id_hash = uses_same_id_hash(other_key, key)
+        rechunking = args.chunker_params is not None
+        if not using_same_id_hash and not rechunking:
+            raise Error("You must either keep the same ID hash or use --chunker-params.")
+        if not rechunking and not uses_same_chunker_secret(other_key, key):
             raise Error(
                 "You must use the same chunker secret or deduplication will break. " "Use a related repository!"
             )
@@ -172,18 +167,21 @@ class TransferMixIn:
             raise Error("\n".join(ac_errors))
 
         from .. import upgrade as upgrade_mod
+        from ..legacy import upgrade as legacy_upgrade_mod
 
-        v1_or_v2 = getattr(args, "v1_or_v2", False)
+        v1_legacy = getattr(args, "v1_legacy", False)
         upgrader = args.upgrader
-        if upgrader == "NoOp" and v1_or_v2:
+        if upgrader == "NoOp" and v1_legacy:
             upgrader = "From12To20"
 
         try:
-            UpgraderCls = getattr(upgrade_mod, f"Upgrader{upgrader}")
+            UpgraderCls = getattr(upgrade_mod, f"Upgrader{upgrader}", None) or getattr(
+                legacy_upgrade_mod, f"Upgrader{upgrader}"
+            )
         except AttributeError:
             raise Error(f"No such upgrader: {upgrader}")
 
-        if UpgraderCls is not upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
+        if UpgraderCls is not legacy_upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
             raise Error("To transfer from a borg 1.x repo, you need to use: --upgrader=From12To20")
 
         upgrader = UpgraderCls(cache=cache, args=args)
@@ -307,13 +305,13 @@ class TransferMixIn:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-        Data migration / upgrade from borg 1.x
+        Data migration / upgrade from Borg 1.x
         ++++++++++++++++++++++++++++++++++++++
 
-        To migrate your borg 1.x archives into a related, new borg2 repository, usage is quite similar
+        To migrate your Borg 1.x archives into a related, new Borg 2 repository, usage is quite similar
         to the above, but you need the ``--from-borg1`` option::
 
-            borg --repo=DST_REPO repocreate --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
+            borg --repo=DST_REPO repo-create --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
 
             # to continue using lz4 compression as you did in SRC_REPO:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \\
@@ -332,7 +330,7 @@ class TransferMixIn:
         subparser = ArgumentParser(
             parents=[common_parser], description=self.do_transfer.__doc__, epilog=transfer_epilog
         )
-        subparsers.add_subcommand("transfer", subparser, help="transfer of archives from another repository")
+        subparsers.add_subcommand("transfer", subparser, help="Transfer of archives from another repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository, just check"
         )
@@ -346,7 +344,7 @@ class TransferMixIn:
             help="transfer archives from the other repository",
         )
         subparser.add_argument(
-            "--from-borg1", dest="v1_or_v2", action="store_true", help="other repository is borg 1.x"
+            "--from-borg1", dest="v1_legacy", action="store_true", help="other repository is borg 1.x"
         )
         subparser.add_argument(
             "--upgrader",

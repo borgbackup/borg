@@ -5,18 +5,17 @@ import sys
 from unittest.mock import patch
 
 import pytest
-from xxhash import xxh64
-
-from ..hashindex import NSIndex1
+from ..legacy.hashindex import NSIndex1
 from ..helpers import Location
 from ..helpers import IntegrityError
+from ..helpers import PathNotAllowed
 from ..helpers import msgpack
 from ..fslocking import Lock, LockFailed
 from ..platformflags import is_win32
-from ..legacyremote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllowed
-from ..legacyrepository import LegacyRepository, LoggedIO
-from ..legacyrepository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
-from ..repoobj import RepoObj
+from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod
+from ..legacy.repository import LegacyRepository, LoggedIO
+from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
+from ..compress import CNONE
 from .hashindex_test import H
 
 
@@ -52,7 +51,7 @@ def reopen(repository, exclusive: bool | None = True, create=False):
         return LegacyRepository(repository.path, exclusive=exclusive, create=create)
 
     if isinstance(repository, LegacyRemoteRepository):
-        if repository.p is not None or repository.sock is not None:
+        if repository.p is not None:
             raise RuntimeError("Remote repo must be closed before a reopen. Cannot support nested repository contexts.")
         return LegacyRemoteRepository(repository.location, exclusive=exclusive, create=create)
 
@@ -74,21 +73,15 @@ def get_path(repository):
 
 
 def fchunk(data, meta=b""):
-    # Create a raw chunk that has a valid RepoObj layout but does not use encryption or compression.
-    hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta).digest(), xxh64(data).digest())
+    # simplified borg 1.x format: 1-byte ctype header (CNONE = no compression) followed by payload.
     assert isinstance(data, bytes)
-    chunk = hdr + meta + data
-    return chunk
+    assert meta == b""
+    return bytes([CNONE.ID]) + data
 
 
 def pchunk(chunk):
-    # Parse data and meta from a raw chunk made by fchunk.
-    hdr_size = RepoObj.obj_header.size
-    hdr = chunk[:hdr_size]
-    meta_size, data_size = RepoObj.obj_header.unpack(hdr)[0:2]
-    meta = chunk[hdr_size : hdr_size + meta_size]
-    data = chunk[hdr_size + meta_size : hdr_size + meta_size + data_size]
-    return data, meta
+    # strip the 1-byte ctype header; meta is always empty in the borg 1.x format.
+    return chunk[1:], b""
 
 
 def pdchunk(chunk):
@@ -110,7 +103,7 @@ def repo_dump(repository, label=None):
     label = label + ": " if label is not None else ""
     H_trans = {H(i): i for i in range(10)}
     H_trans[None] = -1  # key == None appears in commits
-    tag_trans = {TAG_PUT2: "put2", TAG_PUT: "put", TAG_DELETE: "del", TAG_COMMIT: "comm"}
+    tag_trans = {TAG_PUT: "put", TAG_DELETE: "del", TAG_COMMIT: "comm"}
     for segment, fn in repository.io.segment_iterator():
         for tag, key, offset, size, _ in repository.io.iter_objects(segment):
             print("%s%s H(%d) -> %s[%d..+%d]" % (label, tag_trans[tag], H_trans[key], fn, offset, size))
@@ -149,15 +142,12 @@ def test_multiple_transactions(repo_fixtures, request):
 
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
-        meta, data = b"meta", b"data"
-        hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta).digest(), xxh64(data).digest())
-        chunk_complete = hdr + meta + data
-        chunk_short = hdr + meta
-        repository.put(H(0), chunk_complete)
+        data = b"somedata"
+        repository.put(H(0), fchunk(data))
         repository.commit(compact=False)
-        assert repository.get(H(0)) == chunk_complete
-        assert repository.get(H(0), read_data=True) == chunk_complete
-        assert repository.get(H(0), read_data=False) == chunk_short
+        assert pdchunk(repository.get(H(0))) == data
+        assert pdchunk(repository.get(H(0), read_data=True)) == data
+        assert repository.get(H(0), read_data=False) is None
 
 
 def test_consistency(repo_fixtures, request):
@@ -225,7 +215,7 @@ def test_list(repo_fixtures, request):
 
 def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
-        max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)
+        max_data = b"x" * (MAX_DATA_SIZE - 1)
         repository.put(H(0), fchunk(max_data))
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):
@@ -235,13 +225,13 @@ def test_max_data_size(repo_fixtures, request):
 
 def _assert_sparse(repository):
     # the superseded 123456... PUT
-    assert repository.compact[0] == 41 + 8 + 0  # len(fchunk(b"123456789"))
+    assert repository.compact[0] == 41 + 0  # len(fchunk(b"123456789"))
     # a COMMIT
     assert repository.compact[1] == 9
     # the DELETE issued by the superseding PUT (or issued directly)
     assert repository.compact[2] == 41
     repository._rebuild_sparse(0)
-    assert repository.compact[0] == 41 + 8 + len(fchunk(b"123456789"))  # 9 is chunk or commit?
+    assert repository.compact[0] == 41 + len(fchunk(b"123456789"))  # 9 is chunk or commit?
 
 
 def test_sparse1(repository):
@@ -269,10 +259,10 @@ def test_sparse_delete(repository):
         repository.delete(H(0))
         repository.io._write_fd.sync()
         # the on-line tracking works on a per-object basis...
-        assert repository.compact[0] == 41 + 8 + 41 + 0  # len(chunk0) information is lost
+        assert repository.compact[0] == 41 + 41 + 0  # len(chunk0) information is lost
         repository._rebuild_sparse(0)
         # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
-        assert repository.compact[0] == 41 + 8 + 41 + len(chunk0) + len(MAGIC)
+        assert repository.compact[0] == 41 + 41 + len(chunk0) + len(MAGIC)
         repository.commit(compact=True)
         assert 0 not in [segment for segment, _ in repository.io.segment_iterator()]
 
@@ -664,7 +654,7 @@ def test_subtly_corrupted_hints_without_integrity(repository, caplog):
         repository.put(H(3), fchunk(b"1234"))
         # Do a compaction run.
         # The corrupted refcount is detected and logged as a warning, but compaction proceeds.
-        caplog.set_level(logging.WARNING, logger="borg.legacyrepository")
+        caplog.set_level(logging.WARNING, logger="borg.legacy.repository")
         repository.commit(compact=True)
         assert "Corrupted segment reference count" in caplog.text
         # We verify that the repository is still consistent.

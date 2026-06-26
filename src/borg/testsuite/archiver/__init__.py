@@ -24,7 +24,6 @@ from ...helpers import init_ec_warnings
 from ...logger import flush_logging
 from ...manifest import Manifest
 from ...platform import get_flags
-from ...remote import RemoteRepository
 from ...repository import Repository
 from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, filter_xattrs
 from .. import changedir, ENOATTR  # NOQA
@@ -32,8 +31,12 @@ from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_suppor
 from ..platform.platform_test import is_win32
 from ...xattr import get_all
 
-RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
-KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
+# --encryption selects only the cipher / AE algorithm; the id hash is chosen with --id-hash
+# (default: sha256) and key storage with --key-location (default: repokey). RK_* stays a single
+# token (defaults apply); for keyfile storage, pass KF_ENCRYPTION together with KF_LOCATION.
+RK_ENCRYPTION = "--encryption=aes256-ocb"
+KF_ENCRYPTION = "--encryption=chacha20-poly1305"
+KF_LOCATION = "--key-location=keyfile"
 
 # This points to the ``src/borg/archiver`` directory (small, with only a few files).
 # There are quite a lot of files in there, because there is a __pycache__ subdirectory.
@@ -178,7 +181,7 @@ def open_archive(repo_path, name):
 
 def open_repository(archiver):
     if archiver.get_kind() == "remote":
-        return RemoteRepository(Location(archiver.repository_location))
+        return Repository(Location(archiver.repository_location), exclusive=True)
     else:
         return Repository(archiver.repository_path, exclusive=True)
 

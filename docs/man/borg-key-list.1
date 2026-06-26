@@ -1,0 +1,50 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-key-list" "1" "2026-06-16" "" "borg backup tool"
+.SH Name
+borg-key-list \- List the borg keys of the repository.
+.SH SYNOPSIS
+.sp
+borg [common options] key list [options]
+.SH DESCRIPTION
+.sp
+List the borg keys of the repository, showing each borg key\(aqs id, mode (\fBrepokey\fP or
+\fBkeyfile\fP), label and key derivation/encryption algorithm. The borg key used to
+unlock the repository in this invocation is marked with \fB*\fP\&.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

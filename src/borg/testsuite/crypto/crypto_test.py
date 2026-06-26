@@ -6,9 +6,11 @@ import unittest
 
 from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
 from ...crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
-from ...crypto.low_level import AES, hmac_sha256
+from ...crypto.low_level import hmac_sha256
+from ...legacy.crypto.low_level import AES
 from hashlib import sha256
-from ...crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey, KeyBase, PlaintextKey
+from ...crypto.key import CHPOKey, AESOCBKey, KeyBase, PlaintextKey
+from ...legacy.crypto.key import AESCTRKey as LegacyAESCTRKey
 from ...helpers import msgpack, bin_to_hex
 
 from .. import BaseTestCase
@@ -215,7 +217,7 @@ def test_decrypt_key_file_argon2_chacha20_poly1305():
             "data": envelope,
         }
     )
-    key = CHPOKeyfileKey(None)
+    key = CHPOKey(None)
 
     decrypted = key.decrypt_key_file(encrypted, "hello, pass phrase")
 
@@ -226,13 +228,13 @@ def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256():
     plain = b"hello"
     salt = b"salt" * 4
     passphrase = "hello, pass phrase"
-    key = FlexiKey.pbkdf2(passphrase, salt, 1, 32)
+    key = LegacyAESCTRKey.pbkdf2(passphrase, salt, 1, 32)
     hash = hmac_sha256(key, plain)
     data = AES(key, b"\0" * 16).encrypt(plain)
     encrypted = msgpack.packb(
         {"version": 1, "algorithm": "sha256", "iterations": 1, "salt": salt, "data": data, "hash": hash}
     )
-    key = CHPOKeyfileKey(None)
+    key = LegacyAESCTRKey(None)
 
     decrypted = key.decrypt_key_file(encrypted, passphrase)
 
@@ -273,16 +275,20 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     repository = MagicMock(id=b"repository_id")
     getpass.return_value = "hello, pass phrase"
     monkeypatch.setenv("BORG_DISPLAY_PASSPHRASE", "no")
-    AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm="argon2"))
-    repository.load_key.return_value = repository.save_key.call_args.args[0]
+    AESOCBKey.create(repository, args=MagicMock(key_algorithm="argon2"))
+    saved = repository.store_key.call_args.args[0]
+    repository.load_keys.return_value = [("key0", saved)]
 
-    AESOCBRepoKey.detect(repository, manifest_data=None)
+    AESOCBKey.detect(repository, manifest_data=None)
 
 
 class TestDeriveKey(BaseTestCase):
     # Create a simple KeyBase subclass with a non-empty crypt_key
     class CustomKey(KeyBase):
+        TYPE = 0x42
+
         def __init__(self, crypt_key, id_key):
+            super().__init__(None)
             self.crypt_key = crypt_key
             self.id_key = id_key
 

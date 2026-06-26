@@ -15,6 +15,8 @@ from ..version import parse_version, format_version
         ("1.0.0a1.dev204+g8866961", (1, 0, 0, -4, 1)),
         ("1.0.0+d20170606", (1, 0, 0, -1)),
         # Pre-release versions:
+        ("1.0.0.dev1", (1, 0, 0, -9, 1)),
+        ("1.0.0dev2", (1, 0, 0, -9, 2)),
         ("1.0.0a1", (1, 0, 0, -4, 1)),
         ("1.0.0a2", (1, 0, 0, -4, 2)),
         ("1.0.0b3", (1, 0, 0, -3, 3)),
@@ -39,6 +41,7 @@ def test_parse_version_invalid(invalid_version):
 @pytest.mark.parametrize(
     "version_str, version_tuple",
     [
+        ("1.0.0.dev1", (1, 0, 0, -9, 1)),
         ("1.0.0a1", (1, 0, 0, -4, 1)),
         ("1.0.0", (1, 0, 0, -1)),
         ("1.0.0a2", (1, 0, 0, -4, 2)),

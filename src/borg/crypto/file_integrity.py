@@ -5,8 +5,6 @@ from hmac import compare_digest
 from collections.abc import Callable
 from pathlib import Path
 
-from xxhash import xxh64
-
 from ..helpers import IntegrityError
 from ..logger import create_logger
 
@@ -62,13 +60,14 @@ class FileHashingWrapper(FileLikeWrapper):
     ALGORITHM: str = None
     FACTORY: Callable = None
 
-    def __init__(self, backing_fd, write):
+    def __init__(self, backing_fd, write, *, pure_hash: bool = False):
         super().__init__(backing_fd)
         self.writing = write
         self.hash = self.FACTORY()
+        self.pure_hash = pure_hash  # if True, we don't hash the length of the file
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
+        if exc_type is None and not self.pure_hash:
             self.hash_length()
         super().__exit__(exc_type, exc_val, exc_tb)
 
@@ -106,20 +105,12 @@ class FileHashingWrapper(FileLikeWrapper):
         self.hash.update(str(self.tell()).encode())
 
 
-class SHA512FileHashingWrapper(FileHashingWrapper):
-    ALGORITHM = "SHA512"
-    FACTORY = hashlib.sha512
+class SHA256FileHashingWrapper(FileHashingWrapper):
+    ALGORITHM = "SHA256"
+    FACTORY = hashlib.sha256
 
 
-class XXH64FileHashingWrapper(FileHashingWrapper):
-    ALGORITHM = "XXH64"
-    FACTORY = xxh64
-
-
-SUPPORTED_ALGORITHMS = {
-    SHA512FileHashingWrapper.ALGORITHM: SHA512FileHashingWrapper,
-    XXH64FileHashingWrapper.ALGORITHM: XXH64FileHashingWrapper,
-}
+SUPPORTED_ALGORITHMS = {SHA256FileHashingWrapper.ALGORITHM: SHA256FileHashingWrapper}
 
 
 class FileIntegrityError(IntegrityError):
@@ -137,7 +128,7 @@ class IntegrityCheckedFile(FileLikeWrapper):
         self.file_opened = override_fd is None
         self.digests = {}
 
-        hash_cls = XXH64FileHashingWrapper
+        hash_cls = SHA256FileHashingWrapper
 
         if not write:
             algorithm_and_digests = self.load_integrity_data(path, integrity_data)

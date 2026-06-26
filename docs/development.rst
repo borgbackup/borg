@@ -310,12 +310,22 @@ Important notes:
 
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
+Running pytest directly without tox:
+
+::
+
+    # run the tests, with parallelism, skipping remote tests
+    pytest -v -rs --benchmark-skip -n auto -k "not remote"
+
+    # run the tests, skipping remote tests, only running repository test
+    pytest -v -rs --benchmark-skip -k "not remote and repository"
+
 Running the tests (using the pypi package)
 ------------------------------------------
 
-Since borg 1.4, it is also possible to run the tests without a development
-environment, using the borgbackup dist package (downloaded from pypi.org or
-github releases page):
+It is also possible to run the tests without a development environment, using
+the borgbackup dist package (downloaded from pypi.org or github releases page):
+
 ::
 
     # optional: create and use a virtual env:
@@ -453,19 +463,12 @@ Creating standalone binaries
 ----------------------------
 
 Make sure you have everything built and installed (including fuse stuff).
-When using the Vagrant VMs, pyinstaller will already be installed.
 
 With virtual env activated::
 
-  pip install pyinstaller  # or git checkout master
-  pyinstaller -F -n borg-PLATFORM borg/__main__.py
-  for file in dist/borg-*; do gpg --armor --detach-sign $file; done
+  scripts/build-borg-using-pyinstaller.sh
+  scripts/build-borg-using-nuitka.sh
 
-If you encounter issues, see also our `Vagrantfile` for details.
-
-.. note:: Standalone binaries built with pyinstaller are supposed to
-          work on same OS, same architecture (x86 32bit, amd64 64bit)
-          without external dependencies.
 
 .. _releasing:
 

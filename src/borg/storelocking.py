@@ -1,9 +1,8 @@
 import datetime
+import hashlib
 import json
 import random
 import time
-
-from xxhash import xxh64
 
 from borgstore.store import ObjectNotFound
 
@@ -97,11 +96,11 @@ class Lock:
 
     def _create_lock(self, *, exclusive=None, update_last_refresh=False):
         assert exclusive is not None
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         timestamp = now.isoformat(timespec="milliseconds")
         lock = dict(exclusive=exclusive, hostid=self.id[0], processid=self.id[1], threadid=self.id[2], time=timestamp)
         value = json.dumps(lock).encode("utf-8")
-        key = xxh64(value).hexdigest()
+        key = hashlib.sha256(value).hexdigest()
         logger.debug(f"LOCK-CREATE: creating lock in store. key: {key}, lock: {lock}.")
         self.store.store(f"locks/{key}", value)
         if update_last_refresh:
@@ -124,7 +123,7 @@ class Lock:
         return self.id == (lock["hostid"], lock["processid"], lock["threadid"])
 
     def _is_stale_lock(self, lock):
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         if now > lock["dt"] + self.stale_td:
             logger.debug(f"LOCK-STALE: lock is too old, it was not refreshed. lock: {lock}.")
             return True
@@ -248,7 +247,7 @@ class Lock:
 
     def refresh(self):
         """Refreshes the lock; call this frequently, but not later than every <stale> seconds."""
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         if self.last_refresh_dt is not None and now > self.last_refresh_dt + self.refresh_td:
             old_locks = self._find_locks(only_mine=True)
             if len(old_locks) == 0:

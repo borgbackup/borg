@@ -9,6 +9,22 @@ from ...chunkers import sparsemap, FileReader, FileFMAPReader, Chunk
 from ...constants import *  # NOQA
 
 
+def coalesce_sparse_map(sparse_map):
+    """Coalesce adjacent ranges with the same is_data flag, as the OS would report them."""
+    if not sparse_map:
+        return []
+    result = []
+    start, size, is_data = sparse_map[0]
+    for next_start, next_size, next_is_data in sparse_map[1:]:
+        if next_is_data == is_data:
+            size += next_size
+        else:
+            result.append((start, size, is_data))
+            start, size, is_data = next_start, next_size, next_is_data
+    result.append((start, size, is_data))
+    return result
+
+
 @pytest.mark.skipif(not fs_supports_sparse(), reason="filesystem does not support sparse files")
 @pytest.mark.parametrize(
     "fname, sparse_map",
@@ -28,8 +44,11 @@ def test_sparsemap(tmpdir, fname, sparse_map):
 
     fn = str(tmpdir / fname)
     make_sparsefile(fn, sparse_map)
-    assert get_sparsemap_fh(fn) == sparse_map
-    assert get_sparsemap_fd(fn) == sparse_map
+    # The OS coalesces adjacent ranges of the same type (data or hole),
+    # so we compare against the coalesced version of the expected map.
+    expected = coalesce_sparse_map(sparse_map)
+    assert get_sparsemap_fh(fn) == expected
+    assert get_sparsemap_fd(fn) == expected
 
 
 @pytest.mark.parametrize(

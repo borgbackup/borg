@@ -11,8 +11,7 @@ import stat
 import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
-from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from hashlib import sha256
 from string import Formatter
@@ -24,7 +23,7 @@ logger = create_logger()
 import yaml
 
 from .errors import Error
-from .fs import get_keys_dir, make_path_safe, slashify
+from .fs import make_path_safe, slashify
 from .argparsing import Action, ArgumentError, ArgumentTypeError, register_type
 from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, safe_timestamp
@@ -129,9 +128,14 @@ def decode_dict(d, keys, encoding="utf-8", errors="surrogateescape"):
 
 
 def interval(s):
-    """Convert a string representing a valid interval to a number of seconds."""
-    if isinstance(s, int):
+    """Parse an interval string (e.g. ``7d``, ``2w``, ``30M``) into a timedelta.
+
+    Supported units: y (years, 365d), m (months, 31d), w (weeks), d (days),
+    H (hours), M (minutes), S (seconds).  The value must be nonnegative.
+    """
+    if isinstance(s, timedelta):
         return s
+
     seconds_in_a_minute = 60
     seconds_in_an_hour = 60 * seconds_in_a_minute
     seconds_in_a_day = 24 * seconds_in_an_hour
@@ -159,10 +163,37 @@ def interval(s):
     except ValueError:
         seconds = -1
 
-    if seconds <= 0:
-        raise ArgumentTypeError(f'Invalid number "{number}": expected positive integer')
+    if seconds < 0:
+        raise ArgumentTypeError(f'Invalid number "{number}": expected nonnegative integer')
 
-    return seconds
+    return timedelta(seconds=seconds)
+
+
+def int_or_interval(s):
+    """Parse *s* as an :class:`int` or, failing that, as an interval string.
+
+    Returns :class:`int` if *s* can be parsed as an integer (e.g. ``"7"``),
+    or :class:`datetime.timedelta` if *s* is a valid interval (e.g. ``"7d"``).
+
+    Raises :class:`ArgumentTypeError` if *s* is neither an integer nor
+    a valid interval.
+    """
+    if isinstance(s, (int, timedelta)):
+        return s
+
+    # Explicitly check 'all' as a shortcut to 'infinite' sentinel value `-1`.
+    if s == "all":
+        return -1
+
+    try:
+        return int(s)
+    except ValueError:
+        pass
+
+    try:
+        return interval(s)
+    except ArgumentTypeError as e:
+        raise ArgumentTypeError(f"Value is neither an integer nor an interval: {e}")
 
 
 class CompressionSpec:
@@ -176,71 +207,74 @@ class CompressionSpec:
             raise ArgumentTypeError("not enough arguments")
         # --compression algo[,level]
         self.name = values[0]
-        if self.name in ("none", "lz4"):
-            return
-        elif self.name in ("zlib", "lzma", "zlib_legacy"):  # zlib_legacy just for testing
-            if count < 2:
-                level = 6  # default compression level in py stdlib
-            elif count == 2:
-                level = int(values[1])
-                if not 0 <= level <= 9:
-                    raise ArgumentTypeError("level must be >= 0 and <= 9")
-            else:
-                raise ArgumentTypeError("too many arguments")
-            self.level = level
-        elif self.name in ("zstd",):
-            if count < 2:
-                level = 3  # default compression level in zstd
-            elif count == 2:
-                level = int(values[1])
-                if not 1 <= level <= 22:
-                    raise ArgumentTypeError("level must be >= 1 and <= 22")
-            else:
-                raise ArgumentTypeError("too many arguments")
-            self.level = level
-        elif self.name == "auto":
-            if 2 <= count <= 3:
-                compression = ",".join(values[1:])
-            else:
-                raise ArgumentTypeError("bad arguments")
-            self.inner = CompressionSpec(compression)
-        elif self.name == "obfuscate":
-            if 3 <= count <= 5:
-                level = int(values[1])
-                if not ((1 <= level <= 6) or (110 <= level <= 123) or (level == 250)):
-                    raise ArgumentTypeError("level must be (inclusively) within 1...6, 110...123 or equal to 250")
+        match self.name:
+            case "none" | "lz4":
+                return
+            case "zlib" | "lzma" | "zlib_legacy":  # zlib_legacy just for testing
+                if count < 2:
+                    level = 6  # default compression level in py stdlib
+                elif count == 2:
+                    level = int(values[1])
+                    if not 0 <= level <= 9:
+                        raise ArgumentTypeError("level must be >= 0 and <= 9")
+                else:
+                    raise ArgumentTypeError("too many arguments")
                 self.level = level
-                compression = ",".join(values[2:])
-            else:
-                raise ArgumentTypeError("bad arguments")
-            self.inner = CompressionSpec(compression)
-        else:
-            raise ArgumentTypeError("unsupported compression type")
+            case "zstd":
+                if count < 2:
+                    level = 3  # default compression level in zstd
+                elif count == 2:
+                    level = int(values[1])
+                    if not 1 <= level <= 22:
+                        raise ArgumentTypeError("level must be >= 1 and <= 22")
+                else:
+                    raise ArgumentTypeError("too many arguments")
+                self.level = level
+            case "auto":
+                if 2 <= count <= 3:
+                    compression = ",".join(values[1:])
+                else:
+                    raise ArgumentTypeError("bad arguments")
+                self.inner = CompressionSpec(compression)
+            case "obfuscate":
+                if 3 <= count <= 5:
+                    level = int(values[1])
+                    if not ((1 <= level <= 6) or (110 <= level <= 123) or (level == 250)):
+                        raise ArgumentTypeError("level must be (inclusively) within 1...6, 110...123 or equal to 250")
+                    self.level = level
+                    compression = ",".join(values[2:])
+                else:
+                    raise ArgumentTypeError("bad arguments")
+                self.inner = CompressionSpec(compression)
+            case _:
+                raise ArgumentTypeError("unsupported compression type")
 
     @property
     def compressor(self):
         from ..compress import get_compressor
 
-        if self.name in ("none", "lz4"):
-            return get_compressor(self.name)
-        elif self.name in ("zlib", "lzma", "zstd", "zlib_legacy"):
-            return get_compressor(self.name, level=self.level)
-        elif self.name == "auto":
-            return get_compressor(self.name, compressor=self.inner.compressor)
-        elif self.name == "obfuscate":
-            return get_compressor(self.name, level=self.level, compressor=self.inner.compressor)
+        match self.name:
+            case "none" | "lz4":
+                return get_compressor(self.name)
+            case "zlib" | "lzma" | "zstd" | "zlib_legacy":
+                return get_compressor(self.name, level=self.level)
+            case "auto":
+                return get_compressor(self.name, compressor=self.inner.compressor)
+            case "obfuscate":
+                return get_compressor(self.name, level=self.level, compressor=self.inner.compressor)
 
     def __str__(self):
-        if self.name in ("none", "lz4"):
-            return f"{self.name}"
-        elif self.name in ("zlib", "lzma", "zstd", "zlib_legacy"):
-            return f"{self.name},{self.level}"
-        elif self.name == "auto":
-            return f"auto,{self.inner}"
-        elif self.name == "obfuscate":
-            return f"obfuscate,{self.level},{self.inner}"
-        else:
-            raise ValueError(f"unsupported compression type: {self.name}")
+        match self.name:
+            case "none" | "lz4":
+                return f"{self.name}"
+            case "zlib" | "lzma" | "zstd" | "zlib_legacy":
+                return f"{self.name},{self.level}"
+            case "auto":
+                return f"auto,{self.inner}"
+            case "obfuscate":
+                return f"obfuscate,{self.level},{self.inner}"
+            case _:
+                raise ValueError(f"unsupported compression type: {self.name}")
 
 
 def ChunkerParams(s):
@@ -364,7 +398,7 @@ def _replace_placeholders(text, overrides={}):
     """Replace placeholders in text with their values."""
     from ..platform import fqdn, hostname, getosusername
 
-    current_time = datetime.now(timezone.utc)
+    current_time = datetime.now(UTC)
     data = {
         "pid": os.getpid(),
         "fqdn": fqdn,
@@ -503,6 +537,15 @@ def parse_stringified_list(s):
     return [item for item in items if item != ""]
 
 
+def _redact_url_credentials(url):
+    """Remove embedded credentials from a repository URL for safe display/identity use."""
+    # netloc style: scheme://user[:pass]@host... -> scheme://host...
+    url = re.sub(r"(://)[^/@]+@", r"\1", url)
+    # s3/b2 style: (s3|b2):profile@... or (s3|b2):key:secret@... -> (s3|b2):...
+    url = re.sub(r"^((?:s3|b2):)[^@/]+@", r"\1", url)
+    return url
+
+
 class Location:
     """Object representing a repository location"""
 
@@ -528,12 +571,14 @@ class Location:
     # :port (optional)
     optional_port_re = r"(?::(?P<port>\d+))?"
 
-    # path may contain any chars. to avoid ambiguities with other regexes,
-    # it must not start with "//" nor with "scheme://" nor with "rclone:".
-    local_path_re = r"""
-        (?!(//|(ssh|socket|sftp|file)://|(rclone|s3|b2):))
-        (?P<path>.+)
-    """
+    # locations that borgstore parses and validates itself - borg only detects the scheme and
+    # passes the raw URL through. covers both "scheme://..." and opaque "scheme:..." forms.
+    BORGSTORE_SCHEMES = ("sftp", "http", "https", "s3", "b2", "rclone")
+
+    # path may contain any chars. to avoid ambiguities with other regexes, it must not start with
+    # "//", a "scheme://" or one of the borgstore "scheme:" specifiers (all of which are matched
+    # before local_re in _parse). the borgstore scheme list is sourced from BORGSTORE_SCHEMES.
+    local_path_re = r"(?!(//|(?:ssh|file)://|(?:" + "|".join(BORGSTORE_SCHEMES) + r"):))" r"(?P<path>.+)"
 
     # abs_path must start with a slash (or drive letter on Windows).
     abs_path_re = r"(?P<path>[A-Za-z]:/.+)" if is_win32 else r"(?P<path>/.+)"
@@ -541,9 +586,14 @@ class Location:
     # path may or may not start with a slash.
     abs_or_rel_path_re = r"(?P<path>.+)"
 
-    # regexes for misc. kinds of supported location specifiers:
-    ssh_or_sftp_re = re.compile(
-        r"(?P<proto>(ssh|sftp))://"
+    # We only parse out individual fields (user/host/port/path) for the protocols where borg
+    # itself needs them: legacy "ssh" (v1 repositories) and "rest" (for the ssh tunnel + FILE
+    # backend), plus local "file" paths. Everything else (see BORGSTORE_SCHEMES) is handed to
+    # borgstore as the raw URL and parsed/validated there - we only detect the scheme.
+
+    # ssh:// is only used for legacy borg 1.x repositories nowadays.
+    ssh_re = re.compile(
+        r"(?P<proto>ssh)://"
         + optional_user_re
         + host_re
         + optional_port_re
@@ -552,42 +602,24 @@ class Location:
         re.VERBOSE,
     )
 
-    # BorgStore REST server
-    # (http|https)://user:pass@host:port/
-    http_re = re.compile(
-        r"(?P<proto>http|https)://"
-        + r"((?P<user>[^:@]+):(?P<pass>[^@]+)@)?"
+    # REST http via stdio (via ssh, if host given):
+    rest_re = re.compile(
+        r"(?P<proto>(rest))://"
+        + r"("
+        + optional_user_re
         + host_re
         + optional_port_re
-        + r"(?P<path>/)",
+        + r")?"
+        + r"/"  # this is the separator, not part of the path!
+        + abs_or_rel_path_re,
         re.VERBOSE,
     )
 
-    # (s3|b2):[(profile|(access_key_id:access_key_secret))@][scheme://hostname[:port]]/bucket/path
-    s3_re = re.compile(
-        r"""
-        (?P<s3type>(s3|b2)):
-        ((
-            (?P<profile>[^@:]+)  # profile (no colons allowed)
-            |
-            (?P<access_key_id>[^:@]+):(?P<access_key_secret>[^@]+)  # access key and secret
-        )@)?  # optional authentication
-        (
-            [^:/]+://  # scheme (often https)
-            (?P<hostname>[^:/]+)
-            (:(?P<port>\d+))?
-        )?  # optional endpoint
-        /
-        (?P<bucket>[^/]+)/  # bucket name
-        (?P<path>.+)  # path
-    """,
-        re.VERBOSE,
-    )
-
-    rclone_re = re.compile(r"(?P<proto>rclone):(?P<path>(.*))", re.VERBOSE)
+    # scheme detector for the borgstore-handled locations listed in BORGSTORE_SCHEMES above.
+    scheme_re = re.compile(r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]*):")
 
     sl = "/" if is_win32 else ""
-    file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + sl + abs_path_re, re.VERBOSE)
+    file_re = re.compile(r"(?P<proto>file)://" + sl + abs_path_re, re.VERBOSE)
 
     local_re = re.compile(local_path_re, re.VERBOSE)
 
@@ -623,7 +655,7 @@ class Location:
             raise ValueError('Invalid location format: "%s"' % self.processed)
 
     def _parse(self, text):
-        m = self.ssh_or_sftp_re.match(text)
+        m = self.ssh_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.user = m.group("user")
@@ -631,33 +663,24 @@ class Location:
             self.port = m.group("port") and int(m.group("port")) or None
             self.path = os.path.normpath(m.group("path"))
             return True
-        m = self.http_re.match(text)
+        m = self.rest_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.user = m.group("user")
-            self._pass = True if m.group("pass") else False
             self._host = m.group("host")
             self.port = m.group("port") and int(m.group("port")) or None
-            self.path = m.group("path")
+            self.path = os.path.normpath(m.group("path"))
             return True
-        m = self.rclone_re.match(text)
-        if m:
-            self.proto = m.group("proto")
-            self.path = m.group("path")
-            return True
-        m = self.file_or_socket_re.match(text)
+        m = self.file_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.path = os.path.normpath(m.group("path"))
             return True
-        m = self.s3_re.match(text)
-        if m:
-            self.proto = m.group("s3type")
-            self.user = m.group("profile") if m.group("profile") else m.group("access_key_id")
-            self._pass = True if m.group("access_key_secret") else False
-            self._host = m.group("hostname")
-            self.port = m.group("port") and int(m.group("port")) or None
-            self.path = m.group("bucket") + "/" + m.group("path")
+        m = self.scheme_re.match(text)
+        if m and m.group("scheme") in self.BORGSTORE_SCHEMES:
+            # borgstore parses/validates these; we only detect the scheme and pass the raw
+            # URL (self.processed) through to it - no fields are extracted here.
+            self.proto = m.group("scheme")
             return True
         m = self.local_re.match(text)
         if m:
@@ -678,17 +701,6 @@ class Location:
         ]
         return ", ".join(items)
 
-    def to_key_filename(self):
-        name = re.sub(r"[^\w]", "_", self.path.rstrip("/"))
-        if self.proto not in ("file", "socket", "rclone"):
-            name = re.sub(r"[^\w]", "_", self.host) + "__" + name
-        if len(name) > 120:
-            # Limit file names to some reasonable length. Most file systems
-            # limit them to 255 [unit of choice]; due to variations in unicode
-            # handling we truncate to 100 *characters*.
-            name = name[:120]
-        return os.path.join(get_keys_dir(), name)
-
     def __repr__(self):
         return "Location(%s)" % self
 
@@ -699,28 +711,27 @@ class Location:
             return self._host.lstrip("[").rstrip("]")
 
     def canonical_path(self):
-        if self.proto in ("file", "socket"):
+        if self.proto == "file":
             return self.path
-        if self.proto == "rclone":
-            return f"{self.proto}:{self.path}"
-        if self.proto in ("sftp", "ssh", "s3", "b2", "http", "https"):
+        if self.proto in ("rest", "ssh"):
             return (
                 f"{self.proto}://"
                 f"{(self.user + '@') if self.user else ''}"
                 f"{self._host if self._host else ''}"
-                f"{self.port if self.port else ''}/"
+                f"{(':' + str(self.port)) if self.port else ''}/"
                 f"{self.path}"
             )
+        if self.proto in self.BORGSTORE_SCHEMES:
+            # borgstore-handled locations: use the raw (processed) URL as given, but strip any
+            # embedded credentials so we never write secrets to the security state file or logs.
+            return _redact_url_credentials(self.processed)
         raise NotImplementedError(self.proto)
 
     def with_timestamp(self, timestamp):
         # note: this only affects the repository URL/path, not the archive name!
         return Location(
             self.raw,
-            overrides={
-                "now": DatetimeWrapper(timestamp),
-                "utcnow": DatetimeWrapper(timestamp.astimezone(timezone.utc)),
-            },
+            overrides={"now": DatetimeWrapper(timestamp), "utcnow": DatetimeWrapper(timestamp.astimezone(UTC))},
         )
 
 
@@ -968,9 +979,9 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    # we provide the hash algos from python stdlib (except shake_*) and additionally xxh64.
+    # we provide the hash algos from python stdlib (except shake_*).
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
-    hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
+    hash_algorithms = set(hashlib.algorithms_guaranteed).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
         "type": "file type (file, dir, symlink, ...)",
         "mode": "file mode (as in stat)",
@@ -992,7 +1003,6 @@ class ItemFormatter(BaseFormatter):
         "isomtime": "file modification time (ISO 8601 format)",
         "isoctime": "file change time (ISO 8601 format)",
         "isoatime": "file access time (ISO 8601 format)",
-        "xxh64": "XXH64 checksum of this file (note: this is NOT a cryptographic hash!)",
         "fingerprint": "Fingerprint of the file content (may have false negatives), format: H(conditions)-H(chunk_ids)",
         "archiveid": "internal ID of the archive",
         "archivename": "name of the archive",
@@ -1013,11 +1023,8 @@ class ItemFormatter(BaseFormatter):
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format):
-        from xxhash import xxh64
-
         static_data = {"archivename": archive.name, "archiveid": archive.fpr} | self.FIXED_KEYS
         super().__init__(format, static_data)
-        self.xxh64 = xxh64
         self.archive = archive
         # track which keys were requested in the format string
         self.format_keys = {f[1] for f in Formatter().parse(format)}
@@ -1104,9 +1111,7 @@ class ItemFormatter(BaseFormatter):
     def hash_item(self, hash_function, item):
         if "chunks" not in item:
             return ""
-        if hash_function == "xxh64":
-            hash = self.xxh64()
-        elif hash_function in self.hash_algorithms:
+        if hash_function in self.hash_algorithms:
             hash = hashlib.new(hash_function)
         for data in self.archive.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
             hash.update(data)
@@ -1335,14 +1340,13 @@ def ellipsis_truncate(msg, space):
 
 class BorgJsonEncoder(json.JSONEncoder):
     def default(self, o):
-        from ..legacyrepository import LegacyRepository
+        from ..legacy.repository import LegacyRepository
         from ..repository import Repository
-        from ..legacyremote import LegacyRemoteRepository
-        from ..remote import RemoteRepository
+        from ..legacy.remote import LegacyRemoteRepository
         from ..archive import Archive
         from ..cache import AdHocWithFilesCache
 
-        if isinstance(o, (LegacyRepository, LegacyRemoteRepository)) or isinstance(o, (Repository, RemoteRepository)):
+        if isinstance(o, (LegacyRepository, LegacyRemoteRepository)) or isinstance(o, Repository):
             return {"id": bin_to_hex(o.id), "location": o._location.canonical_path()}
         if isinstance(o, Archive):
             return o.info()
@@ -1358,9 +1362,12 @@ class BorgJsonEncoder(json.JSONEncoder):
 def basic_json_data(manifest, *, cache=None, extra=None):
     key = manifest.key
     data = extra or {}
-    data |= {"repository": BorgJsonEncoder().default(manifest.repository), "encryption": {"mode": key.ARG_NAME}}
+    data |= {
+        "repository": BorgJsonEncoder().default(manifest.repository),
+        "encryption": {"encryption": key.ENC_NAME, "id_hash": key.IDHASH_NAME},
+    }
     data["repository"]["last_modified"] = OutputTimestamp(manifest.last_timestamp)
-    if key.NAME.startswith("key file"):
+    if getattr(key, "storage", None) == KeyBlobStorage.KEYFILE:
         data["encryption"]["keyfile"] = key.find_key()
     if cache:
         data["cache"] = cache
@@ -1403,7 +1410,7 @@ def prepare_dump_dict(d):
         return res
 
     def decode(d):
-        res = OrderedDict()
+        res = {}
         for key, value in d.items():
             if isinstance(value, dict):
                 value = decode(value)

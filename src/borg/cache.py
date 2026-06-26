@@ -1,14 +1,13 @@
 import configparser
+import hashlib
 import io
 import os
 import shutil
 import stat
 from collections import namedtuple
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
-
-from xxhash import xxh64
 
 from borgstore.backends.errors import PermissionDenied
 
@@ -22,22 +21,19 @@ from borgstore.store import ItemInfo
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
 from .hashindex import ChunkIndex, ChunkIndexEntry
-from .helpers import Error
-from .helpers import get_cache_dir, get_security_dir
+from .helpers import get_cache_dir
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
-from .helpers import yes
 from .helpers import ProgressIndicatorMessage
 from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
-from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .manifest import Manifest
 from .platform import SaveFile
-from .remote import RemoteRepository
-from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound, repo_lister
+from .repository import Repository, StoreObjectNotFound, PackReader
+from .security import SecurityManager, assert_secure  # noqa: F401
 
 
 def files_cache_name(archive_name, files_cache_name="files"):
@@ -53,7 +49,7 @@ def files_cache_name(archive_name, files_cache_name="files"):
     # when not, the user may manually do that by using the env var.
     if not suffix:
         # avoid issues with too complex or long archive_name by hashing it:
-        suffix = xxh64(archive_name.encode()).hexdigest()
+        suffix = hashlib.sha256(archive_name.encode()).hexdigest()
     return files_cache_name + "." + suffix
 
 
@@ -70,169 +66,6 @@ def discover_files_cache_names(path, files_cache_name="files"):
 
 # chunks is a list of ChunkListEntry
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks")
-
-
-class SecurityManager:
-    """
-    Tracks repositories. Ensures that nothing bad happens (repository swaps,
-    replay attacks, unknown repositories, etc.).
-
-    This is complicated by the cache being initially used for this, while
-    only some commands actually use the cache, which meant that other commands
-    did not perform these checks.
-
-    Further complications were created by the cache being a cache, so it
-    could be legitimately deleted, which is annoying because Borg did not
-    recognize repositories after that.
-
-    Therefore, a second location, the security database (see get_security_dir),
-    was introduced, which stores this information. However, this means that
-    the code has to deal with a cache existing but no security database entry,
-    or inconsistencies between the security database and the cache which have to
-    be reconciled, and also with no cache existing but a security database entry.
-    """
-
-    def __init__(self, repository):
-        self.repository = repository
-        self.dir = Path(get_security_dir(repository.id_str, legacy=(repository.version == 1)))
-        self.key_type_file = self.dir / "key-type"
-        self.location_file = self.dir / "location"
-        self.manifest_ts_file = self.dir / "manifest-timestamp"
-
-    @staticmethod
-    def destroy(repository, path=None):
-        """Destroys the security directory for ``repository`` or at ``path``."""
-        path = path or get_security_dir(repository.id_str, legacy=(repository.version == 1))
-        if Path(path).exists():
-            shutil.rmtree(path)
-
-    def known(self):
-        return all(f.exists() for f in (self.key_type_file, self.location_file, self.manifest_ts_file))
-
-    def key_matches(self, key):
-        if not self.known():
-            return False
-        try:
-            with self.key_type_file.open() as fd:
-                type = fd.read()
-                return type == str(key.TYPE)
-        except OSError as exc:
-            logger.warning("Could not read/parse key type file: %s", exc)
-
-    def save(self, manifest, key):
-        logger.debug("security: saving state for %s to %s", self.repository.id_str, str(self.dir))
-        current_location = self.repository._location.canonical_path()
-        logger.debug("security: current location   %s", current_location)
-        logger.debug("security: key type           %s", str(key.TYPE))
-        logger.debug("security: manifest timestamp %s", manifest.timestamp)
-        with SaveFile(self.location_file) as fd:
-            fd.write(current_location)
-        with SaveFile(self.key_type_file) as fd:
-            fd.write(str(key.TYPE))
-        with SaveFile(self.manifest_ts_file) as fd:
-            fd.write(manifest.timestamp)
-
-    def assert_location_matches(self):
-        # Warn user before sending data to a relocated repository
-        try:
-            with self.location_file.open() as fd:
-                previous_location = fd.read()
-            logger.debug("security: read previous location %r", previous_location)
-        except FileNotFoundError:
-            logger.debug("security: previous location file %s not found", self.location_file)
-            previous_location = None
-        except OSError as exc:
-            logger.warning("Could not read previous location file: %s", exc)
-            previous_location = None
-
-        repository_location = self.repository._location.canonical_path()
-        if previous_location and previous_location != repository_location:
-            msg = (
-                "Warning: The repository at location {} was previously located at {}\n".format(
-                    repository_location, previous_location
-                )
-                + "Do you want to continue? [yN] "
-            )
-            if not yes(
-                msg,
-                false_msg="Aborting.",
-                invalid_msg="Invalid answer, aborting.",
-                retry=False,
-                env_var_override="BORG_RELOCATED_REPO_ACCESS_IS_OK",
-            ):
-                raise Cache.RepositoryAccessAborted()
-            # adapt on-disk config immediately if the new location was accepted
-            logger.debug("security: updating location stored in security dir")
-            with SaveFile(self.location_file) as fd:
-                fd.write(repository_location)
-
-    def assert_no_manifest_replay(self, manifest, key):
-        try:
-            with self.manifest_ts_file.open() as fd:
-                timestamp = fd.read()
-            logger.debug("security: read manifest timestamp %r", timestamp)
-        except FileNotFoundError:
-            logger.debug("security: manifest timestamp file %s not found", self.manifest_ts_file)
-            timestamp = ""
-        except OSError as exc:
-            logger.warning("Could not read previous location file: %s", exc)
-            timestamp = ""
-        logger.debug("security: determined newest manifest timestamp as %s", timestamp)
-        # If repository is older than the cache or security dir something fishy is going on
-        if timestamp and timestamp > manifest.timestamp:
-            if isinstance(key, PlaintextKey):
-                raise Cache.RepositoryIDNotUnique()
-            else:
-                raise Cache.RepositoryReplay()
-
-    def assert_key_type(self, key):
-        # Make sure an encrypted repository has not been swapped for an unencrypted repository
-        if self.known() and not self.key_matches(key):
-            raise Cache.EncryptionMethodMismatch()
-
-    def assert_secure(self, manifest, key, *, warn_if_unencrypted=True):
-        # warn_if_unencrypted=False is only used for initializing a new repository.
-        # Thus, avoiding asking about a repository that's currently initializing.
-        self.assert_access_unknown(warn_if_unencrypted, manifest, key)
-        self._assert_secure(manifest, key)
-        logger.debug("security: repository checks ok, allowing access")
-
-    def _assert_secure(self, manifest, key):
-        self.assert_location_matches()
-        self.assert_key_type(key)
-        self.assert_no_manifest_replay(manifest, key)
-        if not self.known():
-            logger.debug("security: remembering previously unknown repository")
-            self.save(manifest, key)
-
-    def assert_access_unknown(self, warn_if_unencrypted, manifest, key):
-        # warn_if_unencrypted=False is only used for initializing a new repository.
-        # Thus, avoiding asking about a repository that's currently initializing.
-        if not key.logically_encrypted and not self.known():
-            msg = (
-                "Warning: Attempting to access a previously unknown unencrypted repository!\n"
-                + "Do you want to continue? [yN] "
-            )
-            allow_access = not warn_if_unencrypted or yes(
-                msg,
-                false_msg="Aborting.",
-                invalid_msg="Invalid answer, aborting.",
-                retry=False,
-                env_var_override="BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK",
-            )
-            if allow_access:
-                if warn_if_unencrypted:
-                    logger.debug("security: remembering unknown unencrypted repository (explicitly allowed)")
-                else:
-                    logger.debug("security: initializing unencrypted repository")
-                self.save(manifest, key)
-            else:
-                raise Cache.CacheInitAbortedError()
-
-
-def assert_secure(repository, manifest):
-    sm = SecurityManager(repository)
-    sm.assert_secure(manifest, manifest.key)
 
 
 def cache_dir(repository, path=None):
@@ -330,30 +163,13 @@ class CacheConfig:
 class Cache:
     """Client Side cache"""
 
-    class CacheInitAbortedError(Error):
-        """Cache initialization aborted"""
-
-        exit_mcode = 60
-
-    class EncryptionMethodMismatch(Error):
-        """Repository encryption method changed since last access, refusing to continue"""
-
-        exit_mcode = 61
-
-    class RepositoryAccessAborted(Error):
-        """Repository access aborted"""
-
-        exit_mcode = 62
-
-    class RepositoryIDNotUnique(Error):
-        """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
-
-        exit_mcode = 63
-
-    class RepositoryReplay(Error):
-        """Cache, or information obtained from the security directory is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
-
-        exit_mcode = 64
+    from .security import (
+        CacheInitAbortedError,
+        EncryptionMethodMismatch,
+        RepositoryAccessAborted,
+        RepositoryIDNotUnique,
+        RepositoryReplay,
+    )  # noqa: F401
 
     @staticmethod
     def break_lock(repository, path=None):
@@ -411,7 +227,7 @@ class FilesCacheMixin:
         assert "d" in cache_mode or "c" in cache_mode or "m" in cache_mode
         self.cache_mode = cache_mode
         self._files = None
-        self._newest_cmtime = 0
+        self._newest_cmtime = None  # None means "no file was chunked/seen yet", see _write_files_cache
         self._newest_path_hashes = set()
         self.start_backup = start_backup
 
@@ -496,13 +312,13 @@ class FilesCacheMixin:
                 path_hash = self.key.id_hash(safe_encode(item.path))
                 # keep track of the key(s) for the most recent timestamp(s):
                 ctime_ns = item.ctime
-                if ctime_ns > self._newest_cmtime:
+                if self._newest_cmtime is None or ctime_ns > self._newest_cmtime:
                     self._newest_cmtime = ctime_ns
                     self._newest_path_hashes = {path_hash}
                 elif ctime_ns == self._newest_cmtime:
                     self._newest_path_hashes.add(path_hash)
                 mtime_ns = item.mtime
-                if mtime_ns > self._newest_cmtime:
+                if self._newest_cmtime is None or mtime_ns > self._newest_cmtime:
                     self._newest_cmtime = mtime_ns
                     self._newest_path_hashes = {path_hash}
                 elif mtime_ns == self._newest_cmtime:
@@ -612,7 +428,7 @@ class FilesCacheMixin:
                         entries += 1
             integrity_data = fd.integrity_data
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {age_discarded} entries with age >= TTL [{ttl}]")
-        t_str = datetime.fromtimestamp(discard_after / 1e9, timezone.utc).isoformat()
+        t_str = datetime.fromtimestamp(discard_after / 1e9, UTC).isoformat()
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {race_discarded} entries with ctime/mtime >= {t_str}")
         files_cache_logger.debug(f"FILES-CACHE-SAVE: finished, {entries} remaining entries saved.")
         return integrity_data
@@ -700,35 +516,33 @@ class FilesCacheMixin:
 
 def list_chunkindex_hashes(repository):
     hashes = []
-    for info in repository.store_list("cache"):
+    for info in repository.store_list("index"):
         info = ItemInfo(*info)  # RPC does not give namedtuple
-        if info.name.startswith("chunks."):
-            hash = info.name.removeprefix("chunks.")
-            hashes.append(hash)
+        # in the index/ namespace, each object's name is the sha256 hash of its content.
+        hashes.append(info.name)
     hashes = sorted(hashes)
-    logger.debug(f"cached chunk indexes: {hashes}")
+    logger.debug(f"chunk indexes: {hashes}")
     return hashes
 
 
-def delete_chunkindex_cache(repository):
+def delete_chunkindex_from_repo(repository):
     hashes = list_chunkindex_hashes(repository)
     for hash in hashes:
-        cache_name = f"cache/chunks.{hash}"
+        index_name = f"index/{hash}"
         try:
-            repository.store_delete(cache_name)
+            repository.store_delete(index_name)
         except StoreObjectNotFound:
             pass
-    logger.debug(f"cached chunk indexes deleted: {hashes}")
+    logger.debug(f"chunk indexes deleted: {hashes}")
+    # the in-memory index is now stale; drop it so close() does not write it back into the
+    # index we just deleted. the next .chunks access rebuilds it from actual repo contents.
+    repository.invalidate_chunk_index()
 
 
-CHUNKINDEX_HASH_SEED = 3
-
-
-def write_chunkindex_to_repo_cache(
+def write_chunkindex_to_repo(
     repository, chunks, *, incremental=True, clear=False, force_write=False, delete_other=False, delete_these=None
 ):
-    # for now, we don't want to serialize the flags or the size, just the keys (chunk IDs):
-    cleaned_value = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=0)
+    # for now, we don't want to serialize the flags or the size:
     chunks_to_write = ChunkIndex()
     # incremental==True:
     # the borghash code has no means to only serialize the F_NEW table entries,
@@ -736,67 +550,78 @@ def write_chunkindex_to_repo_cache(
     # incremental==False:
     # maybe copying the stuff into a new ChunkIndex is not needed here,
     # but for simplicity, we do it anyway.
-    for key, _ in chunks.iteritems(only_new=incremental):
-        chunks_to_write[key] = cleaned_value
+    for key, existing in chunks.iteritems(only_new=incremental):
+        chunks_to_write[key] = existing._replace(flags=ChunkIndex.F_NONE, size=0)
+    num_to_write = len(chunks_to_write)
     with io.BytesIO() as f:
         chunks_to_write.write(f)
         data = f.getvalue()
-    logger.debug(f"caching {len(chunks_to_write)} chunks (incremental={incremental}).")
+    logger.debug(f"caching {num_to_write} chunks (incremental={incremental}).")
     chunks_to_write.clear()  # free memory of the temporary table
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately
-    new_hash = xxh64(data, seed=CHUNKINDEX_HASH_SEED).hexdigest()
-    cached_hashes = list_chunkindex_hashes(repository)
-    if force_write or new_hash not in cached_hashes:
-        # when an updated chunks index is stored into the cache, we also store its hash as part of the name.
-        # when a client is loading the chunks index from a cache, it has to compare its xxh64
-        # hash against the hash in its name. if it is the same, the cache is valid.
-        # if it is different, the cache is either corrupted or out of date and has to be discarded.
-        # when some functionality is DELETING chunks from the repository, it has to delete
-        # all existing cache/chunks.* and maybe write a new, valid cache/chunks.<hash>,
+    # the index object's name in the repo is the pure sha256 of its content, so borgstore can verify
+    # it the same way as any other object. an incompatible index format from a different borg version
+    # is rejected by borghash's own versioned header (MAGIC + VERSION) when it is read back.
+    new_hash = hashlib.sha256(data).hexdigest()
+    if num_to_write == 0 and not force_write:
+        # don't persist an empty incremental index: if it became the only index/* (e.g. right
+        # after delete_chunkindex_from_repo()), build_chunkindex_from_repo() would return it as-is
+        # instead of rebuilding from the repo. with nothing new, the existing index is already up to date.
+        logger.debug("no new chunks to persist; not writing an empty incremental chunk index.")
+        return new_hash
+    stored_hashes = list_chunkindex_hashes(repository)
+    if force_write or new_hash not in stored_hashes:
+        # an index object is stored as index/<hash>, where <hash> is the sha256 of its content.
+        # when a client loads an index object, it compares the content hash against the hash in its
+        # name. if it is the same, the object is valid. if it is different, it is either corrupted or
+        # out of date and has to be discarded. when some functionality is DELETING chunks from the
+        # repository, it has to delete all existing index/* and maybe write a new, valid index/<hash>,
         # so that all clients will discard any client-local chunks index caches.
-        cache_name = f"cache/chunks.{new_hash}"
-        logger.debug(f"caching chunks index as {cache_name} in repository...")
-        repository.store_store(cache_name, data)
+        index_name = f"index/{new_hash}"
+        logger.debug(f"storing chunks index as {index_name} in repository...")
+        repository.store_store(index_name, data)
         # we have successfully stored to the repository, so we can clear all F_NEW flags now:
         chunks.clear_new()
-        # delete some not needed cached chunk indexes, but never the one we just wrote:
+        # delete some no longer needed index objects, but never the one we just wrote:
         if delete_other:
-            delete_these = set(cached_hashes) - {new_hash}
+            delete_these = set(stored_hashes) - {new_hash}
         elif delete_these:
             delete_these = set(delete_these) - {new_hash}
         else:
             delete_these = set()
         for hash in delete_these:
-            cache_name = f"cache/chunks.{hash}"
+            index_name = f"index/{hash}"
             try:
-                repository.store_delete(cache_name)
+                repository.store_delete(index_name)
             except StoreObjectNotFound:
                 pass
         if delete_these:
-            logger.debug(f"cached chunk indexes deleted: {delete_these}")
+            logger.debug(f"chunk indexes deleted: {delete_these}")
     return new_hash
 
 
-def read_chunkindex_from_repo_cache(repository, hash):
-    cache_name = f"cache/chunks.{hash}"
-    logger.debug(f"trying to load {cache_name} from the repo...")
+def read_chunkindex_from_repo(repository, hash):
+    index_name = f"index/{hash}"
+    logger.debug(f"trying to load {index_name} from the repo...")
     try:
-        chunks_data = repository.store_load(cache_name)
+        chunks_data = repository.store_load(index_name)
     except StoreObjectNotFound:
-        logger.debug(f"{cache_name} not found in the repository.")
+        logger.debug(f"{index_name} not found in the repository.")
     else:
-        if xxh64(chunks_data, seed=CHUNKINDEX_HASH_SEED).digest() == hex_to_bin(hash):
-            logger.debug(f"{cache_name} is valid.")
+        if hashlib.sha256(chunks_data).digest() == hex_to_bin(hash):
+            logger.debug(f"{index_name} is valid.")
             with io.BytesIO(chunks_data) as f:
                 chunks = ChunkIndex.read(f)
             return chunks
         else:
-            logger.debug(f"{cache_name} is invalid.")
+            logger.debug(f"{index_name} is invalid.")
 
 
-def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immediately=False):
+def build_chunkindex_from_repo(
+    repository, *, disable_caches=False, cache_immediately=False, init_flags=ChunkIndex.F_USED
+):
     # first, try to build a fresh, mostly complete chunk index from centrally cached chunk indexes:
     if not disable_caches:
         hashes = list_chunkindex_hashes(repository)
@@ -804,7 +629,7 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
             merged = 0
             chunks = ChunkIndex()  # we'll merge all we find into this
             for hash in hashes:
-                chunks_to_merge = read_chunkindex_from_repo_cache(repository, hash)
+                chunks_to_merge = read_chunkindex_from_repo(repository, hash)
                 if chunks_to_merge is not None:
                     logger.debug(f"cached chunk index {hash} gets merged...")
                     for k, v in chunks_to_merge.items():
@@ -813,35 +638,42 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
                     chunks_to_merge.clear()
             if merged > 0:
                 if merged > 1 and cache_immediately:
-                    # immediately update cache/chunks, so we don't have to merge these again:
-                    write_chunkindex_to_repo_cache(
-                        repository, chunks, clear=False, force_write=True, delete_these=hashes
-                    )
+                    # immediately update the index, so we don't have to merge these again:
+                    write_chunkindex_to_repo(repository, chunks, clear=False, force_write=True, delete_these=hashes)
                 else:
                     chunks.clear_new()
                 return chunks
     # if we didn't get anything from the cache, compute the ChunkIndex the slow way:
-    logger.debug("querying the chunk IDs list from the repo...")
+    logger.debug("rebuilding the chunk index from the repo the slow way...")
     chunks = ChunkIndex()
     t0 = perf_counter()
     num_chunks = 0
-    # The repo says it has these chunks, so we assume they are referenced/used chunks.
-    # We do not know the plaintext size (!= stored_size), thus we set size = 0.
-    init_entry = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
-    for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
-        num_chunks += 1
-        chunks[id] = init_entry
-    # Cache does not contain the manifest.
-    if not isinstance(repository, (Repository, RemoteRepository)):
-        del chunks[Manifest.MANIFEST_ID]
+    # By default we assume the repo's chunks are used; callers that compute usage themselves
+    # (e.g. compact) pass init_flags=F_NONE. Plaintext size is unknown here (!= stored size), so size=0.
+    # Every caller passes a (modern) Repository; legacy borg 1.x repos never reach here (transfer reads
+    # their archives directly and never builds a chunk index for them), so there is no legacy branch.
+    assert isinstance(repository, Repository)
+    # Read each pack's object headers with borgstore range requests, fetching only the fixed-size
+    # headers and skipping the (much larger) encrypted payloads. Don't call Repository.list() here:
+    # it iterates this same index we are building, so it would recurse. The headers also give each
+    # object's real (chunk_id, offset, size), so every object in a pack is indexed individually.
+    for info in repository.store_list("packs"):
+        # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
+        repository._lock_refresh()
+        pack_id = hex_to_bin(info.name)
+        for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_id).iter_headers():
+            num_chunks += 1
+            chunks[chunk_id] = ChunkIndexEntry(
+                flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+            )
     duration = perf_counter() - t0 or 0.001
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
     # Protocol overhead is neglected in this calculation.
     speed = format_file_size(num_chunks * 34 / duration)
     logger.debug(f"queried {num_chunks} chunk IDs in {duration} s, ~{speed}/s")
     if cache_immediately:
-        # immediately update cache/chunks, so we only rarely have to do it the slow way:
-        write_chunkindex_to_repo_cache(repository, chunks, clear=False, force_write=True, delete_other=True)
+        # immediately update the index, so we only rarely have to do it the slow way:
+        write_chunkindex_to_repo(repository, chunks, clear=False, force_write=True, delete_other=True)
     return chunks
 
 
@@ -852,15 +684,24 @@ class ChunksMixin:
 
     def __init__(self):
         self._chunks = None
-        self.last_refresh_dt = datetime.now(timezone.utc)
+        self.last_refresh_dt = datetime.now(UTC)
         self.refresh_td = timedelta(seconds=60)
-        self.chunks_cache_last_write = datetime.now(timezone.utc)
+        self.chunks_cache_last_write = datetime.now(UTC)
         self.chunks_cache_write_td = timedelta(seconds=600)
 
     @property
     def chunks(self):
         if self._chunks is None:
-            self._chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
+            # the repository owns the one and only chunk index; use it rather than
+            # building a second one and pushing it back into the repository.
+            self._chunks = self.repository.chunks
+            # note: we deliberately do NOT consolidate the cached chunk index fragments here.
+            # each backup writes a small incremental index/* fragment (only its new chunks),
+            # which is cheap. collapsing them all into one big fragment on every run would re-upload
+            # the whole index and, with delete_other, invalidate every other client's fragments --
+            # a multi-GB churn per run on a shared repo. fragment count is reclaimed by `borg compact`
+            # (build_chunkindex_from_repo with cache_immediately). a size/threshold-based policy that
+            # bounds the fragment count without re-uploading large fragments can be added later.
         return self._chunks
 
     def seen_chunk(self, id, size=None):
@@ -882,18 +723,7 @@ class ChunksMixin:
         return ChunkListEntry(id, size)
 
     def add_chunk(
-        self,
-        id,
-        meta,
-        data,
-        *,
-        stats,
-        wait=True,
-        compress=True,
-        size=None,
-        ctype=None,
-        clevel=None,
-        ro_type=ROBJ_FILE_STREAM,
+        self, id, meta, data, *, stats, compress=True, size=None, ctype=None, clevel=None, ro_type=ROBJ_FILE_STREAM
     ):
         assert ro_type is not None
         if size is None:
@@ -901,7 +731,7 @@ class ChunksMixin:
                 size = len(data)  # data is still uncompressed
             else:
                 raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self._maybe_write_chunks_cache(now)
         exists = self.seen_chunk(id, size)
         if exists:
@@ -912,16 +742,17 @@ class ChunksMixin:
         cdata = self.repo_objs.format(
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
-        self.repository.put(id, cdata, wait=wait)
+        pack_results = self.repository.put(id, cdata)
         self.last_refresh_dt = now  # .put also refreshed the lock
         self.chunks.add(id, size)
+        self.chunks.update_pack_info(pack_results)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
 
     def _maybe_write_chunks_cache(self, now, force=False, clear=False):
         if force or now > self.chunks_cache_last_write + self.chunks_cache_write_td:
             if self._chunks is not None:
-                write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=clear)
+                write_chunkindex_to_repo(self.repository, self._chunks, clear=clear)
             self.chunks_cache_last_write = now
 
     def refresh_lock(self, now):
@@ -1012,6 +843,8 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def close(self):
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
+        if self._chunks is not None:
+            self.repository.flush()
         if self._files is not None:
             pi.output("Saving files cache")
             integrity_data = self._write_files_cache(self._files)
@@ -1020,8 +853,8 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             for key, value in sorted(self._chunks.stats.items()):
                 logger.debug(f"Chunks index stats: {key}: {value}")
             pi.output("Saving chunks cache")
-            # note: cache/chunks.* in repo has a different integrity mechanism
-            now = datetime.now(timezone.utc)
+            # note: index/* in repo has a different integrity mechanism
+            now = datetime.now(UTC)
             self._maybe_write_chunks_cache(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
         pi.output("Saving cache config")
@@ -1045,6 +878,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def wipe_cache(self):
         logger.warning("Discarding incompatible cache and forcing a cache rebuild")
         self._chunks = ChunkIndex()
+        self.repository.chunks = self._chunks
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
 

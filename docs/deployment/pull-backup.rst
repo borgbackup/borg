@@ -54,8 +54,16 @@ completely in every aspect from such a backup.
 
 .. warning::
 
+    The SSHFS + chroot method requires that the backup server and the client
+    use the same CPU architecture (e.g. both x86_64), as binaries from the
+    client (like ``/bin/sh`` or the ``borg`` binary) are executed on the
+    backup server. If you have different architectures, use the :ref:`socat_method`
+    instead.
+
+.. warning::
+
     The chroot method was chosen to get the right user and group name-id
-    mappings, assuming they only come from files (/etc/passwd and group).
+    mappings, assuming they only come from files (/etc/passwd and /etc/group).
     This assumption might be wrong, e.g. if users/groups also come from
     ldap or other providers.
     Thus, it might be better to use ``--numeric-ids`` and not archive any
@@ -98,7 +106,7 @@ create the backup, retaining the original paths, excluding the repository:
 
 ::
 
-    borg create --exclude borgrepo --files-cache ctime,size --repo /borgrepo archive  /
+    borg create --exclude borgrepo --files-cache ctime,size --repo /borgrepo archive /
 
 For the sake of simplicity only ``borgrepo`` is excluded here. You may want to
 set up an exclude file with additional files and folders to be excluded. Also
@@ -204,6 +212,8 @@ directly extract it without the need of mounting with SSHFS:
 Note that in this scenario the tar format is the limiting factor – it cannot
 restore all the advanced features that BorgBackup supports. See
 :ref:`borg_export-tar` for limitations.
+
+.. _socat_method:
 
 socat
 =====
@@ -349,7 +359,7 @@ dedicated ssh key:
 ::
 
   borgs@borg-server$ install -m 700 -d ~/.ssh/
-  borgs@borg-server$ ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_key
+  borgs@borg-server$ ssh-keygen -N '' -t rsa -f ~/.ssh/borg-client_key
   borgs@borg-server$ { echo -n 'command="borg serve --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
   borgs@borg-server$ chmod 600 ~/.ssh/authorized_keys
 
@@ -357,7 +367,7 @@ dedicated ssh key:
 
   Create directory ~/.ssh with correct permissions if it does not exist yet.
 
-``ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_key``
+``ssh-keygen -N '' -t rsa -f ~/.ssh/borg-client_key``
 
   Create an ssh key dedicated to communication with borg-client.
 

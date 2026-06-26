@@ -38,11 +38,11 @@ Description
 
 This command displays the Borg client and server versions.
 
-If a local repository is given, the client code directly accesses the repository,
-so the client version is also shown as the server version.
+For current repositories the client code directly accesses the repository (also for
+rest:// repositories), so the client version is shown as the server version, too.
 
-If a remote repository is given (e.g., ssh:), the remote Borg is queried, and
-its version is displayed as the server version.
+If a legacy (borg 1.x / v1) repository is given via ssh: together with --from-borg1,
+the remote Borg is queried, and its version is displayed as the server version.
 
 Examples::
 
@@ -50,8 +50,8 @@ Examples::
     $ borg version /mnt/backup
     1.4.0a / 1.4.0a
 
-    # remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
-    $ borg version ssh://borg@borgbackup:repo
+    # legacy remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
+    $ borg version --from-borg1 ssh://borg@borgbackup:repo
     1.4.0a / 1.2.7
 
 Due to the version tuple format used in Borg client/server negotiation, only

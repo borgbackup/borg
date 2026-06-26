@@ -12,21 +12,25 @@ borg repo-create
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+------------------------------------+------------------------------------------------------------------------------------------------------------------------+
-    | **options**                                                                                                                                                                                                         |
-    +-------------------------------------------------------+------------------------------------+------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--other-repo SRC_REPOSITORY``    | reuse the key material from the other repository                                                                       |
-    +-------------------------------------------------------+------------------------------------+------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--from-borg1``                   | other repository is Borg 1.x                                                                                           |
-    +-------------------------------------------------------+------------------------------------+------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``-e MODE``, ``--encryption MODE`` | select encryption key mode **(required)**                                                                              |
-    +-------------------------------------------------------+------------------------------------+------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--copy-crypt-key``               | copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key). |
-    +-------------------------------------------------------+------------------------------------+------------------------------------------------------------------------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                                                                                                                      |
-    |                                                                                                                                                                                                                     |
-    | :ref:`common_options`                                                                                                                                                                                               |
-    +-------------------------------------------------------+------------------------------------+------------------------------------------------------------------------------------------------------------------------+
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **options**                                                                                                                                                                                                                                                         |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--other-repo SRC_REPOSITORY``                | reuse the key material from the other repository                                                                                                           |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--from-borg1``                               | other repository is Borg 1.x                                                                                                                               |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-e ENCRYPTION``, ``--encryption ENCRYPTION`` | select cipher / AE algorithm: 'none', 'authenticated', 'aes256-ocb' or 'chacha20-poly1305' **(required)**                                                  |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-i HASH``, ``--id-hash HASH``                | select the id hash function: 'sha256' (default) or 'blake3'. The 'none' encryption only supports 'sha256'.                                                 |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--key-location LOCATION``                    | where to store the key: 'repokey' (in the repository, default) or 'keyfile' (in the local keys directory). Ignored for the 'none' mode (which has no key). |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--copy-crypt-key``                           | copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key).                                     |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                      |
+    |                                                                                                                                                                                                                                                                     |
+    | :ref:`common_options`                                                                                                                                                                                                                                               |
+    +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -42,9 +46,11 @@ borg repo-create
 
     options
         --other-repo SRC_REPOSITORY    reuse the key material from the other repository
-        --from-borg1                   other repository is Borg 1.x
-        -e MODE, --encryption MODE     select encryption key mode **(required)**
-        --copy-crypt-key               copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key).
+        --from-borg1                other repository is Borg 1.x
+        -e ENCRYPTION, --encryption ENCRYPTION    select cipher / AE algorithm: 'none', 'authenticated', 'aes256-ocb' or 'chacha20-poly1305' **(required)**
+        -i HASH, --id-hash HASH     select the id hash function: 'sha256' (default) or 'blake3'. The 'none' encryption only supports 'sha256'.
+        --key-location LOCATION     where to store the key: 'repokey' (in the repository, default) or 'keyfile' (in the local keys directory). Ignored for the 'none' mode (which has no key).
+        --copy-crypt-key            copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key).
 
 
     :ref:`common_options`
@@ -70,7 +76,7 @@ tips will come below):
 
 ::
 
-    borg repo-create --encryption repokey-aes-ocb
+    borg repo-create --encryption aes256-ocb --key-location repokey
 
 Borg will:
 
@@ -112,49 +118,49 @@ a different keyboard layout.
 You can change your passphrase for existing repositories at any time; it will not affect
 the encryption/decryption key or other secrets.
 
-Choosing an encryption mode
-+++++++++++++++++++++++++++
+Choosing a crypto suite
++++++++++++++++++++++++
 
 Depending on your hardware, hashing and crypto performance may vary widely.
 The easiest way to find out what is fastest is to run ``borg benchmark cpu``.
 
-`repokey` modes: if you want ease-of-use and "passphrase" security is good enough -
-the key will be stored in the repository (in ``repo_dir/config``).
+A crypto suite is selected by three orthogonal options:
 
-`keyfile` modes: if you want "passphrase and having-the-key" security -
-the key will be stored in your home directory (in ``~/.config/borg/keys``).
+``--encryption`` (**required**) selects the cipher / authenticated-encryption algorithm:
 
-The following table is roughly sorted in order of preference, the better ones are
-in the upper part of the table, in the lower part is the old and/or unsafe(r) stuff:
+- ``aes256-ocb``: AES256 in OCB mode (encryption + authentication).
+- ``chacha20-poly1305``: ChaCha20 + Poly1305 (encryption + authentication).
+- ``authenticated``: no encryption, but still authenticates your data (tamper detection).
+- ``none``: no encryption and no authentication (see the warning below).
 
-.. nanorst: inline-fill
+``--id-hash`` selects the id hash function (used for chunk ids and authentication):
 
-+-----------------------------------+--------------+----------------+--------------------+
-| Mode (K = keyfile or repokey)     | ID-Hash      | Encryption     | Authentication     |
-+-----------------------------------+--------------+----------------+--------------------+
-| K-blake2-chacha20-poly1305        | BLAKE2b      | CHACHA20       | POLY1305           |
-+-----------------------------------+--------------+----------------+--------------------+
-| K-chacha20-poly1305               | HMAC-SHA-256 | CHACHA20       | POLY1305           |
-+-----------------------------------+--------------+----------------+--------------------+
-| K-blake2-aes-ocb                  | BLAKE2b      | AES256-OCB     | AES256-OCB         |
-+-----------------------------------+--------------+----------------+--------------------+
-| K-aes-ocb                         | HMAC-SHA-256 | AES256-OCB     | AES256-OCB         |
-+-----------------------------------+--------------+----------------+--------------------+
-| authenticated-blake2              | BLAKE2b      | none           | BLAKE2b            |
-+-----------------------------------+--------------+----------------+--------------------+
-| authenticated                     | HMAC-SHA-256 | none           | HMAC-SHA256        |
-+-----------------------------------+--------------+----------------+--------------------+
-| none                              | SHA-256      | none           | none               |
-+-----------------------------------+--------------+----------------+--------------------+
+- ``sha256`` (default): HMAC-SHA-256 (or plain SHA-256 for the ``none`` encryption).
+- ``blake3``: BLAKE3. Often faster on CPUs without SHA hardware acceleration.
 
-.. nanorst: inline-replace
+The ``none`` encryption has no key, so it only supports the ``sha256`` id hash.
 
-`none` mode uses no encryption and no authentication. You are advised NOT to use this mode
-as it would expose you to all sorts of issues (DoS, confidentiality, tampering, ...) in
-case of malicious activity in the repository.
+``--key-location`` selects where the key is stored (orthogonal to the crypto suite):
+
+- ``repokey`` (default): the key is stored in the repository (under ``keys/``). Pick this
+  if you want ease-of-use and "passphrase" security is good enough.
+- ``keyfile``: the key is stored in your home directory (in ``~/.config/borg/keys``). Pick
+  this if you want "passphrase and having-the-key" security.
+
+You can move the key between these locations later with ``borg key change-location``.
+This also applies to the ``authenticated`` encryption: it does not encrypt your data, but it
+still has a key (used for the id hash and authentication), so ``--key-location`` selects
+where that key is stored, just like for the encrypted suites.
+``--key-location`` is only ignored for the ``none`` encryption, which has no key at all.
+
+`none` encryption uses no encryption and no authentication. You are advised NOT to use this
+as it would expose you to a Denial-of-Service risk (due to how the :ref:`internals_hashindex`
+works) and other issues (confidentiality, tampering, ...) in case of malicious activity
+in the repository.
 
 If you do **not** want to encrypt the contents of your backups, but still want to detect
-malicious tampering, use an `authenticated` mode. It is like `repokey` minus encryption.
+malicious tampering, use ``--encryption authenticated``. It is like an encrypted suite
+minus the data encryption.
 To normally work with ``authenticated`` repositories, you will need the passphrase, but
 there is an emergency workaround; see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 

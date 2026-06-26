@@ -13,11 +13,8 @@ from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
-from ..legacyremote import LegacyRemoteRepository
-from ..remote import RemoteRepository
-from ..legacyrepository import LegacyRepository
 from ..repository import Repository
-from ..repoobj import RepoObj, RepoObj1
+from ..repoobj import RepoObj
 from ..patterns import (
     ArgparsePatternAction,
     ArgparseExcludeFileAction,
@@ -31,20 +28,33 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_or_v2):
-    if location.proto in ("ssh", "socket"):
-        RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
-        repository = RemoteRepoCls(
-            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
-        )
+def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_legacy):
+    if location.proto == "ssh":
+        if v1_legacy:
+            from ..legacy.remote import LegacyRemoteRepository
+
+            repository = LegacyRemoteRepository(
+                location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
+            )
+        else:
+            raise Error(
+                "ssh:// is no longer supported for current repositories; use rest:// instead "
+                "(it can tunnel over ssh). ssh:// remains available only for legacy v1 repositories "
+                "via --from-borg1."
+            )
 
     elif (
-        location.proto in ("sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_or_v2
+        location.proto in ("rest", "sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_legacy
     ):  # stuff directly supported by borgstore
         repository = Repository(location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
 
     else:
-        RepoCls = LegacyRepository if v1_or_v2 else Repository
+        if v1_legacy:
+            from ..legacy.repository import LegacyRepository
+
+            RepoCls = LegacyRepository
+        else:
+            RepoCls = Repository
         repository = RepoCls(location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
     return repository
 
@@ -66,7 +76,14 @@ def compat_check(*, create, manifest, key, cache, compatibility, decorator_name)
 
 
 def with_repository(
-    create=False, lock=True, exclusive=False, manifest=True, cache=False, secure=True, compatibility=None
+    create=False,
+    lock=True,
+    exclusive=False,
+    manifest=True,
+    cache=False,
+    secure=True,
+    compatibility=None,
+    allow_v1=False,
 ):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
@@ -80,6 +97,7 @@ def with_repository(
     :param secure: do assert_secure after loading manifest
     :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory
            feature categories to check
+    :param allow_v1: (bool) allow legacy Borg 1.x repositories
     """
     # Note: with_repository decorator does not have a "key" argument (yet?)
     compatibility = compat_check(
@@ -108,6 +126,8 @@ def with_repository(
             assert isinstance(exclusive, bool)
             lock = getattr(args, "lock", _lock)
 
+            v1_legacy = getattr(args, "v1_legacy", False) if allow_v1 else False
+
             repository = get_repository(
                 location,
                 create=create,
@@ -115,18 +135,25 @@ def with_repository(
                 lock_wait=self.lock_wait,
                 lock=lock,
                 args=args,
-                v1_or_v2=False,
+                v1_legacy=v1_legacy,
             )
 
             with repository:
-                if repository.version not in (3,):
+                acceptable_versions = (1,) if v1_legacy else (4,)
+                if repository.version not in acceptable_versions:
                     raise Error(
-                        f"This borg version only accepts version 3 repos for -r/--repo, "
-                        f"but not version {repository.version}. "
+                        f"This borg version only accepts version {' or '.join(str(v) for v in acceptable_versions)} "
+                        f"repos for -r/--repo, but not version {repository.version}. "
                         f"You can use 'borg transfer' to copy archives from old to new repos."
                     )
                 if manifest or cache:
-                    manifest_ = Manifest.load(repository, compatibility, other=False)
+                    if repository.version > 1:
+                        ro_cls = RepoObj
+                    else:
+                        from ..legacy.repoobj import RepoObj1
+
+                        ro_cls = RepoObj1
+                    manifest_ = Manifest.load(repository, compatibility, other=False, ro_cls=ro_cls)
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor
@@ -173,7 +200,7 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
             if not location.valid:  # nothing to do
                 return method(self, args, **kwargs)
 
-            v1_or_v2 = getattr(args, "v1_or_v2", False)
+            v1_legacy = getattr(args, "v1_legacy", False)
 
             repository = get_repository(
                 location,
@@ -182,21 +209,25 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 lock_wait=self.lock_wait,
                 lock=True,
                 args=args,
-                v1_or_v2=v1_or_v2,
+                v1_legacy=v1_legacy,
             )
 
             with repository:
-                acceptable_versions = (1, 2) if v1_or_v2 else (3,)
+                acceptable_versions = (1,) if v1_legacy else (4,)
                 if repository.version not in acceptable_versions:
                     raise Error(
-                        f"This borg version only accepts version {' or '.join(acceptable_versions)} "
+                        f"This borg version only accepts version {' or '.join(str(v) for v in acceptable_versions)} "
                         f"repos for --other-repo."
                     )
                 kwargs["other_repository"] = repository
                 if manifest or cache:
-                    manifest_ = Manifest.load(
-                        repository, compatibility, other=True, ro_cls=RepoObj if repository.version > 1 else RepoObj1
-                    )
+                    if repository.version > 1:
+                        ro_cls = RepoObj
+                    else:
+                        from ..legacy.repoobj import RepoObj1
+
+                        ro_cls = RepoObj1
+                    manifest_ = Manifest.load(repository, compatibility, other=True, ro_cls=ro_cls)
                     assert_secure(repository, manifest_)
                     if manifest:
                         kwargs["other_manifest"] = manifest_
@@ -251,6 +282,7 @@ rst_plain_text_references = {
     "borg_placeholders": '"borg help placeholders"',
     "key_files": "Internals -> Data structures and file formats -> Key files",
     "borg_key_export": "borg key export --help",
+    "internals_hashindex": "Internals -> Data structures and file formats -> HashIndex",
 }
 
 
@@ -529,7 +561,7 @@ def define_common_options(add_common_option):
         type=int,
         action=Highlander,
         help="set network upload rate limit in kiByte/s (default: 0=unlimited)",
-    )
+    )  # legacy
     add_common_option(
         "--upload-buffer",
         metavar="UPLOAD_BUFFER",
@@ -537,7 +569,7 @@ def define_common_options(add_common_option):
         type=int,
         action=Highlander,
         help="set network upload buffer size in MiB. (default: 0=no buffer)",
-    )
+    )  # legacy
     add_common_option(
         "--debug-profile",
         metavar="FILE",
@@ -553,16 +585,6 @@ def define_common_options(add_common_option):
         dest="rsh",
         action=Highlander,
         help="Use this command to connect to the 'borg serve' process (default: 'ssh')",
-    )
-    add_common_option(
-        "--socket",
-        metavar="PATH",
-        dest="use_socket",
-        default=False,
-        const=True,
-        nargs="?",
-        action=Highlander,
-        help="Use UNIX DOMAIN (IPC) socket at PATH for client/server communication with socket: protocol.",
     )
     add_common_option(
         "-r",

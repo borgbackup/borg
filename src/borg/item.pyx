@@ -424,7 +424,8 @@ cdef class EncryptedKey(PropDict):
     """
 
     VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
-                  'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type'}
+                  'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type',
+                  'label'}
 
     version = PropDictProperty(int)
     algorithm = PropDictProperty(str)
@@ -436,6 +437,7 @@ cdef class EncryptedKey(PropDict):
     argon2_memory_cost = PropDictProperty(int)
     argon2_parallelism = PropDictProperty(int)
     argon2_type = PropDictProperty(str)
+    label = PropDictProperty(str)  # optional human-readable borg key label, e.g. "admin"
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -443,7 +445,7 @@ cdef class EncryptedKey(PropDict):
             k = fix_key(d, k)
             if k == 'version':
                 assert isinstance(v, int)
-            if k in ('algorithm', 'argon2_type'):
+            if k in ('algorithm', 'argon2_type', 'label'):
                 v = fix_str_value(d, k)
             if k in ('salt', 'hash', 'data'):
                 v = fix_bytes_value(d, k)

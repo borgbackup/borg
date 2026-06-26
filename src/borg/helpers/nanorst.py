@@ -65,10 +65,7 @@ def rst_to_text(text, state_hook=None, references=None):
 
     inline_single = ("*", "`")
 
-    while True:
-        char = text.read(1)
-        if not char:
-            break
+    while char := text.read(1):
         next = text.peek(1)  # type: str
 
         if state == "text":
@@ -158,6 +155,12 @@ def rst_to_text(text, state_hook=None, references=None):
             state_hook(state, "text", out)
             state = "text"
         out.write(char)
+
+    if state == "code-block":
+        # without this, we would need 2 empty lines after a code block,
+        # even if it is at the end of the string anyway.
+        state_hook(state, "text", out)
+        state = "text"
 
     assert state == "text", "Invalid final state %r (This usually indicates unmatched */**)" % state
     return out.getvalue()

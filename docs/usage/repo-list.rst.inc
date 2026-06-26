@@ -17,6 +17,8 @@ borg repo-list
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--short``                                  | only print the archive IDs, nothing else                                                                                                                                        |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--from-borg1``                             | repository is Borg 1.x                                                                                                                                                          |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--format FORMAT``                          | specify format for archive listing (default: "{archive:<36} {time} [{id}]{NL}")                                                                                                 |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--json``                                   | Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. |
@@ -60,6 +62,7 @@ borg repo-list
 
     options
         --short     only print the archive IDs, nothing else
+        --from-borg1    repository is Borg 1.x
         --format FORMAT    specify format for archive listing (default: "{archive:<36} {time} [{id}]{NL}")
         --json      Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
 
@@ -90,7 +93,7 @@ The FORMAT specifier syntax
 +++++++++++++++++++++++++++
 
 The ``--format`` option uses Python's `format string syntax
-<https://docs.python.org/3.10/library/string.html#formatstrings>`_.
+<https://docs.python.org/3.11/library/string.html#formatstrings>`_.
 
 Examples:
 ::

@@ -190,13 +190,15 @@ def _get_birthtime_ns(path, follow_symlinks=False):
     cdef int result
     if isinstance(path, int):
         result = c_fstat(path, &stat_info)
+        if result != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno), "<FD %d>" % path)
     else:
         if follow_symlinks:
             result = c_stat(path, &stat_info)
         else:
             result = c_lstat(path, &stat_info)
-    if result != 0:
-        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+        if result != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     return stat_info.st_birthtimespec.tv_sec * 1_000_000_000 + stat_info.st_birthtimespec.tv_nsec
 
 
@@ -271,9 +273,9 @@ import fcntl as fcntl_mod
 def fdatasync(fd):
     """macOS fdatasync using F_FULLFSYNC for true data durability.
 
-    On macOS, os.fsync() only flushes to the drive's write cache.
-    fcntl F_FULLFSYNC flushes to persistent storage.
-    Falls back to os.fsync() if F_FULLFSYNC is not supported.
+    os.fsync() is an OS-level flush (kernel page cache -> drive write buffer).
+    F_FULLFSYNC additionally issues a HW-level flush (drive write buffer -> persistent storage).
+    Falls back to os.fsync() if F_FULLFSYNC is not supported (e.g. network fs).
     """
     try:
         fcntl_mod.fcntl(fd, fcntl_mod.F_FULLFSYNC)

@@ -33,7 +33,7 @@ General:
         When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
         This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
         be checked.
-        Main use case for this is to fully automate ``borg change-passphrase``.
+        Main use case for this is to fully automate ``borg key change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_DEBUG_PASSPHRASE
@@ -71,9 +71,6 @@ General:
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
-    BORG_USE_CHUNKS_ARCHIVE
-        When set to no (default: yes), the ``chunks.archive.d`` folder will not be used. This reduces
-        disk space usage but slows down cache resyncs.
     BORG_SHOW_SYSINFO
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.

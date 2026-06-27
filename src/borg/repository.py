@@ -106,7 +106,7 @@ def build_rest_backend(location):
 class PackWriter:
     """Buffers chunks into a pack file and writes to the store when full.
 
-    Collects (chunk_id, cdata) pairs in a list and flushes once max_count is
+    Collects (chunk_id, cdata) pairs in a list and flushes once a limit is
     reached.  PackWriter maintains the ChunkIndex directly: each add() marks the
     chunk as pending (pack_id=UNKNOWN_BYTES32); flush() then assigns the real
     pack_id, offset and size to every pending entry once the pack is on disk.
@@ -116,18 +116,22 @@ class PackWriter:
     uses that repository's single, authoritative index (see the chunks property), so
     there is never a second copy to keep in sync.  Unit tests pass an explicit index.
 
-    max_count bounds how many chunks a pack accumulates before flush() writes it.
-    Raising it produces larger packs without changing this class's interface.
+    max_count bounds how many chunks a pack accumulates; max_size (if set) bounds its
+    byte size.  flush() fires when either limit is reached.  max_size=None disables the
+    size check, leaving count the only trigger.  Both can be tuned without changing this
+    class's interface.
     """
 
-    def __init__(self, store, *, max_count=1, chunks=None, repository=None):
+    def __init__(self, store, *, max_count=3, max_size=None, chunks=None, repository=None):
         if repository is None and chunks is None:
             raise ValueError("PackWriter requires either a repository or an explicit chunks index")
         self.store = store
         self.max_count = max_count
+        self.max_size = max_size  # None = no size limit; flush is then count-only
         self.repository = repository  # when set, the one and only index lives there
         self._chunks = chunks  # explicit index for repository-less use (tests)
         self._pieces = []  # list of (chunk_id, cdata)
+        self._size = 0  # running byte size of buffered pieces (== len of the pack-to-be)
 
     @property
     def chunks(self):
@@ -152,7 +156,10 @@ class PackWriter:
         self.chunks.add(chunk_id, 0)  # size filled in by cache layer
         self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, 0, len(cdata))])
         self._pieces.append((chunk_id, cdata))
-        if len(self._pieces) >= self.max_count:
+        self._size += len(cdata)
+        # Flush when EITHER limit is hit: too many objects, or the pack is big enough.
+        # max_size is OR-ed with max_count; None disables the size check.
+        if len(self._pieces) >= self.max_count or (self.max_size is not None and self._size >= self.max_size):
             return self.flush()
         return None
 
@@ -201,6 +208,7 @@ class PackWriter:
             raise
         finally:
             self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
+            self._size = 0  # next pack starts empty
         self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
         return results
 
@@ -507,7 +515,7 @@ class Repository:
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._chunks = None
-        self._pack_writer = PackWriter(self.store, max_count=2, repository=self)
+        self._pack_writer = PackWriter(self.store, repository=self)
         self.opened = True
 
     @property

@@ -248,6 +248,7 @@ def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA", chunk_id=H(x)))  # unique bytes -> unique pack id
+        repository.flush()  # flush the last partial pack so all 100 objects are listable
         repo_list = repository.list()
         assert len(repo_list) == 100
         first_half = repository.list(limit=50)
@@ -343,6 +344,24 @@ def test_pack_writer_n2_flush():
     expected_pack_id = sha256(pack_data).digest()
     assert results[0] == (id1, expected_pack_id, 0, len(data1))
     assert results[1] == (id2, expected_pack_id, len(data1), len(data2))
+
+
+def test_pack_writer_flushes_on_max_size():
+    # max_count kept high so ONLY the size limit can trigger the flush.
+    store = MockStore()
+    pw = PackWriter(store, max_count=100, max_size=10, chunks=ChunkIndex())
+    assert pw.add(b"a" * 32, b"12345") is None  # _size = 5 < 10, no flush yet
+    results = pw.add(b"b" * 32, b"67890")  # _size = 10 >= 10 -> flush
+    assert results is not None
+    assert len(results) == 2
+
+
+def test_pack_writer_max_size_none_is_count_only():
+    # max_size=None must disable the size check entirely (count is the only trigger).
+    store = MockStore()
+    pw = PackWriter(store, max_count=2, max_size=None, chunks=ChunkIndex())
+    assert pw.add(b"a" * 32, b"x" * 10_000) is None  # huge, but the size check is off
+    assert pw.add(b"b" * 32, b"y" * 10_000) is not None  # flush on count == 2
 
 
 def test_pack_writer_rolls_back_index_on_failed_store():

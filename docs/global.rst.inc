@@ -19,6 +19,7 @@
 .. _OpenSSL: https://www.openssl.org/
 .. _`Python 3`: https://www.python.org/
 .. _Buzhash: https://en.wikipedia.org/wiki/Buzhash
+.. _FastCDC: https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia
 .. _msgpack: https://msgpack.org/
 .. _`msgpack-python`: https://pypi.org/project/msgpack-python/
 .. _llfuse: https://pypi.org/project/llfuse/

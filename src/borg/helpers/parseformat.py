@@ -324,6 +324,24 @@ def ChunkerParams(s):
             )
         # note that for buzhash64, there is no problem with even window_size.
         return CH_BUZHASH64, chunk_min, chunk_max, chunk_mask, window_size, nc_level
+    if algo == CH_FASTCDC and count == 5:
+        # fastcdc, chunk_min, chunk_max, chunk_mask, nc_level
+        # fastcdc uses a window-less Gear hash, so there is no window_size field.
+        # nc_level is required; use nc_level 0 to disable normalized chunking.
+        chunk_min, chunk_max, chunk_mask = (int(p) for p in params[1:4])
+        nc_level = int(params[4])
+        if not (chunk_min <= chunk_mask <= chunk_max):
+            raise ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+        if chunk_min < 6:
+            # see comment in 'fixed' algo check
+            raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
+        if chunk_max > 23:
+            raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
+            raise ArgumentTypeError(
+                "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
+            )
+        return CH_FASTCDC, chunk_min, chunk_max, chunk_mask, nc_level
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4 :])

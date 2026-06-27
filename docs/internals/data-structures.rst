@@ -403,6 +403,8 @@ Borg has these chunkers:
 - "buzhash": variable, content-defined blocksize, uses a rolling hash
   computed by the Buzhash_ algorithm.
 - "buzhash64": similar to "buzhash", but improved 64bit implementation
+- "fastcdc": variable, content-defined blocksize, uses the window-less, keyed
+  Gear rolling hash (FastCDC_); faster than buzhash, same deduplication.
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -482,6 +484,22 @@ The buzhash table is cryptographically derived from secret key material.
 
 These changes should improve resistance against attacks and also solve
 some of the issues of the original (32bit / XORed table) implementation.
+
+"fastcdc" chunker
++++++++++++++++++
+
+FastCDC_ content-defined chunker using the Gear rolling hash. Unlike buzhash it
+is window-less (each byte's influence simply decays out of the hash), so its
+update is cheaper and it chunks noticeably faster, while producing the same
+deduplication and (with normalized chunking) the same chunk-size distribution.
+
+Like "buzhash64", the Gear table is cryptographically derived from secret key
+material, so chunk cut points are unpredictable without the key.
+
+``borg create --chunker-params fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+
+There is no window size (Gear is window-less). NC_LEVEL is the normalized
+chunking level (0 disables it); 2 is a good default. E.g.: ``fastcdc,19,23,21,2``.
 
 .. _cache:
 

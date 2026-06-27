@@ -56,6 +56,7 @@ crypto_ll_source = "src/borg/crypto/low_level.pyx"
 crypto_legacy_ll_source = "src/borg/legacy/crypto/low_level.pyx"
 buzhash_source = "src/borg/chunkers/buzhash.pyx"
 buzhash64_source = "src/borg/chunkers/buzhash64.pyx"
+fastcdc_source = "src/borg/chunkers/fastcdc.pyx"
 reader_source = "src/borg/chunkers/reader.pyx"
 hashindex_source = "src/borg/hashindex.pyx"
 item_source = "src/borg/item.pyx"
@@ -73,6 +74,7 @@ cython_sources = [
     crypto_legacy_ll_source,
     buzhash_source,
     buzhash64_source,
+    fastcdc_source,
     reader_source,
     hashindex_source,
     item_source,
@@ -189,6 +191,7 @@ if not on_rtd:
         Extension("borg.item", [item_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash", [buzhash_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash64", [buzhash64_source], extra_compile_args=cflags),
+        Extension("borg.chunkers.fastcdc", [fastcdc_source], extra_compile_args=cflags),
         Extension("borg.chunkers.reader", [reader_source], extra_compile_args=cflags),
     ]
 

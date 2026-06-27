@@ -129,7 +129,10 @@ def chunk_stats(algo, data, min_exp, max_exp, mask_bits, win, nc_level=0, normal
     params = [min_exp, max_exp, mask_bits, win]
     kw = dict(key=None, sparse=False)
     if algo == "buzhash64":
-        params.append(nc_level)  # nc_level is a positional buzhash64 param
+        params.append(nc_level)  # nc_level is a positional param
+        kw["normal_size"] = normal_size
+    elif algo == "fastcdc":
+        params = [min_exp, max_exp, mask_bits, nc_level]  # fastcdc is window-less
         kw["normal_size"] = normal_size
     chunker = get_chunker(algo, *params, **kw)
     sizes = []
@@ -285,11 +288,11 @@ def main():
     print(f"shift test: {args.shift_edits} edits   repeats: {args.repeat}")
     print("-" * 118)
 
-    # build (algo, nc_level) variants; for buzhash64 also run the requested NC level
+    # build (algo, nc_level) variants; for buzhash64/fastcdc also run the requested NC level
     variants = []
     for algo in args.algo:
         variants.append((algo, 0))
-        if algo == "buzhash64" and args.nc_level > 0:
+        if algo in ("buzhash64", "fastcdc") and args.nc_level > 0:
             variants.append((algo, args.nc_level))
 
     for algo, nc in variants:

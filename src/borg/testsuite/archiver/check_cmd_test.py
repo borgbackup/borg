@@ -10,7 +10,7 @@ from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
 from ...repository import Repository
-from ..repository_test import fchunk
+from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -374,7 +374,6 @@ def test_extra_chunks(archivers, request):
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
-@pytest.mark.skip(reason="TODO: test broken due to packs refactoring")
 @pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none"]])
 def test_verify_data(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)
@@ -390,9 +389,7 @@ def test_verify_data(archivers, request, init_args):
         for item in archive.iter_items():
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
-                data = repository.get(chunk.id)
-                data = corrupt(data, 123)
-                repository.put(chunk.id, data)
+                corrupt_chunk_on_disk(repository, chunk.id)
                 break
 
     # the normal archives check does not read file content data.

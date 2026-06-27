@@ -798,48 +798,47 @@ class Repository:
         # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
-    def delete(self, id):
-        """Delete a single repo object by rewriting its pack without it.
+    def delete(self, id, *, update_index=True):
+        """Delete a single repo object by rewriting its pack without it (via compact_pack).
 
-        A pack holds several objects, so we can not just drop the whole pack: that would take the
-        target's innocent neighbours with it. Route through compact_pack, which copies the survivors
-        into a new pack and repoints them in the chunk index. Rewriting a whole pack to remove one
-        object is slow, but delete is only used by special-purpose callers (tests, the debug command,
-        check --repair), never on a hot path, so the cost does not matter.
+        With update_index=True the full chunk index is written back so the next borg process sees the
+        deletion; callers that rebuild the index themselves (check --repair) pass update_index=False to
+        skip the per-object index rewrite.
         """
         self._lock_refresh()
-        from .cache import write_chunkindex_to_repo
-
         entry = self.chunks.get(id)
         if entry is None:
             raise self.ObjectNotFound(id, str(self._location))
         pack_id = entry.pack_id
-        # keep every other object in the same pack; compact_pack rewrites the pack without the target.
-        # work off the live index (each entry already carries its offset/size after flush): do not
-        # rebuild from the packs here, that could not tell the target apart from stale duplicate copies
-        # of the same id left in other packs by re-puts (build keeps an arbitrary one of them).
+        # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
-        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id})
-        # persist a full index so a following borg process sees the deletion; close() only writes new
-        # entries incrementally and would not record the removal.
-        write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
+        # complete=False: a pack may also hold superseded bytes (an older copy of a chunk later re-put
+        # elsewhere, no longer in the index), so keep_ids and drop_ids need not cover the whole pack.
+        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id}, complete=False)
+        if update_index:
+            # close() only persists new entries incrementally, so write the full index here to record
+            # the removal for the next borg process.
+            from .cache import write_chunkindex_to_repo
 
-    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set):
+            write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
+
+    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, complete: bool = True):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
-        keep_ids and drop_ids are sets of chunk ids that must together be every object of the pack, as
-        recorded in the chunk index. The caller guarantees that completeness (both callers build the two
-        sets by iterating the index for this pack_id); here we only assert their ranges tile contiguously
-        from offset 0 with no gap or overlap, and that their intersection is empty. Kept objects are
-        copied into a new pack via store.defrag and repointed in the chunk index; dropped objects' index
-        entries are removed.
+        keep_ids: chunk ids in this pack to copy into the new pack.
+        drop_ids: chunk ids in this pack to discard. Must not overlap keep_ids.
+        complete: if True, keep_ids and drop_ids must together be every object in the pack (asserted).
+            If False, they may name only some of the pack's objects.
 
-        Returns the new pack_id, None if nothing is kept (pack dropped), or <pack_id> unchanged if the
-        kept objects reproduce the old pack (same sha256 name, nothing to delete).
+        Kept objects are copied into a new pack via store.defrag and repointed in the chunk index;
+        dropped objects' chunk index entries are removed.
 
-        Updates the in-memory chunk index only. The caller holds the exclusive lock and owns index
-        durability: invalidate the cached index before calling, write it back after, as compact does.
+        Returns the new pack_id, or None if nothing is kept, or the unchanged pack_id if nothing
+        was dropped.
+
+        Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
+        index back to the store afterwards.
         """
         self._lock_refresh()
         pack_key = "packs/" + bin_to_hex(pack_id)
@@ -855,18 +854,23 @@ class Repository:
             located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
 
-        # keep + drop tile the pack contiguously from offset 0; collect the objects to keep in the same
-        # pass. we do not cross-check against the pack's on-disk size: the caller already guarantees the
-        # two sets are the pack's complete object set.
+        # walk objects in offset order, collecting the survivors.
         kept = []  # (obj_offset, obj_id, obj_size), offset-ordered
         covered = 0
         for offset, obj_id, size, keep in located:
-            assert offset == covered, f"gap or overlap in pack {bin_to_hex(pack_id)} at offset {covered}"
+            if complete:  # keep+drop are the whole pack: they must tile it with no gap or overlap
+                assert offset == covered, f"gap or overlap in pack {bin_to_hex(pack_id)} at offset {covered}"
             covered += size
             if keep:
                 kept.append((offset, obj_id, size))
 
-        for drop_id in drop_ids:  # remove dropped objects from the index; their bytes are not copied forward
+        if complete:  # the listed objects must reach the pack's end, no trailing object unaccounted for
+            pack_size = self.store.info(pack_key).size
+            assert (
+                covered == pack_size
+            ), f"pack {bin_to_hex(pack_id)}: {pack_size - covered} trailing bytes unaccounted for"
+
+        for drop_id in drop_ids:  # remove dropped objects from the index
             del self.chunks[drop_id]
 
         if not kept:  # nothing kept: drop the pack, no replacement

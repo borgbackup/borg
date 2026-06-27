@@ -64,6 +64,16 @@ def fchunk(data, meta=b"", chunk_id=b"\x00" * 32):
     return chunk
 
 
+def corrupt_chunk_on_disk(repository, chunk_id):
+    # Flip a byte of the chunk's data in its pack file on disk, chunk index untouched.
+    entry = repository.chunks[chunk_id]
+    key = "packs/" + bin_to_hex(entry.pack_id)
+    pack = repository.store_load(key)
+    pos = entry.obj_offset + entry.obj_size - 1  # last byte of the chunk
+    pack = pack[:pos] + bytes([pack[pos] ^ 0xFF]) + pack[pos + 1 :]
+    repository.store_store(key, pack)
+
+
 def pchunk(chunk):
     # Parse chunk: extract data and metadata from a raw chunk made by fchunk.
     hdr_size = RepoObj.obj_header.size
@@ -148,6 +158,22 @@ def test_consistency(repo_fixtures, request):
         repository.delete(H(0))
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(H(0))
+
+
+def test_delete_with_stale_earlier_object_in_pack(repo_fixtures, request):
+    # Re-putting H(0) leaves its old bytes ahead of H(1) in the first pack while its index entry moves
+    # to a new pack. delete(H(1)) then sees a partial pack view (H(1) at a non-zero offset) and must not
+    # trip compact_pack's contiguity assert.
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # H(0) and H(1) share the first pack
+        repository.put(H(0), fchunk(b"aaa"))
+        repository.put(H(1), fchunk(b"bbb"))  # fills the pack, flushing both objects
+        repository.put(H(0), fchunk(b"ccc"))  # re-put: H(0)'s index entry moves to a new pack
+        repository.flush()
+        repository.delete(H(1))
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(H(1))
+        assert pdchunk(repository.get(H(0))) == b"ccc"  # H(0) still served from its new pack
 
 
 def test_multi_object_pack_roundtrip(repo_fixtures, request):
@@ -241,6 +267,22 @@ def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
         assert new_pack_id == old_pack_id
         assert pdchunk(repository.get(H(0))) == b"DATA0"
         assert pdchunk(repository.get(H(1))) == b"DATA1"
+
+
+def test_compact_pack_complete_detects_short_coverage(repo_fixtures, request):
+    # complete=True must catch a pack whose listed objects do not reach its end: shrink the last
+    # object's recorded obj_size so the summed coverage falls short of the actual pack file size.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    with repository:
+        old_pack_id = repository.chunks[H(0)].pack_id
+        entry = repository.chunks[H(1)]
+        repository.chunks[H(1)] = entry._replace(obj_size=entry.obj_size - 1)  # leave 1 trailing byte unaccounted
+
+        with pytest.raises(AssertionError):
+            repository.compact_pack(old_pack_id, keep_ids={H(0), H(1)}, drop_ids=set())
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
 
 

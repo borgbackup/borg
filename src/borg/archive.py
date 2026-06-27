@@ -1854,9 +1854,9 @@ class ArchiveChecker:
                         self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
                     except IntegrityErrorBase:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
-                        # keeping the other chunks. persist=False: finish() rebuilds the index from the
-                        # rewritten packs anyway, so a per-chunk full index write would be wasted.
-                        self.repository.delete(defect_chunk, persist=False)
+                        # keeping the other chunks. update_index=False: finish() rebuilds the index from
+                        # the rewritten packs anyway, so a per-chunk full index write would be wasted.
+                        self.repository.delete(defect_chunk, update_index=False)
                         # drop it from our own index too, so rebuild_archives reports the file it belongs to.
                         del self.chunks[defect_chunk]
                     else:

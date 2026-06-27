@@ -389,14 +389,15 @@ def test_verify_data(archivers, request, init_args):
         for item in archive.iter_items():
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
-                data = corrupt(repository.get(chunk.id), 123)
-                # re-putting the same id would not repoint the index: close() persists new index
-                # entries incrementally, not updates to existing ones, so the next process would still
-                # read the old, good copy. delete first, then put the corrupted bytes as a fresh entry.
-                repository.delete(chunk.id)
-                repository.put(chunk.id, data)
+                # simulate bit rot: corrupt the chunk's bytes inside its pack file on disk, leaving
+                # the index untouched, so --verify-data has to read and MAC-check the data to find it.
+                entry = repository.chunks[chunk.id]
+                key = "packs/" + bin_to_hex(entry.pack_id)
+                pack = repository.store_load(key)
+                start, end = entry.obj_offset, entry.obj_offset + entry.obj_size
+                pack = pack[:start] + corrupt(pack[start:end], 123) + pack[end:]
+                repository.store_store(key, pack)
                 break
-        repository.flush()  # make the corrupted put durable before close()
 
     # the normal archives check does not read file content data.
     cmd(archiver, "check", "--archives-only", exit_code=0)

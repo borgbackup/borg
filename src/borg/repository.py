@@ -798,25 +798,23 @@ class Repository:
         # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
-    def delete(self, id, *, persist=True):
-        """Delete a single repo object by rewriting its pack without it.
+    def delete(self, id, *, update_index=True):
+        """Delete a single repo object by rewriting its pack without it (via compact_pack).
 
-        A pack holds several objects, so we rewrite it via compact_pack(complete=False) rather than
-        dropping the whole pack. With persist=True the full chunk index is written back so the next
-        borg process sees the deletion; bulk callers that rebuild the index themselves (check --repair)
-        pass persist=False to avoid a full index rewrite per deleted object.
+        With update_index=True the full chunk index is written back so the next borg process sees the
+        deletion; callers that rebuild the index themselves (check --repair) pass update_index=False to
+        skip the per-object index rewrite.
         """
         self._lock_refresh()
         entry = self.chunks.get(id)
         if entry is None:
             raise self.ObjectNotFound(id, str(self._location))
         pack_id = entry.pack_id
-        # build keep_ids from the live index (offsets are filled in after flush), not from the packs:
-        # a rebuild could not tell the target from stale duplicates that re-puts left in other packs.
+        # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
         self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id}, complete=False)
-        if persist:
+        if update_index:
             # close() only persists new entries incrementally, so write the full index here to record
             # the removal for the next borg process.
             from .cache import write_chunkindex_to_repo
@@ -826,18 +824,19 @@ class Repository:
     def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, complete: bool = True):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
-        keep_ids and drop_ids come from the caller iterating the chunk index for this pack_id; they
-        must not overlap. With complete=True (compact) they are the pack's whole object set, so their
-        ranges must tile it from offset 0 with no gap or overlap. With complete=False (delete) the index
-        view may be partial (a re-put can repoint an earlier object to another pack while its bytes stay
-        here), so we copy only the known survivors at their real offsets and allow gaps. Kept objects are
-        copied into a new pack via store.defrag and repointed; dropped objects' index entries are removed.
+        keep_ids: chunk ids in this pack to copy into the new pack.
+        drop_ids: chunk ids in this pack to discard. Must not overlap keep_ids.
+        complete: if True, keep_ids and drop_ids must together be every object in the pack (asserted).
+            If False, they may name only some of the pack's objects.
 
-        Returns the new pack_id, None if nothing is kept (pack dropped), or <pack_id> unchanged if the
-        kept objects reproduce the old pack (same sha256 name, nothing to delete).
+        Kept objects are copied into a new pack via store.defrag and repointed in the chunk index;
+        dropped objects' chunk index entries are removed.
 
-        Updates the in-memory chunk index only; the caller holds the exclusive lock and owns index
-        durability (invalidate before, write back after, as compact does).
+        Returns the new pack_id, or None if nothing is kept, or the unchanged pack_id if nothing
+        was dropped.
+
+        Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
+        index back to the store afterwards.
         """
         self._lock_refresh()
         pack_key = "packs/" + bin_to_hex(pack_id)
@@ -863,7 +862,7 @@ class Repository:
             if keep:
                 kept.append((offset, obj_id, size))
 
-        for drop_id in drop_ids:  # remove dropped objects from the index; their bytes are not copied forward
+        for drop_id in drop_ids:  # remove dropped objects from the index
             del self.chunks[drop_id]
 
         if not kept:  # nothing kept: drop the pack, no replacement

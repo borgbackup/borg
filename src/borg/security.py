@@ -11,6 +11,15 @@ from .logger import create_logger
 logger = create_logger()
 
 
+def _security_dir(repository, *, create=True):
+    """Security dir path for repository, using the borg 1.x layout for v1 repos."""
+    if repository.version == 1:
+        from .legacy.fs import get_security_dir as get_security_dir_legacy
+
+        return get_security_dir_legacy(repository.id_str, create=create)
+    return get_security_dir(repository.id_str, create=create)
+
+
 class CacheInitAbortedError(Error):
     """Cache initialization aborted"""
 
@@ -63,7 +72,7 @@ class SecurityManager:
 
     def __init__(self, repository):
         self.repository = repository
-        self.dir = Path(get_security_dir(repository.id_str, legacy=(repository.version == 1)))
+        self.dir = Path(_security_dir(repository))
         self.key_type_file = self.dir / "key-type"
         self.location_file = self.dir / "location"
         self.manifest_ts_file = self.dir / "manifest-timestamp"
@@ -71,7 +80,7 @@ class SecurityManager:
     @staticmethod
     def destroy(repository, path=None):
         """Destroys the security directory for ``repository`` or at ``path``."""
-        path = path or get_security_dir(repository.id_str, legacy=(repository.version == 1))
+        path = path or _security_dir(repository)
         if Path(path).exists():
             shutil.rmtree(path)
 

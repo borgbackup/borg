@@ -22,7 +22,7 @@ from ...helpers.fs import (
     make_path_safe,
     map_chars,
 )
-from ...platform import is_win32, is_darwin, is_haiku, is_cygwin
+from ...platform import is_win32, is_darwin
 from .. import are_hardlinks_supported
 from .. import rejected_dotdot_paths
 
@@ -30,33 +30,9 @@ from .. import rejected_dotdot_paths
 def test_get_base_dir(monkeypatch):
     """test that get_base_dir respects environment"""
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
-    monkeypatch.delenv("HOME", raising=False)
-    monkeypatch.delenv("USER", raising=False)
-    assert get_base_dir(legacy=True) == os.path.expanduser("~")
-    # Haiku OS is a single-user OS, expanding "~root" is not supported.
-    if not (is_haiku or is_cygwin):
-        monkeypatch.setenv("USER", "root")
-        assert get_base_dir(legacy=True) == os.path.expanduser("~root")
-    monkeypatch.setenv("HOME", "/var/tmp/home")
-    assert get_base_dir(legacy=True) == "/var/tmp/home"
+    assert get_base_dir() is None
     monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
-    assert get_base_dir(legacy=True) == "/var/tmp/base"
-    # non-legacy is much easier:
-    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
-    assert get_base_dir(legacy=False) is None
-    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
-    assert get_base_dir(legacy=False) == "/var/tmp/base"
-
-
-def test_get_base_dir_compat(monkeypatch):
-    """test that it works the same for legacy and for non-legacy implementation"""
-    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
-    # old way: if BORG_BASE_DIR is not set, make something up with HOME/USER/~
-    # new way: if BORG_BASE_DIR is not set, return None and let caller deal with it.
-    assert get_base_dir(legacy=False) is None
-    # new and old way: BORG_BASE_DIR overrides all other "base path determination".
-    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
-    assert get_base_dir(legacy=False) == get_base_dir(legacy=True)
+    assert get_base_dir() == "/var/tmp/base"
 
 
 def test_get_config_dir(monkeypatch):
@@ -86,25 +62,6 @@ def test_get_config_dir(monkeypatch):
         assert get_config_dir(create=False) == "/var/tmp"
 
 
-def test_get_config_dir_compat(monkeypatch):
-    """test that it works the same for legacy and for non-legacy implementation"""
-    monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
-    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
-    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-    if not is_darwin and not is_win32:
-        # fails on macOS: assert '/Users/tw/Library/Application Support/borg' == '/Users/tw/.config/borg'
-        # fails on win32 MSYS2 (but we do not need legacy compat there).
-        assert get_config_dir(legacy=False, create=False) == get_config_dir(legacy=True, create=False)
-    if not is_win32:
-        monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/xdg.config.d")
-        # fails on win32 MSYS2 (but we do not need legacy compat there).
-        assert get_config_dir(legacy=False, create=False) == get_config_dir(legacy=True, create=False)
-    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
-    assert get_config_dir(legacy=False, create=False) == get_config_dir(legacy=True, create=False)
-    monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp/borg.config.d")
-    assert get_config_dir(legacy=False, create=False) == get_config_dir(legacy=True, create=False)
-
-
 def test_get_cache_dir(monkeypatch):
     """test that get_cache_dir respects environment"""
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
@@ -130,25 +87,6 @@ def test_get_cache_dir(monkeypatch):
         assert get_cache_dir(create=False) == os.path.join("/var/tmp/.cache", "borg")
         monkeypatch.setenv("BORG_CACHE_DIR", "/var/tmp")
         assert get_cache_dir(create=False) == "/var/tmp"
-
-
-def test_get_cache_dir_compat(monkeypatch):
-    """test that it works the same for legacy and for non-legacy implementation"""
-    monkeypatch.delenv("BORG_CACHE_DIR", raising=False)
-    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
-    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
-    if not is_darwin and not is_win32:
-        # fails on macOS: assert '/Users/tw/Library/Caches/borg' == '/Users/tw/.cache/borg'
-        # fails on win32 MSYS2 (but we do not need legacy compat there).
-        assert get_cache_dir(legacy=False, create=False) == get_cache_dir(legacy=True, create=False)
-    if not is_win32:
-        # fails on win32 MSYS2 (but we do not need legacy compat there).
-        monkeypatch.setenv("XDG_CACHE_HOME", "/var/tmp/xdg.cache.d")
-        assert get_cache_dir(legacy=False, create=False) == get_cache_dir(legacy=True, create=False)
-    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
-    assert get_cache_dir(legacy=False, create=False) == get_cache_dir(legacy=True, create=False)
-    monkeypatch.setenv("BORG_CACHE_DIR", "/var/tmp/borg.cache.d")
-    assert get_cache_dir(legacy=False, create=False) == get_cache_dir(legacy=True, create=False)
 
 
 def test_get_keys_dir(monkeypatch):

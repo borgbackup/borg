@@ -1,10 +1,12 @@
-import logging
 import json
+import logging
 import sys
 import time
+import typing
 from shutil import get_terminal_size
 
 from ..logger import create_logger
+
 logger = create_logger()
 
 from .parseformat import ellipsis_truncate
@@ -75,7 +77,7 @@ class ProgressIndicatorBase:
             self.logger.removeHandler(self.handler)
             self.handler.close()
 
-    def output_json(self, *, finished=False, **kwargs):
+    def output_json(self, *, finished=False, override_time: typing.Optional[float] = None, **kwargs):
         assert self.json
         if not self.emit:
             return
@@ -84,7 +86,7 @@ class ProgressIndicatorBase:
             msgid=self.msgid,
             type=self.JSON_TYPE,
             finished=finished,
-            time=time.time(),
+            time=override_time if override_time is not None else time.time(),
         ))
         print(json.dumps(kwargs), file=sys.stderr, flush=True)
 

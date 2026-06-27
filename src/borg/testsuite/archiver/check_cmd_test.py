@@ -10,7 +10,7 @@ from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
 from ...repository import Repository
-from ..repository_test import fchunk
+from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -389,14 +389,7 @@ def test_verify_data(archivers, request, init_args):
         for item in archive.iter_items():
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
-                # simulate bit rot: corrupt the chunk's bytes inside its pack file on disk, leaving
-                # the index untouched, so --verify-data has to read and MAC-check the data to find it.
-                entry = repository.chunks[chunk.id]
-                key = "packs/" + bin_to_hex(entry.pack_id)
-                pack = repository.store_load(key)
-                start, end = entry.obj_offset, entry.obj_offset + entry.obj_size
-                pack = pack[:start] + corrupt(pack[start:end], 123) + pack[end:]
-                repository.store_store(key, pack)
+                corrupt_chunk_on_disk(repository, chunk.id)
                 break
 
     # the normal archives check does not read file content data.

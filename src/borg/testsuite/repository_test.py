@@ -64,6 +64,16 @@ def fchunk(data, meta=b"", chunk_id=b"\x00" * 32):
     return chunk
 
 
+def corrupt_chunk_on_disk(repository, chunk_id):
+    # Flip a byte of the chunk's data in its pack file on disk, chunk index untouched.
+    entry = repository.chunks[chunk_id]
+    key = "packs/" + bin_to_hex(entry.pack_id)
+    pack = repository.store_load(key)
+    pos = entry.obj_offset + entry.obj_size - 1  # last byte of the chunk
+    pack = pack[:pos] + bytes([pack[pos] ^ 0xFF]) + pack[pos + 1 :]
+    repository.store_store(key, pack)
+
+
 def pchunk(chunk):
     # Parse chunk: extract data and metadata from a raw chunk made by fchunk.
     hdr_size = RepoObj.obj_header.size

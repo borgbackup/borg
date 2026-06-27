@@ -813,6 +813,8 @@ class Repository:
         # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
+        # complete=False: a pack may also hold superseded bytes (an older copy of a chunk later re-put
+        # elsewhere, no longer in the index), so keep_ids and drop_ids need not cover the whole pack.
         self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id}, complete=False)
         if update_index:
             # close() only persists new entries incrementally, so write the full index here to record

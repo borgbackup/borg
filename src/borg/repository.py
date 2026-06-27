@@ -104,51 +104,45 @@ def build_rest_backend(location):
 
 
 class PackWriter:
-    """Buffers chunks into a pack file and writes to the store when full.
+    """Buffers chunks into a pack file and writes it to the store when full.
 
-    Collects (chunk_id, cdata) pairs in a list and flushes once a limit is
-    reached.  PackWriter maintains the ChunkIndex directly: each add() marks the
-    chunk as pending (pack_id=UNKNOWN_BYTES32); flush() then assigns the real
-    pack_id, offset and size to every pending entry once the pack is on disk.
+    add() buffers a (chunk_id, cdata) pair and marks the chunk pending in the
+    ChunkIndex (pack_id=UNKNOWN_BYTES32); flush() writes the pack and sets each
+    entry's real pack_id and obj_offset.
 
-    The index is not owned here.  Construction requires either a repository or an
-    explicit chunks index; there is no silent default.  With a repository, the writer
-    uses that repository's single, authoritative index (see the chunks property), so
-    there is never a second copy to keep in sync.  Unit tests pass an explicit index.
+    The ChunkIndex comes from the repository, or from an explicit chunks index when
+    there is no repository (see the chunks property).
 
     max_count bounds how many chunks a pack holds; max_size bounds its byte size.
-    flush() fires when either limit is reached.  Each limit is disabled by setting it
-    to None; at least one must be set.
+    flush() fires when either limit is reached.  Set a limit to None to disable it;
+    at least one must be set, otherwise the pack buffer is unbounded.
     """
 
     def __init__(self, store, *, max_count=3, max_size=None, chunks=None, repository=None):
         if repository is None and chunks is None:
             raise ValueError("PackWriter requires either a repository or an explicit chunks index")
         if max_count is None and max_size is None:
-            raise ValueError("PackWriter requires at least one of max_count or max_size")
+            raise ValueError("PackWriter needs max_count or max_size, otherwise the pack buffer is unbounded")
         self.store = store
         self.max_count = max_count  # None = no count limit
         self.max_size = max_size  # None = no size limit
-        self.repository = repository  # when set, the one and only index lives there
-        self._chunks = chunks  # explicit index for repository-less use (tests)
+        self.repository = repository
+        self._chunks = chunks  # used when there is no repository
         self._pieces = []  # list of (chunk_id, cdata)
         self._size = 0  # byte size of buffered pieces
 
     @property
     def chunks(self):
-        """The ChunkIndex this writer updates.
-
-        With a repository, this is the repository's single index (shared, not copied).
-        Without one, it is the explicit index passed at construction.
-        """
+        """The ChunkIndex this writer updates: the repository's index, or the
+        explicit index passed at construction when there is no repository."""
         if self.repository is not None:
             return self.repository.chunks
         return self._chunks
 
     def add(self, chunk_id, cdata):
         """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
-        # Mark the chunk as pending; flush() fills in the pack_id, offset and size.
-        self.chunks.add(chunk_id, 0)
+        self.chunks.add(chunk_id, 0)  # size: plaintext chunk size, set by the cache layer
+        # obj_size is final; pack_id and obj_offset get their real values in flush().
         self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, 0, len(cdata))])
         self._pieces.append((chunk_id, cdata))
         self._size += len(cdata)
@@ -163,7 +157,7 @@ class PackWriter:
 
         Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples --
         one entry per chunk that was written.  Returns None if there was nothing
-        to flush.  Always updates the ChunkIndex with the real pack_id.
+        to flush.  Always updates the ChunkIndex with the real pack_id and obj_offset.
         """
         if not self._pieces:
             return None
@@ -190,19 +184,15 @@ class PackWriter:
         try:
             self.store.store(key, pack_data)
         except Exception:
-            # The pack was not durably stored, so every entry add() pre-marked for it now
-            # points at data that does not exist.  Leaving them would make seen_chunk() report
-            # these ids as present, letting a later identical chunk dedup against bytes that were
-            # never written -- silent data loss.  These entries were created this session and never
-            # received a real pack_id, so dropping them restores the index to its pre-add() state
-            # (matching master, where the index only ever reflected successfully stored chunks).
+            # The pack is not stored, so drop the pending entries: keeping them would let
+            # seen_chunk() dedup later chunks against bytes that were never written.
             for chunk_id in pending_ids:
                 entry = self.chunks.get(chunk_id)
                 if entry is not None and entry.pack_id == UNKNOWN_BYTES32:
                     del self.chunks[chunk_id]
             raise
         finally:
-            self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
+            self._pieces = []  # cleared on success and on failure
             self._size = 0
         self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
         return results

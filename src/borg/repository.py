@@ -864,6 +864,12 @@ class Repository:
             if keep:
                 kept.append((offset, obj_id, size))
 
+        if complete:  # the listed objects must reach the pack's end, no trailing object unaccounted for
+            pack_size = self.store.info(pack_key).size
+            assert (
+                covered == pack_size
+            ), f"pack {bin_to_hex(pack_id)}: {pack_size - covered} trailing bytes unaccounted for"
+
         for drop_id in drop_ids:  # remove dropped objects from the index
             del self.chunks[drop_id]
 

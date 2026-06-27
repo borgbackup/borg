@@ -708,7 +708,7 @@ class CompletionMixIn:
         comp_spec_choices_str = " ".join(comp_spec_choices)
 
         # Chunker params choices (static list)
-        chunker_params_choices = ["default", "fixed,4194304", "buzhash,19,23,21,4095", "buzhash64,19,23,21,4095"]
+        chunker_params_choices = ["default", "fixed,4194304", "buzhash,19,23,21,4095", "buzhash64,19,23,21,4095,2"]
         chunker_params_choices_str = " ".join(chunker_params_choices)
 
         # Relative time marker choices (static list)

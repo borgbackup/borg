@@ -250,7 +250,7 @@ def test_fingerprint(archivers, request):
     assert fingerprints1["input/file2"] != fingerprints4["input/file2"]
 
     # Also try with buzhash64
-    cmd(archiver, "create", "--chunker-params=buzhash64,10,23,16,4095", "test5", "input")
+    cmd(archiver, "create", "--chunker-params=buzhash64,10,23,16,4095,2", "test5", "input")
     output = cmd(archiver, "list", "test5", "--format={fingerprint} {path}{NL}")
     fingerprints5 = {}
     for line in output.splitlines():

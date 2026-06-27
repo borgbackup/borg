@@ -109,6 +109,9 @@ cdef class ChunkerBuzHash64:
     It also uses a per-repo random seed to avoid some chunk length fingerprinting attacks.
     """
     cdef uint64_t chunk_mask
+    cdef uint64_t mask_s, mask_l  # normalized chunking: strict / loose masks
+    cdef size_t normal_size       # chunk length at which we switch mask_s -> mask_l
+    cdef int nc_level             # normalized chunking level (0 = disabled)
     cdef uint64_t* table
     cdef uint8_t* data
     cdef object _fd  # Python object for file descriptor
@@ -121,7 +124,7 @@ cdef class ChunkerBuzHash64:
     cdef size_t reader_block_size
     cdef bint sparse
 
-    def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
+    def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, int nc_level=0, size_t normal_size=0, bint sparse=False):
         self.table = NULL
         self.data = NULL
         min_size = 1 << chunk_min_exp
@@ -131,8 +134,29 @@ cdef class ChunkerBuzHash64:
         assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
 
         self.window_size = hash_window_size
-        self.chunk_mask = (1 << hash_mask_bits) - 1
+        self.chunk_mask = (1ULL << hash_mask_bits) - 1
         self.min_size = min_size
+        # Normalized chunking (FastCDC-style): use a stricter mask (lower cut probability) until
+        # the chunk reaches its expected/normal size, then a looser mask (higher cut probability).
+        # This concentrates chunk sizes around the target and reduces chunk-size variance.
+        # nc_level == 0 disables it, keeping behavior byte-identical to the single-mask chunker.
+        assert nc_level >= 0
+        assert hash_mask_bits - nc_level >= 1, "nc_level too large for hash_mask_bits"
+        assert hash_mask_bits + nc_level <= 48, "nc_level too large for hash_mask_bits"
+        self.nc_level = nc_level
+        if nc_level:
+            self.mask_s = (1ULL << (hash_mask_bits + nc_level)) - 1
+            self.mask_l = (1ULL << (hash_mask_bits - nc_level)) - 1
+            # normal_size is the chunk length at which we switch from the strict to the loose
+            # mask; it dominates the mean chunk size. The default is the nominal target size
+            # (1ULL << hash_mask_bits) minus the expected loose-phase tail (1ULL << (bits - nc_level)),
+            # which lands the mean close to the target instead of overshooting it. Pass an
+            # explicit normal_size to tune it further.
+            self.normal_size = normal_size if normal_size else ((1ULL << hash_mask_bits) - (1ULL << (hash_mask_bits - nc_level)))
+        else:
+            self.mask_s = self.chunk_mask
+            self.mask_l = self.chunk_mask
+            self.normal_size = 0
         self.table = buzhash64_init_table(key)
         self.buf_size = max_size
         self.data = <uint8_t*>malloc(self.buf_size)
@@ -196,10 +220,14 @@ cdef class ChunkerBuzHash64:
 
     cdef object process(self) except *:
         """Process the chunker's buffer and return the next chunk."""
-        cdef uint64_t sum, chunk_mask = self.chunk_mask
+        cdef uint64_t sum, mask
+        cdef uint64_t mask_s = self.mask_s, mask_l = self.mask_l
+        cdef int nc_level = self.nc_level
         cdef size_t n, old_last, min_size = self.min_size, window_size = self.window_size
+        cdef size_t normal_size = self.normal_size, normal_pos
         cdef uint8_t* p
         cdef uint8_t* stop_at
+        cdef uint8_t* nc_stop
         cdef size_t did_bytes
 
         if self.done:
@@ -232,11 +260,32 @@ cdef class ChunkerBuzHash64:
         self.remaining -= min_size
         sum = _buzhash64(self.data + self.position, window_size, self.table)
 
-        while self.remaining > window_size and (sum & chunk_mask) and not (self.eof and self.remaining <= window_size):
+        # Normalized chunking: pick the mask based on how far we are into the current chunk.
+        # While below normal_size use the strict mask (lower cut probability), afterward the
+        # loose mask (higher cut probability). The mask is re-evaluated at the top of every
+        # iteration, so the transition is honored exactly at normal_pos. When nc is disabled,
+        # mask_s == mask_l == chunk_mask and the normal_pos cap is not applied, so this reduces
+        # to the original single-mask behavior.
+        mask = mask_s
+        normal_pos = 0
+        while True:
+            if nc_level:
+                normal_pos = self.last + normal_size
+                mask = mask_s if self.position < normal_pos else mask_l
+
+            if not (self.remaining > window_size and (sum & mask) and not (self.eof and self.remaining <= window_size)):
+                break
+
             p = self.data + self.position
             stop_at = p + self.remaining - window_size
 
-            while p < stop_at and (sum & chunk_mask):
+            if nc_level and self.position < normal_pos:
+                # do not scan past the strict->loose transition; re-evaluate the mask there
+                nc_stop = self.data + normal_pos
+                if nc_stop < stop_at:
+                    stop_at = nc_stop
+
+            while p < stop_at and (sum & mask):
                 sum = _buzhash64_update(sum, p[0], p[window_size], window_size, self.table)
                 p += 1
 

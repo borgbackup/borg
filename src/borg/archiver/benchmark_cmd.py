@@ -199,8 +199,8 @@ class BenchmarkMixIn:
             ),
             # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
             (
-                "buzhash64,19,23,21,4095",
-                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, sparse=False)",
+                "buzhash64,19,23,21,4095,2",
+                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, 2, sparse=False)",
                 "chunkit(ch)",
                 locals(),
             ),
@@ -211,7 +211,7 @@ class BenchmarkMixIn:
                 algo, _, algo_params = spec.partition(",")
                 result["chunkers"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
             else:
-                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
+                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
 
         from ..crypto.low_level import hmac_sha256, blake2b_256
         import blake3
@@ -232,7 +232,7 @@ class BenchmarkMixIn:
             if args.json:
                 result["hashes"].append({"algo": spec, "size": size, "time": dt})
             else:
-                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
+                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
 
         from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
         from ..crypto.low_level import AES256_OCB, CHACHA20_POLY1305
@@ -272,7 +272,7 @@ class BenchmarkMixIn:
             if args.json:
                 result["encryption"].append({"algo": spec, "size": size, "time": dt})
             else:
-                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
+                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
 
         if not args.json:
             print("Compression ====================================================")

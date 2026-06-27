@@ -347,21 +347,32 @@ def test_pack_writer_n2_flush():
 
 
 def test_pack_writer_flushes_on_max_size():
-    # max_count kept high so ONLY the size limit can trigger the flush.
+    # max_count is high, so the flush is driven by max_size alone.
     store = MockStore()
     pw = PackWriter(store, max_count=100, max_size=10, chunks=ChunkIndex())
-    assert pw.add(b"a" * 32, b"12345") is None  # _size = 5 < 10, no flush yet
-    results = pw.add(b"b" * 32, b"67890")  # _size = 10 >= 10 -> flush
+    assert pw.add(b"a" * 32, b"12345") is None
+    results = pw.add(b"b" * 32, b"67890")
     assert results is not None
     assert len(results) == 2
 
 
 def test_pack_writer_max_size_none_is_count_only():
-    # max_size=None must disable the size check entirely (count is the only trigger).
     store = MockStore()
     pw = PackWriter(store, max_count=2, max_size=None, chunks=ChunkIndex())
-    assert pw.add(b"a" * 32, b"x" * 10_000) is None  # huge, but the size check is off
-    assert pw.add(b"b" * 32, b"y" * 10_000) is not None  # flush on count == 2
+    assert pw.add(b"a" * 32, b"x" * 10_000) is None
+    assert pw.add(b"b" * 32, b"y" * 10_000) is not None
+
+
+def test_pack_writer_max_count_none_is_size_only():
+    store = MockStore()
+    pw = PackWriter(store, max_count=None, max_size=10, chunks=ChunkIndex())
+    assert pw.add(b"a" * 32, b"12345") is None
+    assert pw.add(b"b" * 32, b"67890") is not None
+
+
+def test_pack_writer_requires_a_limit():
+    with pytest.raises(ValueError):
+        PackWriter(MockStore(), max_count=None, max_size=None, chunks=ChunkIndex())
 
 
 def test_pack_writer_rolls_back_index_on_failed_store():

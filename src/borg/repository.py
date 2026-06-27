@@ -116,22 +116,23 @@ class PackWriter:
     uses that repository's single, authoritative index (see the chunks property), so
     there is never a second copy to keep in sync.  Unit tests pass an explicit index.
 
-    max_count bounds how many chunks a pack accumulates; max_size (if set) bounds its
-    byte size.  flush() fires when either limit is reached.  max_size=None disables the
-    size check, leaving count the only trigger.  Both can be tuned without changing this
-    class's interface.
+    max_count bounds how many chunks a pack holds; max_size bounds its byte size.
+    flush() fires when either limit is reached.  Each limit is disabled by setting it
+    to None; at least one must be set.
     """
 
     def __init__(self, store, *, max_count=3, max_size=None, chunks=None, repository=None):
         if repository is None and chunks is None:
             raise ValueError("PackWriter requires either a repository or an explicit chunks index")
+        if max_count is None and max_size is None:
+            raise ValueError("PackWriter requires at least one of max_count or max_size")
         self.store = store
-        self.max_count = max_count
-        self.max_size = max_size  # None = no size limit; flush is then count-only
+        self.max_count = max_count  # None = no count limit
+        self.max_size = max_size  # None = no size limit
         self.repository = repository  # when set, the one and only index lives there
         self._chunks = chunks  # explicit index for repository-less use (tests)
         self._pieces = []  # list of (chunk_id, cdata)
-        self._size = 0  # running byte size of buffered pieces (== len of the pack-to-be)
+        self._size = 0  # byte size of buffered pieces
 
     @property
     def chunks(self):
@@ -146,20 +147,14 @@ class PackWriter:
 
     def add(self, chunk_id, cdata):
         """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
-        # Mark the chunk as pending (pack_id=UNKNOWN_BYTES32).  flush() assigns the real
-        # pack_id and offset for every piece, so the placeholder offset 0 here is never read:
-        # get() refuses a pending entry (PackLocationUnknown) before any offset would matter.
-        # Precondition: callers add only chunks not already stored (the cache dedups via
-        # seen_chunk() first), so add(chunk_id, 0) never resets a real size on an existing entry.
-        # This is also what keeps ChunkIndex.add's "v.size == 0 or v.size == size" assertion happy:
-        # a fresh id has no entry, so the size=0 we pass here is never compared against a real size.
-        self.chunks.add(chunk_id, 0)  # size filled in by cache layer
+        # Mark the chunk as pending; flush() fills in the pack_id, offset and size.
+        self.chunks.add(chunk_id, 0)
         self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, 0, len(cdata))])
         self._pieces.append((chunk_id, cdata))
         self._size += len(cdata)
-        # Flush when EITHER limit is hit: too many objects, or the pack is big enough.
-        # max_size is OR-ed with max_count; None disables the size check.
-        if len(self._pieces) >= self.max_count or (self.max_size is not None and self._size >= self.max_size):
+        if (self.max_count is not None and len(self._pieces) >= self.max_count) or (
+            self.max_size is not None and self._size >= self.max_size
+        ):
             return self.flush()
         return None
 
@@ -208,7 +203,7 @@ class PackWriter:
             raise
         finally:
             self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
-            self._size = 0  # next pack starts empty
+            self._size = 0
         self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
         return results
 

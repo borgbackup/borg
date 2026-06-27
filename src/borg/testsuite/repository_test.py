@@ -150,6 +150,22 @@ def test_consistency(repo_fixtures, request):
             repository.get(H(0))
 
 
+def test_delete_with_stale_earlier_object_in_pack(repo_fixtures, request):
+    # Re-putting H(0) leaves its old bytes ahead of H(1) in the first pack while its index entry moves
+    # to a new pack. delete(H(1)) then sees a partial pack view (H(1) at a non-zero offset) and must not
+    # trip compact_pack's contiguity assert.
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # H(0) and H(1) share the first pack
+        repository.put(H(0), fchunk(b"aaa"))
+        repository.put(H(1), fchunk(b"bbb"))  # fills the pack, flushing both objects
+        repository.put(H(0), fchunk(b"ccc"))  # re-put: H(0)'s index entry moves to a new pack
+        repository.flush()
+        repository.delete(H(1))
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(H(1))
+        assert pdchunk(repository.get(H(0))) == b"ccc"  # H(0) still served from its new pack
+
+
 def test_multi_object_pack_roundtrip(repo_fixtures, request):
     # Two objects fill one pack and must both read back: the second from a non-zero offset, and
     # read_data=False returning only its header+meta. The test pins max_count=2 so it does not depend

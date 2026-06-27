@@ -374,7 +374,6 @@ def test_extra_chunks(archivers, request):
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
-@pytest.mark.skip(reason="TODO: test broken due to packs refactoring")
 @pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none"]])
 def test_verify_data(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)
@@ -390,10 +389,14 @@ def test_verify_data(archivers, request, init_args):
         for item in archive.iter_items():
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
-                data = repository.get(chunk.id)
-                data = corrupt(data, 123)
+                data = corrupt(repository.get(chunk.id), 123)
+                # re-putting the same id would not repoint the index: close() persists new index
+                # entries incrementally, not updates to existing ones, so the next process would still
+                # read the old, good copy. delete first, then put the corrupted bytes as a fresh entry.
+                repository.delete(chunk.id)
                 repository.put(chunk.id, data)
                 break
+        repository.flush()  # make the corrupted put durable before close()
 
     # the normal archives check does not read file content data.
     cmd(archiver, "check", "--archives-only", exit_code=0)

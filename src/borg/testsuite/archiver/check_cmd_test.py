@@ -285,7 +285,9 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get_manifest()
-        corrupted_manifest = corrupt(manifest, 250)
+        # flip a byte inside the encrypted manifest data so its integrity check fails and
+        # check --repair rebuilds the manifest.
+        corrupted_manifest = corrupt(manifest, len(manifest) // 3)
         repository.put_manifest(corrupted_manifest)
         chunk = repository.get(archive.id)
         # corrupt a byte in the middle of the object: the last byte can land on store-level

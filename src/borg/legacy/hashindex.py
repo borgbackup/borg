@@ -88,8 +88,10 @@ class NSIndex1(HTProxyMixin, MutableMapping):
         magic, entries, buckets, ksize, vsize = struct.unpack(self.HEADER_FMT, header_bytes)
         if magic != self.MAGIC:
             raise ValueError(f"Invalid file: magic {self.MAGIC.decode()} not found.")
-        assert ksize == self.KEY_SIZE, "invalid key size"
-        assert vsize == self.VALUE_SIZE, "invalid value size"
+        if ksize != self.KEY_SIZE:
+            raise ValueError("Invalid key size")
+        if vsize != self.VALUE_SIZE:
+            raise ValueError("Invalid value size")
         buckets_size = buckets * (ksize + vsize)
         current_pos = fd.tell()
         end_of_file = fd.seek(0, os.SEEK_END)
@@ -105,4 +107,5 @@ class NSIndex1(HTProxyMixin, MutableMapping):
                 continue
             self.ht._set_raw(key, value)
         pos = fd.tell()
-        assert pos == end_of_file
+        if pos != end_of_file:
+            raise ValueError(f"Expected pos ({pos}) to be at end_of_file ({end_of_file})")

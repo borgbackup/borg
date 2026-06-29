@@ -107,19 +107,8 @@ class ArchiveGarbageCollector:
         logger.info(f"Removed {len(unused_files_cache_names)} unused files cache files.")
 
     def analyze_archives(self) -> tuple[set, int, int, int]:
-        """Iterate over all items in all archives, create the dicts id -> size of all used chunks."""
-
-        def use_it(id):
-            entry = self.chunks.get(id)
-            if entry is not None:
-                # the chunk is in the repo, mark it used.
-                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED)
-            else:
-                # with --stats: we do NOT have this chunk in the repository!
-                # without --stats: we do not have this chunk or the chunks index is incomplete.
-                missing_chunks.add(id)
-
-        missing_chunks: set[bytes] = set()
+        """Iterate over all archives, mark used chunks and add up the source files count and size."""
+        self.missing_chunks: set[bytes] = set()
         archive_infos = self.manifest.archives.list(sort_by=["ts"])
         num_archives = len(archive_infos)
         pi = ProgressIndicatorPercent(
@@ -131,22 +120,40 @@ class ArchiveGarbageCollector:
                 f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
             )
             archive = Archive(self.manifest, info.id, iec=self.iec)
-            # archive metadata size unknown, but usually small/irrelevant:
-            use_it(archive.id)
-            for id in archive.metadata.item_ptrs:
-                use_it(id)
-            for id in archive.metadata.items:
-                use_it(id)
-            # archive items content data:
-            for item in archive.iter_items():
-                total_files += 1  # every fs object counts, not just regular files
-                if "chunks" in item:
-                    for id, size in item.chunks:
-                        total_size += size  # original, uncompressed file content size
-                        use_it(id)
+            size, files = self.analyze_archive(archive)
+            total_size += size
+            total_files += files
             pi.show(i + 1)  # report after each archive, so the last one lands on 100%
         pi.finish()
-        return missing_chunks, total_files, total_size, num_archives
+        return self.missing_chunks, total_files, total_size, num_archives
+
+    def analyze_archive(self, archive: Archive) -> tuple[int, int]:
+        """Mark all chunks used by the archive; return its source files content size and count."""
+
+        def use_it(id):
+            entry = self.chunks.get(id)
+            if entry is not None:
+                # the chunk is in the repo, mark it used.
+                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED)
+            else:
+                # we do not have this chunk or the chunks index is incomplete.
+                self.missing_chunks.add(id)
+
+        total_size, total_files = 0, 0
+        # archive metadata size unknown, but usually small/irrelevant:
+        use_it(archive.id)
+        for id in archive.metadata.item_ptrs:
+            use_it(id)
+        for id in archive.metadata.items:
+            use_it(id)
+        # archive items content data:
+        for item in archive.iter_items():
+            total_files += 1  # every fs object counts, not just regular files
+            if "chunks" in item:
+                for id, size in item.chunks:
+                    total_size += size  # original, uncompressed file content size
+                    use_it(id)
+        return total_size, total_files
 
     def report_and_delete(self):
         if self.missing_chunks:

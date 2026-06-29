@@ -4,7 +4,6 @@ import io
 from pathlib import Path
 
 from borghash import HashTableNT
-from borgstore.store import ItemInfo
 
 from ._common import with_repository
 from ..archive import Archive
@@ -201,8 +200,7 @@ class ArchiveGarbageCollector:
     def list_archive_reference_caches(self) -> set[str]:
         """Return the set of archive ids (hex) that currently have a reference cache in the repo."""
         hex_ids = set()
-        for info in self.repository.store_list("cache"):
-            info = ItemInfo(*info)  # RPC does not give a namedtuple
+        for info in self.repository.store_list("cache"):  # store_list yields ItemInfo namedtuples
             if info.name.startswith(REFERENCED_BY_ARCHIVE):
                 hex_ids.add(info.name[len(REFERENCED_BY_ARCHIVE) :])
         return hex_ids

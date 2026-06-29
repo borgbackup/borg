@@ -52,9 +52,9 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     # user flags:
     F_USED = 2 ** 0  # chunk is used/referenced
     F_COMPRESS = 2 ** 1  # chunk shall get (re-)compressed
+    F_PENDING = 2 ** 2  # pack location (pack_id, obj_offset, obj_size) not resolved yet.
     # system flags (internal use, always 0 to user, not changeable by user):
     F_NEW = 2 ** 24  # a new chunk that is not present in repo index/* yet.
-    F_PENDING = 2 ** 25  # pack location (pack_id, obj_offset, obj_size) not resolved yet.
 
     def __init__(self, capacity=1000, path=None, usable=None):
         if path:
@@ -82,12 +82,12 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         else:
             flags = v.flags | self.F_USED
             assert v.size == 0 or v.size == size
+        # F_PENDING marks the pack location (pack_id, obj_offset, obj_size) as not yet set.
+        # Re-adding a chunk resets it to UNKNOWN/pending, dropping any prior location until the next flush().
         self[key] = ChunkIndexEntry(
-            flags=flags, size=size, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+            flags=flags | self.F_PENDING, size=size,
+            pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
         )
-        # __setitem__ ignores system flags in the assigned value, so set F_PENDING on the raw entry.
-        raw = self.ht[key]
-        self.ht[key] = raw._replace(flags=raw.flags | self.F_PENDING)
 
     def __getitem__(self, key):
         """Specialized __getitem__ that hides system flags."""
@@ -119,14 +119,13 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
             return
         for chunk_id, pack_id, obj_offset, obj_size in pack_results:
             existing = self[chunk_id]
-            self[chunk_id] = existing._replace(pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size)
-            # __setitem__ preserves existing system flags, so clear F_PENDING on the raw entry.
-            raw = self.ht[chunk_id]
-            self.ht[chunk_id] = raw._replace(flags=raw.flags & ~self.F_PENDING)
+            self[chunk_id] = existing._replace(
+                flags=existing.flags & ~self.F_PENDING, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+            )
 
     def is_pending(self, key):
         """Return whether the chunk's pack location (pack_id, obj_offset, obj_size) is unresolved."""
-        return bool(self.ht[key].flags & self.F_PENDING)
+        return bool(self[key].flags & self.F_PENDING)
 
     def clear_new(self):
         """Clears the F_NEW flag of all items."""

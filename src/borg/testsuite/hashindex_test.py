@@ -21,17 +21,18 @@ def test_chunkindex_add():
     chunks = ChunkIndex()
     x = H2(1)
     chunks.add(x, 0)
-    assert chunks.is_pending(x)  # unresolved until update_pack_info()
+    assert chunks.is_pending(x)
+    pending = ChunkIndex.F_USED | ChunkIndex.F_PENDING  # add() sets F_PENDING alongside F_USED
     assert chunks[x] == ChunkIndexEntry(
-        flags=ChunkIndex.F_USED, size=0, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+        flags=pending, size=0, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
     )
     chunks.add(x, 2)  # updating size (we do not have a size yet)
     assert chunks[x] == ChunkIndexEntry(
-        flags=ChunkIndex.F_USED, size=2, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+        flags=pending, size=2, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
     )
     chunks.add(x, 2)
     assert chunks[x] == ChunkIndexEntry(
-        flags=ChunkIndex.F_USED, size=2, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+        flags=pending, size=2, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
     )
     with pytest.raises(AssertionError):
         chunks.add(x, 3)  # inconsistent size (we already have a different size)

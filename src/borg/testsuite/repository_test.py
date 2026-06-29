@@ -523,31 +523,29 @@ def test_put_marks_id_in_chunk_index(tmp_path):
 
 
 def test_list_skips_pending_chunk(tmp_path):
-    # A buffered (not yet flushed) chunk is in the index but has no pack location, so list() must skip it.
+    # list() skips a pending chunk and yields it once flushed.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.put(H(1), fchunk(b"BUFFERED"))  # buffered: the pack is not full yet
         assert repository._chunks.is_pending(H(1))
-        assert repository.list() == []  # pending chunk not listed
+        assert repository.list() == []
         repository.flush()
-        assert [chunk_id for chunk_id, _ in repository.list()] == [H(1)]  # listed once flushed
+        assert [chunk_id for chunk_id, _ in repository.list()] == [H(1)]
 
 
 def test_get_pending_chunk_raises(tmp_path):
-    # get() on a buffered (not yet flushed) chunk is a flush/index ordering bug, not a miss:
-    # it must raise PackLocationUnknown regardless of raise_missing.
+    # get() on a pending chunk raises PackLocationUnknown, also with raise_missing=False.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.put(H(1), fchunk(b"BUFFERED"))  # buffered: the pack is not full yet
         assert repository._chunks.is_pending(H(1))
         with pytest.raises(Repository.PackLocationUnknown):
             repository.get(H(1))
         with pytest.raises(Repository.PackLocationUnknown):
-            repository.get(H(1), raise_missing=False)  # still raises: this is a code bug, not a miss
-        repository.flush()  # flush the buffered chunk so close() does not assert on unflushed pieces
+            repository.get(H(1), raise_missing=False)
+        repository.flush()  # close() requires the buffer to be empty
 
 
 def test_flush_store_failure_drops_pending_entries(tmp_path):
-    # If storing the pack fails, flush() must remove the pending index entries so a later seen_chunk()
-    # does not dedup against chunks that were never written.
+    # flush() removes the pending index entries when storing the pack fails.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.put(H(1), fchunk(b"BUFFERED"))
         assert repository._chunks.is_pending(H(1))
@@ -558,7 +556,7 @@ def test_flush_store_failure_drops_pending_entries(tmp_path):
         repository._pack_writer.store.store = boom
         with pytest.raises(OSError):
             repository.flush()
-        assert H(1) not in repository._chunks  # pending entry removed after the failed store
+        assert H(1) not in repository._chunks
 
 
 def test_check_detects_corruption_in_later_object(tmp_path):

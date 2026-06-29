@@ -181,10 +181,9 @@ class PackWriter:
         try:
             self.store.store(key, pack_data)
         except Exception:
-            # store failed: remove the pending entries so seen_chunk() does not dedup against
-            # chunks that were never written.
+            # the pack was not stored: drop the index entries for its chunks.
             for chunk_id in pending_ids:
-                if chunk_id in self.chunks and self.chunks.is_pending(chunk_id):
+                if chunk_id in self.chunks:  # a chunk_id may appear more than once in this pack
                     del self.chunks[chunk_id]
             raise
         finally:

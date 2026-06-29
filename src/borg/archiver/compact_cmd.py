@@ -119,7 +119,7 @@ class ArchiveGarbageCollector:
         logger.info(f"Removed {len(unused_files_cache_names)} unused files cache files.")
 
     def analyze_archives(self) -> tuple[set, int, int]:
-        """Iterate over all archives, mark used chunks and add up the source files content size."""
+        """Collect the objects all archives reference, then mark the used chunks and sum their size."""
         self.missing_chunks: set[bytes] = set()
         archive_infos = self.manifest.archives.list(sort_by=["ts"])
         num_archives = len(archive_infos)
@@ -131,33 +131,25 @@ class ArchiveGarbageCollector:
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Computing used chunks %3.1f%%", step=0.1, msgid="compact.analyze_archives"
         )
-        total_size = 0
+        # merge every archive's referenced objects into one table, deduplicated across all archives.
+        # merging here (in borghash) and marking the chunk index once per unique object below is much
+        # cheaper than marking once per (archive, object) when archives share a lot of objects.
+        all_references = HashTableNT(
+            key_size=32, value_type=ArchiveReferenceEntry, value_format=ArchiveReferenceEntryFormat
+        )
         for i, info in enumerate(archive_infos):
             logger.info(
                 f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
             )
             archive = Archive(self.manifest, info.id, iec=self.iec)
-            total_size += self.analyze_archive(archive, cached=bin_to_hex(info.id) in cached_hex_ids)
+            references = self.get_archive_references(archive, cached=bin_to_hex(info.id) in cached_hex_ids)
+            all_references.update(references)
             pi.show(i + 1)  # report after each archive, so the last one lands on 100%
         pi.finish()
-        return self.missing_chunks, total_size, num_archives
-
-    def analyze_archive(self, archive: Archive, *, cached: bool) -> int:
-        """Mark all objects the archive references as used; return its source files content size
-        (in-archive duplicated chunks are only counted once).
-
-        The set of referenced objects and their plaintext sizes is read from a per-archive cache in
-        the repo if present, else computed by scanning the archive and then cached for next time.
-        """
-        references = self.load_archive_references(archive.id) if cached else None
-        if references is None:
-            references = self.scan_archive_references(archive)
-            if not self.dry_run:
-                self.store_archive_references(archive.id, references)
-        # mark every referenced object used and add up the source content size. each object counts
-        # once (the references mapping is deduplicated); metadata objects carry size 0.
+        # mark every referenced object used and add up the source content size. each object counts once
+        # (all_references is deduplicated across archives); metadata objects carry size 0.
         total_size = 0
-        for id, entry in references.items():
+        for id, entry in all_references.items():
             existing = self.chunks.get(id)
             if existing is not None:
                 # the object is in the repo, mark it used.
@@ -166,7 +158,20 @@ class ArchiveGarbageCollector:
                 # we do not have this object or the chunks index is incomplete.
                 self.missing_chunks.add(id)
             total_size += entry.size
-        return total_size
+        return self.missing_chunks, total_size, num_archives
+
+    def get_archive_references(self, archive: Archive, *, cached: bool) -> HashTableNT:
+        """Return the table of objects the archive references (object id -> plaintext size).
+
+        It is read from a per-archive cache in the repo if present, else computed by scanning the
+        archive and then cached for next time.
+        """
+        references = self.load_archive_references(archive.id) if cached else None
+        if references is None:
+            references = self.scan_archive_references(archive)
+            if not self.dry_run:
+                self.store_archive_references(archive.id, references)
+        return references
 
     def scan_archive_references(self, archive: Archive) -> HashTableNT:
         """Scan the archive's items, collecting the object ids it references and their plaintext sizes."""
@@ -260,7 +265,9 @@ class ArchiveGarbageCollector:
 
         count = len(self.chunks)
         logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
-        logger.info(f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)}.")
+        logger.info(
+            f"Deduplicated source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)}."
+        )
         if self.stats:
             logger.info(
                 f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "

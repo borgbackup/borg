@@ -522,6 +522,45 @@ def test_put_marks_id_in_chunk_index(tmp_path):
         assert entry.size == 0  # uncompressed size filled in by cache layer
 
 
+def test_list_skips_pending_chunk(tmp_path):
+    # A buffered (not yet flushed) chunk is in the index but has no pack location, so list() must skip it.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.put(H(1), fchunk(b"BUFFERED"))  # buffered: the pack is not full yet
+        assert repository._chunks.is_pending(H(1))
+        assert repository.list() == []  # pending chunk not listed
+        repository.flush()
+        assert [chunk_id for chunk_id, _ in repository.list()] == [H(1)]  # listed once flushed
+
+
+def test_get_pending_chunk_raises(tmp_path):
+    # get() on a buffered (not yet flushed) chunk is a flush/index ordering bug, not a miss:
+    # it must raise PackLocationUnknown regardless of raise_missing.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.put(H(1), fchunk(b"BUFFERED"))  # buffered: the pack is not full yet
+        assert repository._chunks.is_pending(H(1))
+        with pytest.raises(Repository.PackLocationUnknown):
+            repository.get(H(1))
+        with pytest.raises(Repository.PackLocationUnknown):
+            repository.get(H(1), raise_missing=False)  # still raises: this is a code bug, not a miss
+        repository.flush()  # flush the buffered chunk so close() does not assert on unflushed pieces
+
+
+def test_flush_store_failure_drops_pending_entries(tmp_path):
+    # If storing the pack fails, flush() must remove the pending index entries so a later seen_chunk()
+    # does not dedup against chunks that were never written.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.put(H(1), fchunk(b"BUFFERED"))
+        assert repository._chunks.is_pending(H(1))
+
+        def boom(*args, **kwargs):
+            raise OSError("store failed")
+
+        repository._pack_writer.store.store = boom
+        with pytest.raises(OSError):
+            repository.flush()
+        assert H(1) not in repository._chunks  # pending entry removed after the failed store
+
+
 def test_check_detects_corruption_in_later_object(tmp_path):
     # Corruption anywhere in a multi-object pack must be caught, not just in the first object: the pack
     # is named by sha256(content), so flipping any byte makes its stored hash differ from its name.

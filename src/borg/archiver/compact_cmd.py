@@ -38,6 +38,7 @@ class ArchiveGarbageCollector:
         assert isinstance(repository, Repository)
         self.manifest = manifest
         self.chunks = None  # a ChunkIndex, here used for: id -> (is_used, stored_size)
+        self.missing_chunks: set[bytes] = set()  # ids of referenced objects not present in the repo
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
@@ -120,7 +121,7 @@ class ArchiveGarbageCollector:
 
     def analyze_archives(self) -> tuple[set, int, int]:
         """Collect the objects all archives reference, then mark the used chunks and sum their size."""
-        self.missing_chunks: set[bytes] = set()
+        self.missing_chunks = set()
         archive_infos = self.manifest.archives.list(sort_by=["ts"])
         num_archives = len(archive_infos)
         cached_hex_ids = self.list_archive_reference_caches()

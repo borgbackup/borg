@@ -54,6 +54,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     F_COMPRESS = 2 ** 1  # chunk shall get (re-)compressed
     # system flags (internal use, always 0 to user, not changeable by user):
     F_NEW = 2 ** 24  # a new chunk that is not present in repo index/* yet.
+    F_PENDING = 2 ** 25  # pack location (pack_id, obj_offset, obj_size) not resolved yet.
 
     def __init__(self, capacity=1000, path=None, usable=None):
         if path:
@@ -84,6 +85,9 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         self[key] = ChunkIndexEntry(
             flags=flags, size=size, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
         )
+        # __setitem__ ignores system flags in the assigned value, so set F_PENDING on the raw entry.
+        raw = self.ht[key]
+        self.ht[key] = raw._replace(flags=raw.flags | self.F_PENDING)
 
     def __getitem__(self, key):
         """Specialized __getitem__ that hides system flags."""
@@ -109,12 +113,20 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         self.ht[key] = value._replace(flags=system_flags | user_flags)
 
     def update_pack_info(self, pack_results):
-        """Update the on-disk location fields for a list of (chunk_id, pack_id, obj_offset, obj_size) tuples."""
+        """Set pack_id, obj_offset and obj_size from a list of (chunk_id, pack_id, obj_offset, obj_size)
+        tuples and clear F_PENDING."""
         if not pack_results:
             return
         for chunk_id, pack_id, obj_offset, obj_size in pack_results:
             existing = self[chunk_id]
             self[chunk_id] = existing._replace(pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size)
+            # __setitem__ preserves existing system flags, so clear F_PENDING on the raw entry.
+            raw = self.ht[chunk_id]
+            self.ht[chunk_id] = raw._replace(flags=raw.flags & ~self.F_PENDING)
+
+    def is_pending(self, key):
+        """Return whether the chunk's pack location (pack_id, obj_offset, obj_size) is unresolved."""
+        return bool(self.ht[key].flags & self.F_PENDING)
 
     def clear_new(self):
         """Clears the F_NEW flag of all items."""

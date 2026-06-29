@@ -106,9 +106,9 @@ def build_rest_backend(location):
 class PackWriter:
     """Buffers chunks into a pack file and writes it to the store when full.
 
-    add() buffers a (chunk_id, cdata) pair and marks the chunk pending in the
-    ChunkIndex (pack_id=UNKNOWN_BYTES32); flush() writes the pack and sets each
-    entry's real pack_id and obj_offset.
+    add() buffers a (chunk_id, cdata) pair and marks the chunk pending (F_PENDING);
+    flush() writes the pack and sets each entry's pack_id, obj_offset and obj_size,
+    clearing F_PENDING.
 
     The ChunkIndex comes from the repository, or from an explicit chunks index when
     there is no repository (see the chunks property).
@@ -142,8 +142,6 @@ class PackWriter:
     def add(self, chunk_id, cdata):
         """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
         self.chunks.add(chunk_id, 0)  # size: plaintext chunk size, set by the cache layer
-        # obj_size is final; pack_id and obj_offset get their real values in flush().
-        self.chunks.update_pack_info([(chunk_id, UNKNOWN_BYTES32, 0, len(cdata))])
         self._pieces.append((chunk_id, cdata))
         self._size += len(cdata)
         if (self.max_count is not None and len(self._pieces) >= self.max_count) or (
@@ -179,22 +177,20 @@ class PackWriter:
             offset += obj_size
 
         key = "packs/" + bin_to_hex(pack_id)
-        # ids this flush pre-marked in the index via add() (pack_id still UNKNOWN_BYTES32).
         pending_ids = [chunk_id for chunk_id, _ in self._pieces]
         try:
             self.store.store(key, pack_data)
         except Exception:
-            # The pack is not stored, so drop the pending entries: keeping them would let
-            # seen_chunk() dedup later chunks against bytes that were never written.
+            # store failed: remove the pending entries so seen_chunk() does not dedup against
+            # chunks that were never written.
             for chunk_id in pending_ids:
-                entry = self.chunks.get(chunk_id)
-                if entry is not None and entry.pack_id == UNKNOWN_BYTES32:
+                if chunk_id in self.chunks and self.chunks.is_pending(chunk_id):
                     del self.chunks[chunk_id]
             raise
         finally:
             self._pieces = []  # cleared on success and on failure
             self._size = 0
-        self.chunks.update_pack_info(results)  # replace UNKNOWN_BYTES32 with real pack_id
+        self.chunks.update_pack_info(results)  # set the real location and clear F_PENDING
         return results
 
 
@@ -711,7 +707,7 @@ class Repository:
         collect = marker is None
         result = []
         for chunk_id, entry in self.chunks.iteritems():
-            if entry.pack_id == UNKNOWN_BYTES32:
+            if self.chunks.is_pending(chunk_id):
                 continue  # buffered in PackWriter, not flushed to a pack yet
             if collect:
                 result.append((chunk_id, entry.obj_size))
@@ -728,11 +724,9 @@ class Repository:
             if raise_missing:
                 raise self.ObjectNotFound(id, str(self._location))
             return None
-        if entry.pack_id == UNKNOWN_BYTES32:
-            # chunk is buffered in PackWriter, not yet flushed to a pack. Everything must be flushed
-            # before it can be read back, so reaching here points at a flush / index-update ordering
-            # bug, not a genuinely missing object. this is a code bug, so we crash loudly regardless
-            # of raise_missing instead of pretending the object is absent.
+        if self.chunks.is_pending(id):
+            # buffered but not flushed; a chunk must be flushed before any read, so this is a code
+            # bug (wrong flush/index ordering), not a missing object: raise regardless of raise_missing.
             raise self.PackLocationUnknown(id, str(self._location))
         pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)

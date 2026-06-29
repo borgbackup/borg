@@ -21,6 +21,7 @@ def test_chunkindex_add():
     chunks = ChunkIndex()
     x = H2(1)
     chunks.add(x, 0)
+    assert chunks.is_pending(x)  # unresolved until update_pack_info()
     assert chunks[x] == ChunkIndexEntry(
         flags=ChunkIndex.F_USED, size=0, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
     )
@@ -43,10 +44,15 @@ def test_chunkindex_update_pack_info():
     chunks.add(x2, 20)
     assert chunks[x1].obj_offset == UNKNOWN_INT32
     assert chunks[x2].obj_offset == UNKNOWN_INT32
+    assert chunks.is_pending(x1)
+    assert chunks.is_pending(x2)
 
     pack_id = H2(3)
     # Both chunks land in the same pack: batch update in one call.
     chunks.update_pack_info([(x1, pack_id, 0, 50), (x2, pack_id, 50, 60)])
+    # resolving the location clears the pending flag
+    assert not chunks.is_pending(x1)
+    assert not chunks.is_pending(x2)
     # Location fields updated; flags and size must be unchanged.
     assert chunks[x1] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=10, pack_id=pack_id, obj_offset=0, obj_size=50)
     assert chunks[x2] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=20, pack_id=pack_id, obj_offset=50, obj_size=60)

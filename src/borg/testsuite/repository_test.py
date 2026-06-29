@@ -5,7 +5,6 @@ from hashlib import sha256
 import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
-from ..constants import UNKNOWN_BYTES32
 from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, PackReader
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
@@ -187,11 +186,11 @@ def test_multi_object_pack_roundtrip(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository._pack_writer.max_count = 2  # this test is written for exactly two objects per pack
         repository.put(H(0), chunk0)
-        assert repository.chunks[H(0)].pack_id == UNKNOWN_BYTES32  # buffered: the pack is not full yet
+        assert repository.chunks.is_pending(H(0))  # buffered: the pack is not full yet
         repository.put(H(1), chunk1)  # fills the pack, flushing both objects at once
         # both objects share one pack, written exactly once, laid out in put() order
         pack_id = repository.chunks[H(0)].pack_id
-        assert pack_id != UNKNOWN_BYTES32
+        assert not repository.chunks.is_pending(H(0))
         assert repository.chunks[H(1)].pack_id == pack_id
         assert [info.name for info in repository.store_list("packs")] == [bin_to_hex(pack_id)]
         assert repository.chunks[H(0)].obj_offset == 0
@@ -509,16 +508,16 @@ def test_get_uses_chunk_index_location(tmp_path):
 
 
 def test_put_marks_id_in_chunk_index(tmp_path):
-    # put() marks the id pending (pack_id=UNKNOWN_BYTES32); flush() then fills in the
-    # real pack location for the current session.
+    # put() marks the id pending; flush() sets the real pack location and clears the pending flag.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         id1 = H(1)
         repository.put(id1, fchunk(b"ZEROS"))
         entry = repository._chunks.get(id1)
         assert entry is not None
-        assert entry.pack_id == UNKNOWN_BYTES32  # buffered, not yet flushed
+        assert repository._chunks.is_pending(id1)  # buffered, not yet flushed
         repository.flush()
         entry = repository._chunks.get(id1)
+        assert not repository._chunks.is_pending(id1)
         assert entry.pack_id == sha256(fchunk(b"ZEROS")).digest()
         assert entry.size == 0  # uncompressed size filled in by cache layer
 

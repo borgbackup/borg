@@ -25,7 +25,6 @@ class ArchiveGarbageCollector:
         assert isinstance(repository, Repository)
         self.manifest = manifest
         self.chunks = None  # a ChunkIndex, here used for: id -> (is_used, stored_size)
-        self.total_files = None  # overall number of source files written to all archives in this repo
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
@@ -44,7 +43,7 @@ class ArchiveGarbageCollector:
         logger.info("Starting compaction / garbage collection...")
         self.chunks = self.get_repository_chunks()
         logger.info("Computing object IDs used by archives...")
-        (self.missing_chunks, self.total_files, self.total_size, self.archives_count) = self.analyze_archives()
+        (self.missing_chunks, self.total_size, self.archives_count) = self.analyze_archives()
         self.report_and_delete()
         if not self.dry_run:
             self.save_chunk_index()
@@ -106,29 +105,27 @@ class ArchiveGarbageCollector:
                 logger.warning(f"Could not access cache file: {e}")
         logger.info(f"Removed {len(unused_files_cache_names)} unused files cache files.")
 
-    def analyze_archives(self) -> tuple[set, int, int, int]:
-        """Iterate over all archives, mark used chunks and add up the source files count and size."""
+    def analyze_archives(self) -> tuple[set, int, int]:
+        """Iterate over all archives, mark used chunks and add up the source files content size."""
         self.missing_chunks: set[bytes] = set()
         archive_infos = self.manifest.archives.list(sort_by=["ts"])
         num_archives = len(archive_infos)
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Computing used chunks %3.1f%%", step=0.1, msgid="compact.analyze_archives"
         )
-        total_size, total_files = 0, 0
+        total_size = 0
         for i, info in enumerate(archive_infos):
             logger.info(
                 f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
             )
             archive = Archive(self.manifest, info.id, iec=self.iec)
-            size, files = self.analyze_archive(archive)
-            total_size += size
-            total_files += files
+            total_size += self.analyze_archive(archive)
             pi.show(i + 1)  # report after each archive, so the last one lands on 100%
         pi.finish()
-        return self.missing_chunks, total_files, total_size, num_archives
+        return self.missing_chunks, total_size, num_archives
 
-    def analyze_archive(self, archive: Archive) -> tuple[int, int]:
-        """Mark all chunks used by the archive; return its source files content size and count."""
+    def analyze_archive(self, archive: Archive) -> int:
+        """Mark all chunks used by the archive; return its source files content size."""
 
         def use_it(id):
             entry = self.chunks.get(id)
@@ -139,7 +136,7 @@ class ArchiveGarbageCollector:
                 # we do not have this chunk or the chunks index is incomplete.
                 self.missing_chunks.add(id)
 
-        total_size, total_files = 0, 0
+        total_size = 0
         # archive metadata size unknown, but usually small/irrelevant:
         use_it(archive.id)
         for id in archive.metadata.item_ptrs:
@@ -148,12 +145,11 @@ class ArchiveGarbageCollector:
             use_it(id)
         # archive items content data:
         for item in archive.iter_items():
-            total_files += 1  # every fs object counts, not just regular files
             if "chunks" in item:
                 for id, size in item.chunks:
                     total_size += size  # original, uncompressed file content size
                     use_it(id)
-        return total_size, total_files
+        return total_size
 
     def report_and_delete(self):
         if self.missing_chunks:
@@ -177,10 +173,7 @@ class ArchiveGarbageCollector:
 
         count = len(self.chunks)
         logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
-        logger.info(
-            f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
-            f"in {self.total_files} files."
-        )
+        logger.info(f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)}.")
         if self.stats:
             logger.info(
                 f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "

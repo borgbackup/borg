@@ -204,6 +204,56 @@ def test_multi_object_pack_roundtrip(repo_fixtures, request):
         assert repository.get(H(1), read_data=False) == chunk1[: hdr_size + len(meta1)]
 
 
+def test_get_many_one_load_per_pack(repo_fixtures, request):
+    # Ids that are byte-contiguous in a pack -- each id's obj_offset equals the previous id's
+    # obj_offset + obj_size -- are read with one store.load. stats["load_calls"] counts store.load()
+    # calls.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(6)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 3  # three objects per pack -> two packs for the six objects
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        ids = [chunk_id for chunk_id, _ in objects]
+        assert len({repository.chunks[chunk_id].pack_id for chunk_id in ids}) == 2  # six ids, two packs
+        one_by_one = [repository.get(chunk_id) for chunk_id in ids]  # reference bytes, one store.load each
+
+        loads_before = repository.store.stats["load_calls"]
+        assert list(repository.get_many(ids)) == one_by_one
+        assert repository.store.stats["load_calls"] - loads_before == 2  # one store.load per pack
+
+
+def test_get_many_keeps_request_order(repo_fixtures, request):
+    # Ids requested out of their stored order come back in the requested order with their own bytes.
+    # Ids whose objects are not consecutive in a pack each take their own store.load.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(6)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 3  # two packs: {H0,H1,H2} and {H3,H4,H5}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        ids = [H(0), H(3), H(1), H(4), H(2), H(5)]  # interleave the two packs
+        one_by_one = [repository.get(chunk_id) for chunk_id in ids]
+
+        loads_before = repository.store.stats["load_calls"]
+        assert list(repository.get_many(ids)) == one_by_one  # same order, same bytes
+        assert repository.store.stats["load_calls"] - loads_before == 6  # each id takes its own store.load
+
+
+def test_get_many_missing_id_yields_none(repo_fixtures, request):
+    # With raise_missing=False, an id that was never stored yields None in its position; the ids
+    # before and after it read back unchanged.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(3)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 4  # above the object count, so the pack flushes on flush() only
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        ids = [H(0), H(99), H(2)]  # H(99) was never put
+        result = list(repository.get_many(ids, raise_missing=False))
+        assert result[0] == repository.get(H(0))
+        assert result[1] is None  # never stored -> None
+        assert result[2] == repository.get(H(2))
+
+
 def build_one_pack(repository, objects):
     with repository:
         repository._pack_writer.max_count = len(objects) + 1  # prevent per-put flush; one pack on flush()

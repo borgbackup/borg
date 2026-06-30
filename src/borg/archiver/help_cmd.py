@@ -314,6 +314,7 @@ class HelpMixIn:
         - user: exact match on the username who created the archive
         - host: exact match on the hostname where the archive was created
         - tags: match on the archive tags
+        - date: match on the archive creation timestamp
 
         In case of a name pattern match,
         it uses pattern styles similar to the ones described by ``borg help patterns``:
@@ -327,6 +328,28 @@ class HelpMixIn:
         `Regular expressions <https://docs.python.org/3/library/re.html>`_, selector ``re:``
             Full regular expression support.
             This is very powerful, but can also get rather complicated.
+
+        Date patterns, selector ``date:``
+            Match archives by creation timestamp. Supported forms are:
+
+            - ``YYYY``: 1 year
+            - ``YYYY-MM``: 1 month
+            - ``YYYY-MM-DD``: 1 day
+            - ``YYYY-MM-DDTHH``: 1 hour
+            - ``YYYY-MM-DDTHH:MM``: 1 minute
+            - ``YYYY-MM-DDTHH:MM:SS``: 1 second
+            - ``@1735732800``: 1 second
+            - ``YYYY-MM-DDTHH:MM:SS.ffffff``: exact timestamp
+            - ``@1735732800.123456``: exact timestamp
+
+            Date and time patterns match the interval implied by their precision, including
+            the start and excluding the end. Fractional-second patterns accept 1 to 6
+            digits and match exactly.
+
+            Date and time patterns may include a timezone suffix: ``Z``, ``+HH:MM``,
+            ``-HH:MM``, or ``[Region/City]``. Patterns without a timezone are interpreted
+            in the local timezone. Unix timestamp patterns are UTC and do not accept a
+            timezone suffix.
 
         Examples::
 
@@ -349,7 +372,12 @@ class HelpMixIn:
             borg delete -a 'host:kenny-pc'
 
             # tags match
-            borg delete -a 'tags:TAG1' -a 'tags:TAG2'\n\n"""
+            borg delete -a 'tags:TAG1' -a 'tags:TAG2'
+
+            # archive creation date match
+            borg delete -a 'date:2025-01'
+            borg delete -a 'date:2025-01-01T14:30Z'
+            borg delete -a 'date:2025-01-01T09:30[America/New_York]'\n\n"""
     )
     helptext["placeholders"] = textwrap.dedent(
         """

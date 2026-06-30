@@ -55,7 +55,7 @@ locations and passphrases first:
     # The AEAD cipher does not matter (everything must be re-encrypted and
     # re-authenticated anyway); you could also choose -e chacha20-poly1305 -i blake3.
     $ borg repo-create -e aes256-ocb -i blake3
-    $ export CHUNKER_PARAMS="buzhash64,19,23,21,4095"
+    $ export CHUNKER_PARAMS="buzhash64,19,23,21,4095,2"
 
     # 2. Check what and how much it would transfer:
     $ borg transfer --from-borg1 --chunker-params=$CHUNKER_PARAMS --dry-run

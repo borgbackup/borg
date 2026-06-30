@@ -112,9 +112,13 @@ CHUNK_MAX_EXP = 23  # 2**23 == 8 MiB
 HASH_WINDOW_SIZE = 0xFFF  # 4095 B
 HASH_MASK_BITS = 21  # results in ~2 MiB chunks statistically
 
+# buzhash64-only: normalized chunking level (0 disables it). buzhash (32bit) does not support this
+# and must stay bit-compatible to borg 1.x, so it has no nc_level param.
+NC_LEVEL = 2  # FastCDC-style normalized chunking: tightens chunk-size distribution (much lower variance)
+
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
-CHUNKER64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
+CHUNKER64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, NC_LEVEL)
 
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)

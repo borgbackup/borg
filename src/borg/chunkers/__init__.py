@@ -17,7 +17,9 @@ def get_chunker(algo, *params, **kw):
     if algo == "buzhash":
         return Chunker(seed, *params, sparse=sparse)
     if algo == "buzhash64":
-        return ChunkerBuzHash64(bh64_key, *params, sparse=sparse)
+        # params is (chunk_min_exp, chunk_max_exp, hash_mask_bits, hash_window_size, nc_level);
+        # nc_level is passed positionally. normal_size is an optional tuning knob (0 = auto).
+        return ChunkerBuzHash64(bh64_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
     if algo == "fixed":
         return ChunkerFixed(*params, sparse=sparse)
     if algo == "fail":

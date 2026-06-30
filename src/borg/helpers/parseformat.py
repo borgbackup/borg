@@ -304,8 +304,11 @@ def ChunkerParams(s):
         return algo, block_size, header_size
     if algo == "default" and count == 1:  # default
         return CHUNKER_PARAMS
-    if algo == CH_BUZHASH64 and count == 5:  # buzhash64, chunk_min, chunk_max, chunk_mask, window_size
-        chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[1:])
+    if algo == CH_BUZHASH64 and count == 6:
+        # buzhash64, chunk_min, chunk_max, chunk_mask, window_size, nc_level
+        # use nc_level 0 to disable normalized chunking.
+        chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[1:5])
+        nc_level = int(params[5])
         if not (chunk_min <= chunk_mask <= chunk_max):
             raise ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
         if chunk_min < 6:
@@ -313,8 +316,14 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        # normalized chunking switches the mask at the target size; it needs room below and above
+        # the base mask bits (chunk_mask). nc_level 0 disables it.
+        if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
+            raise ArgumentTypeError(
+                "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
+            )
         # note that for buzhash64, there is no problem with even window_size.
-        return CH_BUZHASH64, chunk_min, chunk_max, chunk_mask, window_size
+        return CH_BUZHASH64, chunk_min, chunk_max, chunk_mask, window_size, nc_level
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4 :])

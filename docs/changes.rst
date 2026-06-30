@@ -168,6 +168,14 @@ above.
 
 New features:
 
+- buzhash64 chunker: add FastCDC-style normalized chunking and enable it by default
+  (``nc_level=2``). It switches between a stricter and a looser cut mask around the target
+  chunk size, which greatly tightens the chunk-size distribution (chunk-size variance /
+  coefficient of variation roughly cut by ~60% in tests) and removes the dedup-hostile
+  max-size-clamped chunks, at negligible throughput cost and with unchanged deduplication.
+  ``chunker-params`` for buzhash64 gains a required 6th field ``nc_level``
+  (``buzhash64,chunk_min,chunk_max,chunk_mask,window_size,nc_level``).
+  buzhash (32bit) is unchanged and stays bit-compatible with borg 1.x.
 - repo-create: split ``--encryption`` into orthogonal options. ``--encryption`` now
   selects only the cipher / AE algorithm (``none``, ``authenticated``, ``aes256-ocb``
   or ``chacha20-poly1305``), the new ``--id-hash`` selects the id hash function

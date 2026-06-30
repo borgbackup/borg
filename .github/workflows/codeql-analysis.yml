@@ -55,7 +55,7 @@ jobs:
       with:
         python-version: 3.11
     - name: Cache pip
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}

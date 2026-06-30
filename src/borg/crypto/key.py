@@ -661,9 +661,18 @@ class FlexiKey:
             return keyfile
         return get_keys_dir()
 
+    def _keys_dir(self):
+        # v1 repos use the borg 1.x keys dir, which differs from the borg2 one on macOS
+        # (~/.config/borg/keys vs ~/Library/Application Support/borg/keys).
+        if self.repository.version == 1:
+            from ..legacy.fs import get_keys_dir as get_keys_dir_legacy
+
+            return get_keys_dir_legacy()
+        return get_keys_dir()
+
     def _find_key_in_keys_dir(self):
         id = self.repository.id
-        keys_path = Path(get_keys_dir())
+        keys_path = Path(self._keys_dir())
         for entry in keys_path.iterdir():
             filename = keys_path / entry.name
             try:
@@ -674,7 +683,7 @@ class FlexiKey:
     def _find_all_keys_in_keys_dir(self):
         # return all keyfiles in the keys dir that belong to this repository (multiple passphrases).
         id = self.repository.id
-        keys_path = Path(get_keys_dir())
+        keys_path = Path(self._keys_dir())
         found = []
         if not keys_path.exists():
             return found

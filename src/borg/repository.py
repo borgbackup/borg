@@ -303,6 +303,10 @@ class Repository:
 
         exit_mcode = 21
 
+    # Max bytes one grouped read in get_many() covers; a run reaching this size is split into
+    # multiple reads.
+    GET_MANY_GROUP_SIZE_LIMIT = 64 * 1024 * 1024
+
     def __init__(
         self,
         path_or_location,
@@ -798,8 +802,63 @@ class Repository:
                 return None
 
     def get_many(self, ids, read_data=True, raise_missing=True):
+        if not read_data:
+            # read_data=False returns only each object's header+meta, sized per object by get().
+            for id_ in ids:
+                yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
+            return
+
+        # A pack stores its objects back-to-back. Fetch a run of ids that are byte-contiguous in
+        # one pack (each obj_offset == the previous obj_offset + obj_size) with one store.load and
+        # slice each object out of it. Objects are yielded in ids order.
+        run = []  # (id, obj_size) of the objects in the current run, in read order
+        run_key = None  # store key "packs/<pack_id>" the run reads from
+        run_start = 0  # obj_offset of the run's first object
+        run_end = 0  # obj_offset just past the run's last object
+
+        def flush_run():
+            # read the whole run with one store.load and yield each object's slice
+            if not run:
+                return
+            try:
+                blob = self.store.load(run_key, offset=run_start, size=run_end - run_start)
+            except StoreObjectNotFound:
+                if raise_missing:
+                    raise self.ObjectNotFound(run[0][0], str(self._location)) from None
+                for _ in run:
+                    yield None
+                return
+            pos = 0
+            for _id, obj_size in run:
+                yield blob[pos : pos + obj_size]
+                pos += obj_size
+
         for id_ in ids:
-            yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
+            self._lock_refresh()
+            entry = self.chunks.get(id_)
+            if entry is None or self.chunks.is_pending(id_):
+                # not a flushed pack object: end the run and let get() read it or raise.
+                yield from flush_run()
+                run, run_key = [], None
+                yield self.get(id_, read_data=True, raise_missing=raise_missing)
+                continue
+            key = "packs/" + bin_to_hex(entry.pack_id)
+            contiguous = (
+                run
+                and key == run_key
+                and entry.obj_offset == run_end
+                and (run_end - run_start) + entry.obj_size <= self.GET_MANY_GROUP_SIZE_LIMIT
+            )
+            if contiguous:
+                run.append((id_, entry.obj_size))
+                run_end += entry.obj_size
+            else:
+                yield from flush_run()
+                run = [(id_, entry.obj_size)]
+                run_key = key
+                run_start = entry.obj_offset
+                run_end = entry.obj_offset + entry.obj_size
+        yield from flush_run()
 
     def put(self, id, data):
         """put a repo object

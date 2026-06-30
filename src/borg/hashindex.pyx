@@ -52,6 +52,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     # user flags:
     F_USED = 2 ** 0  # chunk is used/referenced
     F_COMPRESS = 2 ** 1  # chunk shall get (re-)compressed
+    F_PENDING = 2 ** 2  # pack location (pack_id, obj_offset, obj_size) not resolved yet.
     # system flags (internal use, always 0 to user, not changeable by user):
     F_NEW = 2 ** 24  # a new chunk that is not present in repo index/* yet.
 
@@ -81,8 +82,11 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         else:
             flags = v.flags | self.F_USED
             assert v.size == 0 or v.size == size
+        # F_PENDING marks the pack location (pack_id, obj_offset, obj_size) as not yet set.
+        # Re-adding a chunk resets it to UNKNOWN/pending, dropping any prior location until the next flush().
         self[key] = ChunkIndexEntry(
-            flags=flags, size=size, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+            flags=flags | self.F_PENDING, size=size,
+            pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
         )
 
     def __getitem__(self, key):
@@ -109,12 +113,19 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         self.ht[key] = value._replace(flags=system_flags | user_flags)
 
     def update_pack_info(self, pack_results):
-        """Update the on-disk location fields for a list of (chunk_id, pack_id, obj_offset, obj_size) tuples."""
+        """Set pack_id, obj_offset and obj_size from a list of (chunk_id, pack_id, obj_offset, obj_size)
+        tuples and clear F_PENDING."""
         if not pack_results:
             return
         for chunk_id, pack_id, obj_offset, obj_size in pack_results:
             existing = self[chunk_id]
-            self[chunk_id] = existing._replace(pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size)
+            self[chunk_id] = existing._replace(
+                flags=existing.flags & ~self.F_PENDING, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+            )
+
+    def is_pending(self, key):
+        """Return whether the chunk's pack location (pack_id, obj_offset, obj_size) is unresolved."""
+        return bool(self[key].flags & self.F_PENDING)
 
     def clear_new(self):
         """Clears the F_NEW flag of all items."""

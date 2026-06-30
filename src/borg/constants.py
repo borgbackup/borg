@@ -55,7 +55,8 @@ MAX_DATA_SIZE = 20971479
 # Grep for UNKNOWN_INT32 to find every site that still needs updating.
 UNKNOWN_INT32 = 0xFFFFFFFF
 
-# Placeholder for pack_id (32-byte field) when the value is not yet known.
+# Filler for the pack_id (32-byte field) while the real value is unknown. Never interpreted;
+# an unresolved pack location is tracked by the ChunkIndex.F_PENDING flag.
 UNKNOWN_BYTES32 = b"\xff" * 32
 
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)

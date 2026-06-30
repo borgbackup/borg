@@ -29,7 +29,6 @@ from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError, BackupItemExcluded
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
-from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
@@ -1968,13 +1967,7 @@ class ArchiveChecker:
             # either we already have this chunk in repo and chunks index or we add it now
             if id_ not in self.chunks:
                 assert cdata is not None
-                self.chunks[id_] = ChunkIndexEntry(
-                    flags=ChunkIndex.F_USED,
-                    size=size,
-                    pack_id=UNKNOWN_BYTES32,
-                    obj_offset=UNKNOWN_INT32,
-                    obj_size=UNKNOWN_INT32,
-                )
+                self.chunks.add(id_, size)
                 if self.repair:
                     pack_results = self.repository.put(id_, cdata)
                     self.chunks.update_pack_info(pack_results)

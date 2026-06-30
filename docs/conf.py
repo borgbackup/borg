@@ -110,7 +110,6 @@ def set_rst_settings(app):
 
 
 def setup(app):
-    app.setup_extension("sphinxcontrib.jquery")
     app.add_css_file("css/borg.css")
     app.connect("builder-inited", set_rst_settings)
 

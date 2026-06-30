@@ -3,7 +3,7 @@ import json
 from ...constants import *  # NOQA
 from . import checkts, cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION, KF_LOCATION
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_info(archivers, request):

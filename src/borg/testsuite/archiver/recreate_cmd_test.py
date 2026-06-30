@@ -22,7 +22,7 @@ from . import (
     RK_ENCRYPTION,
 )
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_recreate_exclude_caches(archivers, request):

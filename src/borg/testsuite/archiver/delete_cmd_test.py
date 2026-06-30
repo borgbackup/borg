@@ -1,7 +1,7 @@
 from ...constants import *  # NOQA
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_delete_options(archivers, request):

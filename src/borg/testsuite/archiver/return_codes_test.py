@@ -5,7 +5,7 @@ from ...helpers import IncludePatternNeverMatchedWarning
 from ...repository import Repository
 from . import cmd, changedir, generate_archiver_tests  # NOQA
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_return_codes(archivers, request):

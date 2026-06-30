@@ -7,7 +7,7 @@ from .. import changedir
 from ..compress_test import Compressor
 from . import cmd, create_test_files, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_debug_profile(archivers, request):

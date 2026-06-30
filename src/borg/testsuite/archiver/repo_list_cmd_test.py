@@ -7,7 +7,7 @@ from ...constants import *  # NOQA
 from . import cmd, checkts, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 from .prune_cmd_test import _create_archive_ts
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_repo_list_glob(archivers, request, backup_files):

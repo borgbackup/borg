@@ -23,7 +23,7 @@ from . import (
     generate_archiver_tests,
 )
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_change_passphrase(archivers, request):

@@ -123,6 +123,20 @@ def cmd_fixture(request):
 
 def generate_archiver_tests(metafunc, kinds: str):
     # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
+    #
+    # Picking "kinds" (see #9324, testsuite speedup):
+    # - "local" should always be included.
+    # - "remote" exercises the rest:// transport (it spawns a borgstore-server-rest subprocess and does
+    #   synchronous HTTP-over-stdio round trips per object), so a remote run costs several times its local
+    #   twin. Only add "remote" where the *store I/O pattern itself* is what's under test and is not already
+    #   covered elsewhere: writing/reading archive data over the wire (create, extract, tar), repository
+    #   lifecycle (repo create/delete), integrity (check, compact), locking, repo space and transfer.
+    #   Pure command logic that operates on metadata or only formats output (prune scheduling, diff/list/info
+    #   rendering, rename, delete/undelete, recreate, key handling, debug, return codes, fuse mount) behaves
+    #   identically regardless of transport, so it runs "local,binary" only - the data path over rest is
+    #   already covered by the create/extract tests.
+    # - "binary" runs the frozen borg.exe; it is only built for tag releases, so it does not affect normal
+    #   PR/push CI run time.
     archivers = []
     for kind in kinds.split(","):
         if kind == "local":

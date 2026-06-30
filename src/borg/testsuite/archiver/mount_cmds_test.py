@@ -22,7 +22,7 @@ from ..platform.platform_test import fakeroot_detected
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 @requires_hardlinks

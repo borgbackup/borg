@@ -30,7 +30,7 @@ import pytest
 import borg
 import borg.helpers.errors
 from .. import xattr, helpers, platform
-from ..archive import Archive, ChunkBuffer, ChunksProcessor
+from ..archive import Archive, ChunkBuffer, ChunksProcessor, MetadataCollector
 from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
 from ..cache import Cache, LocalCache
 from ..chunker import has_seek_hole
@@ -1322,6 +1322,45 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 refcounts = {id: entry.refcount for id, entry in cache.chunks.iteritems()}
         # each data chunk of the file must be referenced exactly as often as it occurs in the item -
         # a leaked chunk from the failed read attempt would show up here as a too high refcount:
+        for chunk_id, refs in item_chunk_refs.items():
+            assert refcounts[chunk_id] == refs
+
+    def test_create_ext_attrs_error_retry_rolls_back_chunks(self):
+        # a read error that happens AFTER chunking (here: while reading the extended attributes) must
+        # also roll back the chunk increfs, so a retry does not end up with bad (too high) refcounts.
+        # the chunker reads the file fine; the failure is injected into stat_ext_attrs instead.
+        from collections import Counter
+        chunk_size = 1000
+        # distinct content per block, so each block maps to its own (unique) chunk id:
+        self.create_regular_file('file', contents=b'A' * chunk_size + b'B' * chunk_size)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        orig_stat_ext_attrs = MetadataCollector.stat_ext_attrs
+        failed = []
+
+        def failing_stat_ext_attrs(self, st, path, fd=None):
+            # fail exactly once, on the first regular file we read the extended attributes for:
+            if stat.S_ISREG(st.st_mode) and not failed:
+                failed.append(True)
+                raise borg.helpers.errors.BackupOSError(
+                    'extended stat (xattrs)', OSError(errno.EIO, 'simulated I/O error', path))
+            return orig_stat_ext_attrs(self, st, path, fd=fd)
+
+        with patch.object(MetadataCollector, 'stat_ext_attrs', failing_stat_ext_attrs):
+            out = self.cmd('create', f'--chunker-params=fixed,{chunk_size}', '--list',
+                           self.repository_location + '::test', 'input')
+        assert 'retry: 1 of ' in out
+        assert failed  # the error was actually injected
+        assert 'E input/file' not in out  # it was backed up ok on the retry
+
+        with Repository(self.repository_path, exclusive=True) as repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            archive = Archive(repository, key, manifest, 'test')
+            item = [item for item in archive.iter_items() if item.path == 'input/file'][0]
+            item_chunk_refs = Counter(chunk.id for chunk in item.chunks)
+            with Cache(repository, key, manifest) as cache:
+                refcounts = {id: entry.refcount for id, entry in cache.chunks.iteritems()}
+        # a leaked chunk from the failed attempt would show up here as a too high refcount:
         for chunk_id, refs in item_chunk_refs.items():
             assert refcounts[chunk_id] == refs
 
@@ -4560,6 +4599,10 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     def test_create_erroneous_file_with_part_files(self):
         pass
 
+    @unittest.skip('patches objects')
+    def test_create_ext_attrs_error_retry_rolls_back_chunks(self):
+        pass
+
     @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')
     def test_basic_functionality(self):
         pass
@@ -5022,6 +5065,10 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
     @unittest.skip('only works locally')  # inspects cache chunk refcounts via a local Cache/Repository
     def test_create_erroneous_file_read_retry_rolls_back_chunks(self):
+        pass
+
+    @unittest.skip('only works locally')  # inspects cache chunk refcounts via a local Cache/Repository
+    def test_create_ext_attrs_error_retry_rolls_back_chunks(self):
         pass
 
     @unittest.skip('only works locally')

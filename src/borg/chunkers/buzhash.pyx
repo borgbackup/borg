@@ -232,8 +232,7 @@ cdef class Chunker:
                 raise Exception("chunkifier byte count mismatch")
 
         while self.remaining < min_size + window_size + 1 and not self.eof:  # see assert in Chunker init
-            if not self.fill():
-                return None
+            self.fill()
 
         # Here we either are at eof...
         if self.eof:
@@ -268,8 +267,7 @@ cdef class Chunker:
             self.remaining -= did_bytes
 
             if self.remaining <= window_size:
-                if not self.fill():
-                    return None
+                self.fill()
 
         if self.remaining <= window_size:
             self.position += self.remaining

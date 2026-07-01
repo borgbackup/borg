@@ -175,8 +175,7 @@ cdef class ChunkerFastCDC:
 
         # ensure at least min_size + 1 bytes are buffered, or we are at eof
         while self.remaining < min_size + 1 and not self.eof:
-            if not self.fill():
-                return None
+            self.fill()
 
         # at eof with only a remainder (< min_size + 1): emit it as the final chunk
         if self.eof and self.remaining < min_size + 1:
@@ -207,8 +206,7 @@ cdef class ChunkerFastCDC:
             if self.remaining == 0:
                 if self.eof:
                     break  # cut at end of data
-                if not self.fill():
-                    return None
+                self.fill()
                 if self.remaining == 0:
                     break  # buffer full -> chunk reached max_size -> forced cut
                 continue

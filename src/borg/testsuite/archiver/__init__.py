@@ -123,6 +123,29 @@ def cmd_fixture(request):
 
 def generate_archiver_tests(metafunc, kinds: str):
     # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
+    #
+    # Picking "kinds" (see #9324, testsuite speedup):
+    # - "local" should always be included.
+    # - "remote" exercises the rest:// transport (it spawns a borgstore-server-rest subprocess and does
+    #   synchronous HTTP-over-stdio round trips per object), so a remote run costs several times its local
+    #   twin. Only add "remote" where a backend genuinely branches its implementation per transport, and
+    #   that branch is not already exercised by another remote-tested file:
+    #   - create/extract exercise Repository.get()/PackWriter's store.load(offset=, size=) partial reads
+    #     and store.store()'s content-hash header - the REST backend implements both very differently
+    #     (HTTP Range requests, upload hash verification) than e.g. posixfs (seek/read, plain write).
+    #   - check exercises store.hash(), which the REST backend computes server-side (nothing downloaded)
+    #     instead of the default download-then-hash - see check_cmd_remote_test.py.
+    #   - transfer opens two Repository/store connections at once (source and destination); no other
+    #     command does that, so it isn't covered by anything else.
+    #   - compact has its own store-level defrag/pack-rewrite path.
+    #   Everything else - even commands that move real archive data, like tar (routes through the same
+    #   Repository.get()/put() as extract/create) or repo space (never calls store.quota(), just generic
+    #   store_list/store/delete) - only calls the generic list/load/store/delete forwarding that every
+    #   backend implements the same way, so it runs "local,binary" only: repo lifecycle (repo create/
+    #   delete), locking, repo space, tar, recreate, and pure command/formatting logic (prune scheduling,
+    #   diff/list/info rendering, rename, delete/undelete, key handling, debug, return codes, fuse mount).
+    # - "binary" runs the frozen borg.exe; it is only built for tag releases, so it does not affect normal
+    #   PR/push CI run time.
     archivers = []
     for kind in kinds.split(","):
         if kind == "local":

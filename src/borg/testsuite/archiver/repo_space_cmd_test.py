@@ -2,7 +2,7 @@ from ...constants import *  # NOQA
 
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
 
 
 def test_repo_space_basics(archivers, request):

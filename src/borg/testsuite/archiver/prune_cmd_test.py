@@ -20,7 +20,7 @@ from ...helpers import CommandError
 from ...manifest import ArchiveInfo
 from . import cmd, RK_ENCRYPTION, generate_archiver_tests
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def _create_archive_dt(archiver, backup_files, name, dt, tzinfo=timezone.utc):

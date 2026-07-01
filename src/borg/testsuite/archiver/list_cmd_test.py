@@ -5,7 +5,7 @@ import pytest
 from ...constants import *  # NOQA
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, requires_hardlinks
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_list_format(archivers, request, backup_files):

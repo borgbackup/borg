@@ -13,7 +13,7 @@ from . import generate_archiver_tests
 from ...platform import acl_get, acl_set
 from ..platform.platform_test import skipif_not_linux, skipif_acls_not_working
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def have_gnutar():

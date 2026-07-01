@@ -117,6 +117,9 @@ def test_fastcdc_params_parsing():
     # a 6-field (buzhash64-style, with window) fastcdc must be rejected
     with pytest.raises(ArgumentTypeError):
         ChunkerParams("fastcdc,19,23,21,4095,2")
+    # a 4-field fastcdc (missing nc_level) must be rejected, not fall into old-style compat mode
+    with pytest.raises(ArgumentTypeError):
+        ChunkerParams("fastcdc,19,23,21")
     # nc_level out of range (chunk_mask - nc_level < 1)
     with pytest.raises(ArgumentTypeError):
         ChunkerParams("fastcdc,19,23,21,21")

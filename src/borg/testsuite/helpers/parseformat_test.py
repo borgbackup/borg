@@ -704,9 +704,12 @@ def test_valid_chunkerparams(chunker_params, expected_return):
         "buzhash,19,24,21,4095",  # too big max. size
         "buzhash,23,19,21,4095",  # violates min <= mask <= max
         "buzhash,19,23,21,4096",  # even window size
+        "buzhash,19,23,21",  # missing window_size (must not fall into old-style compat mode)
         "buzhash64,20,20,20,4095,2",  # window_size + 2^chunk_min + 1 > 2^chunk_max
         "buzhash64,19,19,19,4095,2",  # dito, chunk_min == chunk_max
+        "buzhash64,19,23,21,4095",  # missing nc_level
         "fastcdc,20,20,20,2",  # chunk_min == chunk_max
+        "fastcdc,19,23,21",  # missing nc_level (must not fall into old-style compat mode)
         "fixed,63",  # too small block size
         "fixed,%d,%d" % (MAX_DATA_SIZE + 1, 4096),  # too big block size
         "fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1),  # too big header size

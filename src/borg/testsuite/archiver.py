@@ -4519,7 +4519,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd('init', '--encryption=repokey', self.repository_location)
         secrets_path = os.path.join(self.tmpdir, 'secrets.json')
         self.cmd('key', 'export-related-secrets', self.repository_location, secrets_path)
- 
+
         # Try to create repo2 with BLAKE2b (incompatible)
         repo2_path = os.path.join(self.tmpdir, 'repo2')
         repo2_location = self.prefix + repo2_path
@@ -4550,6 +4550,14 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_create_exclude_dataless(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_changed_file_retry_rolls_back_chunks(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_erroneous_file_with_part_files(self):
         pass
 
     @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')

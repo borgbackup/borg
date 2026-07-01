@@ -16,6 +16,7 @@ from .hashindex import ChunkIndex
 from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
+from .helpers import get_cache_dir
 from .helpers import ProgressIndicatorPercent
 from .storelocking import Lock
 from .logger import create_logger
@@ -336,6 +337,21 @@ class Repository:
         permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
         permissions = borg_permissions(permissions)
 
+        # writethrough cache on the packs/ namespace: a load that misses the cache fetches the whole
+        # pack and caches it, so later loads of that pack's objects come from the local cache.
+        # BORG_PACK_CACHE sets the cache directory ("1" means <cache_dir>/packcache). BORG_PACK_CACHE_SIZE
+        # bounds it in bytes, evicting least recently accessed packs at store open and close.
+        cache_url = None
+        pack_cache = os.environ.get("BORG_PACK_CACHE")
+        if pack_cache:
+            cache_dir = Path(get_cache_dir()) / "packcache" if pack_cache == "1" else Path(pack_cache)
+            os.makedirs(cache_dir, exist_ok=True)
+            ns_config["packs/"]["cache"] = "writethrough"
+            cache_size = os.environ.get("BORG_PACK_CACHE_SIZE")
+            if cache_size:
+                ns_config["packs/"]["size"] = int(cache_size)
+            cache_url = cache_dir.as_uri()
+
         try:
             if location.proto == "rest":
                 # rest:// is served by "borg serve --rest" (reachable via ssh if a host is given),
@@ -343,9 +359,9 @@ class Repository:
                 # permissions are not given to the (remote) backend here; they are enforced on the
                 # server side by "borg serve --rest --permissions ...".
                 backend = build_rest_backend(location)
-                self.store = Store(backend=backend, config=ns_config)
+                self.store = Store(backend=backend, config=ns_config, cache_url=cache_url)
             else:
-                self.store = Store(url, config=ns_config, permissions=permissions)
+                self.store = Store(url, config=ns_config, permissions=permissions, cache_url=cache_url)
         except StoreBackendError as e:
             raise Error(str(e))
         self.store_opened = False
@@ -495,7 +511,14 @@ class Repository:
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._chunks = None
-        self._pack_writer = PackWriter(self.store, repository=self)
+        # pack-sizing overrides: BORG_PACK_MAX_COUNT sets the max object count per pack,
+        # BORG_PACK_MAX_SIZE the max pack size in bytes.
+        pw_kwargs = {}
+        if (v := os.environ.get("BORG_PACK_MAX_COUNT")) is not None:
+            pw_kwargs["max_count"] = int(v)
+        if (v := os.environ.get("BORG_PACK_MAX_SIZE")) is not None:
+            pw_kwargs["max_size"] = int(v)
+        self._pack_writer = PackWriter(self.store, repository=self, **pw_kwargs)
         self.opened = True
 
     @property

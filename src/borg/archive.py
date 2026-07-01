@@ -1513,6 +1513,19 @@ class FilesystemObjectProcessors:
                     # so it can be extracted / accessed in FUSE mount like a regular file.
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
+
+                def rollback_chunks():
+                    # roll back the chunk references we added for the (still uncommitted) complete file item.
+                    # a read error can happen after we already added and referenced chunks (e.g. while reading
+                    # xattrs/flags or re-fstat-ing the file). if we then abort (and maybe retry) the file, those
+                    # references would leak (inflated refcount / orphan chunk). decref one reference per id in
+                    # item.chunks: for a cache hit this undoes the incref above, for a freshly chunked file it
+                    # undoes the add_chunk reference, and if part files were written it undoes the extra
+                    # "complete file" incref while leaving the (committed) part file references intact.
+                    for chunk in item.get('chunks', []):
+                        cache.chunk_decref(chunk.id, self.stats)
+                    item.chunks = []
+
                 if not hardlinked or hardlink_master:
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
@@ -1550,8 +1563,12 @@ class FilesystemObjectProcessors:
                         if is_win32:
                             changed_while_backup = False  # TODO
                         else:
-                            with backup_io('fstat2'):
-                                st2 = os.fstat(fd)
+                            try:
+                                with backup_io('fstat2'):
+                                    st2 = os.fstat(fd)
+                            except BackupOSError:
+                                rollback_chunks()
+                                raise
                             # special files:
                             # - fifos change naturally, because they are fed from the other side. no problem.
                             # - blk/chr devices don't change ctime anyway.
@@ -1575,9 +1592,7 @@ class FilesystemObjectProcessors:
                                 # not the last try and no part files written yet: trigger a retry by raising,
                                 # hoping that re-reading the file gives us a consistent copy. the retry is
                                 # done by the caller (Archiver._process_any).
-                                for chunk in item.chunks:
-                                    cache.chunk_decref(chunk.id, self.stats)
-                                item.chunks = []
+                                rollback_chunks()
                                 raise BackupError('file changed while we read it!')
                         if not is_special_file and not changed_while_backup:
                             # we must not memorize special files, because the contents of e.g. a
@@ -1586,7 +1601,13 @@ class FilesystemObjectProcessors:
                             # changed while we backed it up.
                             cache.memorize_file(hashed_path, path_hash, st, [c.id for c in item.chunks])
                     self.stats.nfiles += 1
-                item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
+                try:
+                    item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
+                except BackupOSError:
+                    # reading extended attributes (bsdflags / xattrs / ACLs) failed after we already
+                    # referenced the file's chunks - roll them back so a retry does not leak refcounts.
+                    rollback_chunks()
+                    raise
                 item.get_size(memorize=True)
                 return status
 

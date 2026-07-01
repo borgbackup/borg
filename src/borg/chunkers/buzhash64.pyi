@@ -15,6 +15,8 @@ class ChunkerBuzHash64:
         chunk_max_exp: int,
         hash_mask_bits: int,
         hash_window_size: int,
+        nc_level: int = 0,
+        normal_size: int = 0,
         sparse: bool = False,
     ) -> None: ...
     def chunkify(self, fd: BinaryIO = None, fh: int = -1, fmap: list[fmap_entry] = None) -> Iterator: ...

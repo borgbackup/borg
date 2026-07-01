@@ -316,6 +316,10 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
+        # a max. chunk size sized buffer, see the assertion in ChunkerBuzHash64.__cinit__.
+        if window_size + 2**chunk_min + 1 > 2**chunk_max:
+            raise ArgumentTypeError("required: window_size + 2^chunk_min + 1 <= 2^chunk_max")
         # normalized chunking switches the mask at the target size; it needs room below and above
         # the base mask bits (chunk_mask). nc_level 0 disables it.
         if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
@@ -337,6 +341,10 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        # the chunker needs one byte beyond the min. chunk size to fit into a max. chunk size
+        # sized buffer, see the assertion in ChunkerFastCDC.__cinit__.
+        if chunk_min >= chunk_max:
+            raise ArgumentTypeError("required: chunk_min < chunk_max")
         if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
             raise ArgumentTypeError(
                 "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"

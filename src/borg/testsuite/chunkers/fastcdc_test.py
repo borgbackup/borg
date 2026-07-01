@@ -123,6 +123,9 @@ def test_fastcdc_params_parsing():
     # chunk_min <= chunk_mask <= chunk_max violated
     with pytest.raises(ArgumentTypeError):
         ChunkerParams("fastcdc,19,23,24,2")
+    # chunk_min == chunk_max: the chunker needs min_size + 1 <= max_size
+    with pytest.raises(ArgumentTypeError):
+        ChunkerParams("fastcdc,20,20,20,2")
 
 
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")

@@ -6,7 +6,7 @@ from ...constants import *  # NOQA
 from ...helpers import CancelledByUser
 from . import create_regular_file, cmd, generate_archiver_tests, RK_ENCRYPTION
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_delete_repo(archivers, request):

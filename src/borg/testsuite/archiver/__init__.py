@@ -128,13 +128,22 @@ def generate_archiver_tests(metafunc, kinds: str):
     # - "local" should always be included.
     # - "remote" exercises the rest:// transport (it spawns a borgstore-server-rest subprocess and does
     #   synchronous HTTP-over-stdio round trips per object), so a remote run costs several times its local
-    #   twin. Only add "remote" where the *store I/O pattern itself* is what's under test and is not already
-    #   covered elsewhere: writing/reading archive data over the wire (create, extract, tar), repository
-    #   lifecycle (repo create/delete), integrity (check, compact), locking, repo space and transfer.
-    #   Pure command logic that operates on metadata or only formats output (prune scheduling, diff/list/info
-    #   rendering, rename, delete/undelete, recreate, key handling, debug, return codes, fuse mount) behaves
-    #   identically regardless of transport, so it runs "local,binary" only - the data path over rest is
-    #   already covered by the create/extract tests.
+    #   twin. Only add "remote" where a backend genuinely branches its implementation per transport, and
+    #   that branch is not already exercised by another remote-tested file:
+    #   - create/extract exercise Repository.get()/PackWriter's store.load(offset=, size=) partial reads
+    #     and store.store()'s content-hash header - the REST backend implements both very differently
+    #     (HTTP Range requests, upload hash verification) than e.g. posixfs (seek/read, plain write).
+    #   - check exercises store.hash(), which the REST backend computes server-side (nothing downloaded)
+    #     instead of the default download-then-hash - see check_cmd_remote_test.py.
+    #   - transfer opens two Repository/store connections at once (source and destination); no other
+    #     command does that, so it isn't covered by anything else.
+    #   - compact has its own store-level defrag/pack-rewrite path.
+    #   Everything else - even commands that move real archive data, like tar (routes through the same
+    #   Repository.get()/put() as extract/create) or repo space (never calls store.quota(), just generic
+    #   store_list/store/delete) - only calls the generic list/load/store/delete forwarding that every
+    #   backend implements the same way, so it runs "local,binary" only: repo lifecycle (repo create/
+    #   delete), locking, repo space, tar, recreate, and pure command/formatting logic (prune scheduling,
+    #   diff/list/info rendering, rename, delete/undelete, key handling, debug, return codes, fuse mount).
     # - "binary" runs the frozen borg.exe; it is only built for tag releases, so it does not affect normal
     #   PR/push CI run time.
     archivers = []

@@ -10,7 +10,7 @@ from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 from ...helpers import CommandError
 from ...platformflags import is_haiku, is_win32
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 def test_break_lock(archivers, request):

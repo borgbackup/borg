@@ -362,9 +362,11 @@ class HelpMixIn:
 
             Date and time patterns may include a timezone suffix: ``Z`` (UTC), ``+HH:MM``,
             ``-HH:MM``, or ``[Region/City]``. Patterns without a timezone are interpreted
-            in the local timezone. Be wary of Daylight Saving Time (DST) transitions, as
-            they can make time intervals ambiguous or nonexistent. Use UTC to avoid such
-            issues. Unix timestamps are always UTC and do not accept a timezone suffix.
+            in the local timezone. Unix timestamps are always UTC and do not accept a timezone suffix.
+
+            Be wary of Daylight Saving Time (DST) transitions, as they can make time intervals
+            ambiguous or nonexistent. For example, named zones such as ``[Europe/Berlin]`` track DST,
+            but the equivalent (winter) UTC offset of ``+01:00`` does not. Use UTC to avoid such issues.
 
         Examples::
 

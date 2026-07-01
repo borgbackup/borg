@@ -297,6 +297,50 @@ def test_match_bare_pattern_uses_local_timezone(archivers, request, set_timezone
     assert "archive-local-out" not in out
 
 
+def test_match_space_date_time_separator(archivers, request):
+    """A space is accepted in place of the T date-time separator."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive-in", ts="2025-01-01T14:30:30+00:00")
+    create_src_archive(archiver, "archive-out", ts="2025-01-01T14:31:30+00:00")
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-01-01 14:30Z", exit_code=0)
+    assert "archive-in" in out
+    assert "archive-out" not in out
+
+
+# Europe/Berlin springs forward 2026-03-29: 02:00 CET (+01:00) -> 03:00 CEST (+02:00).
+DST_ARCHIVES = [
+    ("archive-cet", "2026-03-29T00:30:00Z"),  # local 01:30 CET (+01:00), before the transition
+    ("archive-plus2", "2026-03-28T23:30:00Z"),  # 01:30 at a fixed +02:00 offset
+    ("archive-cest", "2026-03-29T01:00:00Z"),  # local 03:00 CEST (+02:00), after the transition
+]
+
+
+def test_match_dst_transition(archivers, request):
+    """Named zones track DST, so they can differ from a fixed offset around a transition."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in DST_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # Before the transition Europe/Berlin is +01:00, so 01:30 there differs from a literal +02:00.
+    out_berlin = cmd(archiver, "repo-list", "-v", "--match-archives=date:2026-03-29T01:30[Europe/Berlin]", exit_code=0)
+    assert "archive-cet" in out_berlin
+    assert "archive-plus2" not in out_berlin
+    assert "archive-cest" not in out_berlin
+
+    out_plus2 = cmd(archiver, "repo-list", "-v", "--match-archives=date:2026-03-29T01:30+02:00", exit_code=0)
+    assert "archive-plus2" in out_plus2
+    assert "archive-cet" not in out_plus2
+
+    # After the transition Europe/Berlin is +02:00, so 03:00 there equals the fixed +02:00.
+    out_after = cmd(archiver, "repo-list", "-v", "--match-archives=date:2026-03-29T03:00[Europe/Berlin]", exit_code=0)
+    assert "archive-cest" in out_after
+    assert "archive-cet" not in out_after
+    assert "archive-plus2" not in out_after
+
+
 @pytest.mark.parametrize(
     "invalid_expr",
     [

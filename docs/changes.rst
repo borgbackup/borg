@@ -214,6 +214,10 @@ New features:
 - create/extract/compact --stats: report store statistics, #9880, #9405
 - compact: show deduplication and compression factors, #9856
 - json: support BORG_JSON_INDENT env var for JSON output formatting
+- implement --match-archives ``date:`` selector to match archives by creation
+  timestamp. It supports ISO-8601-like dates/times from year to fractional-second
+  precision, Unix epoch timestamps (``@...``), and ``Z`` / ``+HH:MM`` /
+  ``[Region/City]`` timezone suffixes. #8776
 
 Fixes:
 

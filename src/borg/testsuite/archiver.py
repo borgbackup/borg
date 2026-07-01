@@ -4536,6 +4536,14 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     def test_extract_xattrs_errors(self):
         pass
 
+    @unittest.skip('patches objects')
+    def test_create_changed_file_retry_rolls_back_chunks(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_erroneous_file_with_part_files(self):
+        pass
+
     @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')
     def test_basic_functionality(self):
         pass

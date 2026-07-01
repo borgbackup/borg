@@ -255,7 +255,7 @@ DATE_PATTERN_RE = r"""
          (?:
              -(?P<day>\d{2})
              (?:
-                 T(?P<hour>\d{2})
+                 [ T](?P<hour>\d{2})
                  (?:
                      :(?P<minute>\d{2})
                      (?:
@@ -267,7 +267,7 @@ DATE_PATTERN_RE = r"""
      )?
   )
   (?P<tz>Z|[+\-]\d\d:\d\d|\[[^]]+\])?
-  $
+  \Z
 """
 
 
@@ -341,7 +341,6 @@ def compile_date_pattern(expr: str):
     Supported expressions are static calendar timestamps from year to fractional-second precision,
     optional timezone suffixes (Z, +/-HH:MM, or [Region/City]), and Unix epoch timestamps prefixed with @.
     """
-    expr = expr.strip()
     start, end = parse_date_pattern_interval(expr)
     if start == end:
         return date_match_exact(start)

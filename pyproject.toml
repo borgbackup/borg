@@ -42,6 +42,7 @@ dependencies = [
   "jsonargparse>=4.47.0",
   "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
   "blake3>=1.0.0,!=1.0.9",  # 1.0.9 does not build on windows/msys2/mingw
+  "tzdata; sys_platform == 'win32'",  # zoneinfo has no system tz database on Windows (date: named zones)
 ]
 
 [project.optional-dependencies]

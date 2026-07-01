@@ -1,4 +1,5 @@
 import calendar
+import os
 import time
 from datetime import datetime, timezone
 
@@ -10,6 +11,27 @@ from ...platform import is_win32
 from . import cmd, create_src_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+
+
+@pytest.fixture
+def set_timezone(request):
+    """Set the process-local timezone for the duration of a test, restoring it afterwards."""
+
+    def _set(tz):
+        old_tz = os.environ.get("TZ")
+
+        def restore():
+            if old_tz is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = old_tz
+            time.tzset()
+
+        request.addfinalizer(restore)
+        os.environ["TZ"] = tz
+        time.tzset()
+
+    return _set
 
 
 # (archive_name, timestamp)
@@ -261,11 +283,10 @@ LOCAL_TZ_ARCHIVES = [
 
 
 @pytest.mark.skipif(is_win32, reason="time.tzset() is not available on Windows")
-def test_match_bare_pattern_uses_local_timezone(archivers, request, monkeypatch):
+def test_match_bare_pattern_uses_local_timezone(archivers, request, set_timezone):
     """A pattern without a timezone suffix is interpreted in the local timezone."""
+    set_timezone("America/New_York")
     archiver = request.getfixturevalue(archivers)
-    monkeypatch.setenv("TZ", "America/New_York")
-    time.tzset()
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     for name, ts in LOCAL_TZ_ARCHIVES:
         create_src_archive(archiver, name, ts=ts)
@@ -347,3 +368,14 @@ def test_fractional_precision_rejected(archivers, request, invalid_expr):
     msg = str(excinfo.value)
     assert "Invalid date pattern" in msg
     assert invalid_expr in msg
+
+
+@pytest.mark.parametrize("invalid_expr", ["2025\n", " 2025", "2025 "])
+def test_surrounding_whitespace_rejected(archivers, request, invalid_expr):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    with pytest.raises(CommandError) as excinfo:
+        cmd(archiver, "repo-list", "-v", f"--match-archives=date:{invalid_expr}")
+
+    assert "Invalid date pattern" in str(excinfo.value)

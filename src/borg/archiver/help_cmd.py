@@ -330,26 +330,41 @@ class HelpMixIn:
             This is very powerful, but can also get rather complicated.
 
         Date patterns, selector ``date:``
-            Match archives by creation timestamp. Supported forms are:
+            Match archives by creation timestamp. You can either match a single archive by
+            passing its exact creation time, or all archives created within a given time
+            interval.
 
-            - ``YYYY``: 1 year
-            - ``YYYY-MM``: 1 month
-            - ``YYYY-MM-DD``: 1 day
-            - ``YYYY-MM-DDTHH``: 1 hour
-            - ``YYYY-MM-DDTHH:MM``: 1 minute
-            - ``YYYY-MM-DDTHH:MM:SS``: 1 second
-            - ``@1735732800``: 1 second
-            - ``YYYY-MM-DDTHH:MM:SS.ffffff``: exact timestamp
-            - ``@1735732800.123456``: exact timestamp
+            To match a single archive by its exact creation time, use the forms:
+
+            - ``YYYY-MM-DDTHH:MM:SS.ffffff``: ISO-8601-like date-time string
+            - ``@1735732800.123456``: UNIX timestamp
+
+            To match a single archive, the pattern must specify the archive's complete
+            creation timestamp, including any fractional seconds. Fractional-second
+            patterns accept 1 to 6 digits.
+
+            To match all archives created within a given time interval, use the forms:
+
+            - ``YYYY``: match all archives created within the given year
+            - ``YYYY-MM``: within the given month
+            - ``YYYY-MM-DD``: on the given day
+            - ``YYYY-MM-DDTHH``: in the given hour
+            - ``YYYY-MM-DDTHH:MM``: in the given minute
+            - ``YYYY-MM-DDTHH:MM:SS``: in the given second
+            - ``@1735732800``: within the 1 second interval from the given UNIX timestamp
+
+            The ``T`` date-time separator may also be written as a space, e.g.
+            ``date:2025-01-01 14:30``.
 
             Date and time patterns match the interval implied by their precision, including
-            the start and excluding the end. Fractional-second patterns accept 1 to 6
-            digits and match exactly.
+            the start and excluding the end. For example, ``date:2026-06`` matches archives
+            created on or after ``2026-06-01T00:00:00`` and before ``2026-07-01T00:00:00``.
 
-            Date and time patterns may include a timezone suffix: ``Z``, ``+HH:MM``,
+            Date and time patterns may include a timezone suffix: ``Z`` (UTC), ``+HH:MM``,
             ``-HH:MM``, or ``[Region/City]``. Patterns without a timezone are interpreted
-            in the local timezone. Unix timestamp patterns are UTC and do not accept a
-            timezone suffix.
+            in the local timezone. Be wary of Daylight Saving Time (DST) transitions, as
+            they can make time intervals ambiguous or nonexistent. Use UTC to avoid such
+            issues. Unix timestamps are always UTC and do not accept a timezone suffix.
 
         Examples::
 

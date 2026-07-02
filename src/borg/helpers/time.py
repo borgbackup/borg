@@ -1,6 +1,7 @@
 import os
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 
 def parse_timestamp(timestamp, tzinfo=UTC):
@@ -198,3 +199,150 @@ class OutputTimestamp:
 def archive_ts_now():
     """return tz-aware datetime obj for current time for usage as archive timestamp"""
     return datetime.now(UTC)  # utc time / utc timezone
+
+
+class DatePatternError(ValueError):
+    """Raised when a date: archive pattern cannot be parsed."""
+
+
+def date_match_exact(dt: datetime):
+    """Return predicate matching archives whose timestamp equals dt."""
+    dt_utc = dt.astimezone(UTC)
+    return lambda ts: ts.astimezone(UTC) == dt_utc
+
+
+def date_match_interval(start: datetime, end: datetime):
+    """Return predicate matching archives in the start-inclusive, end-exclusive interval."""
+    start_utc = start.astimezone(UTC)
+    end_utc = end.astimezone(UTC)
+    return lambda ts: start_utc <= ts.astimezone(UTC) < end_utc
+
+
+def parse_date_pattern_tz(tzstr: str):
+    """Parse a date: pattern timezone suffix."""
+    if not tzstr:
+        return None
+    if tzstr == "Z":
+        return UTC
+    if tzstr[0] in "+-":
+        sign = 1 if tzstr[0] == "+" else -1
+        try:
+            hh, mm = map(int, tzstr[1:].split(":"))
+            if not (0 <= hh <= 23 and 0 <= mm < 60):
+                raise ValueError
+        except ValueError:
+            raise DatePatternError("invalid UTC offset format")
+        total_minutes = sign * (hh * 60 + mm)
+        if not (-12 * 60 <= total_minutes <= 14 * 60):
+            raise DatePatternError("UTC offset outside ISO-8601 bounds")
+        return timezone(timedelta(minutes=total_minutes))
+    if tzstr.startswith("[") and tzstr.endswith("]"):
+        try:
+            return ZoneInfo(tzstr[1:-1])
+        except Exception:
+            raise DatePatternError("invalid timezone format")
+    raise DatePatternError("invalid timezone format")
+
+
+DATE_PATTERN_RE = r"""
+  ^
+  (?:
+     @(?P<epoch>\d+)(?:\.(?P<epoch_fraction>\d{1,6}))?
+   |
+     (?P<year>\d{4})
+     (?:
+         -(?P<month>\d{2})
+         (?:
+             -(?P<day>\d{2})
+             (?:
+                 T(?P<hour>\d{2})
+                 (?:
+                     :(?P<minute>\d{2})
+                     (?:
+                         :(?P<second>\d{2})(?:\.(?P<fraction>\d{1,6}))?
+                     )?
+                 )?
+             )?
+         )?
+     )?
+  )
+  (?P<tz>Z|[+\-]\d\d:\d\d|\[[^]]+\])?
+  $
+"""
+
+
+def build_date_pattern_datetime(groups: dict, tz) -> datetime:
+    """Build the earliest datetime represented by a date: pattern."""
+    second = 0
+    microsecond = 0
+    if groups.get("second"):
+        second = int(groups["second"])
+    if groups.get("fraction"):
+        microsecond = int((groups["fraction"] + "000000")[:6])
+    try:
+        return datetime(
+            year=int(groups["year"]),
+            month=int(groups.get("month") or 1),
+            day=int(groups.get("day") or 1),
+            hour=int(groups.get("hour") or 0),
+            minute=int(groups.get("minute") or 0),
+            second=second,
+            microsecond=microsecond,
+            tzinfo=tz,
+        )
+    except ValueError as exc:
+        raise DatePatternError(str(exc))
+
+
+def parse_date_pattern_interval(expr: str) -> tuple[datetime, datetime]:
+    """Parse a static date: pattern into the interval it represents."""
+    match = re.match(DATE_PATTERN_RE, expr, re.VERBOSE)
+    if not match:
+        raise DatePatternError(f"unrecognised date: {expr!r}")
+
+    groups = match.groupdict()
+    tz = parse_date_pattern_tz(groups["tz"])
+
+    if groups["epoch"] and groups["tz"]:
+        raise DatePatternError("Unix timestamps must not have timezone suffixes")
+
+    try:
+        if groups["epoch"]:
+            if groups["epoch_fraction"]:
+                start = _EPOCH + timedelta(
+                    seconds=int(groups["epoch"]), microseconds=int((groups["epoch_fraction"] + "000000")[:6])
+                )
+                return start, start
+            start = _EPOCH + timedelta(seconds=int(groups["epoch"]))
+            return start, start + timedelta(seconds=1)
+
+        start = build_date_pattern_datetime(groups, tz)
+        if groups["second"]:
+            if groups["fraction"]:
+                return start, start
+            return start, start + timedelta(seconds=1)
+        if groups["minute"]:
+            return start, start + timedelta(minutes=1)
+        if groups["hour"]:
+            return start, start + timedelta(hours=1)
+        if groups["day"]:
+            return start, start + timedelta(days=1)
+        if groups["month"]:
+            return start, offset_n_months(start, 1)
+        return start, offset_n_months(start, 12)
+    except (ValueError, OverflowError) as exc:
+        raise DatePatternError(str(exc))
+
+
+def compile_date_pattern(expr: str):
+    """
+    Compile a date: archive match expression into a timestamp predicate.
+
+    Supported expressions are static calendar timestamps from year to fractional-second precision,
+    optional timezone suffixes (Z, +/-HH:MM, or [Region/City]), and Unix epoch timestamps prefixed with @.
+    """
+    expr = expr.strip()
+    start, end = parse_date_pattern_interval(expr)
+    if start == end:
+        return date_match_exact(start)
+    return date_match_interval(start, end)

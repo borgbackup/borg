@@ -337,14 +337,17 @@ class Repository:
         permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
         permissions = borg_permissions(permissions)
 
-        # writethrough cache on the packs/ namespace: a load that misses the cache fetches the whole
-        # pack and caches it, so later loads of that pack's objects come from the local cache.
-        # BORG_PACK_CACHE sets the cache directory ("1" means <cache_dir>/packcache). BORG_PACK_CACHE_SIZE
-        # bounds it in bytes, evicting least recently accessed packs at store open and close.
+        # writethrough cache for the packs/ namespace: on a cache miss borgstore loads the whole
+        # pack, caches it, and serves later reads of that pack's objects from the cache.
+        # packs are named by content hash, so one cache directory can hold packs from several
+        # repositories; a colliding name has identical content, so sharing is safe.
+        # BORG_STORE_CACHE sets the cache directory ("1" means <cache_dir>/storecache); the
+        # directory holds the whole store's cache, currently just the packs/ namespace.
+        # BORG_PACK_CACHE_SIZE limits the pack cache size in bytes.
         cache_url = None
-        pack_cache = os.environ.get("BORG_PACK_CACHE")
-        if pack_cache:
-            cache_dir = Path(get_cache_dir()) / "packcache" if pack_cache == "1" else Path(pack_cache)
+        store_cache = os.environ.get("BORG_STORE_CACHE")
+        if store_cache:
+            cache_dir = Path(get_cache_dir()) / "storecache" if store_cache == "1" else Path(store_cache)
             os.makedirs(cache_dir, exist_ok=True)
             ns_config["packs/"]["cache"] = "writethrough"
             cache_size = os.environ.get("BORG_PACK_CACHE_SIZE")

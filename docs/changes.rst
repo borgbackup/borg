@@ -215,6 +215,9 @@ New features:
 - prune: show total vs matching archives in output, #9262
 - prune: add --json option, #9222
 - archive: preserve cwd archive metadata, #9495
+- create: replace the --hostname/--username options (added in 2.0.0b21) with the
+  BORG_HOSTNAME and BORG_USERNAME env vars. When set, they override the hostname/username
+  stored in newly created archives and used by the {hostname}/{user} placeholders, #9651
 
 Fixes:
 

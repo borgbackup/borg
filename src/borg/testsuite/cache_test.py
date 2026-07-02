@@ -6,7 +6,20 @@ import pytest
 from .hashindex_test import H
 from .crypto.key_test import TestKey
 from ..archive import Statistics
-from ..cache import AdHocWithFilesCache, FileCacheEntry, delete_chunkindex_from_repo, read_chunkindex_from_repo
+from .. import cache as cache_mod
+from ..cache import (
+    AdHocWithFilesCache,
+    ChunksMixin,
+    FileCacheEntry,
+    build_chunkindex_from_repo,
+    delete_chunkindex_from_repo,
+    list_chunkindex_fragments,
+    list_chunkindex_hashes,
+    read_chunkindex_from_repo,
+    repack_chunkindex,
+    write_chunkindex_to_repo,
+)
+from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
 from ..helpers import safe_ns
 from ..helpers.msgpack import int_to_timestamp
@@ -121,9 +134,6 @@ def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
     on every access would re-upload the whole index and, with delete_other, invalidate every other
     client's fragments. Fragment count is reclaimed by `borg compact`, not on every read here.
     """
-    from ..cache import ChunksMixin, write_chunkindex_to_repo, list_chunkindex_hashes
-    from ..hashindex import ChunkIndex, ChunkIndexEntry
-
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
         # seed extra fragments on top of the empty one written at repo creation
@@ -142,3 +152,210 @@ def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
         assert len(list_chunkindex_hashes(repository)) == before
         # ... and the in-memory index still resolves every seeded chunk
         assert H(1) in index and H(2) in index
+
+
+def _ci_key(i):
+    """A distinct 32-byte chunk id for entry number i."""
+    return i.to_bytes(32, "big")
+
+
+def _make_chunkindex(keys):
+    ci = ChunkIndex()
+    for k in keys:
+        ci[k] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, k, 0, 4)
+    return ci
+
+
+def _seed_fragment(repository, first, count):
+    """Write a fresh index fragment holding entries [first, first+count) and return its keys."""
+    keys = [_ci_key(i) for i in range(first, first + count)]
+    write_chunkindex_to_repo(repository, _make_chunkindex(keys), incremental=False, force_write=True)
+    return keys
+
+
+def test_write_chunkindex_splits_full_write(tmp_path, monkeypatch):
+    """A non-incremental (full) write splits the index into fragments of at most MAX entries."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 3000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)  # start from a known-empty fragment set
+        keys = [_ci_key(i) for i in range(7000)]
+        write_chunkindex_to_repo(
+            repository, _make_chunkindex(keys), incremental=False, force_write=True, delete_other=True
+        )
+        frags = list_chunkindex_fragments(repository)
+        # 7000 entries split by MAX=3000 -> 3 fragments (3000 + 3000 + 1000)
+        counts = sorted(len(read_chunkindex_from_repo(repository, name)) for name, _ in frags)
+        assert counts == [1000, 3000, 3000]
+        assert all(c <= 3000 for c in counts)
+
+
+def test_repack_defers_when_below_min_and_few_fragments(tmp_path, monkeypatch):
+    """Deferred merging: small fragments summing to < MIN and not exceeding the cap are left alone."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 3000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 5)
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)
+        for j in range(3):  # 3 fragments * 100 = 300 entries < MIN, count 3 <= cap 5
+            _seed_fragment(repository, j * 100, 100)
+        before = {name for name, _ in list_chunkindex_fragments(repository)}
+        repack_chunkindex(repository)
+        after = {name for name, _ in list_chunkindex_fragments(repository)}
+        assert after == before  # nothing merged
+
+
+def test_repack_seals_when_smalls_reach_min(tmp_path, monkeypatch):
+    """When small fragments sum to >= MIN they are merged into a sealed fragment."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 3000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 100)
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)
+        all_keys = []
+        for j in range(5):  # 5 * 300 = 1500 >= MIN
+            all_keys += _seed_fragment(repository, j * 300, 300)
+        assert len(list_chunkindex_fragments(repository)) == 5
+        repack_chunkindex(repository)
+        frags = list_chunkindex_fragments(repository)
+        assert len(frags) == 1  # 1500 entries, one fragment (< MAX)
+        merged = read_chunkindex_from_repo(repository, frags[0][0])
+        assert len(merged) == 1500
+        assert set(merged) == set(all_keys)
+
+
+def test_repack_cap_forces_merge_below_min(tmp_path, monkeypatch):
+    """More than SMALL_FRAGMENT_CAP tiny fragments are merged even though they sum to < MIN."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 3000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 5)
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)
+        all_keys = []
+        for j in range(6):  # 6 * 50 = 300 < MIN, but count 6 > cap 5
+            all_keys += _seed_fragment(repository, j * 50, 50)
+        assert len(list_chunkindex_fragments(repository)) == 6
+        repack_chunkindex(repository)
+        frags = list_chunkindex_fragments(repository)
+        assert len(frags) == 1  # merged into a single sub-MIN remainder
+        merged = read_chunkindex_from_repo(repository, frags[0][0])
+        assert len(merged) == 300
+        assert set(merged) == set(all_keys)
+
+
+def test_write_chunkindex_splits_incremental_write(tmp_path, monkeypatch):
+    """Even an incremental write (a single backup's new chunks) is split into <= MAX fragments."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 500)
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)
+        keys = [_ci_key(i) for i in range(1200)]  # all F_NEW -> written by the incremental path
+        write_chunkindex_to_repo(repository, _make_chunkindex(keys), incremental=True)
+        counts = sorted(
+            len(read_chunkindex_from_repo(repository, name)) for name, _ in list_chunkindex_fragments(repository)
+        )
+        assert counts == [200, 500, 500]  # 1200 split by MAX=500
+
+
+def test_write_chunkindex_deterministic_fragments(tmp_path, monkeypatch):
+    """Identical entry sets always produce identical fragments, regardless of insertion order.
+
+    The write path sorts the keys before partitioning them into batches, so the fragment set
+    (content hashes) only depends on the entries, not on the hash table's iteration order.
+    This makes writing/repacking idempotent and convergent across clients.
+    """
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 500)
+
+    key_ints = list(range(1200))
+    hashes = []
+    for reverse in (False, True):  # build the same index with different insertion orders
+        repository_location = os.fspath(tmp_path / f"repository{reverse}")
+        with Repository(repository_location, exclusive=True, create=True) as repository:
+            delete_chunkindex_from_repo(repository)
+            keys = [_ci_key(i) for i in (reversed(key_ints) if reverse else key_ints)]
+            write_chunkindex_to_repo(repository, _make_chunkindex(keys), incremental=False, force_write=True)
+            frags = list_chunkindex_fragments(repository)
+            hashes.append({name for name, _ in frags})
+            # keys are big-endian ints, so sorted key order == numeric order: the batches must
+            # hold exactly the ranges [0..499], [500..999], [1000..1199].
+            ranges = sorted(sorted(read_chunkindex_from_repo(repository, name)) for name, _ in frags)
+            assert ranges == [
+                [_ci_key(i) for i in range(0, 500)],
+                [_ci_key(i) for i in range(500, 1000)],
+                [_ci_key(i) for i in range(1000, 1200)],
+            ]
+    assert hashes[0] == hashes[1]  # identical fragment sets from differently-ordered inputs
+
+
+def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
+    """End-to-end: repeated create-like sessions leave a bounded, consolidated set of fragments."""
+    monkeypatch.setenv("BORG_PASSPHRASE", "test")
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 200)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 500)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 1000)
+
+    loc = os.fspath(tmp_path / "repository")
+    with Repository(loc, exclusive=True, create=True) as repository:
+        key = AESOCBKey.create(repository, TestKey.MockArgs())
+        Manifest(key, repository).write()
+
+    all_ids = []
+    for s in range(5):  # each session adds 100 new chunks (< MIN), so fragments must be consolidated
+        with Repository(loc, exclusive=True) as repository:
+            manifest = Manifest.load(repository, key=key, operations=Manifest.NO_OPERATION_CHECK)
+            cache = AdHocWithFilesCache(manifest)
+            try:
+                for i in range(s * 100, s * 100 + 100):
+                    cid = H(i)
+                    all_ids.append(cid)
+                    cache.add_chunk(cid, {}, b"data-%d" % i, stats=Statistics())
+            finally:
+                cache.close()
+            repository.flush()
+
+    with Repository(loc, exclusive=True) as repository:
+        frags = list_chunkindex_fragments(repository)
+        # without repack there would be one incremental fragment per session (plus creation's empty);
+        # repack consolidates the small ones as they accumulate, so we end up with fewer.
+        assert len(frags) < 5
+        assert any(approx >= 200 for _, approx in frags)  # at least one sealed (>= MIN) fragment
+        assert all(approx <= 500 + 8 for _, approx in frags)  # none exceeds MAX (+ header slack)
+        index = build_chunkindex_from_repo(repository)
+        for cid in all_ids:
+            assert cid in index
+
+
+def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):
+    """Sealed (>= MIN) fragments survive a repack; build_chunkindex_from_repo reconstructs the index."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 3000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 100)
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)
+        sealed_keys = _seed_fragment(repository, 0, 2000)  # >= MIN -> sealed
+        sealed_hashes = {name for name, _ in list_chunkindex_fragments(repository)}
+        assert len(sealed_hashes) == 1
+        small_keys = []
+        for j in range(3):  # 3 * 400 = 1200 >= MIN -> will be merged
+            small_keys += _seed_fragment(repository, 2000 + j * 400, 400)
+
+        repack_chunkindex(repository)
+
+        frags = {name for name, _ in list_chunkindex_fragments(repository)}
+        assert sealed_hashes <= frags  # the sealed fragment was not rewritten or deleted
+        assert len(frags) == 2  # sealed one + the merged small ones
+
+        index = build_chunkindex_from_repo(repository)
+        assert len(index) == 2000 + 1200
+        assert set(index) == set(sealed_keys + small_keys)

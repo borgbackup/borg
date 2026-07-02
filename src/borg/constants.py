@@ -95,6 +95,19 @@ MAX_ARCHIVES = 400000
 # repo.list() result count limit used by the Borg client
 LIST_SCAN_LIMIT = 100000
 
+# The chunks index is stored in the repo as immutable, content-addressed index/<sha256> fragments.
+# We keep each fragment's entry count within [MIN, MAX] where possible: MAX bounds a fragment's size,
+# MIN keeps the fragment count down. Small (< MIN) fragments are merged (repacked); fragments already
+# in range are left untouched (stable/immutable). SMALL_FRAGMENT_CAP bounds how many sub-MIN fragments
+# may accumulate before we force a merge even if their entries still sum to less than MIN.
+CHUNKINDEX_FRAGMENT_ENTRIES_MIN = 100000  # ~8MB
+CHUNKINDEX_FRAGMENT_ENTRIES_MAX = 400000  # ~32MB
+CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
+# Approximate on-disk bytes per serialized entry: 32 (key) + 48 (value: flags 4 + size 4 + pack_id 32
+# + obj_offset 4 + obj_size 4). Only used to estimate a fragment's entry count from its byte size,
+# so we can classify fragments without loading them.
+CHUNKINDEX_ENTRY_SIZE = 80
+
 FD_MAX_AGE = 4 * 60  # 4 minutes
 
 # Some bounds on segment / segment_dir indexes

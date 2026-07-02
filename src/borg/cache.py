@@ -20,6 +20,8 @@ files_cache_logger = create_logger("borg.debug.files_cache")
 from borgstore.store import ItemInfo
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
+from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
+from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_ENTRY_SIZE
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import get_cache_dir
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
@@ -525,6 +527,22 @@ def list_chunkindex_hashes(repository):
     return hashes
 
 
+def list_chunkindex_fragments(repository):
+    """Like list_chunkindex_hashes, but also return each fragment's approximate entry count.
+
+    The entry count is estimated from the stored object's byte size (CHUNKINDEX_ENTRY_SIZE bytes
+    per entry), so we can classify fragments (small vs. sealed) without loading them. The estimate
+    ignores the small fixed header, which is negligible for the fragment sizes we care about.
+    Returns a list of (name, approx_entries) tuples, sorted by name.
+    """
+    fragments = []
+    for info in repository.store_list("index"):
+        info = ItemInfo(*info)  # RPC does not give namedtuple
+        fragments.append((info.name, info.size // CHUNKINDEX_ENTRY_SIZE))
+    fragments.sort()
+    return fragments
+
+
 def delete_chunkindex_from_repo(repository):
     hashes = list_chunkindex_hashes(repository)
     for hash in hashes:
@@ -539,58 +557,104 @@ def delete_chunkindex_from_repo(repository):
     repository.invalidate_chunk_index()
 
 
-def write_chunkindex_to_repo(
-    repository, chunks, *, incremental=True, clear=False, force_write=False, delete_other=False, delete_these=None
-):
-    # for now, we don't want to serialize the flags or the size:
-    chunks_to_write = ChunkIndex()
-    # incremental==True:
-    # the borghash code has no means to only serialize the F_NEW table entries,
-    # thus we copy only the new entries to a temporary table.
-    # incremental==False:
-    # maybe copying the stuff into a new ChunkIndex is not needed here,
-    # but for simplicity, we do it anyway.
-    for key, existing in chunks.iteritems(only_new=incremental):
-        chunks_to_write[key] = existing._replace(flags=ChunkIndex.F_NONE, size=0)
-    num_to_write = len(chunks_to_write)
+def _store_chunkindex_fragment(repository, batch, stored_hashes, *, force_write):
+    """Serialize a temporary ChunkIndex `batch` and store it as an index/<sha256> fragment.
+
+    We don't serialize the flags or the size, so callers pass entries with those zeroed. The object
+    is stored under index/<hash>, where <hash> is the sha256 of its content, so borgstore can verify
+    it like any other object; an incompatible format from a different borg version is rejected by
+    borghash's own versioned header (MAGIC + VERSION) when read back.
+
+    Returns (new_hash, stored) where `stored` is True iff we actually wrote to the repository (we skip
+    the write if a fragment with the same content hash already exists and force_write is not set).
+    """
     with io.BytesIO() as f:
-        chunks_to_write.write(f)
+        batch.write(f)
         data = f.getvalue()
-    logger.debug(f"caching {num_to_write} chunks (incremental={incremental}).")
-    chunks_to_write.clear()  # free memory of the temporary table
-    if clear:
-        # if we don't need the in-memory chunks index anymore:
-        chunks.clear()  # free memory, immediately
-    # the index object's name in the repo is the pure sha256 of its content, so borgstore can verify
-    # it the same way as any other object. an incompatible index format from a different borg version
-    # is rejected by borghash's own versioned header (MAGIC + VERSION) when it is read back.
     new_hash = hashlib.sha256(data).hexdigest()
-    if num_to_write == 0 and not force_write:
-        # don't persist an empty incremental index: if it became the only index/* (e.g. right
-        # after delete_chunkindex_from_repo()), build_chunkindex_from_repo() would return it as-is
-        # instead of rebuilding from the repo. with nothing new, the existing index is already up to date.
-        logger.debug("no new chunks to persist; not writing an empty incremental chunk index.")
-        return new_hash
-    stored_hashes = list_chunkindex_hashes(repository)
+    stored = False
     if force_write or new_hash not in stored_hashes:
-        # an index object is stored as index/<hash>, where <hash> is the sha256 of its content.
-        # when a client loads an index object, it compares the content hash against the hash in its
-        # name. if it is the same, the object is valid. if it is different, it is either corrupted or
-        # out of date and has to be discarded. when some functionality is DELETING chunks from the
-        # repository, it has to delete all existing index/* and maybe write a new, valid index/<hash>,
-        # so that all clients will discard any client-local chunks index caches.
         index_name = f"index/{new_hash}"
         logger.debug(f"storing chunks index as {index_name} in repository...")
         repository.store_store(index_name, data)
+        stored = True
+    return new_hash, stored
+
+
+def write_chunkindex_to_repo(
+    repository, chunks, *, incremental=True, clear=False, force_write=False, delete_other=False, delete_these=None
+):
+    # incremental controls *which* entries we write: only the F_NEW ones (a backup's new chunks) when
+    #   True, else the whole index. borghash cannot serialize just the F_NEW entries, so either way we
+    #   copy the selected entries into temporary table(s).
+    # Regardless of that, we always split the output into fragments of at most
+    #   CHUNKINDEX_FRAGMENT_ENTRIES_MAX entries, so no single fragment gets too large (even the one
+    #   incremental fragment of a huge initial backup). See repack_chunkindex for why we prefer many
+    #   bounded, immutable fragments over one big index.
+    max_entries = CHUNKINDEX_FRAGMENT_ENTRIES_MAX
+    # the fragment set present in the repo before we start writing:
+    stored_hashes = set(list_chunkindex_hashes(repository))
+    new_hashes = set()  # content hashes of the fragments that make up the index we are writing now
+    stored_anything = False
+    fragments_written = 0
+
+    def flush(batch):
+        nonlocal stored_anything, fragments_written
+        count = len(batch)
+        if count == 0 and not force_write:
+            # don't persist an empty fragment: if it became the only index/* (e.g. right after
+            # delete_chunkindex_from_repo()), build_chunkindex_from_repo() would return it as-is
+            # instead of rebuilding from the repo. with nothing to write, the repo is already correct.
+            logger.debug("no new chunks to persist; not writing an empty chunk index fragment.")
+            batch.clear()
+            return
+        new_hash, stored = _store_chunkindex_fragment(repository, batch, stored_hashes, force_write=force_write)
+        batch.clear()  # free memory of the temporary table
+        new_hashes.add(new_hash)
+        if stored:
+            stored_anything = True
+            fragments_written += 1
+
+    # sort the selected keys, so that an identical set of entries always produces identical
+    # fragments (identical content hashes), no matter in which order the entries were inserted
+    # into the hash table. this makes writing/repacking idempotent and convergent across clients:
+    # a fragment that already exists in the repo is not stored again (see _store_chunkindex_fragment)
+    # and no differently-partitioned duplicates of the same entries can pile up.
+    keys = sorted(key for key, _ in chunks.iteritems(only_new=incremental))
+    total = len(keys)
+    # partition the selected entries into batches of at most max_entries entries and store each:
+    batch = ChunkIndex()
+    n = 0
+    for key in keys:
+        # for now, we don't want to serialize the flags or the size:
+        batch[key] = chunks[key]._replace(flags=ChunkIndex.F_NONE, size=0)
+        n += 1
+        if n >= max_entries:
+            flush(batch)
+            batch = ChunkIndex()
+            n = 0
+    if n > 0 or total == 0:
+        # trailing, partially filled batch - or nothing to write at all:
+        # let flush handle force_write / the empty-index short-circuit.
+        flush(batch)
+    else:
+        batch.clear()  # entries were an exact multiple of max_entries; no trailing batch to write
+
+    logger.debug(f"cached {total} chunks (incremental={incremental}) in {fragments_written} fragment(s).")
+    if clear:
+        # if we don't need the in-memory chunks index anymore:
+        chunks.clear()  # free memory, immediately
+    if stored_anything:
         # we have successfully stored to the repository, so we can clear all F_NEW flags now:
         chunks.clear_new()
-        # delete some no longer needed index objects, but never the one we just wrote:
+
+    # delete some no longer needed index objects, but never the ones we just wrote. we only do this
+    # if we actually stored the replacement fragment(s), so we never leave the repo without an index.
+    if stored_anything and (delete_other or delete_these):
         if delete_other:
-            delete_these = set(stored_hashes) - {new_hash}
-        elif delete_these:
-            delete_these = set(delete_these) - {new_hash}
+            delete_these = set(stored_hashes) - new_hashes
         else:
-            delete_these = set()
+            delete_these = set(delete_these) - new_hashes
         for hash in delete_these:
             index_name = f"index/{hash}"
             try:
@@ -599,7 +663,7 @@ def write_chunkindex_to_repo(
                 pass
         if delete_these:
             logger.debug(f"chunk indexes deleted: {delete_these}")
-    return new_hash
+    return new_hashes
 
 
 def read_chunkindex_from_repo(repository, hash):
@@ -617,6 +681,53 @@ def read_chunkindex_from_repo(repository, hash):
             return chunks
         else:
             logger.debug(f"{index_name} is invalid.")
+
+
+def repack_chunkindex(repository):
+    """Consolidate small chunk-index fragments to keep their number and size in a healthy range.
+
+    The chunks index lives in the repo as immutable, content-addressed index/<hash> fragments.
+    Ordinary backups append a small incremental fragment each, so small fragments pile up over time.
+    This merges the small (< CHUNKINDEX_FRAGMENT_ENTRIES_MIN entries) fragments into fragments of up
+    to CHUNKINDEX_FRAGMENT_ENTRIES_MAX entries and deletes the small sources. Fragments already in
+    range are left untouched, so they stay immutable (and, once index/ is cache-backed, stay cached
+    for every client instead of being invalidated by an all-in-one consolidation).
+
+    Merging is deferred: we only act when we can seal at least one full fragment (the small entries
+    sum to >= MIN) or when too many small fragments have piled up (more than
+    CHUNKINDEX_SMALL_FRAGMENT_CAP), so we don't rewrite a slowly growing fragment on every backup.
+    """
+    small = [
+        (name, approx)
+        for name, approx in list_chunkindex_fragments(repository)
+        if approx < CHUNKINDEX_FRAGMENT_ENTRIES_MIN
+    ]
+    if len(small) < 2:
+        return  # nothing to gain from merging zero or one fragment
+    small_total = sum(approx for _, approx in small)
+    if small_total < CHUNKINDEX_FRAGMENT_ENTRIES_MIN and len(small) <= CHUNKINDEX_SMALL_FRAGMENT_CAP:
+        # can't seal a full fragment yet and not too many have piled up: defer.
+        return
+    logger.debug(f"repacking {len(small)} small chunk index fragments (~{small_total} entries)...")
+    merged = ChunkIndex()
+    merged_hashes = []
+    for name, _ in small:
+        fragment = read_chunkindex_from_repo(repository, name)
+        if fragment is None:
+            # gone or invalid (e.g. deleted by another client); just don't merge it.
+            continue
+        for k, v in fragment.items():
+            merged[k] = v
+        merged_hashes.append(name)
+        fragment.clear()
+    if not merged_hashes:
+        return
+    # write the merged entries split into bounded (<= MAX) fragments and delete the small sources.
+    # write_chunkindex_to_repo never deletes a hash it just wrote, so a fragment whose content is
+    # unchanged by the merge survives rather than being deleted and re-created.
+    write_chunkindex_to_repo(
+        repository, merged, incremental=False, clear=True, force_write=True, delete_these=merged_hashes
+    )
 
 
 def build_chunkindex_from_repo(
@@ -638,10 +749,13 @@ def build_chunkindex_from_repo(
                     chunks_to_merge.clear()
             if merged > 0:
                 if merged > 1 and cache_immediately:
-                    # immediately update the index, so we don't have to merge these again:
-                    write_chunkindex_to_repo(repository, chunks, clear=False, force_write=True, delete_these=hashes)
-                else:
-                    chunks.clear_new()
+                    # consolidate small fragments on the repo so they don't pile up. this is a
+                    # bounded repack: it does not collapse large, already-sealed fragments, so those
+                    # stay immutable (and cache-stable for other clients) rather than being re-uploaded.
+                    repack_chunkindex(repository)
+                # merging set F_NEW on every entry (see ChunkIndex.__setitem__); clear it, the repo
+                # already holds these entries in its fragments.
+                chunks.clear_new()
                 return chunks
     # if we didn't get anything from the cache, compute the ChunkIndex the slow way:
     logger.debug("rebuilding the chunk index from the repo the slow way...")
@@ -699,9 +813,9 @@ class ChunksMixin:
             # each backup writes a small incremental index/* fragment (only its new chunks),
             # which is cheap. collapsing them all into one big fragment on every run would re-upload
             # the whole index and, with delete_other, invalidate every other client's fragments --
-            # a multi-GB churn per run on a shared repo. fragment count is reclaimed by `borg compact`
-            # (build_chunkindex_from_repo with cache_immediately). a size/threshold-based policy that
-            # bounds the fragment count without re-uploading large fragments can be added later.
+            # a multi-GB churn per run on a shared repo. instead, fragment count is bounded by
+            # repack_chunkindex (a size/threshold-based policy that merges only small fragments and
+            # leaves large, already-sealed ones untouched), run on close() and by `borg compact`.
         return self._chunks
 
     def seen_chunk(self, id, size=None):
@@ -858,6 +972,16 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             now = datetime.now(UTC)
             self._maybe_write_chunks_cache(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
+            # this run just appended a (small) incremental fragment; consolidate accumulated small
+            # fragments so their count/size stays in a healthy range (bounded repack, see the function).
+            # repack works on the repo's index/* fragments, so it is independent of the in-memory index.
+            # the archive and its incremental fragment are already durably stored above, so repack is
+            # optional maintenance: if it fails (e.g. a transient store error), warn and carry on
+            # rather than failing an already-committed backup. the next run will repack again.
+            try:
+                repack_chunkindex(self.repository)
+            except Exception as exc:
+                logger.warning(f"consolidating the chunk index fragments failed (will retry next time): {exc}")
             # the index we just cleared in-place is the same object the repository holds; drop the
             # repository's reference too, so a later .chunks access rebuilds it from the repo instead
             # of seeing a valid-looking but empty index (and so is_chunk_index_loaded reports False).

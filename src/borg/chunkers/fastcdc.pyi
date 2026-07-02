@@ -3,18 +3,15 @@ from typing import BinaryIO
 
 from .reader import fmap_entry
 
-def buzhash64(data: bytes, key: bytes) -> int: ...
-def buzhash64_update(sum: int, remove: int, add: int, len: int, key: bytes) -> int: ...
-def buzhash64_get_table(key: bytes) -> list[int]: ...
+def fastcdc_get_gear_table(key: bytes) -> list[int]: ...
 
-class ChunkerBuzHash64:
+class ChunkerFastCDC:
     def __init__(
         self,
         key: bytes,
         chunk_min_exp: int,
         chunk_max_exp: int,
         hash_mask_bits: int,
-        hash_window_size: int,
         nc_level: int = 0,
         normal_size: int = 0,
         sparse: bool = False,

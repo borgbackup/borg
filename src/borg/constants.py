@@ -103,6 +103,7 @@ MAX_SEGMENT_DIR_INDEX = 2**32 - 1
 # chunker algorithms
 CH_BUZHASH = "buzhash"
 CH_BUZHASH64 = "buzhash64"
+CH_FASTCDC = "fastcdc"
 CH_FIXED = "fixed"
 CH_FAIL = "fail"
 
@@ -119,6 +120,8 @@ NC_LEVEL = 2  # FastCDC-style normalized chunking: tightens chunk-size distribut
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 CHUNKER64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, NC_LEVEL)
+# fastcdc uses a window-less Gear hash, so it has no window_size parameter.
+FASTCDC_PARAMS = (CH_FASTCDC, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
 
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)

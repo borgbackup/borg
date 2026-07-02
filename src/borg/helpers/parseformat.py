@@ -304,9 +304,13 @@ def ChunkerParams(s):
         return algo, block_size, header_size
     if algo == "default" and count == 1:  # default
         return CHUNKER_PARAMS
-    if algo == CH_BUZHASH64 and count == 6:
+    if algo == CH_BUZHASH64:
         # buzhash64, chunk_min, chunk_max, chunk_mask, window_size, nc_level
         # use nc_level 0 to disable normalized chunking.
+        if count != 6:
+            raise ArgumentTypeError(
+                "buzhash64 chunker params must be: buzhash64,chunk_min,chunk_max,chunk_mask,window_size,nc_level"
+            )
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[1:5])
         nc_level = int(params[5])
         if not (chunk_min <= chunk_mask <= chunk_max):
@@ -316,6 +320,10 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
+        # a max. chunk size sized buffer, see the assertion in ChunkerBuzHash64.__cinit__.
+        if window_size + 2**chunk_min + 1 > 2**chunk_max:
+            raise ArgumentTypeError("required: window_size + 2^chunk_min + 1 <= 2^chunk_max")
         # normalized chunking switches the mask at the target size; it needs room below and above
         # the base mask bits (chunk_mask). nc_level 0 disables it.
         if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
@@ -324,8 +332,35 @@ def ChunkerParams(s):
             )
         # note that for buzhash64, there is no problem with even window_size.
         return CH_BUZHASH64, chunk_min, chunk_max, chunk_mask, window_size, nc_level
-    # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
-    if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
+    if algo == CH_FASTCDC:
+        # fastcdc, chunk_min, chunk_max, chunk_mask, nc_level
+        # fastcdc uses a window-less Gear hash, so there is no window_size field.
+        # nc_level is required; use nc_level 0 to disable normalized chunking.
+        if count != 5:
+            raise ArgumentTypeError("fastcdc chunker params must be: fastcdc,chunk_min,chunk_max,chunk_mask,nc_level")
+        chunk_min, chunk_max, chunk_mask = (int(p) for p in params[1:4])
+        nc_level = int(params[4])
+        if not (chunk_min <= chunk_mask <= chunk_max):
+            raise ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+        if chunk_min < 6:
+            # see comment in 'fixed' algo check
+            raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
+        if chunk_max > 23:
+            raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        # the chunker needs one byte beyond the min. chunk size to fit into a max. chunk size
+        # sized buffer, see the assertion in ChunkerFastCDC.__cinit__.
+        if chunk_min >= chunk_max:
+            raise ArgumentTypeError("required: chunk_min < chunk_max")
+        if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
+            raise ArgumentTypeError(
+                "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
+            )
+        return CH_FASTCDC, chunk_min, chunk_max, chunk_mask, nc_level
+    # this must stay last as it deals with old-style compat mode (no algorithm, 4 numeric params, buzhash);
+    # the isdigit check keeps misspelled/incomplete algo specs out of the compat branch.
+    if (algo == CH_BUZHASH and count == 5) or (
+        count == 4 and all(p.strip().isdigit() for p in params)
+    ):  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4 :])
         if not (chunk_min <= chunk_mask <= chunk_max):
             raise ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")

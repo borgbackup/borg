@@ -176,6 +176,12 @@ New features:
   ``chunker-params`` for buzhash64 gains a required 6th field ``nc_level``
   (``buzhash64,chunk_min,chunk_max,chunk_mask,window_size,nc_level``).
   buzhash (32bit) is unchanged and stays bit-compatible with borg 1.x.
+- new ``fastcdc`` chunker: a FastCDC content-defined chunker using a window-less, keyed Gear
+  rolling hash (the gear table is derived from the repo's id key, like buzhash64, so cut points
+  stay unpredictable without the key). It supports the same normalized chunking as buzhash64 and
+  produces the same chunk-size distribution and deduplication, but chunks roughly 1.3-1.5x faster.
+  Select it via ``--chunker-params fastcdc,chunk_min,chunk_max,chunk_mask,nc_level`` (no window
+  field; e.g. ``fastcdc,19,23,21,2``). ``borg benchmark cpu`` now reports its throughput too.
 - repo-create: split ``--encryption`` into orthogonal options. ``--encryption`` now
   selects only the cipher / AE algorithm (``none``, ``authenticated``, ``aes256-ocb``
   or ``chacha20-poly1305``), the new ``--id-hash`` selects the id hash function

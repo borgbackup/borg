@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from collections import OrderedDict
 from pathlib import Path
 from hashlib import sha256
 
@@ -206,7 +207,7 @@ class PackReader:
         self.key = "packs/" + bin_to_hex(pack_id) if pack_id is not None else None
         self.pack_contents = pack_contents
 
-    def _read(self, offset, size):
+    def read(self, offset, size):
         # read from the in-memory pack if we have it, else range-read from the store
         if self.pack_contents is not None:
             return self.pack_contents[offset : offset + size]
@@ -221,7 +222,7 @@ class PackReader:
         hdr_size = RepoObj.obj_header.size
         offset = 0
         while True:
-            hdr_data = self._read(offset, hdr_size)
+            hdr_data = self.read(offset, hdr_size)
             if len(hdr_data) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
             hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
@@ -303,9 +304,9 @@ class Repository:
 
         exit_mcode = 21
 
-    # Max bytes one grouped read in get_many() covers; a run reaching this size is split into
-    # multiple reads.
-    GET_MANY_GROUP_SIZE_LIMIT = 64 * 1024 * 1024
+    # Whole packs kept in memory for reads; the least recently used is evicted first.
+    # Memory use is this count times the pack size.
+    PACK_READER_CACHE_SIZE = 3
 
     def __init__(
         self,
@@ -388,6 +389,7 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
+        self._pack_cache = OrderedDict()  # pack_id -> PackReader
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self._location}>"
@@ -593,6 +595,7 @@ class Repository:
             self.store.close()
             self.store_opened = False
         self.opened = False
+        self._pack_cache.clear()
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
@@ -796,6 +799,22 @@ class Repository:
             else:
                 return None
 
+    def _cached_pack_reader(self, pack_id):
+        """Return a PackReader holding the whole pack, fetching it from the store on a cache miss.
+
+        Keeps up to PACK_READER_CACHE_SIZE packs, evicting the least recently used.
+        """
+        reader = self._pack_cache.get(pack_id)
+        if reader is not None:
+            self._pack_cache.move_to_end(pack_id)
+            return reader
+        key = "packs/" + bin_to_hex(pack_id)
+        reader = PackReader(pack_id=pack_id, pack_contents=self.store.load(key))
+        self._pack_cache[pack_id] = reader
+        if len(self._pack_cache) > self.PACK_READER_CACHE_SIZE:
+            self._pack_cache.popitem(last=False)
+        return reader
+
     def get_many(self, ids, read_data=True, raise_missing=True):
         if not read_data:
             # read_data=False returns only each object's header+meta, sized per object by get().
@@ -803,57 +822,21 @@ class Repository:
                 yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
             return
 
-        # A pack stores its objects back-to-back. Fetch a run of ids that are byte-contiguous in
-        # one pack (each obj_offset == the previous obj_offset + obj_size) with one store.load and
-        # slice each object out of it. Objects are yielded in ids order.
-        run = []  # (id, obj_size) of the objects in the current run, in read order
-        run_key = None  # store key "packs/<pack_id>" the run reads from
-        run_start = 0  # obj_offset of the run's first object
-        run_end = 0  # obj_offset just past the run's last object
-
-        def flush_run():
-            # read the whole run with one store.load and yield each object's slice
-            if not run:
-                return
-            try:
-                blob = self.store.load(run_key, offset=run_start, size=run_end - run_start)
-            except StoreObjectNotFound:
-                if raise_missing:
-                    raise self.ObjectNotFound(run[0][0], str(self._location)) from None
-                for _ in run:
-                    yield None
-                return
-            pos = 0
-            for _id, obj_size in run:
-                yield blob[pos : pos + obj_size]
-                pos += obj_size
-
         for id_ in ids:
             self._lock_refresh()
             entry = self.chunks.get(id_)
             if entry is None or self.chunks.is_pending(id_):
-                # not a flushed pack object: end the run and let get() read it or raise.
-                yield from flush_run()
-                run, run_key = [], None
+                # id is unknown or still buffered, not yet in a pack: read it with get()
                 yield self.get(id_, read_data=True, raise_missing=raise_missing)
                 continue
-            key = "packs/" + bin_to_hex(entry.pack_id)
-            contiguous = (
-                run
-                and key == run_key
-                and entry.obj_offset == run_end
-                and (run_end - run_start) + entry.obj_size <= self.GET_MANY_GROUP_SIZE_LIMIT
-            )
-            if contiguous:
-                run.append((id_, entry.obj_size))
-                run_end += entry.obj_size
-            else:
-                yield from flush_run()
-                run = [(id_, entry.obj_size)]
-                run_key = key
-                run_start = entry.obj_offset
-                run_end = entry.obj_offset + entry.obj_size
-        yield from flush_run()
+            try:
+                reader = self._cached_pack_reader(entry.pack_id)
+            except StoreObjectNotFound:
+                if raise_missing:
+                    raise self.ObjectNotFound(id_, str(self._location)) from None
+                yield None
+                continue
+            yield reader.read(entry.obj_offset, entry.obj_size)
 
     def put(self, id, data):
         """put a repo object

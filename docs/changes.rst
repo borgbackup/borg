@@ -168,52 +168,44 @@ above.
 
 New features:
 
-- buzhash64 chunker: add FastCDC-style normalized chunking and enable it by default
-  (``nc_level=2``). It switches between a stricter and a looser cut mask around the target
-  chunk size, which greatly tightens the chunk-size distribution (chunk-size variance /
-  coefficient of variation roughly cut by ~60% in tests) and removes the dedup-hostile
-  max-size-clamped chunks, at negligible throughput cost and with unchanged deduplication.
-  ``chunker-params`` for buzhash64 gains a required 6th field ``nc_level``
-  (``buzhash64,chunk_min,chunk_max,chunk_mask,window_size,nc_level``).
-  buzhash (32bit) is unchanged and stays bit-compatible with borg 1.x.
-- new ``fastcdc`` chunker: a FastCDC content-defined chunker using a window-less, keyed Gear
-  rolling hash (the gear table is derived from the repo's id key, like buzhash64, so cut points
-  stay unpredictable without the key). It supports the same normalized chunking as buzhash64 and
-  produces the same chunk-size distribution and deduplication, but chunks roughly 1.3-1.5x faster.
-  Select it via ``--chunker-params fastcdc,chunk_min,chunk_max,chunk_mask,nc_level`` (no window
-  field; e.g. ``fastcdc,19,23,21,2``). ``borg benchmark cpu`` now reports its throughput too.
-- repo-create: split ``--encryption`` into orthogonal options. ``--encryption`` now
-  selects only the cipher / AE algorithm (``none``, ``authenticated``, ``aes256-ocb``
-  or ``chacha20-poly1305``), the new ``--id-hash`` selects the id hash function
-  (``sha256`` (default) or ``blake3``), and ``--key-location`` (already present) selects
-  the key storage. The old combined names were removed: select a BLAKE3 suite via
-  ``--encryption ... --id-hash blake3`` instead of ``blake3-*``, and note that
-  ``aes-ocb`` was renamed to ``aes256-ocb``. The JSON output (``--json``) reflects this
-  too: the ``encryption.mode`` field was replaced by separate ``encryption.encryption``
-  (cipher / AE algorithm) and ``encryption.id_hash`` fields. #9168
-- key: unify keyfile/repokey key classes and locate the key independently of the
-  manifest key-type byte. Borg now tries keyfiles first and repokeys afterwards until
-  a passphrase unlocks a key, so where a key is stored (keyfile vs repokey) is a
-  per-key property rather than a separate key class. The key-type byte still selects
-  the crypto suite (id hash, MAC, cipher). ``borg repo-create --encryption`` now takes
-  only the crypto suite (e.g. ``aes256-ocb``, ``chacha20-poly1305``; see #9168 above for
-  the further split into ``--encryption`` and ``--id-hash``);
-  choose the storage location with the new ``--key-location=repokey|keyfile`` option
-  (default: ``repokey``). The old combined modes (``repokey-aes-ocb`` etc.) were
-  removed. ``borg key import`` also gained ``--key-location``. #9743
-- WIP packs project, major repo format changes, you must create new repos! #8572
-- rest:// repository URLs - connect via ssh to remote borgstore REST server,
-  talking http via stdio, #9593
-- ``borg serve --rest`` serves a (non-legacy) repository as the remote-side
-  component of a rest:// repository (HTTP over stdio). A rest:// client then
-  starts ``borg serve --rest`` on the remote.
-  ``borg serve`` (without --rest) serves legacy borg 1.x repositories.
-- removed ssh:// and socket:// support for current repositories; use a rest://
-  repository instead (it can tunnel over ssh). ssh:// and ``borg serve`` remain
-  available only for legacy (borg 1.x / v1) repositories, e.g. for
-  ``borg transfer --from-borg1 --other-repo ssh://...``.
-- prune: show total vs matching archives in output, #9262
-- prune: add --json option, #9222
+- Packs - Google Summer of Code 2026 project of @mr-raj12! #8572
+
+  - more efficient: multiple chunks per pack, less latency impact!
+  - BORG_PACK_MAX_COUNT/SIZE env vars to determine pack sizing
+  - create, extract, delete, prune, compact, check (read-only) should work already
+  - check --repair not implemented yet
+  - fine tuning and optimizations only partly done yet
+- add BORG_STORE_CACHE and BORG_PACK_CACHE_SIZE env vars to enable borgstore caching
+  (use this for slow / high latency primary stores)
+- Remote repositories:
+
+  - implemented via borgstore now
+  - borg serve --rest: serve rest:// repositories with a repository-side borg.
+    note: borg serve (without --rest) still serves legacy borg 1.x repositories
+    (talking legacy RPC protocol via stdio via ssh).
+  - rest:// repository URLs - connect via ssh to remote borg serve --rest process,
+    talking http via stdio, #9593
+- Chunkers:
+
+  - fastcdc: new chunker (keyed Gear hash, normalized chunking, ~1.3x faster), #9824
+  - buzhash64: add normalized chunking (better chunksize distribution, less clamping)
+- borg keys:
+
+  - locate borg key automatically in key directory or repository, #9743
+  - key list/add/remove/export: support multiple borg keys per repository, #9743
+  - allow --key-location also for authenticated* modes
+- create: add --exclude-dataless to skip cloud files not materialized locally (macOS)
+- repo-create: split --encryption into --encryption, --id-hash, --key-location, #9168
+- repo-info/list --json: report encryption + id_hash separately, #9168
+- repo-list --from-borg1: list Borg 1.x repositories
+- prune:
+
+  - add optional interval support for all prune retention flags
+  - removes `--keep-last` and `--keep-within`, superseded by `--keep`
+  - prune --from: give reference timestamp (default: now)
+  - show total vs matching archives in output, #9262
+  - add --json option, #9222
+- add blake3 (super-fast hash/keyed MAC), replacing blake2b for new repos
 - archive: preserve cwd archive metadata, #9495
 
 Fixes:
@@ -235,25 +227,42 @@ Fixes:
 - mount: improve error msg when uid/gid cannot be resolved, #9574
 - fix: properly handle invalid and dev versions in version parser, #9014
 - patterns: allow backslashes in paths, #9518
+- legacy: use borg 1.x keys directory for v1 repos (relevant for macOS)
+- deal with corrupted archive metadata items
+- repoobj: reject malformed objects with IntegrityError, not struct.error/assert
 
 Other changes:
 
-- msgpack: also allow 1.2.1
-- Location: simplify parsing/validation, #9678.
+- remove Python 3.10 support, add Python 3.15 support, #9707
+- support msgpack up to 1.2.1
+- remove xxhash / xxh64 requirement
+- add blake3 requirement, blacklist blake3 1.0.9 (win32/msys2 build issues)
+- removed ssh:// and socket:// support for current repositories; use a rest://
+  repository instead (it can tunnel over ssh). ssh:// and ``borg serve`` remain
+  available only for legacy (borg 1.x / v1) repositories, e.g. for
+  ``borg transfer --from-borg1 --other-repo ssh://...``.
+- modernize: use more Python 3.7/3.8/3.9/3.10/3.11+ features
+- Build: enable strict Cython warnings and clean up compiler flags
+- Binary build:
+
+  - scripts/build-borg-using-pyinstaller.sh: generate binary using pyinstaller
+  - scripts/build-nuitka.sh: generate binary using nuitka, #3227
+  - use /bin/sh, pyinstaller 6.20, python 3.14, ubuntu 24.04
+- ChunkerParams: better errors for wrong parameters
+- Location: simplify parsing/validation, #9678, #9754
   For sftp/http(s)/s3/b2/rclone repositories, borg now only detects the scheme and hands the raw
   URL to borgstore, which parses and validates it (removing the duplicate parsing borg did before).
   Note: for these repositories the canonical location string changed slightly, so on the first run
   against an existing such repository borg may warn once that it "was previously located at ..." -
   this is harmless and can be confirmed.
-- remove leftover socket: protocol code (the unix-socket transport and the --socket option were
-  never part of a stable borg 2 release).
+- remove socket: protocol code
 - keyfile: name key files by sha256(keyfile_contents).
   Existing legacy-named keyfiles continue to work.
 - repokey: use same format as with external keyfile
 - repo-compress: remove this command for now
 - list: remove xxh64 hash support
 - benchmark: remove xxh64 and crc32 benchmarking
-- benchmark cpu: drop KDF section
+- benchmark cpu: drop KDF section (irrelevant: KDFs should not be fast)
 - separate a lot of legacy code into borg.legacy package, #9556
 - archiver: warn about MSYS2 path translation, #9339
 - tests / CI:
@@ -265,9 +274,17 @@ Other changes:
   - Fixes cleanup of append-only test tempfiles on macOS/BSD
   - Fixes tests/docs assuming XDG_* vars not used on macOS
   - add more tests
+  - don't run transport-agnostic archiver tests over rest://, #9324
+  - sweep stale borg FUSE mounts left by aborted runs
+  - make the "remote archiver" tests use "borg serve --rest"
+  - cover borg transfer --from-borg1 from an ssh:// borg 1.x repo
+  - reduce /tmp space usage
+  - invoke --help for all commands to check if it works, see #9714
+- nanorst: do not require 2 empty lines at end of string after code block, #9714
 - docs:
 
   - add pack file format design and internals documentation, #8572
+  - other updates / fixes to "internals" section
   - update to 'borg key change-passphrase' in env help, #9697
   - document the impact of the slashdot hack to pattern matching
   - contributing guide incl. AI policy, #9409
@@ -280,6 +297,10 @@ Other changes:
   - FAQ entry about scalability, #4742
   - improve macOS Keychain instructions, #5156
   - pull-backup.rst minor fixes
+  - update repo-create examples for split --encryption/--id-hash/--key-location
+  - add docs for "key add", "key list" and "key remove"
+  - list additional help topics in main borg help, #3432
+  - offer a PDF download and link offline formats in the sidebar, #9731
 
 
 Version 2.0.0b21 (2026-03-16)

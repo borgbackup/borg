@@ -1,7 +1,8 @@
 import pytest
 from datetime import datetime, timezone
 
-from ...helpers.time import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS, calculate_relative_offset
+from ...helpers.time import safe_ns, safe_s, safe_timestamp, SUPPORT_32BIT_PLATFORMS, calculate_relative_offset
+from ...helpers.time import format_time, format_time_ns, OutputTimestamp
 
 
 def utcfromtimestamp(timestamp):
@@ -51,3 +52,26 @@ def test_calculate_relative_offset_year_regular():
     ts = datetime(2024, 6, 15, 12, 30, 45, tzinfo=timezone.utc)
     assert calculate_relative_offset("2y", ts, earlier=False) == datetime(2026, 6, 15, 12, 30, 45, tzinfo=timezone.utc)
     assert calculate_relative_offset("2y", ts, earlier=True) == datetime(2022, 6, 15, 12, 30, 45, tzinfo=timezone.utc)
+
+
+def test_format_time_ns():
+    ns = 1000000000_000123_456
+    ts = safe_timestamp(ns)
+    result = format_time_ns(ts, ns)
+    # full nanosecond precision fraction, otherwise identical to format_time's output
+    assert result.replace(".000123456", "") == format_time(ts)
+
+
+def test_output_timestamp_ns_isoformat():
+    ns = 1000000000_000123_456
+    ots = OutputTimestamp(safe_timestamp(ns), ns=ns)
+    iso = ots.isoformat()
+    # full nanosecond precision fraction, otherwise identical to the seconds-precision isoformat
+    assert iso.replace(".000123456", "") == safe_timestamp(ns).astimezone().isoformat(timespec="seconds")
+    assert ots.to_json() == iso
+
+
+def test_output_timestamp_without_ns_isoformat():
+    ns = 1000000000_000123_456
+    ots = OutputTimestamp(safe_timestamp(ns))  # no ns given
+    assert ots.isoformat() == safe_timestamp(ns).astimezone().isoformat(timespec="microseconds")

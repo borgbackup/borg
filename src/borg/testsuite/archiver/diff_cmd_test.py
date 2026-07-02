@@ -1,13 +1,14 @@
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import time
 import pytest
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported, granularity_sleep
-from ...platformflags import is_win32, is_freebsd, is_netbsd
+from ...platformflags import is_win32, is_freebsd, is_netbsd, is_openbsd
 from . import (
     cmd,
     create_regular_file,
@@ -428,8 +429,7 @@ def test_sort_by_all_keys_with_directions(archivers, request, sort_key):
 
 
 @pytest.mark.skipif(
-    not are_hardlinks_supported() or is_freebsd or is_netbsd or is_win32,
-    reason="hardlinks not supported or test failing on freebsd, netbsd and windows",
+    not are_hardlinks_supported() or is_win32, reason="hardlinks not supported or not available on windows"
 )
 def test_hard_link_deletion_and_replacement(archivers, request):
     archiver = request.getfixturevalue(archivers)
@@ -511,5 +511,18 @@ def test_hard_link_deletion_and_replacement(archivers, request):
     assert_line_exists(lines, "[cm]time:.*[cm]time:.*input/a$")
     # From test1 to test2's POV, the a/hardlink file is a fresh new file.
     assert_line_exists(lines, "added.*B.*input/a/hardlink")
-    # But the b/hardlink file was not modified at all.
-    assert_line_not_exists(lines, ".*input/b/hardlink")
+    if is_freebsd or is_netbsd or is_openbsd:
+        # On the BSDs, b/hardlink may show a (usually sub-second) ctime update in this
+        # scenario (POSIX permits this). If it shows up, it must be a ctime-only change
+        # and the displayed timestamps must be distinguishable (microsecond precision).
+        for line in lines:
+            if re.search("input/b/hardlink", line):
+                m = re.search(r"\[ctime: (.+?) -> (.+?)\]", line)
+                assert m is not None, f"unexpected non-ctime change: {line!r}"
+                assert m.group(1) != m.group(2), f"indistinguishable timestamps: {line!r}"
+        assert_line_not_exists(lines, "mtime:.*input/b/hardlink")
+        assert_line_not_exists(lines, "modified.*input/b/hardlink")
+        assert_line_not_exists(lines, "-[r-][w-][x-].*input/b/hardlink")
+    else:
+        # But the b/hardlink file was not modified at all.
+        assert_line_not_exists(lines, ".*input/b/hardlink")

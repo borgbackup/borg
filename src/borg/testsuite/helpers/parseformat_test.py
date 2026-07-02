@@ -27,8 +27,10 @@ from ...helpers.parseformat import (
     swidth_slice,
     eval_escapes,
     ChunkerParams,
+    DiffFormatter,
 )
 from ...helpers.time import format_timedelta, parse_timestamp
+from ...item import Item, ItemDiff
 from ...platformflags import is_win32
 
 
@@ -718,3 +720,24 @@ def test_valid_chunkerparams(chunker_params, expected_return):
 def test_invalid_chunkerparams(invalid_chunker_params):
     with pytest.raises(ArgumentTypeError):
         ChunkerParams(invalid_chunker_params)
+
+
+@pytest.mark.parametrize(
+    "ctime1_ns, ctime2_ns",
+    [
+        (1000000000_000123_000, 1000000000_000456_000),  # same second, different microsecond
+        (1000000000_000123_000, 1000000001_000123_000),  # different second
+    ],
+)
+def test_diff_formatter_time_precision(ctime1_ns, ctime2_ns):
+    """DiffFormatter renders time changes with microsecond precision, so that timestamps
+    differing at sub-second level (e.g. hardlink ctime updates, see #9147) are distinguishable."""
+    item1 = Item(path="p", mode=0o100644, mtime=0, ctime=ctime1_ns)
+    item2 = Item(path="p", mode=0o100644, mtime=0, ctime=ctime2_ns)
+    diff = ItemDiff("p", item1, item2, iter([]), iter([]), can_compare_chunk_ids=True)
+    formatter = DiffFormatter("{ctime} {path}{NL}")
+    output = formatter.format_item(diff)
+    m = re.search(r"\[ctime: (.+?) -> (.+?)\]", output)
+    assert m is not None
+    assert "." in m.group(1) and "." in m.group(2)  # microseconds are shown
+    assert m.group(1) != m.group(2)  # timestamps are distinguishable

@@ -1284,7 +1284,12 @@ class DiffFormatter(BaseFormatter):
 
     def format_time(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)
-        return f"[{key}: {change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+        if not change:
+            return ""
+        # always show microseconds: time diffs are often sub-second (e.g. ctime updates of
+        # surviving hardlinks), second precision would render both timestamps identically.
+        fmt = "%a, %Y-%m-%d %H:%M:%S.%f %z"
+        return f"[{key}: {change.diff_data['item1']:{fmt}} -> {change.diff_data['item2']:{fmt}}]"
 
     def format_iso_time(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)

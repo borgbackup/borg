@@ -198,7 +198,9 @@ def test_sparse_file(archivers, request):
                 try:
                     if fd.seek(0, os.SEEK_HOLE) != 0:
                         sparse = False
-                    if fd.seek(0, os.SEEK_DATA) != hole_size:
+                    # FS allocation granularity may report DATA before the actual first
+                    # non-zero byte, so only check it is not after the expected content.
+                    if fd.seek(0, os.SEEK_DATA) > hole_size:
                         sparse = False
                 except OSError:
                     # OS/FS does not really support SEEK_HOLE/SEEK_DATA

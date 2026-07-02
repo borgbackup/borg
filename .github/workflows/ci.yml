@@ -31,7 +31,7 @@ permissions:
 jobs:
   lint:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
 
     steps:
@@ -40,7 +40,7 @@ jobs:
 
   security:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
 
     steps:
@@ -48,7 +48,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.11'
+        python-version: '3.14'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -59,7 +59,7 @@ jobs:
 
   asan_ubsan:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     needs: [lint]
 
@@ -73,7 +73,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.12'
+        python-version: '3.14'
 
     - name: Install system packages
       run: |
@@ -141,19 +141,18 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "mypy"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "mypy"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "docs"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-llfuse"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-pyfuse3"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
-              {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-llfuse"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc243-x86_64-gh"},
+              {"os": "ubuntu-26.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc243-arm64-gh"},
               {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
               {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"}
             ]
@@ -382,7 +381,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 180
     needs: [lint]
     continue-on-error: true
@@ -392,11 +391,11 @@ jobs:
       matrix:
         include:
           - os: freebsd
-            version: '14.3'
+            version: '15.0'
             display_name: FreeBSD
             # Controls binary build and provenance attestation on tags
             do_binaries: true
-            artifact_prefix: borg-freebsd-14-x86_64-gh
+            artifact_prefix: borg-freebsd-15-x86_64-gh
 
           - os: netbsd
             version: '10.1'
@@ -520,6 +519,30 @@ jobs:
                 touch ${TMPDIR}/testfile
                 lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
 
+                # NetBSD 10 has a too old OpenSSL, build a fresher one.
+                VERSION="3.5.6"
+                echo "--- Building OpenSSL ${VERSION} ---"
+                PREFIX="/usr/local"
+                JOBS=$(sysctl -n hw.ncpu)
+
+                pushd /tmp
+                ftp -o "openssl-${VERSION}.tar.gz" "https://www.openssl.org/source/openssl-${VERSION}.tar.gz"
+                tar xzf "openssl-${VERSION}.tar.gz"
+                pushd "openssl-${VERSION}"
+
+                ./Configure --prefix="${PREFIX}" --openssldir="${PREFIX}/etc/ssl" --libdir=lib \
+                            -Wl,-rpath,${PREFIX}/lib shared threads no-tests no-docs
+                export LD_LIBRARY_PATH="/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+                make -j"${JOBS}"
+                sudo -E make install
+                popd
+                rm -rf "/tmp/openssl-${VERSION}" "/tmp/openssl-${VERSION}.tar.gz"
+                popd
+
+                "${PREFIX}/bin/openssl" version
+                export BORG_OPENSSL_PREFIX="${PREFIX}"
+                export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
                 tox3 -e py311-none
                 ;;
 
@@ -564,8 +587,7 @@ jobs:
                 pkgman install -y openssl3
                 pkgman install -y rust_bin
                 pkgman install -y python3.11
-                pkgman install -y cffi
-                pkgman install -y lz4_devel openssl3_devel libffi_devel
+                pkgman install -y lz4_devel openssl3_devel
 
                 # there is no pkgman package for tox, so we install it into a venv
                 python3 -m ensurepip --upgrade
@@ -651,7 +673,7 @@ jobs:
 
       - name: Build python venv
         run: |
-          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          # building native extensions in the venv fails, so we try to use the system packages
           python -m venv --system-site-packages env
           . env/bin/activate
           # python -m pip install --upgrade pip
@@ -685,7 +707,7 @@ jobs:
         uses: codecov/codecov-action@v7
         env:
           OS: ${{ runner.os }}
-          python: '3.11'
+          python: '3.14'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
@@ -697,7 +719,7 @@ jobs:
         uses: codecov/codecov-action@v7
         env:
           OS: ${{ runner.os }}
-          python: '3.11'
+          python: '3.14'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: coverage

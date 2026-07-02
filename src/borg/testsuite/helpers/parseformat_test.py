@@ -725,12 +725,13 @@ def test_invalid_chunkerparams(invalid_chunker_params):
 @pytest.mark.parametrize(
     "ctime1_ns, ctime2_ns",
     [
+        (1000000000_000123_111, 1000000000_000123_999),  # same microsecond, different nanosecond
         (1000000000_000123_000, 1000000000_000456_000),  # same second, different microsecond
         (1000000000_000123_000, 1000000001_000123_000),  # different second
     ],
 )
 def test_diff_formatter_time_precision(ctime1_ns, ctime2_ns):
-    """DiffFormatter renders time changes with microsecond precision, so that timestamps
+    """DiffFormatter renders time changes with nanosecond precision, so that timestamps
     differing at sub-second level (e.g. hardlink ctime updates, see #9147) are distinguishable."""
     item1 = Item(path="p", mode=0o100644, mtime=0, ctime=ctime1_ns)
     item2 = Item(path="p", mode=0o100644, mtime=0, ctime=ctime2_ns)
@@ -739,5 +740,6 @@ def test_diff_formatter_time_precision(ctime1_ns, ctime2_ns):
     output = formatter.format_item(diff)
     m = re.search(r"\[ctime: (.+?) -> (.+?)\]", output)
     assert m is not None
-    assert "." in m.group(1) and "." in m.group(2)  # microseconds are shown
+    assert re.search(r"\.\d{9} ", m.group(1))  # 9-digit fraction is shown
+    assert re.search(r"\.\d{9} ", m.group(2))
     assert m.group(1) != m.group(2)  # timestamps are distinguishable

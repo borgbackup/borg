@@ -144,14 +144,14 @@ jobs:
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "mypy"},
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3", "store_cache": "1"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy"},
+              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy", "store_cache": "1"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
               {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
               {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
@@ -277,6 +277,10 @@ jobs:
         mc mb --ignore-existing local/borg
         # Export S3 test URL for tox via GITHUB_ENV
         echo "BORG_TEST_S3_REPO=s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/s3-repo" >> $GITHUB_ENV
+
+    - name: Enable store cache (test only)
+      if: ${{ matrix.store_cache == '1' }}
+      run: echo "BORG_STORE_CACHE=1" >> $GITHUB_ENV
 
     - name: Install Python requirements
       run: |

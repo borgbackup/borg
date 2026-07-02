@@ -4386,6 +4386,10 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
     def test_extract_xattrs_errors(self):
         pass
 
+    @unittest.skip('patches objects')
+    def test_create_exclude_dataless(self):
+        pass
+
     @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')
     def test_basic_functionality(self):
         pass

@@ -15,6 +15,7 @@ from ...helpers.fs import (
     get_keys_dir,
     get_security_dir,
     get_config_dir,
+    get_data_dir,
     get_runtime_dir,
     dash_open,
     safe_unlink,
@@ -186,6 +187,37 @@ def test_get_runtime_dir(monkeypatch):
         assert get_runtime_dir(create=False) == os.path.join("/var/tmp/.cache", "borg")
         monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
         assert get_runtime_dir(create=False) == "/var/tmp"
+
+
+def test_get_cache_dir_subdirs(monkeypatch, tmp_path):
+    """extra path components are appended and created; the CACHEDIR.TAG stays in the cache root"""
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    monkeypatch.setenv("BORG_CACHE_DIR", str(tmp_path))
+    # without subdirs the behaviour is unchanged
+    assert get_cache_dir(create=False) == str(tmp_path)
+    # extra path components are appended
+    assert get_cache_dir("storecache", create=False) == str(tmp_path / "storecache")
+    # create=True creates the nested directory ...
+    assert get_cache_dir("storecache") == str(tmp_path / "storecache")
+    assert (tmp_path / "storecache").is_dir()
+    # ... and the CACHEDIR.TAG marks the cache root, not the subdir
+    assert (tmp_path / CACHE_TAG_NAME).exists()
+    assert not (tmp_path / "storecache" / CACHE_TAG_NAME).exists()
+
+
+def test_get_dir_subdirs(monkeypatch, tmp_path):
+    """the config/data/runtime helpers append and create extra path components"""
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    for env_var, get_dir in [
+        ("BORG_CONFIG_DIR", get_config_dir),
+        ("BORG_DATA_DIR", get_data_dir),
+        ("BORG_RUNTIME_DIR", get_runtime_dir),
+    ]:
+        base = tmp_path / env_var.lower()
+        monkeypatch.setenv(env_var, str(base))
+        assert get_dir("a", "b", create=False) == str(base / "a" / "b")
+        assert get_dir("a", "b") == str(base / "a" / "b")
+        assert (base / "a" / "b").is_dir()
 
 
 def test_dash_open():

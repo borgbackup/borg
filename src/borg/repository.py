@@ -838,13 +838,15 @@ class Repository:
 
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
 
-    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, complete: bool = True):
+    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, complete: bool = True, chunks=None):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
         keep_ids: chunk ids in this pack to copy into the new pack.
         drop_ids: chunk ids in this pack to discard. Must not overlap keep_ids.
         complete: if True, keep_ids and drop_ids must together be every object in the pack (asserted).
             If False, they may name only some of the pack's objects.
+        chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
+            updates to. Must be the index keep_ids and drop_ids were derived from. Default: self.chunks.
 
         Kept objects are copied into a new pack via store.defrag and repointed in the chunk index;
         dropped objects' chunk index entries are removed.
@@ -856,6 +858,8 @@ class Repository:
         index back to the store afterwards.
         """
         self._lock_refresh()
+        if chunks is None:
+            chunks = self.chunks
         pack_key = "packs/" + bin_to_hex(pack_id)
 
         assert keep_ids & drop_ids == set(), "an id cannot appear in both keep_ids and drop_ids"
@@ -864,7 +868,7 @@ class Repository:
         located = []  # (obj_offset, obj_id, obj_size, keep)
         for obj_id in keep_ids | drop_ids:
             keep = obj_id in keep_ids
-            entry = self.chunks[obj_id]
+            entry = chunks[obj_id]
             assert entry.pack_id == pack_id, f"{bin_to_hex(obj_id)} is not in pack {bin_to_hex(pack_id)}"
             located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
@@ -886,7 +890,7 @@ class Repository:
             ), f"pack {bin_to_hex(pack_id)}: {pack_size - covered} trailing bytes unaccounted for"
 
         for drop_id in drop_ids:  # remove dropped objects from the index
-            del self.chunks[drop_id]
+            del chunks[drop_id]
 
         if not kept:  # nothing kept: drop the pack, no replacement
             self.store_delete(pack_key)
@@ -902,7 +906,7 @@ class Repository:
         for _, keep_id, size in kept:
             new_locations.append((keep_id, new_pack_id, offset, size))
             offset += size
-        self.chunks.update_pack_info(new_locations)
+        chunks.update_pack_info(new_locations)
 
         # delete the old pack last, after the new one is stored and indexed, so kept bytes are never the
         # only copy. if every object was kept in order, defrag reproduced the pack (new_pack_id == pack_id)

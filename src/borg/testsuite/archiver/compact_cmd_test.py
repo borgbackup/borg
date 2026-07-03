@@ -8,6 +8,7 @@ from ...helpers import get_cache_dir, bin_to_hex
 from ...hashindex import ChunkIndex
 from ...repository import Repository
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
+from ...cache import delete_chunkindex_from_repo
 from ...manifest import Manifest
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
@@ -186,6 +187,72 @@ def test_compact_packs_respects_threshold(tmp_path):
         pack_names = [info.name for info in repository.store_list("packs")]
         assert bin_to_hex(wasteful_pack) not in pack_names
         assert bin_to_hex(frugal_pack) in pack_names
+
+
+def test_compact_gc_after_index_loss(archivers, request):
+    """When no cached chunk index exists (e.g. after an interrupted compact, #9748), compact
+    rebuilds the index from the packs. The rebuilt entries must start unused (init_flags=F_NONE),
+    otherwise every object looks used and this compact run frees nothing."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive")
+    cmd(archiver, "delete", "-a", "archive")
+
+    # drop all cached chunk indexes, like an interrupted compact leaves the repo
+    repository = open_repository(archiver)
+    with repository:
+        delete_chunkindex_from_repo(repository)
+
+    output = cmd(archiver, "compact", "-v", "--stats", exit_code=0)
+    assert "Repository size is 0 B in 0 objects." in output
+
+
+def test_compact_pack_rewrite_updates_persisted_index(archivers, request, monkeypatch):
+    """Regression test for issue #9850.
+
+    When compact rewrites a mixed pack (still-used objects are copied into a new pack, the old
+    pack is deleted), the persisted chunk index must point at the new pack. A stale index makes
+    extract fail on the kept chunks and makes the next delete + compact crash with ObjectNotFound
+    when it tries to delete the already gone old pack.
+    """
+    archiver = request.getfixturevalue(archivers)
+    # one big pack per create run: all of archive1's chunks land in a single pack, so that pack
+    # is mixed (used + unused objects) once archive1 is deleted below.
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1000")
+
+    contents_kept = os.urandom(1024)  # unique contents -> own chunk
+    contents_dropped = os.urandom(1024)
+    create_regular_file(archiver.input_path, "file_kept", contents=contents_kept)
+    create_regular_file(archiver.input_path, "file_dropped", contents=contents_dropped)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive1", "input")
+    # archive2 references only file_kept's chunk, which deduplicates against archive1's pack.
+    os.remove(os.path.join(archiver.input_path, "file_dropped"))
+    cmd(archiver, "create", "archive2", "input")
+
+    cmd(archiver, "delete", "-a", "archive1")
+    # threshold 0: every pack with any unused bytes is rewritten
+    cmd(archiver, "compact", "-v", "--threshold", "0", exit_code=0)
+
+    # the persisted chunk index may only reference packs that still exist
+    repository = open_repository(archiver)
+    with repository:
+        pack_names = {info.name for info in repository.store_list("packs")}
+        for id, entry in repository.chunks.iteritems():
+            assert bin_to_hex(entry.pack_id) in pack_names, f"chunk {bin_to_hex(id)} points at a deleted pack"
+
+    # the kept chunk moved into a new pack; extracting must read it from there
+    with changedir("output"):
+        cmd(archiver, "extract", "archive2")
+        with open(os.path.join("input", "file_kept"), "rb") as fd:
+            assert fd.read() == contents_kept
+
+    # 9850: delete the remaining archive and compact again - must not crash with ObjectNotFound
+    cmd(archiver, "delete", "-a", "archive2")
+    output = cmd(archiver, "compact", "-v", exit_code=0)
+    assert "Finished compaction" in output
 
 
 def test_compact_dry_run_reports_and_changes_nothing(archivers, request):

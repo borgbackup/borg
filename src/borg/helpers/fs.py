@@ -65,7 +65,7 @@ def get_keys_dir(*, create=True):
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        keys_dir = str(Path(get_config_dir()) / "keys")
+        return get_config_dir("keys", create=create)
     if create:
         ensure_dir(keys_dir)
     return keys_dir
@@ -76,7 +76,8 @@ def get_security_dir(repository_id=None, *, create=True):
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = str(Path(get_data_dir()) / "security")
+        subdirs = ("security", repository_id) if repository_id else ("security",)
+        return get_data_dir(*subdirs, create=create)
     if repository_id:
         security_dir = str(Path(security_dir) / repository_id)
     if create:
@@ -84,31 +85,46 @@ def get_security_dir(repository_id=None, *, create=True):
     return security_dir
 
 
-def get_data_dir(*, create=True):
-    """Determine where to store borg changing data on the client"""
+def get_data_dir(*subdirs, create=True):
+    """Determine where to store borg changing data on the client.
+
+    Any additional path components are appended to the data directory.
+    """
     data_dir = os.environ.get(
         "BORG_DATA_DIR", join_base_dir(".local", "share", "borg") or platformdirs.user_data_dir("borg")
     )
+    if subdirs:
+        data_dir = str(Path(data_dir).joinpath(*subdirs))
     if create:
         ensure_dir(data_dir)
     return data_dir
 
 
-def get_runtime_dir(*, create=True):
-    """Determine where to store runtime files, like sockets, PID files, ..."""
+def get_runtime_dir(*subdirs, create=True):
+    """Determine where to store runtime files, like sockets, PID files, ...
+
+    Any additional path components are appended to the runtime directory.
+    """
     runtime_dir = os.environ.get(
         "BORG_RUNTIME_DIR", join_base_dir(".cache", "borg") or platformdirs.user_runtime_dir("borg")
     )
+    if subdirs:
+        runtime_dir = str(Path(runtime_dir).joinpath(*subdirs))
     if create:
         ensure_dir(runtime_dir)
     return runtime_dir
 
 
-def get_cache_dir(*, create=True):
-    """Determine where to store Borg cache data."""
+def get_cache_dir(*subdirs, create=True):
+    """Determine where to store Borg cache data.
+
+    Any additional path components are appended to the cache directory.
+    """
     cache_dir = os.environ.get("BORG_CACHE_DIR", join_base_dir(".cache", "borg") or platformdirs.user_cache_dir("borg"))
+    full_dir = str(Path(cache_dir).joinpath(*subdirs)) if subdirs else cache_dir
     if create:
-        ensure_dir(cache_dir)
+        ensure_dir(full_dir)
+        # the CACHEDIR.TAG applies to the whole tree below it, so it goes into the cache root
         cache_tag_fn = Path(cache_dir) / CACHE_TAG_NAME
         if not cache_tag_fn.exists():
             cache_tag_contents = (
@@ -125,14 +141,19 @@ def get_cache_dir(*, create=True):
 
             with SaveFile(cache_tag_fn, binary=True) as fd:
                 fd.write(cache_tag_contents)
-    return cache_dir
+    return full_dir
 
 
-def get_config_dir(*, create=True):
-    """Determine where to store the configuration."""
+def get_config_dir(*subdirs, create=True):
+    """Determine where to store the configuration.
+
+    Any additional path components are appended to the config directory.
+    """
     config_dir = os.environ.get(
         "BORG_CONFIG_DIR", join_base_dir(".config", "borg") or platformdirs.user_config_dir("borg")
     )
+    if subdirs:
+        config_dir = str(Path(config_dir).joinpath(*subdirs))
     if create:
         ensure_dir(config_dir)
     return config_dir

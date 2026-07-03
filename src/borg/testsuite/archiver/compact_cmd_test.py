@@ -223,7 +223,7 @@ def test_compact_files_cache_cleanup(archivers, request):
         pytest.fail("Could not find repository ID in info output")
 
     # Check cache directory for files cache files
-    cache_dir = Path(get_cache_dir()) / repo_id
+    cache_dir = Path(get_cache_dir(repo_id, create=False))
     if not cache_dir.exists():
         pytest.skip("Cache directory does not exist, skipping test")
 

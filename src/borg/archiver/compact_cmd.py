@@ -78,7 +78,7 @@ class ArchiveGarbageCollector:
         """
         logger.info("Cleaning up files cache...")
 
-        cache_dir = Path(get_cache_dir()) / self.repository.id_str
+        cache_dir = Path(get_cache_dir(self.repository.id_str, create=False))
         if not cache_dir.exists():
             logger.debug("Cache directory does not exist, skipping files cache cleanup")
             return

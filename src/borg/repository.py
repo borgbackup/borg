@@ -347,8 +347,11 @@ class Repository:
         cache_url = None
         store_cache = os.environ.get("BORG_STORE_CACHE")
         if store_cache:
-            cache_dir = Path(get_cache_dir()) / "storecache" if store_cache == "1" else Path(store_cache)
-            os.makedirs(cache_dir, exist_ok=True)
+            if store_cache == "1":
+                cache_dir = Path(get_cache_dir("storecache"))
+            else:
+                cache_dir = Path(store_cache)
+                cache_dir.mkdir(parents=True, exist_ok=True)
             ns_config["packs/"]["cache"] = "writethrough"
             cache_size = os.environ.get("BORG_PACK_CACHE_SIZE")
             if cache_size:

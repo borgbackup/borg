@@ -1,6 +1,8 @@
 from collections import defaultdict
 from pathlib import Path
 
+from borgstore.store import ObjectNotFound as StoreObjectNotFound
+
 from ._common import with_repository
 from ..archive import Archive
 from ..cache import write_chunkindex_to_repo, build_chunkindex_from_repo, delete_chunkindex_from_repo
@@ -53,10 +55,13 @@ class ArchiveGarbageCollector:
 
     def get_repository_chunks(self) -> ChunkIndex:
         """return a chunks index"""
-        # The cached index already has each object's obj_size and starts entries as F_NONE, so it
-        # serves both GC and --stats; no need to force the slow pack-header scan just to get sizes.
+        # Entries must start as unused (F_NONE); analyze_archives() marks the used ones afterwards.
+        # The cached index loads entries with F_NONE flags and each object's obj_size (used by --stats).
+        # init_flags applies when there is no cached index and the entries are read from the pack headers.
         logger.info("Getting object IDs from the cached chunks index...")
-        chunks = build_chunkindex_from_repo(self.repository, cache_immediately=not self.dry_run)
+        chunks = build_chunkindex_from_repo(
+            self.repository, cache_immediately=not self.dry_run, init_flags=ChunkIndex.F_NONE
+        )
         return chunks
 
     def save_chunk_index(self):
@@ -258,13 +263,19 @@ class ArchiveGarbageCollector:
         )
         progress = 0
         for pid in drop_packs:
-            self.repository.store_delete("packs/" + bin_to_hex(pid))
+            try:
+                self.repository.store_delete("packs/" + bin_to_hex(pid))
+            except StoreObjectNotFound:
+                # happens when a stale chunk index references an already deleted pack (#9850)
+                logger.warning(f"Pack {bin_to_hex(pid)} to delete was already gone.")
             progress += 1
             pi.show(progress)  # report after the work, so the final pack lands on 100%
         for id in forget:
             del self.chunks[id]  # their pack file is gone, so drop their index entries too
         for pid in rewrite_packs:
-            self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid])  # helper owns index update
+            # chunks=self.chunks: the index updates (repoint kept objects, remove dropped ones)
+            # must land in the index that save_chunk_index() persists (#9850).
+            self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid], chunks=self.chunks)
             progress += 1
             pi.show(progress)
         pi.finish()

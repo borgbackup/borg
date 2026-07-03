@@ -119,7 +119,7 @@ class PackWriter:
     at least one must be set, otherwise the pack buffer is unbounded.
     """
 
-    def __init__(self, store, *, max_count=3, max_size=None, chunks=None, repository=None):
+    def __init__(self, store, *, max_count=None, max_size=None, chunks=None, repository=None):
         if repository is None and chunks is None:
             raise ValueError("PackWriter requires either a repository or an explicit chunks index")
         if max_count is None and max_size is None:
@@ -518,13 +518,15 @@ class Repository:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._chunks = None
         # pack-sizing overrides: BORG_PACK_MAX_COUNT sets the max object count per pack,
-        # BORG_PACK_MAX_SIZE the max pack size in bytes.
-        pw_kwargs = {}
-        if (v := os.environ.get("BORG_PACK_MAX_COUNT")) is not None:
-            pw_kwargs["max_count"] = int(v)
-        if (v := os.environ.get("BORG_PACK_MAX_SIZE")) is not None:
-            pw_kwargs["max_size"] = int(v)
-        self._pack_writer = PackWriter(self.store, repository=self, **pw_kwargs)
+        # BORG_PACK_MAX_SIZE the max pack size in bytes. Default: size-bound only.
+        max_count_env = os.environ.get("BORG_PACK_MAX_COUNT")
+        max_size_env = os.environ.get("BORG_PACK_MAX_SIZE")
+        max_count = int(max_count_env) if max_count_env is not None else None
+        if max_size_env is not None:
+            max_size = int(max_size_env)
+        else:
+            max_size = None if max_count is not None else DEFAULT_PACK_MAX_SIZE
+        self._pack_writer = PackWriter(self.store, repository=self, max_count=max_count, max_size=max_size)
         self.opened = True
 
     @property
@@ -838,13 +840,15 @@ class Repository:
 
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
 
-    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, complete: bool = True):
+    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, complete: bool = True, chunks=None):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
         keep_ids: chunk ids in this pack to copy into the new pack.
         drop_ids: chunk ids in this pack to discard. Must not overlap keep_ids.
         complete: if True, keep_ids and drop_ids must together be every object in the pack (asserted).
             If False, they may name only some of the pack's objects.
+        chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
+            updates to. Must be the index keep_ids and drop_ids were derived from. Default: self.chunks.
 
         Kept objects are copied into a new pack via store.defrag and repointed in the chunk index;
         dropped objects' chunk index entries are removed.
@@ -856,6 +860,8 @@ class Repository:
         index back to the store afterwards.
         """
         self._lock_refresh()
+        if chunks is None:
+            chunks = self.chunks
         pack_key = "packs/" + bin_to_hex(pack_id)
 
         assert keep_ids & drop_ids == set(), "an id cannot appear in both keep_ids and drop_ids"
@@ -864,7 +870,7 @@ class Repository:
         located = []  # (obj_offset, obj_id, obj_size, keep)
         for obj_id in keep_ids | drop_ids:
             keep = obj_id in keep_ids
-            entry = self.chunks[obj_id]
+            entry = chunks[obj_id]
             assert entry.pack_id == pack_id, f"{bin_to_hex(obj_id)} is not in pack {bin_to_hex(pack_id)}"
             located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
@@ -886,7 +892,7 @@ class Repository:
             ), f"pack {bin_to_hex(pack_id)}: {pack_size - covered} trailing bytes unaccounted for"
 
         for drop_id in drop_ids:  # remove dropped objects from the index
-            del self.chunks[drop_id]
+            del chunks[drop_id]
 
         if not kept:  # nothing kept: drop the pack, no replacement
             self.store_delete(pack_key)
@@ -902,7 +908,7 @@ class Repository:
         for _, keep_id, size in kept:
             new_locations.append((keep_id, new_pack_id, offset, size))
             offset += size
-        self.chunks.update_pack_info(new_locations)
+        chunks.update_pack_info(new_locations)
 
         # delete the old pack last, after the new one is stored and indexed, so kept bytes are never the
         # only copy. if every object was kept in order, defrag reproduced the pack (new_pack_id == pack_id)

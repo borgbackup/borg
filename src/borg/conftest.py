@@ -89,6 +89,8 @@ def clean_env(tmpdir_factory, monkeypatch):
     # Speed up tests
     monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "1")
     monkeypatch.setenv("BORG_STORE_DATA_LEVELS", "0")  # flat storage for few objects
+    # tiny packs, so small test data still produces multiple multi-object packs
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "3")
     yield
     shutil.rmtree(str(base_dir), ignore_errors=True)  # clean up
 

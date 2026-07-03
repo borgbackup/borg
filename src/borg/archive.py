@@ -1434,15 +1434,18 @@ class FilesystemObjectProcessors:
                     changed_while_backup = False
                     if "chunks" not in item:
                         start_reading = time.time_ns()
-                        with backup_io("read"):
-                            self.process_file_chunks(
-                                item,
-                                cache,
-                                self.stats,
-                                self.show_progress,
-                                backup_io_iter(self.chunker.chunkify(None, fd)),
-                            )
-                            self.stats.chunking_time = self.chunker.chunking_time
+                        # Do NOT wrap this in backup_io("read"): the source-file reads are already
+                        # guarded individually by backup_io_iter() below. Wrapping the whole call would
+                        # also wrap add_chunk()'s *repository* writes, turning a critical repository IO
+                        # failure (e.g. the repo running out of space during a pack flush) into a
+                        # non-critical per-file BackupOSError. Borg would then only warn, skip the file,
+                        # and still commit the archive -- referencing chunks that were never durably
+                        # stored. An unwrapped repository OSError is critical and aborts create before
+                        # archive.save() runs (see the BackupOSError docstring).
+                        self.process_file_chunks(
+                            item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd))
+                        )
+                        self.stats.chunking_time = self.chunker.chunking_time
                         end_reading = time.time_ns()
                         with backup_io("fstat2"):
                             st2 = os.fstat(fd)

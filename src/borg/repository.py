@@ -1,3 +1,4 @@
+import functools
 import os
 import sys
 import time
@@ -18,7 +19,6 @@ from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .helpers import get_cache_dir
 from .helpers import ProgressIndicatorPercent
-from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
@@ -392,7 +392,8 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
-        self._pack_cache = LRUCache(capacity=self.PACK_READER_CACHE_SIZE)  # pack_id -> PackReader
+        # pack_id -> PackReader, per repository so close() can free the cached packs
+        self._cached_pack_reader = functools.lru_cache(maxsize=self.PACK_READER_CACHE_SIZE)(self._load_pack_reader)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self._location}>"
@@ -600,7 +601,7 @@ class Repository:
             self.store.close()
             self.store_opened = False
         self.opened = False
-        self._pack_cache.clear()
+        self._cached_pack_reader.cache_clear()
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
@@ -804,15 +805,10 @@ class Repository:
             else:
                 return None
 
-    def _cached_pack_reader(self, pack_id):
-        """Return a PackReader holding the whole pack, fetching it from the store on a cache miss."""
-        reader = self._pack_cache.get(pack_id)
-        if reader is not None:
-            return reader
+    def _load_pack_reader(self, pack_id):
+        """Return a PackReader holding the whole pack, loaded from the store."""
         key = "packs/" + bin_to_hex(pack_id)
-        reader = PackReader(pack_id=pack_id, pack_contents=self.store.load(key))
-        self._pack_cache[pack_id] = reader
-        return reader
+        return PackReader(pack_id=pack_id, pack_contents=self.store.load(key))
 
     def get_many(self, ids, read_data=True, raise_missing=True):
         if not read_data:

@@ -53,6 +53,15 @@ The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
 ``len(OBJ_MAGIC)`` + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
 ``REPOOBJ_HEADER_SIZE = len(OBJ_MAGIC) + 1 + 32 + 4 + 4 = 49``
 
+.. figure:: pack-objheader.png
+    :width: 100%
+    :figclass: figure-padded
+    :alt: The 49-byte RepoObj header: magic, version, chunk_id, meta_size, data_size.
+
+    The fixed 49-byte blob header. ``meta_size`` and ``data_size`` drive
+    traversal; integrity comes from the content-addressed pack name plus the
+    per-blob AEAD, not from any header checksum.
+
 A reader locates the next blob by advancing::
 
     next_blob_offset = current_blob_offset + REPOOBJ_HEADER_SIZE + meta_size + data_size
@@ -67,6 +76,15 @@ Blobs follow one another contiguously with no padding::
     OBJ_MAGIC | version=0x01 | chunk_id_0 | meta_size_0 | data_size_0 | encrypted_meta_0 | encrypted_data_0
     OBJ_MAGIC | version=0x01 | chunk_id_1 | meta_size_1 | data_size_1 | encrypted_meta_1 | encrypted_data_1
     ...
+
+.. figure:: pack-layout.png
+    :width: 100%
+    :figclass: figure-padded
+    :alt: A pack file as objects stored back to back, with no file header.
+
+    A pack file: self-describing objects concatenated with no pack-level header
+    and no length prefix. Object boundaries are found by walking each 49-byte
+    header (``offset += 49 + meta_size + data_size``).
 
 Pack ID
 ~~~~~~~
@@ -95,29 +113,41 @@ single directory level keyed on the first byte of the pack ID (hex-encoded)::
 Pack Index Entry
 ----------------
 
-Each pack contains one blob. The pack for a given chunk is always at::
+A pack holds one or more blobs, so locating a chunk needs both which pack it is
+in and where inside that pack its blob starts. The ChunkIndex maps each chunk to
+a full pack location::
 
-    packs/<hex(pack_id)>
+    chunk_id  →  (pack_id, obj_offset, obj_size)
 
-A ChunkIndex entry maps a chunk to its pack::
+``obj_offset`` is the byte offset of the blob from the start of the pack file and
+``obj_size`` is the total blob length (header + encrypted_meta + encrypted_data).
+A reader fetches a single chunk with one range request::
 
-    chunk_id  →  pack_id
+    read packs/<hex(pack_id)> at [obj_offset, obj_offset + obj_size)
 
-Since each pack holds exactly one blob, the blob is always at offset 0 and
-its length is the full file size. No offset or length field is stored in the
-index for this phase.
+The full ChunkIndex entry is ``(flags, size, pack_id, obj_offset, obj_size)``
+(``ChunkIndexEntry`` in ``borg.hashindex``), where ``size`` is the plaintext
+chunk size. While a chunk is buffered in the pack writer but not yet flushed, its
+entry carries the ``F_PENDING`` flag and its pack location is unresolved.
 
 .. _pack-write-order:
 
-Write Order and Crash Safety
------------------------------
+.. figure:: pack-write-order.png
+    :width: 55%
+    :align: center
+    :alt: Write order: pack files, chunk index, then the archive pointer commit.
+
+    The archive pointer write (``archives/<archive_id>``) is the commit point; a
+    crash before it leaves only unreferenced objects that ``borg compact``
+    reclaims.
 
 Pack data must be stored before any archive pointer references it.
 The required write order is:
 
 1. Store the pack file to ``packs/<pack_id>`` via borgstore.
 2. Store the partial index file to ``index/<index_id>`` (see :ref:`pack-index-namespace`).
-3. Write the archive and archive pointer. This is the sole commit point.
+3. Write the archive metadata object into a pack, then write the archive pointer
+   ``archives/<hex(archive_id)>``. This pointer write is the sole commit point.
 
 A crash between steps 1 and 2 leaves orphan pack files in ``packs/``. No archive
 references these chunks; ``borg compact`` removes them on the next run.
@@ -127,8 +157,10 @@ committed to any archive. The extra index entries point to valid, fully-written 
 data; they are harmless and will be cleaned up by the next ``borg compact``.
 
 A crash after step 3 cannot leave the repository in an inconsistent state. The
-archive pointer write is the commit point: data not referenced by any archive pointer
-is unreachable and treated as garbage by ``borg compact``.
+archive pointer write is the commit point: archives are listed from the
+``archives/`` namespace (not from the manifest, whose archive list is empty in
+Borg 2), so data not referenced by any archive pointer is unreachable and treated
+as garbage by ``borg compact``.
 
 Only ``borg compact`` and ``borg check --repair`` delete pack files. When compact
 determines via mark-and-sweep that none of a pack's blobs are referenced by any

@@ -857,6 +857,10 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             now = datetime.now(UTC)
             self._maybe_write_chunks_cache(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
+            # the index we just cleared in-place is the same object the repository holds; drop the
+            # repository's reference too, so a later .chunks access rebuilds it from the repo instead
+            # of seeing a valid-looking but empty index (and so is_chunk_index_loaded reports False).
+            self.repository.invalidate_chunk_index()
         pi.output("Saving cache config")
         self.cache_config.save(self.manifest)
         self.cache_config.close()

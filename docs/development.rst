@@ -387,6 +387,29 @@ Then point a web browser at docs/_build/html/index.html.
 The website is updated automatically by ReadTheDocs through GitHub web hooks on the
 main repository.
 
+Diagrams and figures
+~~~~~~~~~~~~~~~~~~~~~
+
+Diagrams in the docs (for example the pack file figures in
+``docs/internals/``) are drawn with `Excalidraw <https://excalidraw.com/>`_.
+
+For every figure we keep the editable source next to the image it produces, in
+the same directory and with the same base name: ``pack-layout.excalidraw`` for
+``pack-layout.png``. The ``.excalidraw`` file is plain JSON, so it diffs in git
+and anyone can open it on excalidraw.com to make changes and re-export.
+
+To update a figure, edit the ``.excalidraw`` source, then export it to PNG with
+a white background at 2x scale (the docs use a light theme, so light text on a
+transparent background would be unreadable). Keep the PNG file name unchanged so
+the ``figure::`` directive that references it keeps working. Reference figures
+with the ``figure-padded`` class for consistent spacing::
+
+    .. figure:: pack-layout.png
+        :width: 100%
+        :figclass: figure-padded
+
+        Caption text.
+
 Using Vagrant
 -------------
 

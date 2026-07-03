@@ -59,8 +59,8 @@ The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
     :alt: The 49-byte RepoObj header: magic, version, chunk_id, meta_size, data_size.
 
     The fixed 49-byte blob header. ``meta_size`` and ``data_size`` drive
-    traversal; integrity comes from the content-addressed pack name plus the
-    per-blob AEAD, not from any header checksum.
+    traversal; integrity comes from the content-addressed pack name and the
+    per-blob AEAD.
 
 A reader locates the next blob by advancing::
 
@@ -82,9 +82,9 @@ Blobs follow one another contiguously with no padding::
     :figclass: figure-padded
     :alt: A pack file as objects stored back to back, with no file header.
 
-    A pack file: self-describing objects concatenated with no pack-level header
-    and no length prefix. Object boundaries are found by walking each 49-byte
-    header (``offset += 49 + meta_size + data_size``).
+    A pack file: self-describing objects concatenated back to back. Object
+    boundaries are found by walking each 49-byte header
+    (``offset += 49 + meta_size + data_size``).
 
 Pack ID
 ~~~~~~~
@@ -113,11 +113,11 @@ single directory level keyed on the first byte of the pack ID (hex-encoded)::
 Pack Index Entry
 ----------------
 
-A pack holds one or more blobs, so locating a chunk needs both which pack it is
-in and where inside that pack its blob starts. The ChunkIndex maps each chunk to
-a full pack location::
+A pack usually holds many blobs, so locating a chunk needs which pack it is in,
+where inside that pack its blob starts, and how long the blob is. The ChunkIndex
+maps each chunk to a full pack location::
 
-    chunk_id  →  (pack_id, obj_offset, obj_size)
+    chunk_id  →  (..., pack_id, obj_offset, obj_size)
 
 ``obj_offset`` is the byte offset of the blob from the start of the pack file and
 ``obj_size`` is the total blob length (header + encrypted_meta + encrypted_data).
@@ -158,9 +158,8 @@ data; they are harmless and will be cleaned up by the next ``borg compact``.
 
 A crash after step 3 cannot leave the repository in an inconsistent state. The
 archive pointer write is the commit point: archives are listed from the
-``archives/`` namespace (not from the manifest, whose archive list is empty in
-Borg 2), so data not referenced by any archive pointer is unreachable and treated
-as garbage by ``borg compact``.
+``archives/`` namespace, so data not referenced by any archive pointer is
+unreachable and treated as garbage by ``borg compact``.
 
 Only ``borg compact`` and ``borg check --repair`` delete pack files. When compact
 determines via mark-and-sweep that none of a pack's blobs are referenced by any

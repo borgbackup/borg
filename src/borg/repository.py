@@ -26,6 +26,8 @@ from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
 
+DEFAULT_PACK_MAX_SIZE = 50 * 1000 * 1000  # default pack size limit [bytes], see PackWriter
+
 
 def repo_lister(repository, *, limit=None):
     marker = None
@@ -117,9 +119,10 @@ class PackWriter:
     max_count bounds how many chunks a pack holds; max_size bounds its byte size.
     flush() fires when either limit is reached.  Set a limit to None to disable it;
     at least one must be set, otherwise the pack buffer is unbounded.
+    By default, packs are bound by DEFAULT_PACK_MAX_SIZE only.
     """
 
-    def __init__(self, store, *, max_count=3, max_size=None, chunks=None, repository=None):
+    def __init__(self, store, *, max_count=None, max_size=DEFAULT_PACK_MAX_SIZE, chunks=None, repository=None):
         if repository is None and chunks is None:
             raise ValueError("PackWriter requires either a repository or an explicit chunks index")
         if max_count is None and max_size is None:

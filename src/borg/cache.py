@@ -407,8 +407,18 @@ class FilesCacheMixin:
                 entries = 0
                 age_discarded = 0
                 race_discarded = 0
+                broken_discarded = 0
                 for path_hash, entry in files.items():
-                    entry = self.decompress_entry(entry)
+                    try:
+                        entry = self.decompress_entry(entry)
+                    except KeyError:
+                        # the entry references a chunk that is no longer in the chunks index (e.g.
+                        # after an aborted / out-of-space backup rolled back pending chunks). such an
+                        # entry is unusable; drop it rather than crash while saving the cache — the
+                        # file will simply be re-chunked in a future backup. this mirrors the
+                        # compress_entry KeyError handling in _read_files_cache.
+                        broken_discarded += 1
+                        continue
                     if entry.age == 0:  # current entries
                         if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
                             # Only keep files seen in this backup that old enough not to suffer race conditions
@@ -430,6 +440,8 @@ class FilesCacheMixin:
                         entries += 1
             integrity_data = fd.integrity_data
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {age_discarded} entries with age >= TTL [{ttl}]")
+        if broken_discarded:
+            files_cache_logger.debug(f"FILES-CACHE-KILL: removed {broken_discarded} entries referencing missing chunks")
         t_str = datetime.fromtimestamp(discard_after / 1e9, UTC).isoformat()
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {race_discarded} entries with ctime/mtime >= {t_str}")
         files_cache_logger.debug(f"FILES-CACHE-SAVE: finished, {entries} remaining entries saved.")
@@ -463,7 +475,13 @@ class FilesCacheMixin:
             files_cache_logger.debug("UNKNOWN: no file metadata in cache for: %r", hashed_path)
             return False, None
         # we know the file!
-        entry = self.decompress_entry(entry)
+        try:
+            entry = self.decompress_entry(entry)
+        except KeyError:
+            # the cached entry references a chunk that is no longer in the chunks index (e.g. after
+            # an aborted / out-of-space backup); treat the file as unknown so it gets re-chunked.
+            files_cache_logger.debug("UNKNOWN: cached entry references a missing chunk: %r", hashed_path)
+            return False, None
         if "s" in cache_mode and entry.size != st.st_size:
             files_cache_logger.debug("KNOWN-CHANGED: file size has changed: %r", hashed_path)
             return True, None

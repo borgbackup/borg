@@ -396,3 +396,50 @@ def test_repack_idempotent_deletes_sources_when_merged_exists(tmp_path, monkeypa
         assert frags == sealed  # sources deleted; only the (unchanged) sealed fragment remains
         merged = read_chunkindex_from_repo(repository, next(iter(frags)))
         assert set(merged) == set(all_keys)
+
+
+def test_files_cache_save_tolerates_missing_chunk(tmp_path, monkeypatch):
+    """A files-cache entry whose chunk vanished from the index is dropped, not fatal.
+
+    When a backup runs out of space and aborts, pending chunks get rolled back out of the chunks
+    index. A files-cache entry memorized earlier still references such a chunk by its (now stale)
+    hash-table index position, so decompress_entry's `self.chunks[id]` raises KeyError. That must not
+    crash a cache lookup or the files-cache save (which runs during close(), while cleaning up the
+    already-failed backup) -- the entry is simply discarded and the file re-chunked next time.
+    Regression test for the ENOSPC 'Key not found' crash in decompress_entry.
+    """
+    monkeypatch.setenv("BORG_PASSPHRASE", "test")
+    loc = os.fspath(tmp_path / "repository")
+    with Repository(loc, exclusive=True, create=True) as repository:
+        key = AESOCBKey.create(repository, TestKey.MockArgs())
+        Manifest(key, repository).write()
+
+    with Repository(loc, exclusive=True) as repository:
+        manifest = Manifest.load(repository, key=key, operations=Manifest.NO_OPERATION_CHECK)
+        # size+inode+ctime cache mode -> files cache active; archive_name -> names the cache file
+        cache = AdHocWithFilesCache(manifest, cache_mode="cis", archive_name="test")
+        try:
+            cid = H(1)
+            cache.chunks[cid] = ChunkIndexEntry(ChunkIndex.F_NEW, 4, cid, 0, 4)
+            realfile = tmp_path / "f"
+            realfile.write_bytes(b"data")
+            st = os.stat(realfile)
+            path_hash = H(100)
+            cache.memorize_file(os.fspath(realfile), path_hash, st, [(cid, 4)])
+
+            # while the chunk is present, the file resolves as known/unchanged
+            known, chunks = cache.file_known_and_unchanged(os.fspath(realfile), path_hash, st)
+            assert known and chunks
+
+            # simulate the out-of-space rollback: the referenced chunk is gone from the index
+            del cache.chunks[cid]
+
+            # a lookup must now report the file as unknown (re-chunk it), not raise KeyError
+            known, chunks = cache.file_known_and_unchanged(os.fspath(realfile), path_hash, st)
+            assert known is False and chunks is None
+
+            # saving the files cache must drop the broken entry rather than raise KeyError
+            cache._write_files_cache(cache._files)
+        finally:
+            cache.close()
+        repository.flush()

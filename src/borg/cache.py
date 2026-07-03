@@ -648,9 +648,16 @@ def write_chunkindex_to_repo(
         # we have successfully stored to the repository, so we can clear all F_NEW flags now:
         chunks.clear_new()
 
-    # delete some no longer needed index objects, but never the ones we just wrote. we only do this
-    # if we actually stored the replacement fragment(s), so we never leave the repo without an index.
-    if stored_anything and (delete_other or delete_these):
+    # delete some no longer needed index objects, but never the ones we just wrote. we gate this on
+    # new_hashes (the fragments that make up the index we just wrote), not on whether we actually
+    # uploaded them: a fragment can be dedupe-skipped because its content already exists in the repo
+    # (see _store_chunkindex_fragment), and in that case the replacement is verifiably present, so
+    # deleting the superseded fragments is still safe. this also makes repack idempotent -- if a
+    # previous repack crashed after storing but before deleting, the next one re-derives the same
+    # fragments, dedupe-skips the uploads, and still deletes the small sources. when there is nothing
+    # to write (new_hashes empty, e.g. an empty incremental index), we skip deletion so we never leave
+    # the repo without an index.
+    if new_hashes and (delete_other or delete_these):
         if delete_other:
             delete_these = set(stored_hashes) - new_hashes
         else:
@@ -723,10 +730,13 @@ def repack_chunkindex(repository):
     if not merged_hashes:
         return
     # write the merged entries split into bounded (<= MAX) fragments and delete the small sources.
-    # write_chunkindex_to_repo never deletes a hash it just wrote, so a fragment whose content is
-    # unchanged by the merge survives rather than being deleted and re-created.
+    # force_write=False so a merged fragment whose content already exists in the repo is dedupe-skipped
+    # rather than re-uploaded; write_chunkindex_to_repo still deletes the small sources because deletion
+    # is gated on the fragment set being present, not on a fresh upload (so repack is idempotent and
+    # avoids redundant uploads). write_chunkindex_to_repo also never deletes a hash it just wrote, so a
+    # fragment whose content is unchanged by the merge survives rather than being deleted and re-created.
     write_chunkindex_to_repo(
-        repository, merged, incremental=False, clear=True, force_write=True, delete_these=merged_hashes
+        repository, merged, incremental=False, clear=True, force_write=False, delete_these=merged_hashes
     )
 
 

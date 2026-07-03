@@ -359,3 +359,40 @@ def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):
         index = build_chunkindex_from_repo(repository)
         assert len(index) == 2000 + 1200
         assert set(index) == set(sealed_keys + small_keys)
+
+
+def test_repack_idempotent_deletes_sources_when_merged_exists(tmp_path, monkeypatch):
+    """A repack whose merged fragment already exists (dedupe-skipped) still deletes the small sources.
+
+    This is the crash / concurrent-repack recovery case: a prior repack may have stored the merged
+    fragment but not gotten to delete the small sources. The next repack re-derives the same merged
+    content, dedupe-skips the upload (force_write=False), and must still remove the now-superseded
+    sources -- otherwise they would pile up and be re-merged on every run. Deletion is therefore gated
+    on the merged fragment being present in the repo, not on a fresh upload having happened.
+    """
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 3000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 100)
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)
+        all_keys = []
+        for j in range(5):  # 5 * 300 = 1500 >= MIN -> merges into one sealed fragment
+            all_keys += _seed_fragment(repository, j * 300, 300)
+        repack_chunkindex(repository)
+        sealed = {name for name, _ in list_chunkindex_fragments(repository)}
+        assert len(sealed) == 1  # the merged, sealed fragment
+
+        # simulate a repack that stored the merged fragment but crashed before deleting the sources:
+        # the sealed fragment is present, and the same small sources exist again alongside it.
+        for j in range(5):
+            _seed_fragment(repository, j * 300, 300)
+        assert len(list_chunkindex_fragments(repository)) == 6  # sealed + 5 re-seeded small
+
+        repack_chunkindex(repository)  # merged content already exists -> upload is dedupe-skipped
+
+        frags = {name for name, _ in list_chunkindex_fragments(repository)}
+        assert frags == sealed  # sources deleted; only the (unchanged) sealed fragment remains
+        merged = read_chunkindex_from_repo(repository, next(iter(frags)))
+        assert set(merged) == set(all_keys)

@@ -26,8 +26,6 @@ from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
 
-DEFAULT_PACK_MAX_SIZE = 50 * 1000 * 1000  # default pack size limit [bytes], see PackWriter
-
 
 def repo_lister(repository, *, limit=None):
     marker = None
@@ -119,10 +117,9 @@ class PackWriter:
     max_count bounds how many chunks a pack holds; max_size bounds its byte size.
     flush() fires when either limit is reached.  Set a limit to None to disable it;
     at least one must be set, otherwise the pack buffer is unbounded.
-    By default, packs are bound by DEFAULT_PACK_MAX_SIZE only.
     """
 
-    def __init__(self, store, *, max_count=None, max_size=DEFAULT_PACK_MAX_SIZE, chunks=None, repository=None):
+    def __init__(self, store, *, max_count=None, max_size=None, chunks=None, repository=None):
         if repository is None and chunks is None:
             raise ValueError("PackWriter requires either a repository or an explicit chunks index")
         if max_count is None and max_size is None:
@@ -518,13 +515,15 @@ class Repository:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self._chunks = None
         # pack-sizing overrides: BORG_PACK_MAX_COUNT sets the max object count per pack,
-        # BORG_PACK_MAX_SIZE the max pack size in bytes.
-        pw_kwargs = {}
-        if (v := os.environ.get("BORG_PACK_MAX_COUNT")) is not None:
-            pw_kwargs["max_count"] = int(v)
-        if (v := os.environ.get("BORG_PACK_MAX_SIZE")) is not None:
-            pw_kwargs["max_size"] = int(v)
-        self._pack_writer = PackWriter(self.store, repository=self, **pw_kwargs)
+        # BORG_PACK_MAX_SIZE the max pack size in bytes. Default: size-bound only.
+        max_count_env = os.environ.get("BORG_PACK_MAX_COUNT")
+        max_size_env = os.environ.get("BORG_PACK_MAX_SIZE")
+        max_count = int(max_count_env) if max_count_env is not None else None
+        if max_size_env is not None:
+            max_size = int(max_size_env)
+        else:
+            max_size = None if max_count is not None else DEFAULT_PACK_MAX_SIZE
+        self._pack_writer = PackWriter(self.store, repository=self, max_count=max_count, max_size=max_size)
         self.opened = True
 
     @property

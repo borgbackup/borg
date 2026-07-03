@@ -59,6 +59,9 @@ UNKNOWN_INT32 = 0xFFFFFFFF
 # an unresolved pack location is tracked by the ChunkIndex.F_PENDING flag.
 UNKNOWN_BYTES32 = b"\xff" * 32
 
+# default pack size limit [bytes], see PackWriter in the repository module
+DEFAULT_PACK_MAX_SIZE = 50 * 1000 * 1000
+
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module
 

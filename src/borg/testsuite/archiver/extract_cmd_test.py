@@ -626,7 +626,7 @@ def test_extract_restores_append_flag(archivers, request):
     if (platform.get_flags(src_path, st) & stat.UF_APPEND) == 0:
         pytest.skip("UF_APPEND not settable on this filesystem")
     # archive and extract
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")

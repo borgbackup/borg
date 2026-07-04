@@ -721,17 +721,25 @@ def test_invalid_chunkerparams(invalid_chunker_params):
         ChunkerParams(invalid_chunker_params)
 
 
-def test_json_dump_compact(monkeypatch):
+@pytest.mark.parametrize(
+    "env_value, expect_newlines",
+    [
+        (None, True),       # default indent=4
+        ("none", False),    # compact single-line
+        ("0", True),        # newlines only, no spaces
+        ("4", True),        # explicit pretty-print
+    ],
+)
+def test_json_dump_indent(monkeypatch, env_value, expect_newlines):
     from ...helpers.parseformat import json_dump
 
     obj = {"key": "value", "number": 42}
+    if env_value is not None:
+        monkeypatch.setenv("BORG_JSON_INDENT", env_value)
 
-    # Default: pretty-printed (multi-line)
     result = json_dump(obj)
-    assert "\n" in result
-
-    # With BORG_JSON_COMPACT set: single-line
-    monkeypatch.setenv("BORG_JSON_COMPACT", "1")
-    result = json_dump(obj)
-    assert "\n" not in result
+    if expect_newlines:
+        assert "\n" in result
+    else:
+        assert "\n" not in result
     assert json.loads(result) == obj

@@ -516,7 +516,7 @@ def test_parse_timestamp():
         (10**12, "1.00 TB"),  # terabytes
         (10**15, "1.00 PB"),  # petabytes
         (10**18, "1.00 EB"),  # exabytes
-        (10**21, "1.00 ZB"),  # zottabytes
+        (10**21, "1.00 ZB"),  # zettabytes
         (10**24, "1.00 YB"),  # yottabytes
         (-1, "-1 B"),  # negative value
         (-1010, "-1.01 kB"),  # negative value with rounding

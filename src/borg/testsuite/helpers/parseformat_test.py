@@ -724,10 +724,10 @@ def test_invalid_chunkerparams(invalid_chunker_params):
 @pytest.mark.parametrize(
     "env_value, expect_newlines",
     [
-        (None, True),       # default indent=4
-        ("none", False),    # compact single-line
-        ("0", True),        # newlines only, no spaces
-        ("4", True),        # explicit pretty-print
+        (None, True),  # default indent=4
+        ("none", False),  # compact single-line
+        ("0", True),  # newlines only, no spaces
+        ("4", True),  # explicit pretty-print
     ],
 )
 def test_json_dump_indent(monkeypatch, env_value, expect_newlines):

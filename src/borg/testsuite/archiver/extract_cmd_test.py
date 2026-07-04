@@ -677,7 +677,7 @@ def test_do_not_fail_when_percent_is_in_xattr_name(archivers, request):
 
     create_regular_file(archiver.input_path, "file")
     xattr.setxattr(b"input/file", b"user.attribute%p", b"value")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):

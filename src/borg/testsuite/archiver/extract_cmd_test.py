@@ -587,7 +587,7 @@ def test_extract_xattrs_errors(archivers, request):
 def test_extract_xattrs_resourcefork(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     input_path = os.path.abspath("input/file")
     xa_key, xa_value = b"com.apple.ResourceFork", b"whatshouldbehere"  # issue #7234
     xattr.setxattr(input_path.encode(), xa_key, xa_value)

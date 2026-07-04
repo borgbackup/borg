@@ -697,7 +697,7 @@ def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
 
     os.makedirs(os.path.join(archiver.input_path, "dir%p"))
     xattr.setxattr(b"input/dir%p", b"user.attribute", b"value")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):

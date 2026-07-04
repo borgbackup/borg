@@ -559,7 +559,7 @@ def test_extract_xattrs_errors(archivers, request):
 
     create_regular_file(archiver.input_path, "file")
     xattr.setxattr(b"input/file", b"user.attribute", b"value")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         input_abspath = os.path.abspath("input/file")
@@ -587,7 +587,7 @@ def test_extract_xattrs_errors(archivers, request):
 def test_extract_xattrs_resourcefork(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     input_path = os.path.abspath("input/file")
     xa_key, xa_value = b"com.apple.ResourceFork", b"whatshouldbehere"  # issue #7234
     xattr.setxattr(input_path.encode(), xa_key, xa_value)
@@ -626,7 +626,7 @@ def test_extract_restores_append_flag(archivers, request):
     if (platform.get_flags(src_path, st) & stat.UF_APPEND) == 0:
         pytest.skip("UF_APPEND not settable on this filesystem")
     # archive and extract
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
@@ -677,7 +677,7 @@ def test_do_not_fail_when_percent_is_in_xattr_name(archivers, request):
 
     create_regular_file(archiver.input_path, "file")
     xattr.setxattr(b"input/file", b"user.attribute%p", b"value")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
@@ -697,7 +697,7 @@ def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
 
     os.makedirs(os.path.join(archiver.input_path, "dir%p"))
     xattr.setxattr(b"input/dir%p", b"user.attribute", b"value")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):

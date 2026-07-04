@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 
 import re
@@ -718,3 +719,19 @@ def test_valid_chunkerparams(chunker_params, expected_return):
 def test_invalid_chunkerparams(invalid_chunker_params):
     with pytest.raises(ArgumentTypeError):
         ChunkerParams(invalid_chunker_params)
+
+
+def test_json_dump_compact(monkeypatch):
+    from ...helpers.parseformat import json_dump
+
+    obj = {"key": "value", "number": 42}
+
+    # Default: pretty-printed (multi-line)
+    result = json_dump(obj)
+    assert "\n" in result
+
+    # With BORG_JSON_COMPACT set: single-line
+    monkeypatch.setenv("BORG_JSON_COMPACT", "1")
+    result = json_dump(obj)
+    assert "\n" not in result
+    assert json.loads(result) == obj

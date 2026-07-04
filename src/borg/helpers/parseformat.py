@@ -1418,11 +1418,24 @@ def basic_json_data(manifest, *, cache=None, extra=None):
     return data
 
 
+def _json_indent_from_env():
+    """Parse BORG_JSON_INDENT env var for json.dumps indent parameter."""
+    value = os.environ.get("BORG_JSON_INDENT")
+    if value is None:
+        return 4
+    if value.lower() == "none":
+        return None
+    if value == "":
+        return ""
+    try:
+        return int(value)
+    except ValueError:
+        return value
+
+
 def json_dump(obj):
     """Dump using BorgJSONEncoder."""
-    indent = 4
-    if os.environ.get("BORG_JSON_COMPACT"):
-        indent = None
+    indent = _json_indent_from_env()
     return json.dumps(obj, sort_keys=True, indent=indent, cls=BorgJsonEncoder)
 
 

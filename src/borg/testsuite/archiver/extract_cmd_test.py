@@ -559,7 +559,7 @@ def test_extract_xattrs_errors(archivers, request):
 
     create_regular_file(archiver.input_path, "file")
     xattr.setxattr(b"input/file", b"user.attribute", b"value")
-    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "repo-create", "-e", "none")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         input_abspath = os.path.abspath("input/file")

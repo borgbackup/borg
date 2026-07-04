@@ -815,7 +815,9 @@ def build_chunkindex_from_repo(
     logger.debug(f"queried {num_chunks} chunk IDs in {duration} s, ~{speed}/s")
     if cache_immediately:
         # immediately update the index, so we only rarely have to do it the slow way:
-        write_chunkindex_to_repo(repository, chunks, clear=False, force_write=True, delete_other=True)
+        write_chunkindex_to_repo(
+            repository, chunks, incremental=False, clear=False, force_write=True, delete_other=True
+        )
     return chunks
 
 

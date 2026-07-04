@@ -1041,7 +1041,10 @@ def basic_json_data(manifest, *, cache=None, extra=None):
 
 def json_dump(obj):
     """Dump using BorgJSONEncoder."""
-    return json.dumps(obj, sort_keys=True, indent=4, cls=BorgJsonEncoder)
+    indent = 4
+    if os.environ.get("BORG_JSON_COMPACT"):
+        indent = None
+    return json.dumps(obj, sort_keys=True, indent=indent, cls=BorgJsonEncoder)
 
 
 def json_print(obj):

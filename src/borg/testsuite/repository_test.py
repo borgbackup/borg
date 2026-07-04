@@ -288,6 +288,32 @@ def test_get_many_evicts_least_recently_used(repo_fixtures, request):
         assert repository.store.stats["load_calls"] - loads_before == 5  # 4 distinct packs + 1 reload
 
 
+def test_get_reuses_cached_pack(repo_fixtures, request):
+    # get() slices from a pack that get_many already cached, doing no store load; a get() whose pack
+    # is not cached reads only its object's range and does not load the whole pack into the cache.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(2)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # one pack: {H0, H1}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+
+        # cold cache: get() reads one range and leaves the cache empty, so the next get() reads again
+        loads_before = repository.store.stats["load_calls"]
+        reference = repository.get(H(0))
+        assert repository.store.stats["load_calls"] - loads_before == 1  # one ranged read
+        loads_before = repository.store.stats["load_calls"]
+        repository.get(H(1))
+        assert repository.store.stats["load_calls"] - loads_before == 1  # pack was not cached, another range
+
+        list(repository.get_many([H(0), H(1)]))  # loads the whole pack into the cache
+
+        loads_before = repository.store.stats["load_calls"]
+        assert repository.get(H(0)) == reference
+        assert repository.store.stats["load_calls"] - loads_before == 0  # sliced from the cached pack
+        assert repository.get(H(1), read_data=False)  # read_data=False also peeks the cache
+        assert repository.store.stats["load_calls"] - loads_before == 0
+
+
 def build_one_pack(repository, objects):
     with repository:
         repository._pack_writer.max_count = len(objects) + 1  # prevent per-put flush; one pack on flush()

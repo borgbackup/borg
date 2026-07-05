@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 
 import re
@@ -718,3 +719,31 @@ def test_valid_chunkerparams(chunker_params, expected_return):
 def test_invalid_chunkerparams(invalid_chunker_params):
     with pytest.raises(ArgumentTypeError):
         ChunkerParams(invalid_chunker_params)
+
+
+@pytest.mark.parametrize(
+    "env_value, expect_newlines",
+    [
+        (None, True),  # default indent=4
+        ("none", False),  # compact single-line
+        ("0", True),  # newlines only, no spaces
+        ("4", True),  # explicit pretty-print
+        ("", True),  # empty string, newlines only
+        ("\t", True),  # tab indent string
+    ],
+)
+def test_json_dump_indent(monkeypatch, env_value, expect_newlines):
+    from ...helpers.parseformat import json_dump
+
+    obj = {"key": "value", "number": 42}
+    if env_value is not None:
+        monkeypatch.setenv("BORG_JSON_INDENT", env_value)
+    else:
+        monkeypatch.delenv("BORG_JSON_INDENT", raising=False)
+
+    result = json_dump(obj)
+    if expect_newlines:
+        assert "\n" in result
+    else:
+        assert "\n" not in result
+    assert json.loads(result) == obj

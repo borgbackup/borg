@@ -207,6 +207,9 @@ New features:
   - add --json option, #9222
 - add blake3 (super-fast hash/keyed MAC), replacing blake2b for new repos
 - archive: preserve cwd archive metadata, #9495
+- create: replace the --hostname/--username options (added in 2.0.0b21) with the
+  BORG_HOSTNAME and BORG_USERNAME env vars. When set, they override the hostname/username
+  stored in newly created archives and used by the {hostname}/{user} placeholders, #9651
 
 Fixes:
 

@@ -77,10 +77,26 @@ class MountMixIn:
         archives and the directory structure below these will be loaded on-demand from
         the repository when entering these directories, so expect some delay.
 
-        Care should be taken, as Borg backs up symlinks as-is. When an archive 
-        or repository is mounted, it is possible to “jump” outside the mount point 
-        by following a symlink. If this happens, files or directories (or versions of them)
-        that are not part of the archive or repository may appear to be within the mount point.
+        .. note::
+
+            Borg stores symbolic links as-is. Consequently, when an archive or
+            repository is mounted, symbolic links may resolve to locations outside of
+            the mountpoint, either because they are absolute or because relative links
+            traverse outside of the mounted tree.
+
+            Normal UNIX pathname resolution applies: most tools follow symbolic links
+            by default and may therefore access files or directories that are not part
+            of the mounted archive. Consequently, operations intended to inspect
+            archived data may instead access "live" data from the host filesystem.
+
+            On Linux, this can be prevented by remounting the mountpoint with the
+            ``nosymfollow`` VFS mount option, for example:
+
+                borg mount <repo path> <mountpoint>
+                mount -o remount,nosymfollow <repo path> <mountpoint>
+
+            Alternatively, access the mounted archive from an appropriately isolated
+            environment (for example, a container or ``chroot``).
 
         Unless the ``--foreground`` option is given, the command will run in the
         background until the filesystem is ``unmounted``.

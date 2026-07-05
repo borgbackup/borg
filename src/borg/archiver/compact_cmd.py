@@ -114,11 +114,12 @@ class ArchiveGarbageCollector:
     def analyze_archives(self) -> tuple[set, int, int, int]:
         """Iterate over all items in all archives, create the dicts id -> size of all used chunks."""
 
-        def use_it(id):
+        def use_it(id, size=0):
             entry = self.chunks.get(id)
             if entry is not None:
                 # the chunk is in the repo, mark it used.
-                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED)
+                new_size = size if entry.size == 0 and size != 0 else entry.size
+                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED, size=new_size)
             else:
                 # with --stats: we do NOT have this chunk in the repository!
                 # without --stats: we do not have this chunk or the chunks index is incomplete.
@@ -148,7 +149,7 @@ class ArchiveGarbageCollector:
                 if "chunks" in item:
                     for id, size in item.chunks:
                         total_size += size  # original, uncompressed file content size
-                        use_it(id)
+                        use_it(id, size)
             pi.show(i + 1)  # report after each archive, so the last one lands on 100%
         pi.finish()
         return missing_chunks, total_files, total_size, num_archives
@@ -169,28 +170,34 @@ class ArchiveGarbageCollector:
                 except self.repository.ObjectNotFound:
                     logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
 
-        repo_size_before = self.repository_size
+        repo_size_before = self.repository_size if self.stats else 0
         self.compact_packs()
-        repo_size_after = self.repository_size
+        repo_size_after = self.repository_size if self.stats else 0
 
-        count = len(self.chunks)
-        logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
-        logger.info(
-            f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
-            f"in {self.total_files} files."
-        )
         if self.stats:
+            deduplicated_size = sum(
+                entry.size for id, entry in self.chunks.iteritems() if entry.flags & ChunkIndex.F_USED
+            )
+            count = len(self.chunks)
+            logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
+            logger.info(
+                f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
+                f"in {self.total_files} files."
+            )
+            logger.info(f"Deduplicated size is {format_file_size(deduplicated_size, precision=0, iec=self.iec)}.")
+            dedup_factor = deduplicated_size / self.total_size if self.total_size else 1.0
+            logger.info(f"Deduplication factor is {dedup_factor:.2f}.")
             logger.info(
                 f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "
                 f"in {count} objects."
             )
+            comp_factor = repo_size_after / deduplicated_size if deduplicated_size else 1.0
+            logger.info(f"Compression factor is {comp_factor:.2f}.")
             if not self.dry_run:  # nothing was deleted on a dry run, so before == after
                 logger.info(
                     f"Compaction saved "
                     f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
                 )
-        else:
-            logger.info(f"Repository has data stored in {count} objects.")
 
     def compact_packs(self):
         """Free space one pack at a time (the store can only delete whole packs).

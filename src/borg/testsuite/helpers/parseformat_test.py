@@ -728,6 +728,8 @@ def test_invalid_chunkerparams(invalid_chunker_params):
         ("none", False),  # compact single-line
         ("0", True),  # newlines only, no spaces
         ("4", True),  # explicit pretty-print
+        ("", True),  # empty string, newlines only
+        ("\t", True),  # tab indent string
     ],
 )
 def test_json_dump_indent(monkeypatch, env_value, expect_newlines):
@@ -736,6 +738,8 @@ def test_json_dump_indent(monkeypatch, env_value, expect_newlines):
     obj = {"key": "value", "number": 42}
     if env_value is not None:
         monkeypatch.setenv("BORG_JSON_INDENT", env_value)
+    else:
+        monkeypatch.delenv("BORG_JSON_INDENT", raising=False)
 
     result = json_dump(obj)
     if expect_newlines:

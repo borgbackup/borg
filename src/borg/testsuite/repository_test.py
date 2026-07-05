@@ -204,6 +204,116 @@ def test_multi_object_pack_roundtrip(repo_fixtures, request):
         assert repository.get(H(1), read_data=False) == chunk1[: hdr_size + len(meta1)]
 
 
+def test_get_many_one_load_per_pack(repo_fixtures, request):
+    # get_many loads each pack once as a whole and slices every object out of the cached bytes.
+    # stats["load_calls"] counts store.load() calls.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(6)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 3  # three objects per pack -> two packs for the six objects
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        ids = [chunk_id for chunk_id, _ in objects]
+        assert len({repository.chunks[chunk_id].pack_id for chunk_id in ids}) == 2  # six ids, two packs
+        one_by_one = [repository.get(chunk_id) for chunk_id in ids]  # reference bytes, one store.load each
+
+        loads_before = repository.store.stats["load_calls"]
+        assert list(repository.get_many(ids)) == one_by_one
+        assert repository.store.stats["load_calls"] - loads_before == 2  # one store.load per pack
+
+
+def test_get_many_keeps_request_order(repo_fixtures, request):
+    # Ids requested out of their stored order come back in the requested order with their own bytes.
+    # Interleaving two packs still loads each pack once: the pack cache serves the second visit.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(6)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 3  # two packs: {H0,H1,H2} and {H3,H4,H5}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        ids = [H(0), H(3), H(1), H(4), H(2), H(5)]  # interleave the two packs
+        one_by_one = [repository.get(chunk_id) for chunk_id in ids]
+
+        loads_before = repository.store.stats["load_calls"]
+        assert list(repository.get_many(ids)) == one_by_one  # same order, same bytes
+        assert repository.store.stats["load_calls"] - loads_before == 2  # each pack loaded once
+
+
+def test_get_many_missing_id_yields_none(repo_fixtures, request):
+    # With raise_missing=False, an id that was never stored yields None in its position; the ids
+    # before and after it read back unchanged.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(3)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 4  # above the object count, so the pack flushes on flush() only
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        ids = [H(0), H(99), H(2)]  # H(99) was never put
+        result = list(repository.get_many(ids, raise_missing=False))
+        assert result[0] == repository.get(H(0))
+        assert result[1] is None  # never stored -> None
+        assert result[2] == repository.get(H(2))
+
+
+def test_get_many_repeated_ids(repo_fixtures, request):
+    # A dedup'd item repeats chunk ids, e.g. [A, A, B, C, B]. Each repeat returns the right bytes
+    # and each pack is loaded once: the cached pack serves the later visits.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(4)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # two packs: {H0,H1} and {H2,H3}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        assert len({repository.chunks[H(i)].pack_id for i in range(4)}) == 2
+        ids = [H(0), H(0), H(1), H(2), H(1)]  # A A B C B, A/B in one pack, C in the other
+        one_by_one = [repository.get(chunk_id) for chunk_id in ids]
+
+        loads_before = repository.store.stats["load_calls"]
+        assert list(repository.get_many(ids)) == one_by_one  # every position, including repeats
+        assert repository.store.stats["load_calls"] - loads_before == 2  # two packs, one load each
+
+
+def test_get_many_evicts_least_recently_used(repo_fixtures, request):
+    # Visiting more packs than the cache holds evicts the oldest; revisiting an evicted pack reloads it.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(8)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # four packs: {H0,H1} {H2,H3} {H4,H5} {H6,H7}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        assert len({repository.chunks[H(i)].pack_id for i in range(8)}) == 4
+        assert repository.PACK_READER_CACHE_SIZE == 3  # cache holds three of the four packs
+        # touch packs 0,1,2 (fills cache), then 3 (evicts pack 0), then pack 0 again (reload).
+        ids = [H(0), H(2), H(4), H(6), H(0)]
+        one_by_one = [repository.get(chunk_id) for chunk_id in ids]
+
+        loads_before = repository.store.stats["load_calls"]
+        assert list(repository.get_many(ids)) == one_by_one
+        assert repository.store.stats["load_calls"] - loads_before == 5  # 4 distinct packs + 1 reload
+
+
+def test_get_reuses_cached_pack(repo_fixtures, request):
+    # get() slices from a pack that get_many already cached, doing no store load; a get() whose pack
+    # is not cached reads only its object's range and does not load the whole pack into the cache.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(2)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # one pack: {H0, H1}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+
+        # cold cache: get() reads one range and leaves the cache empty, so the next get() reads again
+        loads_before = repository.store.stats["load_calls"]
+        reference = repository.get(H(0))
+        assert repository.store.stats["load_calls"] - loads_before == 1  # one ranged read
+        loads_before = repository.store.stats["load_calls"]
+        repository.get(H(1))
+        assert repository.store.stats["load_calls"] - loads_before == 1  # pack was not cached, another range
+
+        list(repository.get_many([H(0), H(1)]))  # loads the whole pack into the cache
+
+        loads_before = repository.store.stats["load_calls"]
+        assert repository.get(H(0)) == reference
+        assert repository.store.stats["load_calls"] - loads_before == 0  # sliced from the cached pack
+        assert repository.get(H(1), read_data=False)  # read_data=False also peeks the cache
+        assert repository.store.stats["load_calls"] - loads_before == 0
+
+
 def build_one_pack(repository, objects):
     with repository:
         repository._pack_writer.max_count = len(objects) + 1  # prevent per-put flush; one pack on flush()

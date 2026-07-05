@@ -18,6 +18,7 @@ from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .helpers import get_cache_dir
 from .helpers import ProgressIndicatorPercent
+from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
@@ -206,7 +207,7 @@ class PackReader:
         self.key = "packs/" + bin_to_hex(pack_id) if pack_id is not None else None
         self.pack_contents = pack_contents
 
-    def _read(self, offset, size):
+    def read(self, offset, size):
         # read from the in-memory pack if we have it, else range-read from the store
         if self.pack_contents is not None:
             return self.pack_contents[offset : offset + size]
@@ -221,7 +222,7 @@ class PackReader:
         hdr_size = RepoObj.obj_header.size
         offset = 0
         while True:
-            hdr_data = self._read(offset, hdr_size)
+            hdr_data = self.read(offset, hdr_size)
             if len(hdr_data) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
             hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
@@ -302,6 +303,10 @@ class Repository:
         """Permission denied to {}."""
 
         exit_mcode = 21
+
+    # Whole packs kept in memory for reads; the least recently used is evicted first.
+    # Memory use is this count times the pack size.
+    PACK_READER_CACHE_SIZE = 3
 
     def __init__(
         self,
@@ -387,6 +392,8 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
+        # pack_id -> PackReader holding the whole pack; get_many loads into it, get() reuses it
+        self._pack_cache = LRUCache(capacity=self.PACK_READER_CACHE_SIZE)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self._location}>"
@@ -594,6 +601,7 @@ class Repository:
             self.store.close()
             self.store_opened = False
         self.opened = False
+        self._pack_cache.clear()
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
@@ -760,10 +768,14 @@ class Repository:
             raise self.PackLocationUnknown(id, str(self._location))
         pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
-        key = "packs/" + bin_to_hex(pack_id)
+        # slice from the cached whole pack if get_many (or an earlier get) already loaded it;
+        # otherwise read ranges from the store without loading and caching the whole pack.
+        reader = self._pack_cache.get(pack_id)
+        if reader is None:
+            reader = PackReader(store=self.store, pack_id=pack_id)
         try:
             if read_data:
-                return self.store.load(key, offset=obj_offset, size=obj_size)
+                return reader.read(obj_offset, obj_size)
             else:
                 # RepoObj layout supports separately encrypted metadata and data.
                 # We return enough bytes so the client can decrypt the metadata.
@@ -775,7 +787,7 @@ class Repository:
                 # uses the header's length and ignores trailing bytes -- this is just tidy.) obj_size
                 # comes from the same index we already route with.
                 load_size = min(load_size, obj_size)
-                obj = self.store.load(key, offset=obj_offset, size=load_size)
+                obj = reader.read(obj_offset, load_size)
                 hdr = obj[0:hdr_size]
                 if len(hdr) != hdr_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
@@ -786,7 +798,7 @@ class Repository:
                     retry_size = hdr_size + meta_size
                     # same boundary as above: normally a no-op, just keeps the retry within this object.
                     retry_size = min(retry_size, obj_size)
-                    obj = self.store.load(key, offset=obj_offset, size=retry_size)
+                    obj = reader.read(obj_offset, retry_size)
                 meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
@@ -797,9 +809,37 @@ class Repository:
             else:
                 return None
 
+    def _cached_pack_reader(self, pack_id):
+        """Return a PackReader holding the whole pack, loading it into the cache on a miss."""
+        reader = self._pack_cache.get(pack_id)
+        if reader is None:
+            key = "packs/" + bin_to_hex(pack_id)
+            reader = PackReader(pack_id=pack_id, pack_contents=self.store.load(key))
+            self._pack_cache[pack_id] = reader
+        return reader
+
     def get_many(self, ids, read_data=True, raise_missing=True):
+        if not read_data:
+            # read_data=False returns only each object's header+meta, sized per object by get().
+            for id_ in ids:
+                yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
+            return
+
         for id_ in ids:
-            yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
+            self._lock_refresh()
+            entry = self.chunks.get(id_)
+            if entry is None or self.chunks.is_pending(id_):
+                # id unknown or still buffered: get() raises or returns None accordingly
+                yield self.get(id_, read_data=True, raise_missing=raise_missing)
+                continue
+            try:
+                reader = self._cached_pack_reader(entry.pack_id)
+            except StoreObjectNotFound:
+                if raise_missing:
+                    raise self.ObjectNotFound(id_, str(self._location)) from None
+                yield None
+            else:
+                yield reader.read(entry.obj_offset, entry.obj_size)
 
     def put(self, id, data):
         """put a repo object

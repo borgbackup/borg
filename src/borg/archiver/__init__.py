@@ -339,7 +339,7 @@ class Archiver(
                 # everything else comes from the forced "borg serve" command (or the defaults).
                 # stuff from denylist must never be used from the client.
                 denylist = {"restrict_to_paths", "restrict_to_repositories", "umask", "permissions"}
-                # "backend" is given by the client to the REST server to contruct a posixfs backend
+                # "backend" is given by the client to the REST server to construct a posixfs backend
                 # that shall be used as a repository (borg serve --rest --backend FILE:<path>).
                 # Like the legacy repository path (transmitted via the RPC protocol),
                 # the client chooses *which* repository it wants to use; the ssh forced command pins the

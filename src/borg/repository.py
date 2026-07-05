@@ -829,7 +829,7 @@ class Repository:
             self._lock_refresh()
             entry = self.chunks.get(id_)
             if entry is None or self.chunks.is_pending(id_):
-                # id is unknown or still buffered, not yet in a pack: read it with get()
+                # id unknown or still buffered: get() raises or returns None accordingly
                 yield self.get(id_, read_data=True, raise_missing=raise_missing)
                 continue
             try:
@@ -838,8 +838,8 @@ class Repository:
                 if raise_missing:
                     raise self.ObjectNotFound(id_, str(self._location)) from None
                 yield None
-                continue
-            yield reader.read(entry.obj_offset, entry.obj_size)
+            else:
+                yield reader.read(entry.obj_offset, entry.obj_size)
 
     def put(self, id, data):
         """put a repo object

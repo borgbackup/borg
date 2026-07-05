@@ -170,22 +170,23 @@ class ArchiveGarbageCollector:
                 except self.repository.ObjectNotFound:
                     logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
 
-        repo_size_before = self.repository_size
+        repo_size_before = self.repository_size if self.stats else 0
         self.compact_packs()
-        repo_size_after = self.repository_size
+        repo_size_after = self.repository_size if self.stats else 0
 
-        deduplicated_size = sum(entry.size for id, entry in self.chunks.iteritems() if entry.flags & ChunkIndex.F_USED)
-
-        count = len(self.chunks)
-        logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
-        logger.info(
-            f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
-            f"in {self.total_files} files."
-        )
-        logger.info(f"Deduplicated size is {format_file_size(deduplicated_size, precision=0, iec=self.iec)}.")
-        dedup_factor = deduplicated_size / self.total_size if self.total_size else 1.0
-        logger.info(f"Deduplication factor is {dedup_factor:.2f}.")
         if self.stats:
+            deduplicated_size = sum(
+                entry.size for id, entry in self.chunks.iteritems() if entry.flags & ChunkIndex.F_USED
+            )
+            count = len(self.chunks)
+            logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
+            logger.info(
+                f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
+                f"in {self.total_files} files."
+            )
+            logger.info(f"Deduplicated size is {format_file_size(deduplicated_size, precision=0, iec=self.iec)}.")
+            dedup_factor = deduplicated_size / self.total_size if self.total_size else 1.0
+            logger.info(f"Deduplication factor is {dedup_factor:.2f}.")
             logger.info(
                 f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "
                 f"in {count} objects."
@@ -197,8 +198,6 @@ class ArchiveGarbageCollector:
                     f"Compaction saved "
                     f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
                 )
-        else:
-            logger.info(f"Repository has data stored in {count} objects.")
 
     def compact_packs(self):
         """Free space one pack at a time (the store can only delete whole packs).

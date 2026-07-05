@@ -29,7 +29,8 @@ def test_compact_empty_repository(archivers, request, stats):
     if stats:
         assert "Repository size is 0 B in 0 objects." in output
     else:
-        assert "Repository has data stored in 0 objects." in output
+        assert "Repository size is" not in output
+        assert "Repository has data stored in" not in output
     assert "Finished compaction" in output
 
 
@@ -48,7 +49,8 @@ def test_compact_after_deleting_all_archives(archivers, request, stats):
     if stats:
         assert "Repository size is 0 B in 0 objects." in output
     else:
-        assert "Repository has data stored in 0 objects." in output
+        assert "Repository size is" not in output
+        assert "Repository has data stored in" not in output
     assert "Finished compaction" in output
 
 
@@ -68,7 +70,8 @@ def test_compact_after_deleting_some_archives(archivers, request, stats):
     if stats:
         assert "Repository size is 0 B in 0 objects." not in output
     else:
-        assert "Repository has data stored in 0 objects." not in output
+        assert "Repository size is" not in output
+        assert "Repository has data stored in" not in output
     assert "Finished compaction" in output
 
 

@@ -253,6 +253,25 @@ def test_get_many_missing_id_yields_none(repo_fixtures, request):
         assert result[2] == repository.get(H(2))
 
 
+def test_get_many_missing_pack_raises_pack_not_found(repo_fixtures, request):
+    # get_many raises PackNotFound when a chunk's index entry points to a pack that is not in the
+    # store; with raise_missing=False it yields None instead.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(2)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # one pack: {H0, H1}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        pack_id = repository.chunks[H(0)].pack_id
+        repository.store_delete("packs/" + bin_to_hex(pack_id))  # delete the pack, keep its index entry
+
+        with pytest.raises(Repository.PackNotFound):
+            list(repository.get_many([H(0)]))
+        with pytest.raises(Repository.PackNotFound):
+            list(repository.get_many([H(0), H(1)]))  # one id's pack missing in a batch
+        assert list(repository.get_many([H(0)], raise_missing=False)) == [None]  # raise_missing=False -> None
+
+
 def test_get_many_repeated_ids(repo_fixtures, request):
     # A dedup'd item repeats chunk ids, e.g. [A, A, B, C, B]. Each repeat returns the right bytes
     # and each pack is loaded once: the cached pack serves the later visits.

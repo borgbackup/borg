@@ -21,7 +21,7 @@ from borgstore.store import ItemInfo
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
 from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
-from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_ENTRY_SIZE
+from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_ENTRY_SIZE, CHUNKINDEX_MERGE_ATTEMPTS
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import get_cache_dir
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
@@ -763,20 +763,31 @@ def build_chunkindex_from_repo(
 ):
     # first, try to build a fresh, mostly complete chunk index from centrally cached chunk indexes:
     if not disable_caches:
-        hashes = list_chunkindex_hashes(repository)
-        if hashes:  # we have at least one cached chunk index!
-            merged = 0
-            chunks = ChunkIndex()  # we'll merge all we find into this
+        # a concurrent repack_chunkindex (another client, shared lock) deletes the small fragments it
+        # merged - only after storing the merged replacement, so no entries are ever lost, but a
+        # fragment we just listed can vanish before we load it. the index must be built from ALL
+        # fragments or not at all: a partially merged index would miss chunks that exist in the repo
+        # (spurious ObjectNotFound, lost deduplication). so on a failed load, re-list and retry -
+        # the fresh listing contains the replacement fragment. if we cannot get a complete, consistent
+        # set (e.g. a persistently unreadable fragment), fall through to the slow rebuild instead.
+        for _ in range(CHUNKINDEX_MERGE_ATTEMPTS):
+            hashes = list_chunkindex_hashes(repository)
+            if not hashes:  # no cached chunk index available
+                break
+            chunks = ChunkIndex()  # we'll merge all fragments into this
+            complete = True
             for hash in hashes:
                 chunks_to_merge = read_chunkindex_from_repo(repository, hash)
-                if chunks_to_merge is not None:
-                    logger.debug(f"cached chunk index {hash} gets merged...")
-                    for k, v in chunks_to_merge.items():
-                        chunks[k] = v
-                    merged += 1
-                    chunks_to_merge.clear()
-            if merged > 0:
-                if merged > 1 and cache_immediately:
+                if chunks_to_merge is None:
+                    logger.debug(f"cached chunk index {hash} vanished or is invalid, restarting the merge...")
+                    complete = False
+                    break
+                logger.debug(f"cached chunk index {hash} gets merged...")
+                for k, v in chunks_to_merge.items():
+                    chunks[k] = v
+                chunks_to_merge.clear()
+            if complete:
+                if len(hashes) > 1 and cache_immediately:
                     # consolidate small fragments on the repo so they don't pile up. this is a
                     # bounded repack: it does not collapse large, already-sealed fragments, so those
                     # stay immutable (and cache-stable for other clients) rather than being re-uploaded.
@@ -785,6 +796,9 @@ def build_chunkindex_from_repo(
                 # already holds these entries in its fragments.
                 chunks.clear_new()
                 return chunks
+            chunks.clear()  # free the partial merge before retrying
+        else:
+            logger.warning("could not read a complete set of cached chunk index fragments, rebuilding the index.")
     # if we didn't get anything from the cache, compute the ChunkIndex the slow way:
     logger.debug("rebuilding the chunk index from the repo the slow way...")
     chunks = ChunkIndex()

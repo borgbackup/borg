@@ -107,6 +107,9 @@ CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
 # + obj_offset 4 + obj_size 4). Only used to estimate a fragment's entry count from its byte size,
 # so we can classify fragments without loading them.
 CHUNKINDEX_ENTRY_SIZE = 80
+# How often to restart merging the fragments into a chunk index when a listed fragment vanishes
+# mid-merge (a concurrent repack replaced it). After that, fall back to the slow rebuild from packs.
+CHUNKINDEX_MERGE_ATTEMPTS = 3
 
 FD_MAX_AGE = 4 * 60  # 4 minutes
 

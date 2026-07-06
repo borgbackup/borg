@@ -127,6 +127,71 @@ def test_read_chunkindex_from_repo_missing(tmp_path):
         assert result is None
 
 
+def test_build_chunkindex_retries_on_vanished_fragment(tmp_path):
+    """build_chunkindex_from_repo must re-list and retry when a fragment vanishes mid-merge.
+
+    A concurrent repack_chunkindex (another client closing its cache, shared lock) stores a merged
+    replacement fragment and then deletes the small source fragments. A reader that listed the
+    fragments before the replacement existed and loads them after the deletion must not silently
+    skip the vanished fragment (that would yield an incomplete index: spurious ObjectNotFound for
+    existing chunks, lost deduplication) - it must restart from a fresh listing.
+    """
+    from borgstore.store import ObjectNotFound as StoreObjectNotFound
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        # two fragments, as left behind by two incremental backups
+        for h in (H(1), H(2)):
+            ci = ChunkIndex()
+            ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
+            write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
+        fragment_names = list_chunkindex_hashes(repository)
+        original_store_load = repository.store_load
+        raced = False
+
+        def racing_store_load(name, **kwargs):
+            nonlocal raced
+            if not raced and name.startswith("index/"):
+                raced = True
+                # simulate a concurrent repack: store the merged replacement fragment first,
+                # then delete the sources, then fail this load (the fragment has vanished).
+                merged = ChunkIndex()
+                for h in (H(1), H(2)):
+                    merged[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
+                write_chunkindex_to_repo(repository, merged, incremental=False, force_write=True)
+                for frag in fragment_names:
+                    repository.store_delete(f"index/{frag}")
+                raise StoreObjectNotFound(name)
+            return original_store_load(name, **kwargs)
+
+        repository.store_load = racing_store_load
+        try:
+            chunks = build_chunkindex_from_repo(repository)
+        finally:
+            repository.store_load = original_store_load
+        assert raced  # the simulated repack fired
+        # the retry picked up the replacement fragment: the index is complete
+        assert H(1) in chunks
+        assert H(2) in chunks
+
+
+def test_build_chunkindex_no_partial_merge(tmp_path):
+    """A persistently unreadable fragment must cause a rebuild from the packs, never a partial index."""
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        # a valid fragment ...
+        ci = ChunkIndex()
+        ci[H(1)] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, H(1), 0, 4)
+        write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
+        # ... and a corrupt one (content does not match its name), which never loads successfully
+        repository.store_store(f"index/{'e' * 64}", b"garbage")
+        chunks = build_chunkindex_from_repo(repository)
+        # merging must have been abandoned in favor of the slow rebuild from the (empty) packs
+        # namespace; with the old skip-and-continue behavior, H(1) would be present here.
+        assert H(1) not in chunks
+        assert len(chunks) == 0
+
+
 def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
     """ChunksMixin.chunks binds the repository index without collapsing the cached fragments.
 

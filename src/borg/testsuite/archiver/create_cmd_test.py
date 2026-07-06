@@ -868,6 +868,30 @@ def test_file_status_counters(archivers, request):
     assert result["Modified files"] == 1
 
 
+def test_create_stats_bytes(archivers, request):
+    """Bytes read/sent in `borg create --stats` are populated from the store stats."""
+    archiver = request.getfixturevalue(archivers)
+
+    def to_dict(borg_create_output):
+        lines = [line.split(":", 1) for line in borg_create_output.strip().splitlines()]
+        return {
+            key.strip(): int(value)
+            for key, value in lines
+            if key.strip() in ("Bytes read from repository", "Bytes sent to repository")
+        }
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "testfile", contents=b"some data to back up")
+    result = to_dict(cmd(archiver, "create", "--stats", "test_archive", archiver.input_path))
+    assert result["Bytes sent to repository"] > 0
+    assert result["Bytes read from repository"] >= 0
+    # the json output carries the same numbers
+    create_info = json.loads(cmd(archiver, "create", "--json", "--stats", "test_archive2", archiver.input_path))
+    stats = create_info["archive"]["stats"]
+    assert "rx_bytes" in stats
+    assert "tx_bytes" in stats
+
+
 def test_create_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

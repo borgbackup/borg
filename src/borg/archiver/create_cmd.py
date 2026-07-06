@@ -205,20 +205,12 @@ class CreateMixIn:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 archive.stats += fso.stats
-                archive.stats.rx_bytes = getattr(repository, "rx_bytes", 0)
-                archive.stats.tx_bytes = getattr(repository, "tx_bytes", 0)
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed.
                     raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.tags = set(args.tags or [])
                     archive.save(comment=args.comment, timestamp=args.timestamp)
-                    args.stats |= args.json
-                    if args.stats:
-                        if args.json:
-                            json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
-                        else:
-                            log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -285,6 +277,16 @@ class CreateMixIn:
                     files_changed=args.files_changed,
                 )
                 create_inner(archive, cache, fso)
+            args.stats |= args.json
+            if args.stats:
+                # store.stats is complete only after the cache is closed (last pack flushed).
+                store_stats = repository.store.stats
+                archive.stats.rx_bytes = store_stats["backend_load_volume"]
+                archive.stats.tx_bytes = store_stats["backend_store_volume"]
+                if args.json:
+                    json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
+                else:
+                    log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
         else:
             create_inner(None, None, None)
 
@@ -671,6 +673,22 @@ class CreateMixIn:
         how much your repository will grow. Please note that the "All archives" stats refer to
         the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
         exclusive because the data is not actually compressed and deduplicated during a dry run.
+
+        The ``--stats`` output also reports "Bytes read from repository" and "Bytes sent
+        to repository": the data volume transferred from/to the backend for this run. This
+        includes chunk data and Borg's own index and metadata writes; for reads it counts
+        what actually reached the backend (cache hits are served locally). The values are
+        approximate due to write buffering and caching. On a repeated backup, a near-zero
+        "sent" value means almost no new data had to be stored because the chunks already
+        exist in the repository (deduplication); a much larger value than usual means a lot
+        of new or changed data was stored this run.
+
+        The "Added", "Modified" and "Unchanged" file counters come from the files-cache
+        comparison described above: "Unchanged" files matched the cached metadata and were
+        not read again (their existing chunks are reused); "Added" and "Modified" files did
+        not match and were read and chunked (new chunks are stored, already-known chunks are
+        deduplicated). The comparison uses the files cache, keyed by the file's absolute
+        path, not a parent archive selected by name.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 

@@ -105,8 +105,8 @@ Unchanged files: {unchanged_files}
 Modified files: {modified_files}
 Error files: {error_files}
 Files changed while reading: {files_changed_while_reading}
-Bytes read from remote: {stats.rx_bytes}
-Bytes sent to remote: {stats.tx_bytes}
+Bytes read from repository: {stats.rx_bytes}
+Bytes sent to repository: {stats.tx_bytes}
 """.format(
             stats=self,
             hashing_time=hashing_time,
@@ -130,6 +130,8 @@ Bytes sent to remote: {stats.tx_bytes}
             "hashing_time": self.hashing_time,
             "chunking_time": self.chunking_time,
             "files_stats": self.files_stats,
+            "rx_bytes": self.rx_bytes,
+            "tx_bytes": self.tx_bytes,
         }
 
     def as_raw_dict(self):

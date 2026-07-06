@@ -45,6 +45,17 @@ class TestLock:
             with pytest.raises(LockTimeout):
                 Lock(lockstore, exclusive=True, id=ID2).acquire()
 
+    def test_exclusive_lock_timeout_leaves_no_lock(self, lockstore):
+        # When acquiring an exclusive lock times out because a non-exclusive lock does not go away,
+        # the not-acquired exclusive lock must not stay behind in the store: it would block all
+        # other clients (even on other hosts) until it expired as stale.
+        with Lock(lockstore, exclusive=False, id=ID1) as shared_lock:
+            with pytest.raises(LockTimeout):
+                Lock(lockstore, exclusive=True, id=ID2).acquire()
+            locks = shared_lock._get_locks()
+            assert len(locks) == 1  # only the non-exclusive lock of ID1 is left
+            assert not any(lock["exclusive"] for lock in locks.values())
+
     def test_double_nonexclusive_lock_succeeds(self, lockstore):
         with Lock(lockstore, exclusive=False, id=ID1):
             with Lock(lockstore, exclusive=False, id=ID2):

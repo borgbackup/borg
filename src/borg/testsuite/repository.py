@@ -1061,6 +1061,13 @@ class RemoteLoggerTestCase(BaseTestCase):
     def setUp(self):
         self.stream = io.StringIO()
         self.handler = logging.StreamHandler(self.stream)
+        
+        # Save old logging state
+        self.old_root_handlers = logging.getLogger().handlers[:]
+        self.old_root_level = logging.getLogger().level
+        self.old_repo_handlers = logging.getLogger('borg.repository').handlers[:]
+        self.old_repo_level = logging.getLogger('borg.repository').level
+
         logging.getLogger().handlers[:] = [self.handler]
         logging.getLogger('borg.repository').handlers[:] = []
         logging.getLogger('borg.repository.foo').handlers[:] = []
@@ -1071,6 +1078,12 @@ class RemoteLoggerTestCase(BaseTestCase):
 
     def tearDown(self):
         sys.stderr = self.old_stderr
+        
+        # Restore old logging state
+        logging.getLogger().handlers[:] = self.old_root_handlers
+        logging.getLogger().setLevel(self.old_root_level)
+        logging.getLogger('borg.repository').handlers[:] = self.old_repo_handlers
+        logging.getLogger('borg.repository').setLevel(self.old_repo_level)
 
     def test_stderr_messages(self):
         handle_remote_line("unstructured stderr message\n")

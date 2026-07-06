@@ -279,10 +279,8 @@ class CreateMixIn:
                 create_inner(archive, cache, fso)
             args.stats |= args.json
             if args.stats:
-                # store.stats is complete only after the cache is closed (last pack flushed).
-                store_stats = repository.store.stats
-                archive.stats.rx_bytes = store_stats["backend_load_volume"]
-                archive.stats.tx_bytes = store_stats["backend_store_volume"]
+                # Cache.close() writes the chunks index to the repo; sample after it so that traffic is counted.
+                archive.stats.store_stats = repository.store.stats
                 if args.json:
                     json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
                 else:
@@ -674,21 +672,22 @@ class CreateMixIn:
         the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
         exclusive because the data is not actually compressed and deduplicated during a dry run.
 
-        The ``--stats`` output also reports "Bytes read from repository" and "Bytes sent
-        to repository": the data volume transferred from/to the backend for this run. This
-        includes chunk data and Borg's own index and metadata writes; for reads it counts
-        what actually reached the backend (cache hits are served locally). The values are
-        approximate due to write buffering and caching. On a repeated backup, a near-zero
-        "sent" value means almost no new data had to be stored because the chunks already
-        exist in the repository (deduplication); a much larger value than usual means a lot
-        of new or changed data was stored this run.
+        The ``--stats`` output also reports the store statistics (lines prefixed with
+        "Store"), taken from the storage layer after this run. These cover the backend and
+        the local store cache: call counts and timings per operation, the load/store data
+        volumes and throughput, and cache hits/misses. "Store backend load volume" and
+        "Store backend store volume" are the bytes actually read from and sent to the
+        backend; a load counts only what missed the cache, and a store counts chunk data
+        together with Borg's own index and metadata writes. The values are approximate
+        because of write buffering and caching. On a repeated backup a near-zero store
+        volume means almost no new data had to be written, because the chunks already exist
+        in the repository (deduplication).
 
         The "Added", "Modified" and "Unchanged" file counters come from the files-cache
         comparison described above: "Unchanged" files matched the cached metadata and were
         not read again (their existing chunks are reused); "Added" and "Modified" files did
         not match and were read and chunked (new chunks are stored, already-known chunks are
-        deduplicated). The comparison uses the files cache, keyed by the file's absolute
-        path, not a parent archive selected by name.
+        deduplicated). The comparison uses the files cache, keyed by the file's absolute path.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 

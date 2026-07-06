@@ -93,8 +93,6 @@ Unchanged files: 0
 Modified files: 0
 Error files: 0
 Files changed while reading: 0
-Bytes read from repository: 0
-Bytes sent to repository: 0
 """
     )
     s = f"{stats.osize_fmt}"

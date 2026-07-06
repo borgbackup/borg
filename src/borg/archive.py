@@ -60,6 +60,49 @@ SF_DATALESS = getattr(stat, "SF_DATALESS", 0x40000000)
 has_link = hasattr(os, "link")
 
 
+# order for rendering store stats, grouped by method, then backend, then cache
+_STORE_STATS_ORDER = []
+for _method in ("info", "list", "load", "store", "delete", "move"):
+    _STORE_STATS_ORDER += [f"{_method}_calls", f"{_method}_time", f"{_method}_volume", f"{_method}_throughput"]
+_STORE_STATS_ORDER += [
+    "backend_load_calls",
+    "backend_load_volume",
+    "backend_store_calls",
+    "backend_store_volume",
+    "backend_delete_calls",
+    "cache_disabled",
+    "cache_hits",
+    "cache_misses",
+    "cache_hit_ratio",
+    "cache_errors",
+    "cache_load_calls",
+    "cache_load_volume",
+    "cache_store_calls",
+    "cache_store_volume",
+    "cache_delete_calls",
+]
+del _method
+
+
+def format_store_stats(stats, iec=False):
+    """Render a borgstore stats dict as one "Store <name>: <value>" line per entry."""
+
+    def format_value(key, value):
+        if key.endswith("_throughput"):
+            return f"{format_file_size(value, iec=iec)}/s"
+        if key.endswith("_volume"):
+            return format_file_size(value, iec=iec)
+        if key.endswith("_time"):
+            return f"{value:.3f} seconds"
+        if key.endswith("_ratio"):
+            return f"{value * 100:.1f}%"
+        return str(value)
+
+    ordered = [key for key in _STORE_STATS_ORDER if key in stats]
+    ordered += [key for key in stats if key not in _STORE_STATS_ORDER]
+    return "\n".join(f"Store {key.replace('_', ' ')}: {format_value(key, stats[key])}" for key in ordered)
+
+
 class Statistics:
     def __init__(self, output_json=False, iec=False):
         self.output_json = output_json
@@ -69,8 +112,7 @@ class Statistics:
         self.files_stats = defaultdict(int)
         self.chunking_time = 0.0
         self.hashing_time = 0.0
-        self.rx_bytes = 0
-        self.tx_bytes = 0
+        self.store_stats = {}
 
     def update(self, size, unique):
         self.osize += size
@@ -94,7 +136,7 @@ class Statistics:
     def __str__(self):
         hashing_time = format_timedelta(timedelta(seconds=self.hashing_time))
         chunking_time = format_timedelta(timedelta(seconds=self.chunking_time))
-        return """\
+        result = """\
 Number of files: {stats.nfiles}
 Original size: {stats.osize_fmt}
 Deduplicated size: {stats.usize_fmt}
@@ -105,8 +147,6 @@ Unchanged files: {unchanged_files}
 Modified files: {modified_files}
 Error files: {error_files}
 Files changed while reading: {files_changed_while_reading}
-Bytes read from repository: {stats.rx_bytes}
-Bytes sent to repository: {stats.tx_bytes}
 """.format(
             stats=self,
             hashing_time=hashing_time,
@@ -117,6 +157,9 @@ Bytes sent to repository: {stats.tx_bytes}
             error_files=self.files_stats["E"],
             files_changed_while_reading=self.files_stats["C"],
         )
+        if self.store_stats:
+            result += format_store_stats(self.store_stats, iec=self.iec) + "\n"
+        return result
 
     def __repr__(self):
         return "<{cls} object at {hash:#x} ({self.osize}, {self.usize})>".format(
@@ -130,8 +173,7 @@ Bytes sent to repository: {stats.tx_bytes}
             "hashing_time": self.hashing_time,
             "chunking_time": self.chunking_time,
             "files_stats": self.files_stats,
-            "rx_bytes": self.rx_bytes,
-            "tx_bytes": self.tx_bytes,
+            "store_stats": self.store_stats,
         }
 
     def as_raw_dict(self):

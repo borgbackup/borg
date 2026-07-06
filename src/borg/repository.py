@@ -287,6 +287,19 @@ class Repository:
                 id = bin_to_hex(id)
             super().__init__(id, repo)
 
+    class PackNotFound(ErrorWithTraceback):
+        """Object with key {} is indexed to pack {}, but that whole pack is missing from repository {}."""
+
+        exit_mcode = 23
+
+        # a missing pack means the index is stale or more than one object was lost.
+        def __init__(self, id, pack_id, repo):
+            if isinstance(id, bytes):
+                id = bin_to_hex(id)
+            if isinstance(pack_id, bytes):
+                pack_id = bin_to_hex(pack_id)
+            super().__init__(id, pack_id, repo)
+
     class ParentPathDoesNotExist(Error):
         """The parent path of the repository directory [{}] does not exist."""
 
@@ -836,7 +849,7 @@ class Repository:
                 reader = self._cached_pack_reader(entry.pack_id)
             except StoreObjectNotFound:
                 if raise_missing:
-                    raise self.ObjectNotFound(id_, str(self._location)) from None
+                    raise self.PackNotFound(id_, entry.pack_id, str(self._location)) from None
                 yield None
             else:
                 yield reader.read(entry.obj_offset, entry.obj_size)

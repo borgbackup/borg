@@ -888,9 +888,7 @@ class Repository:
         # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
-        # complete=False: a pack may also hold superseded bytes (an older copy of a chunk later re-put
-        # elsewhere, no longer in the index), so keep_ids and drop_ids need not cover the whole pack.
-        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id}, complete=False)
+        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id})
         if update_index:
             # close() only persists new entries incrementally, so write the full index here to record
             # the removal for the next borg process.
@@ -898,15 +896,19 @@ class Repository:
 
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
 
-    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, complete: bool = True, chunks=None):
+    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, chunks=None):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
         keep_ids: chunk ids in this pack to copy into the new pack.
         drop_ids: chunk ids in this pack to discard. Must not overlap keep_ids.
-        complete: if True, keep_ids and drop_ids must together be every object in the pack (asserted).
-            If False, they may name only some of the pack's objects.
         chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
             updates to. Must be the index keep_ids and drop_ids were derived from. Default: self.chunks.
+
+        keep_ids and drop_ids need not name every object in the pack. A pack can hold bytes that no
+        index entry covers: an older copy of a chunk that was later stored again elsewhere, or objects
+        from a backup that crashed before writing its index. Such bytes appear as gaps between the
+        listed objects and are dropped. An overlap between listed objects means index corruption and
+        raises IntegrityError.
 
         Kept objects are copied into a new pack via store.defrag and repointed in the chunk index;
         dropped objects' chunk index entries are removed.
@@ -924,7 +926,7 @@ class Repository:
 
         assert keep_ids & drop_ids == set(), "an id cannot appear in both keep_ids and drop_ids"
 
-        # collect every object's range, tagged with whether it is kept, ordered by offset.
+        # collect every listed object's range, tagged with whether it is kept, ordered by offset.
         located = []  # (obj_offset, obj_id, obj_size, keep)
         for obj_id in keep_ids | drop_ids:
             keep = obj_id in keep_ids
@@ -933,21 +935,20 @@ class Repository:
             located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
 
-        # walk objects in offset order, collecting the survivors.
+        # walk objects in offset order, collecting the survivors. covered is the end offset of the last
+        # object; a gap (offset > covered) is unindexed bytes we drop, an overlap (offset < covered) is
+        # index corruption.
         kept = []  # (obj_offset, obj_id, obj_size), offset-ordered
         covered = 0
         for offset, obj_id, size, keep in located:
-            if complete:  # keep+drop are the whole pack: they must tile it with no gap or overlap
-                assert offset == covered, f"gap or overlap in pack {bin_to_hex(pack_id)} at offset {covered}"
-            covered += size
+            if offset < covered:
+                raise IntegrityError(
+                    f"pack {bin_to_hex(pack_id)}: overlapping objects at offset {offset} (index corruption), "
+                    f'run "borg check"'
+                )
+            covered = offset + size
             if keep:
                 kept.append((offset, obj_id, size))
-
-        if complete:  # the listed objects must reach the pack's end, no trailing object unaccounted for
-            pack_size = self.store.info(pack_key).size
-            assert (
-                covered == pack_size
-            ), f"pack {bin_to_hex(pack_id)}: {pack_size - covered} trailing bytes unaccounted for"
 
         for drop_id in drop_ids:  # remove dropped objects from the index
             del chunks[drop_id]

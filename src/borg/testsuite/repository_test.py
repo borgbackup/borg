@@ -399,9 +399,51 @@ def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
         assert pdchunk(repository.get(H(1))) == b"DATA1"
 
 
-def test_compact_pack_complete_detects_short_coverage(repo_fixtures, request):
-    # complete=True must catch a pack whose listed objects do not reach its end: shrink the last
-    # object's recorded obj_size so the summed coverage falls short of the actual pack file size.
+def test_compact_pack_tolerates_gap(repo_fixtures, request):
+    # A pack may hold bytes no index entry covers (a superseded copy of a chunk re-put elsewhere).
+    # Drop the middle object's index entry to simulate that, then compact keeping the outer two:
+    # the gap must be skipped and its bytes reclaimed (issue #9868).
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    chunk2 = fchunk(b"DATA2", chunk_id=H(2))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1), (H(2), chunk2)])
+    with repository:
+        old_pack_id = repository.chunks[H(0)].pack_id
+        del repository.chunks[H(1)]  # H(1)'s bytes stay in the pack but are now unindexed (a gap)
+
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+
+        assert new_pack_id is not None and new_pack_id != old_pack_id
+        assert pdchunk(repository.get(H(0))) == b"DATA0"
+        assert pdchunk(repository.get(H(2))) == b"DATA2"
+        packs = {info.name: info.size for info in repository.store_list("packs")}
+        assert bin_to_hex(old_pack_id) not in packs
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk2)  # gap bytes reclaimed
+
+
+def test_compact_pack_tolerates_trailing_bytes(repo_fixtures, request):
+    # Same as the gap case, but the unindexed bytes are at the end of the pack: dropping the last
+    # object's index entry leaves trailing bytes the listed objects do not reach. Must still succeed.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    with repository:
+        old_pack_id = repository.chunks[H(0)].pack_id
+        del repository.chunks[H(1)]  # trailing unindexed bytes
+
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(0)}, drop_ids=set())
+
+        assert new_pack_id is not None and new_pack_id != old_pack_id
+        assert pdchunk(repository.get(H(0))) == b"DATA0"
+        packs = {info.name: info.size for info in repository.store_list("packs")}
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk0)  # trailing bytes reclaimed
+
+
+def test_compact_pack_detects_overlap(repo_fixtures, request):
+    # Overlapping index entries mean index corruption: compact_pack must raise IntegrityError and
+    # leave the pack in place. Point H(1) back at H(0)'s offset to overlap it.
     chunk0 = fchunk(b"DATA0", chunk_id=H(0))
     chunk1 = fchunk(b"DATA1", chunk_id=H(1))
     repository = get_repository_from_fixture(repo_fixtures, request)
@@ -409,9 +451,9 @@ def test_compact_pack_complete_detects_short_coverage(repo_fixtures, request):
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
         entry = repository.chunks[H(1)]
-        repository.chunks[H(1)] = entry._replace(obj_size=entry.obj_size - 1)  # leave 1 trailing byte unaccounted
+        repository.chunks[H(1)] = entry._replace(obj_offset=0)  # now overlaps H(0) at offset 0
 
-        with pytest.raises(AssertionError):
+        with pytest.raises(IntegrityError):
             repository.compact_pack(old_pack_id, keep_ids={H(0), H(1)}, drop_ids=set())
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
 

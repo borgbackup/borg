@@ -58,6 +58,17 @@ def test_extract_stats(archivers, request):
     assert "Store cache hit ratio:" in output
 
 
+def test_extract_stats_dry_run(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        output = cmd(archiver, "extract", "test", "--dry-run", "--stats")
+    assert "Ignoring --stats" not in output
+    assert "Store load volume:" in output
+
+
 @pytest.mark.skipif(
     not are_symlinks_supported() or not are_hardlinks_supported() or is_darwin,
     reason="symbolic links or hard links or hard-linked sym-links not supported",

@@ -151,8 +151,8 @@ class ExtractMixIn:
 
         When using ``--stats``, borg reports the store statistics (lines prefixed with
         "Store") for the extraction: per-operation call counts and timings, the load/store
-        data volumes and throughput, and cache hits/misses. ``--stats`` is ignored when
-        combined with ``--dry-run``.
+        data volumes and throughput, and cache hits/misses. This includes ``--dry-run``
+        extractions.
 
         .. note::
 

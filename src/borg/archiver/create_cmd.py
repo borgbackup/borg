@@ -405,16 +405,13 @@ class CreateMixIn:
                     if err.errno in (errno.EPERM, errno.EACCES):
                         # Do not try again, such errors can not be fixed by retrying.
                         raise
+                if last_try:
+                    # giving up with retries, error will be dealt with (logged) by upper error handler
+                    raise
                 # sleep a bit, so temporary problems might go away...
                 sleep_s = 1000.0 / 1e6 * 10 ** (retry / 2)  # retry 0: 1ms, retry 6: 1s, ...
                 time.sleep(sleep_s)
-                if retry < MAX_RETRIES - 1:
-                    logger.warning(
-                        f"{path}: {err}, slept {sleep_s:.3f}s, next: retry: {retry + 1} of {MAX_RETRIES - 1}..."
-                    )
-                else:
-                    # giving up with retries, error will be dealt with (logged) by upper error handler
-                    raise
+                logger.warning(f"{path}: {err}, slept {sleep_s:.3f}s, next: retry: {retry + 1} of {MAX_RETRIES - 1}...")
                 # we better do a fresh stat on the file, just to make sure to get the current file
                 # mode right (which could have changed due to a race condition and is important for
                 # dispatching) and also to get current inode number of that file.

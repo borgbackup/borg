@@ -868,6 +868,24 @@ def test_file_status_counters(archivers, request):
     assert result["Modified files"] == 1
 
 
+def test_create_stats_store(archivers, request):
+    """`borg create --stats` shows the full store stats, populated from the store."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "testfile", contents=b"some data to back up")
+    output = cmd(archiver, "create", "--stats", "test_archive", archiver.input_path)
+    # the store stats block is present, formatted like the other stats lines
+    assert "Store backend store volume:" in output
+    assert "Store backend load volume:" in output
+    assert "Store cache hit ratio:" in output
+    # the json output carries the same numbers as a structured dict
+    create_info = json.loads(cmd(archiver, "create", "--json", "--stats", "test_archive2", archiver.input_path))
+    store_stats = create_info["archive"]["stats"]["store_stats"]
+    assert store_stats["backend_store_volume"] > 0
+    assert store_stats["backend_load_volume"] >= 0
+
+
 def test_create_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

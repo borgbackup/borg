@@ -205,20 +205,12 @@ class CreateMixIn:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 archive.stats += fso.stats
-                archive.stats.rx_bytes = getattr(repository, "rx_bytes", 0)
-                archive.stats.tx_bytes = getattr(repository, "tx_bytes", 0)
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed.
                     raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.tags = set(args.tags or [])
                     archive.save(comment=args.comment, timestamp=args.timestamp)
-                    args.stats |= args.json
-                    if args.stats:
-                        if args.json:
-                            json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
-                        else:
-                            log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -285,6 +277,14 @@ class CreateMixIn:
                     files_changed=args.files_changed,
                 )
                 create_inner(archive, cache, fso)
+            args.stats |= args.json
+            if args.stats:
+                # Cache.close() writes the chunks index to the repo; sample after it so that traffic is counted.
+                archive.stats.store_stats = repository.store.stats
+                if args.json:
+                    json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
+                else:
+                    log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
         else:
             create_inner(None, None, None)
 
@@ -671,6 +671,23 @@ class CreateMixIn:
         how much your repository will grow. Please note that the "All archives" stats refer to
         the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
         exclusive because the data is not actually compressed and deduplicated during a dry run.
+
+        The ``--stats`` output also reports the store statistics (lines prefixed with
+        "Store"), taken from the storage layer after this run. These cover the backend and
+        the local store cache: call counts and timings per operation, the load/store data
+        volumes and throughput, and cache hits/misses. "Store backend load volume" and
+        "Store backend store volume" are the bytes actually read from and sent to the
+        backend; a load counts only what missed the cache, and a store counts chunk data
+        together with Borg's own index and metadata writes. The values are approximate
+        because of write buffering and caching. On a repeated backup a near-zero store
+        volume means almost no new data had to be written, because the chunks already exist
+        in the repository (deduplication).
+
+        The "Added", "Modified" and "Unchanged" file counters come from the files-cache
+        comparison described above: "Unchanged" files matched the cached metadata and were
+        not read again (their existing chunks are reused); "Added" and "Modified" files did
+        not match and were read and chunked (new chunks are stored, already-known chunks are
+        deduplicated). The comparison uses the files cache, keyed by the file's absolute path.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 

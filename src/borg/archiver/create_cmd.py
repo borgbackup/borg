@@ -221,7 +221,7 @@ class CreateMixIn:
         dry_run = args.dry_run
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
-        logger.info('Creating archive at "%s"' % args.location.processed)
+        logger.info('Creating archive "%s" in repository %s' % (args.name, args.location.processed))
         if not dry_run:
             with Cache(
                 repository,

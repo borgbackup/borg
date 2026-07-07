@@ -886,6 +886,15 @@ def test_create_stats_store(archivers, request):
     assert store_stats["backend_load_volume"] >= 0
 
 
+def test_create_logs_archive_name(archivers, request):
+    """`borg create --info` announces the archive name, not just the repository."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "testfile", contents=b"data")
+    output = cmd(archiver, "create", "--info", "my_archive", archiver.input_path)
+    assert 'Creating archive "my_archive"' in output
+
+
 def test_create_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

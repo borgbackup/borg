@@ -46,6 +46,18 @@ def test_symlink_extract(archivers, request):
         assert os.readlink("input/link1") == "somewhere"
 
 
+def test_extract_stats(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        output = cmd(archiver, "extract", "test", "--stats")
+    assert "Store load volume:" in output
+    assert "Store backend load volume:" in output
+    assert "Store cache hit ratio:" in output
+
+
 @pytest.mark.skipif(
     not are_symlinks_supported() or not are_hardlinks_supported() or is_darwin,
     reason="symbolic links or hard links or hard-linked sym-links not supported",

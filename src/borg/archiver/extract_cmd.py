@@ -4,11 +4,12 @@ import stat
 
 from ._common import with_repository, with_archive
 from ._common import build_filter, build_matcher
-from ..archive import BackupError
+from ..archive import BackupError, format_store_stats
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator, PathSpec
 from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
+from ..helpers import log_multi
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
 from ..helpers.argparsing import ArgumentParser
@@ -119,6 +120,11 @@ class ExtractMixIn:
             # clear progress output
             pi.finish()
 
+        if args.stats:
+            log_multi(
+                format_store_stats(repository.store.stats, iec=args.iec), logger=logging.getLogger("borg.output.stats")
+            )
+
     def build_parser_extract(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
         from ._common import define_exclusion_group
@@ -143,6 +149,11 @@ class ExtractMixIn:
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
 
+        When using ``--stats``, borg reports the store statistics (lines prefixed with
+        "Store") for the extraction: per-operation call counts and timings, the load/store
+        data volumes and throughput, and cache hits/misses. ``--stats`` is ignored when
+        combined with ``--dry-run``.
+
         .. note::
 
             Currently, extract always writes into the current working directory ("."),
@@ -157,6 +168,9 @@ class ExtractMixIn:
         subparsers.add_subcommand("extract", subparser, help="extract archive contents")
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output a verbose list of items (files, dirs, ...)"
+        )
+        subparser.add_argument(
+            "-s", "--stats", dest="stats", action="store_true", help="print store statistics for the extraction"
         )
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not actually change any files"

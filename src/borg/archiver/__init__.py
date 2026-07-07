@@ -465,9 +465,9 @@ class Archiver(
         args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
-        if getattr(args, "stats", False) and getattr(args, "dry_run", False):
-            # the data needed for --stats is not computed when using --dry-run, so we can't do it.
-            # for ease of scripting, we just ignore --stats when given with --dry-run.
+        # extract --dry-run reads, decrypts and decompresses every object, so its store stats are accurate.
+        stats_supported_with_dry_run = func_name == "do_extract"
+        if getattr(args, "stats", False) and getattr(args, "dry_run", False) and not stats_supported_with_dry_run:
             logger.warning("Ignoring --stats. It is not supported when using --dry-run.")
             args.stats = False
         if args.show_version:

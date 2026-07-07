@@ -1,7 +1,7 @@
 pip==26.1.2
-virtualenv==21.4.1
+virtualenv==21.4.3
 build==1.5.0
-tox==4.55.0
+tox==4.55.1
 pytest==9.0.3
 pytest-xdist==3.8.0
 coverage[toml]==7.14.3

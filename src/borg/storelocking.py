@@ -189,6 +189,9 @@ class Lock:
                                 return self
                             time.sleep(self.other_locks_go_away_delay)
                         logger.debug("LOCK-ACQUIRE: timeout while waiting for non-exclusive locks to go away.")
+                        # we won't get the exclusive lock, so do not leave our lock behind:
+                        # it would needlessly block other clients until it expired as stale.
+                        self._delete_lock(key, ignore_not_found=True, update_last_refresh=True)
                         break  # timeout
                     else:
                         logger.debug("LOCK-ACQUIRE: someone else also created an exclusive lock, deleting ours.")

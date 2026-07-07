@@ -458,6 +458,23 @@ def test_compact_pack_detects_overlap(repo_fixtures, request):
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
 
 
+def test_compact_pack_detects_past_eof(repo_fixtures, request):
+    # An index entry whose span ends past the pack file means index corruption: compact_pack must
+    # raise IntegrityError and leave the pack in place, so defrag never short-reads a truncated object.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    with repository:
+        old_pack_id = repository.chunks[H(0)].pack_id
+        entry = repository.chunks[H(1)]
+        repository.chunks[H(1)] = entry._replace(obj_size=entry.obj_size + 1000)  # now claims to end past EOF
+
+        with pytest.raises(IntegrityError):
+            repository.compact_pack(old_pack_id, keep_ids={H(0), H(1)}, drop_ids=set())
+        assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
+
+
 def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):

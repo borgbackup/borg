@@ -907,8 +907,8 @@ class Repository:
         keep_ids and drop_ids need not name every object in the pack. A pack can hold bytes that no
         index entry covers: an older copy of a chunk that was later stored again elsewhere, or objects
         from a backup that crashed before writing its index. Such bytes appear as gaps between the
-        listed objects and are dropped. An overlap between listed objects means index corruption and
-        raises IntegrityError.
+        listed objects and are dropped. An overlap between listed objects, or an object claiming to end
+        past the pack file, means index corruption and raises IntegrityError.
 
         Kept objects are copied into a new pack via store.defrag and repointed in the chunk index;
         dropped objects' chunk index entries are removed.
@@ -949,6 +949,15 @@ class Repository:
             covered = offset + size
             if keep:
                 kept.append((offset, obj_id, size))
+
+        # reject an object that ends past the pack file: store.defrag would short-read it into a
+        # truncated object in the new pack, then the intact source pack is deleted.
+        pack_size = self.store.info(pack_key).size
+        if covered > pack_size:
+            raise IntegrityError(
+                f"pack {bin_to_hex(pack_id)}: object extends past end of file at offset {covered} "
+                f'(index corruption), run "borg check"'
+            )
 
         for drop_id in drop_ids:  # remove dropped objects from the index
             del chunks[drop_id]

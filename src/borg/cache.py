@@ -535,17 +535,6 @@ class FilesCacheMixin:
         )
 
 
-def list_chunkindex_hashes(repository):
-    hashes = []
-    for info in repository.store_list("index"):
-        info = ItemInfo(*info)  # RPC does not give namedtuple
-        # in the index/ namespace, each object's name is the sha256 hash of its content.
-        hashes.append(info.name)
-    hashes = sorted(hashes)
-    logger.debug(f"chunk indexes: {hashes}")
-    return hashes
-
-
 def chunkindex_fragment_entry_size():
     """Approximate on-disk bytes per serialized chunks-index entry.
 
@@ -562,11 +551,13 @@ def chunkindex_fragment_entry_size():
 
 
 def list_chunkindex_fragments(repository):
-    """Like list_chunkindex_hashes, but also return each fragment's approximate entry count.
+    """List the index/ fragments, returning each fragment's (name, approximate entry count).
 
-    The entry count is estimated from the stored object's byte size (chunkindex_fragment_entry_size()
-    bytes per entry), so we can classify fragments (small vs. sealed) without loading them. The estimate
-    ignores the small fixed header, which is negligible for the fragment sizes we care about.
+    This is the single primitive that walks the index/ namespace; list_chunkindex_hashes is a thin
+    wrapper over it. In that namespace each object's name is the sha256 hash of its content. The entry
+    count is estimated from the stored object's byte size (chunkindex_fragment_entry_size() bytes per
+    entry), so we can classify fragments (small vs. sealed) without loading them. The estimate ignores
+    the small fixed header, which is negligible for the fragment sizes we care about.
     Returns a list of (name, approx_entries) tuples, sorted by name.
     """
     entry_size = chunkindex_fragment_entry_size()
@@ -576,6 +567,12 @@ def list_chunkindex_fragments(repository):
         fragments.append((info.name, info.size // entry_size))
     fragments.sort()
     return fragments
+
+
+def list_chunkindex_hashes(repository):
+    hashes = [name for name, _ in list_chunkindex_fragments(repository)]  # already sorted by name
+    logger.debug(f"chunk indexes: {hashes}")
+    return hashes
 
 
 def delete_chunkindex_from_repo(repository):

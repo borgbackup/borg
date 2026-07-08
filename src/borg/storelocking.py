@@ -78,6 +78,7 @@ class Lock:
         self.stale_td = datetime.timedelta(seconds=stale)  # ignore/delete it if older
         self.refresh_td = datetime.timedelta(seconds=stale // 2)  # don't refresh it if younger
         self.last_refresh_dt = None
+        self.my_lock_key = None  # store key of the lock we currently hold, None if we hold none
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
         logger.debug(f"LOCK-INIT: initializing. store: {store}, stale: {stale}s, refresh: {stale // 2}s.")
@@ -106,6 +107,7 @@ class Lock:
         if update_last_refresh:
             # we parse the timestamp string to get *precisely* the datetime in the lock:
             self.last_refresh_dt = datetime.datetime.fromisoformat(timestamp)
+            self.my_lock_key = key
         return key
 
     def _delete_lock(self, key, *, ignore_not_found=False, update_last_refresh=False):
@@ -118,11 +120,18 @@ class Lock:
         finally:
             if update_last_refresh:
                 self.last_refresh_dt = None
+                self.my_lock_key = None
 
     def _is_our_lock(self, lock):
         return self.id == (lock["hostid"], lock["processid"], lock["threadid"])
 
     def _is_stale_lock(self, lock):
+        if lock["key"] == self.my_lock_key:
+            # the lock we are currently holding: we are obviously alive and can refresh or
+            # release it, so it must never be considered stale (and get deleted), no matter
+            # how old it is. it can get old e.g. if the machine is suspended while doing a
+            # backup or if there is a long stretch of work without repository access, see #9883.
+            return False
         now = datetime.datetime.now(datetime.UTC)
         if now > lock["dt"] + self.stale_td:
             logger.debug(f"LOCK-STALE: lock is too old, it was not refreshed. lock: {lock}.")
@@ -145,8 +154,11 @@ class Lock:
             lock["key"] = key
             lock["dt"] = datetime.datetime.fromisoformat(lock["time"])
             if self._is_stale_lock(lock):
-                # ignore it and delete it (even if it is not from us)
-                self._delete_lock(key, ignore_not_found=True, update_last_refresh=self._is_our_lock(lock))
+                # ignore it and delete it (even if it is not from us).
+                # note: this is never the lock we currently hold (see _is_stale_lock), so this
+                # must not touch last_refresh_dt / my_lock_key - a stale lock matching our id
+                # can only be a leftover of a dead process (pid reuse), not our own lock.
+                self._delete_lock(key, ignore_not_found=True)
             else:
                 locks[key] = lock
         return locks
@@ -236,6 +248,7 @@ class Lock:
         for key in locks:
             self._delete_lock(key, ignore_not_found=True)
         self.last_refresh_dt = None
+        self.my_lock_key = None
 
     def migrate_lock(self, old_id, new_id):
         """Migrates the lock ownership from old_id to new_id."""
@@ -256,8 +269,11 @@ class Lock:
             if len(old_locks) == 0:
                 # crap, my lock has been removed. :-(
                 # this can happen e.g. if my machine has been suspended while doing a backup, so that the
-                # lock will auto-expire. a borg client on another machine might then kill that lock.
+                # lock became stale and a borg client on another machine killed it.
                 # if my machine then wakes up again, the lock will have vanished and we get here.
+                # note: if our lock became stale, but is still present (no other client killed it),
+                # we do not get here - we never consider our own lock stale (see _is_stale_lock),
+                # so it is found above and simply refreshed below.
                 # in this case, we need to abort the operation, because the other borg might have removed
                 # repo objects we have written, but the referential tree was not yet full present, e.g.
                 # no archive has been added yet to the manifest, thus all objects looked unused/orphaned.
@@ -269,5 +285,14 @@ class Lock:
             old_lock = old_locks[0]
             if now > old_lock["dt"] + self.refresh_td:
                 logger.debug(f"LOCK-REFRESH: lock needs a refresh. lock: {old_lock}.")
-                self._create_lock(exclusive=old_lock["exclusive"], update_last_refresh=True)
-                self._delete_lock(old_lock["key"], update_last_refresh=False)
+                new_key = self._create_lock(exclusive=old_lock["exclusive"], update_last_refresh=True)
+                try:
+                    self._delete_lock(old_lock["key"], update_last_refresh=False)
+                except ObjectNotFound:
+                    # our old lock vanished between listing and deleting it: another client considered
+                    # it stale, killed it and (not having seen our new lock in its recheck) might have
+                    # acquired its own lock already. there is no safe way to continue - clean up the
+                    # new lock (so it does not needlessly block others until it expires) and abort.
+                    logger.debug("LOCK-REFRESH: our lock was killed while refreshing it, no safe way to continue.")
+                    self._delete_lock(new_key, ignore_not_found=True, update_last_refresh=True)
+                    raise LockTimeout(str(self.store))

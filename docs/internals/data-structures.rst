@@ -275,7 +275,7 @@ Borg releases unaware of feature flags.
 .. _Cache feature flags:
 .. rubric:: Cache feature flags
 
-`The cache`_ does not have its separate set of feature flags. Instead, Borg stores
+`The cache <cache>`_ does not have its separate set of feature flags. Instead, Borg stores
 which flags were used to create or modify a cache.
 
 All mandatory manifest features from all operations are gathered in one set.
@@ -503,8 +503,8 @@ chunking level (0 disables it); 2 is a good default. E.g.: ``fastcdc,19,23,21,2`
 
 .. _cache:
 
-The cache
----------
+The files cache
+---------------
 
 The **files cache** is stored in ``cache/files.<SUFFIX>`` and is used at backup
 time to quickly determine whether a given file is unchanged and we have all its
@@ -561,11 +561,15 @@ The on-disk format of the files cache is a stream of msgpacked tuples (key, valu
 Loading the files cache involves reading the file, one msgpack object at a time,
 unpacking it, and msgpacking the value (in an effort to save memory).
 
-The **chunks cache** is not persisted to disk, but dynamically built in memory
-by querying the existing object IDs from the repository.
+.. _index:
+
+The chunks index
+----------------
+
+The **chunks index** is persisted in the repository as index fragments and loaded in memory.
 It is used to determine whether we already have a specific chunk.
 
-The chunks cache is a key -> value mapping and contains:
+The chunks index is a key -> value mapping and contains:
 
 * key:
 
@@ -575,7 +579,7 @@ The chunks cache is a key -> value mapping and contains:
   - reference count (always MAX_VALUE as we do not refcount anymore)
   - size (0 for prev. existing objects, we can't query their plaintext size)
 
-The chunks cache is a HashIndex_.
+The chunks index is a HashIndex_.
 
 .. _cache-memory-usage:
 
@@ -587,11 +591,11 @@ Here is the estimated memory usage of Borg - it's complicated::
   chunk_size ~= 2 ^ HASH_MASK_BITS  (for buzhash chunker, BLOCK_SIZE for fixed chunker)
   chunk_count ~= total_file_size / chunk_size
 
-  chunks_cache_usage = chunk_count * 40
+  chunks_index_usage = chunk_count * 40
 
   files_cache_usage = total_file_count * 240 + chunk_count * 165
 
-  mem_usage ~= chunks_cache_usage + files_cache_usage
+  mem_usage ~= chunks_index_usage + files_cache_usage
              = chunk_count * 205 + total_file_count * 240
 
 Due to the hashtables, the best/usual/worst cases for memory allocation can
@@ -610,7 +614,7 @@ It is also assuming that typical chunk size is 2^HASH_MASK_BITS (if you have
 a lot of files smaller than this statistical medium chunk size, you will have
 more chunks than estimated above, because 1 file is at least 1 chunk).
 
-The chunks cache and files cache are all implemented as hash tables.
+The chunks index and files cache are all implemented as hash tables.
 A hash table must have a significant amount of unused entries to be fast -
 the so-called load factor gives the used/unused elements ratio.
 
@@ -640,7 +644,7 @@ b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
 HashIndex
 ---------
 
-The chunks cache is implemented as a hash table, with
+The chunks index is implemented as a hash table, with
 only one slot per bucket, spreading hash collisions to the following
 buckets. As a consequence the hash is just a start position for a linear
 search. If a key is looked up that is not in the table, then the hash table

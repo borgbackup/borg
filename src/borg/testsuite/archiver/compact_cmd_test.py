@@ -105,7 +105,7 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
     not re-upload the affected chunks and silently produces an archive with dangling object
     references (which extracts to zero bytes).
 
-    The fix invalidates all cached chunk indexes before the first delete, so an interruption
+    The fix invalidates all chunk indexes before the first delete, so an interruption
     is conservative: the next client rebuilds the index from actual repository contents and
     re-uploads any deleted data. This is tested for both compact paths (default and --stats).
     """
@@ -135,7 +135,7 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
         with pytest.raises(KeyboardInterrupt):
             gc.garbage_collect()
 
-    # The objects were deleted, so no readable cached chunk index may still list them.
+    # The objects were deleted, so no readable chunk index may still list them.
     repository = open_repository(archiver)
     with repository:
         assert list_chunkindex_hashes(repository) == []
@@ -193,7 +193,7 @@ def test_compact_packs_respects_threshold(tmp_path):
 
 
 def test_compact_gc_after_index_loss(archivers, request):
-    """When no cached chunk index exists (e.g. after an interrupted compact, #9748), compact
+    """When no chunk index exists (e.g. after an interrupted compact, #9748), compact
     rebuilds the index from the packs. The rebuilt entries must start unused (init_flags=F_NONE),
     otherwise every object looks used and this compact run frees nothing."""
     archiver = request.getfixturevalue(archivers)
@@ -202,7 +202,7 @@ def test_compact_gc_after_index_loss(archivers, request):
     create_src_archive(archiver, "archive")
     cmd(archiver, "delete", "-a", "archive")
 
-    # drop all cached chunk indexes, like an interrupted compact leaves the repo
+    # drop all chunk indexes, like an interrupted compact leaves the repo
     repository = open_repository(archiver)
     with repository:
         delete_chunkindex_from_repo(repository)

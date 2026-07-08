@@ -9,7 +9,7 @@ what their name suggests: put objects into the repository / delete objects from 
 
 Please note:
 
-- they will not update the chunks cache (chunks index) about the object
+- they will not update the chunks index about the object
 - they will not update the manifest (so no automatic chunks index resync is triggered)
 - they will not check whether the object is in use (e.g. before delete-obj)
 - they will not update any metadata which may point to the object

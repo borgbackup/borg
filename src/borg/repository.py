@@ -575,7 +575,7 @@ class Repository:
     def invalidate_chunk_index(self):
         """Drop the in-memory chunk index so close() will not persist a stale copy.
 
-        Called when the on-disk chunk index cache is deleted; the next access to
+        Called when the on-disk chunk index is deleted; the next access to
         .chunks rebuilds the index from actual repository contents.  PackWriter
         reads the index through this Repository, so it follows automatically.
         """

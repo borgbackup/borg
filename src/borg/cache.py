@@ -762,10 +762,10 @@ def repack_chunkindex(repository):
 
 
 def build_chunkindex_from_repo(
-    repository, *, disable_caches=False, cache_immediately=False, init_flags=ChunkIndex.F_USED
+    repository, *, slow_rebuild=False, write_immediately=False, init_flags=ChunkIndex.F_USED
 ):
-    # first, try to build a fresh, mostly complete chunk index from centrally cached chunk indexes:
-    if not disable_caches:
+    # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
+    if not slow_rebuild:
         # a concurrent repack_chunkindex (another client, shared lock) deletes the small fragments it
         # merged - only after storing the merged replacement, so no entries are ever lost, but a
         # fragment we just listed can vanish before we load it. the index must be built from ALL
@@ -775,22 +775,22 @@ def build_chunkindex_from_repo(
         # set (e.g. a persistently unreadable fragment), fall through to the slow rebuild instead.
         for _ in range(CHUNKINDEX_MERGE_ATTEMPTS):
             hashes = list_chunkindex_hashes(repository)
-            if not hashes:  # no cached chunk index available
+            if not hashes:  # no chunk index fragments available
                 break
             chunks = ChunkIndex()  # we'll merge all fragments into this
             complete = True
             for hash in hashes:
                 chunks_to_merge = read_chunkindex_from_repo(repository, hash)
                 if chunks_to_merge is None:
-                    logger.debug(f"cached chunk index {hash} vanished or is invalid, restarting the merge...")
+                    logger.debug(f"chunk index fragment {hash} vanished or is invalid, restarting the merge...")
                     complete = False
                     break
-                logger.debug(f"cached chunk index {hash} gets merged...")
+                logger.debug(f"chunk index fragment {hash} gets merged...")
                 for k, v in chunks_to_merge.items():
                     chunks[k] = v
                 chunks_to_merge.clear()
             if complete:
-                if len(hashes) > 1 and cache_immediately:
+                if len(hashes) > 1 and write_immediately:
                     # consolidate small fragments on the repo so they don't pile up. this is a
                     # bounded repack: it does not collapse large, already-sealed fragments, so those
                     # stay immutable (and cache-stable for other clients) rather than being re-uploaded.
@@ -801,8 +801,8 @@ def build_chunkindex_from_repo(
                 return chunks
             chunks.clear()  # free the partial merge before retrying
         else:
-            logger.warning("could not read a complete set of cached chunk index fragments, rebuilding the index.")
-    # if we didn't get anything from the cache, compute the ChunkIndex the slow way:
+            logger.warning("could not read a complete set of chunk index fragments, rebuilding the index.")
+    # if we didn't get anything from the index fragments, compute the ChunkIndex the slow way:
     logger.debug("rebuilding the chunk index from the repo the slow way...")
     chunks = ChunkIndex()
     t0 = perf_counter()
@@ -830,7 +830,7 @@ def build_chunkindex_from_repo(
     # Protocol overhead is neglected in this calculation.
     speed = format_file_size(num_chunks * 34 / duration)
     logger.debug(f"queried {num_chunks} chunk IDs in {duration} s, ~{speed}/s")
-    if cache_immediately:
+    if write_immediately:
         # immediately update the index, so we only rarely have to do it the slow way:
         write_chunkindex_to_repo(
             repository, chunks, incremental=False, clear=False, force_write=True, delete_other=True
@@ -847,8 +847,8 @@ class ChunksMixin:
         self._chunks = None
         self.last_refresh_dt = datetime.now(UTC)
         self.refresh_td = timedelta(seconds=60)
-        self.chunks_cache_last_write = datetime.now(UTC)
-        self.chunks_cache_write_td = timedelta(seconds=600)
+        self.chunks_index_last_write = datetime.now(UTC)
+        self.chunks_index_write_td = timedelta(seconds=600)
 
     @property
     def chunks(self):
@@ -856,7 +856,7 @@ class ChunksMixin:
             # the repository owns the one and only chunk index; use it rather than
             # building a second one and pushing it back into the repository.
             self._chunks = self.repository.chunks
-            # note: we deliberately do NOT consolidate the cached chunk index fragments here.
+            # note: we deliberately do NOT consolidate the chunk index fragments here.
             # each backup writes a small incremental index/* fragment (only its new chunks),
             # which is cheap. collapsing them all into one big fragment on every run would re-upload
             # the whole index and, with delete_other, invalidate every other client's fragments --
@@ -893,7 +893,7 @@ class ChunksMixin:
             else:
                 raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         now = datetime.now(UTC)
-        self._maybe_write_chunks_cache(now)
+        self._maybe_write_chunks_index(now)
         exists = self.seen_chunk(id, size)
         if exists:
             # if borg create is processing lots of unchanged files (no content and not metadata changes),
@@ -910,11 +910,11 @@ class ChunksMixin:
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
 
-    def _maybe_write_chunks_cache(self, now, force=False, clear=False):
-        if force or now > self.chunks_cache_last_write + self.chunks_cache_write_td:
+    def _maybe_write_chunks_index(self, now, force=False, clear=False):
+        if force or now > self.chunks_index_last_write + self.chunks_index_write_td:
             if self._chunks is not None:
                 write_chunkindex_to_repo(self.repository, self._chunks, clear=clear)
-            self.chunks_cache_last_write = now
+            self.chunks_index_last_write = now
 
     def refresh_lock(self, now):
         if now > self.last_refresh_dt + self.refresh_td:
@@ -1014,10 +1014,10 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         if self._chunks is not None:
             for key, value in sorted(self._chunks.stats.items()):
                 logger.debug(f"Chunks index stats: {key}: {value}")
-            pi.output("Saving chunks cache")
+            pi.output("Saving index")
             # note: index/* in repo has a different integrity mechanism
             now = datetime.now(UTC)
-            self._maybe_write_chunks_cache(now, force=True, clear=True)
+            self._maybe_write_chunks_index(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
             # this run just appended a (small) incremental fragment; consolidate accumulated small
             # fragments so their count/size stays in a healthy range (bounded repack, see the function).

@@ -25,6 +25,7 @@ from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTR
 from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS
 from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
 from .helpers import get_cache_dir
+from .helpers import chunkit
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
@@ -627,25 +628,7 @@ def write_chunkindex_to_repo(
     # the fragment set present in the repo before we start writing:
     stored_hashes = set(list_chunkindex_hashes(repository))
     new_hashes = set()  # content hashes of the fragments that make up the index we are writing now
-    stored_anything = False
     fragments_written = 0
-
-    def flush(batch):
-        nonlocal stored_anything, fragments_written
-        count = len(batch)
-        if count == 0 and not force_write:
-            # don't persist an empty fragment: if it became the only index/* (e.g. right after
-            # delete_chunkindex_from_repo()), build_chunkindex_from_repo() would return it as-is
-            # instead of rebuilding from the repo. with nothing to write, the repo is already correct.
-            logger.debug("no new chunks to persist; not writing an empty chunk index fragment.")
-            batch.clear()
-            return
-        new_hash, stored = _store_chunkindex_fragment(repository, batch, stored_hashes, force_write=force_write)
-        batch.clear()  # free memory of the temporary table
-        new_hashes.add(new_hash)
-        if stored:
-            stored_anything = True
-            fragments_written += 1
 
     # sort the selected keys, so that an identical set of entries always produces identical
     # fragments (identical content hashes), no matter in which order the entries were inserted
@@ -654,29 +637,35 @@ def write_chunkindex_to_repo(
     # and no differently-partitioned duplicates of the same entries can pile up.
     keys = sorted(key for key, _ in chunks.iteritems(only_new=incremental))
     total = len(keys)
-    # partition the selected entries into batches of at most max_entries entries and store each:
-    batch = ChunkIndex()
-    n = 0
-    for key in keys:
-        # for now, we don't want to serialize the flags or the size:
-        batch[key] = chunks[key]._replace(flags=ChunkIndex.F_NONE, size=0)
-        n += 1
-        if n >= max_entries:
-            flush(batch)
-            batch = ChunkIndex()
-            n = 0
-    if n > 0 or total == 0:
-        # trailing, partially filled batch - or nothing to write at all:
-        # let flush handle force_write / the empty-index short-circuit.
-        flush(batch)
+    if keys:
+        # partition the selected entries into batches of at most max_entries entries:
+        batches = chunkit(keys, max_entries)
+    elif force_write:
+        # write a single empty fragment (e.g. at repo creation or after delete_chunkindex_from_repo()):
+        batches = [[]]
     else:
-        batch.clear()  # entries were an exact multiple of max_entries; no trailing batch to write
+        # don't persist an empty fragment: if it became the only index/* (e.g. right after
+        # delete_chunkindex_from_repo()), build_chunkindex_from_repo() would return it as-is
+        # instead of rebuilding from the repo. with nothing to write, the repo is already correct.
+        logger.debug("no new chunks to persist; not writing an empty chunk index fragment.")
+        batches = []
+    for batch_keys in batches:
+        # pre-size the temporary table to this batch so filling it does not repeatedly rehash:
+        batch = ChunkIndex(usable=len(batch_keys) or None)
+        for key in batch_keys:
+            # for now, we don't want to serialize the flags or the size:
+            batch[key] = chunks[key]._replace(flags=ChunkIndex.F_NONE, size=0)
+        new_hash, stored = _store_chunkindex_fragment(repository, batch, stored_hashes, force_write=force_write)
+        batch.clear()  # free memory of the temporary table
+        new_hashes.add(new_hash)
+        if stored:
+            fragments_written += 1
 
     logger.debug(f"cached {total} chunks (incremental={incremental}) in {fragments_written} fragment(s).")
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately
-    if stored_anything:
+    if fragments_written:
         # we have successfully stored to the repository, so we can clear all F_NEW flags now:
         chunks.clear_new()
 

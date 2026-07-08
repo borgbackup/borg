@@ -608,7 +608,11 @@ class Repository:
 
             write_chunkindex_to_repo(self, self.chunks, incremental=True)
         if self.lock:
-            self.lock.release()
+            # ignore_not_found: close() runs during normal teardown, but also while unwinding an
+            # exception. if the lock was already gone (e.g. it went stale and another client killed
+            # it, or refresh() aborted with LockTimeout), a NotLocked raised here would mask the
+            # original error. we are closing anyway, so treat a missing lock as nothing to release.
+            self.lock.release(ignore_not_found=True)
             self.lock = None
         if self.store_opened:
             self.store.close()

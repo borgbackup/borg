@@ -14,6 +14,15 @@ class ChunkIndexEntry(NamedTuple):
 
 CIE = tuple[int, int, bytes, int, int] | type[ChunkIndexEntry]
 
+class ChunkIndexEntryFormatT(NamedTuple):
+    flags: str
+    size: str
+    pack_id: str
+    obj_offset: str
+    obj_size: str
+
+ChunkIndexEntryFormat: ChunkIndexEntryFormatT
+
 class ChunkIndex:
     F_NONE: int
     F_USED: int

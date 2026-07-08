@@ -594,6 +594,7 @@ class Repository:
     def flush(self):
         """Flush any buffered pack writer chunks."""
         if self._pack_writer is not None:
+            self._lock_refresh()
             self._pack_writer.flush()  # PackWriter updates _chunks internally
 
     def close(self):

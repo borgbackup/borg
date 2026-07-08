@@ -103,10 +103,8 @@ LIST_SCAN_LIMIT = 100000
 CHUNKINDEX_FRAGMENT_ENTRIES_MIN = 100000  # ~8MB
 CHUNKINDEX_FRAGMENT_ENTRIES_MAX = 400000  # ~32MB
 CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
-# Approximate on-disk bytes per serialized entry: 32 (key) + 48 (value: flags 4 + size 4 + pack_id 32
-# + obj_offset 4 + obj_size 4). Only used to estimate a fragment's entry count from its byte size,
-# so we can classify fragments without loading them.
-CHUNKINDEX_ENTRY_SIZE = 80
+# (the approximate on-disk bytes per serialized entry used to classify fragments by their byte size
+# is derived from the actual entry layout, see cache.chunkindex_fragment_entry_size())
 # How often to restart merging the fragments into a chunk index when a listed fragment vanishes
 # mid-merge (a concurrent repack replaced it). After that, fall back to the slow rebuild from packs.
 CHUNKINDEX_MERGE_ATTEMPTS = 3

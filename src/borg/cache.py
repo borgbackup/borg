@@ -4,6 +4,7 @@ import io
 import os
 import shutil
 import stat
+import struct
 from collections import namedtuple
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -21,8 +22,8 @@ from borgstore.store import ItemInfo
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
 from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
-from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_ENTRY_SIZE, CHUNKINDEX_MERGE_ATTEMPTS
-from .hashindex import ChunkIndex, ChunkIndexEntry
+from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS
+from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
 from .helpers import get_cache_dir
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size, safe_encode
@@ -545,18 +546,34 @@ def list_chunkindex_hashes(repository):
     return hashes
 
 
+def chunkindex_fragment_entry_size():
+    """Approximate on-disk bytes per serialized chunks-index entry.
+
+    Derived from the actual ChunkIndex layout instead of a hardcoded constant, so it tracks any change
+    to the entry format automatically: a fragment stores each entry as its 32-byte key followed by the
+    struct-packed value (ChunkIndexEntryFormat, little-endian as borghash serializes it). Only used to
+    estimate a fragment's entry count from its stored byte size (see list_chunkindex_fragments), so we
+    can classify fragments without loading them; the small fixed header is ignored (negligible for the
+    fragment sizes we care about).
+    """
+    key_size = 32  # a chunk id is a 256bit / 32 byte hash
+    value_size = struct.calcsize("<" + "".join(ChunkIndexEntryFormat))
+    return key_size + value_size
+
+
 def list_chunkindex_fragments(repository):
     """Like list_chunkindex_hashes, but also return each fragment's approximate entry count.
 
-    The entry count is estimated from the stored object's byte size (CHUNKINDEX_ENTRY_SIZE bytes
-    per entry), so we can classify fragments (small vs. sealed) without loading them. The estimate
+    The entry count is estimated from the stored object's byte size (chunkindex_fragment_entry_size()
+    bytes per entry), so we can classify fragments (small vs. sealed) without loading them. The estimate
     ignores the small fixed header, which is negligible for the fragment sizes we care about.
     Returns a list of (name, approx_entries) tuples, sorted by name.
     """
+    entry_size = chunkindex_fragment_entry_size()
     fragments = []
     for info in repository.store_list("index"):
         info = ItemInfo(*info)  # RPC does not give namedtuple
-        fragments.append((info.name, info.size // CHUNKINDEX_ENTRY_SIZE))
+        fragments.append((info.name, info.size // entry_size))
     fragments.sort()
     return fragments
 

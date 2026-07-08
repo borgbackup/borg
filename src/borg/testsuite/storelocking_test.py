@@ -89,13 +89,49 @@ class TestLock:
         lock.refresh()  # This should refresh the lock.
         lock_keys_b00 = set(lock._get_locks())
         time.sleep(2.1)
-        lock_keys_b21 = set(lock._get_locks())  # now the lock should be stale & gone.
+        # now the lock is stale. we never consider the lock we hold ourselves stale,
+        # but another client (== another Lock instance) does:
+        other_lock = Lock(lockstore, exclusive=True, id=ID2, stale=2)
+        lock_keys_b21 = set(other_lock._get_locks())  # now the lock should be stale & gone.
         assert lock_keys_a00 == lock_keys_a05  # was too young, no refresh done
         assert len(lock_keys_a00) == 1
         assert lock_keys_a00 != lock_keys_b00  # refresh done, new lock has different key
         assert len(lock_keys_b00) == 1
         assert len(lock_keys_b21) == 0  # stale lock was ignored
         assert len(list(lock.store.list("locks"))) == 0  # stale lock was removed from store
+
+    def test_release_stale_lock(self, lockstore):
+        # even if our own lock became stale (e.g. machine suspended while doing a backup or
+        # a long time without repository access), release() must find and remove it instead
+        # of removing it as stale and then raising NotLocked, see #9883.
+        lock = Lock(lockstore, exclusive=True, id=ID1, stale=2)
+        lock.acquire()
+        time.sleep(2.1)  # lock is now older than the stale timeout
+        lock.release()  # must not raise NotLocked
+        assert len(list(lockstore.list("locks"))) == 0
+
+    def test_refresh_stale_lock(self, lockstore):
+        # if our own lock became stale, but no other client killed it (it is still present),
+        # refresh() must renew it, so the operation can continue safely, see #9883.
+        lock = Lock(lockstore, exclusive=True, id=ID1, stale=2)
+        lock.acquire()
+        old_keys = set(lock._get_locks())
+        time.sleep(2.1)  # lock is now older than the stale timeout
+        lock.refresh()  # must not raise LockTimeout, must renew the lock
+        new_keys = set(lock._get_locks())
+        assert len(old_keys) == len(new_keys) == 1
+        assert old_keys != new_keys  # refresh done, new lock has different key
+        lock.release()
+
+    def test_refresh_killed_lock(self, lockstore):
+        # if our own lock is gone (another client considered it stale and killed it),
+        # there is no safe way to continue, refresh() must raise LockTimeout.
+        lock = Lock(lockstore, exclusive=True, id=ID1, stale=2)
+        lock.acquire()
+        time.sleep(1.1)  # older than refresh_td (stale // 2), so refresh() checks the store
+        Lock(lockstore, exclusive=True, id=ID2, stale=2).break_lock()  # kill it, like another client would
+        with pytest.raises(LockTimeout):
+            lock.refresh()
 
     def test_migrate_lock(self, lockstore):
         old_id, new_id = ID1, ID2

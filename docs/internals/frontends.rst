@@ -197,7 +197,7 @@ Internal transaction progress::
 
     {"message": "Saving files cache", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
     {"message": "Saving cache config", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
-    {"message": "Saving chunks cache", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
+    {"message": "Saving index", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
     {"operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": true}
 
 A debug log message::

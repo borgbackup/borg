@@ -56,17 +56,17 @@ class ArchiveGarbageCollector:
     def get_repository_chunks(self) -> ChunkIndex:
         """return a chunks index"""
         # Entries must start as unused (F_NONE); analyze_archives() marks the used ones afterwards.
-        # The cached index loads entries with F_NONE flags and each object's obj_size (used by --stats).
-        # init_flags applies when there is no cached index and the entries are read from the pack headers.
-        logger.info("Getting object IDs from the cached chunks index...")
+        # The index loads entries with F_NONE flags and each object's obj_size (used by --stats).
+        # init_flags applies when there is no index and the entries are read from the pack headers.
+        logger.info("Getting object IDs from the index...")
         chunks = build_chunkindex_from_repo(
-            self.repository, cache_immediately=not self.dry_run, init_flags=ChunkIndex.F_NONE
+            self.repository, write_immediately=not self.dry_run, init_flags=ChunkIndex.F_NONE
         )
         return chunks
 
     def save_chunk_index(self):
         # as we may have deleted some chunks, we must write a full updated chunkindex to the repo
-        # and also remove all older cached chunk indexes.
+        # and also remove all older chunk indexes.
         # write_chunkindex_to_repo now removes all flags and size infos.
         # we need this, as we put the wrong size in there to support --stats computations.
         write_chunkindex_to_repo(
@@ -242,9 +242,9 @@ class ArchiveGarbageCollector:
             return  # dry run: report only, change nothing
         if not drop_packs and not rewrite_packs:
             logger.info("Deleting 0 unused objects...")
-            return  # nothing to reclaim; do not touch the cached chunk indexes
+            return  # nothing to reclaim; do not touch the chunk indexes
 
-        # crash-safety (#9748): invalidate cached chunk indexes before the first store change
+        # crash-safety (#9748): invalidate chunk indexes before the first store change
         delete_chunkindex_from_repo(self.repository)
 
         # Pass 2: collect object ids only for the affected packs (a subset, not the whole index)

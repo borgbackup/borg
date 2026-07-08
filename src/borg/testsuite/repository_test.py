@@ -558,21 +558,21 @@ def test_pack_writer_rolls_back_index_on_failed_store():
 
 
 def test_failed_store_phantom_not_persisted(tmp_path):
-    # The phantom must not survive into the persisted repo cache either: close() can write the
+    # The phantom must not survive into the persisted repo index either: close() can write the
     # in-memory index on context exit, so the rollback has to happen before anything is serialized.
     from ..cache import write_chunkindex_to_repo, build_chunkindex_from_repo
 
     chunk_id = H(60)
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         # fail only the pack write on the repository's own store; index/* writes still work,
-        # so one store models "just the pack write broke" (PackWriter and the index cache share a
+        # so one store models "just the pack write broke" (PackWriter and the index share a
         # store in production). the failing store is thus load-bearing for every assertion below.
         repository.store = FailingPackStore(repository.store)
         pw = PackWriter(repository.store, max_count=1, repository=repository)
         with pytest.raises(OSError):
             pw.add(chunk_id, fchunk(b"DATA"))
         assert repository.chunks.get(chunk_id) is None  # rolled back from the in-memory index ...
-        # ... and persisting + reloading the cache (through that same store) does not bring it back:
+        # ... and persisting + reloading the index (through that same store) does not bring it back:
         write_chunkindex_to_repo(repository, repository.chunks, incremental=True)
         reloaded = build_chunkindex_from_repo(repository)
         assert reloaded.get(chunk_id) is None

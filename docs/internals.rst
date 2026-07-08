@@ -23,7 +23,7 @@ Buzhash_ algorithm ("buzhash" and "buzhash64" chunker) or a simpler
 fixed block size algorithm ("fixed" chunker).
 
 To perform the repository-wide deduplication, a hash of each
-chunk is checked against the :ref:`chunks cache <cache>`, which is a
+chunk is checked against the :ref:`chunks index <index>`, which is a
 hash table of all chunks that already exist.
 
 .. figure:: internals/structure.png

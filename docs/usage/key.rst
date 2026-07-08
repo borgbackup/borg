@@ -16,8 +16,8 @@ Examples
     Remember your passphrase. Your data will be inaccessible without it.
     Key in "/root/.config/borg/keys/mnt_backup" created.
     Keep this key safe. Your data will be inaccessible without it.
-    Synchronizing chunks cache...
-    Archives: 0, w/ cached Idx: 0, w/ outdated Idx: 0, w/o cached Idx: 0.
+    Synchronizing index...
+    Archives: 0, w/ index: 0, w/ outdated index: 0, w/o index: 0.
     Done.
 
     # Change key file passphrase

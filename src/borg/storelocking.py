@@ -285,5 +285,14 @@ class Lock:
             old_lock = old_locks[0]
             if now > old_lock["dt"] + self.refresh_td:
                 logger.debug(f"LOCK-REFRESH: lock needs a refresh. lock: {old_lock}.")
-                self._create_lock(exclusive=old_lock["exclusive"], update_last_refresh=True)
-                self._delete_lock(old_lock["key"], update_last_refresh=False)
+                new_key = self._create_lock(exclusive=old_lock["exclusive"], update_last_refresh=True)
+                try:
+                    self._delete_lock(old_lock["key"], update_last_refresh=False)
+                except ObjectNotFound:
+                    # our old lock vanished between listing and deleting it: another client considered
+                    # it stale, killed it and (not having seen our new lock in its recheck) might have
+                    # acquired its own lock already. there is no safe way to continue - clean up the
+                    # new lock (so it does not needlessly block others until it expires) and abort.
+                    logger.debug("LOCK-REFRESH: our lock was killed while refreshing it, no safe way to continue.")
+                    self._delete_lock(new_key, ignore_not_found=True, update_last_refresh=True)
+                    raise LockTimeout(str(self.store))

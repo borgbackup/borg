@@ -133,6 +133,29 @@ class TestLock:
         with pytest.raises(LockTimeout):
             lock.refresh()
 
+    def test_refresh_killed_lock_race(self, lockstore, monkeypatch):
+        # if our own lock gets killed by another client *between* refresh() listing it and
+        # deleting it (the other client considered it stale and might have acquired its own
+        # lock already), refresh() must raise LockTimeout and must not leave its just-created
+        # new lock behind (it would needlessly block other clients until it expired as stale).
+        lock = Lock(lockstore, exclusive=True, id=ID1, stale=2)
+        lock.acquire()
+        old_key = lock.my_lock_key
+        time.sleep(1.1)  # older than refresh_td (stale // 2), so refresh() will renew the lock
+
+        orig_delete = lockstore.delete
+
+        def delete(name, *args, **kwargs):
+            if name == f"locks/{old_key}":
+                orig_delete(name)  # another client killed our old lock just before we delete it,
+                # so our own deletion attempt below finds it already gone and raises ObjectNotFound:
+            return orig_delete(name, *args, **kwargs)
+
+        monkeypatch.setattr(lockstore, "delete", delete)
+        with pytest.raises(LockTimeout):
+            lock.refresh()
+        assert len(list(lockstore.list("locks"))) == 0  # no new lock left behind
+
     def test_migrate_lock(self, lockstore):
         old_id, new_id = ID1, ID2
         assert old_id[1] != new_id[1]  # different PIDs (like when doing daemonize())

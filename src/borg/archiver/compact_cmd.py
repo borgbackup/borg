@@ -250,9 +250,9 @@ class ArchiveGarbageCollector:
         delete_chunkindex_from_repo(self.repository)
 
         # Pass 2: collect object ids only for the affected packs (a subset, not the whole index)
-        keep = {pid: set() for pid in rewrite_packs}  # survivors to copy forward, per pack
-        drop = {pid: set() for pid in rewrite_packs}  # unused objects in those same packs
-        forget = {pid: set() for pid in drop_packs}  # ids living in fully-unused packs we delete outright
+        keep = defaultdict(set)  # survivors to copy forward, per rewritten pack
+        drop = defaultdict(set)  # unused objects in those same packs
+        forget = defaultdict(set)  # ids in fully-unused packs we delete outright
         for id, entry in self.chunks.iteritems():
             pid = entry.pack_id
             if pid in rewrite_packs:

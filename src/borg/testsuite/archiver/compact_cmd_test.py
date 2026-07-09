@@ -177,9 +177,10 @@ def test_compact_soft_interrupt_persists_valid_index(archivers, request, monkeyp
 
         def store_delete_then_interrupt(name, **kwargs):
             original_store_delete(name, **kwargs)
-            calls.append(name)
-            if len(calls) == 1:
-                sig_int._sig_int_triggered = True  # one Ctrl-C after the first pack is deleted
+            if name.startswith("packs/"):  # only real pack deletes, not the earlier archive/index deletes
+                calls.append(name)
+                if len(calls) == 1:
+                    sig_int._sig_int_triggered = True  # one Ctrl-C after the first pack is deleted
 
         monkeypatch.setattr(repository, "store_delete", store_delete_then_interrupt)
         try:
@@ -188,13 +189,12 @@ def test_compact_soft_interrupt_persists_valid_index(archivers, request, monkeyp
         finally:
             sig_int._sig_int_triggered = False  # reset the global flag for the following tests
 
-    assert 0 < len(calls) < len(pack_names_before)  # stopped before deleting all packs
-
     # every persisted index entry points at a pack that still exists
     repository = open_repository(archiver)
     with repository:
         assert list_chunkindex_hashes(repository) != []
         pack_names_after = {info.name for info in repository.store_list("packs")}
+        assert 0 < len(pack_names_after) < len(pack_names_before)  # some packs deleted, some left
         for id, entry in repository.chunks.iteritems():
             assert bin_to_hex(entry.pack_id) in pack_names_after
 

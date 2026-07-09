@@ -558,6 +558,8 @@ def test_corrupted_manifest(archivers, request):
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive1" in output
     assert "archive2" in output
+    assert "problem(s) found" in output
+    assert "repaired" in output
     cmd(archiver, "check", exit_code=0)
 
 
@@ -778,6 +780,8 @@ def test_verify_data(archivers, request, init_args):
     assert "The following chunks are missing in the repository:" in output
     assert bin_to_hex(chunk.id) in output
     assert src_file in output
+    assert "problem(s) found" in output
+    assert "repaired" in output
 
     # run with --verify-data again, it will notice the missing chunk.
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
@@ -869,6 +873,8 @@ def test_corrupted_file_chunk(archivers, request, init_args):
     assert "The following chunks are missing in the repository:" in output
     assert bin_to_hex(chunk.id) in output
     assert src_file in output
+    assert "problem(s) found" in output
+    assert "repaired" in output
 
     # run normal check again
     cmd(archiver, "check", "--repository-only", exit_code=0)

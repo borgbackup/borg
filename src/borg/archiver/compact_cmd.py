@@ -11,7 +11,7 @@ from ..helpers import get_cache_dir
 from ..helpers.argparsing import ArgumentParser
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex
-from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
+from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
 from ..repository import Repository
@@ -50,6 +50,8 @@ class ArchiveGarbageCollector:
         self.report_and_delete()
         if not self.dry_run:
             self.save_chunk_index()
+            if sig_int:  # raise after saving, so a Ctrl-C still leaves a valid index
+                raise Error("Got Ctrl-C / SIGINT.")
             self.cleanup_files_cache()
         logger.info("Finished compaction / garbage collection...")
 
@@ -250,17 +252,17 @@ class ArchiveGarbageCollector:
         # Pass 2: collect object ids only for the affected packs (a subset, not the whole index)
         keep = {pid: set() for pid in rewrite_packs}  # survivors to copy forward, per pack
         drop = {pid: set() for pid in rewrite_packs}  # unused objects in those same packs
-        forget = []  # ids living in fully-unused packs we delete outright
+        forget = {pid: set() for pid in drop_packs}  # ids living in fully-unused packs we delete outright
         for id, entry in self.chunks.iteritems():
             pid = entry.pack_id
             if pid in rewrite_packs:
                 (keep if entry.flags & ChunkIndex.F_USED else drop)[pid].add(id)
             elif pid in drop_packs:
-                forget.append(id)
+                forget[pid].add(id)
 
         # count what we remove: every object of a dropped pack, plus the unused objects cut from
         # rewritten packs. unused objects in below-threshold packs stay, so they don't count.
-        deleted = len(forget) + sum(len(ids) for ids in drop.values())
+        deleted = sum(len(ids) for ids in forget.values()) + sum(len(ids) for ids in drop.values())
         logger.info(f"Deleting {deleted} unused objects...")
         pi = ProgressIndicatorPercent(
             total=len(drop_packs) + len(rewrite_packs),
@@ -269,17 +271,22 @@ class ArchiveGarbageCollector:
             msgid="compact.compact_packs",
         )
         progress = 0
+        # self.chunks stays consistent with the store after each pack, so Ctrl-C can stop between packs
         for pid in drop_packs:
+            if sig_int:
+                break
             try:
                 self.repository.store_delete("packs/" + bin_to_hex(pid))
             except StoreObjectNotFound:
                 # happens when a stale chunk index references an already deleted pack (#9850)
                 logger.warning(f"Pack {bin_to_hex(pid)} to delete was already gone.")
+            for id in forget[pid]:  # drop the deleted pack's index entries
+                del self.chunks[id]
             progress += 1
             pi.show(progress)  # report after the work, so the final pack lands on 100%
-        for id in forget:
-            del self.chunks[id]  # their pack file is gone, so drop their index entries too
         for pid in rewrite_packs:
+            if sig_int:
+                break
             # chunks=self.chunks: the index updates (repoint kept objects, remove dropped ones)
             # must land in the index that save_chunk_index() persists (#9850).
             self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid], chunks=self.chunks)

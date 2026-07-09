@@ -11,7 +11,7 @@ from ..helpers import get_cache_dir
 from ..helpers.argparsing import ArgumentParser
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex
-from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin
+from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin, IntegrityError
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
 from ..repository import Repository
@@ -35,13 +35,6 @@ class ArchiveGarbageCollector:
         self.threshold = threshold  # rewrite a mixed pack only when its wasted-bytes fraction reaches this percent
         self.iec = iec  # formats statistics using IEC units (1KiB = 1024B)
         self.dry_run = dry_run
-
-    @property
-    def repository_size(self):
-        if not self.stats:
-            return None
-        # on-disk size: sum of the actual pack file sizes, including bytes no index entry covers.
-        return sum(ItemInfo(*info).size for info in self.repository.store_list("packs"))
 
     def garbage_collect(self):
         """Removes unused chunks from a repository."""
@@ -164,9 +157,10 @@ class ArchiveGarbageCollector:
             for id in sorted(self.missing_chunks):
                 logger.debug(f"Missing object {bin_to_hex(id)}")
             set_ec(EXIT_ERROR)
-        # a missing chunk means the repo is damaged: keep the soft-deleted archives so "borg undelete"
-        # stays possible until "borg check --repair" has run.
-        if not self.dry_run and not self.missing_chunks:  # skip nuking on a dry run or a damaged repo
+            # the repo is damaged: keep the soft-deleted archives so "borg undelete" stays possible
+            # until "borg check --repair" has run.
+            self.mark_soft_deleted_used()
+        elif not self.dry_run:
             logger.info("Cleaning archives directory from soft-deleted archives...")
             archive_infos = self.manifest.archives.list(sort_by=["ts"], deleted=True)
             for archive_info in archive_infos:
@@ -176,9 +170,7 @@ class ArchiveGarbageCollector:
                 except self.repository.ObjectNotFound:
                     logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
 
-        repo_size_before = self.repository_size if self.stats else 0
-        self.compact_packs()
-        repo_size_after = self.repository_size if self.stats else 0
+        repo_size_before, repo_size_after = self.compact_packs()
 
         if self.stats:
             deduplicated_size = sum(
@@ -205,6 +197,35 @@ class ArchiveGarbageCollector:
                     f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
                 )
 
+    def mark_soft_deleted_used(self):
+        """Flag every chunk of the soft-deleted archives F_USED, so compaction keeps them.
+
+        Keeps each soft-deleted archive's metadata object, item metadata and file content, so
+        "borg undelete" can still recover it. An archive whose metadata object is itself already
+        gone is skipped with a warning.
+        """
+
+        def mark(id):
+            entry = self.chunks.get(id)
+            if entry is not None:
+                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED)
+
+        for archive_info in self.manifest.archives.list(sort_by=["ts"], deleted=True):
+            try:
+                archive = Archive(self.manifest, archive_info.id, iec=self.iec, deleted=True)
+                mark(archive.id)
+                for id in archive.metadata.item_ptrs:
+                    mark(id)
+                for id in archive.metadata.items:
+                    mark(id)
+                for item in archive.iter_items():
+                    if "chunks" in item:
+                        for id, _ in item.chunks:
+                            mark(id)
+            except (Repository.ObjectNotFound, IntegrityError) as e:
+                name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
+                logger.warning(f"Soft-deleted archive {name} {hex_id} cannot be fully preserved: {e}")
+
     def compact_packs(self):
         """Free space one pack at a time (the store can only delete whole packs).
 
@@ -228,12 +249,16 @@ class ArchiveGarbageCollector:
         When the repo is damaged (archives reference chunks the index cannot find), packs holding
         unindexed bytes are left untouched: those bytes may be live data "borg check --repair" can
         recover. Packs without unindexed bytes are still compacted, so delete/prune waste is reclaimed.
+
+        Returns (repo_size_before, repo_size_after), the on-disk pack size before and after this run.
         """
-        # Pass 1: list the pack files and their sizes; these are the packs we consider.
+        # Pass 1: list the pack files and their sizes; these are the packs we consider. This is the
+        # only pack listing per run.
         pack_total = {}  # pack_id -> file size in the store
         for info in self.repository.store_list("packs"):
             info = ItemInfo(*info)
             pack_total[hex_to_bin(info.name)] = info.size
+        repo_size_before = sum(pack_total.values())  # on-disk pack size before compaction (for --stats)
 
         # sum the used bytes per pack from the index; also sum every entry's bytes (used or not) to
         # detect which packs hold unindexed bytes. collect index entries whose pack is not in the store.
@@ -297,10 +322,10 @@ class ArchiveGarbageCollector:
                 f"Would free {format_file_size(freed, iec=self.iec)} "
                 f"by dropping {len(drop_packs)} packs and rewriting {len(rewrite_packs)} packs."
             )
-            return  # dry run: report only, change nothing
+            return repo_size_before, repo_size_before  # dry run: report only, change nothing
         if not drop_packs and not rewrite_packs and not stale_ids:
             logger.info("Deleting 0 unused objects...")
-            return  # nothing to reclaim; do not touch the chunk indexes
+            return repo_size_before, repo_size_before  # nothing to reclaim; chunk indexes stay valid
 
         # crash-safety (#9748): invalidate chunk indexes before the first store change
         delete_chunkindex_from_repo(self.repository)
@@ -351,6 +376,9 @@ class ArchiveGarbageCollector:
             progress += 1
             pi.show(progress)
         pi.finish()
+
+        # a rewritten pack's new size equals its kept bytes, so reclaimed is the exact on-disk delta.
+        return repo_size_before, repo_size_before - reclaimed
 
 
 class CompactMixIn:

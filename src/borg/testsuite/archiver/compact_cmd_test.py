@@ -10,6 +10,7 @@ from ...repository import Repository
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
 from ...cache import delete_chunkindex_from_repo, write_chunkindex_to_repo
 from ...manifest import Manifest
+from ...archive import Archive
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
 from ..repository_test import H, fchunk, pdchunk
@@ -383,26 +384,38 @@ def test_compact_partial_when_chunks_missing(tmp_path):
         assert pdchunk(repository.get(H(2))) == b"LIVE"
 
 
-def test_compact_skips_nuke_when_chunks_missing(archivers, request):
-    # On a damaged repo, compact must not finalize soft-deleted archives: it skips nuking so their
-    # directory entries survive until "borg check --repair" has run (#9868).
+def test_compact_keeps_undelete_data_when_chunks_missing(archivers, request):
+    # On a damaged repo, compact preserves soft-deleted archives whole (metadata and data), so
+    # "borg undelete" can still recover them until "borg check --repair" has run (#9868).
     archiver = request.getfixturevalue(archivers)
 
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    create_src_archive(archiver, "kept")
-    create_src_archive(archiver, "gone")
+    # two archives with distinct content, so the soft-deleted one has its own chunks to preserve.
+    create_regular_file(archiver.input_path, "kept_dir/kept_file", contents=b"K" * (1024 * 80))
+    create_regular_file(archiver.input_path, "gone_dir/gone_file", contents=b"G" * (1024 * 80))
+    cmd(archiver, "create", "kept", "input/kept_dir")
+    cmd(archiver, "create", "gone", "input/gone_dir")
     cmd(archiver, "delete", "gone")  # soft-delete: finalized only once compact nukes it
 
-    # drop one used chunk's index entry and persist the index, so analyze_archives() reports a missing chunk.
+    # damage the repo: drop a content chunk index entry of the live "kept" archive, so compact
+    # sees a missing object and treats the repo as damaged.
     repository = open_repository(archiver)
     with repository:
-        some_id = next(iter(repository.chunks.iteritems()))[0]
-        del repository.chunks[some_id]
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        kept = Archive(manifest, manifest.archives.get_one(["kept"]).id)
+        victim = next(id for item in kept.iter_items() if "chunks" in item for id, _ in item.chunks)
+        del repository.chunks[victim]
         write_chunkindex_to_repo(repository, repository.chunks, incremental=False, force_write=True, delete_other=True)
 
     output = cmd(archiver, "compact", "-v", exit_code=EXIT_ERROR)
     assert "missing objects" in output  # the repo is seen as damaged ...
     assert "Cleaning archives directory" not in output  # ... so soft-deleted archives are not nuked
+
+    cmd(archiver, "undelete", "gone")  # recover the soft-deleted archive
+    with changedir("output"):
+        cmd(archiver, "extract", "gone")
+    with open("output/input/gone_dir/gone_file", "rb") as fd:
+        assert fd.read() == b"G" * (1024 * 80)  # its data survived compaction
 
 
 def test_compact_drops_stale_index_entries(tmp_path):

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import get_cache_dir, bin_to_hex
+from ...helpers import get_cache_dir, bin_to_hex, sig_int, Error
 from ...hashindex import ChunkIndex
 from ...repository import Repository
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
@@ -148,6 +148,58 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
         assert "missing" not in output
         with open(os.path.join("input", "file1"), "rb") as fd:
             assert fd.read() == content
+
+
+def test_compact_soft_interrupt_persists_valid_index(archivers, request, monkeypatch):
+    """One Ctrl-C during pack deletion stops at the next pack boundary, saves a chunk index that
+    still matches the repository, and exits with an error (#9830). A later compact finishes the rest."""
+    from ...archiver.compact_cmd import ArchiveGarbageCollector
+
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1")  # one object per pack -> several packs to stop between
+
+    for i in range(3):
+        create_regular_file(archiver.input_path, f"file{i}", contents=os.urandom(1024))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive", "input")
+    cmd(archiver, "delete", "-a", "archive")
+
+    repository = open_repository(archiver)
+    with repository:
+        pack_names_before = {info.name for info in repository.store_list("packs")}
+        assert len(pack_names_before) >= 2  # need several packs to observe an early stop
+
+        manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        gc = ArchiveGarbageCollector(repository, manifest, stats=False, iec=False, threshold=10)
+
+        original_store_delete = repository.store_delete
+        calls = []
+
+        def store_delete_then_interrupt(name, **kwargs):
+            original_store_delete(name, **kwargs)
+            if name.startswith("packs/"):  # only real pack deletes, not the earlier archive/index deletes
+                calls.append(name)
+                if len(calls) == 1:
+                    sig_int._sig_int_triggered = True  # one Ctrl-C after the first pack is deleted
+
+        monkeypatch.setattr(repository, "store_delete", store_delete_then_interrupt)
+        try:
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                gc.garbage_collect()
+        finally:
+            sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+
+    # every persisted index entry points at a pack that still exists
+    repository = open_repository(archiver)
+    with repository:
+        assert list_chunkindex_hashes(repository) != []
+        pack_names_after = {info.name for info in repository.store_list("packs")}
+        assert 0 < len(pack_names_after) < len(pack_names_before)  # some packs deleted, some left
+        for id, entry in repository.chunks.iteritems():
+            assert bin_to_hex(entry.pack_id) in pack_names_after
+
+    output = cmd(archiver, "compact", "-v", exit_code=0)
+    assert "Finished compaction" in output
 
 
 def test_compact_packs_respects_threshold(tmp_path):

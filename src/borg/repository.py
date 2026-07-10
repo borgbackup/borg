@@ -6,7 +6,7 @@ from hashlib import sha256
 
 from borgstore.store import Store
 from borgstore.backends.rest import REST, ssh_cmd
-from borgstore.store import ObjectNotFound as StoreObjectNotFound
+from borgstore.store import ObjectNotFound as StoreObjectNotFound, ReadRangeError
 from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
@@ -973,11 +973,13 @@ class Repository:
             sources.append((pack_hex, cursor, pack_size - cursor))
 
         # write the new pack (named sha256 of its content) from those spans before touching the index
-        # or the old pack, so a failed read-back leaves everything unchanged.
-        # TODO: borgstore 0.5.5 defrag raises ReadRangeError on a short/long read (corrupt/truncated
-        # pack); catch it here and translate to IntegrityError once the dependency is bumped to 0.5.5.
+        # or the old pack, so a failed read-back leaves everything unchanged. a span reading back short
+        # (defrag raises ReadRangeError) means the pack file is truncated or corrupt.
         if sources:
-            new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+            try:
+                new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+            except ReadRangeError as e:
+                raise IntegrityError(f'pack {pack_hex}: {e}, run "borg check"') from e
         else:
             new_pack_id = None  # every byte was dropped: no replacement pack
 

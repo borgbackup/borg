@@ -477,6 +477,29 @@ def test_compact_pack_detects_past_eof(repo_fixtures, request):
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
 
 
+def test_compact_pack_translates_read_range_error(repo_fixtures, request, monkeypatch):
+    # On a truncated or corrupt pack a defrag span reads back short and borgstore raises ReadRangeError.
+    # compact_pack translates it to IntegrityError, keeps the source pack and leaves the index unchanged.
+    # store.defrag is patched to raise ReadRangeError.
+    from borgstore.store import ReadRangeError
+
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    with repository:
+        old_pack_id = repository.chunks[H(0)].pack_id
+
+        def short_read(*args, **kwargs):
+            raise ReadRangeError("requested 5 bytes at offset 0, got 3")
+
+        monkeypatch.setattr(repository.store, "defrag", short_read)
+        with pytest.raises(IntegrityError):
+            repository.compact_pack(old_pack_id, keep_ids={H(0)}, drop_ids={H(1)})
+        assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
+        assert H(1) in repository.chunks  # still indexed: aborted before deleting the dropped id
+
+
 def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):

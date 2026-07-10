@@ -344,7 +344,7 @@ def build_one_pack(repository, objects):
 
 
 def test_compact_pack_copy_forward(repo_fixtures, request):
-    # Keep a subset of a multi-object pack: survivors must read back, the dropped object and its bytes gone.
+    # Keep a subset of a multi-object pack: kept objects must read back, the dropped object and its bytes gone.
     chunk0 = fchunk(b"DATA0", chunk_id=H(0))
     chunk1 = fchunk(b"DATA1", chunk_id=H(1))
     chunk2 = fchunk(b"DATA2", chunk_id=H(2))
@@ -399,10 +399,11 @@ def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
         assert pdchunk(repository.get(H(1))) == b"DATA1"
 
 
-def test_compact_pack_tolerates_gap(repo_fixtures, request):
+def test_compact_pack_keeps_gap(repo_fixtures, request):
     # A pack may hold bytes no index entry covers (a superseded copy of a chunk re-put elsewhere).
-    # Drop the middle object's index entry to simulate that, then compact keeping the outer two:
-    # the gap must be skipped and its bytes reclaimed (issue #9868).
+    # compact_pack must copy such gaps into the new pack rather than dropping data it was not told to
+    # drop; only "borg check --repair" decides their fate (issue #9868). Drop the middle object's index
+    # entry to make a gap, then rewrite dropping the first object and keeping the last: the gap survives.
     chunk0 = fchunk(b"DATA0", chunk_id=H(0))
     chunk1 = fchunk(b"DATA1", chunk_id=H(1))
     chunk2 = fchunk(b"DATA2", chunk_id=H(2))
@@ -412,33 +413,34 @@ def test_compact_pack_tolerates_gap(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         del repository.chunks[H(1)]  # H(1)'s bytes stay in the pack but are now unindexed (a gap)
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(2)}, drop_ids={H(0)})
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
-        assert pdchunk(repository.get(H(0))) == b"DATA0"
         assert pdchunk(repository.get(H(2))) == b"DATA2"
         packs = {info.name: info.size for info in repository.store_list("packs")}
         assert bin_to_hex(old_pack_id) not in packs
-        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk2)  # gap bytes reclaimed
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk1) + len(chunk2)  # gap bytes kept, only H(0) dropped
 
 
-def test_compact_pack_tolerates_trailing_bytes(repo_fixtures, request):
+def test_compact_pack_keeps_trailing_bytes(repo_fixtures, request):
     # Same as the gap case, but the unindexed bytes are at the end of the pack: dropping the last
-    # object's index entry leaves trailing bytes the listed objects do not reach. Must still succeed.
+    # object's index entry leaves trailing bytes the listed objects do not reach. Rewrite dropping the
+    # first object; the trailing bytes must be copied forward, not lost.
     chunk0 = fchunk(b"DATA0", chunk_id=H(0))
     chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    chunk2 = fchunk(b"DATA2", chunk_id=H(2))
     repository = get_repository_from_fixture(repo_fixtures, request)
-    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1), (H(2), chunk2)])
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
-        del repository.chunks[H(1)]  # trailing unindexed bytes
+        del repository.chunks[H(2)]  # trailing unindexed bytes
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(0)}, drop_ids=set())
+        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(1)}, drop_ids={H(0)})
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
-        assert pdchunk(repository.get(H(0))) == b"DATA0"
+        assert pdchunk(repository.get(H(1))) == b"DATA1"
         packs = {info.name: info.size for info in repository.store_list("packs")}
-        assert packs[bin_to_hex(new_pack_id)] == len(chunk0)  # trailing bytes reclaimed
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk1) + len(chunk2)  # trailing bytes kept
 
 
 def test_compact_pack_detects_overlap(repo_fixtures, request):

@@ -904,17 +904,19 @@ class Repository:
         chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
             updates to. Must be the index keep_ids and drop_ids were derived from. Default: self.chunks.
 
-        keep_ids and drop_ids need not name every object in the pack. A pack can hold bytes that no
-        index entry covers: an older copy of a chunk that was later stored again elsewhere, or objects
-        from a backup that crashed before writing its index. Such bytes appear as gaps between the
-        listed objects and are dropped. An overlap between listed objects, or an object claiming to end
-        past the pack file, means index corruption and raises IntegrityError.
+        Together, keep_ids and drop_ids must cover every object the chunk index lists for this pack;
+        an unlisted indexed object would keep its bytes in the new pack but its index entry would go
+        stale when the old pack is deleted. Bytes that no index entry covers (an older copy of a chunk
+        that was later stored again elsewhere, or objects from a backup that crashed before writing its
+        index) appear as gaps between the listed objects; they are copied into the new pack unchanged.
+        Only drop_ids are removed. An overlap between listed objects, or an object claiming to end past
+        the pack file, means index corruption and raises IntegrityError.
 
-        Kept objects are copied into a new pack via store.defrag and repointed in the chunk index;
-        dropped objects' chunk index entries are removed.
+        The new pack is the old pack minus the dropped objects, built via store.defrag; kept objects are
+        repointed in the chunk index and dropped objects' chunk index entries are removed.
 
-        Returns the new pack_id, or None if nothing is kept, or the unchanged pack_id if nothing
-        was dropped.
+        Returns the new pack_id, or None if every byte was dropped, or the unchanged pack_id if
+        nothing was dropped.
 
         Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
         index back to the store afterwards.
@@ -935,10 +937,10 @@ class Repository:
             located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
 
-        # walk objects in offset order, collecting the survivors. covered is the end offset of the last
-        # object; a gap (offset > covered) is unindexed bytes we drop, an overlap (offset < covered) is
-        # index corruption.
-        kept = []  # (obj_offset, obj_id, obj_size), offset-ordered
+        # walk objects in offset order. covered is the end offset of the last object; an overlap
+        # (offset < covered) is index corruption. record the dropped objects' byte ranges; every other
+        # byte (kept objects and gaps that no index entry covers) is copied into the new pack unchanged.
+        drop_ranges = []  # (obj_offset, obj_size) of dropped objects, offset-ordered
         covered = 0
         for offset, obj_id, size, keep in located:
             if offset < covered:
@@ -947,8 +949,8 @@ class Repository:
                     f'run "borg check"'
                 )
             covered = offset + size
-            if keep:
-                kept.append((offset, obj_id, size))
+            if not keep:
+                drop_ranges.append((offset, size))
 
         # reject an object that ends past the pack file: store.defrag would short-read it into a
         # truncated object in the new pack, then the intact source pack is deleted.
@@ -959,28 +961,45 @@ class Repository:
                 f'(index corruption), run "borg check"'
             )
 
+        # the new pack is the whole file minus the dropped ranges: copy the byte spans between them.
+        sources = []  # (pack_hex, offset, size) to copy, offset-ordered
+        pack_hex = bin_to_hex(pack_id)
+        cursor = 0
+        for offset, size in drop_ranges:
+            if offset > cursor:
+                sources.append((pack_hex, cursor, offset - cursor))
+            cursor = offset + size
+        if cursor < pack_size:
+            sources.append((pack_hex, cursor, pack_size - cursor))
+
+        # write the new pack (named sha256 of its content) from those spans before touching the index
+        # or the old pack, so a failed read-back leaves everything unchanged.
+        # TODO: borgstore 0.5.5 defrag raises ReadRangeError on a short/long read (corrupt/truncated
+        # pack); catch it here and translate to IntegrityError once the dependency is bumped to 0.5.5.
+        if sources:
+            new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+        else:
+            new_pack_id = None  # every byte was dropped: no replacement pack
+
         for drop_id in drop_ids:  # remove dropped objects from the index
             del chunks[drop_id]
 
-        if not kept:  # nothing kept: drop the pack, no replacement
+        if new_pack_id is None:  # nothing kept: drop the pack, no replacement
             self.store_delete(pack_key)
             return None
 
-        # copy kept objects into a new pack (named sha256 of its content)
-        sources = [(bin_to_hex(pack_id), offset, size) for offset, _, size in kept]
-        new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
-
-        # repoint kept objects at the new pack; new offset is the running sum of kept sizes
+        # repoint kept objects at the new pack; an object's new offset is its old offset minus the
+        # dropped bytes lying before it.
         new_locations = []
-        offset = 0
-        for _, keep_id, size in kept:
-            new_locations.append((keep_id, new_pack_id, offset, size))
-            offset += size
+        for offset, obj_id, size, keep in located:
+            if keep:
+                dropped_before = sum(dsize for doffset, dsize in drop_ranges if doffset < offset)
+                new_locations.append((obj_id, new_pack_id, offset - dropped_before, size))
         chunks.update_pack_info(new_locations)
 
         # delete the old pack last, after the new one is stored and indexed, so kept bytes are never the
-        # only copy. if every object was kept in order, defrag reproduced the pack (new_pack_id == pack_id)
-        # and deleting it would drop what we kept, so skip.
+        # only copy. with nothing dropped, defrag reproduced the pack (new_pack_id == pack_id) and
+        # deleting it would drop what we kept, so skip.
         if new_pack_id != pack_id:
             self.store_delete(pack_key)
         return new_pack_id

@@ -205,8 +205,8 @@ def test_compact_soft_interrupt_persists_valid_index(archivers, request, monkeyp
 
 def test_compact_packs_respects_threshold(tmp_path):
     # Two multi-object packs in one repo, then pack-level compaction at a 40% threshold. The pack that
-    # wastes 2/3 of its bytes is rewritten down to its single survivor (and its old file deleted); the
-    # pack that wastes only 1/3 stays untouched, since copying its survivors to reclaim that little is
+    # wastes 2/3 of its bytes is rewritten down to its single kept object (and its old file deleted); the
+    # pack that wastes only 1/3 stays untouched, since copying its kept objects to reclaim that little is
     # not worth it. This covers the rewrite, leave-alone and keep/drop split unique to multi-object packs.
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
@@ -233,7 +233,7 @@ def test_compact_packs_respects_threshold(tmp_path):
         gc.chunks = repository.chunks
         gc.compact_packs()
 
-        # wasteful pack was rewritten: the survivor reads back, the dropped objects and the old file are gone
+        # wasteful pack was rewritten: the kept object reads back, the dropped objects and the old file are gone
         assert pdchunk(repository.get(H(0))) == b"DATA0"
         assert repository.get(H(1), raise_missing=False) is None
         assert repository.get(H(2), raise_missing=False) is None
@@ -248,7 +248,8 @@ def test_compact_packs_respects_threshold(tmp_path):
 def test_compact_superseded_duplicate(tmp_path):
     # Issue #9868 repro. Concurrent backups can write the same chunk into two packs; when the index
     # fragments merge, only one copy stays indexed and the other is left as unindexed bytes in a pack.
-    # Once such a mixed pack crosses the threshold, compact must rewrite it, dropping those bytes.
+    # Rewriting such a pack (because of its ordinary unused objects) must copy those superseded bytes
+    # forward, not drop them: only "borg check --repair" decides their fate.
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
@@ -259,6 +260,8 @@ def test_compact_superseded_duplicate(tmp_path):
             repository.put(cid, fchunk(data, chunk_id=cid))
         repository.flush()
         pack_a = repository.chunks[H(0)].pack_id
+        pack_a_size = next(i.size for i in repository.store_list("packs") if i.name == bin_to_hex(pack_a))
+        y_size = repository.chunks[H(2)].obj_size
 
         # pack B: a second copy of X only, in its own pack (as a concurrent writer would have produced).
         repository.put(H(1), fchunk(b"XXXX", chunk_id=H(1)))
@@ -279,17 +282,21 @@ def test_compact_superseded_duplicate(tmp_path):
         gc.chunks = repository.chunks
         gc.compact_packs()
 
-        # W still readable; X still readable from pack B; Y dropped; pack A rewritten to only W's bytes.
+        # W still readable; X still readable from pack B; Y (the unused indexed object) dropped.
         assert pdchunk(repository.get(H(0))) == b"WWWW"
         assert pdchunk(repository.get(H(1))) == b"XXXX"
         assert repository.get(H(2), raise_missing=False) is None
+        # pack A rewritten, shrunk by exactly Y's bytes: W's and the superseded X span are kept, not dropped.
         assert bin_to_hex(pack_a) not in [info.name for info in repository.store_list("packs")]
+        new_pack = repository.chunks[H(0)].pack_id
+        new_size = next(i.size for i in repository.store_list("packs") if i.name == bin_to_hex(new_pack))
+        assert new_size == pack_a_size - y_size
 
 
-def test_compact_drops_orphan_pack(tmp_path):
+def test_compact_keeps_orphan_pack(tmp_path):
     # A pack with no index entries at all (a backup that crashed after writing the pack but before
-    # writing its index) must still be found and dropped: compact enumerates the actual pack files,
-    # not just the index (#9868).
+    # writing its index) is left alone: its objects hold no reclaimable indexed waste and may be live
+    # data, so dropping them is "borg check --repair"'s call, not compact's (#9868).
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
@@ -310,15 +317,16 @@ def test_compact_drops_orphan_pack(tmp_path):
         gc.compact_packs()
 
         pack_names = [info.name for info in repository.store_list("packs")]
-        assert "ab" * 32 not in pack_names  # orphan pack dropped
+        assert "ab" * 32 in pack_names  # orphan pack kept for check --repair
         assert bin_to_hex(live_pack) in pack_names  # the used pack kept
         assert pdchunk(repository.get(H(0))) == b"KEEP"
 
 
-def test_compact_superseded_waste_triggers_rewrite(tmp_path):
-    # A pack whose indexed objects are all used but which also holds unindexed bytes over the
-    # threshold must be rewritten (#9868). Delete one object's index entry so its bytes become
-    # unindexed waste, then compact must copy the used survivors into a fresh pack.
+def test_compact_keeps_unindexed_waste(tmp_path):
+    # A pack whose indexed objects are all used, but which also holds unindexed bytes, is left alone:
+    # compact reclaims only indexed-but-unused bytes, never bytes no index entry covers. Those may be
+    # live data for "borg check --repair" (#9868). Delete one object's index entry to make a big
+    # unindexed span; compact must not rewrite the pack over it.
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
@@ -331,56 +339,54 @@ def test_compact_superseded_waste_triggers_rewrite(tmp_path):
         # every remaining indexed object is used ...
         for i in (0, 2):
             repository.chunks[H(i)] = repository.chunks[H(i)]._replace(flags=ChunkIndex.F_USED)
-        # ... but H(1)'s big object becomes an unindexed superseded span (waste well over threshold).
+        # ... but H(1)'s big object becomes an unindexed superseded span (well over threshold if counted).
         del repository.chunks[H(1)]
 
         gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
-        new_pack = repository.chunks[H(0)].pack_id
-        assert new_pack != pack  # the pack was rewritten despite all indexed objects being used
-        assert bin_to_hex(pack) not in [info.name for info in repository.store_list("packs")]
+        assert repository.chunks[H(0)].pack_id == pack  # not rewritten: unindexed bytes are not reclaimed
+        assert bin_to_hex(pack) in [info.name for info in repository.store_list("packs")]
         assert pdchunk(repository.get(H(0))) == b"AAAA"
         assert pdchunk(repository.get(H(2))) == b"CCCC"
 
 
-def test_compact_partial_when_chunks_missing(tmp_path):
-    # On a damaged repo (archives reference missing chunks) compact still reclaims ordinary waste from
-    # packs that hold no unindexed bytes, but leaves packs that DO hold unindexed bytes alone, since
-    # those bytes may be live data "borg check --repair" can recover (#9868).
+def test_compact_reclaims_indexed_waste_only(tmp_path):
+    # compact reclaims a pack's indexed-but-unused bytes, but leaves alone a pack whose only waste is
+    # unindexed (bytes no index entry covers): those may be live data "borg check --repair" can
+    # recover (#9868).
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         repository._pack_writer.max_count = 4
-        # clean pack: one used, one unused object -> reclaimable waste, but every byte is indexed.
+        # indexed-waste pack: one used, one unused object -> reclaimable waste, every byte still indexed.
         for cid, data in [(H(0), b"KEEP"), (H(1), b"DROPME")]:
             repository.put(cid, fchunk(data, chunk_id=cid))
         repository.flush()
-        clean_pack = repository.chunks[H(0)].pack_id
+        waste_pack = repository.chunks[H(0)].pack_id
         repository.chunks[H(0)] = repository.chunks[H(0)]._replace(flags=ChunkIndex.F_USED)
         repository.chunks[H(1)] = repository.chunks[H(1)]._replace(flags=ChunkIndex.F_NONE)  # unused waste
 
-        # damaged pack: one used object plus unindexed bytes (H(3)'s entry dropped from the index).
+        # unindexed-waste pack: one used object plus unindexed bytes (H(3)'s entry dropped from the index).
         for cid, data in [(H(2), b"LIVE"), (H(3), b"UNINDEXED")]:
             repository.put(cid, fchunk(data, chunk_id=cid))
         repository.flush()
-        damaged_pack = repository.chunks[H(2)].pack_id
+        unindexed_pack = repository.chunks[H(2)].pack_id
         repository.chunks[H(2)] = repository.chunks[H(2)]._replace(flags=ChunkIndex.F_USED)
-        del repository.chunks[H(3)]  # its bytes remain in damaged_pack as unindexed data
+        del repository.chunks[H(3)]  # its bytes remain in unindexed_pack as unindexed data
 
         gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
         gc.chunks = repository.chunks
-        gc.missing_chunks = {H(9)}  # mark the repo damaged
         gc.compact_packs()
 
         pack_names = [info.name for info in repository.store_list("packs")]
-        # clean pack: waste but no unindexed bytes -> compacted, survivor still readable
-        assert bin_to_hex(clean_pack) not in pack_names
+        # indexed waste -> compacted, kept object still readable
+        assert bin_to_hex(waste_pack) not in pack_names
         assert pdchunk(repository.get(H(0))) == b"KEEP"
-        # damaged pack: holds unindexed bytes -> left untouched for check --repair
-        assert bin_to_hex(damaged_pack) in pack_names
+        # only unindexed waste -> left untouched for check --repair
+        assert bin_to_hex(unindexed_pack) in pack_names
         assert pdchunk(repository.get(H(2))) == b"LIVE"
 
 
@@ -418,9 +424,10 @@ def test_compact_keeps_undelete_data_when_chunks_missing(archivers, request):
         assert fd.read() == b"G" * (1024 * 80)  # its data survived compaction
 
 
-def test_compact_drops_stale_index_entries(tmp_path):
-    # An index entry whose pack file is gone from the store is stale: compact drops it. If it was still
-    # flagged used, that is lost data, so compact reports it and sets an error exit code (#9850).
+def test_compact_keeps_stale_index_entries(tmp_path):
+    # An index entry whose pack file is gone from the store is stale, but it may be an archive's only
+    # pointer to a chunk: compact keeps it and only reports the problem, since dropping it is
+    # "borg check --repair"'s call. A used stale entry means data is missing (#9850).
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
@@ -436,7 +443,7 @@ def test_compact_drops_stale_index_entries(tmp_path):
         gc.chunks = repository.chunks
         gc.compact_packs()
 
-        assert H(0) not in repository.chunks  # stale entry dropped from the index
+        assert H(0) in repository.chunks  # stale entry kept for check --repair, not dropped
 
 
 def test_compact_skips_oversized_index_entry(tmp_path):

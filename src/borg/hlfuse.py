@@ -90,7 +90,7 @@ class FuseBackend:
         self.repository = repository
         # serializes all repository access (FUSE handlers and the background lock-refresh
         # thread), because borgstore connections are not thread-safe. see _lock_refresh.
-        self._repo_lock = threading.Lock()
+        self._repo_lock = threading.RLock()
 
         self.default_uid = os.getuid()
         self.default_gid = os.getgid()

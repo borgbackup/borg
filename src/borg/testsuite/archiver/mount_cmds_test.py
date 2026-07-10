@@ -409,7 +409,7 @@ def test_fuse_lock_refresh_calls_repository_info():
 
     # build a bare backend without running the heavy __init__.
     backend = FuseBackend.__new__(FuseBackend)
-    backend._repo_lock = threading.Lock()
+    backend._repo_lock = threading.RLock()
     # fuse.py refreshes via self.repository_uncached, hlfuse.py via self.repository; set both.
     backend.repository = backend.repository_uncached = FakeRepository()
 

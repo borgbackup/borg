@@ -304,7 +304,7 @@ class FuseBackend:
         self.cache = ItemCache(repository, self.repo_objs)
         # serializes all repository access (FUSE handlers and the background lock-refresh
         # thread), because borgstore connections are not thread-safe. see _lock_refresh.
-        self._repo_lock = threading.Lock()
+        self._repo_lock = threading.RLock()
         self.allow_damaged_files = False
         self.versions = False
         self.uid_forced = None

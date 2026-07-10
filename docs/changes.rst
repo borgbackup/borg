@@ -168,33 +168,32 @@ above.
 
 New features:
 
-- Packs - Google Summer of Code 2026 project of @mr-raj12! #8572
+- Packs - ongoing Google Summer of Code 2026 project of @mr-raj12! #8572
 
-  - more efficient: multiple chunks per pack, less latency impact!
+  - multiple chunks per pack, less latency impact, less storage space overhead!
   - BORG_PACK_MAX_COUNT/SIZE env vars to determine pack sizing
   - create, extract, delete, prune, compact, check (read-only) should work already
-  - check --repair not implemented yet
+  - check --repair and repo-compress not implemented yet
   - fine tuning and optimizations only partly done yet
+  - needs new repositories, no support for repos from previous betas.
 - add BORG_STORE_CACHE and BORG_PACK_CACHE_SIZE env vars to enable borgstore caching
   (use this for slow / high latency primary stores)
-- Remote repositories:
+- Remote repositories (via ssh):
 
   - implemented via borgstore now
-  - borg serve --rest: serve rest:// repositories with a repository-side borg.
-    note: borg serve (without --rest) still serves legacy borg 1.x repositories
-    (talking legacy RPC protocol via stdio via ssh).
   - rest:// repository URLs - connect via ssh to remote borg serve --rest process,
     talking http via stdio, #9593
+  - borg serve --rest: serve rest:// repositories with a repository-side borg.
+  - borg serve (without --rest): serves legacy borg 1.x repositories
 - Chunkers:
 
   - fastcdc: new chunker (keyed Gear hash, normalized chunking, ~1.3x faster), #9824
-  - buzhash64: add normalized chunking (better chunksize distribution, less clamping)
+  - buzhash64: add normalized chunking (better chunk size distribution, less clamping)
 - borg keys:
 
   - locate borg key automatically in key directory or repository, #9743
   - key list/add/remove/export: support multiple borg keys per repository, #9743
   - allow --key-location also for authenticated* modes
-- create: add --exclude-dataless to skip cloud files not materialized locally (macOS)
 - repo-create: split --encryption into --encryption, --id-hash, --key-location, #9168
 - repo-info/list --json: report encryption + id_hash separately, #9168
 - repo-list --from-borg1: list Borg 1.x repositories
@@ -207,12 +206,26 @@ New features:
   - add --json option, #9222
 - add blake3 (super-fast hash/keyed MAC), replacing blake2b for new repos
 - archive: preserve cwd archive metadata, #9495
+- create: add --exclude-dataless to skip cloud files not materialized locally (macOS)
 - create: replace the --hostname/--username options (added in 2.0.0b21) with the
   BORG_HOSTNAME and BORG_USERNAME env vars. When set, they override the hostname/username
   stored in newly created archives and used by the {hostname}/{user} placeholders, #9651
+- create: log the archive name, not just the repository, #9865
+- create/extract/compact --stats: report store statistics, #9880, #9405
+- compact: show deduplication and compression factors, #9856
+- json: support BORG_JSON_INDENT env var for JSON output formatting
 
 Fixes:
 
+- create: do not wrap repository writes in backup_io("read"), fixes silent
+  data loss when running out of repository space.
+- create: input file retries: do not sleep before giving up on the last try
+- files cache: drop entries referencing chunks missing in the index
+- locking: misc. fixes (refresh the lock before flushing the final pack, do not
+  mask the original error when releasing the lock on close, handle our lock
+  getting killed while we are refreshing it, never consider the lock we
+  currently hold stale (#9883), do not leave a lock behind when exclusive
+  acquire times out).
 - compact: invalidate cached chunk indexes before deleting objects, #9748.
   An interrupted compact no longer leaves a stale cache/chunks.* that claims
   deleted objects still exist, which could cause a later create to skip
@@ -240,10 +253,10 @@ Other changes:
 - support msgpack up to 1.2.1
 - remove xxhash / xxh64 requirement
 - add blake3 requirement, blacklist blake3 1.0.9 (win32/msys2 build issues)
-- removed ssh:// and socket:// support for current repositories; use a rest://
-  repository instead (it can tunnel over ssh). ssh:// and ``borg serve`` remain
-  available only for legacy (borg 1.x / v1) repositories, e.g. for
-  ``borg transfer --from-borg1 --other-repo ssh://...``.
+- removed ``ssh://`` and ``socket://`` support for current repositories; use
+  a ``rest://`` repository instead (it tunnels over ssh).
+  ``ssh://`` and ``borg serve`` remain available only for legacy (borg 1.x)
+  repositories, e.g. for ``borg transfer --from-borg1 --other-repo ssh://...``.
 - modernize: use more Python 3.7/3.8/3.9/3.10/3.11+ features
 - Build: enable strict Cython warnings and clean up compiler flags
 - Binary build:
@@ -258,16 +271,16 @@ Other changes:
   Note: for these repositories the canonical location string changed slightly, so on the first run
   against an existing such repository borg may warn once that it "was previously located at ..." -
   this is harmless and can be confirmed.
-- remove socket: protocol code
 - keyfile: name key files by sha256(keyfile_contents).
   Existing legacy-named keyfiles continue to work.
 - repokey: use same format as with external keyfile
-- repo-compress: remove this command for now
-- list: remove xxh64 hash support
+- list: remove xxh64 hash support (placeholder)
 - benchmark: remove xxh64 and crc32 benchmarking
 - benchmark cpu: drop KDF section (irrelevant: KDFs should not be fast)
 - separate a lot of legacy code into borg.legacy package, #9556
 - archiver: warn about MSYS2 path translation, #9339
+- mount: drop runtime warning about symlinks, improve corresponding docs
+- repack chunks index into medium-sized fragments
 - tests / CI:
 
   - remote archiver tests: use rest:/// rather than ssh://
@@ -280,7 +293,7 @@ Other changes:
   - don't run transport-agnostic archiver tests over rest://, #9324
   - sweep stale borg FUSE mounts left by aborted runs
   - make the "remote archiver" tests use "borg serve --rest"
-  - cover borg transfer --from-borg1 from an ssh:// borg 1.x repo
+  - cover ``borg transfer --from-borg1`` from an ``ssh://`` borg 1.x repo
   - reduce /tmp space usage
   - invoke --help for all commands to check if it works, see #9714
 - nanorst: do not require 2 empty lines at end of string after code block, #9714

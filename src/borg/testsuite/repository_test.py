@@ -552,6 +552,94 @@ def test_compact_pack_translates_read_range_error(repo_fixtures, request, monkey
         assert H(1) in repository.chunks  # still indexed: aborted before deleting the dropped id
 
 
+def test_merge_packs_combines_whole_files(repo_fixtures, request):
+    # Several one-object packs merge into one, and every object reads back from its new location.
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    with repository:
+        pack_ids = []
+        for i in range(3):
+            repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
+            repository.flush()  # one object per pack
+            pack_ids.append(repository.chunks[H(i)].pack_id)
+
+        packs_before = {info.name for info in repository.store_list("packs")}
+        assert len(packs_before) == 3
+
+        repository.merge_packs(pack_ids)
+
+        packs_after = {info.name for info in repository.store_list("packs")}
+        assert len(packs_after) == 1
+        assert packs_after.isdisjoint(packs_before)  # a brand-new pack, all originals deleted
+        for i in range(3):
+            assert pdchunk(repository.get(H(i))) == f"DATA{i}".encode()
+            assert bin_to_hex(repository.chunks[H(i)].pack_id) in packs_after
+
+
+def test_merge_packs_carries_unindexed_bytes_forward(repo_fixtures, request):
+    # A pack byte range no index entry covers (e.g. a chunk copy superseded by a later put) must
+    # survive a merge unchanged, not be silently dropped: merge_packs copies whole pack files.
+    # Merged alongside a second pack, so the result is a genuinely new pack (a lone unchanged pack
+    # would defrag to identical bytes and thus the same content-addressed name).
+    chunk0 = fchunk(b"AAAA", chunk_id=H(0))
+    chunk1 = fchunk(b"BBBB", chunk_id=H(1))  # this entry is removed from the index before merging
+    chunk2 = fchunk(b"CCCC", chunk_id=H(2))  # lives in a second, separate pack
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1)])
+    with repository:
+        repository.put(H(2), chunk2)
+        repository.flush()
+        pack1_id = repository.chunks[H(0)].pack_id
+        pack2_id = repository.chunks[H(2)].pack_id
+        pack1_size_before = repository.store.info("packs/" + bin_to_hex(pack1_id)).size
+        del repository.chunks[H(1)]  # H(1)'s bytes are now unindexed, but still on disk
+
+        repository.merge_packs({pack1_id, pack2_id})
+
+        new_pack_id = repository.chunks[H(0)].pack_id
+        assert new_pack_id == repository.chunks[H(2)].pack_id  # both merged into the same new pack
+        new_pack_size = repository.store.info("packs/" + bin_to_hex(new_pack_id)).size
+        assert new_pack_size == pack1_size_before + len(chunk2)  # H(1)'s bytes carried forward, not dropped
+        assert pdchunk(repository.get(H(0))) == b"AAAA"
+        assert pdchunk(repository.get(H(2))) == b"CCCC"
+
+
+def test_merge_packs_detects_past_eof(repo_fixtures, request):
+    # An index entry claiming bytes past its pack's actual end means index corruption. merge_packs
+    # must raise before writing anything, so the only intact copy of the pack is never deleted.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0)])
+    with repository:
+        pack_id = repository.chunks[H(0)].pack_id
+        entry = repository.chunks[H(0)]
+        repository.chunks[H(0)] = entry._replace(obj_size=entry.obj_size + 1)  # claims 1 byte past EOF
+
+        with pytest.raises(IntegrityError):
+            repository.merge_packs({pack_id})
+        assert bin_to_hex(pack_id) in [info.name for info in repository.store_list("packs")]  # untouched
+
+
+def test_merge_packs_skips_pack_already_gone(repo_fixtures, request):
+    # A stale index entry pointing at a pack file the store no longer has (#9850) must not abort the
+    # merge: the pack is excluded with a warning and the rest of the batch still merges.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    with repository:
+        repository.put(H(0), chunk0)
+        repository.flush()
+        pack0_id = repository.chunks[H(0)].pack_id
+        repository.put(H(1), chunk1)
+        repository.flush()
+        pack1_id = repository.chunks[H(1)].pack_id
+
+        repository.store_delete("packs/" + bin_to_hex(pack0_id))  # pack gone, index entry left stale
+
+        repository.merge_packs({pack0_id, pack1_id})
+
+        assert pdchunk(repository.get(H(1))) == b"DATA1"  # the still-present pack merged normally
+
+
 def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):

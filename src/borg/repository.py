@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 from hashlib import sha256
 
@@ -1063,11 +1064,19 @@ class Repository:
     def merge_packs(self, pack_ids, *, chunks=None, max_size=None):
         """Combine several small packs into fewer, larger ones to reduce the pack count.
 
-        pack_ids: the packs to merge. Each still-indexed object of these packs is copied into a new
-            pack (each kept at most max_size bytes); afterwards the source packs are deleted.
+        pack_ids: the packs to merge, whole files; afterwards the source packs are deleted.
         chunks: the ChunkIndex to read object locations from and to apply the index updates to.
             Must be the index pack_ids were derived from. Default: self.chunks.
         max_size: byte cap for each merged pack. Default: the repository's configured pack size limit.
+
+        Whole pack files are copied, not individual indexed objects, so bytes no index entry covers
+        (a chunk copy superseded by a later put, or objects from a backup that crashed before
+        writing its index) are carried forward into the merged pack rather than silently dropped.
+
+        Before copying anything, every source pack's index entries are checked for overlap or for
+        claiming bytes past the pack's actual end -- either means a corrupt index, and copying such
+        a pack could silently truncate the corrupt object. Raises IntegrityError in that case,
+        leaving the store untouched; recovery is "borg check --repair"'s job.
 
         Every new pack is stored and indexed before any source pack is deleted, so a crash mid-merge
         never destroys the only stored copy of an object.
@@ -1080,38 +1089,72 @@ class Repository:
         pack_ids = set(pack_ids)
 
         # collect every still-indexed object of the selected packs, grouped per source pack and
-        # ordered by offset so each source pack is read sequentially.
-        per_pack = {}  # pack_id -> [(obj_offset, obj_id, obj_size), ...]
+        # ordered by offset, used both to validate each pack and to repoint its objects afterwards.
+        per_pack = defaultdict(list)  # pack_id -> [(obj_offset, obj_id, obj_size), ...]
         for obj_id, entry in chunks.iteritems():
             if entry.pack_id in pack_ids:
-                per_pack.setdefault(entry.pack_id, []).append((entry.obj_offset, obj_id, entry.obj_size))
+                per_pack[entry.pack_id].append((entry.obj_offset, obj_id, entry.obj_size))
         for objs in per_pack.values():
             objs.sort()
 
-        # greedily batch objects across packs so each output pack stays within max_size.
-        batches = []  # each batch: [(src_pack_id, obj_offset, obj_id, obj_size), ...]
+        # get each source pack's real file size, dropping any pack that is already gone (stale
+        # index entries, #9850) before validating or copying anything. store.info() reports a
+        # missing object via info.exists rather than raising, unlike store.delete().
+        pack_size = {}
+        for pid in list(pack_ids):
+            info = self.store.info("packs/" + bin_to_hex(pid))
+            if not info.exists:
+                logger.warning(f"Pack {bin_to_hex(pid)} to merge was already gone.")
+                pack_ids.discard(pid)
+                per_pack.pop(pid, None)
+                continue
+            pack_size[pid] = info.size
+
+        # validate every remaining pack before writing anything (see docstring).
+        for pid in pack_ids:
+            covered = 0
+            for offset, _, size in per_pack[pid]:
+                if offset < covered:
+                    raise IntegrityError(
+                        f"pack {bin_to_hex(pid)}: overlapping objects at offset {offset} "
+                        f'(index corruption), run "borg check"'
+                    )
+                covered = offset + size
+            if covered > pack_size[pid]:
+                raise IntegrityError(
+                    f"pack {bin_to_hex(pid)}: object extends past end of file at offset {covered} "
+                    f'(index corruption), run "borg check"'
+                )
+
+        # greedily batch whole pack files so each output pack stays within max_size. batches never
+        # split a source pack, so bytes no index entry covers always travel with their pack instead
+        # of being dropped.
+        batches = []  # each batch: [pack_id, ...]
         current, current_size = [], 0
-        for pid, objs in per_pack.items():
-            for offset, obj_id, size in objs:
-                if current and current_size + size > max_size:
-                    batches.append(current)
-                    current, current_size = [], 0
-                current.append((pid, offset, obj_id, size))
-                current_size += size
+        for pid in pack_ids:
+            size = pack_size[pid]
+            if current and current_size + size > max_size:
+                batches.append(current)
+                current, current_size = [], 0
+            current.append(pid)
+            current_size += size
         if current:
             batches.append(current)
 
-        # write each batch as a new pack (named sha256 of its content) and repoint its objects.
+        # write each batch as a new pack (named sha256 of its content) and repoint its objects: an
+        # object's new offset is the running byte total of the packs placed before its pack in the
+        # batch, plus its old offset within that pack.
         produced = set()
         for batch in batches:
-            sources = [(bin_to_hex(pid), offset, size) for pid, offset, _, size in batch]
+            sources = [(bin_to_hex(pid), 0, pack_size[pid]) for pid in batch]
             new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
             produced.add(new_pack_id)
             new_locations = []
-            new_offset = 0
-            for pid, _, obj_id, size in batch:
-                new_locations.append((obj_id, new_pack_id, new_offset, size))
-                new_offset += size
+            pack_base = 0
+            for pid in batch:
+                for offset, obj_id, size in per_pack[pid]:
+                    new_locations.append((obj_id, new_pack_id, pack_base + offset, size))
+                pack_base += pack_size[pid]
             chunks.update_pack_info(new_locations)
 
         # delete the source packs now that every new pack is stored and indexed. skip any pack whose

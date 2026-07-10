@@ -384,26 +384,32 @@ def test_migrate_lock_alive(archivers, request):
 
 def test_fuse_lock_refresh_calls_repository_info():
     # regression test for #9872: an idle mount must keep its repository lock alive via a
-    # background refresh. LockRefresher does this indirectly through repository.info(),
-    # serialized against the FUSE handlers by self._repo_lock.
+    # background refresh. LockRefresher periodically calls repository.info() while holding
+    # the serialization lock (the FUSE handlers use the same lock), so repo access from the
+    # refresh thread and the FUSE handlers never runs concurrently.
     import threading
 
     from ...storelocking import LockRefresher
 
-    calls = []
+    # a plain Lock is enough here and, unlike RLock, has .locked() on all Python versions.
+    # in the FUSE code the lock is an RLock (it needs to be reentrant), but LockRefresher
+    # only ever acquires/releases it, so a plain Lock exercises the same code path.
+    lock = threading.Lock()
+    called = threading.Event()
+    held_while_calling = []
 
     class FakeRepository:
         def info(self):
-            # record whether the caller holds the serialization lock (it must, so that repo
-            # access from the refresh thread and the FUSE handlers never runs concurrently).
-            calls.append(lock.locked())
-            refresher._keep_running.clear()
+            held_while_calling.append(lock.locked())  # the lock must be held while we run
+            called.set()
             return dict(id=b"\x00" * 32, version=3)
 
-    lock = threading.RLock()
-    repository = FakeRepository()
-    refresher = LockRefresher(repository.info, sleep_interval=60, lock=lock)
-    refresher._run()
+    refresher = LockRefresher(FakeRepository().info, sleep_interval=60, lock=lock)
+    refresher.start()
+    try:
+        assert called.wait(timeout=10), "LockRefresher did not call repository.info()"
+    finally:
+        refresher.terminate()
 
-    assert calls == [True], "repository.info() must be called exactly once, while holding lock"
+    assert held_while_calling and all(held_while_calling), "repository.info() must run while holding the lock"
     assert not lock.locked(), "lock must be released again after refreshing"

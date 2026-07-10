@@ -26,8 +26,9 @@ from .archiver._common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
 from .helpers import daemonizing, signal_handler, bin_to_hex, Error
-from .helpers import HardLinkManager, ThreadRunner
+from .helpers import HardLinkManager
 from .helpers import msgpack
+from .storelocking import LockRefresher
 from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
@@ -171,19 +172,6 @@ class FuseBackend:
 
                 self.root.add_child(name_bytes, archive_node)
                 self.pending_archives[archive_node] = archive
-
-    def _lock_refresh(self):
-        # Called periodically by a background thread (see mount()) so that an idle mount keeps
-        # its repository lock alive. Without this, the lock of a long-idle mount expires as stale
-        # after <stale> seconds (currently 30 min), which would e.g. let a compact run and rewrite
-        # packs, invalidating this mount's cached pack locations (see #9872).
-        # Refreshing the lock is not part of the repository API, so we do it indirectly via
-        # repository.info() (same approach as `borg with-lock`). info() only touches the store
-        # every <stale>/2 seconds; all other calls are cheap no-ops.
-        # We serialize against the FUSE handlers via self._repo_lock, because borgstore connections
-        # are not thread-safe.
-        with self._repo_lock:
-            self.repository.info()
 
     def check_pending_archive(self, node):
         archive_info = self.pending_archives.pop(node, None)
@@ -552,7 +540,7 @@ class borgfs(hlfuse.Operations, FuseBackend):
 
         # keep the repository lock of an idle mount alive, so it is not killed as stale (see #9872).
         # started here (after a possible daemonizing fork, as threads do not survive fork()).
-        lock_refreshing_thread = ThreadRunner(sleep_interval=60, target=self._lock_refresh)
+        lock_refreshing_thread = LockRefresher(self.repository.info, sleep_interval=60, lock=self._repo_lock)
         lock_refreshing_thread.start()
         try:
             # Run the FUSE main loop in foreground (we might be daemonized already or not)

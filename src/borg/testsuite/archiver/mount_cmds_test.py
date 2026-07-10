@@ -382,21 +382,13 @@ def test_migrate_lock_alive(archivers, request):
         Lock.migrate_lock = Lock.migrate_lock.__wrapped__
 
 
-@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse_lock_refresh_calls_repository_info():
     # regression test for #9872: an idle mount must keep its repository lock alive via a
-    # background refresh. FuseBackend._lock_refresh() does this indirectly through
-    # repository.info(), serialized against the FUSE handlers by self._repo_lock.
+    # background refresh. LockRefresher does this indirectly through repository.info(),
+    # serialized against the FUSE handlers by self._repo_lock.
     import threading
 
-    from ...fuse_impl import has_mfusepy
-
-    # import the FuseBackend of the active FUSE implementation (fuse.py is not even importable
-    # when the mfusepy backend is in use, and vice versa).
-    if has_mfusepy:
-        from ...hlfuse import FuseBackend
-    else:
-        from ...fuse import FuseBackend
+    from ...storelocking import LockRefresher
 
     calls = []
 
@@ -404,16 +396,14 @@ def test_fuse_lock_refresh_calls_repository_info():
         def info(self):
             # record whether the caller holds the serialization lock (it must, so that repo
             # access from the refresh thread and the FUSE handlers never runs concurrently).
-            calls.append(backend._repo_lock.locked())
+            calls.append(lock.locked())
+            refresher._keep_running.clear()
             return dict(id=b"\x00" * 32, version=3)
 
-    # build a bare backend without running the heavy __init__.
-    backend = FuseBackend.__new__(FuseBackend)
-    backend._repo_lock = threading.RLock()
-    # fuse.py refreshes via self.repository_uncached, hlfuse.py via self.repository; set both.
-    backend.repository = backend.repository_uncached = FakeRepository()
+    lock = threading.RLock()
+    repository = FakeRepository()
+    refresher = LockRefresher(repository.info, sleep_interval=60, lock=lock)
+    refresher._run()
 
-    backend._lock_refresh()
-
-    assert calls == [True], "repository.info() must be called exactly once, while holding _repo_lock"
-    assert not backend._repo_lock.locked(), "_repo_lock must be released again after refreshing"
+    assert calls == [True], "repository.info() must be called exactly once, while holding lock"
+    assert not lock.locked(), "lock must be released again after refreshing"

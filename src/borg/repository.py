@@ -10,6 +10,7 @@ from borgstore.store import ObjectNotFound as StoreObjectNotFound, ReadRangeErro
 from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
+from borgstore.backends.errors import PermissionDenied as StorePermissionDenied
 
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex
@@ -388,6 +389,9 @@ class Repository:
                 self.store = Store(url, config=ns_config, permissions=permissions, cache_url=cache_url)
         except StoreBackendError as e:
             raise Error(str(e))
+        # None means "all" (no restrictions); for rest:// the backend enforces permissions
+        # server-side, so the client does not check them (see above).
+        self.permissions = None if location.proto == "rest" else permissions
         self.store_opened = False
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
@@ -1152,6 +1156,22 @@ class Repository:
     def store_delete(self, name, *, deleted=False):
         self._lock_refresh()
         return self.store.delete(name, deleted=deleted)
+
+    def assert_writable(self):
+        """Raise PermissionDenied if the repo permissions forbid compaction.
+
+        Compaction stores new packs and index fragments and deletes the old ones, so it needs
+        write (w/W) and delete (D) access to the packs/ and index/ namespaces. self.permissions
+        is None when no restrictions apply (BORG_REPO_PERMISSIONS=all).
+        """
+        if self.permissions is None:
+            return
+        for namespace in ("packs", "index"):
+            granted = set(self.permissions.get(namespace, self.permissions.get("", "")))
+            if not (granted & set("wW")) or "D" not in granted:
+                raise StorePermissionDenied(
+                    f"Repository permissions do not allow compaction (need write and delete on {namespace}/)."
+                )
 
     def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
         self._lock_refresh()

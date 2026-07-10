@@ -422,6 +422,10 @@ class CompactMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_compact(self, args, repository, manifest):
         """Collects garbage in the repository."""
+        if not args.dry_run:
+            # refuse up front on a repo opened read-only, before the reclaim gate can decide there
+            # is nothing to do and make compaction a silent no-op.
+            repository.assert_writable()
         ArchiveGarbageCollector(
             repository, manifest, stats=args.stats, iec=args.iec, threshold=args.threshold, dry_run=args.dry_run
         ).garbage_collect()

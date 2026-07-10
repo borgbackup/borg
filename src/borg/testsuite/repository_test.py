@@ -20,11 +20,13 @@ def test_rest_serve_command_local():
 
 def test_rest_serve_command_ssh(monkeypatch):
     # rest:// with a host is reached via ssh, running "borg serve --rest" remotely.
-    monkeypatch.delenv("BORGSTORE_RSH", raising=False)
+    # we override BORGSTORE_RSH to a simple "ssh" here to simplify testing.
+    # without that, borgstore 0.5.5+ would also set some ssh options via cmdline.
+    monkeypatch.setenv("BORGSTORE_RSH", "ssh")
     monkeypatch.delenv("BORG_REMOTE_PATH", raising=False)
-    cmd = rest_serve_command(Location("rest://user@host:2222/repo/path"))
-    assert cmd[:4] == ["ssh", "-p", "2222", "user@host"]
-    assert cmd[4:] == ["borg", "serve", "--rest", "--backend", "FILE:repo/path"]
+    cmd = rest_serve_command(Location("rest://user@host/repo/path"))
+    assert cmd[:2] == ["ssh", "user@host"]
+    assert cmd[-5:] == ["borg", "serve", "--rest", "--backend", "FILE:repo/path"]
 
 
 @pytest.fixture()

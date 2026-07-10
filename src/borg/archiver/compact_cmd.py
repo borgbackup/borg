@@ -255,7 +255,8 @@ class ArchiveGarbageCollector:
         dropping them is "borg check --repair"'s job. See issue #9868.
 
         Compacting anything rewrites the whole chunk index and invalidates every client's cached
-        copy, so compact only when the reclaimable space or the tiny-pack count is worth that cost.
+        copy, so compact only when the reclaimable space or the combined size of tiny packs is worth
+        that cost.
 
         Two passes bound the memory use: the first keeps only per-pack byte counts to pick the packs
         to change, the second collects object ids for just those packs, not the whole index.
@@ -335,9 +336,12 @@ class ArchiveGarbageCollector:
         # all pack bytes; freeing less does not justify the whole-index rewrite.
         reclaimable_total = sum(pack_reclaim.values())
         worth_reclaiming = repo_size_before > 0 and 100 * reclaimable_total / repo_size_before >= self.threshold / 5
-        # merge only from MIN_PACK_COUNT tiny packs up, so merging does not run for every backup's
-        # single new pack.
-        worth_merging = len(merge_packs) >= MIN_PACK_COUNT
+        # merge only once the tiny packs' combined size reaches a full pack, so every merge produces
+        # at least one pack too large to ever be a merge candidate again. merging smaller amounts
+        # would just repack a still-tiny pile into a slightly-bigger-but-still-tiny pack, and each
+        # such repack invalidates the chunk index for every client for no lasting gain.
+        tiny_total = sum(pack_total[pid] for pid in merge_packs)
+        worth_merging = tiny_total >= self.repository.pack_max_size
 
         if not worth_reclaiming:
             drop_packs, rewrite_packs, pack_reclaim = set(), set(), {}

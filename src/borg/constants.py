@@ -62,10 +62,10 @@ UNKNOWN_BYTES32 = b"\xff" * 32
 # default pack size limit [bytes], see PackWriter in the repository module
 DEFAULT_PACK_MAX_SIZE = 50 * 1000 * 1000
 
-# borg compact merges tiny packs once at least MIN_PACK_COUNT of them,
-# each smaller than MIN_PACK_SIZE bytes, have accumulated.
+# borg compact merges packs smaller than MIN_PACK_SIZE bytes ("tiny") once their combined size
+# reaches the repository's max pack size, so every merge produces at least one full-size pack that
+# is never tiny again (avoids repeatedly re-merging a growing-but-still-tiny pack).
 MIN_PACK_SIZE = DEFAULT_PACK_MAX_SIZE // 50  # 1 MB
-MIN_PACK_COUNT = 10
 
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module

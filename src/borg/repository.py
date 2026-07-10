@@ -554,6 +554,11 @@ class Repository:
         self.opened = True
 
     @property
+    def pack_max_size(self):
+        """The configured byte cap for a pack (BORG_PACK_MAX_SIZE, or the default if count-bound)."""
+        return self._pack_writer.max_size or DEFAULT_PACK_MAX_SIZE
+
+    @property
     def chunks(self):
         """ChunkIndex mapping every known chunk id to its pack location.
 
@@ -1071,7 +1076,7 @@ class Repository:
         if chunks is None:
             chunks = self.chunks
         if max_size is None:
-            max_size = self._pack_writer.max_size or DEFAULT_PACK_MAX_SIZE
+            max_size = self.pack_max_size
         pack_ids = set(pack_ids)
 
         # collect every still-indexed object of the selected packs, grouped per source pack and

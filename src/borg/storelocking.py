@@ -337,10 +337,17 @@ class LockRefresher:
                 count -= 1
 
     def start(self):
-        self._thread = threading.Thread(target=self._run, name="LockRefresher")
+        # daemon=True so a refresh that is stuck in a blocking refresh_callable() (e.g. network
+        # I/O to a remote repo that never returns) can never keep the process alive on exit.
+        self._thread = threading.Thread(target=self._run, name="LockRefresher", daemon=True)
         self._thread.start()
 
     def terminate(self):
         if self._thread is not None:
             self._keep_running.clear()
-            self._thread.join()
+            # bounded join: if refresh_callable() is wedged (e.g. a hung remote-repo request),
+            # don't let it stall shutdown - e.g. a FUSE unmount waiting for this. the thread is a
+            # daemon, so it is torn down at interpreter exit even if it is still alive here.
+            self._thread.join(timeout=5.0)
+            if self._thread.is_alive():
+                logger.warning("Lock refresh thread did not stop within 5s; continuing shutdown.")

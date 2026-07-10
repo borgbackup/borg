@@ -1051,6 +1051,70 @@ class Repository:
             self.store_delete(pack_key)
         return new_pack_id, dropped_bytes
 
+    def merge_packs(self, pack_ids, *, chunks=None, max_size=None):
+        """Combine several small packs into fewer, larger ones to reduce the pack count.
+
+        pack_ids: the packs to merge. Each still-indexed object of these packs is copied into a new
+            pack (each kept at most max_size bytes); afterwards the source packs are deleted.
+        chunks: the ChunkIndex to read object locations from and to apply the index updates to.
+            Must be the index pack_ids were derived from. Default: self.chunks.
+        max_size: byte cap for each merged pack. Default: the repository's configured pack size limit.
+
+        Every new pack is stored and indexed before any source pack is deleted, so a crash mid-merge
+        never destroys the only stored copy of an object.
+        """
+        self._lock_refresh()
+        if chunks is None:
+            chunks = self.chunks
+        if max_size is None:
+            max_size = self._pack_writer.max_size or DEFAULT_PACK_MAX_SIZE
+        pack_ids = set(pack_ids)
+
+        # collect every still-indexed object of the selected packs, grouped per source pack and
+        # ordered by offset so each source pack is read sequentially.
+        per_pack = {}  # pack_id -> [(obj_offset, obj_id, obj_size), ...]
+        for obj_id, entry in chunks.iteritems():
+            if entry.pack_id in pack_ids:
+                per_pack.setdefault(entry.pack_id, []).append((entry.obj_offset, obj_id, entry.obj_size))
+        for objs in per_pack.values():
+            objs.sort()
+
+        # greedily batch objects across packs so each output pack stays within max_size.
+        batches = []  # each batch: [(src_pack_id, obj_offset, obj_id, obj_size), ...]
+        current, current_size = [], 0
+        for pid, objs in per_pack.items():
+            for offset, obj_id, size in objs:
+                if current and current_size + size > max_size:
+                    batches.append(current)
+                    current, current_size = [], 0
+                current.append((pid, offset, obj_id, size))
+                current_size += size
+        if current:
+            batches.append(current)
+
+        # write each batch as a new pack (named sha256 of its content) and repoint its objects.
+        produced = set()
+        for batch in batches:
+            sources = [(bin_to_hex(pid), offset, size) for pid, offset, _, size in batch]
+            new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+            produced.add(new_pack_id)
+            new_locations = []
+            new_offset = 0
+            for pid, _, obj_id, size in batch:
+                new_locations.append((obj_id, new_pack_id, new_offset, size))
+                new_offset += size
+            chunks.update_pack_info(new_locations)
+
+        # delete the source packs now that every new pack is stored and indexed. skip any pack whose
+        # id a batch reproduced (identical bytes hash to the same name): it now holds merged data.
+        for pid in pack_ids:
+            if pid in produced:
+                continue
+            try:
+                self.store_delete("packs/" + bin_to_hex(pid))
+            except StoreObjectNotFound:
+                logger.warning(f"Pack {bin_to_hex(pid)} to merge was already gone.")
+
     def break_lock(self):
         Lock(self.store).break_lock()
 

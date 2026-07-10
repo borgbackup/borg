@@ -380,3 +380,32 @@ def test_migrate_lock_alive(archivers, request):
     finally:
         # Undecorate
         Lock.migrate_lock = Lock.migrate_lock.__wrapped__
+
+
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+def test_fuse_lock_refresh_calls_repository_info():
+    # regression test for #9872: an idle mount must keep its repository lock alive via a
+    # background refresh. FuseBackend._lock_refresh() does this indirectly through
+    # repository.info(), serialized against the FUSE handlers by self._repo_lock.
+    import threading
+
+    from ...fuse import FuseBackend
+
+    calls = []
+
+    class FakeRepository:
+        def info(self):
+            # record whether the caller holds the serialization lock (it must, so that repo
+            # access from the refresh thread and the FUSE handlers never runs concurrently).
+            calls.append(backend._repo_lock.locked())
+            return dict(id=b"\x00" * 32, version=3)
+
+    # build a bare backend without running the heavy __init__.
+    backend = FuseBackend.__new__(FuseBackend)
+    backend._repo_lock = threading.Lock()
+    backend.repository_uncached = FakeRepository()
+
+    backend._lock_refresh()
+
+    assert calls == [True], "repository.info() must be called exactly once, while holding _repo_lock"
+    assert not backend._repo_lock.locked(), "_repo_lock must be released again after refreshing"

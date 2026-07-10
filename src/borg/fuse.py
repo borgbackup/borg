@@ -12,6 +12,11 @@ This code is only safe for single-threaded and synchronous (non-async) usage.
   asynchronous manner. However, as long as we do not use any asynchronous
   operations (like using "await") in this code, it is still de facto
   synchronous, and we are safe.
+
+The only exception is a background thread that periodically refreshes the
+repository lock while the mount is idle (see #9872). borgstore connections are
+not thread-safe, so all repository access from the FUSE handlers and the refresh
+thread is serialized via self._repo_lock.
 """
 
 import errno
@@ -22,6 +27,7 @@ import stat
 import struct
 import sys
 import tempfile
+import threading
 import time
 from collections import defaultdict, Counter
 from signal import SIGINT
@@ -63,7 +69,7 @@ from .archiver._common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
 from .helpers import daemonizing, signal_handler, format_file_size, bin_to_hex, Error
-from .helpers import HardLinkManager
+from .helpers import HardLinkManager, ThreadRunner
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
 from .item import Item
@@ -296,6 +302,9 @@ class FuseBackend:
         # Archives to be loaded when first accessed, mapped by their placeholder inode
         self.pending_archives = {}
         self.cache = ItemCache(repository, self.repo_objs)
+        # serializes all repository access (FUSE handlers and the background lock-refresh
+        # thread), because borgstore connections are not thread-safe. see _lock_refresh.
+        self._repo_lock = threading.Lock()
         self.allow_damaged_files = False
         self.versions = False
         self.uid_forced = None
@@ -334,15 +343,30 @@ class FuseBackend:
             return self._items[inode]
         except KeyError:
             # while self.cache does some internal caching, it has still quite some overhead, so we cache the result.
-            item = self.cache.get(inode)
+            with self._repo_lock:
+                item = self.cache.get(inode)
             self._inode_cache[inode] = item
             return item
+
+    def _lock_refresh(self):
+        # Called periodically by a background thread (see mount()) so that an idle mount keeps
+        # its repository lock alive. Without this, the lock of a long-idle mount expires as stale
+        # after <stale> seconds (currently 30 min), which would e.g. let a compact run and rewrite
+        # packs, invalidating this mount's cached pack locations (see #9872).
+        # Refreshing the lock is not part of the repository API, so we do it indirectly via
+        # repository.info() (same approach as `borg with-lock`). info() only touches the store
+        # every <stale>/2 seconds; all other calls are cheap no-ops.
+        # We serialize against the FUSE handlers via self._repo_lock, because borgstore connections
+        # are not thread-safe.
+        with self._repo_lock:
+            self.repository_uncached.info()
 
     def check_pending_archive(self, inode):
         # Check if this is an archive we need to load
         archive_info = self.pending_archives.pop(inode, None)
         if archive_info is not None:
-            self._process_archive(archive_info.id, [os.fsencode(self.archive_root_dir[archive_info.id])])
+            with self._repo_lock:
+                self._process_archive(archive_info.id, [os.fsencode(self.archive_root_dir[archive_info.id])])
 
     def _allocate_inode(self):
         self.inode_count += 1
@@ -602,12 +626,17 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         # job - seeing the mountpoint empty, rsync would delete everything in the
         # mirror.
         umount = False
+        # keep the repository lock of an idle mount alive, so it is not killed as stale (see #9872).
+        # started here (after a possible daemonizing fork, as threads do not survive fork()).
+        lock_refreshing_thread = ThreadRunner(sleep_interval=60, target=self._lock_refresh)
+        lock_refreshing_thread.start()
         try:
             with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
                 signal = fuse_main()
             # no crash and no signal (or it's ^C and we're in the foreground) -> umount request
             umount = signal is None or (signal == SIGINT and foreground)
         finally:
+            lock_refreshing_thread.terminate()
             llfuse.close(umount)
 
     @async_wrapper
@@ -721,7 +750,8 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     del self.data_cache[id]
             else:
                 try:
-                    cdata = self.repository_uncached.get(id)
+                    with self._repo_lock:
+                        cdata = self.repository_uncached.get(id)
                 except Repository.ObjectNotFound:
                     if self.allow_damaged_files:
                         data = zeros[:s]

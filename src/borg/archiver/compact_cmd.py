@@ -108,16 +108,32 @@ class ArchiveGarbageCollector:
                 logger.warning(f"Could not access cache file: {e}")
         logger.info(f"Removed {len(unused_files_cache_names)} unused files cache files.")
 
+    def _mark_object_used(self, id, size=0) -> bool:
+        """Mark object <id> used in the chunks index, updating its stored size. Return False if <id>
+        is not in the index."""
+        entry = self.chunks.get(id)
+        if entry is None:
+            return False
+        new_size = size if entry.size == 0 and size != 0 else entry.size
+        self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED, size=new_size)
+        return True
+
+    def _archive_object_ids(self, archive):
+        """Yield every object id an archive references: its metadata object, item metadata, and the
+        content chunks of its items."""
+        yield archive.id
+        yield from archive.metadata.item_ptrs
+        yield from archive.metadata.items
+        for item in archive.iter_items():
+            if "chunks" in item:
+                for id, _ in item.chunks:
+                    yield id
+
     def analyze_archives(self) -> tuple[set, int, int, int]:
         """Iterate over all items in all archives, create the dicts id -> size of all used chunks."""
 
         def use_it(id, size=0):
-            entry = self.chunks.get(id)
-            if entry is not None:
-                # the chunk is in the repo, mark it used.
-                new_size = size if entry.size == 0 and size != 0 else entry.size
-                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED, size=new_size)
-            else:
+            if not self._mark_object_used(id, size):
                 # with --stats: we do NOT have this chunk in the repository!
                 # without --stats: we do not have this chunk or the chunks index is incomplete.
                 missing_chunks.add(id)
@@ -204,24 +220,11 @@ class ArchiveGarbageCollector:
         "borg undelete" can still recover it. An archive whose metadata object is itself already
         gone is skipped with a warning.
         """
-
-        def mark(id):
-            entry = self.chunks.get(id)
-            if entry is not None:
-                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED)
-
         for archive_info in self.manifest.archives.list(sort_by=["ts"], deleted=True):
             try:
                 archive = Archive(self.manifest, archive_info.id, iec=self.iec, deleted=True)
-                mark(archive.id)
-                for id in archive.metadata.item_ptrs:
-                    mark(id)
-                for id in archive.metadata.items:
-                    mark(id)
-                for item in archive.iter_items():
-                    if "chunks" in item:
-                        for id, _ in item.chunks:
-                            mark(id)
+                for id in self._archive_object_ids(archive):
+                    self._mark_object_used(id)
             except (Repository.ObjectNotFound, IntegrityError) as e:
                 name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
                 logger.warning(f"Soft-deleted archive {name} {hex_id} cannot be fully preserved: {e}")
@@ -247,8 +250,9 @@ class ArchiveGarbageCollector:
         such packs be rewritten or dropped rather than kept forever. See issue #9868.
 
         When the repo is damaged (archives reference chunks the index cannot find), packs holding
-        unindexed bytes are left untouched: those bytes may be live data "borg check --repair" can
-        recover. Packs without unindexed bytes are still compacted, so delete/prune waste is reclaimed.
+        unindexed objects are left untouched: those objects may be live data "borg check --repair"
+        can recover. Packs without unindexed objects are still compacted, so delete/prune waste is
+        reclaimed.
 
         Returns (repo_size_before, repo_size_after), the on-disk pack size before and after this run.
         """
@@ -289,7 +293,7 @@ class ArchiveGarbageCollector:
         pack_unused = {}  # pack_id -> wasted bytes, for the packs we act on (drop or rewrite)
         skipped_unindexed = 0  # packs left alone because they hold unindexed bytes on a damaged repo
         for pid, total in pack_total.items():
-            used = pack_used.get(pid, 0)
+            used = pack_used[pid]
             unused = total - used
             if unused < 0:
                 # the index says more is used than the file holds.
@@ -331,9 +335,9 @@ class ArchiveGarbageCollector:
         delete_chunkindex_from_repo(self.repository)
 
         # Pass 2: collect object ids only for the affected packs (a subset, not the whole index)
-        keep = defaultdict(set)  # survivors to copy forward, per rewritten pack
-        drop = defaultdict(set)  # unused objects in those same packs
-        forget = defaultdict(set)  # ids in fully-unused packs we delete outright
+        keep = defaultdict(set)  # rewrite pack_id -> survivors to copy forward
+        drop = defaultdict(set)  # rewrite pack_id -> unused objects in that pack
+        forget = defaultdict(set)  # drop pack_id -> objects to remove from the index
         for id, entry in self.chunks.iteritems():
             pid = entry.pack_id
             if pid in rewrite_packs:

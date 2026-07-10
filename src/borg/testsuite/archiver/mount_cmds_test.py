@@ -389,7 +389,14 @@ def test_fuse_lock_refresh_calls_repository_info():
     # repository.info(), serialized against the FUSE handlers by self._repo_lock.
     import threading
 
-    from ...fuse import FuseBackend
+    from ...fuse_impl import has_mfusepy
+
+    # import the FuseBackend of the active FUSE implementation (fuse.py is not even importable
+    # when the mfusepy backend is in use, and vice versa).
+    if has_mfusepy:
+        from ...hlfuse import FuseBackend
+    else:
+        from ...fuse import FuseBackend
 
     calls = []
 
@@ -403,7 +410,8 @@ def test_fuse_lock_refresh_calls_repository_info():
     # build a bare backend without running the heavy __init__.
     backend = FuseBackend.__new__(FuseBackend)
     backend._repo_lock = threading.Lock()
-    backend.repository_uncached = FakeRepository()
+    # fuse.py refreshes via self.repository_uncached, hlfuse.py via self.repository; set both.
+    backend.repository = backend.repository_uncached = FakeRepository()
 
     backend._lock_refresh()
 

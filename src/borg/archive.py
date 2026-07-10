@@ -1828,10 +1828,7 @@ class ArchiveChecker:
                     self.repairs_done,
                 )
             else:
-                logger.error(
-                    "Archive consistency check complete, %d problem(s) found.",
-                    self.problems_found,
-                )
+                logger.error("Archive consistency check complete, %d problem(s) found.", self.problems_found)
         else:
             logger.info("Archive consistency check complete, no problems found.")
         return self.repair or not self.error_found

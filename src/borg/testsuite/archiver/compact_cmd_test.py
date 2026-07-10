@@ -248,8 +248,8 @@ def test_compact_packs_respects_threshold(tmp_path):
 def test_compact_superseded_duplicate(tmp_path):
     # Issue #9868 repro. Concurrent backups can write the same chunk into two packs; when the index
     # fragments merge, only one copy stays indexed and the other is left as unindexed bytes in a pack.
-    # Rewriting such a pack (because of its ordinary unused objects) must copy those superseded bytes
-    # forward, not drop them: only "borg check --repair" decides their fate.
+    # Rewriting such a pack (because of its ordinary unused objects) reclaims those superseded bytes:
+    # the surviving copy is authoritative, so the duplicate is dropped.
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
@@ -261,6 +261,7 @@ def test_compact_superseded_duplicate(tmp_path):
         repository.flush()
         pack_a = repository.chunks[H(0)].pack_id
         pack_a_size = next(i.size for i in repository.store_list("packs") if i.name == bin_to_hex(pack_a))
+        x_size = repository.chunks[H(1)].obj_size  # X's copy in pack A becomes a superseded gap
         y_size = repository.chunks[H(2)].obj_size
 
         # pack B: a second copy of X only, in its own pack (as a concurrent writer would have produced).
@@ -286,11 +287,11 @@ def test_compact_superseded_duplicate(tmp_path):
         assert pdchunk(repository.get(H(0))) == b"WWWW"
         assert pdchunk(repository.get(H(1))) == b"XXXX"
         assert repository.get(H(2), raise_missing=False) is None
-        # pack A rewritten, shrunk by exactly Y's bytes: W's and the superseded X span are kept, not dropped.
+        # pack A rewritten, shrunk by Y's bytes (unused indexed) plus X's superseded gap: only W remains.
         assert bin_to_hex(pack_a) not in [info.name for info in repository.store_list("packs")]
         new_pack = repository.chunks[H(0)].pack_id
         new_size = next(i.size for i in repository.store_list("packs") if i.name == bin_to_hex(new_pack))
-        assert new_size == pack_a_size - y_size
+        assert new_size == pack_a_size - y_size - x_size
 
 
 def test_compact_keeps_orphan_pack(tmp_path):

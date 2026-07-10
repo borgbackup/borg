@@ -221,12 +221,16 @@ class ArchiveGarbageCollector:
         gone is skipped with a warning.
         """
         for archive_info in self.manifest.archives.list(sort_by=["ts"], deleted=True):
+            name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
             try:
                 archive = Archive(self.manifest, archive_info.id, iec=self.iec, deleted=True)
-                for id in self._archive_object_ids(archive):
-                    self._mark_object_used(id)
+                missing = sum(not self._mark_object_used(id) for id in self._archive_object_ids(archive))
+                if missing:
+                    logger.warning(
+                        f"Soft-deleted archive {name} {hex_id}: {missing} objects missing from the index; "
+                        f'"borg undelete" may not fully recover it.'
+                    )
             except (Repository.ObjectNotFound, IntegrityError) as e:
-                name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
                 logger.warning(f"Soft-deleted archive {name} {hex_id} cannot be fully preserved: {e}")
 
     def compact_packs(self):
@@ -286,8 +290,17 @@ class ArchiveGarbageCollector:
                 logger.error(f"{stale_used} of them are still in use: repository data is missing!")
                 set_ec(EXIT_ERROR)
 
-        # decide each pack's fate. compact reclaims only indexed-but-unused bytes; bytes no index entry
-        # covers (total - indexed) are preserved by compact_pack, so they never count as reclaimable.
+        # bytes no index entry covers. compact_pack reclaims the redundant duplicates among them while
+        # rewriting a pack; the rest is left for "borg check --repair".
+        unindexed = sum(total - pack_indexed[pid] for pid, total in pack_total.items() if total > pack_indexed[pid])
+        if unindexed:
+            logger.info(
+                f"{format_file_size(unindexed, iec=self.iec)} in pack files is not covered by the index; "
+                'redundant copies are reclaimed on pack rewrite, the rest by "borg check --repair".'
+            )
+
+        # decide each pack's fate. a pack's reclaimable bytes are its indexed-but-unused bytes; the
+        # redundant duplicates compact_pack finds in the gaps are reclaimed on top when it rewrites.
         drop_packs, rewrite_packs = set(), set()
         pack_reclaim = {}  # pack_id -> reclaimable bytes, for the packs we act on (drop or rewrite)
         for pid, total in pack_total.items():
@@ -345,6 +358,7 @@ class ArchiveGarbageCollector:
             msgid="compact.compact_packs",
         )
         progress = 0
+        freed = 0  # bytes removed from disk this run, for --stats
         # self.chunks stays consistent with the store after each pack, so Ctrl-C can stop between packs
         for pid in drop_packs:
             if sig_int:
@@ -354,6 +368,8 @@ class ArchiveGarbageCollector:
             except StoreObjectNotFound:
                 # happens when a stale chunk index references an already deleted pack (#9850)
                 logger.warning(f"Pack {bin_to_hex(pid)} to delete was already gone.")
+            else:
+                freed += pack_total[pid]  # whole pack removed
             for id in forget[pid]:  # drop the deleted pack's index entries
                 del self.chunks[id]
             progress += 1
@@ -363,13 +379,13 @@ class ArchiveGarbageCollector:
                 break
             # chunks=self.chunks: the index updates (repoint kept objects, remove dropped ones)
             # must land in the index that save_chunk_index() persists (#9850).
-            self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid], chunks=self.chunks)
+            _, dropped = self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid], chunks=self.chunks)
+            freed += dropped  # unused indexed objects plus superseded duplicates
             progress += 1
             pi.show(progress)
         pi.finish()
 
-        # a rewritten pack shrinks by exactly its dropped bytes, so reclaimed is the exact on-disk delta.
-        return repo_size_before, repo_size_before - reclaimed
+        return repo_size_before, repo_size_before - freed
 
 
 class CompactMixIn:
@@ -398,9 +414,11 @@ class CompactMixIn:
             - backups of source files that encountered an I/O error mid-transfer and were skipped
             - corruption of the repository (e.g., the archives directory lost entries; see notes below)
 
-            ``borg compact`` only reclaims objects the chunk index knows about. Bytes no index entry
-            covers (redundant copies written by concurrent backups, or packs left behind by a backup
-            that crashed before recording its objects) are kept and reclaimed by ``borg check --repair``.
+            ``borg compact`` reclaims objects the chunk index knows about, plus redundant copies of
+            indexed chunks (e.g. written by concurrent backups) that it finds while rewriting a pack.
+            Other bytes no index entry covers, such as packs left behind by a backup that crashed
+            before recording its objects, are re-indexed by ``borg check --repair`` and reclaimed by
+            the next ``borg compact``.
 
             You usually do not want to run ``borg compact`` after every write operation, but
             either regularly (e.g., once a month, possibly together with ``borg check``) or

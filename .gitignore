@@ -6,6 +6,7 @@ dist
 src/borg/compress.c
 src/borg/hashindex.c
 src/borg/crypto/low_level.c
+src/borg/legacy/crypto/low_level.c
 src/borg/item.c
 src/borg/chunkers/buzhash.c
 src/borg/chunkers/buzhash64.c
@@ -24,6 +25,7 @@ src/borg/_version.py
 *.pyc
 *.pyd
 *.so
+.claude/
 .idea/
 .junie/
 .vscode/

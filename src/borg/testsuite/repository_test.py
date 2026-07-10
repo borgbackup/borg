@@ -355,9 +355,10 @@ def test_compact_pack_copy_forward(repo_fixtures, request):
         assert repository.chunks[H(1)].pack_id == old_pack_id
         assert repository.chunks[H(2)].pack_id == old_pack_id
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids={H(1)})
+        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids={H(1)})
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
+        assert dropped == len(chunk1)  # reported freed bytes for --stats
         assert pdchunk(repository.get(H(0))) == b"DATA0"
         assert pdchunk(repository.get(H(2))) == b"DATA2"
         assert repository.get(H(1), raise_missing=False) is None  # compact_pack removed its index entry
@@ -375,7 +376,9 @@ def test_compact_pack_drops_whole_pack(repo_fixtures, request):
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        assert repository.compact_pack(old_pack_id, keep_ids=set(), drop_ids={H(0), H(1)}) is None
+        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids=set(), drop_ids={H(0), H(1)})
+        assert new_pack_id is None  # every byte dropped: no replacement pack
+        assert dropped == len(chunk0) + len(chunk1)
 
         assert repository.get(H(0), raise_missing=False) is None
         assert repository.get(H(1), raise_missing=False) is None
@@ -392,9 +395,12 @@ def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(1), H(0)}, drop_ids=set())  # out of order
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(1), H(0)}, drop_ids=set()
+        )  # out of order
 
         assert new_pack_id == old_pack_id
+        assert dropped == 0  # nothing dropped
         assert pdchunk(repository.get(H(0))) == b"DATA0"
         assert pdchunk(repository.get(H(1))) == b"DATA1"
 
@@ -413,7 +419,7 @@ def test_compact_pack_keeps_gap(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         del repository.chunks[H(1)]  # H(1)'s bytes stay in the pack but are now unindexed (a gap)
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(2)}, drop_ids={H(0)})
+        new_pack_id, _ = repository.compact_pack(old_pack_id, keep_ids={H(2)}, drop_ids={H(0)})
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert pdchunk(repository.get(H(2))) == b"DATA2"
@@ -435,12 +441,58 @@ def test_compact_pack_keeps_trailing_bytes(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         del repository.chunks[H(2)]  # trailing unindexed bytes
 
-        new_pack_id = repository.compact_pack(old_pack_id, keep_ids={H(1)}, drop_ids={H(0)})
+        new_pack_id, _ = repository.compact_pack(old_pack_id, keep_ids={H(1)}, drop_ids={H(0)})
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert pdchunk(repository.get(H(1))) == b"DATA1"
         packs = {info.name: info.size for info in repository.store_list("packs")}
         assert packs[bin_to_hex(new_pack_id)] == len(chunk1) + len(chunk2)  # trailing bytes kept
+
+
+def test_compact_pack_drops_superseded_gap(repo_fixtures, request):
+    # A gap object whose chunk id is still in the index has its authoritative copy elsewhere, so it is
+    # a superseded duplicate and compact_pack drops its bytes. Repoint H(1) to another pack: its bytes
+    # here become an indexed-elsewhere gap. Rewrite keeping H(0) and H(2); the gap is dropped and H(1)'s
+    # index entry (pointing elsewhere) stays.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    chunk2 = fchunk(b"DATA2", chunk_id=H(2))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1), (H(2), chunk2)])
+    with repository:
+        old_pack_id = repository.chunks[H(0)].pack_id
+        repository.chunks[H(1)] = repository.chunks[H(1)]._replace(pack_id=H(9))  # authoritative copy elsewhere
+
+        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+
+        assert new_pack_id is not None and new_pack_id != old_pack_id
+        assert dropped == len(chunk1)  # the superseded gap's bytes are counted as freed
+        assert pdchunk(repository.get(H(0))) == b"DATA0"
+        assert pdchunk(repository.get(H(2))) == b"DATA2"
+        packs = {info.name: info.size for info in repository.store_list("packs")}
+        assert bin_to_hex(old_pack_id) not in packs
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk2)  # superseded H(1) gap dropped
+        assert repository.chunks[H(1)].pack_id == H(9)  # index entry pointing elsewhere is untouched
+
+
+def test_compact_pack_keeps_self_referencing_gap(repo_fixtures, request):
+    # A gap object whose index entry points back at this very pack and offset is the object's only copy
+    # (a caller that broke the keep+drop contract by not listing it). compact_pack must keep its bytes,
+    # not destroy them. Leave H(1) out of keep_ids and drop_ids with its entry pointing here.
+    chunk0 = fchunk(b"DATA0", chunk_id=H(0))
+    chunk1 = fchunk(b"DATA1", chunk_id=H(1))
+    chunk2 = fchunk(b"DATA2", chunk_id=H(2))
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), chunk0), (H(1), chunk1), (H(2), chunk2)])
+    with repository:
+        old_pack_id = repository.chunks[H(0)].pack_id
+
+        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+
+        assert new_pack_id == old_pack_id  # nothing dropped, defrag reproduced the same pack
+        assert dropped == 0  # the self-referencing gap is kept, nothing freed
+        packs = {info.name: info.size for info in repository.store_list("packs")}
+        assert packs[bin_to_hex(new_pack_id)] == len(chunk0) + len(chunk1) + len(chunk2)  # H(1) bytes kept
 
 
 def test_compact_pack_detects_overlap(repo_fixtures, request):

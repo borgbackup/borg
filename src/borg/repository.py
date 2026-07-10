@@ -22,7 +22,7 @@ from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
-from .repoobj import RepoObj
+from .repoobj import RepoObj, OBJ_MAGIC
 from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
@@ -906,17 +906,19 @@ class Repository:
 
         Together, keep_ids and drop_ids must cover every object the chunk index lists for this pack;
         an unlisted indexed object would keep its bytes in the new pack but its index entry would go
-        stale when the old pack is deleted. Bytes that no index entry covers (an older copy of a chunk
-        that was later stored again elsewhere, or objects from a backup that crashed before writing its
-        index) appear as gaps between the listed objects; they are copied into the new pack unchanged.
-        Only drop_ids are removed. An overlap between listed objects, or an object claiming to end past
-        the pack file, means index corruption and raises IntegrityError.
+        stale when the old pack is deleted. Bytes that no index entry covers appear as gaps between the
+        listed objects: a gap object whose chunk id is in the index is a superseded duplicate (its
+        authoritative copy is elsewhere) and is dropped; a gap object whose id is not in the index is
+        copied into the new pack unchanged, to be handled by "borg check --repair". An overlap between
+        listed objects, or an object claiming to end past the pack file, means index corruption and
+        raises IntegrityError.
 
         The new pack is the old pack minus the dropped objects, built via store.defrag; kept objects are
         repointed in the chunk index and dropped objects' chunk index entries are removed.
 
-        Returns the new pack_id, or None if every byte was dropped, or the unchanged pack_id if
-        nothing was dropped.
+        Returns (new_pack_id, dropped_bytes): new_pack_id is None if every byte was dropped, or the
+        unchanged pack_id if nothing was dropped; dropped_bytes is the on-disk bytes this rewrite freed
+        (unused indexed objects plus superseded duplicates), for --stats accounting.
 
         Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
         index back to the store afterwards.
@@ -961,6 +963,44 @@ class Repository:
                 f'(index corruption), run "borg check"'
             )
 
+        # find the gaps: byte ranges no listed object covers (a chunk copy stored again elsewhere, or
+        # objects from a backup that crashed before writing its index).
+        gaps = []  # (start, end) of each gap, offset-ordered
+        cursor = 0
+        for offset, obj_id, size, keep in located:
+            if offset > cursor:
+                gaps.append((cursor, offset))
+            cursor = offset + size
+        if cursor < pack_size:
+            gaps.append((cursor, pack_size))
+
+        # walk each gap's object headers. drop an object whose chunk id the index maps to a different
+        # location: that entry is the authoritative copy (the id is a keyed MAC of the plaintext, so
+        # equal ids mean equal content) and these bytes are redundant. keep an object whose id is not in
+        # the index (borg check --repair re-indexes it) or whose entry points back at this offset (its
+        # only copy). a header that does not parse or overruns its gap ends the walk over that gap.
+        # TODO(#9868 follow-up): classify gaps in compact_packs pass 1 too, so superseded bytes count
+        # toward the rewrite threshold and a wholly superseded orphan pack can be dropped outright.
+        reader = PackReader(store=self.store, pack_id=pack_id)
+        hdr_size = RepoObj.obj_header.size
+        for gstart, gend in gaps:
+            offset = gstart
+            while offset < gend:
+                hdr_data = reader.read(offset, hdr_size)
+                if len(hdr_data) < hdr_size:
+                    break
+                hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+                obj_size = hdr_size + hdr.meta_size + hdr.data_size
+                if hdr.magic != OBJ_MAGIC or offset + obj_size > gend:
+                    break
+                if hdr.chunk_id in chunks:
+                    entry = chunks[hdr.chunk_id]
+                    if entry.pack_id != pack_id or entry.obj_offset != offset:
+                        drop_ranges.append((offset, obj_size))
+                offset += obj_size
+        drop_ranges.sort()
+        dropped_bytes = sum(size for _, size in drop_ranges)  # on-disk bytes this rewrite frees, for --stats
+
         # the new pack is the whole file minus the dropped ranges: copy the byte spans between them.
         sources = []  # (pack_hex, offset, size) to copy, offset-ordered
         pack_hex = bin_to_hex(pack_id)
@@ -988,14 +1028,19 @@ class Repository:
 
         if new_pack_id is None:  # nothing kept: drop the pack, no replacement
             self.store_delete(pack_key)
-            return None
+            return None, dropped_bytes
 
         # repoint kept objects at the new pack; an object's new offset is its old offset minus the
-        # dropped bytes lying before it.
+        # dropped bytes lying before it. both lists are offset-ordered, so a single walk over the
+        # drop ranges keeps the running total of dropped bytes.
         new_locations = []
+        dropped_before = 0
+        di = 0
         for offset, obj_id, size, keep in located:
+            while di < len(drop_ranges) and drop_ranges[di][0] < offset:
+                dropped_before += drop_ranges[di][1]
+                di += 1
             if keep:
-                dropped_before = sum(dsize for doffset, dsize in drop_ranges if doffset < offset)
                 new_locations.append((obj_id, new_pack_id, offset - dropped_before, size))
         chunks.update_pack_info(new_locations)
 
@@ -1004,7 +1049,7 @@ class Repository:
         # deleting it would drop what we kept, so skip.
         if new_pack_id != pack_id:
             self.store_delete(pack_key)
-        return new_pack_id
+        return new_pack_id, dropped_bytes
 
     def break_lock(self):
         Lock(self.store).break_lock()

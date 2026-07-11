@@ -3,6 +3,7 @@ import errno
 import hashlib
 import os
 import stat
+import threading
 import time
 from collections import Counter
 from typing import TYPE_CHECKING
@@ -27,6 +28,7 @@ from .hashindex import FuseVersionsIndex
 from .helpers import daemonizing, signal_handler, bin_to_hex, Error
 from .helpers import HardLinkManager
 from .helpers import msgpack
+from .storelocking import LockRefresher
 from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
@@ -87,6 +89,9 @@ class FuseBackend:
         self._manifest = manifest
         self.repo_objs = manifest.repo_objs
         self.repository = repository
+        # serializes all repository access (FUSE handlers and the background lock-refresh
+        # thread), because borgstore connections are not thread-safe. see _lock_refresh.
+        self._repo_lock = threading.RLock()
 
         self.default_uid = os.getuid()
         self.default_gid = os.getgid()
@@ -171,7 +176,8 @@ class FuseBackend:
     def check_pending_archive(self, node):
         archive_info = self.pending_archives.pop(node, None)
         if archive_info is not None:
-            self._process_archive(archive_info.id, node)
+            with self._repo_lock:
+                self._process_archive(archive_info.id, node)
 
     def _iter_archive_items(self, archive_item_ids, filter=None):
         unpacker = msgpack.Unpacker()
@@ -532,9 +538,16 @@ class borgfs(hlfuse.Operations, FuseBackend):
                 logger.debug("fuse: mount repo, going to background: migrating lock.")
                 self.repository.migrate_lock(old_id, new_id)
 
-        # Run the FUSE main loop in foreground (we might be daemonized already or not)
-        with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
-            hlfuse.FUSE(self, mountpoint, options, foreground=True, use_ino=True)
+        # keep the repository lock of an idle mount alive, so it is not killed as stale (see #9872).
+        # started here (after a possible daemonizing fork, as threads do not survive fork()).
+        lock_refreshing_thread = LockRefresher(self.repository.info, sleep_interval=60, lock=self._repo_lock)
+        lock_refreshing_thread.start()
+        try:
+            # Run the FUSE main loop in foreground (we might be daemonized already or not)
+            with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
+                hlfuse.FUSE(self, mountpoint, options, foreground=True, use_ino=True)
+        finally:
+            lock_refreshing_thread.terminate()
 
     def statfs(self, path):
         debug_log(f"statfs(path={path!r})")
@@ -645,7 +658,8 @@ class borgfs(hlfuse.Operations, FuseBackend):
             else:
                 try:
                     # Direct repository access
-                    cdata = self.repository.get(id)
+                    with self._repo_lock:
+                        cdata = self.repository.get(id)
                 except Repository.ObjectNotFound:
                     if self.allow_damaged_files:
                         data = zeros[:s]

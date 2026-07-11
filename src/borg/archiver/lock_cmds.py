@@ -3,8 +3,9 @@ import subprocess
 from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import prepare_subprocess_env, set_ec, CommandError, ThreadRunner
+from ..helpers import prepare_subprocess_env, set_ec, CommandError
 from ..helpers.argparsing import ArgumentParser, REMAINDER
+from ..storelocking import LockRefresher
 
 from ..logger import create_logger
 
@@ -17,7 +18,7 @@ class LocksMixIn:
         """Runs a user-specified command with the repository lock held."""
         # the repository lock needs to get refreshed regularly, or it will be killed as stale.
         # refreshing the lock is not part of the repository API, so we do it indirectly via repository.info.
-        lock_refreshing_thread = ThreadRunner(sleep_interval=60, target=repository.info)
+        lock_refreshing_thread = LockRefresher(repository.info, sleep_interval=60)
         lock_refreshing_thread.start()
         env = prepare_subprocess_env(system=True)
         try:

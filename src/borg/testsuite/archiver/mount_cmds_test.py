@@ -380,3 +380,36 @@ def test_migrate_lock_alive(archivers, request):
     finally:
         # Undecorate
         Lock.migrate_lock = Lock.migrate_lock.__wrapped__
+
+
+def test_fuse_lock_refresh_calls_repository_info():
+    # regression test for #9872: an idle mount must keep its repository lock alive via a
+    # background refresh. LockRefresher periodically calls repository.info() while holding
+    # the serialization lock (the FUSE handlers use the same lock), so repo access from the
+    # refresh thread and the FUSE handlers never runs concurrently.
+    import threading
+
+    from ...storelocking import LockRefresher
+
+    # a plain Lock is enough here and, unlike RLock, has .locked() on all Python versions.
+    # in the FUSE code the lock is an RLock (it needs to be reentrant), but LockRefresher
+    # only ever acquires/releases it, so a plain Lock exercises the same code path.
+    lock = threading.Lock()
+    called = threading.Event()
+    held_while_calling = []
+
+    class FakeRepository:
+        def info(self):
+            held_while_calling.append(lock.locked())  # the lock must be held while we run
+            called.set()
+            return dict(id=b"\x00" * 32, version=3)
+
+    refresher = LockRefresher(FakeRepository().info, sleep_interval=60, lock=lock)
+    refresher.start()
+    try:
+        assert called.wait(timeout=10), "LockRefresher did not call repository.info()"
+    finally:
+        refresher.terminate()
+
+    assert held_while_calling and all(held_while_calling), "repository.info() must run while holding the lock"
+    assert not lock.locked(), "lock must be released again after refreshing"

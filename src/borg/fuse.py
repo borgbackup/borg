@@ -12,6 +12,11 @@ This code is only safe for single-threaded and synchronous (non-async) usage.
   asynchronous manner. However, as long as we do not use any asynchronous
   operations (like using "await") in this code, it is still de facto
   synchronous, and we are safe.
+
+The only exception is a background thread that periodically refreshes the
+repository lock while the mount is idle (see #9872). borgstore connections are
+not thread-safe, so all repository access from the FUSE handlers and the refresh
+thread is serialized via self._repo_lock.
 """
 
 import errno
@@ -22,6 +27,7 @@ import stat
 import struct
 import sys
 import tempfile
+import threading
 import time
 from collections import defaultdict, Counter
 from signal import SIGINT
@@ -65,6 +71,7 @@ from .hashindex import FuseVersionsIndex
 from .helpers import daemonizing, signal_handler, format_file_size, bin_to_hex, Error
 from .helpers import HardLinkManager
 from .helpers import msgpack
+from .storelocking import LockRefresher
 from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
@@ -296,6 +303,9 @@ class FuseBackend:
         # Archives to be loaded when first accessed, mapped by their placeholder inode
         self.pending_archives = {}
         self.cache = ItemCache(repository, self.repo_objs)
+        # serializes all repository access (FUSE handlers and the background lock-refresh
+        # thread), because borgstore connections are not thread-safe. see _lock_refresh.
+        self._repo_lock = threading.RLock()
         self.allow_damaged_files = False
         self.versions = False
         self.uid_forced = None
@@ -334,7 +344,8 @@ class FuseBackend:
             return self._items[inode]
         except KeyError:
             # while self.cache does some internal caching, it has still quite some overhead, so we cache the result.
-            item = self.cache.get(inode)
+            with self._repo_lock:
+                item = self.cache.get(inode)
             self._inode_cache[inode] = item
             return item
 
@@ -342,7 +353,8 @@ class FuseBackend:
         # Check if this is an archive we need to load
         archive_info = self.pending_archives.pop(inode, None)
         if archive_info is not None:
-            self._process_archive(archive_info.id, [os.fsencode(self.archive_root_dir[archive_info.id])])
+            with self._repo_lock:
+                self._process_archive(archive_info.id, [os.fsencode(self.archive_root_dir[archive_info.id])])
 
     def _allocate_inode(self):
         self.inode_count += 1
@@ -602,12 +614,17 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         # job - seeing the mountpoint empty, rsync would delete everything in the
         # mirror.
         umount = False
+        # keep the repository lock of an idle mount alive, so it is not killed as stale (see #9872).
+        # started here (after a possible daemonizing fork, as threads do not survive fork()).
+        lock_refreshing_thread = LockRefresher(self.repository_uncached.info, sleep_interval=60, lock=self._repo_lock)
+        lock_refreshing_thread.start()
         try:
             with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
                 signal = fuse_main()
             # no crash and no signal (or it's ^C and we're in the foreground) -> umount request
             umount = signal is None or (signal == SIGINT and foreground)
         finally:
+            lock_refreshing_thread.terminate()
             llfuse.close(umount)
 
     @async_wrapper
@@ -721,7 +738,8 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     del self.data_cache[id]
             else:
                 try:
-                    cdata = self.repository_uncached.get(id)
+                    with self._repo_lock:
+                        cdata = self.repository_uncached.get(id)
                 except Repository.ObjectNotFound:
                     if self.allow_damaged_files:
                         data = zeros[:s]

@@ -651,15 +651,15 @@ def test_assert_writable(repository):
         repository.assert_writable()  # does not raise
 
         repository.permissions = {"packs": "lrw", "index": "lrwWD"}  # packs/ has no delete
-        with pytest.raises(Repository.CompactionPermissionDenied):
+        with pytest.raises(Repository.PermissionDenied):
             repository.assert_writable()
 
         repository.permissions = {"packs": "lrwWD", "index": "lrD"}  # index/ has no write
-        with pytest.raises(Repository.CompactionPermissionDenied):
+        with pytest.raises(Repository.PermissionDenied):
             repository.assert_writable()
 
         repository.permissions = {"": "lr"}  # neither namespace listed; "" fallback grants read only
-        with pytest.raises(Repository.CompactionPermissionDenied):
+        with pytest.raises(Repository.PermissionDenied):
             repository.assert_writable()
 
 

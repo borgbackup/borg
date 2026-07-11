@@ -77,7 +77,7 @@ def test_repository_permissions_no_delete(archivers, request, monkeypatch):
     assert "archive2" in cmd(archiver, "repo-list")
 
     # Try to compact the repo, which should fail (no "D" on packs/): compact refuses up front.
-    with pytest.raises(Repository.CompactionPermissionDenied):
+    with pytest.raises(Repository.PermissionDenied):
         cmd(archiver, "compact")
 
     # A dry run only reads and reports, so it is allowed even without write/delete access.
@@ -133,7 +133,7 @@ def test_repository_permissions_read_only(archivers, request, monkeypatch):
         cmd(archiver, "repo-delete")
 
     # Try to compact the repo, which should fail (no write/delete access): compact refuses up front.
-    with pytest.raises(Repository.CompactionPermissionDenied):
+    with pytest.raises(Repository.PermissionDenied):
         cmd(archiver, "compact")
 
     # A dry run only reads and reports, so it is allowed under read-only permissions.
@@ -178,7 +178,7 @@ def test_repository_permissions_write_only(archivers, request, monkeypatch):
         cmd(archiver, "delete", "archive1")
 
     # Try to compact the repo, which should fail (no "D" on packs/): compact refuses up front.
-    with pytest.raises(Repository.CompactionPermissionDenied):
+    with pytest.raises(Repository.PermissionDenied):
         cmd(archiver, "compact")
 
     # Try to check the repo, which should fail (data dir has "lw" permissions, no reading).

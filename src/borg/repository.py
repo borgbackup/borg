@@ -319,8 +319,8 @@ class Repository:
 
         exit_mcode = 21
 
-    class CompactionPermissionDenied(Error):
-        """Repository permissions do not allow compaction (need write and delete on {}/)."""
+    class PermissionDenied(Error):
+        """Repository permission denied: {}"""
 
         exit_mcode = 24
 
@@ -1217,7 +1217,7 @@ class Repository:
         return self.store.delete(name, deleted=deleted)
 
     def assert_writable(self):
-        """Raise CompactionPermissionDenied if the repo permissions forbid compaction.
+        """Raise PermissionDenied if the repo permissions forbid compaction.
 
         Compaction stores new packs and index fragments and deletes the old ones, so it needs
         write (w/W) and delete (D) access to the packs/ and index/ namespaces. self.permissions
@@ -1228,7 +1228,10 @@ class Repository:
         for namespace in ("packs", "index"):
             granted = set(self.permissions.get(namespace, self.permissions.get("", "")))
             if not (granted & set("wW")) or "D" not in granted:
-                raise self.CompactionPermissionDenied(namespace)
+                raise self.PermissionDenied(
+                    f"compaction needs write (w/W) and delete (D) permissions on {namespace}/, "
+                    f"but only {''.join(sorted(granted))!r} is granted (BORG_REPO_PERMISSIONS)."
+                )
 
     def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
         self._lock_refresh()

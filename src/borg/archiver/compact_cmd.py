@@ -52,6 +52,7 @@ class ArchiveGarbageCollector:
         self.threshold = threshold  # rewrite a mixed pack only when its wasted-bytes fraction reaches this percent
         self.iec = iec  # formats statistics using IEC units (1KiB = 1024B)
         self.dry_run = dry_run
+        self.store_changed = False  # True once compact_packs() has changed the store (and its index)
 
     def garbage_collect(self):
         """Removes unused chunks from a repository."""
@@ -61,7 +62,8 @@ class ArchiveGarbageCollector:
         (self.missing_chunks, self.total_files, self.total_size, self.archives_count) = self.analyze_archives()
         self.report_and_delete()
         if not self.dry_run:
-            self.save_chunk_index()
+            if self.store_changed:
+                self.save_chunk_index()
             if sig_int:  # raise after saving, so a Ctrl-C still leaves a valid index
                 raise Error("Got Ctrl-C / SIGINT.")
             self.cleanup_files_cache()
@@ -348,11 +350,16 @@ class ArchiveGarbageCollector:
                                 into a new pack via compact_pack and drop the old one. Below the
                                 threshold keep the pack, so we don't rewrite a large pack to reclaim
                                 little.
-        - no indexed objects unused                      -> keep the pack.
+        - no indexed objects unused                      -> keep it, unless it is a tiny pack we
+                                merge (see below).
 
         A pack can hold bytes no index entry covers (a chunk copy stored again elsewhere, or objects
         from a backup that crashed before writing its index). compact_pack keeps those; recovering or
         dropping them is "borg check --repair"'s job. See issue #9868.
+
+        Compacting anything rewrites the whole chunk index and invalidates every client's cached
+        copy, so compact only when the reclaimable space or the combined size of tiny packs is worth
+        that cost.
 
         Two passes bound the memory use: the first keeps only per-pack byte counts to pick the packs
         to change, the second collects object ids for just those packs, not the whole index.
@@ -360,6 +367,7 @@ class ArchiveGarbageCollector:
         A pack's size is the file size the store reports, so it also counts bytes no index entry covers.
 
         Returns (repo_size_before, repo_size_after), the on-disk pack size before and after this run.
+        Also sets self.store_changed True if the store (and thus the chunk index) was modified.
         """
         # Pass 1: list the pack files and their sizes; these are the packs we consider.
         pack_total = {}  # pack_id -> file size in the store
@@ -404,7 +412,10 @@ class ArchiveGarbageCollector:
 
         # decide each pack's fate. a pack's reclaimable bytes are its indexed-but-unused bytes; the
         # redundant duplicates compact_pack finds in the gaps are reclaimed on top when it rewrites.
-        drop_packs, rewrite_packs = set(), set()
+        # a merge fills packs up to pack_max_size, so cap "tiny" at half of that: a merged full pack
+        # is then at least twice tiny_limit and no longer a merge candidate.
+        tiny_limit = min(MIN_PACK_SIZE, self.repository.pack_max_size // 2)
+        drop_packs, rewrite_packs, merge_packs = set(), set(), set()
         pack_reclaim = {}  # pack_id -> reclaimable bytes, for the packs we act on (drop or rewrite)
         for pid, total in pack_total.items():
             indexed = pack_indexed[pid]
@@ -416,6 +427,8 @@ class ArchiveGarbageCollector:
                 continue  # leave this pack untouched
             reclaimable = indexed - used  # unused indexed bytes; the only bytes compact removes
             if reclaimable == 0:
+                if used == indexed and total < tiny_limit:
+                    merge_packs.add(pid)  # fully-used but tiny -> merge candidate
                 continue  # nothing to reclaim -> leave alone
             if used == 0 and indexed == total:
                 drop_packs.add(pid)  # whole file is unused indexed bytes -> drop it
@@ -424,19 +437,38 @@ class ArchiveGarbageCollector:
                 rewrite_packs.add(pid)  # wasteful enough -> copy used objects (and unindexed bytes) forward
                 pack_reclaim[pid] = reclaimable
             # else: below threshold -> leave alone
+
+        # all-packs gate: drop/rewrite only when the space they free reaches threshold/5 percent of
+        # all pack bytes; freeing less does not justify the whole-index rewrite.
+        reclaimable_total = sum(pack_reclaim.values())
+        worth_reclaiming = repo_size_before > 0 and 100 * reclaimable_total / repo_size_before >= self.threshold / 5
+        # merge only once the tiny packs' combined size reaches a full pack, so every merge produces
+        # at least one pack too large to ever be a merge candidate again. merging smaller amounts
+        # would just repack a still-tiny pile into a slightly-bigger-but-still-tiny pack, and each
+        # such repack invalidates the chunk index for every client for no lasting gain.
+        tiny_total = sum(pack_total[pid] for pid in merge_packs)
+        worth_merging = tiny_total >= self.repository.pack_max_size
+
+        if not worth_reclaiming:
+            drop_packs, rewrite_packs, pack_reclaim = set(), set(), {}
+        if not worth_merging:
+            merge_packs = set()
+
         if self.dry_run:
             freed = sum(pack_reclaim.values())
             logger.info(
-                f"Would free {format_file_size(freed, iec=self.iec)} "
-                f"by dropping {len(drop_packs)} packs and rewriting {len(rewrite_packs)} packs."
+                f"Would free {format_file_size(freed, iec=self.iec)} by dropping {len(drop_packs)} "
+                f"packs, rewriting {len(rewrite_packs)} packs and merging {len(merge_packs)} tiny packs."
             )
             return repo_size_before, repo_size_before  # dry run: report only, change nothing
-        if not drop_packs and not rewrite_packs:
+
+        if not drop_packs and not rewrite_packs and not merge_packs:
             logger.info("Deleting 0 unused objects...")
-            return repo_size_before, repo_size_before  # nothing to reclaim; chunk indexes stay valid
+            return repo_size_before, repo_size_before  # nothing worth doing; chunk indexes stay valid
 
         # crash-safety (#9748): invalidate chunk indexes before the first store change
         delete_chunkindex_from_repo(self.repository)
+        self.store_changed = True
 
         # Pass 2: collect object ids only for the affected packs (a subset, not the whole index)
         keep = defaultdict(set)  # rewrite pack_id -> its used objects, kept in the new pack
@@ -455,7 +487,7 @@ class ArchiveGarbageCollector:
         reclaimed = sum(pack_reclaim.values())
         logger.info(f"Deleting {deleted} unused objects, freeing {format_file_size(reclaimed, iec=self.iec)}...")
         pi = ProgressIndicatorPercent(
-            total=len(drop_packs) + len(rewrite_packs),
+            total=len(drop_packs) + len(rewrite_packs) + (1 if merge_packs else 0),
             msg="Compacting packs %3.1f%%",
             step=0.1,
             msgid="compact.compact_packs",
@@ -486,6 +518,11 @@ class ArchiveGarbageCollector:
             freed += dropped  # unused indexed objects plus superseded duplicates
             progress += 1
             pi.show(progress)
+        if merge_packs and not sig_int:
+            # merge the tiny packs into fewer, larger ones
+            self.repository.merge_packs(merge_packs, chunks=self.chunks)
+            progress += 1
+            pi.show(progress)
         pi.finish()
 
         return repo_size_before, repo_size_before - freed
@@ -495,6 +532,10 @@ class CompactMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_compact(self, args, repository, manifest):
         """Collects garbage in the repository."""
+        if not args.dry_run:
+            # refuse up front on a repo opened read-only, before the reclaim gate can decide there
+            # is nothing to do and make compaction a silent no-op.
+            repository.assert_writable()
         ArchiveGarbageCollector(
             repository, manifest, stats=args.stats, iec=args.iec, threshold=args.threshold, dry_run=args.dry_run
         ).garbage_collect()
@@ -526,6 +567,18 @@ class CompactMixIn:
             You usually do not want to run ``borg compact`` after every write operation, but
             either regularly (e.g., once a month, possibly together with ``borg check``) or
             when disk space needs to be freed.
+
+            Compacting anything rewrites the whole chunk index and invalidates every client's
+            cached copy of it, so ``borg compact`` only acts when the gain is worth that cost:
+
+            - All-packs gate: it drops or rewrites packs only when the space they would free
+              reaches ``--threshold`` divided by 5 percent (2% at the default threshold) of the
+              total pack size. Below that floor it leaves the repository (and the chunk index)
+              untouched. Use ``--threshold 0`` to disable the gate and always compact.
+            - Tiny-pack merging: incremental backups tend to leave one small, fully-used pack per
+              run. ``borg compact`` combines such tiny packs into larger ones, but only once their
+              combined size is large enough to fill at least one full-size pack, so a merge always
+              produces a pack that will not be a merge candidate again.
 
             **Important:**
 
@@ -561,5 +614,6 @@ class CompactMixIn:
             dest="threshold",
             type=int,
             default=10,
-            help="rewrite a pack when at least PERCENT of its bytes are unused (default: 10)",
+            help="rewrite a pack when at least PERCENT of its bytes are unused; also gates whether "
+            "to compact at all (see the all-packs gate above), 0 disables that gate (default: 10)",
         )

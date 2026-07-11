@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 from hashlib import sha256
 
@@ -17,6 +18,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .helpers import get_cache_dir
+from .helpers import sig_int
 from .helpers import ProgressIndicatorPercent
 from .helpers.lrucache import LRUCache
 from .storelocking import Lock
@@ -317,6 +319,11 @@ class Repository:
 
         exit_mcode = 21
 
+    class PermissionDenied(Error):
+        """Repository permission denied: {}"""
+
+        exit_mcode = 24
+
     # Whole packs kept in memory for reads; the least recently used is evicted first.
     # Memory use is this count times the pack size.
     PACK_READER_CACHE_SIZE = 3
@@ -388,6 +395,9 @@ class Repository:
                 self.store = Store(url, config=ns_config, permissions=permissions, cache_url=cache_url)
         except StoreBackendError as e:
             raise Error(str(e))
+        # None means "all" (no restrictions); for rest:// the backend enforces permissions
+        # server-side, so the client does not check them (see above).
+        self.permissions = None if location.proto == "rest" else permissions
         self.store_opened = False
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
@@ -548,6 +558,11 @@ class Repository:
             max_size = None if max_count is not None else DEFAULT_PACK_MAX_SIZE
         self._pack_writer = PackWriter(self.store, repository=self, max_count=max_count, max_size=max_size)
         self.opened = True
+
+    @property
+    def pack_max_size(self):
+        """The configured byte cap for a pack (BORG_PACK_MAX_SIZE, or the default if count-bound)."""
+        return self._pack_writer.max_size or DEFAULT_PACK_MAX_SIZE
 
     @property
     def chunks(self):
@@ -1051,6 +1066,118 @@ class Repository:
             self.store_delete(pack_key)
         return new_pack_id, dropped_bytes
 
+    def merge_packs(self, pack_ids, *, chunks=None, max_size=None):
+        """Combine several small packs into fewer, larger ones to reduce the pack count.
+
+        pack_ids: the packs to merge, whole files; afterwards the source packs are deleted.
+        chunks: the ChunkIndex to read object locations from and to apply the index updates to.
+            Must be the index pack_ids were derived from. Default: self.chunks.
+        max_size: byte cap for each merged pack. Default: the repository's configured pack size limit.
+
+        Whole pack files are copied, not individual indexed objects, so bytes no index entry covers
+        (a chunk copy superseded by a later put, or objects from a backup that crashed before
+        writing its index) are carried into the merged pack too.
+
+        Each source pack's index entries are checked for overlap or for claiming bytes past the
+        pack's actual end before anything is written; either means a corrupt index. Raises
+        IntegrityError in that case and leaves the store untouched; repair is "borg check --repair".
+
+        Packs are merged one batch at a time, each batch's sources deleted once its merged pack is
+        stored and indexed. So a crash or Ctrl-C between batches never destroys the only stored copy
+        of an object, and the store holds at most one batch of extra packs at a time. The packs not
+        yet merged are merged on the next run.
+        """
+        self._lock_refresh()
+        if chunks is None:
+            chunks = self.chunks
+        if max_size is None:
+            max_size = self.pack_max_size
+        pack_ids = set(pack_ids)
+
+        # collect every still-indexed object of the selected packs, grouped per source pack, ordered by offset.
+        per_pack = defaultdict(list)  # pack_id -> [(obj_offset, obj_id, obj_size), ...]
+        for obj_id, entry in chunks.iteritems():
+            if entry.pack_id in pack_ids:
+                per_pack[entry.pack_id].append((entry.obj_offset, obj_id, entry.obj_size))
+        for objs in per_pack.values():
+            objs.sort()
+
+        # get each source pack's real file size; drop any pack already gone from the store (its
+        # index entry is stale). store.info() reports a missing object via info.exists, not by raising.
+        pack_size = {}
+        for pid in list(pack_ids):
+            info = self.store.info("packs/" + bin_to_hex(pid))
+            if not info.exists:
+                logger.warning(f"Pack {bin_to_hex(pid)} to merge was already gone.")
+                pack_ids.discard(pid)
+                per_pack.pop(pid, None)
+                continue
+            pack_size[pid] = info.size
+
+        # validate every remaining pack before writing anything (see docstring).
+        for pid in pack_ids:
+            covered = 0
+            for offset, _, size in per_pack[pid]:
+                if offset < covered:
+                    raise IntegrityError(
+                        f"pack {bin_to_hex(pid)}: overlapping objects at offset {offset} "
+                        f'(index corruption), run "borg check"'
+                    )
+                covered = offset + size
+            if covered > pack_size[pid]:
+                raise IntegrityError(
+                    f"pack {bin_to_hex(pid)}: object extends past end of file at offset {covered} "
+                    f'(index corruption), run "borg check"'
+                )
+
+        # greedily batch whole pack files so each output pack stays within max_size, in sorted id
+        # order so batch composition is reproducible.
+        batches = []  # each batch: [pack_id, ...]
+        current, current_size = [], 0
+        for pid in sorted(pack_ids):
+            size = pack_size[pid]
+            if current and current_size + size > max_size:
+                batches.append(current)
+                current, current_size = [], 0
+            current.append(pid)
+            current_size += size
+        if current:
+            batches.append(current)
+
+        # write each batch as a new pack (named sha256 of its content) and repoint its objects: an
+        # object's new offset is the running byte total of the packs before its pack in the batch,
+        # plus its old offset within that pack.
+        pi = ProgressIndicatorPercent(total=len(batches), msg="Merging packs %3.0f%%", msgid="repository.merge_packs")
+        produced = set()  # merged pack ids; a one-pack batch reproduces its source's id
+        for batch in batches:
+            if sig_int:
+                break
+            self._lock_refresh()  # refresh the lock per batch, the loop can run for a while
+            sources = [(bin_to_hex(pid), 0, pack_size[pid]) for pid in batch]
+            try:
+                new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+            except ReadRangeError as e:  # a source pack shrank or is corrupt
+                raise IntegrityError(f'merge_packs: {e}, run "borg check"') from e
+            produced.add(new_pack_id)
+            new_locations = []
+            pack_base = 0
+            for pid in batch:
+                for offset, obj_id, size in per_pack[pid]:
+                    new_locations.append((obj_id, new_pack_id, pack_base + offset, size))
+                pack_base += pack_size[pid]
+            chunks.update_pack_info(new_locations)
+            # delete this batch's sources; skip any pack a batch reproduced (a one-pack batch hashes
+            # to the same content-addressed name), which now holds the merged data.
+            for pid in batch:
+                if pid in produced:
+                    continue
+                try:
+                    self.store_delete("packs/" + bin_to_hex(pid))
+                except StoreObjectNotFound:
+                    logger.warning(f"Pack {bin_to_hex(pid)} to merge was already gone.")
+            pi.show(increase=1)
+        pi.finish()
+
     def break_lock(self):
         Lock(self.store).break_lock()
 
@@ -1088,6 +1215,23 @@ class Repository:
     def store_delete(self, name, *, deleted=False):
         self._lock_refresh()
         return self.store.delete(name, deleted=deleted)
+
+    def assert_writable(self):
+        """Raise PermissionDenied if the repo permissions forbid compaction.
+
+        Compaction stores new packs and index fragments and deletes the old ones, so it needs
+        write (w/W) and delete (D) access to the packs/ and index/ namespaces. self.permissions
+        is None when no restrictions apply (BORG_REPO_PERMISSIONS=all).
+        """
+        if self.permissions is None:
+            return
+        for namespace in ("packs", "index"):
+            granted = set(self.permissions.get(namespace, self.permissions.get("", "")))
+            if not (granted & set("wW")) or "D" not in granted:
+                raise self.PermissionDenied(
+                    f"compaction needs write (w/W) and delete (D) permissions on {namespace}/, "
+                    f"but only {''.join(sorted(granted))!r} is granted (BORG_REPO_PERMISSIONS)."
+                )
 
     def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
         self._lock_refresh()

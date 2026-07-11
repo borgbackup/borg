@@ -11,6 +11,7 @@ from ...cache import files_cache_name, discover_files_cache_names, list_chunkind
 from ...cache import delete_chunkindex_from_repo, write_chunkindex_to_repo
 from ...manifest import Manifest
 from ...archive import Archive
+from ...archiver.compact_cmd import ArchiveGarbageCollector
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
 from ..repository_test import H, fchunk, pdchunk
@@ -110,7 +111,6 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
     is conservative: the next client rebuilds the index from actual repository contents and
     re-uploads any deleted data. This is tested for both compact paths (default and --stats).
     """
-    from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     archiver = request.getfixturevalue(archivers)
 
@@ -208,7 +208,6 @@ def test_compact_packs_respects_threshold(tmp_path):
     # wastes 2/3 of its bytes is rewritten down to its single kept object (and its old file deleted); the
     # pack that wastes only 1/3 stays untouched, since copying its kept objects to reclaim that little is
     # not worth it. This covers the rewrite, leave-alone and keep/drop split unique to multi-object packs.
-    from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
@@ -467,6 +466,115 @@ def test_compact_skips_oversized_index_entry(tmp_path):
 
         assert bin_to_hex(pack) in [info.name for info in repository.store_list("packs")]  # left untouched
         assert pdchunk(repository.get(H(0))) == b"DATA"
+
+
+def test_compact_packs_merges_tiny_packs(tmp_path, monkeypatch):
+    # Incremental backups leave many tiny, fully-used packs behind (issue #9816): the current
+    # unused-bytes policy never touches them, so they pile up. Once their combined size reaches a
+    # full pack, compact merges them into fewer, larger packs while keeping every object readable.
+    # BORG_PACK_MAX_SIZE is set small here so a handful of tiny packs already cross that threshold.
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", "300")
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        num = 10
+        for i in range(num):
+            repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
+            repository.flush()  # flush after each put -> one object per pack -> many tiny packs
+
+        # mark every object used, so no pack qualifies for drop/rewrite; they only qualify for merging
+        for i in range(num):
+            entry = repository.chunks[H(i)]
+            repository.chunks[H(i)] = entry._replace(flags=ChunkIndex.F_USED)
+
+        packs_before = {info.name for info in repository.store_list("packs")}
+        assert len(packs_before) == num  # one tiny pack per object
+        total_bytes = sum(repository.store.info("packs/" + name).size for name in packs_before)
+        assert total_bytes >= repository.pack_max_size  # combined size crosses the merge threshold
+
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc.chunks = repository.chunks
+        gc.compact_packs()
+        assert gc.store_changed is True  # the merge changed the store
+
+        # the tiny packs collapse into fewer, larger packs (each up to pack_max_size)
+        packs_after = {info.name for info in repository.store_list("packs")}
+        assert len(packs_after) < len(packs_before)
+        assert packs_after - packs_before  # at least one genuinely new merged pack
+        # every object still reads back correctly from wherever it now lives
+        for i in range(num):
+            assert pdchunk(repository.get(H(i))) == f"DATA{i}".encode()
+        # the (rebuilt) chunk index only references packs that still exist
+        for id, entry in repository.chunks.iteritems():
+            assert bin_to_hex(entry.pack_id) in packs_after
+
+        # a merged full-size pack is no longer tiny (the tiny limit is pack_max_size // 2 here), so a
+        # second compact finds nothing to merge and leaves the store unchanged.
+        gc2 = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc2.chunks = repository.chunks
+        gc2.compact_packs()
+        assert gc2.store_changed is False
+        assert {info.name for info in repository.store_list("packs")} == packs_after
+
+
+def test_compact_packs_below_merge_size_gate_leaves_tiny_packs(tmp_path, monkeypatch):
+    # Guards against the count-based trigger this replaced (#9816 review feedback): merging must not
+    # fire just because several tiny packs exist, only once their combined size could produce a full
+    # pack. Otherwise a small repack would invalidate the chunk index for every client for no lasting
+    # reduction in tiny-pack count (Thomas's "10 packs of 1 kB merge into a still-tiny 10 kB pack"
+    # scenario).
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", "100000")  # far above what these tiny packs total
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for i in range(3):
+            repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
+            repository.flush()
+        for i in range(3):
+            entry = repository.chunks[H(i)]
+            repository.chunks[H(i)] = entry._replace(flags=ChunkIndex.F_USED)
+
+        packs_before = {info.name for info in repository.store_list("packs")}
+        assert len(packs_before) == 3
+
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc.chunks = repository.chunks
+        gc.compact_packs()
+        assert gc.store_changed is False  # combined tiny bytes stay far below one full pack: leave them alone
+
+        assert {info.name for info in repository.store_list("packs")} == packs_before
+
+
+def test_compact_packs_below_all_packs_gate_changes_nothing(tmp_path):
+    # A tiny unused pack alongside a large used one: reclaiming it would free far less than the
+    # all-packs threshold (threshold/5, i.e. 2% at the default). Any compaction forces a full
+    # chunk-index rewrite that invalidates every client's cached index (#9817), so below the gate
+    # compact must leave the repo untouched rather than pay that cost for so little.
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        # one big, fully-used pack (well above MIN_PACK_SIZE, so it is not a merge candidate) ...
+        repository.put(H(0), fchunk(b"U" * 2_000_000, chunk_id=H(0)))
+        repository.flush()
+        # ... and one tiny pack we would otherwise drop entirely (all its bytes unused)
+        repository.put(H(1), fchunk(b"x", chunk_id=H(1)))
+        repository.flush()
+
+        repository.chunks[H(0)] = repository.chunks[H(0)]._replace(flags=ChunkIndex.F_USED)
+        repository.chunks[H(1)] = repository.chunks[H(1)]._replace(flags=ChunkIndex.F_NONE)
+
+        packs_before = {info.name for info in repository.store_list("packs")}
+        assert len(packs_before) == 2
+
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc.chunks = repository.chunks
+        gc.compact_packs()
+        assert gc.store_changed is False  # below the all-packs gate: nothing was touched
+
+        # both packs (including the fully-unused tiny one) still exist, and both objects read back
+        assert {info.name for info in repository.store_list("packs")} == packs_before
+        assert pdchunk(repository.get(H(0))) == b"U" * 2_000_000
+        assert pdchunk(repository.get(H(1))) == b"x"
 
 
 def test_compact_gc_after_index_loss(archivers, request):

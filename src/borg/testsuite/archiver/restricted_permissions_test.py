@@ -4,6 +4,7 @@ import pytest
 from borgstore.backends.errors import PermissionDenied
 
 from ...constants import *  # NOQA
+from ...repository import Repository
 from .. import changedir
 from . import cmd, create_test_files, RK_ENCRYPTION, generate_archiver_tests
 
@@ -75,9 +76,12 @@ def test_repository_permissions_no_delete(archivers, request, monkeypatch):
     # Verify the archive still exists.
     assert "archive2" in cmd(archiver, "repo-list")
 
-    # Try to compact the repo, which should fail.
-    with pytest.raises(PermissionDenied):
+    # Try to compact the repo, which should fail (no "D" on packs/): compact refuses up front.
+    with pytest.raises(Repository.PermissionDenied):
         cmd(archiver, "compact")
+
+    # A dry run only reads and reports, so it is allowed even without write/delete access.
+    cmd(archiver, "compact", "--dry-run")
 
     # Check without --repair should work.
     cmd(archiver, "check")
@@ -128,9 +132,12 @@ def test_repository_permissions_read_only(archivers, request, monkeypatch):
     with pytest.raises(PermissionDenied):
         cmd(archiver, "repo-delete")
 
-    # Try to compact the repo, which should fail.
-    with pytest.raises(PermissionDenied):
+    # Try to compact the repo, which should fail (no write/delete access): compact refuses up front.
+    with pytest.raises(Repository.PermissionDenied):
         cmd(archiver, "compact")
+
+    # A dry run only reads and reports, so it is allowed under read-only permissions.
+    cmd(archiver, "compact", "--dry-run")
 
 
 def test_repository_permissions_write_only(archivers, request, monkeypatch):
@@ -170,8 +177,8 @@ def test_repository_permissions_write_only(archivers, request, monkeypatch):
     with pytest.raises(PermissionDenied):
         cmd(archiver, "delete", "archive1")
 
-    # Try to compact the repo, which should fail (data dir has "lw" permissions, no reading).
-    with pytest.raises(PermissionDenied):
+    # Try to compact the repo, which should fail (no "D" on packs/): compact refuses up front.
+    with pytest.raises(Repository.PermissionDenied):
         cmd(archiver, "compact")
 
     # Try to check the repo, which should fail (data dir has "lw" permissions, no reading).

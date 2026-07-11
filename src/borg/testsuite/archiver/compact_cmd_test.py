@@ -550,6 +550,48 @@ def test_compact_dry_run_reports_and_changes_nothing(archivers, request):
     assert "Deleting 0 unused objects" not in out2
 
 
+def test_compact_archive_reference_cache(archivers, request):
+    """compact caches each archive's referenced objects and drops caches of archives that are gone."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive1")
+    create_src_archive(archiver, "archive2")
+
+    prefix = "referenced-by-archive."
+
+    def cached_archive_ids():
+        repository = open_repository(archiver)
+        with repository:
+            return {info.name[len(prefix) :] for info in repository.store_list("cache") if info.name.startswith(prefix)}
+
+    def archive_ids():
+        repository = open_repository(archiver)
+        with repository:
+            manifest = Manifest.load(repository, (Manifest.Operation.READ,))
+            return {bin_to_hex(info.id) for info in manifest.archives.list(sort_by=["ts"])}
+
+    # no reference caches exist before the first compact
+    assert cached_archive_ids() == set()
+
+    # the first compact builds one reference cache per archive
+    cmd(archiver, "compact", "-v", exit_code=0)
+    assert cached_archive_ids() == archive_ids()
+
+    # a second compact reuses the caches and the garbage collection stays correct (no missing objects)
+    output = cmd(archiver, "compact", "-v", "--stats", exit_code=0)
+    assert "missing objects" not in output
+    assert cached_archive_ids() == archive_ids()
+
+    # deleting an archive drops its reference cache on the next compact
+    ids_before = archive_ids()
+    cmd(archiver, "delete", "-a", "archive1", exit_code=0)
+    cmd(archiver, "compact", "-v", exit_code=0)
+    remaining = archive_ids()
+    assert remaining < ids_before  # archive1 is gone
+    assert cached_archive_ids() == remaining
+
+
 def test_compact_files_cache_cleanup(archivers, request):
     """Test that files cache files for deleted archives are removed during compact."""
     archiver = request.getfixturevalue(archivers)

@@ -640,6 +640,29 @@ def test_merge_packs_skips_pack_already_gone(repo_fixtures, request):
         assert pdchunk(repository.get(H(1))) == b"DATA1"  # the still-present pack merged normally
 
 
+def test_assert_writable(repository):
+    # Compaction needs write (w/W) and delete (D) on both packs/ and index/. assert_writable reads
+    # self.permissions directly, so set it explicitly to cover each case.
+    with repository:
+        repository.permissions = None  # "all": no restrictions
+        repository.assert_writable()  # does not raise
+
+        repository.permissions = {"packs": "lrwWD", "index": "lrwWD"}
+        repository.assert_writable()  # does not raise
+
+        repository.permissions = {"packs": "lrw", "index": "lrwWD"}  # packs/ has no delete
+        with pytest.raises(Repository.CompactionPermissionDenied):
+            repository.assert_writable()
+
+        repository.permissions = {"packs": "lrwWD", "index": "lrD"}  # index/ has no write
+        with pytest.raises(Repository.CompactionPermissionDenied):
+            repository.assert_writable()
+
+        repository.permissions = {"": "lr"}  # neither namespace listed; "" fallback grants read only
+        with pytest.raises(Repository.CompactionPermissionDenied):
+            repository.assert_writable()
+
+
 def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):

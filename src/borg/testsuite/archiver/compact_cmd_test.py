@@ -500,13 +500,21 @@ def test_compact_packs_merges_tiny_packs(tmp_path, monkeypatch):
         # the tiny packs collapse into fewer, larger packs (each up to pack_max_size)
         packs_after = {info.name for info in repository.store_list("packs")}
         assert len(packs_after) < len(packs_before)
-        assert packs_after.isdisjoint(packs_before)  # brand-new packs, all originals deleted
+        assert packs_after - packs_before  # at least one genuinely new merged pack
         # every object still reads back correctly from wherever it now lives
         for i in range(num):
             assert pdchunk(repository.get(H(i))) == f"DATA{i}".encode()
         # the (rebuilt) chunk index only references packs that still exist
         for id, entry in repository.chunks.iteritems():
             assert bin_to_hex(entry.pack_id) in packs_after
+
+        # a merged full-size pack is no longer tiny (the tiny limit is pack_max_size // 2 here), so a
+        # second compact finds nothing to merge and leaves the store unchanged.
+        gc2 = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc2.chunks = repository.chunks
+        gc2.compact_packs()
+        assert gc2.store_changed is False
+        assert {info.name for info in repository.store_list("packs")} == packs_after
 
 
 def test_compact_packs_below_merge_size_gate_leaves_tiny_packs(tmp_path, monkeypatch):

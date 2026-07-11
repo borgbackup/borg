@@ -18,6 +18,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .helpers import get_cache_dir
+from .helpers import sig_int
 from .helpers import ProgressIndicatorPercent
 from .helpers.lrucache import LRUCache
 from .storelocking import Lock
@@ -1081,8 +1082,10 @@ class Repository:
         pack's actual end before anything is written; either means a corrupt index. Raises
         IntegrityError in that case and leaves the store untouched; repair is "borg check --repair".
 
-        Every new pack is stored and indexed before any source pack is deleted, so a crash mid-merge
-        never destroys the only stored copy of an object.
+        Packs are merged one batch at a time, each batch's sources deleted once its merged pack is
+        stored and indexed. So a crash or Ctrl-C between batches never destroys the only stored copy
+        of an object, and the store holds at most one batch of extra packs at a time. The packs not
+        yet merged are merged on the next run.
         """
         self._lock_refresh()
         if chunks is None:
@@ -1142,10 +1145,13 @@ class Repository:
             batches.append(current)
 
         # write each batch as a new pack (named sha256 of its content) and repoint its objects: an
-        # object's new offset is the running byte total of the packs placed before its pack in the
-        # batch, plus its old offset within that pack.
-        produced = set()
+        # object's new offset is the running byte total of the packs before its pack in the batch,
+        # plus its old offset within that pack.
+        pi = ProgressIndicatorPercent(total=len(batches), msg="Merging packs %3.0f%%", msgid="repository.merge_packs")
+        produced = set()  # merged pack ids; a one-pack batch reproduces its source's id
         for batch in batches:
+            if sig_int:
+                break
             self._lock_refresh()  # refresh the lock per batch, the loop can run for a while
             sources = [(bin_to_hex(pid), 0, pack_size[pid]) for pid in batch]
             try:
@@ -1160,16 +1166,17 @@ class Repository:
                     new_locations.append((obj_id, new_pack_id, pack_base + offset, size))
                 pack_base += pack_size[pid]
             chunks.update_pack_info(new_locations)
-
-        # delete the source packs now that every new pack is stored and indexed. skip any pack whose
-        # id a batch reproduced (identical bytes hash to the same name): it now holds merged data.
-        for pid in sorted(pack_ids):
-            if pid in produced:
-                continue
-            try:
-                self.store_delete("packs/" + bin_to_hex(pid))
-            except StoreObjectNotFound:
-                logger.warning(f"Pack {bin_to_hex(pid)} to merge was already gone.")
+            # delete this batch's sources; skip any pack a batch reproduced (a one-pack batch hashes
+            # to the same content-addressed name), which now holds the merged data.
+            for pid in batch:
+                if pid in produced:
+                    continue
+                try:
+                    self.store_delete("packs/" + bin_to_hex(pid))
+                except StoreObjectNotFound:
+                    logger.warning(f"Pack {bin_to_hex(pid)} to merge was already gone.")
+            pi.show(increase=1)
+        pi.finish()
 
     def break_lock(self):
         Lock(self.store).break_lock()

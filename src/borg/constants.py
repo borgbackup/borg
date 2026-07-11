@@ -64,7 +64,8 @@ DEFAULT_PACK_MAX_SIZE = 50 * 1000 * 1000
 
 # borg compact merges packs smaller than MIN_PACK_SIZE bytes ("tiny") once their combined size
 # reaches the repository's max pack size, so every merge produces at least one full-size pack that
-# is never tiny again (avoids repeatedly re-merging a growing-but-still-tiny pack).
+# is never tiny again (avoids repeatedly re-merging a growing-but-still-tiny pack). compact caps the
+# tiny limit at half the configured max pack size (see compact_packs).
 MIN_PACK_SIZE = DEFAULT_PACK_MAX_SIZE // 50  # 1 MB
 
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)

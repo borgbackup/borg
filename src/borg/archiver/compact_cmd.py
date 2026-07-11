@@ -309,6 +309,9 @@ class ArchiveGarbageCollector:
 
         # decide each pack's fate. a pack's reclaimable bytes are its indexed-but-unused bytes; the
         # redundant duplicates compact_pack finds in the gaps are reclaimed on top when it rewrites.
+        # a merge fills packs up to pack_max_size, so cap "tiny" at half of that: a merged full pack
+        # is then at least twice tiny_limit and no longer a merge candidate.
+        tiny_limit = min(MIN_PACK_SIZE, self.repository.pack_max_size // 2)
         drop_packs, rewrite_packs, merge_packs = set(), set(), set()
         pack_reclaim = {}  # pack_id -> reclaimable bytes, for the packs we act on (drop or rewrite)
         for pid, total in pack_total.items():
@@ -321,7 +324,7 @@ class ArchiveGarbageCollector:
                 continue  # leave this pack untouched
             reclaimable = indexed - used  # unused indexed bytes; the only bytes compact removes
             if reclaimable == 0:
-                if used == indexed and total < MIN_PACK_SIZE:
+                if used == indexed and total < tiny_limit:
                     merge_packs.add(pid)  # fully-used but tiny -> merge candidate
                 continue  # nothing to reclaim -> leave alone
             if used == 0 and indexed == total:

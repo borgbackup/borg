@@ -11,7 +11,6 @@ from borgstore.store import ObjectNotFound as StoreObjectNotFound, ReadRangeErro
 from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
-from borgstore.backends.errors import PermissionDenied as StorePermissionDenied
 
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex
@@ -318,6 +317,11 @@ class Repository:
         """Permission denied to {}."""
 
         exit_mcode = 21
+
+    class CompactionPermissionDenied(Error):
+        """Repository permissions do not allow compaction (need write and delete on {}/)."""
+
+        exit_mcode = 24
 
     # Whole packs kept in memory for reads; the least recently used is evicted first.
     # Memory use is this count times the pack size.
@@ -1071,12 +1075,11 @@ class Repository:
 
         Whole pack files are copied, not individual indexed objects, so bytes no index entry covers
         (a chunk copy superseded by a later put, or objects from a backup that crashed before
-        writing its index) are carried forward into the merged pack rather than silently dropped.
+        writing its index) are carried into the merged pack too.
 
-        Before copying anything, every source pack's index entries are checked for overlap or for
-        claiming bytes past the pack's actual end -- either means a corrupt index, and copying such
-        a pack could silently truncate the corrupt object. Raises IntegrityError in that case,
-        leaving the store untouched; recovery is "borg check --repair"'s job.
+        Each source pack's index entries are checked for overlap or for claiming bytes past the
+        pack's actual end before anything is written; either means a corrupt index. Raises
+        IntegrityError in that case and leaves the store untouched; repair is "borg check --repair".
 
         Every new pack is stored and indexed before any source pack is deleted, so a crash mid-merge
         never destroys the only stored copy of an object.
@@ -1088,8 +1091,7 @@ class Repository:
             max_size = self.pack_max_size
         pack_ids = set(pack_ids)
 
-        # collect every still-indexed object of the selected packs, grouped per source pack and
-        # ordered by offset, used both to validate each pack and to repoint its objects afterwards.
+        # collect every still-indexed object of the selected packs, grouped per source pack, ordered by offset.
         per_pack = defaultdict(list)  # pack_id -> [(obj_offset, obj_id, obj_size), ...]
         for obj_id, entry in chunks.iteritems():
             if entry.pack_id in pack_ids:
@@ -1097,9 +1099,8 @@ class Repository:
         for objs in per_pack.values():
             objs.sort()
 
-        # get each source pack's real file size, dropping any pack that is already gone (stale
-        # index entries, #9850) before validating or copying anything. store.info() reports a
-        # missing object via info.exists rather than raising, unlike store.delete().
+        # get each source pack's real file size; drop any pack already gone from the store (its
+        # index entry is stale). store.info() reports a missing object via info.exists, not by raising.
         pack_size = {}
         for pid in list(pack_ids):
             info = self.store.info("packs/" + bin_to_hex(pid))
@@ -1126,12 +1127,11 @@ class Repository:
                     f'(index corruption), run "borg check"'
                 )
 
-        # greedily batch whole pack files so each output pack stays within max_size. batches never
-        # split a source pack, so bytes no index entry covers always travel with their pack instead
-        # of being dropped.
+        # greedily batch whole pack files so each output pack stays within max_size, in sorted id
+        # order so batch composition is reproducible.
         batches = []  # each batch: [pack_id, ...]
         current, current_size = [], 0
-        for pid in pack_ids:
+        for pid in sorted(pack_ids):
             size = pack_size[pid]
             if current and current_size + size > max_size:
                 batches.append(current)
@@ -1146,8 +1146,12 @@ class Repository:
         # batch, plus its old offset within that pack.
         produced = set()
         for batch in batches:
+            self._lock_refresh()  # refresh the lock per batch, the loop can run for a while
             sources = [(bin_to_hex(pid), 0, pack_size[pid]) for pid in batch]
-            new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+            try:
+                new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+            except ReadRangeError as e:  # a source pack shrank or is corrupt
+                raise IntegrityError(f'merge_packs: {e}, run "borg check"') from e
             produced.add(new_pack_id)
             new_locations = []
             pack_base = 0
@@ -1159,7 +1163,7 @@ class Repository:
 
         # delete the source packs now that every new pack is stored and indexed. skip any pack whose
         # id a batch reproduced (identical bytes hash to the same name): it now holds merged data.
-        for pid in pack_ids:
+        for pid in sorted(pack_ids):
             if pid in produced:
                 continue
             try:
@@ -1206,7 +1210,7 @@ class Repository:
         return self.store.delete(name, deleted=deleted)
 
     def assert_writable(self):
-        """Raise PermissionDenied if the repo permissions forbid compaction.
+        """Raise CompactionPermissionDenied if the repo permissions forbid compaction.
 
         Compaction stores new packs and index fragments and deletes the old ones, so it needs
         write (w/W) and delete (D) access to the packs/ and index/ namespaces. self.permissions
@@ -1217,9 +1221,7 @@ class Repository:
         for namespace in ("packs", "index"):
             granted = set(self.permissions.get(namespace, self.permissions.get("", "")))
             if not (granted & set("wW")) or "D" not in granted:
-                raise StorePermissionDenied(
-                    f"Repository permissions do not allow compaction (need write and delete on {namespace}/)."
-                )
+                raise self.CompactionPermissionDenied(namespace)
 
     def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
         self._lock_refresh()

@@ -462,6 +462,18 @@ class CompactMixIn:
             either regularly (e.g., once a month, possibly together with ``borg check``) or
             when disk space needs to be freed.
 
+            Compacting anything rewrites the whole chunk index and invalidates every client's
+            cached copy of it, so ``borg compact`` only acts when the gain is worth that cost:
+
+            - All-packs gate: it drops or rewrites packs only when the space they would free
+              reaches ``--threshold`` divided by 5 percent (2% at the default threshold) of the
+              total pack size. Below that floor it leaves the repository (and the chunk index)
+              untouched. Use ``--threshold 0`` to disable the gate and always compact.
+            - Tiny-pack merging: incremental backups tend to leave one small, fully-used pack per
+              run. ``borg compact`` combines such tiny packs into larger ones, but only once their
+              combined size is large enough to fill at least one full-size pack, so a merge always
+              produces a pack that will not be a merge candidate again.
+
             **Important:**
 
             After compacting, it is no longer possible to use ``borg undelete`` to recover
@@ -496,5 +508,6 @@ class CompactMixIn:
             dest="threshold",
             type=int,
             default=10,
-            help="rewrite a pack when at least PERCENT of its bytes are unused (default: 10)",
+            help="rewrite a pack when at least PERCENT of its bytes are unused; also gates whether "
+            "to compact at all (see the all-packs gate above), 0 disables that gate (default: 10)",
         )

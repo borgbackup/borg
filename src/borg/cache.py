@@ -21,7 +21,7 @@ files_cache_logger = create_logger("borg.debug.files_cache")
 from borgstore.store import ItemInfo
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
-from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
+from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX, UNKNOWN_BYTES32
 from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS
 from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
 from .helpers import get_cache_dir
@@ -653,8 +653,12 @@ def write_chunkindex_to_repo(
         # pre-size the temporary table to this batch so filling it does not repeatedly rehash:
         batch = ChunkIndex(usable=len(batch_keys) or None)
         for key in batch_keys:
+            entry = chunks[key]
+            # a chunk still buffered in the pack writer has UNKNOWN_BYTES32 as its pack_id;
+            # only serialize an entry once its pack is written and its pack_id is real (#9900).
+            assert entry.pack_id != UNKNOWN_BYTES32, f"chunk {bin_to_hex(key)} has no pack location"
             # for now, we don't want to serialize the flags or the size:
-            batch[key] = chunks[key]._replace(flags=ChunkIndex.F_NONE, size=0)
+            batch[key] = entry._replace(flags=ChunkIndex.F_NONE, size=0)
         new_hash, stored = _store_chunkindex_fragment(repository, batch, stored_hashes, force_write=force_write)
         batch.clear()  # free memory of the temporary table
         new_hashes.add(new_hash)
@@ -913,8 +917,8 @@ class ChunksMixin:
     def _maybe_write_chunks_index(self, now, force=False, clear=False):
         if force or now > self.chunks_index_last_write + self.chunks_index_write_td:
             if self._chunks is not None:
-                # flush the pack writer first, so buffered chunks get their real pack location
-                # in the index; the write only persists a placeholder location otherwise (#9900).
+                # flush the pack writer first, so buffered chunks get their real pack location;
+                # until their pack is written their pack_id is the UNKNOWN_BYTES32 placeholder (#9900).
                 self.repository.flush()
                 write_chunkindex_to_repo(self.repository, self._chunks, clear=clear)
             self.chunks_index_last_write = now

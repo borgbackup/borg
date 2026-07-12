@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import UTC, datetime
 
 import pytest
 
@@ -19,6 +20,7 @@ from ..cache import (
     repack_chunkindex,
     write_chunkindex_to_repo,
 )
+from ..constants import UNKNOWN_BYTES32
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
 from ..helpers import safe_ns
@@ -65,6 +67,19 @@ class TestAdHocWithFilesCache:
     def test_existing_reuse_after_add_chunk(self, cache):
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
         assert cache.reuse_chunk(H(1), 4, Statistics()) == (H(1), 4)
+
+    def test_periodic_index_write_flushes_pending(self, repository, key, manifest):
+        # #9900: the periodic index write must flush the pack writer first, so a buffered chunk is
+        # persisted with its real pack location instead of the UNKNOWN_BYTES32 placeholder.
+        cache = AdHocWithFilesCache(manifest)
+        cache.add_chunk(H(7), {}, b"h1-payload", stats=Statistics())
+        assert repository.chunks.is_pending(H(7))  # H(7) is buffered, not yet in a pack
+        # force=True runs the same write the 600s timer triggers:
+        cache._maybe_write_chunks_index(datetime.now(UTC), force=True)
+        # rebuild the index from the persisted fragments and check H(7)'s stored location:
+        index = build_chunkindex_from_repo(repository)
+        assert H(7) in index
+        assert index[H(7)].pack_id != UNKNOWN_BYTES32
 
     def test_files_cache(self, cache):
         st = os.stat(".")

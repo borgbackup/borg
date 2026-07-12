@@ -913,6 +913,9 @@ class ChunksMixin:
     def _maybe_write_chunks_index(self, now, force=False, clear=False):
         if force or now > self.chunks_index_last_write + self.chunks_index_write_td:
             if self._chunks is not None:
+                # flush the pack writer first, so buffered chunks get their real pack location
+                # in the index; the write only persists a placeholder location otherwise (#9900).
+                self.repository.flush()
                 write_chunkindex_to_repo(self.repository, self._chunks, clear=clear)
             self.chunks_index_last_write = now
 

@@ -448,7 +448,7 @@ jobs:
                 sudo -E pkg install -y rust
                 sudo -E pkg install -y gmake
                 sudo -E pkg install -y git
-                sudo -E pkg install -y python314 py314-sqlite3 py314-pip py314-virtualenv
+                sudo -E pkg install -y python314 py314-sqlite3
                 sudo ln -sf /usr/local/bin/python3.14 /usr/local/bin/python3
                 sudo ln -sf /usr/local/bin/python3.14 /usr/local/bin/python
                 sudo ln -sf /usr/local/bin/pip3.14 /usr/local/bin/pip3

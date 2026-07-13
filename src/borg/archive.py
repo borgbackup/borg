@@ -712,6 +712,10 @@ Duration: {0.duration}
         metadata |= additional_metadata or {}
         if metadata.get("cwd") is None:
             del metadata["cwd"]
+        # flushing here will empty the pack writer buffer,
+        # so that the ArchiveItem will create a tiny separate pack,
+        # which will perform better for borg repo-list.
+        self.repository.flush()
         metadata = ArchiveItem(metadata)
         data = self.key.pack_metadata(metadata.as_dict())
         self.id = self.repo_objs.id_hash(data)

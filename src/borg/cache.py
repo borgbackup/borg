@@ -653,8 +653,12 @@ def write_chunkindex_to_repo(
         # pre-size the temporary table to this batch so filling it does not repeatedly rehash:
         batch = ChunkIndex(usable=len(batch_keys) or None)
         for key in batch_keys:
+            entry = chunks[key]
+            # a chunk still buffered in the pack writer has F_PENDING set: its pack location
+            # is not resolved yet. only serialize an entry once its pack is written (#9900).
+            assert not (entry.flags & ChunkIndex.F_PENDING), f"chunk {bin_to_hex(key)} has no pack location yet"
             # for now, we don't want to serialize the flags or the size:
-            batch[key] = chunks[key]._replace(flags=ChunkIndex.F_NONE, size=0)
+            batch[key] = entry._replace(flags=ChunkIndex.F_NONE, size=0)
         new_hash, stored = _store_chunkindex_fragment(repository, batch, stored_hashes, force_write=force_write)
         batch.clear()  # free memory of the temporary table
         new_hashes.add(new_hash)
@@ -913,6 +917,9 @@ class ChunksMixin:
     def _maybe_write_chunks_index(self, now, force=False, clear=False):
         if force or now > self.chunks_index_last_write + self.chunks_index_write_td:
             if self._chunks is not None:
+                # flush the pack writer first, so buffered chunks get their real pack location;
+                # until their pack is written they are still F_PENDING with no location (#9900).
+                self.repository.flush()
                 write_chunkindex_to_repo(self.repository, self._chunks, clear=clear)
             self.chunks_index_last_write = now
 
@@ -1004,8 +1011,6 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def close(self):
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
-        if self._chunks is not None:
-            self.repository.flush()
         if self._files is not None:
             pi.output("Saving files cache")
             integrity_data = self._write_files_cache(self._files)

@@ -88,6 +88,34 @@ cdef extern from "openssl/evp.h":
     int EVP_CTRL_AEAD_SET_TAG
     int EVP_CTRL_AEAD_SET_IVLEN
 
+cdef extern from "openssl/kdf.h":
+    ctypedef struct EVP_KDF:
+        pass
+    ctypedef struct EVP_KDF_CTX:
+        pass
+    EVP_KDF *EVP_KDF_fetch(void *ctx, const char *algorithm, const char *properties)
+    void EVP_KDF_free(EVP_KDF *kdf)
+    EVP_KDF_CTX *EVP_KDF_CTX_new(EVP_KDF *kdf)
+    void EVP_KDF_CTX_free(EVP_KDF_CTX *ctx)
+    
+cdef extern from "openssl/params.h":
+    ctypedef struct OSSL_PARAM:
+        pass
+    OSSL_PARAM OSSL_PARAM_construct_uint32(const char *key, uint32_t *buf)
+    OSSL_PARAM OSSL_PARAM_construct_octet_string(const char *key, void *buf, size_t bsize)
+    OSSL_PARAM OSSL_PARAM_construct_end()
+
+cdef extern from "openssl/core_names.h":
+    const char *OSSL_KDF_PARAM_THREADS
+    const char *OSSL_KDF_PARAM_ARGON2_LANES
+    const char *OSSL_KDF_PARAM_ITER
+    const char *OSSL_KDF_PARAM_ARGON2_MEMCOST
+    const char *OSSL_KDF_PARAM_SALT
+    const char *OSSL_KDF_PARAM_PASSWORD
+
+cdef extern from "openssl/kdf.h":
+    int EVP_KDF_derive(EVP_KDF_CTX *ctx, unsigned char *key, size_t keylen, const OSSL_PARAM params[])
+
 
 import struct
 
@@ -825,3 +853,53 @@ cdef class CSPRNG:
 
             # Swap items[i] and items[j]
             items[i], items[j] = items[j], items[i]
+
+
+def argon2_hash(bytes secret, bytes salt, uint32_t time_cost, uint32_t memory_cost,
+                uint32_t parallelism, uint32_t hash_len, type):
+    cdef EVP_KDF *kdf = NULL
+    cdef EVP_KDF_CTX *kctx = NULL
+    cdef OSSL_PARAM params[8]
+    cdef OSSL_PARAM *p = params
+    cdef uint32_t threads = 1
+    cdef bytes result
+    cdef const char *alg_name
+    cdef const unsigned char *secret_c = secret
+    cdef const unsigned char *salt_c = salt
+
+    if type == "i" or type == b"i":
+        alg_name = b"ARGON2I"
+    elif type == "d" or type == b"d":
+        alg_name = b"ARGON2D"
+    elif type == "id" or type == b"id":
+        alg_name = b"ARGON2ID"
+    else:
+        raise ValueError("Invalid argon2 type")
+
+    kdf = EVP_KDF_fetch(NULL, alg_name, NULL)
+    if kdf == NULL:
+        raise CryptoError("Argon2 KDF not found in OpenSSL (requires >= 3.2)")
+
+    kctx = EVP_KDF_CTX_new(kdf)
+    if kctx == NULL:
+        EVP_KDF_free(kdf)
+        raise MemoryError("Failed to create KDF context")
+
+    p[0] = OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_THREADS, &threads)
+    p[1] = OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ARGON2_LANES, &parallelism)
+    p[2] = OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ITER, &time_cost)
+    p[3] = OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ARGON2_MEMCOST, &memory_cost)
+    p[4] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, <void *>salt_c, len(salt))
+    p[5] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD, <void *>secret_c, len(secret))
+    p[6] = OSSL_PARAM_construct_end()
+
+    result = PyBytes_FromStringAndSize(NULL, hash_len)
+
+    if EVP_KDF_derive(kctx, <unsigned char *>result, hash_len, params) <= 0:
+        EVP_KDF_CTX_free(kctx)
+        EVP_KDF_free(kdf)
+        raise CryptoError("EVP_KDF_derive failed")
+
+    EVP_KDF_CTX_free(kctx)
+    EVP_KDF_free(kdf)
+    return result

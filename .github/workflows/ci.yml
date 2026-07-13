@@ -396,11 +396,11 @@ jobs:
       matrix:
         include:
           - os: freebsd
-            version: '14.3'
+            version: '15.1'
             display_name: FreeBSD
             # Controls binary build and provenance attestation on tags
             do_binaries: true
-            artifact_prefix: borg-freebsd-14-x86_64-gh
+            artifact_prefix: borg-freebsd-15-x86_64-gh
 
           - os: netbsd
             version: '10.1'
@@ -448,11 +448,11 @@ jobs:
                 sudo -E pkg install -y rust
                 sudo -E pkg install -y gmake
                 sudo -E pkg install -y git
-                sudo -E pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
-                sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
-                sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python
-                sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip3
-                sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip
+                sudo -E pkg install -y python314 py314-sqlite3 py314-pip py314-virtualenv
+                sudo ln -sf /usr/local/bin/python3.14 /usr/local/bin/python3
+                sudo ln -sf /usr/local/bin/python3.14 /usr/local/bin/python
+                sudo ln -sf /usr/local/bin/pip3.14 /usr/local/bin/pip3
+                sudo ln -sf /usr/local/bin/pip3.14 /usr/local/bin/pip
 
                 # required for libsodium/pynacl build
                 export MAKE=gmake
@@ -464,7 +464,7 @@ jobs:
                 python -m pip install --upgrade pip wheel
                 pip install -r requirements.d/development.lock.txt
                 pip install -e ".[mfusepy,cockpit,s3,sftp,rclone]"
-                tox -e py311-mfusepy
+                tox -e py314-mfusepy
 
                 if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
                   python -m pip install -r requirements.d/pyinstaller.txt

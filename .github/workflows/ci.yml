@@ -464,8 +464,6 @@ jobs:
                 python -m pip install --upgrade pip wheel
                 pip install -r requirements.d/development.lock.txt
                 pip install -e ".[mfusepy,cockpit,s3,sftp,rclone]"
-                tox -e py314-mfusepy
-
                 if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
                   python -m pip install -r requirements.d/pyinstaller.txt
                   ./scripts/build-borg-using-pyinstaller.sh
@@ -486,6 +484,8 @@ jobs:
                     cp -v dist/binary/borg.tgz artifacts/${{ matrix.artifact_prefix }}.tgz
                   fi
                 fi
+                export PATH="$(pwd)/dist/binary:$PATH"
+                tox -e py314-mfusepy
                 ;;
 
               netbsd)

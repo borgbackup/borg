@@ -18,10 +18,10 @@ from ..cache import (
     list_chunkindex_hashes,
     read_chunkindex_from_repo,
     repack_chunkindex,
-    write_chunkindex_invalidated,
+    write_chunkindex_invalid,
     write_chunkindex_to_repo,
 )
-from ..constants import CHUNKINDEX_INVALIDATED_NAME
+from ..constants import CHUNKINDEX_INVALID_SENTINEL
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
 from ..helpers import safe_ns
@@ -163,7 +163,7 @@ def test_build_chunkindex_retries_on_vanished_fragment(tmp_path):
             ci = ChunkIndex()
             ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
             write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
-        fragment_names = list_chunkindex_hashes(repository)[0]
+        fragment_names = list_chunkindex_hashes(repository)
         original_store_load = repository.store_load
         raced = False
 
@@ -224,7 +224,7 @@ def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
             ci = ChunkIndex()
             ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
             write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
-        before = len(list_chunkindex_hashes(repository)[0])
+        before = len(list_chunkindex_hashes(repository))
         assert before > 1
 
         cache = ChunksMixin()
@@ -232,7 +232,7 @@ def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
         index = cache.chunks  # binds the repository index; must NOT collapse the fragments
 
         # fragments are left intact (no consolidation side effect) ...
-        assert len(list_chunkindex_hashes(repository)[0]) == before
+        assert len(list_chunkindex_hashes(repository)) == before
         # ... and the in-memory index still resolves every seeded chunk
         assert H(1) in index and H(2) in index
 
@@ -268,7 +268,7 @@ def test_write_chunkindex_splits_full_write(tmp_path, monkeypatch):
         write_chunkindex_to_repo(
             repository, _make_chunkindex(keys), incremental=False, force_write=True, delete_other=True
         )
-        frags = list_chunkindex_fragments(repository)[0]
+        frags = list_chunkindex_fragments(repository)
         # 7000 entries split by MAX=3000 -> 3 fragments (3000 + 3000 + 1000)
         counts = sorted(len(read_chunkindex_from_repo(repository, name)) for name, _ in frags)
         assert counts == [1000, 3000, 3000]
@@ -286,9 +286,9 @@ def test_repack_defers_when_below_min_and_few_fragments(tmp_path, monkeypatch):
         delete_chunkindex_from_repo(repository)
         for j in range(3):  # 3 fragments * 100 = 300 entries < MIN, count 3 <= cap 5
             _seed_fragment(repository, j * 100, 100)
-        before = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        before = {name for name, _ in list_chunkindex_fragments(repository)}
         repack_chunkindex(repository)
-        after = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        after = {name for name, _ in list_chunkindex_fragments(repository)}
         assert after == before  # nothing merged
 
 
@@ -304,9 +304,9 @@ def test_repack_seals_when_smalls_reach_min(tmp_path, monkeypatch):
         all_keys = []
         for j in range(5):  # 5 * 300 = 1500 >= MIN
             all_keys += _seed_fragment(repository, j * 300, 300)
-        assert len(list_chunkindex_fragments(repository)[0]) == 5
+        assert len(list_chunkindex_fragments(repository)) == 5
         repack_chunkindex(repository)
-        frags = list_chunkindex_fragments(repository)[0]
+        frags = list_chunkindex_fragments(repository)
         assert len(frags) == 1  # 1500 entries, one fragment (< MAX)
         merged = read_chunkindex_from_repo(repository, frags[0][0])
         assert len(merged) == 1500
@@ -325,9 +325,9 @@ def test_repack_cap_forces_merge_below_min(tmp_path, monkeypatch):
         all_keys = []
         for j in range(6):  # 6 * 50 = 300 < MIN, but count 6 > cap 5
             all_keys += _seed_fragment(repository, j * 50, 50)
-        assert len(list_chunkindex_fragments(repository)[0]) == 6
+        assert len(list_chunkindex_fragments(repository)) == 6
         repack_chunkindex(repository)
-        frags = list_chunkindex_fragments(repository)[0]
+        frags = list_chunkindex_fragments(repository)
         assert len(frags) == 1  # merged into a single sub-MIN remainder
         merged = read_chunkindex_from_repo(repository, frags[0][0])
         assert len(merged) == 300
@@ -344,7 +344,7 @@ def test_write_chunkindex_splits_incremental_write(tmp_path, monkeypatch):
         keys = [_ci_key(i) for i in range(1200)]  # all F_NEW -> written by the incremental path
         write_chunkindex_to_repo(repository, _make_chunkindex(keys), incremental=True)
         counts = sorted(
-            len(read_chunkindex_from_repo(repository, name)) for name, _ in list_chunkindex_fragments(repository)[0]
+            len(read_chunkindex_from_repo(repository, name)) for name, _ in list_chunkindex_fragments(repository)
         )
         assert counts == [200, 500, 500]  # 1200 split by MAX=500
 
@@ -366,7 +366,7 @@ def test_write_chunkindex_deterministic_fragments(tmp_path, monkeypatch):
             delete_chunkindex_from_repo(repository)
             keys = [_ci_key(i) for i in (reversed(key_ints) if reverse else key_ints)]
             write_chunkindex_to_repo(repository, _make_chunkindex(keys), incremental=False, force_write=True)
-            frags = list_chunkindex_fragments(repository)[0]
+            frags = list_chunkindex_fragments(repository)
             hashes.append({name for name, _ in frags})
             # keys are big-endian ints, so sorted key order == numeric order: the batches must
             # hold exactly the ranges [0..499], [500..999], [1000..1199].
@@ -406,7 +406,7 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
             repository.flush()
 
     with Repository(loc, exclusive=True) as repository:
-        frags = list_chunkindex_fragments(repository)[0]
+        frags = list_chunkindex_fragments(repository)
         # without repack there would be one incremental fragment per session (plus creation's empty);
         # repack consolidates the small ones as they accumulate, so we end up with fewer.
         assert len(frags) < 5
@@ -427,7 +427,7 @@ def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):
     with Repository(repository_location, exclusive=True, create=True) as repository:
         delete_chunkindex_from_repo(repository)
         sealed_keys = _seed_fragment(repository, 0, 2000)  # >= MIN -> sealed
-        sealed_hashes = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        sealed_hashes = {name for name, _ in list_chunkindex_fragments(repository)}
         assert len(sealed_hashes) == 1
         small_keys = []
         for j in range(3):  # 3 * 400 = 1200 >= MIN -> will be merged
@@ -435,7 +435,7 @@ def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):
 
         repack_chunkindex(repository)
 
-        frags = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        frags = {name for name, _ in list_chunkindex_fragments(repository)}
         assert sealed_hashes <= frags  # the sealed fragment was not rewritten or deleted
         assert len(frags) == 2  # sealed one + the merged small ones
 
@@ -464,58 +464,58 @@ def test_repack_idempotent_deletes_sources_when_merged_exists(tmp_path, monkeypa
         for j in range(5):  # 5 * 300 = 1500 >= MIN -> merges into one sealed fragment
             all_keys += _seed_fragment(repository, j * 300, 300)
         repack_chunkindex(repository)
-        sealed = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        sealed = {name for name, _ in list_chunkindex_fragments(repository)}
         assert len(sealed) == 1  # the merged, sealed fragment
 
         # simulate a repack that stored the merged fragment but crashed before deleting the sources:
         # the sealed fragment is present, and the same small sources exist again alongside it.
         for j in range(5):
             _seed_fragment(repository, j * 300, 300)
-        assert len(list_chunkindex_fragments(repository)[0]) == 6  # sealed + 5 re-seeded small
+        assert len(list_chunkindex_fragments(repository)) == 6  # sealed + 5 re-seeded small
 
         repack_chunkindex(repository)  # merged content already exists -> upload is dedupe-skipped
 
-        frags = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        frags = {name for name, _ in list_chunkindex_fragments(repository)}
         assert frags == sealed  # sources deleted; only the (unchanged) sealed fragment remains
         merged = read_chunkindex_from_repo(repository, next(iter(frags)))
         assert set(merged) == set(all_keys)
 
 
-def _sentinel_present(repository):
-    return any(info.name == CHUNKINDEX_INVALIDATED_NAME for info in repository.store_list("index"))
+def _invalid_marker_present(repository):
+    return any(info.name == CHUNKINDEX_INVALID_SENTINEL for info in repository.store_list("config"))
 
 
-def test_invalidated_sentinel_forces_rebuild(tmp_path):
-    """With the sentinel present, build discards leftover fragments instead of trusting them."""
+def test_invalid_marker_forces_rebuild(tmp_path):
+    """With the marker present, build discards leftover fragments instead of trusting them."""
     loc = os.fspath(tmp_path / "repository")
     with Repository(loc, exclusive=True, create=True) as repository:
-        # a leftover fragment plus the sentinel, as an interrupted deletion would leave them.
+        # a leftover fragment plus the marker, as an interrupted deletion would leave them.
         _seed_fragment(repository, 5000, 3)
-        write_chunkindex_invalidated(repository)
-        assert _sentinel_present(repository)
+        write_chunkindex_invalid(repository)
+        assert _invalid_marker_present(repository)
 
         chunks = build_chunkindex_from_repo(repository)
         # the leftover entry is not merged (the repo has no packs, so a correct rebuild is empty).
         assert _ci_key(5000) not in chunks
-        # the roll-forward removed both the leftover fragments and the sentinel.
-        assert not _sentinel_present(repository)
-        assert list_chunkindex_fragments(repository)[0] == []
+        # the roll-forward removed both the leftover fragments and the marker.
+        assert not _invalid_marker_present(repository)
+        assert list_chunkindex_fragments(repository) == []
 
 
-def test_delete_chunkindex_writes_then_removes_sentinel(tmp_path):
-    """An interrupted delete_chunkindex_from_repo leaves the sentinel behind."""
+def test_delete_chunkindex_writes_then_removes_marker(tmp_path):
+    """An interrupted delete_chunkindex_from_repo leaves the invalid marker behind."""
     loc = os.fspath(tmp_path / "repository")
     with Repository(loc, exclusive=True, create=True) as repository:
         _seed_fragment(repository, 0, 3)
         _seed_fragment(repository, 100, 3)
-        assert not _sentinel_present(repository)
+        assert not _invalid_marker_present(repository)
 
         real_delete = repository.store.delete
         calls = {"n": 0}
 
         def failing_delete(name, **kwargs):
-            # let the sentinel write happen, then fail on the first real fragment deletion.
-            if name.startswith("index/") and name != f"index/{CHUNKINDEX_INVALIDATED_NAME}":
+            # let the marker write happen, then fail on the first fragment deletion.
+            if name.startswith("index/"):
                 calls["n"] += 1
                 if calls["n"] == 1:
                     raise OSError("simulated crash mid-delete")
@@ -525,16 +525,16 @@ def test_delete_chunkindex_writes_then_removes_sentinel(tmp_path):
         with pytest.raises(OSError):
             delete_chunkindex_from_repo(repository)
         repository.store.delete = real_delete
-        # the sentinel was written before the (failed) deletion and is still present.
-        assert _sentinel_present(repository)
+        # the marker was written before the (failed) deletion and is still present.
+        assert _invalid_marker_present(repository)
 
-        # a fresh build sees the sentinel, rolls the deletion forward, and rebuilds cleanly.
+        # a fresh build sees the marker, rolls the deletion forward, and rebuilds cleanly.
         build_chunkindex_from_repo(repository)
-        assert not _sentinel_present(repository)
+        assert not _invalid_marker_present(repository)
 
 
-def test_repack_skips_when_invalidated(tmp_path, monkeypatch):
-    """Repack does nothing while the index is invalidated (a rebuild will supersede it)."""
+def test_repack_skips_when_invalid(tmp_path, monkeypatch):
+    """Repack does nothing while the index is invalid (a rebuild will supersede it)."""
     monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
     monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 2)
     loc = os.fspath(tmp_path / "repository")
@@ -542,19 +542,11 @@ def test_repack_skips_when_invalidated(tmp_path, monkeypatch):
         delete_chunkindex_from_repo(repository)
         for j in range(4):
             _seed_fragment(repository, j * 100, 100)
-        write_chunkindex_invalidated(repository)
-        before = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        write_chunkindex_invalid(repository)
+        before = {name for name, _ in list_chunkindex_fragments(repository)}
         repack_chunkindex(repository)
-        after = {name for name, _ in list_chunkindex_fragments(repository)[0]}
+        after = {name for name, _ in list_chunkindex_fragments(repository)}
         assert before == after  # unchanged: repack bailed out
-
-
-def test_read_sentinel_returns_none(tmp_path):
-    """Reading the sentinel as a fragment returns None (the old-borg graceful-degradation path)."""
-    loc = os.fspath(tmp_path / "repository")
-    with Repository(loc, exclusive=True, create=True) as repository:
-        write_chunkindex_invalidated(repository)
-        assert read_chunkindex_from_repo(repository, CHUNKINDEX_INVALIDATED_NAME) is None
 
 
 def test_files_cache_save_tolerates_missing_chunk(tmp_path, monkeypatch):

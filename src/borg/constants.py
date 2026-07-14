@@ -114,11 +114,11 @@ CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
 # How often to restart merging the fragments into a chunk index when a listed fragment vanishes
 # mid-merge (a concurrent repack replaced it). After that, fall back to the slow rebuild from packs.
 CHUNKINDEX_MERGE_ATTEMPTS = 3
-# Sentinel in the index/ namespace marking the chunk index as invalidated. Written before deleting
-# fragments and removed afterwards; while present, the index is rebuilt from packs. The all-zeros
-# name is a valid but unreachable sha256 (nothing hashes to it), so older borg reads it as an
-# unreadable fragment and falls back to the rebuild.
-CHUNKINDEX_INVALIDATED_NAME = "0" * 64
+# Marker object in the config/ namespace recording that the chunk index is invalid. Written before
+# deleting index fragments and removed once every fragment is gone. While present, the chunk index is
+# rebuilt from the packs on next load, so an interrupted fragment deletion cannot leave a partial
+# fragment set in use.
+CHUNKINDEX_INVALID_SENTINEL = "chunkindex-invalid"
 
 FD_MAX_AGE = 4 * 60  # 4 minutes
 

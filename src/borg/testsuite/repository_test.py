@@ -119,7 +119,7 @@ def test_chunk_index_persisted_on_close(tmp_path):
     # reopen and read the cached fragments straight from disk
     with Repository(location, exclusive=True) as repository:
         persisted = ChunkIndex()
-        for hash in list_chunkindex_hashes(repository)[0]:
+        for hash in list_chunkindex_hashes(repository):
             fragment = read_chunkindex_from_repo(repository, hash)
             if fragment is not None:
                 for k, v in fragment.items():
@@ -967,6 +967,19 @@ def test_check_detects_index_corruption(tmp_path):
         corrupted[0] ^= 0xFF
         repository.store_store(index_name, bytes(corrupted))  # same name, rotted content
         assert repository.check(repair=False) is False  # mismatch between content hash and name detected
+
+
+def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):
+    # a config/ marker records that the chunk index is invalid; check warns but does not fail,
+    # since the index is not part of the repository's object integrity.
+    import logging
+    from ..constants import CHUNKINDEX_INVALID_SENTINEL
+
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store(f"config/{CHUNKINDEX_INVALID_SENTINEL}", b"")
+        with caplog.at_level(logging.WARNING):
+            assert repository.check(repair=False) is True
+        assert "chunk index is invalid" in caplog.text
 
 
 def test_check_intact_multi_object_pack_passes(tmp_path):

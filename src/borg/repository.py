@@ -707,11 +707,10 @@ class Repository:
         # stop and report that rather than continue. matters for partial checks too, whose runs can be
         # days apart (e.g. a weekend cron job).
         index_infos = store_list("index")
-        # the index-invalidated sentinel is not a real fragment and its content does not match its
-        # name; skip verification and warn rather than report it as corruption.
-        if any(info.name == CHUNKINDEX_INVALIDATED_NAME for info in index_infos):
-            logger.warning("chunk index was invalidated by an interrupted operation; it will be rebuilt on next use.")
-            index_infos = [info for info in index_infos if info.name != CHUNKINDEX_INVALIDATED_NAME]
+        # a marker in config/ records that the chunk index is invalid (an interrupted fragment
+        # deletion); it will be rebuilt on next use, so warn rather than verify the leftover fragments.
+        if any(info.name == CHUNKINDEX_INVALID_SENTINEL for info in store_list("config")):
+            logger.warning("chunk index is invalid (interrupted operation); it will be rebuilt on next use.")
         index_pi = ProgressIndicatorPercent(total=len(index_infos), msg="Checking index %3.0f%%", msgid="check.index")
         for info in index_infos:
             self._lock_refresh()

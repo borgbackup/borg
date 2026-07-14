@@ -5,16 +5,8 @@ from hashlib import sha256
 import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
-from ..repository import (
-    Repository,
-    MAX_DATA_SIZE,
-    rest_serve_command,
-    PackWriter,
-    PackReader,
-    CHECKED_PACKS,
-    CheckedPackEntry,
-    new_checked_packs_table,
-)
+from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, PackReader
+from ..repository import CHECKED_PACKS, CheckedPackEntry, new_checked_packs_table
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
 
@@ -1025,6 +1017,45 @@ def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
         repository.store_store("packs/" + bin_to_hex(early_id), b"CORRUPT-does-not-match-name")
 
         assert repository.check(repair=False, max_duration=3600) is False
+
+
+def test_check_partial_rechecks_pack_recorded_corrupt(tmp_path):
+    # a pack recorded corrupt earlier in the cycle is re-verified, so the corruption keeps being reported.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        corrupt_id = H(1)  # stored content does not hash to this name
+        repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
+
+        table = new_checked_packs_table()
+        table[corrupt_id] = CheckedPackEntry(timestamp=1, result=0)
+        repository._store_checked_packs(table)
+
+        assert repository.check(repair=False, max_duration=3600) is False
+
+
+def test_check_partial_clears_recorded_corruption_when_intact(tmp_path, monkeypatch):
+    # a pack recorded corrupt is re-verified, not skipped: assert True alone would also hold if the
+    # pack were skipped outright, so this spies on store.hash to confirm verify() actually ran on it.
+    intact = fchunk(b"INTACT", chunk_id=H(1))
+    intact_id = sha256(intact).digest()
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pack_key = "packs/" + bin_to_hex(intact_id)
+        repository.store_store(pack_key, intact)
+
+        table = new_checked_packs_table()
+        table[intact_id] = CheckedPackEntry(timestamp=1, result=0)  # stale corrupt record
+        repository._store_checked_packs(table)
+
+        hashed_keys = []
+        orig_hash = repository.store.hash
+
+        def spy_hash(key):
+            hashed_keys.append(key)
+            return orig_hash(key)
+
+        monkeypatch.setattr(repository.store, "hash", spy_hash)
+
+        assert repository.check(repair=False, max_duration=3600) is True
+        assert pack_key in hashed_keys  # verify() ran on the pack; it was not skipped
 
 
 def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):

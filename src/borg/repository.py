@@ -33,8 +33,8 @@ from .crypto.key import is_keyfile
 logger = create_logger(__name__)
 
 # check() records the packs verified in the current check cycle in CHECKED_PACKS, a HashTableNT mapping
-# pack_id (32 bytes) -> (timestamp, result). Partial checks (--max-duration) skip packs already in this
-# set. Pack names are content sha256s with no meaningful order, so skipping is a set lookup.
+# pack_id (32 bytes) -> (timestamp, result). A partial check (--max-duration) skips packs recorded intact
+# and re-verifies packs recorded corrupt.
 CHECKED_PACKS = "cache/checked-packs"
 CheckedPackEntry = namedtuple("CheckedPackEntry", "timestamp result")
 CheckedPackEntryFormatT = namedtuple("CheckedPackEntryFormatT", "timestamp result")
@@ -737,7 +737,8 @@ class Repository:
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for every pack, including ones a partial resume skips below
                 pack_id = hex_to_bin(info.name)
-                if pack_id in checked_packs:  # already verified this cycle
+                entry = checked_packs.get(pack_id)
+                if entry is not None and entry.result:  # verified intact earlier in this cycle
                     continue
                 pack_files += 1
                 ok = verify("packs", info.name)

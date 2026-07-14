@@ -341,6 +341,16 @@ def test_match_dst_transition(archivers, request):
     assert "archive-plus2" not in out_after
 
 
+def rejected_date_pattern(archiver, invalid_expr):
+    """Run a rejected ``date:`` pattern and return the resulting error message."""
+    args = ("repo-list", "-v", f"--match-archives=date:{invalid_expr}")
+    if archiver.FORK_DEFAULT:
+        return cmd(archiver, *args, exit_code=CommandError().exit_code)
+    with pytest.raises(CommandError) as excinfo:
+        cmd(archiver, *args)
+    return str(excinfo.value)
+
+
 @pytest.mark.parametrize(
     "invalid_expr",
     [
@@ -358,10 +368,7 @@ def test_invalid_timezones_rejected(archivers, request, invalid_expr):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
-    with pytest.raises(CommandError) as excinfo:
-        cmd(archiver, "repo-list", "-v", f"--match-archives=date:{invalid_expr}")
-
-    msg = str(excinfo.value)
+    msg = rejected_date_pattern(archiver, invalid_expr)
     assert "Invalid date pattern" in msg
     assert invalid_expr in msg
 
@@ -370,10 +377,7 @@ def test_unix_timestamp_rejects_timezone(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
-    with pytest.raises(CommandError) as excinfo:
-        cmd(archiver, "repo-list", "-v", "--match-archives=date:@1735732800Z")
-
-    msg = str(excinfo.value)
+    msg = rejected_date_pattern(archiver, "@1735732800Z")
     assert "Invalid date pattern" in msg
     assert "@1735732800Z" in msg
 
@@ -393,10 +397,7 @@ def test_out_of_range_rejected(archivers, request, invalid_expr):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
-    with pytest.raises(CommandError) as excinfo:
-        cmd(archiver, "repo-list", "-v", f"--match-archives=date:{invalid_expr}")
-
-    msg = str(excinfo.value)
+    msg = rejected_date_pattern(archiver, invalid_expr)
     assert "Invalid date pattern" in msg
     assert invalid_expr in msg
 
@@ -406,10 +407,7 @@ def test_fractional_precision_rejected(archivers, request, invalid_expr):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
-    with pytest.raises(CommandError) as excinfo:
-        cmd(archiver, "repo-list", "-v", f"--match-archives=date:{invalid_expr}")
-
-    msg = str(excinfo.value)
+    msg = rejected_date_pattern(archiver, invalid_expr)
     assert "Invalid date pattern" in msg
     assert invalid_expr in msg
 
@@ -419,7 +417,4 @@ def test_surrounding_whitespace_rejected(archivers, request, invalid_expr):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
-    with pytest.raises(CommandError) as excinfo:
-        cmd(archiver, "repo-list", "-v", f"--match-archives=date:{invalid_expr}")
-
-    assert "Invalid date pattern" in str(excinfo.value)
+    assert "Invalid date pattern" in rejected_date_pattern(archiver, invalid_expr)

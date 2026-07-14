@@ -6,7 +6,7 @@ import pytest
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
 from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, PackReader
-from ..repository import CHECKED_PACKS, CheckedPackEntry, new_checked_packs_table
+from ..repository import PackTracker
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
 
@@ -983,20 +983,23 @@ def test_check_intact_multi_object_pack_passes(tmp_path):
 def test_check_checked_packs_roundtrip(tmp_path):
     # the set survives a store/load round-trip; a rotted blob loads as empty.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        table = new_checked_packs_table()
-        table[H(1)] = CheckedPackEntry(timestamp=123, result=1)
-        table[H(2)] = CheckedPackEntry(timestamp=456, result=0)
-        repository._store_checked_packs(table)
+        tracker = PackTracker(repository.store)
+        tracker.table[H(1)] = PackTracker.Entry(timestamp=123, result=1)
+        tracker.table[H(2)] = PackTracker.Entry(timestamp=456, result=0)
+        tracker.save()
 
-        loaded = repository._load_checked_packs()
+        loaded = PackTracker(repository.store)
+        loaded.load()
         assert len(loaded) == 2
-        assert H(1) in loaded and H(2) in loaded
-        assert tuple(loaded[H(2)]) == (456, 0)
+        assert H(1) in loaded.table and H(2) in loaded.table
+        assert tuple(loaded.table[H(2)]) == (456, 0)
 
-        corrupted = bytearray(repository.store.load(CHECKED_PACKS))
+        corrupted = bytearray(repository.store.load(PackTracker.NAME))
         corrupted[0] ^= 0xFF  # break the appended sha256
-        repository.store.store(CHECKED_PACKS, bytes(corrupted))
-        assert len(repository._load_checked_packs()) == 0
+        repository.store.store(PackTracker.NAME, bytes(corrupted))
+        rotted = PackTracker(repository.store)
+        rotted.load()
+        assert len(rotted) == 0
 
 
 def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
@@ -1007,9 +1010,9 @@ def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
         repository.store_store("packs/" + bin_to_hex(intact_id), intact)
 
         # mark the intact pack as already checked in this cycle.
-        table = new_checked_packs_table()
-        table[intact_id] = CheckedPackEntry(timestamp=1, result=1)
-        repository._store_checked_packs(table)
+        tracker = PackTracker(repository.store)
+        tracker.record(intact_id, ok=True)
+        tracker.save()
 
         # add a corrupt pack (content does not hash to its name) whose id sorts before intact_id.
         early_id = b"\x00" * 32
@@ -1025,9 +1028,9 @@ def test_check_partial_rechecks_pack_recorded_corrupt(tmp_path):
         corrupt_id = H(1)  # stored content does not hash to this name
         repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
 
-        table = new_checked_packs_table()
-        table[corrupt_id] = CheckedPackEntry(timestamp=1, result=0)
-        repository._store_checked_packs(table)
+        tracker = PackTracker(repository.store)
+        tracker.record(corrupt_id, ok=False)
+        tracker.save()
 
         assert repository.check(repair=False, max_duration=3600) is False
 
@@ -1041,9 +1044,9 @@ def test_check_partial_clears_recorded_corruption_when_intact(tmp_path, monkeypa
         pack_key = "packs/" + bin_to_hex(intact_id)
         repository.store_store(pack_key, intact)
 
-        table = new_checked_packs_table()
-        table[intact_id] = CheckedPackEntry(timestamp=1, result=0)  # stale corrupt record
-        repository._store_checked_packs(table)
+        tracker = PackTracker(repository.store)
+        tracker.record(intact_id, ok=False)  # stale corrupt record
+        tracker.save()
 
         hashed_keys = []
         orig_hash = repository.store.hash

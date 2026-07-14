@@ -32,18 +32,6 @@ from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
 
-# check() records the packs verified in the current check cycle in CHECKED_PACKS, a HashTableNT mapping
-# pack_id (32 bytes) -> (timestamp, result). A partial check (--max-duration) skips packs recorded intact
-# and re-verifies packs recorded corrupt.
-CHECKED_PACKS = "cache/checked-packs"
-CheckedPackEntry = namedtuple("CheckedPackEntry", "timestamp result")
-CheckedPackEntryFormatT = namedtuple("CheckedPackEntryFormatT", "timestamp result")
-CheckedPackEntryFormat = CheckedPackEntryFormatT(timestamp="Q", result="B")  # unix ts (uint64), result 1=ok 0=corrupt
-
-
-def new_checked_packs_table():
-    return HashTableNT(key_size=32, value_type=CheckedPackEntry, value_format=CheckedPackEntryFormat)
-
 
 def repo_lister(repository, *, limit=None):
     marker = None
@@ -246,6 +234,60 @@ class PackReader:
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
             yield hdr.chunk_id, offset, obj_size
             offset += obj_size
+
+
+class PackTracker:
+    """Packs check() has verified in the current cycle, mapping pack_id (32 bytes) -> (timestamp, result).
+
+    is_intact() drives the skip in a partial check: intact packs are skipped, packs recorded corrupt are
+    re-verified. save() appends a sha256 over the serialized table; load() drops a blob whose sha256 does
+    not match, so a rotted set re-checks everything instead of skipping an unverified pack.
+    """
+
+    NAME = "cache/checked-packs"
+    Entry = namedtuple("Entry", "timestamp result")
+    EntryFormatT = namedtuple("EntryFormatT", "timestamp result")
+    _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=corrupt
+
+    def __init__(self, store):
+        self.store = store
+        self.table = HashTableNT(key_size=32, value_type=self.Entry, value_format=self._EntryFormat)
+
+    def __len__(self):
+        return len(self.table)
+
+    def is_intact(self, pack_id):
+        entry = self.table.get(pack_id)
+        return entry is not None and bool(entry.result)
+
+    def record(self, pack_id, ok):
+        self.table[pack_id] = self.Entry(timestamp=int(time.time()), result=int(ok))
+
+    def load(self):
+        try:
+            data = self.store.load(self.NAME)
+        except StoreObjectNotFound:
+            return
+        if len(data) < 32 or sha256(data[:-32]).digest() != data[-32:]:
+            logger.warning("Ignoring corrupted checked-packs set.")
+            return
+        try:
+            with io.BytesIO(data[:-32]) as f:
+                self.table = HashTableNT.read(f)
+        except ValueError:
+            logger.warning("Ignoring unreadable checked-packs set.")
+
+    def save(self):
+        with io.BytesIO() as f:
+            self.table.write(f)
+            data = f.getvalue()
+        self.store.store(self.NAME, data + sha256(data).digest())
+
+    def clear(self):
+        try:
+            self.store.delete(self.NAME)
+        except StoreObjectNotFound:
+            pass
 
 
 class Repository:
@@ -694,18 +736,13 @@ class Repository:
         assert not (repair and partial)
         mode = "partial" if partial else "full"
         logger.info(f"Starting {mode} repository check")
+        tracker = PackTracker(self.store)
         if partial:
-            # resume the cycle: packs already in the set are skipped below.
-            checked_packs = self._load_checked_packs()
+            tracker.load()  # resume the cycle: packs already recorded intact are skipped below.
         else:
-            # a full check verifies every pack; start a new cycle.
-            checked_packs = new_checked_packs_table()
-            try:
-                self.store.delete(CHECKED_PACKS)
-            except StoreObjectNotFound:
-                pass
-        if len(checked_packs):
-            logger.info(f"Continuing check cycle, {len(checked_packs)} packs already checked.")
+            tracker.clear()  # a full check verifies every pack; start a new cycle.
+        if len(tracker):
+            logger.info(f"Continuing check cycle, {len(tracker)} packs already checked.")
         else:
             logger.info("Starting from beginning.")
         t_start = time.monotonic()
@@ -737,32 +774,28 @@ class Repository:
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for every pack, including ones a partial resume skips below
                 pack_id = hex_to_bin(info.name)
-                entry = checked_packs.get(pack_id)
-                if entry is not None and entry.result:  # verified intact earlier in this cycle
+                if tracker.is_intact(pack_id):  # verified intact earlier in this cycle
                     continue
                 pack_files += 1
                 ok = verify("packs", info.name)
                 if not ok:
                     pack_errors += 1  # repair (salvage into a new pack, fix index) is not implemented yet
-                checked_packs[pack_id] = CheckedPackEntry(timestamp=int(time.time()), result=int(ok))
+                tracker.record(pack_id, ok)
                 now = time.monotonic()
-                if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
+                if now > t_last_checkpoint + 60:  # checkpoint every minute
                     t_last_checkpoint = now
                     logger.info(f"Checkpointing at pack {info.name}.")
-                    self._store_checked_packs(checked_packs)
+                    tracker.save()
                 if partial and now > t_start + max_duration:
-                    logger.info(f"Finished partial repository check, {len(checked_packs)} packs checked so far.")
-                    self._store_checked_packs(checked_packs)
+                    logger.info(f"Finished partial repository check, {len(tracker)} packs checked so far.")
+                    tracker.save()
                     break
             else:
                 # scanned all packs without hitting the time limit: the cycle is done, drop the set.
                 if pack_infos:
                     pack_pi.show(current=len(pack_infos))  # finish at 100%
                 logger.info("Finished checking packs.")
-                try:
-                    self.store.delete(CHECKED_PACKS)
-                except StoreObjectNotFound:
-                    pass
+                tracker.clear()
             pack_pi.finish()
         else:
             # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).
@@ -778,30 +811,6 @@ class Repository:
         else:
             logger.error(f"Finished {mode} repository check, errors found.")
         return objs_errors == 0 or repair
-
-    def _load_checked_packs(self):
-        """Load the CHECKED_PACKS set. Return an empty table if it is missing, corrupted or unreadable."""
-        try:
-            data = self.store.load(CHECKED_PACKS)
-        except StoreObjectNotFound:
-            return new_checked_packs_table()
-        # the trailing 32 bytes are a sha256 over the rest; a mismatch means the blob rotted.
-        if len(data) < 32 or sha256(data[:-32]).digest() != data[-32:]:
-            logger.warning("Ignoring corrupted checked-packs set.")
-            return new_checked_packs_table()
-        try:
-            with io.BytesIO(data[:-32]) as f:
-                return HashTableNT.read(f)
-        except ValueError:
-            logger.warning("Ignoring unreadable checked-packs set.")
-            return new_checked_packs_table()
-
-    def _store_checked_packs(self, checked_packs):
-        """Store the CHECKED_PACKS set with a sha256 appended over its content."""
-        with io.BytesIO() as f:
-            checked_packs.write(f)
-            data = f.getvalue()
-        self.store.store(CHECKED_PACKS, data + sha256(data).digest())
 
     def list(self, limit=None, marker=None):
         """

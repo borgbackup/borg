@@ -782,7 +782,7 @@ class Repository:
                     pack_errors += 1  # repair (salvage into a new pack, fix index) is not implemented yet
                 tracker.record(pack_id, ok)
                 now = time.monotonic()
-                if now > t_last_checkpoint + 60:  # checkpoint every minute
+                if now > t_last_checkpoint + 30 * 60:  # checkpoint every 30 minutes
                     t_last_checkpoint = now
                     logger.info(f"Checkpointing at pack {info.name}.")
                     tracker.save()

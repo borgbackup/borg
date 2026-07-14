@@ -31,11 +31,14 @@ config/
     the repository version encoded as decimal number text
   manifest
     some data about the repository, binary
-  last-pack-checked
-    repository check progress (partial checks, full checks' checkpointing),
-    key of last pack checked as text
   space-reserve.N
     purely random binary data to reserve space, e.g. for disk-full emergencies
+
+cache/
+  checked-packs
+    repository check progress (partial checks, full checks' checkpointing),
+    the set of packs checked so far this cycle (pack key -> timestamp, result),
+    as a hashtable with an appended integrity hash
 
 There is a list of pointers to archive objects in this directory:
 

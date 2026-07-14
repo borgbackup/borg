@@ -119,7 +119,7 @@ def test_chunk_index_persisted_on_close(tmp_path):
     # reopen and read the cached fragments straight from disk
     with Repository(location, exclusive=True) as repository:
         persisted = ChunkIndex()
-        for hash in list_chunkindex_hashes(repository):
+        for hash in list_chunkindex_hashes(repository)[0]:
             fragment = read_chunkindex_from_repo(repository, hash)
             if fragment is not None:
                 for k, v in fragment.items():

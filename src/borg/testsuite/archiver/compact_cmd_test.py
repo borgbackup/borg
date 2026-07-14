@@ -139,7 +139,7 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
     # The objects were deleted, so no readable chunk index may still list them.
     repository = open_repository(archiver)
     with repository:
-        assert list_chunkindex_hashes(repository) == []
+        assert list_chunkindex_hashes(repository)[0] == []
 
     # A later backup of identical content must re-upload the deleted chunks, ...
     cmd(archiver, "create", "archive2", "input")
@@ -193,7 +193,7 @@ def test_compact_soft_interrupt_persists_valid_index(archivers, request, monkeyp
     # every persisted index entry points at a pack that still exists
     repository = open_repository(archiver)
     with repository:
-        assert list_chunkindex_hashes(repository) != []
+        assert list_chunkindex_hashes(repository)[0] != []
         pack_names_after = {info.name for info in repository.store_list("packs")}
         assert 0 < len(pack_names_after) < len(pack_names_before)  # some packs deleted, some left
         for id, entry in repository.chunks.iteritems():

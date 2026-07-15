@@ -970,13 +970,13 @@ def test_check_detects_index_corruption(tmp_path):
 
 
 def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):
-    # a config/ marker records that the chunk index is invalid; check warns but does not fail,
-    # since the index is not part of the repository's object integrity.
+    # check warns about an invalid chunk index but does not fail, since the index is not part of
+    # the repository's object integrity.
     import logging
-    from ..constants import CHUNKINDEX_INVALID_SENTINEL
+    from ..cache import write_chunkindex_invalid
 
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        repository.store_store(f"config/{CHUNKINDEX_INVALID_SENTINEL}", b"")
+        write_chunkindex_invalid(repository)
         with caplog.at_level(logging.WARNING):
             assert repository.check(repair=False) is True
         assert "chunk index is invalid" in caplog.text

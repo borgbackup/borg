@@ -142,6 +142,8 @@ General:
             Now you can init a fresh repo. Make sure you do not use the workaround any more.
 
 Output formatting:
+    BORG_CHECK_FORMAT
+        Giving the default value for ``borg check --format=X``.
     BORG_LIST_FORMAT
         Giving the default value for ``borg list --format=X``.
     BORG_REPO_LIST_FORMAT

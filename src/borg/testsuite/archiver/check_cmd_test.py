@@ -7,7 +7,7 @@ import pytest
 
 from ...archive import ChunkBuffer
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack
+from ...helpers import bin_to_hex, msgpack, CommandError
 from ...manifest import Manifest
 from ...repository import Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
@@ -213,6 +213,51 @@ def test_missing_archive_metadata(archivers, request):
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
+
+
+def test_check_format(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    output = cmd(archiver, "check", "-v", "--archives-only", "--format", "{archive}|{hostname}", exit_code=0)
+    assert "Analyzing archive archive1|" in output
+
+
+def test_check_format_env_var(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    monkeypatch.setenv("BORG_CHECK_FORMAT", "{archive}|env")
+    output = cmd(archiver, "check", "-v", "--archives-only", exit_code=0)
+    assert "Analyzing archive archive1|env" in output
+    output = cmd(archiver, "check", "-v", "--archives-only", "--format", "{archive}|arg", exit_code=0)
+    assert "Analyzing archive archive1|arg" in output  # --format overrides the env var
+
+
+def test_check_format_invalid_key(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    if archiver.FORK_DEFAULT:
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "check", "--archives-only", "--format", "{nosuchkey}", exit_code=expected_ec)
+        assert "Invalid format keys: nosuchkey" in output
+    else:
+        with pytest.raises(CommandError, match="Invalid format keys: nosuchkey"):
+            cmd(archiver, "check", "--archives-only", "--format", "{nosuchkey}")
+
+
+def test_check_format_missing_archive_metadata(archivers, request):
+    # {comment} needs the archive metadata, which is deleted below.
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        repository.delete(archive.id)
+    archive_id_hex = bin_to_hex(archive.id)
+    output = cmd(archiver, "check", "-v", "--archives-only", "--format", "{archive} {comment}", exit_code=1)
+    # the archive directory entry has no name for it, only the id, which {archive} {comment} would not show:
+    assert "Analyzing archive archive-does-not-exist " in output
+    assert f"{archive_id_hex} (1/2)" in output
+    assert f"Archive metadata block {archive_id_hex} is missing!" in output
+    assert "Analyzing archive archive2" in output  # the intact archive still uses the given format
 
 
 def test_missing_manifest(archivers, request):

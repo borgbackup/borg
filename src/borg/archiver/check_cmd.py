@@ -1,8 +1,11 @@
+import os
+from string import Formatter
+
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
-from ..helpers import yes
+from ..helpers import yes, ArchiveFormatter
 from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
@@ -51,6 +54,19 @@ class CheckMixIn:
                 archive_checker.key = archive_checker.make_key(repository, manifest_only=True)
             except IntegrityError:
                 pass  # will try to make key later again
+            if args.format is not None:
+                format = args.format
+            else:
+                format = os.environ.get("BORG_CHECK_FORMAT", "{archive} {time} {id}")
+            # check the format here, the archives check formats the first archive only after
+            # the repository check has finished, which can take hours.
+            try:
+                format_keys = {key for _, key, _, _ in Formatter().parse(format) if key}
+            except ValueError as err:
+                raise CommandError(f"Invalid format string: {err}")
+            unknown_keys = format_keys - set(ArchiveFormatter.KEY_DESCRIPTIONS) - set(ArchiveFormatter.FIXED_KEYS)
+            if unknown_keys:
+                raise CommandError(f"Invalid format keys: {', '.join(sorted(unknown_keys))}")
         if not args.archives_only:
             if not repository.check(repair=args.repair, max_duration=args.max_duration):
                 set_ec(EXIT_WARNING)
@@ -67,6 +83,8 @@ class CheckMixIn:
             newer=args.newer,
             oldest=args.oldest,
             newest=args.newest,
+            format=format,
+            iec=args.iec,
         ):
             set_ec(EXIT_WARNING)
             return
@@ -139,6 +157,10 @@ class CheckMixIn:
         data from the repository and is thus very time-consuming. You cannot use
         ``--find-lost-archives`` with ``--repository-only``.
 
+        You can influence how the archive part of the ``Analyzing archive ...`` output is
+        formatted by giving a custom format using ``--format`` (see the ``borg repo-list``
+        description for more details about the format string).
+
         About repair mode
         +++++++++++++++++
 
@@ -209,5 +231,12 @@ class CheckMixIn:
             default=0,
             action=Highlander,
             help="perform only a partial repository check for at most SECONDS seconds (default: unlimited)",
+        )
+        subparser.add_argument(
+            "--format",
+            metavar="FORMAT",
+            dest="format",
+            action=Highlander,
+            help="specify format for the archive part " '(default: "{archive} {time} {id}")',
         )
         define_archive_filters_group(subparser)

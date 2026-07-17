@@ -237,11 +237,11 @@ class PackReader:
 
 
 class PackTracker:
-    """Packs check() has verified in the current cycle, mapping pack_id (32 bytes) -> (timestamp, result).
+    """Packs check() verified in the current cycle, mapping pack_id (32 bytes) -> (timestamp, result).
 
-    is_intact() drives the skip in a partial check: intact packs are skipped, packs recorded corrupt are
-    re-verified. save() appends a sha256 over the serialized table; load() drops a blob whose sha256 does
-    not match, so a rotted set re-checks everything instead of skipping an unverified pack.
+    A cycle is one full pass over packs/, which --max-duration may spread over several partial checks.
+    The set is stored at cache/checked-packs with a sha256 over the serialized table appended. load()
+    accepts the table only if that hash matches and its entries have the layout this class writes.
     """
 
     NAME = "cache/checked-packs"
@@ -251,7 +251,11 @@ class PackTracker:
 
     def __init__(self, store):
         self.store = store
-        self.table = HashTableNT(key_size=32, value_type=self.Entry, value_format=self._EntryFormat)
+        self.table = self._new_table()
+
+    @classmethod
+    def _new_table(cls):
+        return HashTableNT(key_size=32, value_type=cls.Entry, value_format=cls._EntryFormat)
 
     def __len__(self):
         return len(self.table)
@@ -273,9 +277,18 @@ class PackTracker:
             return
         try:
             with io.BytesIO(data[:-32]) as f:
-                self.table = HashTableNT.read(f)
+                table = HashTableNT.read(f)
         except ValueError:
             logger.warning("Ignoring unreadable checked-packs set.")
+            return
+        # read() rebuilds key size and value type from the blob, so a table written with a different
+        # Entry layout reads without error. All entries share one layout, so sampling one is enough.
+        for key, value in table.items():
+            if len(key) != 32 or value._fields != self.Entry._fields:
+                logger.warning("Ignoring checked-packs set with an unexpected layout.")
+                return
+            break
+        self.table = table
 
     def save(self):
         with io.BytesIO() as f:
@@ -284,6 +297,7 @@ class PackTracker:
         self.store.store(self.NAME, data + sha256(data).digest())
 
     def clear(self):
+        self.table.clear()
         try:
             self.store.delete(self.NAME)
         except StoreObjectNotFound:
@@ -738,9 +752,9 @@ class Repository:
         logger.info(f"Starting {mode} repository check")
         tracker = PackTracker(self.store)
         if partial:
-            tracker.load()  # resume the cycle: packs already recorded intact are skipped below.
+            tracker.load()  # resume the cycle
         else:
-            tracker.clear()  # a full check verifies every pack; start a new cycle.
+            tracker.clear()  # a full check verifies every pack, so start a new cycle
         if len(tracker):
             logger.info(f"Continuing check cycle, {len(tracker)} packs already checked.")
         else:
@@ -749,11 +763,9 @@ class Repository:
         t_last_checkpoint = t_start
         index_files = index_errors = 0
         pack_files = pack_errors = 0
-        # check index and packs with separate progress indicators, each running from 0% to 100%.
-        # hash the index first, on full and partial checks alike: it is small, and a corrupt index
-        # already means the user must repair it (rebuilding the index re-reads all packs anyway), so we
-        # stop and report that rather than continue. matters for partial checks too, whose runs can be
-        # days apart (e.g. a weekend cron job).
+        # index and packs get separate progress indicators, each running from 0% to 100%.
+        # the index is checked first and in full, on partial checks too: it is small, and index errors
+        # stop the pack check below.
         index_infos = store_list("index")
         index_pi = ProgressIndicatorPercent(total=len(index_infos), msg="Checking index %3.0f%%", msgid="check.index")
         for info in index_infos:
@@ -766,23 +778,23 @@ class Repository:
             index_pi.show(current=len(index_infos))  # finish at 100%
         index_pi.finish()
         if index_errors == 0:
-            # list the packs only now: a corrupt index skips this entirely. packs are the bulk of the
-            # work and the part --max-duration splits.
+            # packs are the bulk of the work and the part --max-duration spreads over several checks.
             pack_infos = store_list("packs")
             pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
             for info in pack_infos:
                 self._lock_refresh()
-                pack_pi.show(increase=1)  # advance for every pack, including ones a partial resume skips below
+                pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
                 if tracker.is_intact(pack_id):  # verified intact earlier in this cycle
                     continue
                 pack_files += 1
                 ok = verify("packs", info.name)
                 if not ok:
-                    pack_errors += 1  # repair (salvage into a new pack, fix index) is not implemented yet
+                    pack_errors += 1
                 tracker.record(pack_id, ok)
                 now = time.monotonic()
-                if now > t_last_checkpoint + 30 * 60:  # checkpoint every 30 minutes
+                # a checkpoint rewrites the whole table (41 bytes per pack), so keep the interval long.
+                if now > t_last_checkpoint + 30 * 60:
                     t_last_checkpoint = now
                     logger.info(f"Checkpointing at pack {info.name}.")
                     tracker.save()

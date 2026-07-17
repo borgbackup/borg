@@ -1,8 +1,12 @@
+import io
 import os
 import sys
+from collections import namedtuple
 from hashlib import sha256
 
 import pytest
+from borghash import HashTableNT
+
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
 from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, PackReader
@@ -1035,30 +1039,93 @@ def test_check_partial_rechecks_pack_recorded_corrupt(tmp_path):
         assert repository.check(repair=False, max_duration=3600) is False
 
 
-def test_check_partial_clears_recorded_corruption_when_intact(tmp_path, monkeypatch):
-    # a pack recorded corrupt is re-verified, not skipped: assert True alone would also hold if the
-    # pack were skipped outright, so this spies on store.hash to confirm verify() actually ran on it.
+def _spy_hash(repository, monkeypatch):
+    # collect the keys passed to store.hash. check() hashes a pack exactly when it verifies it.
+    hashed_keys = []
+    orig_hash = repository.store.hash
+
+    def spy_hash(key):
+        hashed_keys.append(key)
+        return orig_hash(key)
+
+    monkeypatch.setattr(repository.store, "hash", spy_hash)
+    return hashed_keys
+
+
+def _store_intact_pack(repository):
     intact = fchunk(b"INTACT", chunk_id=H(1))
     intact_id = sha256(intact).digest()
+    pack_key = "packs/" + bin_to_hex(intact_id)
+    repository.store_store(pack_key, intact)
+    return intact_id, pack_key
+
+
+def test_check_partial_clears_recorded_corruption_when_intact(tmp_path, monkeypatch):
+    # a pack recorded corrupt is re-verified, and an intact result replaces the stale record.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        pack_key = "packs/" + bin_to_hex(intact_id)
-        repository.store_store(pack_key, intact)
+        intact_id, pack_key = _store_intact_pack(repository)
 
         tracker = PackTracker(repository.store)
         tracker.record(intact_id, ok=False)  # stale corrupt record
         tracker.save()
 
-        hashed_keys = []
-        orig_hash = repository.store.hash
-
-        def spy_hash(key):
-            hashed_keys.append(key)
-            return orig_hash(key)
-
-        monkeypatch.setattr(repository.store, "hash", spy_hash)
+        hashed_keys = _spy_hash(repository, monkeypatch)
 
         assert repository.check(repair=False, max_duration=3600) is True
-        assert pack_key in hashed_keys  # verify() ran on the pack; it was not skipped
+        assert pack_key in hashed_keys  # re-verified
+
+
+def test_check_partial_skips_pack_recorded_intact(tmp_path, monkeypatch):
+    # a pack recorded intact in this cycle is skipped when a partial check resumes.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker(repository.store)
+        tracker.record(intact_id, ok=True)
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_duration=3600) is True
+        assert pack_key not in hashed_keys  # skipped, not re-verified
+
+
+def test_check_full_ignores_recorded_set(tmp_path, monkeypatch):
+    # a full check verifies every pack regardless of the recorded set, then drops the set.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker(repository.store)
+        tracker.record(intact_id, ok=True)
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False) is True
+        assert pack_key in hashed_keys  # verified
+
+        after = PackTracker(repository.store)
+        after.load()
+        assert len(after) == 0  # cycle complete, set dropped
+
+
+def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
+    # load() drops a set whose entries have a different layout than Entry, even though its sha256 matches.
+    OtherEntry = namedtuple("OtherEntry", "timestamp result extra")
+    OtherFormat = namedtuple("OtherFormat", "timestamp result extra")
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        table = HashTableNT(
+            key_size=32, value_type=OtherEntry, value_format=OtherFormat(timestamp="Q", result="B", extra="B")
+        )
+        table[H(1)] = OtherEntry(timestamp=123, result=1, extra=9)
+        with io.BytesIO() as f:
+            table.write(f)
+            data = f.getvalue()
+        repository.store_store(PackTracker.NAME, data + sha256(data).digest())
+
+        tracker = PackTracker(repository.store)
+        tracker.load()
+        assert len(tracker) == 0
 
 
 def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):

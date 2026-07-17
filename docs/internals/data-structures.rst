@@ -37,7 +37,7 @@ config/
 cache/
   checked-packs
     repository check progress (partial checks, full checks' checkpointing),
-    the set of packs checked so far this cycle (pack key -> timestamp, result),
+    the set of packs checked so far this cycle (pack id -> timestamp, result),
     as a hashtable with an appended integrity hash
 
 There is a list of pointers to archive objects in this directory:

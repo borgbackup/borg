@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+import re
 import shutil
 from unittest.mock import patch
 
@@ -244,6 +245,18 @@ def test_check_format_invalid_key(archivers, request):
             cmd(archiver, "check", "--archives-only", "--format", "{nosuchkey}")
 
 
+def test_check_format_invalid_format_string(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    if archiver.FORK_DEFAULT:
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "check", "--archives-only", "--format", "{archive", exit_code=expected_ec)
+        assert "Invalid format string" in output
+    else:
+        with pytest.raises(CommandError, match="Invalid format string"):
+            cmd(archiver, "check", "--archives-only", "--format", "{archive")
+
+
 def test_check_format_missing_archive_metadata(archivers, request):
     # {comment} needs the archive metadata, which is deleted below.
     archiver = request.getfixturevalue(archivers)
@@ -253,8 +266,9 @@ def test_check_format_missing_archive_metadata(archivers, request):
         repository.delete(archive.id)
     archive_id_hex = bin_to_hex(archive.id)
     output = cmd(archiver, "check", "-v", "--archives-only", "--format", "{archive} {comment}", exit_code=1)
-    # the archive directory entry has no name for it, only the id, which {archive} {comment} would not show:
-    assert "Analyzing archive archive-does-not-exist " in output
+    # the archive directory entry has no name for it, only the id, which {archive} {comment} would not show.
+    # the timestamp uses the same style as the formatter would produce, e.g. "Thu, 1970-01-01 00:00:00 +0000":
+    assert re.search(r"Analyzing archive archive-does-not-exist \w{3}, \d{4}-\d{2}-\d{2} ", output)
     assert f"{archive_id_hex} (1/2)" in output
     assert f"Archive metadata block {archive_id_hex} is missing!" in output
     assert "Analyzing archive archive2" in output  # the intact archive still uses the given format

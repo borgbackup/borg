@@ -2159,7 +2159,7 @@ class ArchiveChecker:
             except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityErrorBase):
                 # keys like {comment} need the archive metadata, which is damaged or missing here.
                 # use the values from the archive directory entry, they are always available.
-                formatted = f"{info.name} {info.ts.astimezone()} {archive_id_hex}"
+                formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
             logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
             if archive_id not in self.chunks:
                 logger.error(f"Archive metadata block {archive_id_hex} is missing!")

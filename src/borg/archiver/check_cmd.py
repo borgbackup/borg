@@ -34,9 +34,12 @@ class CheckMixIn:
                 env_var_override="BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
             ):
                 raise CancelledByUser()
-        if args.repo_only and any((args.verify_data, args.first, args.last, args.match_archives)):
+        if args.repo_only and any(
+            (args.verify_data, args.first, args.last, args.match_archives, args.format is not None)
+        ):
             raise CommandError(
-                "--repository-only contradicts --first, --last, -a / --match-archives and --verify-data arguments."
+                "--repository-only contradicts --first, --last, -a / --match-archives, "
+                "--verify-data and --format arguments."
             )
         if args.repo_only and args.find_lost_archives:
             raise CommandError("--repository-only contradicts the --find-lost-archives option.")

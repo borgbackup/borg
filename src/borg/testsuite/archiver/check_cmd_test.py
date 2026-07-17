@@ -245,6 +245,21 @@ def test_check_format_invalid_key(archivers, request):
             cmd(archiver, "check", "--archives-only", "--format", "{nosuchkey}")
 
 
+def test_check_format_repository_only(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    if archiver.FORK_DEFAULT:
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "check", "--repository-only", "--format", "{archive}", exit_code=expected_ec)
+        assert "--repository-only contradicts" in output
+    else:
+        with pytest.raises(CommandError, match="--repository-only contradicts"):
+            cmd(archiver, "check", "--repository-only", "--format", "{archive}")
+    # only the option contradicts, a set env var must not make the repository check fail:
+    monkeypatch.setenv("BORG_CHECK_FORMAT", "{archive}|env")
+    cmd(archiver, "check", "--repository-only", exit_code=0)
+
+
 def test_check_format_invalid_format_string(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)

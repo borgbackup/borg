@@ -582,7 +582,7 @@ def chunkindex_is_invalid(repository):
 
     store_list() bypasses the borgstore cache, so this stays correct even for a cache-backed namespace.
     """
-    return any(ItemInfo(*info).name == CHUNKINDEX_INVALID_SENTINEL for info in repository.store_list("config"))
+    return any(ItemInfo(*info).name == CHUNKINDEX_INVALID_SENTINEL for info in repository.store_list("cache"))
 
 
 def write_chunkindex_invalid(repository):
@@ -590,13 +590,13 @@ def write_chunkindex_invalid(repository):
 
     If the deletion is interrupted, the marker remains and the index is rebuilt on next load.
     """
-    repository.store_store(f"config/{CHUNKINDEX_INVALID_SENTINEL}", b"")
+    repository.store_store(f"cache/{CHUNKINDEX_INVALID_SENTINEL}", b"")
 
 
 def delete_chunkindex_invalid(repository):
     """Clear the chunk-index-invalid marker. Call after all fragment deletions have completed."""
     try:
-        repository.store_delete(f"config/{CHUNKINDEX_INVALID_SENTINEL}")
+        repository.store_delete(f"cache/{CHUNKINDEX_INVALID_SENTINEL}")
     except StoreObjectNotFound:
         pass
 

@@ -114,7 +114,7 @@ CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
 # How often to restart merging the fragments into a chunk index when a listed fragment vanishes
 # mid-merge (a concurrent repack replaced it). After that, fall back to the slow rebuild from packs.
 CHUNKINDEX_MERGE_ATTEMPTS = 3
-# Marker object in the config/ namespace recording that the chunk index is invalid. Written before
+# Marker object in the cache/ namespace recording that the chunk index is invalid. Written before
 # deleting index fragments and removed once every fragment is gone. While present, the chunk index is
 # rebuilt from the packs on next load, so an interrupted fragment deletion cannot leave a partial
 # fragment set in use.

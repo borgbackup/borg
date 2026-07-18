@@ -435,14 +435,17 @@ New features:
 
   - borg key export-related-secrets <REPO> <SPATH>
   - borg init --import-related-secrets <SPATH> <REPO>
+- BORG_JSON_INDENT env var for JSON output formatting, #3605
+- BORG_HOSTNAME and BORG_USERNAME env vars, #9651
 
 Fixes:
 
+- create: do not wrap repository writes in backup_io("read"), #9854
 - Archive.delete: don't reuse msgpack Unpacker after an unpacking failure
 - slashdot hack: fix exclusion of source directory metadata, #9534
 - hashindex: fix new checks for big endian archs, #9521
 
-Note:
+- Note:
 
     Many of the fixed issues listed below relate to rather rare or theoretical
     issues and were found by automated code checking.
@@ -480,6 +483,7 @@ Other changes:
 
 - msgpack: also allow up to 1.2.1
 - use F_FULLFSYNC on macOS for SyncFile data durability, #9383
+- mount: drop runtime warning about symlinks and improve corresponding docs
 - mount: improve error msg when uid/gid cannot be resolved, #9574
 - properly handle invalid and dev versions in version parser, fixes #9014
 - tests: reset borg.output.progress logger between tests to fix flakiness

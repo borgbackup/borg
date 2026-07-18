@@ -414,8 +414,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.5 (not released yet)
---------------------------------
+Version 1.4.5 (2026-07-19)
+--------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
@@ -440,6 +440,8 @@ New features:
 
 Fixes:
 
+- extract: security fixes for CVE-2026-62268 (low severity: attacker would need
+  repository write access and, if the repo is encrypted, also borg key and passphrase).
 - create: do not wrap repository writes in backup_io("read"), #9854
 - Archive.delete: don't reuse msgpack Unpacker after an unpacking failure
 - slashdot hack: fix exclusion of source directory metadata, #9534

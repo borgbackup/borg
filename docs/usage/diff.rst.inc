@@ -31,7 +31,7 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--sort``                            | Sort the output by path (deprecated, use --sort-by=path).                                                                                 |
     +-------------------------------------------------------+---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--sort-by FIELD[,FIELD...]``        | Advanced sorting: specify field(s) to sort by. Accepts a comma-separated list. Prefix with > for descending or < for ascending (default). |
+    |                                                       | ``--sort-by FIELDS``                  | Advanced sorting: specify field(s) to sort by. Accepts a comma-separated list. Prefix with > for descending or < for ascending (default). |
     +-------------------------------------------------------+---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--content-only``                    | Only compare differences in content (exclude metadata differences)                                                                        |
     +-------------------------------------------------------+---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------+
@@ -71,13 +71,13 @@ borg diff
 
 
     options
-        --numeric-owner                deprecated, use ``--numeric-ids`` instead
-        --numeric-ids                  only consider numeric user and group identifiers
-        --same-chunker-params          Override check of chunker parameters.
-        --sort                         Sort the output by path (deprecated, use --sort-by=path).
-        --sort-by FIELD[,FIELD...]     Advanced sorting: specify field(s) to sort by. Accepts a comma-separated list. Prefix with > for descending or < for ascending (default).
-        --content-only                 Only compare differences in content (exclude metadata differences)
-        --json-lines                   Format output as JSON Lines.
+        --numeric-owner      deprecated, use ``--numeric-ids`` instead
+        --numeric-ids        only consider numeric user and group identifiers
+        --same-chunker-params    Override check of chunker parameters.
+        --sort               Sort the output by path (deprecated, use --sort-by=path).
+        --sort-by FIELDS     Advanced sorting: specify field(s) to sort by. Accepts a comma-separated list. Prefix with > for descending or < for ascending (default).
+        --content-only       Only compare differences in content (exclude metadata differences)
+        --json-lines         Format output as JSON Lines.
 
 
     :ref:`common_options`

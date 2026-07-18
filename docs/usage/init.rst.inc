@@ -168,17 +168,16 @@ Borg supports the following encryption modes:
 .. nanorst: inline-fill
 .. class:: borg-encryption-table
 
-+----------+-------------------+--------------------------+-------------------------+
-| Hash/MAC | Not Encrypted                                | Encrypted (AEAD w/ AES) |
-+          +-------------------+--------------------------+-------------------------+
-|          | Not Authenticated | Authenticated                                      |
-+==========+===================+==========================+=========================+
-| SHA-256  | ``none``          | ``authenticated``        | ``repokey``             |
-|          |                   |                          | ``keyfile``             |
-+----------+-------------------+--------------------------+-------------------------+
-| BLAKE2b  | n/a               | ``authenticated-blake2`` | ``repokey-blake2``      |
-|          |                   |                          | ``keyfile-blake2``      |
-+----------+-------------------+--------------------------+-------------------------+
++----------+-------------------+--------------------------+--------------------------+
+| Hash/MAC | Not encrypted,    | Not encrypted,           | Encrypted (AEAD w/ AES), |
+|          | not authenticated | authenticated            | authenticated            |
++==========+===================+==========================+==========================+
+| SHA-256  | ``none``          | ``authenticated``        | ``repokey``              |
+|          |                   |                          | ``keyfile``              |
++----------+-------------------+--------------------------+--------------------------+
+| BLAKE2b  | n/a               | ``authenticated-blake2`` | ``repokey-blake2``       |
+|          |                   |                          | ``keyfile-blake2``       |
++----------+-------------------+--------------------------+--------------------------+
 
 .. nanorst: inline-replace
 

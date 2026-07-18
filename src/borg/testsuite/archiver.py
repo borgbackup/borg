@@ -4298,7 +4298,10 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         CHUNKER_PARAMS = 'buzhash,10,18,14,4095'  # ~16kiB chunks
         # 1. Create repo1
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.create_regular_file('file1', contents=os.urandom(128 * 1024))
+        # use a rather large file so buzhash reliably produces many chunks (~64 on average).
+        # this avoids flaky failures of the "len(ids1) > 3" check below: with a smaller file,
+        # the geometric chunk-length distribution of random data occasionally yields very few chunks.
+        self.create_regular_file('file1', contents=os.urandom(1024 * 1024))
         self.cmd('create', f'--chunker-params={CHUNKER_PARAMS}', self.repository_location + '::archive1', 'input')
 
         # 2. Export related secrets

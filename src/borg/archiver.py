@@ -4402,7 +4402,7 @@ class Archiver:
                                help='Override check of chunker parameters.')
         subparser.add_argument('--sort', dest='sort', action='store_true',
                                help='Sort the output by path (deprecated, use --sort-by=path).')
-        subparser.add_argument('--sort-by', dest='sort_by', metavar='FIELD[,FIELD...]', type=diff_sort_spec_validator,
+        subparser.add_argument('--sort-by', dest='sort_by', metavar='FIELDS', type=diff_sort_spec_validator,
                                action=Highlander,
                                help='Advanced sorting: specify field(s) to sort by. Accepts a comma-separated list. Prefix with > for descending or < for ascending (default).')
         subparser.add_argument(

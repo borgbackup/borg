@@ -3887,8 +3887,6 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
         self.assert_in('Checking segments', output)
-        # reset logging to new process default to avoid need for fork=True on next check
-        logging.getLogger('borg.output.progress').setLevel(logging.NOTSET)
         output = self.cmd('check', '-v', '--repository-only', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)

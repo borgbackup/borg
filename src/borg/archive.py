@@ -1545,8 +1545,16 @@ class FilesystemObjectProcessors:
                     if chunks is not None:
                         item.chunks = chunks
                     else:
-                        with backup_io('read'):
-                            self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
+                        # Do NOT wrap this in backup_io('read'): the source-file reads are already
+                        # guarded individually by backup_io_iter() below. Wrapping the whole call would
+                        # also wrap add_chunk()'s (and maybe_checkpoint()'s) *repository* writes, so a
+                        # repository IO failure (e.g. the repo running out of space) would be misreported
+                        # as a per-file "read" error and only warned about (then the file skipped),
+                        # instead of aborting. An unwrapped repository OSError is critical (see the
+                        # BackupOSError docstring). In 1.4 the transactional repository still rolls the
+                        # partial transaction back, so this is not data loss here, but the misclassified
+                        # warning and pointless read-retries are wrong regardless.
+                        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
                         if is_win32:
                             changed_while_backup = False  # TODO
                         else:

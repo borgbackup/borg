@@ -2166,6 +2166,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('create', '--read-special', archive, 'input/link_fifo')
         finally:
+            # In case `borg create` failed to open FIFO, read all data to avoid join() hanging.
+            fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+            try:
+                os.read(fd, len(data))
+            except OSError:
+                # fails on FreeBSD 13 with BlockingIOError
+                pass
+            finally:
+                os.close(fd)
             t.join()
         with changedir('output'):
             self.cmd('extract', archive)

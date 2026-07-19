@@ -274,6 +274,7 @@ class BuildMan:
 
         'key_change-passphrase': 'key',
         'key_export': 'key',
+        'key_export-related-secrets': 'key',
         'key_import': 'key',
         'key_migrate-to-repokey': 'key',
 

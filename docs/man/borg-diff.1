@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-diff" "1" "2026-06-25" "" "borg backup tool"
+.TH "borg-diff" "1" "2026-07-18" "" "borg backup tool"
 .SH Name
 borg-diff \- Diff contents of two archives
 .SH SYNOPSIS
@@ -148,13 +148,16 @@ Override check of chunker parameters.
 .TP
 .B  \-\-sort
 Sort the output by path (deprecated, use \-\-sort\-by=path).
+.TP
+.BI \-\-sort\-by \ FIELDS
+Advanced sorting: specify field(s) to sort by. Accepts a comma\-separated list. Prefix with > for descending or < for ascending (default).
+.TP
+.B  \-\-content\-only
+Only compare differences in content (exclude metadata differences)
+.TP
+.B  \-\-json\-lines
+Format output as JSON Lines.
 .UNINDENT
-.IP "System Message: WARNING/2 (docs/borg-diff.rst:, line 119)"
-Option list ends without a blank line; unexpected unindent.
-.sp
-\-\-sort\-by FIELD[,FIELD...]      Advanced sorting: specify field(s) to sort by. Accepts a comma\-separated list. Prefix with > for descending or < for ascending (default).
-\-\-content\-only                  Only compare differences in content (exclude metadata differences)
-\-\-json\-lines                    Format output as JSON Lines.
 .SS Include/Exclude options
 .INDENT 0.0
 .TP

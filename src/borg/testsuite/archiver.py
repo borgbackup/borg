@@ -555,6 +555,124 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
             assert os.readlink('input/link1') == 'somewhere'
 
+    def _create_malicious_archive(self, name, items):
+        # Inject raw Items directly into an archive, bypassing "borg create" (which would never
+        # produce a child below a symlink or a path with embedded "..").
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, key, manifest) as cache:
+                archive = Archive(repository, key, manifest, name, cache=cache, create=True)
+                for item in items:
+                    archive.items_buffer.add(item)
+                archive.save()
+
+    def test_extract_through_symlinked_parent(self):
+        # Security: an archive with a symlink "evil" -> "/etc", followed by a regular file
+        # "evil/passwd", must NOT overwrite/delete files in the symlink target directory.
+        if self.prefix:
+            pytest.skip('malicious archive is crafted via direct (local) repository access')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        victim_dir = os.path.join(self.tmpdir, 'victim')
+        os.mkdir(victim_dir)
+        victim_file = os.path.join(victim_dir, 'passwd')
+        with open(victim_file, 'w') as fd:
+            fd.write('original')
+        attrs = dict(mtime=0, uid=0, gid=0, user='root', group='root')
+        self._create_malicious_archive('evil', [
+            Item(path='evil', mode=stat.S_IFLNK | 0o777, source=victim_dir, **attrs),
+            Item(path='evil/passwd', mode=stat.S_IFREG | 0o644, chunks=[], **attrs),
+        ])
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::evil', exit_code=EXIT_WARNING)
+        assert 'parent directory is a symlink' in output
+        # the out-of-tree victim must be untouched (neither deleted nor overwritten)
+        assert os.path.exists(victim_file)
+        with open(victim_file) as fd:
+            assert fd.read() == 'original'
+        # the symlink item itself was restored faithfully
+        assert os.path.islink(os.path.join(self.output_path, 'evil'))
+
+    def test_extract_path_with_embedded_dotdot(self):
+        # Security: a regular file with an embedded ".." (e.g. a/../../victim/passwd) must not
+        # be extracted outside the destination directory.
+        if self.prefix:
+            pytest.skip('malicious archive is crafted via direct (local) repository access')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        victim_dir = os.path.join(self.tmpdir, 'victim')
+        os.mkdir(victim_dir)
+        victim_file = os.path.join(victim_dir, 'passwd')
+        with open(victim_file, 'w') as fd:
+            fd.write('original')
+        attrs = dict(mtime=0, uid=0, gid=0, user='root', group='root')
+        # from inside the output dir, "a/../../victim/passwd" resolves to <tmpdir>/victim/passwd
+        self._create_malicious_archive('evil', [
+            Item(path='a/../../victim/passwd', mode=stat.S_IFREG | 0o644, chunks=[], **attrs),
+        ])
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::evil', exit_code=EXIT_WARNING)
+        assert 'path contains "../"' in output
+        assert os.path.exists(victim_file)
+        with open(victim_file) as fd:
+            assert fd.read() == 'original'
+
+    def test_extract_hardlink_through_symlinked_source(self):
+        # Security: a hardlink whose source traverses a symlink (here "evil" -> victim dir,
+        # source "evil/secret") must NOT link an external file into the extracted tree.
+        if self.prefix:
+            pytest.skip('malicious archive is crafted via direct (local) repository access')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        victim_dir = os.path.join(self.tmpdir, 'victim')
+        os.mkdir(victim_dir)
+        secret = os.path.join(victim_dir, 'secret')
+        with open(secret, 'w') as fd:
+            fd.write('secret')
+        attrs = dict(mtime=0, uid=0, gid=0, user='root', group='root')
+        self._create_malicious_archive('evil', [
+            Item(path='evil', mode=stat.S_IFLNK | 0o777, source=victim_dir, **attrs),
+            Item(path='pwned', mode=stat.S_IFREG | 0o644, source='evil/secret', **attrs),
+        ])
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::evil', exit_code=EXIT_WARNING)
+        assert 'hardlink source path is unsafe' in output
+        # no hardlink to the external file was created
+        assert not os.path.exists(os.path.join(self.output_path, 'pwned'))
+        with open(secret) as fd:
+            assert fd.read() == 'secret'
+
+    def test_extract_hardlink_source_with_embedded_dotdot(self):
+        # Security: a hardlink whose source contains ".." must not be linked.
+        if self.prefix:
+            pytest.skip('malicious archive is crafted via direct (local) repository access')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        victim_dir = os.path.join(self.tmpdir, 'victim')
+        os.mkdir(victim_dir)
+        secret = os.path.join(victim_dir, 'secret')
+        with open(secret, 'w') as fd:
+            fd.write('secret')
+        attrs = dict(mtime=0, uid=0, gid=0, user='root', group='root')
+        self._create_malicious_archive('evil', [
+            Item(path='pwned', mode=stat.S_IFREG | 0o644, source='a/../../victim/secret', **attrs),
+        ])
+        with changedir('output'):
+            output = self.cmd('extract', self.repository_location + '::evil', exit_code=EXIT_WARNING)
+        assert 'hardlink source path is unsafe' in output
+        assert not os.path.exists(os.path.join(self.output_path, 'pwned'))
+
+    def test_extract_deep_tree_ok(self):
+        # The parent-path guard (and its safe_dirs cache) must not break normal extraction of a
+        # deep tree where many files share the same parent directories.
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file('d1/d2/d3/file1', size=10)
+        self.create_regular_file('d1/d2/d3/file2', size=10)
+        self.create_regular_file('d1/d2/other', size=10)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.path.exists('input/d1/d2/d3/file1')
+            assert os.path.exists('input/d1/d2/d3/file2')
+            assert os.path.exists('input/d1/d2/other')
+
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     def test_directory_timestamps1(self):
         self.create_test_files()
@@ -4298,7 +4416,10 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         CHUNKER_PARAMS = 'buzhash,10,18,14,4095'  # ~16kiB chunks
         # 1. Create repo1
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.create_regular_file('file1', contents=os.urandom(128 * 1024))
+        # use a rather large file so buzhash reliably produces many chunks (~64 on average).
+        # this avoids flaky failures of the "len(ids1) > 3" check below: with a smaller file,
+        # the geometric chunk-length distribution of random data occasionally yields very few chunks.
+        self.create_regular_file('file1', contents=os.urandom(1024 * 1024))
         self.cmd('create', f'--chunker-params={CHUNKER_PARAMS}', self.repository_location + '::archive1', 'input')
 
         # 2. Export related secrets

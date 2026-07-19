@@ -68,7 +68,10 @@ today_fmt = '%Y-%m-%d'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+# man_intro.rst is only consumed by scripts/make.py's man-page generator (borg(1)),
+# not by Sphinx. Excluding it avoids a duplicate-label warning for its usage_general
+# include, which is also part of the HTML build via usage/general.rst.
+exclude_patterns = ['_build', 'man_intro.rst']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None

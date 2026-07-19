@@ -128,6 +128,28 @@ class BackupRaceConditionError(BackupError):
     exit_mcode = 103
 
 
+class BackupSymlinkParentError(BackupError):
+    """{}: not extracted, a parent directory is a symlink (malicious or corrupted archive)"""
+    # Refusing to extract an item below a symlinked directory (would write outside the
+    # extraction directory). borg create never produces such items.
+    exit_mcode = 108
+
+
+class BackupPathTraversalError(BackupError):
+    """{}: not extracted, path contains "../" (malicious or corrupted archive)"""
+    # Refusing to extract an item whose path contains "..", which could escape the
+    # extraction directory. borg create never produces such items.
+    exit_mcode = 109
+
+
+class BackupHardlinkSourceError(BackupError):
+    """{}: not extracted, hardlink source path is unsafe (malicious or corrupted archive)"""
+    # Refusing to create a hardlink whose source path contains ".." or is below a symlinked
+    # directory (it could point outside the extraction directory). borg create never produces
+    # such items.
+    exit_mcode = 110
+
+
 class BackupOSError(BackupError):
     """{}: {}"""
     # Wrapper for OSError raised while accessing backup files.

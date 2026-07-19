@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-init" "1" "2026-06-25" "" "borg backup tool"
+.TH "borg-init" "1" "2026-07-18" "" "borg backup tool"
 .SH Name
 borg-init \- Initialize an empty repository
 .SH SYNOPSIS
@@ -154,15 +154,14 @@ l|l|l|l.
 T{
 Hash/MAC
 T}	T{
-Not Encrypted
+Not encrypted,
+not authenticated
 T}	T{
-Encrypted (AEAD w/ AES)
-T}
-_
-T{
-Not Authenticated
+Not encrypted,
+authenticated
 T}	T{
-Authenticated
+Encrypted (AEAD w/ AES),
+authenticated
 T}
 _
 T{

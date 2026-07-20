@@ -2621,11 +2621,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_change_passphrase(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
-        # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
-        self.cmd('key', 'change-passphrase', self.repository_location)
-        os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
-        self.cmd('list', self.repository_location)
+        # use the context manager so BORG_NEW_PASSPHRASE / BORG_PASSPHRASE are restored
+        # afterwards and cannot leak into later tests (a leaked BORG_NEW_PASSPHRASE would
+        # make a later repokey `init` encrypt with the wrong passphrase).
+        with environment_variable(BORG_NEW_PASSPHRASE='newpassphrase'):
+            # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
+            self.cmd('key', 'change-passphrase', self.repository_location)
+            with environment_variable(BORG_PASSPHRASE='newpassphrase'):
+                self.cmd('list', self.repository_location)
 
     def test_break_lock(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

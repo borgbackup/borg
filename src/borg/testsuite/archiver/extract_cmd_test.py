@@ -98,6 +98,48 @@ def test_extract_through_symlinked_parent(archivers, request):
     assert os.path.islink(os.path.join(archiver.output_path, "evil"))
 
 
+@pytest.mark.skipif(
+    not (are_symlinks_supported() and are_hardlinks_supported()), reason="symlinks/hardlinks not supported"
+)
+def test_extract_hardlinked_symlink_does_not_leak_target(archivers, request):
+    # Security (CVE-2026-62268 Fix 2/2, borg 2 form): a crafted archive with a symlink
+    # "s" -> "<victim_file>" plus a contentless hardlink "h" sharing its hlid must restore "h"
+    # as a hardlink to the *symlink* (a faithful restore), NOT as a hardlink to the external
+    # victim file's inode. The latter (os.link following the symlink) would splice an arbitrary
+    # external file into the extracted tree - dangerous especially when restoring as root.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("malicious archive is crafted via direct (local) repository access")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    victim_file = os.path.join(archiver.tmpdir, "victim")
+    with open(victim_file, "w") as fd:
+        fd.write("secret")
+    attrs = dict(mtime=0, uid=0, gid=0, user="root", group="root")
+    hlid = b"H" * 32  # opaque hardlink-group id shared by both items
+    _create_malicious_archive(
+        archiver,
+        "evil",
+        [
+            # master: a symlink pointing at the external victim file
+            Item(path="s", mode=stat.S_IFLNK | 0o777, target=victim_file, hlid=hlid, **attrs),
+            # contentless hardlink to the same hlid
+            Item(path="h", mode=stat.S_IFLNK | 0o777, hlid=hlid, **attrs),
+        ],
+    )
+    with changedir("output"):
+        cmd(archiver, "extract", "evil")
+    s_path = os.path.join(archiver.output_path, "s")
+    h_path = os.path.join(archiver.output_path, "h")
+    # "h" is a hardlink to the symlink itself (same inode as "s"), a faithful restore ...
+    assert os.path.islink(h_path)
+    assert os.stat(h_path, follow_symlinks=False).st_ino == os.stat(s_path, follow_symlinks=False).st_ino
+    # ... and NOT a hardlink to the external victim file's inode (that would be the leak).
+    assert os.stat(h_path, follow_symlinks=False).st_ino != os.stat(victim_file).st_ino
+    # the out-of-tree victim is untouched
+    with open(victim_file) as fd:
+        assert fd.read() == "secret"
+
+
 def test_extract_path_with_embedded_dotdot_rejected_at_item_layer():
     # Security (CVE-2026-62268, embedded-".." vector): unlike borg 1.4, borg 2 already blocks
     # this vector one layer earlier - Item.path is sanitized on both encode (assert_sanitized_path)

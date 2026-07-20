@@ -207,5 +207,15 @@ class BackupPathTraversalError(BackupError):
     exit_mcode = 109
 
 
+class BackupHardlinkSourceError(BackupError):
+    """{}: not extracted, hardlink source path is unsafe (malicious or corrupted archive)"""
+
+    # borg 1.4 raises this when a hardlink's (attacker-controlled) source path contains ".." or
+    # is below a symlinked directory. borg 2 drives extraction hardlinks by hlid and never uses an
+    # attacker-controlled archived path as the os.link() source, so nothing raises this here; the
+    # class (and mcode 110) is kept reserved for cross-branch parity with 1.4-maint.
+    exit_mcode = 110
+
+
 class BackupItemExcluded(Exception):
     """Used internally to skip an item from processing when it is excluded."""

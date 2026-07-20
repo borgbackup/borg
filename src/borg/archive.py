@@ -789,9 +789,18 @@ Duration: {0.duration}
             link_target = hlm.retrieve(id=item.hlid)
             if link_target is not None and has_link:
                 if not dry_run:
-                    # another hard link to same inode (same hlid) was extracted previously, just link to it
+                    # another hard link to same inode (same hlid) was extracted previously, just link to it.
+                    # Security (CVE-2026-62268): follow_symlinks=False makes a hardlinked symlink link the
+                    # symlink itself (a faithful restore) rather than the external file it points to -
+                    # otherwise a crafted archive (symlink -> /etc/shadow, plus a contentless hardlink
+                    # sharing its hlid) could hardlink an arbitrary external file into the extracted tree.
+                    # Guard with supports_follow_symlinks so we do not raise NotImplementedError (which
+                    # backup_io would not catch) on platforms where os.link ignores follow_symlinks.
                     with backup_io("link"):
-                        os.link(link_target, path, follow_symlinks=False)
+                        if os.link in os.supports_follow_symlinks:
+                            os.link(link_target, path, follow_symlinks=False)
+                        else:
+                            os.link(link_target, path)
                 hardlink_set = True
         yield hardlink_set
         if not hardlink_set:

@@ -191,5 +191,21 @@ class BackupFileNotFoundError(BackupOSError):
     exit_mcode = 107
 
 
+class BackupSymlinkParentError(BackupError):
+    """{}: not extracted, a parent directory is a symlink (malicious or corrupted archive)"""
+
+    # Refusing to extract an item below a symlinked directory (would write outside the
+    # extraction directory). borg create never produces such items.
+    exit_mcode = 108
+
+
+class BackupPathTraversalError(BackupError):
+    """{}: not extracted, path contains "../" (malicious or corrupted archive)"""
+
+    # Refusing to extract an item whose path contains "..", which could escape the
+    # extraction directory. borg create never produces such items.
+    exit_mcode = 109
+
+
 class BackupItemExcluded(Exception):
     """Used internally to skip an item from processing when it is excluded."""

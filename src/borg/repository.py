@@ -1,9 +1,12 @@
+import io
 import os
 import sys
 import time
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from pathlib import Path
 from hashlib import sha256
+
+from borghash import HashTableNT
 
 from borgstore.store import Store
 from borgstore.backends.rest import REST, ssh_cmd
@@ -53,7 +56,7 @@ def borg_permissions(permissions):
             return {
                 "": "lr",
                 "archives": "lrw",
-                "cache": "lrwWD",  # WD for last-pack-checked, ...
+                "cache": "lrwWD",  # WD for checked-packs, ...
                 "config": "lrW",  # W for manifest
                 "index": "lrwWD",  # WD for index/<HASH> (merge/compaction of incremental indexes)
                 "keys": "lr",
@@ -231,6 +234,85 @@ class PackReader:
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
             yield hdr.chunk_id, offset, obj_size
             offset += obj_size
+
+
+class PackTracker:
+    """Packs verified in the current check cycle, mapping pack_id -> (timestamp, result).
+
+    A cycle is one full pass over packs/; --max-duration may spread it over several partial checks.
+    Stored at cache/checked-packs as the serialized table with a sha256 over it appended.
+    new() starts a cycle, load() resumes the stored one.
+    """
+
+    NAME = "cache/checked-packs"
+    KEY_SIZE = 32  # pack id
+    DIGEST_SIZE = 32  # sha256
+    Entry = namedtuple("Entry", "timestamp result")
+    EntryFormatT = namedtuple("EntryFormatT", "timestamp result")
+    _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=corrupt
+
+    def __init__(self, store, table):
+        self.store = store
+        self.table = table
+
+    @classmethod
+    def new(cls, store):
+        """Return a tracker with an empty table."""
+        table = HashTableNT(key_size=cls.KEY_SIZE, value_type=cls.Entry, value_format=cls._EntryFormat)
+        return cls(store, table)
+
+    @classmethod
+    def load(cls, store):
+        """Return a tracker holding the stored table.
+
+        Return an empty one if cache/checked-packs is missing, its appended sha256 does not match,
+        it does not deserialize, or its entries do not have this class's key size and Entry layout.
+        """
+        try:
+            data = store.load(cls.NAME)
+        except StoreObjectNotFound:
+            return cls.new(store)
+        if len(data) < cls.DIGEST_SIZE or sha256(data[: -cls.DIGEST_SIZE]).digest() != data[-cls.DIGEST_SIZE :]:
+            logger.warning("Ignoring corrupted checked-packs set.")
+            return cls.new(store)
+        try:
+            with io.BytesIO(data[: -cls.DIGEST_SIZE]) as f:
+                table = HashTableNT.read(f)
+        except ValueError:
+            logger.warning("Ignoring unreadable checked-packs set.")
+            return cls.new(store)
+        # read() takes key size and value type from the blob itself, so the table needs a layout check
+        # against Entry here. All entries in a table share one layout, so checking one entry suffices.
+        sample = next(iter(table.items()), None)
+        if sample is not None:
+            key, value = sample
+            if len(key) != cls.KEY_SIZE or value._fields != cls.Entry._fields:
+                logger.warning("Ignoring checked-packs set with an unexpected layout.")
+                return cls.new(store)
+        return cls(store, table)
+
+    def __len__(self):
+        return len(self.table)
+
+    def get(self, pack_id):
+        """Return the Entry for pack_id, or None if it is not recorded."""
+        return self.table.get(pack_id)
+
+    def record(self, pack_id, ok):
+        self.table[pack_id] = self.Entry(timestamp=int(time.time()), result=int(ok))
+
+    def save(self):
+        with io.BytesIO() as f:
+            self.table.write(f)
+            data = f.getvalue()
+        self.store.store(self.NAME, data + sha256(data).digest())
+
+    def clear(self):
+        self.table.clear()
+        try:
+            self.store.delete(self.NAME)
+        except StoreObjectNotFound:
+            pass
 
 
 class Repository:
@@ -678,34 +760,23 @@ class Repository:
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"
-        LAST_PACK_CHECKED = "cache/last-pack-checked"
         logger.info(f"Starting {mode} repository check")
         if partial:
-            # continue a past partial check (if any) or from a checkpoint or start one from beginning
-            try:
-                last_pack_checked = self.store.load(LAST_PACK_CHECKED).decode()
-            except StoreObjectNotFound:
-                last_pack_checked = ""
+            tracker = PackTracker.load(self.store)
         else:
-            # start from the beginning and also forget about any potential past partial checks
-            last_pack_checked = ""
-            try:
-                self.store.delete(LAST_PACK_CHECKED)
-            except StoreObjectNotFound:
-                pass
-        if last_pack_checked:
-            logger.info(f"Skipping to packs after {last_pack_checked}.")
+            tracker = PackTracker.new(self.store)
+            tracker.clear()  # a full check verifies every pack, so discard the stored cycle
+        if len(tracker):
+            logger.info(f"Continuing check cycle, {len(tracker)} packs already checked.")
         else:
             logger.info("Starting from beginning.")
         t_start = time.monotonic()
         t_last_checkpoint = t_start
         index_files = index_errors = 0
         pack_files = pack_errors = 0
-        # check index and packs with separate progress indicators, each running from 0% to 100%.
-        # hash the index first, on full and partial checks alike: it is small, and a corrupt index
-        # already means the user must repair it (rebuilding the index re-reads all packs anyway), so we
-        # stop and report that rather than continue. matters for partial checks too, whose runs can be
-        # days apart (e.g. a weekend cron job).
+        # index and packs get separate progress indicators, each running from 0% to 100%.
+        # the index is checked first and in full, on partial checks too: it is small, and index errors
+        # stop the pack check below.
         index_infos = store_list("index")
         # an invalid chunk index means an interrupted fragment deletion; it will be rebuilt on next
         # use, so warn rather than verify the leftover fragments.
@@ -724,37 +795,37 @@ class Repository:
             index_pi.show(current=len(index_infos))  # finish at 100%
         index_pi.finish()
         if index_errors == 0:
-            # list the packs only now: a corrupt index skips this entirely. packs are the bulk of the
-            # work and the part --max-duration splits.
+            # packs are the bulk of the work and the part --max-duration spreads over several checks.
             pack_infos = store_list("packs")
             pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
             for info in pack_infos:
                 self._lock_refresh()
-                pack_pi.show(increase=1)  # advance for every pack, including ones a partial resume skips below
-                key = "packs/%s" % info.name
-                if key <= last_pack_checked:  # needs sorted keys
+                pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
+                pack_id = hex_to_bin(info.name)
+                entry = tracker.get(pack_id)
+                if entry is not None and entry.result:  # intact in this cycle; a corrupt one is verified again
                     continue
                 pack_files += 1
-                if not verify("packs", info.name):
-                    pack_errors += 1  # repair (salvage into a new pack, fix index) is not implemented yet
+                ok = verify("packs", info.name)
+                if not ok:
+                    pack_errors += 1
+                tracker.record(pack_id, ok)
                 now = time.monotonic()
-                if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
+                # a checkpoint rewrites the whole table (41 bytes per pack), so keep the interval long.
+                if now > t_last_checkpoint + 30 * 60:
                     t_last_checkpoint = now
-                    logger.info(f"Checkpointing at pack {key}.")
-                    self.store.store(LAST_PACK_CHECKED, key.encode())
+                    logger.info(f"Checkpointing at pack {info.name}.")
+                    tracker.save()
                 if partial and now > t_start + max_duration:
-                    logger.info(f"Finished partial repository check, last pack checked is {key}.")
-                    self.store.store(LAST_PACK_CHECKED, key.encode())
+                    logger.info(f"Finished partial repository check, {len(tracker)} packs checked so far.")
+                    tracker.save()
                     break
             else:
-                # the pack scan reached the end (no partial timeout): the check is complete, drop the checkpoint.
+                # scanned all packs without hitting the time limit: the cycle is done, drop the set.
                 if pack_infos:
                     pack_pi.show(current=len(pack_infos))  # finish at 100%
                 logger.info("Finished checking packs.")
-                try:
-                    self.store.delete(LAST_PACK_CHECKED)
-                except StoreObjectNotFound:
-                    pass
+                tracker.clear()
             pack_pi.finish()
         else:
             # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).

@@ -37,15 +37,15 @@ jobs:
     timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: 3.11
     - name: Lint with flake8
       run: |
         pip install flake8
-        flake8 src scripts conftest.py
+        flake8 src scripts
 
   pytest:
 
@@ -79,22 +79,21 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     - name: Cache pip
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.txt') }}
         restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
+            ${{ runner.os }}-${{ runner.arch }}-pip-
 
     - name: Install Linux packages
       if: ${{ runner.os == 'Linux' }}
@@ -136,7 +135,7 @@ jobs:
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v7
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}

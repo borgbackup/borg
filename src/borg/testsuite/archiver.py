@@ -55,7 +55,7 @@ from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, llfuse
-from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns
+from . import BaseTestCase, changedir, environment_variable, filter_xattrs, same_ts_ns
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected, is_darwin, is_freebsd, is_win32
 from .upgrader import make_attic_repo
@@ -2166,6 +2166,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd('create', '--read-special', archive, 'input/link_fifo')
         finally:
+            # In case `borg create` failed to open FIFO, read all data to avoid join() hanging.
+            fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+            try:
+                os.read(fd, len(data))
+            except OSError:
+                # fails on FreeBSD 13 with BlockingIOError
+                pass
+            finally:
+                os.close(fd)
             t.join()
         with changedir('output'):
             self.cmd('extract', archive)
@@ -2612,11 +2621,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_change_passphrase(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        os.environ['BORG_NEW_PASSPHRASE'] = 'newpassphrase'
-        # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
-        self.cmd('key', 'change-passphrase', self.repository_location)
-        os.environ['BORG_PASSPHRASE'] = 'newpassphrase'
-        self.cmd('list', self.repository_location)
+        # use the context manager so BORG_NEW_PASSPHRASE / BORG_PASSPHRASE are restored
+        # afterwards and cannot leak into later tests (a leaked BORG_NEW_PASSPHRASE would
+        # make a later repokey `init` encrypt with the wrong passphrase).
+        with environment_variable(BORG_NEW_PASSPHRASE='newpassphrase'):
+            # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
+            self.cmd('key', 'change-passphrase', self.repository_location)
+            with environment_variable(BORG_PASSPHRASE='newpassphrase'):
+                self.cmd('list', self.repository_location)
 
     def test_break_lock(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -2716,11 +2728,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 in_fn = 'input/fusexattr'
                 out_fn = os.fsencode(os.path.join(mountpoint, 'input', 'fusexattr'))
                 if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                    assert sorted(no_selinux(xattr.listxattr(out_fn))) == [b'user.empty', b'user.foo', ]
+                    assert sorted(filter_xattrs(xattr.listxattr(out_fn))) == [b'user.empty', b'user.foo', ]
                     assert xattr.getxattr(out_fn, b'user.foo') == b'bar'
                     assert xattr.getxattr(out_fn, b'user.empty') == b''
                 else:
-                    assert no_selinux(xattr.listxattr(out_fn)) == []
+                    assert filter_xattrs(xattr.listxattr(out_fn)) == []
                     try:
                         xattr.getxattr(out_fn, b'user.foo')
                     except OSError as e:
@@ -3878,8 +3890,6 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
         self.assert_in('Checking segments', output)
-        # reset logging to new process default to avoid need for fork=True on next check
-        logging.getLogger('borg.output.progress').setLevel(logging.NOTSET)
         output = self.cmd('check', '-v', '--repository-only', self.repository_location, exit_code=0)
         self.assert_in('Starting repository check', output)
         self.assert_not_in('Starting archive consistency check', output)

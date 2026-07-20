@@ -8,7 +8,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: msys2/setup-msys2@v2
@@ -21,7 +21,7 @@ jobs:
         run: ./scripts/msys2-build
       - name: Test
         run: ./dist/borg.exe -V
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: borg-windows
           path: dist/borg.exe

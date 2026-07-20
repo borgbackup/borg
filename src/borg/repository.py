@@ -237,58 +237,69 @@ class PackReader:
 
 
 class PackTracker:
-    """Packs check() verified in the current cycle, mapping pack_id (32 bytes) -> (timestamp, result).
+    """Packs verified in the current check cycle, mapping pack_id -> (timestamp, result).
 
-    A cycle is one full pass over packs/, which --max-duration may spread over several partial checks.
-    The set is stored at cache/checked-packs with a sha256 over the serialized table appended. load()
-    accepts the table only if that hash matches and its entries have the layout this class writes.
+    A cycle is one full pass over packs/; --max-duration may spread it over several partial checks.
+    Stored at cache/checked-packs as the serialized table with a sha256 over it appended.
+    new() starts a cycle, load() resumes the stored one.
     """
 
     NAME = "cache/checked-packs"
+    KEY_SIZE = 32  # pack id
+    DIGEST_SIZE = 32  # sha256
     Entry = namedtuple("Entry", "timestamp result")
     EntryFormatT = namedtuple("EntryFormatT", "timestamp result")
     _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=corrupt
 
-    def __init__(self, store):
+    def __init__(self, store, table):
         self.store = store
-        self.table = self._new_table()
+        self.table = table
 
     @classmethod
-    def _new_table(cls):
-        return HashTableNT(key_size=32, value_type=cls.Entry, value_format=cls._EntryFormat)
+    def new(cls, store):
+        """Return a tracker with an empty table."""
+        table = HashTableNT(key_size=cls.KEY_SIZE, value_type=cls.Entry, value_format=cls._EntryFormat)
+        return cls(store, table)
+
+    @classmethod
+    def load(cls, store):
+        """Return a tracker holding the stored table.
+
+        Return an empty one if cache/checked-packs is missing, its appended sha256 does not match,
+        it does not deserialize, or its entries do not have this class's key size and Entry layout.
+        """
+        try:
+            data = store.load(cls.NAME)
+        except StoreObjectNotFound:
+            return cls.new(store)
+        if len(data) < cls.DIGEST_SIZE or sha256(data[: -cls.DIGEST_SIZE]).digest() != data[-cls.DIGEST_SIZE :]:
+            logger.warning("Ignoring corrupted checked-packs set.")
+            return cls.new(store)
+        try:
+            with io.BytesIO(data[: -cls.DIGEST_SIZE]) as f:
+                table = HashTableNT.read(f)
+        except ValueError:
+            logger.warning("Ignoring unreadable checked-packs set.")
+            return cls.new(store)
+        # read() takes key size and value type from the blob itself, so the table needs a layout check
+        # against Entry here. All entries in a table share one layout, so checking one entry suffices.
+        sample = next(iter(table.items()), None)
+        if sample is not None:
+            key, value = sample
+            if len(key) != cls.KEY_SIZE or value._fields != cls.Entry._fields:
+                logger.warning("Ignoring checked-packs set with an unexpected layout.")
+                return cls.new(store)
+        return cls(store, table)
 
     def __len__(self):
         return len(self.table)
 
-    def is_intact(self, pack_id):
-        entry = self.table.get(pack_id)
-        return entry is not None and bool(entry.result)
+    def get(self, pack_id):
+        """Return the Entry for pack_id, or None if it is not recorded."""
+        return self.table.get(pack_id)
 
     def record(self, pack_id, ok):
         self.table[pack_id] = self.Entry(timestamp=int(time.time()), result=int(ok))
-
-    def load(self):
-        try:
-            data = self.store.load(self.NAME)
-        except StoreObjectNotFound:
-            return
-        if len(data) < 32 or sha256(data[:-32]).digest() != data[-32:]:
-            logger.warning("Ignoring corrupted checked-packs set.")
-            return
-        try:
-            with io.BytesIO(data[:-32]) as f:
-                table = HashTableNT.read(f)
-        except ValueError:
-            logger.warning("Ignoring unreadable checked-packs set.")
-            return
-        # read() rebuilds key size and value type from the blob, so a table written with a different
-        # Entry layout reads without error. All entries share one layout, so sampling one is enough.
-        for key, value in table.items():
-            if len(key) != 32 or value._fields != self.Entry._fields:
-                logger.warning("Ignoring checked-packs set with an unexpected layout.")
-                return
-            break
-        self.table = table
 
     def save(self):
         with io.BytesIO() as f:
@@ -750,11 +761,11 @@ class Repository:
         assert not (repair and partial)
         mode = "partial" if partial else "full"
         logger.info(f"Starting {mode} repository check")
-        tracker = PackTracker(self.store)
         if partial:
-            tracker.load()  # resume the cycle
+            tracker = PackTracker.load(self.store)
         else:
-            tracker.clear()  # a full check verifies every pack, so start a new cycle
+            tracker = PackTracker.new(self.store)
+            tracker.clear()  # a full check verifies every pack, so discard the stored cycle
         if len(tracker):
             logger.info(f"Continuing check cycle, {len(tracker)} packs already checked.")
         else:
@@ -785,7 +796,8 @@ class Repository:
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
-                if tracker.is_intact(pack_id):  # verified intact earlier in this cycle
+                entry = tracker.get(pack_id)
+                if entry is not None and entry.result:  # intact in this cycle; a corrupt one is verified again
                     continue
                 pack_files += 1
                 ok = verify("packs", info.name)

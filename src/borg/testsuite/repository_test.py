@@ -987,13 +987,12 @@ def test_check_intact_multi_object_pack_passes(tmp_path):
 def test_check_checked_packs_roundtrip(tmp_path):
     # the set survives a store/load round-trip; a rotted blob loads as empty.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        tracker = PackTracker(repository.store)
+        tracker = PackTracker.new(repository.store)
         tracker.table[H(1)] = PackTracker.Entry(timestamp=123, result=1)
         tracker.table[H(2)] = PackTracker.Entry(timestamp=456, result=0)
         tracker.save()
 
-        loaded = PackTracker(repository.store)
-        loaded.load()
+        loaded = PackTracker.load(repository.store)
         assert len(loaded) == 2
         assert H(1) in loaded.table and H(2) in loaded.table
         assert tuple(loaded.table[H(2)]) == (456, 0)
@@ -1001,8 +1000,7 @@ def test_check_checked_packs_roundtrip(tmp_path):
         corrupted = bytearray(repository.store.load(PackTracker.NAME))
         corrupted[0] ^= 0xFF  # break the appended sha256
         repository.store.store(PackTracker.NAME, bytes(corrupted))
-        rotted = PackTracker(repository.store)
-        rotted.load()
+        rotted = PackTracker.load(repository.store)
         assert len(rotted) == 0
 
 
@@ -1014,7 +1012,7 @@ def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
         repository.store_store("packs/" + bin_to_hex(intact_id), intact)
 
         # mark the intact pack as already checked in this cycle.
-        tracker = PackTracker(repository.store)
+        tracker = PackTracker.new(repository.store)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1032,7 +1030,7 @@ def test_check_partial_rechecks_pack_recorded_corrupt(tmp_path):
         corrupt_id = H(1)  # stored content does not hash to this name
         repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
 
-        tracker = PackTracker(repository.store)
+        tracker = PackTracker.new(repository.store)
         tracker.record(corrupt_id, ok=False)
         tracker.save()
 
@@ -1065,7 +1063,7 @@ def test_check_partial_clears_recorded_corruption_when_intact(tmp_path, monkeypa
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker(repository.store)
+        tracker = PackTracker.new(repository.store)
         tracker.record(intact_id, ok=False)  # stale corrupt record
         tracker.save()
 
@@ -1080,7 +1078,7 @@ def test_check_partial_skips_pack_recorded_intact(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker(repository.store)
+        tracker = PackTracker.new(repository.store)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1095,7 +1093,7 @@ def test_check_full_ignores_recorded_set(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker(repository.store)
+        tracker = PackTracker.new(repository.store)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1104,8 +1102,7 @@ def test_check_full_ignores_recorded_set(tmp_path, monkeypatch):
         assert repository.check(repair=False) is True
         assert pack_key in hashed_keys  # verified
 
-        after = PackTracker(repository.store)
-        after.load()
+        after = PackTracker.load(repository.store)
         assert len(after) == 0  # cycle complete, set dropped
 
 
@@ -1123,8 +1120,7 @@ def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
             data = f.getvalue()
         repository.store_store(PackTracker.NAME, data + sha256(data).digest())
 
-        tracker = PackTracker(repository.store)
-        tracker.load()
+        tracker = PackTracker.load(repository.store)
         assert len(tracker) == 0
 
 

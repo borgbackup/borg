@@ -122,10 +122,11 @@ cdef class IndexBase:
             hashindex_write(self.index, path)
 
     def clear(self):
-        hashindex_free(self.index)
-        self.index = hashindex_init(0, self.key_size, self.value_size)
-        if not self.index:
+        new_index = hashindex_init(0, self.key_size, self.value_size)
+        if not new_index:
             raise Exception('hashindex_init failed')
+        hashindex_free(self.index)
+        self.index = new_index
 
     def setdefault(self, key, value):
         if not key in self:

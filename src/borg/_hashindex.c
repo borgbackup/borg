@@ -178,14 +178,9 @@ hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
         if (idx >= index->num_buckets) {  /* triggers at == already */
             idx = 0;
         }
-        /* When idx == start, we have done a full pass over all buckets.
-         * - We did not find a bucket with the key we searched for.
-         * - We did not find an empty bucket either.
-         * So all buckets are either full or deleted/tombstones.
-         * This is an invalid state we never should get into, see
-         * upper_limit and min_empty.
-         */
-        assert(idx != start);
+        if (idx == start) {
+            break;
+        }
     }
     /* we get here if we did not find a bucket with the key we searched for. */
     if (start_idx != NULL) {
@@ -215,7 +210,12 @@ hashindex_resize(HashIndex *index, int capacity)
             return 0;
         }
     }
-    assert(index->num_entries == new->num_entries);
+
+    if(index->num_entries != new->num_entries) {
+        /* This detects structurally corrupt indices maliciously supplied with wrong num_entries */
+        hashindex_free(new);
+        return 0;
+    }
 
     hashindex_free_buckets(index);
     index->buckets = new->buckets;
@@ -251,9 +251,15 @@ int get_min_empty(int num_buckets){
 
 int size_idx(int size){
     /* find the smallest hash_sizes index with entry >= size */
-    int i = NELEMS(hash_sizes) - 1;
+    int i, max_idx = NELEMS(hash_sizes) - 1;
+    i = max_idx;
     while(i >= 0 && hash_sizes[i] >= size) i--;
-    return i + 1;
+    i++;
+    /* if size is larger than any hash_sizes entry, return the largest one */
+    if (i > max_idx) {
+        return max_idx;
+    }
+    return i;
 }
 
 int fit_size(int current){
@@ -262,17 +268,17 @@ int fit_size(int current){
 }
 
 int grow_size(int current){
+    int max_idx = NELEMS(hash_sizes) - 1;
     int i = size_idx(current) + 1;
-    int elems = NELEMS(hash_sizes);
-    if (i >= elems)
-        return hash_sizes[elems - 1];
+    if (i > max_idx)
+        i = max_idx;
     return hash_sizes[i];
 }
 
 int shrink_size(int current){
     int i = size_idx(current) - 1;
     if (i < 0)
-        return hash_sizes[0];
+        i = 0;
     return hash_sizes[i];
 }
 
@@ -377,30 +383,35 @@ hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int
     if (expected_key_size != -1 && header->key_size != expected_key_size) {
         PyErr_Format(PyExc_ValueError, "Expected key size %d, got %d.",
                      expected_key_size, header->key_size);
-        goto fail_decref_header;
+        goto fail_release_header_buffer;
     }
     if (expected_value_size != -1 && header->value_size != expected_value_size) {
         PyErr_Format(PyExc_ValueError, "Expected value size %d, got %d.",
                      expected_value_size, header->value_size);
-        goto fail_decref_header;
+        goto fail_release_header_buffer;
     }
     // in any case, the key and value sizes must be both >= 4, the code assumes this.
     if (header->key_size < 4) {
         PyErr_Format(PyExc_ValueError, "Expected key size >= 4, got %d.", header->key_size);
-        goto fail_decref_header;
+        goto fail_release_header_buffer;
     }
     if (header->value_size < 4) {
         PyErr_Format(PyExc_ValueError, "Expected value size >= 4, got %d.", header->value_size);
-        goto fail_decref_header;
+        goto fail_release_header_buffer;
     }
     // sanity check for num_buckets and num_entries.
     if (header_num_buckets < 1) {
         PyErr_Format(PyExc_ValueError, "Expected num_buckets >= 1, got %d.", header_num_buckets);
-        goto fail_decref_header;
+        goto fail_release_header_buffer;
     }
     if ((header_num_entries < 0) || (header_num_entries > header_num_buckets)) {
         PyErr_Format(PyExc_ValueError, "Expected 0 <= num_entries <= num_buckets, got %d.", header_num_entries);
-        goto fail_decref_header;
+        goto fail_release_header_buffer;
+    }
+
+    if ((Py_ssize_t)header_num_buckets > (PY_SSIZE_T_MAX - (Py_ssize_t)sizeof(HashHeader)) / (header->key_size + header->value_size)) {
+        PyErr_Format(PyExc_ValueError, "Hash index size overflows Py_ssize_t.");
+        goto fail_release_header_buffer;
     }
 
     buckets_length = (Py_ssize_t)header_num_buckets * (header->key_size + header->value_size);
@@ -448,8 +459,9 @@ hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int
     }
     index->buckets = index->buckets_buffer.buf;
 
+    index->min_empty = get_min_empty(index->num_buckets);
+
     if(!permit_compact) {
-        index->min_empty = get_min_empty(index->num_buckets);
         index->num_empty = count_empty(index);
 
         if(index->num_empty < index->min_empty) {
@@ -459,6 +471,8 @@ hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int
                 goto fail_free_buckets;
             }
         }
+    } else {
+        index->num_empty = index->num_buckets - index->num_entries; /* upper bound */
     }
 
     /*
@@ -612,16 +626,22 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
     if(idx < 0)
     {
         if(index->num_entries > index->upper_limit) {
-            /* hashtable too full, grow it! */
-            if(!hashindex_resize(index, grow_size(index->num_buckets))) {
+            int next_size = grow_size(index->num_buckets);
+            if(next_size != index->num_buckets) {
+                /* hashtable too full, grow it! */
+                if(!hashindex_resize(index, next_size)) {
+                    return 0;
+                }
+                /* we have just built a fresh hashtable and removed all tombstones,
+                 * so we only have EMPTY or USED buckets, but no DELETED ones any more.
+                 */
+                idx = hashindex_lookup(index, key, &start_idx);
+                assert(idx < 0);
+                assert(BUCKET_IS_EMPTY(index, start_idx));
+            } else if (index->num_entries >= index->num_buckets) {
+                /* Table is maximally sized and 100% full, cannot insert cleanly. */
                 return 0;
             }
-            /* we have just built a fresh hashtable and removed all tombstones,
-             * so we only have EMPTY or USED buckets, but no DELETED ones any more.
-             */
-            idx = hashindex_lookup(index, key, &start_idx);
-            assert(idx < 0);
-            assert(BUCKET_IS_EMPTY(index, start_idx));
         }
         idx = start_idx;
         if(BUCKET_IS_EMPTY(index, idx)){
@@ -699,11 +719,23 @@ hashindex_compact(HashIndex *index)
     int begin_used_idx;
     int empty_slot_count, count, buckets_to_copy;
     int compact_tail_idx = 0;
-    uint64_t saved_size = (index->num_buckets - index->num_entries) * (uint64_t)index->bucket_size;
+    int new_num_buckets = index->num_entries == 0 ? 1 : index->num_entries;
+    uint64_t saved_size = (index->num_buckets - new_num_buckets) * (uint64_t)index->bucket_size;
 
-    if(index->num_buckets - index->num_entries == 0) {
+    if(index->num_buckets == new_num_buckets) {
         /* already compact */
         return 0;
+    }
+
+    if (index->num_entries == 0) {
+        index->num_buckets = 1;
+        memset(BUCKET_ADDR(index, 0), 0, index->bucket_size);
+        BUCKET_MARK_EMPTY(index, 0);
+        index->lower_limit = get_lower_limit(index->num_buckets);
+        index->upper_limit = get_upper_limit(index->num_buckets);
+        index->min_empty = get_min_empty(index->num_buckets);
+        index->num_empty = 1;
+        return saved_size;
     }
 
     while(idx < index->num_buckets) {
@@ -744,6 +776,10 @@ hashindex_compact(HashIndex *index)
     }
 
     index->num_buckets = index->num_entries;
+    index->lower_limit = get_lower_limit(index->num_buckets);
+    index->upper_limit = get_upper_limit(index->num_buckets);
+    index->min_empty = get_min_empty(index->num_buckets);
+    index->num_empty = 0;
     return saved_size;
 }
 

@@ -183,6 +183,32 @@ class BackupError(Exception):
     """
 
 
+class BackupSymlinkParentError(BackupError):
+    """
+    Refusing to extract an item below a symlinked (or otherwise non-directory) parent directory.
+
+    This would write outside the extraction directory. borg create never produces such items,
+    so this can only come from a malicious or corrupted archive.
+    """
+
+
+class BackupPathTraversalError(BackupError):
+    """
+    Refusing to extract an item whose path contains "..", which could escape the extraction directory.
+
+    borg create never produces such items, so this can only come from a malicious or corrupted archive.
+    """
+
+
+class BackupHardlinkSourceError(BackupError):
+    """
+    Refusing to create a hardlink whose source path contains ".." or is below a symlinked directory.
+
+    Such a source could point outside the extraction directory. borg create never produces such
+    items, so this can only come from a malicious or corrupted archive.
+    """
+
+
 class BackupOSError(Exception):
     """
     Wrapper for OSError raised while accessing backup files.
@@ -444,6 +470,9 @@ class Archive:
         self.cache = cache
         self.manifest = manifest
         self.hard_links = {}
+        # cache of parent directory paths verified (during extraction) to be real
+        # directories and not symlinks, so we do not have to lstat them again and again.
+        self.safe_dirs = set()
         self.stats = Statistics(output_json=log_json, iec=iec)
         self.iec = iec
         self.show_progress = progress
@@ -732,17 +761,69 @@ Utilization of max. archive size: {csize_max:.0%}
                 stats.csize = self.metadata.csize
         return stats
 
+    def _check_safe_parent(self, archived_path):
+        """Refuse *archived_path* if its parent directory chain is not safe for extraction.
+
+        *archived_path* is a path as stored in the archive, relative to self.cwd. As elsewhere
+        in borg, it is split on os.sep (the supported platforms are POSIX, where os.sep == "/").
+        borg create never produces a path containing ".." or a path below a symlinked directory,
+        so such a path can only come from a malicious or corrupted archive and could be used to
+        access a location outside the extraction directory.
+
+        Raises BackupPathTraversalError if a parent component is "..", or
+        BackupSymlinkParentError if an existing parent component is a symlink (or other
+        non-directory). Directories verified to be safe are cached in self.safe_dirs, so each
+        directory is only lstat'ed once per extraction.
+        """
+        parent_components = [c for c in archived_path.split(os.sep)[:-1] if c not in ('', '.')]
+        # Reject ".." up front: this keeps the lstat walk below from climbing above self.cwd,
+        # and makes the early "break" on a not-yet-existing component safe (it can not skip a
+        # later "..").
+        if '..' in parent_components:
+            raise BackupPathTraversalError('not extracted, path contains "../" (malicious or corrupted archive)')
+        # Every *existing* parent directory component must be a real directory, not a symlink.
+        current = self.cwd
+        for component in parent_components:
+            current = os.path.join(current, component)
+            if current in self.safe_dirs:
+                continue
+            try:
+                st = os.lstat(current)
+            except FileNotFoundError:
+                # parent does not exist yet, it will be created (as a real directory) below an
+                # already-verified-safe chain.
+                break
+            if not stat.S_ISDIR(st.st_mode):
+                # os.lstat does not follow symlinks, so a symlinked parent shows up here as a
+                # non-directory. Refuse to follow it out of the extraction directory.
+                raise BackupSymlinkParentError('not extracted, a parent directory is a symlink (malicious or corrupted archive)')
+            self.safe_dirs.add(current)  # verified real directory, skip re-stat for later items
+
     @contextmanager
     def extract_helper(self, dest, item, path, stripped_components, original_path, hardlink_masters):
         hardlink_set = False
         # Hard link?
         if 'source' in item:
-            source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
+            # item.source is attacker-controlled and used as the hardlink target below. Refuse
+            # to follow a symlinked parent or ".." out of the extraction directory - otherwise a
+            # crafted archive could os.link() an arbitrary external file (e.g. /etc/shadow) into
+            # the extracted tree. Split on os.sep, consistent with the rest of borg.
+            source_components = item.source.split(os.sep)[stripped_components:]
+            try:
+                self._check_safe_parent(os.sep.join(source_components))
+            except BackupError:
+                raise BackupHardlinkSourceError('not extracted, hardlink source path is unsafe (malicious or corrupted archive)') from None
+            source = os.path.join(dest, *source_components)
             chunks, link_target = hardlink_masters.get(item.source, (None, source))
             if link_target and has_link:
-                # Hard link was extracted previously, just link
+                # Hard link was extracted previously, just link.
+                # follow_symlinks=False: if the final source component is a symlink, link the
+                # symlink itself (a faithful restore) rather than the external file it targets.
                 with backup_io('link'):
-                    os.link(link_target, path)
+                    if os.link in os.supports_follow_symlinks:
+                        os.link(link_target, path, follow_symlinks=False)
+                    else:
+                        os.link(link_target, path)
                     hardlink_set = True
             elif chunks is not None:
                 # assign chunks to this item, since the item which had the chunks was not extracted
@@ -800,6 +881,12 @@ Utilization of max. archive size: {csize_max:.0%}
         if item.path.startswith(('/', '../')):
             raise Exception('Path should be relative and local')
         path = os.path.join(dest, item.path)
+        # Refuse to extract items whose parent directory path is not safe (a symlinked parent or
+        # a path containing ".."). Without this check, the "remove existing file" block and the
+        # open()/mkdir()/symlink() calls below would follow such a parent path and could delete or
+        # overwrite files outside the extraction directory (e.g. /etc/passwd).
+        self.safe_dirs.discard(path)  # path is about to be (re)created; never trust a stale entry for it
+        self._check_safe_parent(item.path)
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.stat(path, follow_symlinks=False)
@@ -814,8 +901,15 @@ Utilization of max. archive size: {csize_max:.0%}
 
         def make_parent(path):
             parent_dir = os.path.dirname(path)
+            if parent_dir in self.safe_dirs:
+                # the parent path guard above already verified (this extraction) that parent_dir
+                # exists and is a real directory, so there is nothing to do and no need to stat it.
+                return
             if not os.path.exists(parent_dir):
                 os.makedirs(parent_dir)
+            # remember parent_dir as a real directory (it either existed - e.g. dest - or we just
+            # created it below an already-verified-safe chain), so later items can skip the stat.
+            self.safe_dirs.add(parent_dir)
 
         mode = item.mode
         if stat.S_ISREG(mode):
@@ -1451,8 +1545,16 @@ class FilesystemObjectProcessors:
                     if chunks is not None:
                         item.chunks = chunks
                     else:
-                        with backup_io('read'):
-                            self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
+                        # Do NOT wrap this in backup_io('read'): the source-file reads are already
+                        # guarded individually by backup_io_iter() below. Wrapping the whole call would
+                        # also wrap add_chunk()'s (and maybe_checkpoint()'s) *repository* writes, so a
+                        # repository IO failure (e.g. the repo running out of space) would be misreported
+                        # as a per-file "read" error and only warned about (then the file skipped),
+                        # instead of aborting. An unwrapped repository OSError is critical (see the
+                        # BackupOSError docstring). In 1.4 the transactional repository still rolls the
+                        # partial transaction back, so this is not data loss here, but the misclassified
+                        # warning and pointless read-retries are wrong regardless.
+                        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
                         if is_win32:
                             changed_while_backup = False  # TODO
                         else:

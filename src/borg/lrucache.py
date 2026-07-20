@@ -12,10 +12,10 @@ class LRUCache:
         assert key not in self._cache, (
             "Unexpected attempt to replace a cached item,"
             " without first deleting the old item.")
+        self._cache[key] = value
         self._lru.append(key)
         while len(self._lru) > self._capacity:
             del self[self._lru[0]]
-        self._cache[key] = value
 
     def __getitem__(self, key):
         value = self._cache[key]  # raise KeyError if not found
@@ -49,6 +49,7 @@ class LRUCache:
         for value in self._cache.values():
             self._dispose(value)
         self._cache.clear()
+        self._lru.clear()
 
     def items(self):
         return self._cache.items()

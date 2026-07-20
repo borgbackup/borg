@@ -969,6 +969,19 @@ def test_check_detects_index_corruption(tmp_path):
         assert repository.check(repair=False) is False  # mismatch between content hash and name detected
 
 
+def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):
+    # check warns about an invalid chunk index but does not fail, since the index is not part of
+    # the repository's object integrity.
+    import logging
+    from ..cache import write_chunkindex_invalid
+
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        write_chunkindex_invalid(repository)
+        with caplog.at_level(logging.WARNING):
+            assert repository.check(repair=False) is True
+        assert "chunk index is invalid" in caplog.text
+
+
 def test_check_intact_multi_object_pack_passes(tmp_path):
     # An intact pack with several objects passes: it is hashed as a whole, so the object count
     # does not matter.

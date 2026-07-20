@@ -707,6 +707,12 @@ class Repository:
         # stop and report that rather than continue. matters for partial checks too, whose runs can be
         # days apart (e.g. a weekend cron job).
         index_infos = store_list("index")
+        # an invalid chunk index means an interrupted fragment deletion; it will be rebuilt on next
+        # use, so warn rather than verify the leftover fragments.
+        from .cache import chunkindex_is_invalid
+
+        if chunkindex_is_invalid(self):
+            logger.warning("chunk index is invalid (interrupted operation); it will be rebuilt on next use.")
         index_pi = ProgressIndicatorPercent(total=len(index_infos), msg="Checking index %3.0f%%", msgid="check.index")
         for info in index_infos:
             self._lock_refresh()

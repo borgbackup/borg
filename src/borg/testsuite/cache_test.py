@@ -13,11 +13,13 @@ from ..cache import (
     ChunksMixin,
     FileCacheEntry,
     build_chunkindex_from_repo,
+    chunkindex_is_invalid,
     delete_chunkindex_from_repo,
     list_chunkindex_fragments,
     list_chunkindex_hashes,
     read_chunkindex_from_repo,
     repack_chunkindex,
+    write_chunkindex_invalid,
     write_chunkindex_to_repo,
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
@@ -477,6 +479,70 @@ def test_repack_idempotent_deletes_sources_when_merged_exists(tmp_path, monkeypa
         assert frags == sealed  # sources deleted; only the (unchanged) sealed fragment remains
         merged = read_chunkindex_from_repo(repository, next(iter(frags)))
         assert set(merged) == set(all_keys)
+
+
+def test_invalid_marker_forces_rebuild(tmp_path):
+    """With the marker present, build discards leftover fragments instead of trusting them."""
+    loc = os.fspath(tmp_path / "repository")
+    with Repository(loc, exclusive=True, create=True) as repository:
+        # a leftover fragment plus the marker, as an interrupted deletion would leave them.
+        _seed_fragment(repository, 5000, 3)
+        write_chunkindex_invalid(repository)
+        assert chunkindex_is_invalid(repository)
+
+        chunks = build_chunkindex_from_repo(repository)
+        # the leftover entry is not merged (the repo has no packs, so a correct rebuild is empty).
+        assert _ci_key(5000) not in chunks
+        # the roll-forward removed both the leftover fragments and the marker.
+        assert not chunkindex_is_invalid(repository)
+        assert list_chunkindex_fragments(repository) == []
+
+
+def test_delete_chunkindex_writes_then_removes_marker(tmp_path):
+    """An interrupted delete_chunkindex_from_repo leaves the invalid marker behind."""
+    loc = os.fspath(tmp_path / "repository")
+    with Repository(loc, exclusive=True, create=True) as repository:
+        _seed_fragment(repository, 0, 3)
+        _seed_fragment(repository, 100, 3)
+        assert not chunkindex_is_invalid(repository)
+
+        real_delete = repository.store.delete
+        calls = {"n": 0}
+
+        def failing_delete(name, **kwargs):
+            # let the marker write happen, then fail on the first fragment deletion.
+            if name.startswith("index/"):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    raise OSError("simulated crash mid-delete")
+            return real_delete(name, **kwargs)
+
+        repository.store.delete = failing_delete
+        with pytest.raises(OSError):
+            delete_chunkindex_from_repo(repository)
+        repository.store.delete = real_delete
+        # the marker was written before the (failed) deletion and is still present.
+        assert chunkindex_is_invalid(repository)
+
+        # a fresh build sees the marker, rolls the deletion forward, and rebuilds cleanly.
+        build_chunkindex_from_repo(repository)
+        assert not chunkindex_is_invalid(repository)
+
+
+def test_repack_skips_when_invalid(tmp_path, monkeypatch):
+    """Repack does nothing while the index is invalid (a rebuild will supersede it)."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 1000)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_SMALL_FRAGMENT_CAP", 2)
+    loc = os.fspath(tmp_path / "repository")
+    with Repository(loc, exclusive=True, create=True) as repository:
+        delete_chunkindex_from_repo(repository)
+        for j in range(4):
+            _seed_fragment(repository, j * 100, 100)
+        write_chunkindex_invalid(repository)
+        before = {name for name, _ in list_chunkindex_fragments(repository)}
+        repack_chunkindex(repository)
+        after = {name for name, _ in list_chunkindex_fragments(repository)}
+        assert before == after  # unchanged: repack bailed out
 
 
 def test_files_cache_save_tolerates_missing_chunk(tmp_path, monkeypatch):

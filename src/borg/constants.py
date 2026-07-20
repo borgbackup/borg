@@ -114,6 +114,12 @@ CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
 # How often to restart merging the fragments into a chunk index when a listed fragment vanishes
 # mid-merge (a concurrent repack replaced it). After that, fall back to the slow rebuild from packs.
 CHUNKINDEX_MERGE_ATTEMPTS = 3
+# Marker object in the cache/ namespace: the chunk index is invalid. Written before deleting index
+# fragments, removed after the last fragment is gone. While it is present, the chunk index is rebuilt
+# from the packs on next load and the leftover index/ fragments are deleted. Removing the marker while
+# index/ fragments remain makes those fragments look like a complete index, so only
+# delete_chunkindex_invalid() removes it, and clearing cache/ requires clearing index/ too.
+CHUNKINDEX_INVALID_SENTINEL = "chunkindex-invalid"
 
 FD_MAX_AGE = 4 * 60  # 4 minutes
 

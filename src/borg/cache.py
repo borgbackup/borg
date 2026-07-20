@@ -22,7 +22,7 @@ from borgstore.store import ItemInfo
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
 from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
-from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS
+from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS, CHUNKINDEX_INVALID_SENTINEL
 from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
 from .helpers import get_cache_dir
 from .helpers import chunkit
@@ -551,6 +551,7 @@ def chunkindex_fragment_entry_size():
     return key_size + value_size
 
 
+# TODO: refactor the chunk-index functions below into a dedicated index-management class.
 def list_chunkindex_fragments(repository):
     """List the index/ fragments, returning each fragment's (name, approximate entry count).
 
@@ -576,14 +577,46 @@ def list_chunkindex_hashes(repository):
     return hashes
 
 
+def chunkindex_is_invalid(repository):
+    """Return whether the chunk-index-invalid marker is present.
+
+    store_list() bypasses the borgstore cache, so this stays correct even for a cache-backed namespace.
+    """
+    return any(ItemInfo(*info).name == CHUNKINDEX_INVALID_SENTINEL for info in repository.store_list("cache"))
+
+
+def write_chunkindex_invalid(repository):
+    """Mark the chunk index as invalid. Call before deleting index fragments.
+
+    If the deletion is interrupted, the marker remains and the index is rebuilt on next load.
+    """
+    repository.store_store(f"cache/{CHUNKINDEX_INVALID_SENTINEL}", b"")
+
+
+def delete_chunkindex_invalid(repository):
+    """Clear the chunk-index-invalid marker. Call after all fragment deletions have completed."""
+    try:
+        repository.store_delete(f"cache/{CHUNKINDEX_INVALID_SENTINEL}")
+    except StoreObjectNotFound:
+        pass
+
+
 def delete_chunkindex_from_repo(repository):
     hashes = list_chunkindex_hashes(repository)
+    invalid = chunkindex_is_invalid(repository)
+    if hashes:
+        # mark invalid before deleting the first fragment, so an interrupted deletion is detectable.
+        write_chunkindex_invalid(repository)
     for hash in hashes:
         index_name = f"index/{hash}"
         try:
             repository.store_delete(index_name)
         except StoreObjectNotFound:
             pass
+    if hashes or invalid:
+        # clear the marker after every fragment is gone; also clears a marker left behind by an
+        # earlier interrupted deletion.
+        delete_chunkindex_invalid(repository)
     logger.debug(f"chunk indexes deleted: {hashes}")
     # the in-memory index is now stale; drop it so close() does not write it back into the
     # index we just deleted. the next .chunks access rebuilds it from actual repo contents.
@@ -687,12 +720,21 @@ def write_chunkindex_to_repo(
             delete_these = set(stored_hashes) - new_hashes
         else:
             delete_these = set(delete_these) - new_hashes
+        # A delete_other rewrite may drop entries, so leftover fragments after a mid-delete crash must
+        # not be merged back; guard that deletion with the invalid marker. Otherwise the deleted
+        # fragments' entries are already contained in the fragments we just wrote, so leftovers are
+        # harmless.
+        guard = delete_other and bool(delete_these)
+        if guard:
+            write_chunkindex_invalid(repository)
         for hash in delete_these:
             index_name = f"index/{hash}"
             try:
                 repository.store_delete(index_name)
             except StoreObjectNotFound:
                 pass
+        if guard:
+            delete_chunkindex_invalid(repository)
         if delete_these:
             logger.debug(f"chunk indexes deleted: {delete_these}")
     return new_hashes
@@ -729,6 +771,9 @@ def repack_chunkindex(repository):
     sum to >= MIN) or when too many small fragments have piled up (more than
     CHUNKINDEX_SMALL_FRAGMENT_CAP), so we don't rewrite a slowly growing fragment on every backup.
     """
+    if chunkindex_is_invalid(repository):
+        # the index is invalid; it will be rebuilt on next load, so there is nothing to consolidate.
+        return
     small = [
         (name, approx)
         for name, approx in list_chunkindex_fragments(repository)
@@ -778,6 +823,15 @@ def build_chunkindex_from_repo(
         # the fresh listing contains the replacement fragment. if we cannot get a complete, consistent
         # set (e.g. a persistently unreadable fragment), fall through to the slow rebuild instead.
         for _ in range(CHUNKINDEX_MERGE_ATTEMPTS):
+            if chunkindex_is_invalid(repository):
+                # leftover fragments may be incomplete or stale. Finish the interrupted deletion
+                # (best-effort; a read-only client rebuilds in memory only), then rebuild from packs.
+                logger.warning("chunk index is invalid (interrupted operation), rebuilding it.")
+                try:
+                    delete_chunkindex_from_repo(repository)
+                except Exception as err:
+                    logger.debug(f"could not remove invalid chunk index fragments: {err!r}")
+                break
             hashes = list_chunkindex_hashes(repository)
             if not hashes:  # no chunk index fragments available
                 break

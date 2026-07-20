@@ -9,9 +9,14 @@ import pytest
 
 from ... import xattr
 from ... import platform
+from ...archive import Archive
+from ...cache import Cache
 from ...chunkers import has_seek_hole
 from ...constants import *  # NOQA
-from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
+from ...item import Item
+from ...manifest import Manifest
+from ...repository import Repository
+from ...helpers import EXIT_WARNING, BackupPermissionError, BackupSymlinkParentError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns, granularity_sleep
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
@@ -44,6 +49,122 @@ def test_symlink_extract(archivers, request):
     with changedir("output"):
         cmd(archiver, "extract", "test")
         assert os.readlink("input/link1") == "somewhere"
+
+
+def _create_malicious_archive(archiver, name, items):
+    # Inject raw Items directly into an archive, bypassing "borg create" (which would never
+    # produce a child below a symlink or a path with embedded "..").
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        with Cache(repository, manifest, archive_name=name) as cache:
+            archive = Archive(manifest, name, cache=cache, create=True)
+            for item in items:
+                archive.items_buffer.add(item)
+            archive.save(name=name)
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_extract_through_symlinked_parent(archivers, request):
+    # Security (CVE-2026-62268): an archive with a symlink "evil" -> "<victim_dir>", followed by a
+    # regular file "evil/passwd", must NOT overwrite/delete files in the symlink target directory.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("malicious archive is crafted via direct (local) repository access")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    victim_dir = os.path.join(archiver.tmpdir, "victim")
+    os.mkdir(victim_dir)
+    victim_file = os.path.join(victim_dir, "passwd")
+    with open(victim_file, "w") as fd:
+        fd.write("original")
+    attrs = dict(mtime=0, uid=0, gid=0, user="root", group="root")
+    _create_malicious_archive(
+        archiver,
+        "evil",
+        [
+            Item(path="evil", mode=stat.S_IFLNK | 0o777, target=victim_dir, **attrs),
+            Item(path="evil/passwd", mode=stat.S_IFREG | 0o644, chunks=[], **attrs),
+        ],
+    )
+    with changedir("output"):
+        # borg 2 uses modern exit codes, so the warning surfaces as the specific mcode.
+        output = cmd(archiver, "extract", "evil", exit_code=BackupSymlinkParentError.exit_mcode)
+    assert "parent directory is a symlink" in output
+    # the out-of-tree victim must be untouched (neither deleted nor overwritten)
+    assert os.path.exists(victim_file)
+    with open(victim_file) as fd:
+        assert fd.read() == "original"
+    # the symlink item itself was restored faithfully
+    assert os.path.islink(os.path.join(archiver.output_path, "evil"))
+
+
+@pytest.mark.skipif(
+    not (are_symlinks_supported() and are_hardlinks_supported()), reason="symlinks/hardlinks not supported"
+)
+def test_extract_hardlinked_symlink_does_not_leak_target(archivers, request):
+    # Security (CVE-2026-62268 Fix 2/2, borg 2 form): a crafted archive with a symlink
+    # "s" -> "<victim_file>" plus a contentless hardlink "h" sharing its hlid must restore "h"
+    # as a hardlink to the *symlink* (a faithful restore), NOT as a hardlink to the external
+    # victim file's inode. The latter (os.link following the symlink) would splice an arbitrary
+    # external file into the extracted tree - dangerous especially when restoring as root.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("malicious archive is crafted via direct (local) repository access")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    victim_file = os.path.join(archiver.tmpdir, "victim")
+    with open(victim_file, "w") as fd:
+        fd.write("secret")
+    attrs = dict(mtime=0, uid=0, gid=0, user="root", group="root")
+    hlid = b"H" * 32  # opaque hardlink-group id shared by both items
+    _create_malicious_archive(
+        archiver,
+        "evil",
+        [
+            # master: a symlink pointing at the external victim file
+            Item(path="s", mode=stat.S_IFLNK | 0o777, target=victim_file, hlid=hlid, **attrs),
+            # contentless hardlink to the same hlid
+            Item(path="h", mode=stat.S_IFLNK | 0o777, hlid=hlid, **attrs),
+        ],
+    )
+    with changedir("output"):
+        cmd(archiver, "extract", "evil")
+    s_path = os.path.join(archiver.output_path, "s")
+    h_path = os.path.join(archiver.output_path, "h")
+    # "h" is a hardlink to the symlink itself (same inode as "s"), a faithful restore ...
+    assert os.path.islink(h_path)
+    assert os.stat(h_path, follow_symlinks=False).st_ino == os.stat(s_path, follow_symlinks=False).st_ino
+    # ... and NOT a hardlink to the external victim file's inode (that would be the leak).
+    assert os.stat(h_path, follow_symlinks=False).st_ino != os.stat(victim_file).st_ino
+    # the out-of-tree victim is untouched
+    with open(victim_file) as fd:
+        assert fd.read() == "secret"
+
+
+def test_extract_path_with_embedded_dotdot_rejected_at_item_layer():
+    # Security (CVE-2026-62268, embedded-".." vector): unlike borg 1.4, borg 2 already blocks
+    # this vector one layer earlier - Item.path is sanitized on both encode (assert_sanitized_path)
+    # and decode (to_sanitized_path), so an item whose path contains ".." can neither be stored in
+    # an archive nor read back from one. Hence the "../" branch of Archive._check_safe_parent is
+    # defense-in-depth only and cannot be reached via a crafted archive here; we assert the item
+    # layer refuses such a path instead.
+    with pytest.raises(ValueError):
+        Item(path="a/../../victim/passwd", mode=stat.S_IFREG | 0o644, chunks=[])
+
+
+def test_extract_deep_tree_ok(archivers, request):
+    # The parent-path guard (and its safe_dirs cache) must not break normal extraction of a
+    # deep tree where many files share the same parent directories.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "d1/d2/d3/file1", size=10)
+    create_regular_file(archiver.input_path, "d1/d2/d3/file2", size=10)
+    create_regular_file(archiver.input_path, "d1/d2/other", size=10)
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert os.path.exists("input/d1/d2/d3/file1")
+        assert os.path.exists("input/d1/d2/d3/file2")
+        assert os.path.exists("input/d1/d2/other")
 
 
 def test_extract_stats(archivers, request):

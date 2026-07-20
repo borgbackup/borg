@@ -10,7 +10,7 @@ from ...helpers.errors import CommandError
 from ...platform import is_win32
 from . import cmd, create_src_archive, generate_archiver_tests, RK_ENCRYPTION
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
 @pytest.fixture

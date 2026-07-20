@@ -177,7 +177,7 @@ New features:
   - fine tuning and optimizations only partly done yet
   - needs new repositories, no support for repos from previous betas.
 - add BORG_STORE_CACHE and BORG_PACK_CACHE_SIZE env vars to enable borgstore caching
-  (use this for slow / high latency primary stores)
+  (use this for slow / high-latency primary stores)
 - Remote repositories (via ssh):
 
   - implemented via borgstore now
@@ -191,7 +191,7 @@ New features:
   - buzhash64: add normalized chunking (better chunk size distribution, less clamping)
 - borg keys:
 
-  - locate borg key automatically in key directory or repository, #9743
+  - locate the borg key automatically in the key directory or in the repository, #9743
   - key list/add/remove/export: support multiple borg keys per repository, #9743
   - allow --key-location also for authenticated* modes
 - repo-create: split --encryption into --encryption, --id-hash, --key-location, #9168
@@ -200,7 +200,7 @@ New features:
 - prune:
 
   - add optional interval support for all prune retention flags
-  - removes `--keep-last` and `--keep-within`, superseded by `--keep`
+  - remove ``--keep-last`` and ``--keep-within``, superseded by ``--keep``
   - prune --from: give reference timestamp (default: now)
   - show total vs matching archives in output, #9262
   - add --json option, #9222
@@ -213,6 +213,13 @@ New features:
 - create: log the archive name, not just the repository, #9865
 - create/extract/compact --stats: report store statistics, #9880, #9405
 - compact: show deduplication and compression factors, #9856
+- compact: add --threshold PERCENT: only rewrite a pack when at least PERCENT of
+  its bytes are unused, also gates whether to compact at all (default: 10), #9379
+- check --format: support custom archive formatting (also: BORG_CHECK_FORMAT), #9411
+- implement --match-archives ``date:`` selector to match archives by creation
+  timestamp. It supports ISO-8601-like dates/times from year to fractional-second
+  precision, Unix epoch timestamps (``@...``), and ``Z`` / ``+HH:MM`` /
+  ``[Region/City]`` timezone suffixes, #8776 #8715
 - json: support BORG_JSON_INDENT env var for JSON output formatting
 - implement --match-archives ``date:`` selector to match archives by creation
   timestamp. It supports ISO-8601-like dates/times from year to fractional-second
@@ -221,6 +228,9 @@ New features:
 
 Fixes:
 
+- extract: security fixes for CVE-2026-62268 (low severity: an attacker would need
+  repository write access and, if the repo is encrypted, also the borg key and
+  the passphrase).
 - create: do not wrap repository writes in backup_io("read"), fixes silent
   data loss when running out of repository space.
 - create: input file retries: do not sleep before giving up on the last try
@@ -229,11 +239,14 @@ Fixes:
   mask the original error when releasing the lock on close, handle our lock
   getting killed while we are refreshing it, never consider the lock we
   currently hold stale (#9883), do not leave a lock behind when exclusive
-  acquire times out).
+  acquire times out), and refresh the repository lock of an idle mount.
 - compact: invalidate cached chunk indexes before deleting objects, #9748.
   An interrupted compact no longer leaves a stale cache/chunks.* that claims
   deleted objects still exist, which could cause a later create to skip
   re-uploading data and silently produce an archive with dangling references.
+- cache: write a "chunk index invalidated" marker before deleting index fragments,
+  #9904. An interrupted index repack no longer leaves a partial chunks index
+  behind that is mistaken for a complete one.
 - files cache: fix no-change backup emptying the files cache, #9749
 - fix canonical_path() missing ':' before port number
 - fix: xattr xdg backup exclusion should be on 'false'
@@ -241,12 +254,14 @@ Fixes:
 - macOS: fix TypeError when _get_birthtime_ns gets called with an FD
 - fix ChunkerFixed sparse handling and update tests
 - chunkers: check return value of malloc, raise MemoryError
+- buzhash chunkers: add len==0 check to avoid a buffer over-read
 - crypto low_level: fix freeing of memory
-- extract: resolve memory leak on abandoned async requests in RemoteRepository
+- extract: resolve a memory leak on abandoned async requests in RemoteRepository
 - helpers: get_base_dir: avoid using HOME when it incorrectly points to root's home for non-root users (fstab borgfs), #3395
 - mount: improve error msg when uid/gid cannot be resolved, #9574
 - fix: properly handle invalid and dev versions in version parser, #9014
 - patterns: allow backslashes in paths, #9518
+- patterns: validate root paths, clean up TODOs, #9442
 - legacy: use borg 1.x keys directory for v1 repos (relevant for macOS)
 - deal with corrupted archive metadata items
 - repoobj: reject malformed objects with IntegrityError, not struct.error/assert
@@ -256,8 +271,13 @@ Other changes:
 - remove Python 3.10 support, add Python 3.15 support, #9707
 - support msgpack up to 1.2.1
 - remove xxhash / xxh64 requirement
+- file integrity: use sha256 instead of xxh64, add a pure_hash option, #9704
 - add blake3 requirement, blacklist blake3 1.0.9 (win32/msys2 build issues)
-- removed ``ssh://`` and ``socket://`` support for current repositories; use
+- require borgstore 0.5.5. The ``rest`` extra is gone, ``borgstore[rest]`` is now
+  always installed, so use ``pip install borgbackup`` instead of
+  ``pip install borgbackup[rest]``.
+- repo-compress: remove this command for now.
+- remove ``ssh://`` and ``socket://`` support for current repositories; use
   a ``rest://`` repository instead (it tunnels over ssh).
   ``ssh://`` and ``borg serve`` remain available only for legacy (borg 1.x)
   repositories, e.g. for ``borg transfer --from-borg1 --other-repo ssh://...``.
@@ -273,17 +293,18 @@ Other changes:
   For sftp/http(s)/s3/b2/rclone repositories, borg now only detects the scheme and hands the raw
   URL to borgstore, which parses and validates it (removing the duplicate parsing borg did before).
   Note: for these repositories the canonical location string changed slightly, so on the first run
-  against an existing such repository borg may warn once that it "was previously located at ..." -
-  this is harmless and can be confirmed.
+  against such an existing repository borg may warn once that it "was previously located at ..." -
+  this is harmless and the prompt can be confirmed.
 - keyfile: name key files by sha256(keyfile_contents).
   Existing legacy-named keyfiles continue to work.
 - repokey: use same format as with external keyfile
+- compact: cache each archive's referenced objects to speed up analysis, #9896
 - list: remove xxh64 hash support (placeholder)
 - benchmark: remove xxh64 and crc32 benchmarking
 - benchmark cpu: drop KDF section (irrelevant: KDFs should not be fast)
 - separate a lot of legacy code into borg.legacy package, #9556
 - archiver: warn about MSYS2 path translation, #9339
-- mount: drop runtime warning about symlinks, improve corresponding docs
+- mount: drop runtime warning about symlinks, improve the corresponding docs
 - repack chunks index into medium-sized fragments
 - tests / CI:
 
@@ -291,8 +312,9 @@ Other changes:
   - remove workaround for cross-platform-actions < v1.0.0, #9565
   - CI: fix Haiku git safe.directory issue, #9562
   - CI: canary: avoid MSYS2 arg/env conversions, #9513
-  - Fixes cleanup of append-only test tempfiles on macOS/BSD
-  - Fixes tests/docs assuming XDG_* vars not used on macOS
+  - CI: upgrade to FreeBSD 15.1
+  - fix cleanup of append-only test tempfiles on macOS/BSD
+  - fix tests/docs assuming XDG_* vars are not used on macOS
   - add more tests
   - don't run transport-agnostic archiver tests over rest://, #9324
   - sweep stale borg FUSE mounts left by aborted runs
@@ -304,7 +326,7 @@ Other changes:
 - docs:
 
   - add pack file format design and internals documentation, #8572
-  - other updates / fixes to "internals" section
+  - other updates / fixes to the "internals" section
   - update to 'borg key change-passphrase' in env help, #9697
   - document the impact of the slashdot hack to pattern matching
   - contributing guide incl. AI policy, #9409

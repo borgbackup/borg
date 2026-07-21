@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import sys
 from collections import namedtuple
@@ -1116,7 +1117,83 @@ def test_check_full_ignores_recorded_set(tmp_path, monkeypatch):
         assert pack_key in hashed_keys  # verified
 
         after = PackTracker.load(repository.store)
-        assert len(after) == 0  # cycle complete, set dropped
+        assert len(after) == 0  # cycle complete, intact records dropped
+
+
+def _store_corrupt_pack(repository, pack_id):
+    # the stored content does not hash to pack_id, so verifying it fails.
+    repository.store_store("packs/" + bin_to_hex(pack_id), b"CORRUPT-does-not-match-name")
+    return pack_id
+
+
+def test_check_full_keeps_corrupt_record_after_cycle(tmp_path):
+    # a completed cycle keeps the records of corrupt packs and drops the records of intact ones.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, _ = _store_intact_pack(repository)
+        corrupt_id = _store_corrupt_pack(repository, H(2))
+
+        assert repository.check(repair=False) is False
+
+        after = PackTracker.load(repository.store)
+        assert after.corrupt_ids() == [corrupt_id]
+        assert intact_id not in after.table
+
+
+def test_check_full_reports_corrupt_pack_ids(tmp_path, caplog):
+    # the summary names the corrupt packs.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        corrupt_id = _store_corrupt_pack(repository, H(1))
+
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert repository.check(repair=False) is False
+
+        assert f"Corrupt packs: {bin_to_hex(corrupt_id)}" in caplog.text
+
+
+def test_check_full_reverifies_carried_over_corrupt_record(tmp_path, monkeypatch):
+    # a corrupt record from an earlier cycle is re-verified and dropped once the pack is intact again.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        tracker.record(intact_id, ok=False)  # recorded corrupt in an earlier cycle
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False) is True
+        assert pack_key in hashed_keys  # re-verified
+
+        after = PackTracker.load(repository.store)
+        assert len(after) == 0  # verified intact, so the corrupt record is dropped
+
+
+def test_check_full_prunes_corrupt_record_of_vanished_pack(tmp_path):
+    # a corrupt record for a pack that is no longer listed is dropped at cycle end.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        tracker.record(H(9), ok=False)  # no such pack in packs/
+        tracker.save()
+
+        assert repository.check(repair=False) is True
+
+        after = PackTracker.load(repository.store)
+        assert len(after) == 0
+
+
+def test_check_partial_keeps_corrupt_record_across_runs(tmp_path):
+    # corrupt records survive a partial check that completes its cycle, too.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        corrupt_id = _store_corrupt_pack(repository, H(1))
+
+        assert repository.check(repair=False, max_duration=3600) is False
+        assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
+
+        # a second run re-verifies it and keeps reporting it.
+        assert repository.check(repair=False, max_duration=3600) is False
+        assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
 
 
 def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):

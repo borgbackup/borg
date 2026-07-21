@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-prune" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-prune" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-prune \- Prune archives according to specified rules.
 .SH SYNOPSIS
@@ -67,33 +67,81 @@ If you have multiple series of archives with different data sets (e.g.
 from different machines) in one shared repository, use one prune call per
 series.
 .sp
-The \fB\-\-keep\-within\fP option takes an argument of the form \(dq<int><char>\(dq,
-where char is \(dqy\(dq, \(dqm\(dq, \(dqw\(dq, \(dqd\(dq, \(dqH\(dq, \(dqM\(dq, or \(dqS\(dq.  For example,
-\fB\-\-keep\-within 2d\fP means to keep all archives that were created within
-the past 2 days.  \(dq1m\(dq is taken to mean \(dq31d\(dq. The archives kept with
-this option do not count towards the totals specified by any other options.
+The \fB\-\-keep\fP option is the simplest way to specify a basic retention
+policy. It accepts a count or a time interval for retention (e.g.
+\fB10\fP or \fB7d\fP, \fB4w\fP). With a count it keeps at most that many
+recent archives; with an interval it keeps all archives created within
+that time window. When \fB\-\-from\fP is given together with an interval
+retention, the interval is measured backwards from that timestamp
+instead of from the current time. See \fBDate and Time\fP docs for exact
+INTERVAL format.
 .sp
-A good procedure is to thin out more and more the older your backups get.
-As an example, \fB\-\-keep\-daily 7\fP means to keep the latest backup on each day,
-up to 7 most recent days with backups (days without backups do not count).
-The rules are applied from secondly to yearly, and backups selected by previous
-rules do not count towards those of later rules. The time that each backup
-starts is used for pruning purposes. Dates and times are interpreted in the local
-timezone of the system where borg prune runs, and weeks go from Monday to Sunday.
-Specifying a negative number of archives to keep means that there is no limit.
+The \fB\-\-keep\-secondly\fP, \fB\-\-keep\-minutely\fP, \fB\-\-keep\-hourly\fP,
+\fB\-\-keep\-daily\fP, \fB\-\-keep\-weekly\fP, \fB\-\-keep\-monthly\fP,
+\fB\-\-keep\-13weekly\fP, \fB\-\-keep\-3monthly\fP, and \fB\-\-keep\-yearly\fP options
+specify time period retention policies. They accept either a count N for
+retention or a time interval INTERVAL for retention, same as for \fB\-\-keep\fP\&.
+With a retention count, they keep at most that many archives (one per
+period, e.g. one per day or one per month until the retention count is
+met). With a retention interval, they keep one archive per period
+within that time span (e.g. at most one per day in a span of seven
+days, even if some days had none) \-\- measured from \fB\-\-from\fP if given,
+otherwise from the current time. Specifying a count of \fB\-1\fP (or the
+word \fBall\fP) means no limit. A zero count or zero\-length interval
+keeps nothing.
 .sp
-Borg will retain the oldest archive if any of the secondly, minutely, hourly,
-daily, weekly, monthly, quarterly, or yearly rules was not otherwise able to
-meet its retention target. This enables the first chronological archive to
-continue aging until it is replaced by a newer archive that meets the retention
-criteria.
+The \fB\-\-from\fP option restricts pruning to archives older than the given
+TIMESTAMP. Archives made at or after this timestamp are kept unconditionally
+as a pre\-filter. When \fB\-\-from\fP is used together with interval\-based
+\fB\-\-keep\-*\fP options (e.g. \fB\-\-keep\-daily 7d\fP), the interval is measured
+backwards from the given timestamp rather than from the current time.
+Count\-based retention does not count the unconditionally kept archives.
 .sp
 The \fB\-\-keep\-13weekly\fP and \fB\-\-keep\-3monthly\fP rules are two different
 strategies for keeping archives every quarter year.
 .sp
-The \fB\-\-keep\-last N\fP option is doing the same as \fB\-\-keep\-secondly N\fP (and it will
-keep the last N archives under the assumption that you do not create more than one
-backup archive in the same second).
+The oldest archive is kept as long as the coarsest retention rule covers it \-\-
+\fB\-\-keep\-yearly=3\fP will keep the oldest archive if it couldn\(aqt otherwise find
+three candidates, \fB\-\-keep\-yearly=5y\fP will keep the oldest archive as long as
+it is at or within the 5y interval. This is useful for rolling tiered backup
+schemes, where the earliest backup in a retention window should survive until
+the next tier\(aqs interval naturally replaces it.
+.sp
+When using interval\-based pruning with multiple \fB\-\-keep\-*\fP options,
+the intervals must be specified in increasing length matching the
+periods chosen. For example, \fB\-\-keep\-daily 7d \-\-keep\-weekly 4w\fP is
+valid, but \fB\-\-keep\-daily 30d \-\-keep\-weekly 7d\fP is not, because the
+weekly interval is already covered by the daily one and so the weekly
+interval is effectively useless. An error is emitted upon running
+\fBborg prune\fP if such a combination of flags is given. The order of
+flags on the command line is not significant.
+.sp
+A practical approach for recurring backups is to use rules
+with increasing coarseness so that most of recent history is kept and
+older history gradually thins out with time. For example,
+\fB\-\-keep\-daily 7d \-\-keep\-weekly 4w \-\-keep\-monthly 6\fP keeps an
+archive per day for the past week, per week for the past month, and
+one per month for six months after that. Combine this with \fB\-\-from\fP
+to align time windows to calendar boundaries rather than the exact
+moment you run prune for more predictable behavior of coarser rules:
+\fB\-\-keep\-daily 7d \-\-keep\-weekly 4w \-\-from $(date +%F)\fP\&.
+.sp
+Count\-based retention keeps archives less bound to time. For instance,
+\fB\-\-keep\-yearly 3\fP retains 3 yearly archives however far back they
+span and \fB\-\-keep\-daily 20\fP keeps 20 archives no matter if you missed
+a week in between. This can be useful for less regular archive
+creation, or if your use case does not map well to specific time
+intervals, or if you simply prefer to think of archive retention in
+numbers rather than intervals.
+.sp
+For count\-based retention, backups selected by more granular rules do
+not count towards those of coarser rules. \fB\-\-keep 3 \-\-keep\-monthly 2\fP
+will first keep the 3 latest archives and then keep 2 monthly archives,
+skipping ones that were already kept by \fB\-\-keep 3\fP\&.
+.sp
+The time that each archive creation started is used to match archives
+to pruning periods. Dates and times are interpreted in the local
+timezone of your system. Weeks go from Monday to Sunday.
 .sp
 You can influence how the \fB\-\-list\fP output is formatted by using the \fB\-\-short\fP
 option (less wide output) or by giving a custom format using \fB\-\-format\fP (see
@@ -131,35 +179,38 @@ specify format for the archive part (default: \(dq{archive:<36} {time} [{id}]\(d
 .B  \-\-json
 Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
 .TP
-.BI \-\-keep\-within \ INTERVAL
-keep all archives within this time interval
+.BI \-\-from \ TIMESTAMP
+only consider archives older than this for pruning
 .TP
-.B  \-\-keep\-last\fP,\fB  \-\-keep\-secondly
-number of secondly archives to keep
+.B  \-\-keep
+number or time interval of archives to keep
+.TP
+.B  \-\-keep\-secondly
+number or time interval of secondly archives to keep
 .TP
 .B  \-\-keep\-minutely
-number of minutely archives to keep
+number or time interval of minutely archives to keep
 .TP
 .B  \-H\fP,\fB  \-\-keep\-hourly
-number of hourly archives to keep
+number or time interval of hourly archives to keep
 .TP
 .B  \-d\fP,\fB  \-\-keep\-daily
-number of daily archives to keep
+number or time interval of daily archives to keep
 .TP
 .B  \-w\fP,\fB  \-\-keep\-weekly
-number of weekly archives to keep
+number or time interval of weekly archives to keep
 .TP
 .B  \-m\fP,\fB  \-\-keep\-monthly
-number of monthly archives to keep
+number or time interval of monthly archives to keep
 .TP
 .B  \-\-keep\-13weekly
-number of quarterly archives to keep (13 week strategy)
+number or time interval of quarterly archives to keep (13 week strategy)
 .TP
 .B  \-\-keep\-3monthly
-number of quarterly archives to keep (3 month strategy)
+number or time interval of quarterly archives to keep (3 month strategy)
 .TP
 .B  \-y\fP,\fB  \-\-keep\-yearly
-number of yearly archives to keep
+number or time interval of yearly archives to keep
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
@@ -200,6 +251,13 @@ It is strongly recommended to always run \fBprune \-v \-\-list \-\-dry\-run ...\
 first, so you will see what it would do without it actually doing anything.
 .sp
 Do not forget to run \fBborg compact \-v\fP after prune to actually free disk space.
+.sp
+The \fB\-\-keep\-*\fP options accept either a \fBcount\fP (e.g. \fB\-\-keep\-daily 7\fP) or
+a \fBtime interval\fP (e.g. \fB\-\-keep\-daily 7d\fP). A count keeps up to \fIN\fP archives
+per period (e.g. the last 7 daily archives), while an interval keeps one
+archive per period within that time span (e.g. one daily archive per day in the
+last 7\-day window). When using intervals, you may also specify \fB\-\-from\fP to
+set the reference timestamp for interval calculation.
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -221,12 +279,25 @@ $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-keep\-monthly
 
 # Keep all backups in the last 10 days, 4 additional end of week archives,
 # and an end of month archive for every month:
-$ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1
+$ borg prune \-v \-\-list \-\-keep=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1
+
+# Keep daily archives from the last 7 days:
+$ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7d
+
+# Same as above, but with a fixed reference timestamp:
+$ borg prune \-v \-\-list \-\-dry\-run \-\-from 2025\-12\-01T00:00:00+02:00 \-\-keep\-daily=7d
+
+# Keep the last 14 archives using \(ga\-\-keep\(ga:
+$ borg prune \-v \-\-list \-\-dry\-run \-\-keep 14
+
+# Keep all archives from the last 30 days using \(ga\-\-keep\(ga:
+$ borg prune \-v \-\-list \-\-dry\-run \-\-keep 30d
 .EE
 .UNINDENT
 .UNINDENT
 .sp
-There is also a visualized prune example in \fBdocs/misc/prune\-example.txt\fP\&.
+There are also visualized prune examples in \fBdocs/misc/prune\-example.txt\fP and
+\fBdocs/misc/prune\-example\-interval.txt\fP:
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP, \fIborg\-compact(1)\fP

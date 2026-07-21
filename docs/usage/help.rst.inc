@@ -315,6 +315,7 @@ The patterns can have a prefix of:
 - user: exact match on the username who created the archive
 - host: exact match on the hostname where the archive was created
 - tags: match on the archive tags
+- date: match on the archive creation timestamp
 
 In case of a name pattern match,
 it uses pattern styles similar to the ones described by ``borg help patterns``:
@@ -328,6 +329,45 @@ Shell-style patterns, selector ``sh:``
 `Regular expressions <https://docs.python.org/3/library/re.html>`_, selector ``re:``
     Full regular expression support.
     This is very powerful, but can also get rather complicated.
+
+Date patterns, selector ``date:``
+    Match archives by creation timestamp. You can either match a single archive by
+    passing its exact creation time, or all archives created within a given time
+    interval.
+
+    To match a single archive by its exact creation time, use the forms:
+
+    - ``YYYY-MM-DDTHH:MM:SS.ffffff``: ISO-8601-like date-time string
+    - ``@1735732800.123456``: UNIX timestamp
+
+    To match a single archive, the pattern must specify the archive's complete
+    creation timestamp, including any fractional seconds. Fractional-second
+    patterns accept 1 to 6 digits.
+
+    To match all archives created within a given time interval, use the forms:
+
+    - ``YYYY``: match all archives created within the given year
+    - ``YYYY-MM``: within the given month
+    - ``YYYY-MM-DD``: on the given day
+    - ``YYYY-MM-DDTHH``: in the given hour
+    - ``YYYY-MM-DDTHH:MM``: in the given minute
+    - ``YYYY-MM-DDTHH:MM:SS``: in the given second
+    - ``@1735732800``: within the 1 second interval from the given UNIX timestamp
+
+    The ``T`` date-time separator may also be written as a space, e.g.
+    ``date:2025-01-01 14:30``.
+
+    Date and time patterns match the interval implied by their precision, including
+    the start and excluding the end. For example, ``date:2026-06`` matches archives
+    created on or after ``2026-06-01T00:00:00`` and before ``2026-07-01T00:00:00``.
+
+    Date and time patterns may include a timezone suffix: ``Z`` (UTC), ``+HH:MM``,
+    ``-HH:MM``, or ``[Region/City]``. Patterns without a timezone are interpreted
+    in the local timezone. Unix timestamps are always UTC and do not accept a timezone suffix.
+
+    Be wary of Daylight Saving Time (DST) transitions, as they can make time intervals
+    ambiguous or nonexistent. For example, named zones such as ``[Europe/Berlin]`` track DST,
+    but the equivalent (winter) UTC offset of ``+01:00`` does not. Use UTC to avoid such issues.
 
 Examples::
 
@@ -351,6 +391,11 @@ Examples::
 
     # tags match
     borg delete -a 'tags:TAG1' -a 'tags:TAG2'
+
+    # archive creation date match
+    borg delete -a 'date:2025-01'
+    borg delete -a 'date:2025-01-01T14:30Z'
+    borg delete -a 'date:2025-01-01T09:30[America/New_York]'
 
 .. _borg_placeholders:
 

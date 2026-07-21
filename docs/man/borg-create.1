@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-create" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-create" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-create \- Creates a new archive.
 .SH SYNOPSIS
@@ -139,6 +139,23 @@ added \- the \(dqThis Archive\(dq deduplicated size there is most interesting as
 how much your repository will grow. Please note that the \(dqAll archives\(dq stats refer to
 the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
+.sp
+The \fB\-\-stats\fP output also reports the store statistics (lines prefixed with
+\(dqStore\(dq), taken from the storage layer after this run. These cover the backend and
+the local store cache: call counts and timings per operation, the load/store data
+volumes and throughput, and cache hits/misses. \(dqStore backend load volume\(dq and
+\(dqStore backend store volume\(dq are the bytes actually read from and sent to the
+backend; a load counts only what missed the cache, and a store counts chunk data
+together with Borg\(aqs own index and metadata writes. The values are approximate
+because of write buffering and caching. On a repeated backup a near\-zero store
+volume means almost no new data had to be written, because the chunks already exist
+in the repository (deduplication).
+.sp
+The \(dqAdded\(dq, \(dqModified\(dq and \(dqUnchanged\(dq file counters come from the files\-cache
+comparison described above: \(dqUnchanged\(dq files matched the cached metadata and were
+not read again (their existing chunks are reused); \(dqAdded\(dq and \(dqModified\(dq files did
+not match and were read and chunked (new chunks are stored, already\-known chunks are
+deduplicated). The comparison uses the files cache, keyed by the file\(aqs absolute path.
 .sp
 For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .sp
@@ -280,12 +297,6 @@ specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BI
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
-.TP
-.BI \-\-hostname \ HOSTNAME
-explicitly set hostname for the archive
-.TP
-.BI \-\-username \ USERNAME
-explicitly set username for the archive
 .TP
 .BI \-\-tags \ TAG
 add tags to archive (comma\-separated or multiple arguments)

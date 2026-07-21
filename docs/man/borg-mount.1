@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-mount" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-mount" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-mount \- Mounts an archive or an entire repository as a FUSE filesystem.
 .SH SYNOPSIS
@@ -46,10 +46,32 @@ When mounting a repository, the top directories will be named like the
 archives and the directory structure below these will be loaded on\-demand from
 the repository when entering these directories, so expect some delay.
 .sp
-Care should be taken, as Borg backs up symlinks as\-is. When an archive
-or repository is mounted, it is possible to “jump” outside the mount point
-by following a symlink. If this happens, files or directories (or versions of them)
-that are not part of the archive or repository may appear to be within the mount point.
+\fBNote:\fP
+.INDENT 0.0
+.INDENT 3.5
+Borg stores symbolic links as\-is. Consequently, when an archive or
+repository is mounted, symbolic links may resolve to locations outside of
+the mountpoint, either because they are absolute or because relative links
+traverse outside of the mounted tree.
+.sp
+Normal UNIX pathname resolution applies: most tools follow symbolic links
+by default and may therefore access files or directories that are not part
+of the mounted archive. Consequently, operations intended to inspect
+archived data may instead access \(dqlive\(dq data from the host filesystem.
+.sp
+On Linux, this can be prevented by remounting the mountpoint with the
+\fBnosymfollow\fP VFS mount option, for example:
+.INDENT 0.0
+.INDENT 3.5
+borg mount <repo path> <mountpoint>
+mount \-o remount,nosymfollow <repo path> <mountpoint>
+.UNINDENT
+.UNINDENT
+.sp
+Alternatively, access the mounted archive from an appropriately isolated
+environment (for example, a container or \fBchroot\fP).
+.UNINDENT
+.UNINDENT
 .sp
 Unless the \fB\-\-foreground\fP option is given, the command will run in the
 background until the filesystem is \fBunmounted\fP\&.

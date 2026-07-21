@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-check" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-check" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-check \- Checks repository consistency.
 .SH SYNOPSIS
@@ -99,6 +99,10 @@ Unless \fBborg compact\fP is called, these archives can be fully restored with
 \fB\-\-repair\fP\&. Please note that \fB\-\-find\-lost\-archives\fP must read a lot of
 data from the repository and is thus very time\-consuming. You cannot use
 \fB\-\-find\-lost\-archives\fP with \fB\-\-repository\-only\fP\&.
+.sp
+You can influence how the archive part of the \fBAnalyzing archive ...\fP output is
+formatted by giving a custom format using \fB\-\-format\fP (see the \fBborg repo\-list\fP
+description for more details about the format string).
 .SS About repair mode
 .sp
 The check command is a read\-only task by default. If any corruption is found,
@@ -166,6 +170,9 @@ attempt to find lost archives
 .TP
 .BI \-\-max\-duration \ SECONDS
 perform only a partial repository check for at most SECONDS seconds (default: unlimited)
+.TP
+.BI \-\-format \ FORMAT
+specify format for the archive part (default: \(dq{archive} {time} {id}\(dq)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

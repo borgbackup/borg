@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-extract" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-extract" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-extract \- Extracts archive contents.
 .SH SYNOPSIS
@@ -53,6 +53,11 @@ decrypting, and decompressing.
 .sp
 \fB\-\-progress\fP can be slower than no progress display, since it makes one additional
 pass over the archive metadata.
+.sp
+When using \fB\-\-stats\fP, borg reports the store statistics (lines prefixed with
+\(dqStore\(dq) for the extraction: per\-operation call counts and timings, the load/store
+data volumes and throughput, and cache hits/misses. This includes \fB\-\-dry\-run\fP
+extractions.
 .sp
 \fBNote:\fP
 .INDENT 0.0
@@ -82,6 +87,9 @@ paths to extract; patterns are supported
 .TP
 .B  \-\-list
 output a verbose list of items (files, dirs, ...)
+.TP
+.B  \-s\fP,\fB  \-\-stats
+print store statistics for the extraction
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
 do not actually change any files

@@ -269,6 +269,23 @@ how much your repository will grow. Please note that the "All archives" stats re
 the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 
+The ``--stats`` output also reports the store statistics (lines prefixed with
+"Store"), taken from the storage layer after this run. These cover the backend and
+the local store cache: call counts and timings per operation, the load/store data
+volumes and throughput, and cache hits/misses. "Store backend load volume" and
+"Store backend store volume" are the bytes actually read from and sent to the
+backend; a load counts only what missed the cache, and a store counts chunk data
+together with Borg's own index and metadata writes. The values are approximate
+because of write buffering and caching. On a repeated backup a near-zero store
+volume means almost no new data had to be written, because the chunks already exist
+in the repository (deduplication).
+
+The "Added", "Modified" and "Unchanged" file counters come from the files-cache
+comparison described above: "Unchanged" files matched the cached metadata and were
+not read again (their existing chunks are reused); "Added" and "Modified" files did
+not match and were read and chunked (new chunks are stored, already-known chunks are
+deduplicated). The comparison uses the files cache, keyed by the file's absolute path.
+
 For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
 For more help on placeholders, see the :ref:`borg_placeholders` command output.

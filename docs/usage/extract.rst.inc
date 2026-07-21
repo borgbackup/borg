@@ -23,6 +23,8 @@ borg extract
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--list``                            | output a verbose list of items (files, dirs, ...)                                                         |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-s``, ``--stats``                   | print store statistics for the extraction                                                                 |
+    +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``-n``, ``--dry-run``                 | do not actually change any files                                                                          |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--numeric-ids``                     | only use numeric user and group identifiers                                                               |
@@ -73,15 +75,16 @@ borg extract
 
 
     options
-        --list            output a verbose list of items (files, dirs, ...)
-        -n, --dry-run     do not actually change any files
-        --numeric-ids     only use numeric user and group identifiers
-        --noflags         do not extract/set flags (e.g. NODUMP, IMMUTABLE)
-        --noacls          do not extract/set ACLs
-        --noxattrs        do not extract/set xattrs
-        --stdout          write all extracted data to stdout
-        --sparse          create holes in the output sparse file from all-zero chunks
-        --continue        continue a previously interrupted extraction of the same archive
+        --list          output a verbose list of items (files, dirs, ...)
+        -s, --stats     print store statistics for the extraction
+        -n, --dry-run    do not actually change any files
+        --numeric-ids    only use numeric user and group identifiers
+        --noflags       do not extract/set flags (e.g. NODUMP, IMMUTABLE)
+        --noacls        do not extract/set ACLs
+        --noxattrs      do not extract/set xattrs
+        --stdout        write all extracted data to stdout
+        --sparse        create holes in the output sparse file from all-zero chunks
+        --continue      continue a previously interrupted extraction of the same archive
 
 
     :ref:`common_options`
@@ -115,6 +118,11 @@ decrypting, and decompressing.
 
 ``--progress`` can be slower than no progress display, since it makes one additional
 pass over the archive metadata.
+
+When using ``--stats``, borg reports the store statistics (lines prefixed with
+"Store") for the extraction: per-operation call counts and timings, the load/store
+data volumes and throughput, and cache hits/misses. This includes ``--dry-run``
+extractions.
 
 .. note::
 

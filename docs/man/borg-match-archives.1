@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-match-archives" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-match-archives" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-match-archives \- Details regarding match-archives
 .SH DESCRIPTION
@@ -48,6 +48,8 @@ user: exact match on the username who created the archive
 host: exact match on the hostname where the archive was created
 .IP \(bu 2
 tags: match on the archive tags
+.IP \(bu 2
+date: match on the archive creation timestamp
 .UNINDENT
 .sp
 In case of a name pattern match,
@@ -63,6 +65,56 @@ Match like on the shell, wildcards like \fI*\fP and \fI?\fP work.
 .B Regular expressions \%<https://\:docs\:.python\:.org/\:3/\:library/\:re\:.html>, selector \fBre:\fP
 Full regular expression support.
 This is very powerful, but can also get rather complicated.
+.TP
+.B Date patterns, selector \fBdate:\fP
+Match archives by creation timestamp. You can either match a single archive by
+passing its exact creation time, or all archives created within a given time
+interval.
+.sp
+To match a single archive by its exact creation time, use the forms:
+.INDENT 7.0
+.IP \(bu 2
+\fBYYYY\-MM\-DDTHH:MM:SS.ffffff\fP: ISO\-8601\-like date\-time string
+.IP \(bu 2
+\fB@1735732800.123456\fP: UNIX timestamp
+.UNINDENT
+.sp
+To match a single archive, the pattern must specify the archive\(aqs complete
+creation timestamp, including any fractional seconds. Fractional\-second
+patterns accept 1 to 6 digits.
+.sp
+To match all archives created within a given time interval, use the forms:
+.INDENT 7.0
+.IP \(bu 2
+\fBYYYY\fP: match all archives created within the given year
+.IP \(bu 2
+\fBYYYY\-MM\fP: within the given month
+.IP \(bu 2
+\fBYYYY\-MM\-DD\fP: on the given day
+.IP \(bu 2
+\fBYYYY\-MM\-DDTHH\fP: in the given hour
+.IP \(bu 2
+\fBYYYY\-MM\-DDTHH:MM\fP: in the given minute
+.IP \(bu 2
+\fBYYYY\-MM\-DDTHH:MM:SS\fP: in the given second
+.IP \(bu 2
+\fB@1735732800\fP: within the 1 second interval from the given UNIX timestamp
+.UNINDENT
+.sp
+The \fBT\fP date\-time separator may also be written as a space, e.g.
+\fBdate:2025\-01\-01 14:30\fP\&.
+.sp
+Date and time patterns match the interval implied by their precision, including
+the start and excluding the end. For example, \fBdate:2026\-06\fP matches archives
+created on or after \fB2026\-06\-01T00:00:00\fP and before \fB2026\-07\-01T00:00:00\fP\&.
+.sp
+Date and time patterns may include a timezone suffix: \fBZ\fP (UTC), \fB+HH:MM\fP,
+\fB\-HH:MM\fP, or \fB[Region/City]\fP\&. Patterns without a timezone are interpreted
+in the local timezone. Unix timestamps are always UTC and do not accept a timezone suffix.
+.sp
+Be wary of Daylight Saving Time (DST) transitions, as they can make time intervals
+ambiguous or nonexistent. For example, named zones such as \fB[Europe/Berlin]\fP track DST,
+but the equivalent (winter) UTC offset of \fB+01:00\fP does not. Use UTC to avoid such issues.
 .UNINDENT
 .sp
 Examples:
@@ -90,6 +142,11 @@ borg delete \-a \(aqhost:kenny\-pc\(aq
 
 # tags match
 borg delete \-a \(aqtags:TAG1\(aq \-a \(aqtags:TAG2\(aq
+
+# archive creation date match
+borg delete \-a \(aqdate:2025\-01\(aq
+borg delete \-a \(aqdate:2025\-01\-01T14:30Z\(aq
+borg delete \-a \(aqdate:2025\-01\-01T09:30[America/New_York]\(aq
 .EE
 .UNINDENT
 .UNINDENT

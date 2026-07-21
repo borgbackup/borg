@@ -1,5 +1,4 @@
 import os
-from string import Formatter
 
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
@@ -63,13 +62,7 @@ class CheckMixIn:
                 format = os.environ.get("BORG_CHECK_FORMAT", "{archive} {time} {id}")
             # check the format here, the archives check formats the first archive only after
             # the repository check has finished, which can take hours.
-            try:
-                format_keys = {key for _, key, _, _ in Formatter().parse(format) if key}
-            except ValueError as err:
-                raise CommandError(f"Invalid format string: {err}")
-            unknown_keys = format_keys - set(ArchiveFormatter.KEY_DESCRIPTIONS) - set(ArchiveFormatter.FIXED_KEYS)
-            if unknown_keys:
-                raise CommandError(f"Invalid format keys: {', '.join(sorted(unknown_keys))}")
+            ArchiveFormatter.validate_format(format)
         if not args.archives_only:
             if not repository.check(repair=args.repair, max_duration=args.max_duration):
                 set_ec(EXIT_WARNING)

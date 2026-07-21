@@ -22,7 +22,7 @@ logger = create_logger()
 
 import yaml
 
-from .errors import Error
+from .errors import Error, CommandError
 from .fs import make_path_safe, slashify
 from .argparsing import Action, ArgumentError, ArgumentTypeError, register_type
 from .msgpack import Timestamp
@@ -926,6 +926,17 @@ class BaseFormatter(metaclass=abc.ABCMeta):
             help.append("")
         assert not keys, str(keys)
         return "\n".join(help)
+
+    @classmethod
+    def validate_format(cls, format):
+        """raise a CommandError if format is malformed or uses keys this formatter does not know"""
+        try:
+            format_keys = {key for _, key, _, _ in Formatter().parse(format) if key}
+        except ValueError as err:
+            raise CommandError(f"Invalid format string: {err}")
+        unknown_keys = format_keys - set(cls.KEY_DESCRIPTIONS) - set(cls.FIXED_KEYS)
+        if unknown_keys:
+            raise CommandError(f"Invalid format keys: {', '.join(sorted(unknown_keys))}")
 
 
 class ArchiveFormatter(BaseFormatter):

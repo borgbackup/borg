@@ -1753,6 +1753,7 @@ class ArchiveChecker:
         self,
         repository,
         *,
+        format,
         verify_data=False,
         repair=False,
         find_lost_archives=False,
@@ -1764,7 +1765,6 @@ class ArchiveChecker:
         newer=None,
         oldest=None,
         newest=None,
-        format,
         iec=False,
     ):
         """Perform a set of checks on 'repository'

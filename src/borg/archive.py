@@ -36,6 +36,7 @@ from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
 from .helpers import parse_timestamp, archive_ts_now, CompressionSpec
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
+from .helpers import ArchiveFormatter
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
 from .helpers import StableDict
 from .helpers import bin_to_hex
@@ -1816,6 +1817,7 @@ class ArchiveChecker:
         self,
         repository,
         *,
+        format,
         verify_data=False,
         repair=False,
         find_lost_archives=False,
@@ -1827,6 +1829,7 @@ class ArchiveChecker:
         newer=None,
         oldest=None,
         newest=None,
+        iec=False,
     ):
         """Perform a set of checks on 'repository'
 
@@ -1837,6 +1840,8 @@ class ArchiveChecker:
         :param older/newer: only check archives older/newer than timedelta from now
         :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
+        :param format: format string used to describe an archive in the log output
+        :param iec: format sizes using IEC units (1KiB = 1024B)
         """
         if not isinstance(repository, Repository):
             logger.error("Checking legacy repositories is not supported.")
@@ -1844,6 +1849,8 @@ class ArchiveChecker:
         logger.info("Starting archive consistency check...")
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
+        self.format = format
+        self.iec = iec
         self.repository = repository
         # A normal (non-repair) archives check trusts the in-repo index: the repository check verified
         # each index object's sha256, and the index is the authoritative record of which chunks exist,
@@ -2203,6 +2210,7 @@ class ArchiveChecker:
         else:
             archive_infos = self.manifest.archives.list(sort_by=sort_by)
         num_archives = len(archive_infos)
+        formatter = ArchiveFormatter(self.format, self.repository, self.manifest, self.key, iec=self.iec)
 
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Checking archives %3.1f%%", step=0.1, msgid="check.rebuild_archives"
@@ -2210,9 +2218,13 @@ class ArchiveChecker:
         for i, info in enumerate(archive_infos):
             pi.show(i)
             archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
-            logger.info(
-                f"Analyzing archive {info.name} {info.ts.astimezone()} {archive_id_hex} ({i + 1}/{num_archives})"
-            )
+            try:
+                formatted = formatter.format_item(info, jsonline=False)
+            except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityErrorBase):
+                # keys like {comment} need the archive metadata, which is damaged or missing here.
+                # use the values from the archive directory entry, they are always available.
+                formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
+            logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
             if archive_id not in self.chunks:
                 logger.error(f"Archive metadata block {archive_id_hex} is missing!")
                 self.error_found = True

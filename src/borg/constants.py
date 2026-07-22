@@ -78,6 +78,7 @@ HASH_MASK_BITS = 21  # Results in ~2 MiB chunks statistically
 # chunker algorithms
 CH_BUZHASH = 'buzhash'
 CH_FIXED = 'fixed'
+CH_FAIL = 'fail'  # only for testing the error handling of borg create
 
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)

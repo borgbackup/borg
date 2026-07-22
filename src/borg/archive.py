@@ -1343,6 +1343,11 @@ class ChunksProcessor:
         self.checkpoint_interval = checkpoint_interval
         self.last_checkpoint = time.monotonic()
         self.rechunkify = rechunkify
+        # number of the last checkpoint part file we wrote for the file currently being processed.
+        # 0 means "no part file written (yet)". used to decide whether a file may still be retried:
+        # once we have written part files, re-reading the file from the start would create duplicate
+        # part files, so such a file must not be retried (see Archiver._process_any).
+        self.last_part_number = 0
 
     def write_part_file(self, item, from_chunk, number):
         item = Item(internal_dict=item.as_dict())
@@ -1354,10 +1359,11 @@ class ChunksProcessor:
         item.get_size(memorize=True, from_chunks=True)
         item.path += '.borg_part_%d' % number
         item.part = number
-        number += 1
         self.add_item(item, show_progress=False)
         self.write_checkpoint()
-        return length, number
+        # remember that we have committed a part file for the current file, so it must not be retried:
+        self.last_part_number = number
+        return length, number + 1
 
     def maybe_checkpoint(self, item, from_chunk, part_number, forced=False):
         sig_int_triggered = sig_int and sig_int.action_triggered()
@@ -1387,24 +1393,36 @@ class ChunksProcessor:
             del item.chunks_healthy
         from_chunk = 0
         part_number = 1
-        for chunk in chunk_iter:
-            item.chunks.append(chunk_processor(chunk))
-            if show_progress:
-                stats.show_progress(item=item, dt=0.2)
-            from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
-        else:
-            if part_number > 1:
-                if item.chunks[from_chunk:]:
-                    # if we already have created a part item inside this file, we want to put the final
-                    # chunks (if any) into a part item also (so all parts can be concatenated to get
-                    # the complete file):
-                    from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=True)
+        try:
+            for chunk in chunk_iter:
+                item.chunks.append(chunk_processor(chunk))
+                if show_progress:
+                    stats.show_progress(item=item, dt=0.2)
+                from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
+            else:
+                if part_number > 1:
+                    if item.chunks[from_chunk:]:
+                        # if we already have created a part item inside this file, we want to put the final
+                        # chunks (if any) into a part item also (so all parts can be concatenated to get
+                        # the complete file):
+                        from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=True)
 
-                # if we created part files, we have referenced all chunks from the part files,
-                # but we also will reference the same chunks also from the final, complete file:
-                for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
-                stats.nfiles_parts += part_number - 1
+                    # if we created part files, we have referenced all chunks from the part files,
+                    # but we also will reference the same chunks also from the final, complete file:
+                    for chunk in item.chunks:
+                        cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
+                    stats.nfiles_parts += part_number - 1
+        except BackupOSError:
+            # a read error happened after we already read (and added to the repo/cache) some chunks.
+            # the chunks we added since the last checkpoint (item.chunks[from_chunk:]) are not referenced
+            # by any (committed) part item, so they would leak (bad refcount / orphan chunk) - roll them
+            # back. the chunks before from_chunk are referenced by part items we already wrote, keep them.
+            for chunk in item.chunks[from_chunk:]:
+                cache.chunk_decref(chunk.id, stats)
+            item.chunks = item.chunks[:from_chunk]
+            raise
+        # part_number > 1 means we wrote part files (checkpoints) for this file:
+        return part_number
 
 
 class FilesystemObjectProcessors:
@@ -1413,7 +1431,7 @@ class FilesystemObjectProcessors:
     # and process_file becomes a callback passed to __init__.
 
     def __init__(self, *, metadata_collector, cache, key,
-                 add_item, process_file_chunks,
+                 add_item, process_file_chunks, chunks_processor,
                  chunker_params, show_progress, sparse,
                  log_json, iec, file_status_printer=None,
                  files_changed='ctime'):
@@ -1422,6 +1440,9 @@ class FilesystemObjectProcessors:
         self.key = key
         self.add_item = add_item
         self.process_file_chunks = process_file_chunks
+        # the ChunksProcessor (also providing process_file_chunks) - we need it to find out whether
+        # checkpoint part files have already been written for the file currently being processed.
+        self.chunks_processor = chunks_processor
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
         self.files_changed = files_changed
@@ -1547,7 +1568,7 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         return status
 
-    def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal, strip_prefix):
+    def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal, strip_prefix, last_try=False):
         with self.create_helper(path, st, None, strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):  # no status yet
             if item is None:
                 return status
@@ -1561,6 +1582,19 @@ class FilesystemObjectProcessors:
                     # so it can be extracted / accessed in FUSE mount like a regular file.
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
+
+                def rollback_chunks():
+                    # roll back the chunk references we added for the (still uncommitted) complete file item.
+                    # a read error can happen after we already added and referenced chunks (e.g. while reading
+                    # xattrs/flags or re-fstat-ing the file). if we then abort (and maybe retry) the file, those
+                    # references would leak (inflated refcount / orphan chunk). decref one reference per id in
+                    # item.chunks: for a cache hit this undoes the incref above, for a freshly chunked file it
+                    # undoes the add_chunk reference, and if part files were written it undoes the extra
+                    # "complete file" incref while leaving the (committed) part file references intact.
+                    for chunk in item.get('chunks', []):
+                        cache.chunk_decref(chunk.id, self.stats)
+                    item.chunks = []
+
                 if not hardlinked or hardlink_master:
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
@@ -1600,12 +1634,16 @@ class FilesystemObjectProcessors:
                         # BackupOSError docstring). In 1.4 the transactional repository still rolls the
                         # partial transaction back, so this is not data loss here, but the misclassified
                         # warning and pointless read-retries are wrong regardless.
-                        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
+                        part_number = self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd)))
                         if is_win32:
                             changed_while_backup = False  # TODO
                         else:
-                            with backup_io('fstat2'):
-                                st2 = os.fstat(fd)
+                            try:
+                                with backup_io('fstat2'):
+                                    st2 = os.fstat(fd)
+                            except BackupOSError:
+                                rollback_chunks()
+                                raise
                             # special files:
                             # - fifos change naturally, because they are fed from the other side. no problem.
                             # - blk/chr devices don't change ctime anyway.
@@ -1618,7 +1656,19 @@ class FilesystemObjectProcessors:
                             else:
                                 raise ValueError('invalid files_changed value: %r' % self.files_changed)
                         if changed_while_backup:
-                            status = 'C'  # regular file changed while we backed it up, might be inconsistent/corrupt!
+                            # regular file changed while we backed it up, might be inconsistent/corrupt!
+                            if last_try or part_number > 1:
+                                # this was the last try or we already wrote part files (checkpoints) for
+                                # this file. in both cases we must not retry (re-reading the file from the
+                                # start would create duplicate / inconsistent part files), so we keep what
+                                # we have and flag it as potentially inconsistent/corrupt.
+                                status = 'C'
+                            else:
+                                # not the last try and no part files written yet: trigger a retry by raising,
+                                # hoping that re-reading the file gives us a consistent copy. the retry is
+                                # done by the caller (Archiver._process_any).
+                                rollback_chunks()
+                                raise BackupError('file changed while we read it!')
                         if not is_special_file and not changed_while_backup:
                             # we must not memorize special files, because the contents of e.g. a
                             # block or char device will change without its mtime/size/inode changing.
@@ -1626,7 +1676,13 @@ class FilesystemObjectProcessors:
                             # changed while we backed it up.
                             cache.memorize_file(hashed_path, path_hash, st, [c.id for c in item.chunks])
                     self.stats.nfiles += 1
-                item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
+                try:
+                    item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
+                except BackupOSError:
+                    # reading extended attributes (bsdflags / xattrs / ACLs) failed after we already
+                    # referenced the file's chunks - roll them back so a retry does not leak refcounts.
+                    rollback_chunks()
+                    raise
                 item.get_size(memorize=True)
                 return status
 

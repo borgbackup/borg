@@ -1,11 +1,11 @@
 This is borg2!
 --------------
 
-Please note that this is the README for borg2 / master branch.
+Please note that this is the README for (unstable) Borg2 / master branch.
 
-For the stable version's docs, please see here:
+For general project infos, versioned docs, screen casts, please see there:
 
-https://borgbackup.readthedocs.io/en/stable/
+https://www.borgbackup.org/
 
 Borg2 is currently in beta testing and might get major and/or
 breaking changes between beta releases (and there is no beta to
@@ -13,10 +13,6 @@ next-beta upgrade code, so you will have to delete and re-create repos).
 
 Thus, **DO NOT USE BORG2 FOR YOUR PRODUCTION BACKUPS!** Please help with
 testing it, but set it up *additionally* to your production backups.
-
-TODO: the screencasts need a remake using borg2, see here:
-
-https://github.com/borgbackup/borg/issues/6303
 
 
 What is BorgBackup?
@@ -33,10 +29,8 @@ fully trusted.
 
 See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
-There is also an `offline documentation`_ available, in multiple formats.
 
 .. _installation manual: https://borgbackup.readthedocs.io/en/master/installation.html
-.. _offline documentation: https://readthedocs.org/projects/borgbackup/downloads
 
 Main features
 ~~~~~~~~~~~~~
@@ -66,6 +60,12 @@ Main features
   * The absolute position of a data chunk inside a file: Stuff may get shifted
     and will still be found by the deduplication algorithm.
 
+  Supported chunkers:
+
+  * buzhash (as in borg 1.x) / buzhash64 (improved)
+  * fastCDC
+  * fixed
+
 **Speed**
   * performance-critical code (chunking, compression, encryption) is
     implemented in C/Cython
@@ -76,6 +76,9 @@ Main features
     All data can be protected client-side using 256-bit authenticated encryption
     (AES-OCB or chacha20-poly1305), ensuring data confidentiality, integrity and
     authenticity.
+
+**Hashing**
+    You can choose between HMAC-SHA256 and Blake3.
 
 **Obfuscation**
     Optionally, Borg can actively obfuscate, e.g., the size of files/chunks to
@@ -91,9 +94,14 @@ Main features
     * lzma (low speed, high compression)
 
 **Off-site backups**
-    Borg can store data on any remote host accessible over SSH. If Borg is
-    installed on the remote host, significant performance gains can be achieved
-    compared to using a network file system (sshfs, NFS, ...).
+    Borg can store data on any remote host accessible via misc. protocols:
+
+    * ssh (REST-http-over-stdio-over-ssh) and https (REST-http-over-tcp).
+      Significant performance gains can be achieved with this by having a
+      remote agent (borg must be installed on the repo server).
+    * sftp
+    * S3 / B2
+    * lots of protocols / providers supported by rclone
 
 **Backups mountable as file systems**
     Backup archives are mountable as user-space file systems for easy interactive
@@ -108,6 +116,7 @@ Main features
     * FreeBSD
     * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
     * Cygwin (experimental, no binaries yet)
+    * Windows (MSYS2/MINGW borg.exe, experimental)
     * Windows Subsystem for Linux (WSL) on Windows 10/11 (experimental)
 
 **Free and Open Source Software**
@@ -124,17 +133,17 @@ For ease of use, set the BORG_REPO environment variable::
 
 Create a new backup repository (see ``borg repo-create --help`` for encryption options)::
 
-    $ borg repo-create -e repokey-aes-ocb
+    $ borg repo-create --encryption=aes256-ocb --key-location=repokey
 
 Create a new backup archive::
 
-    $ borg create Monday1 ~/Documents
+    $ borg create docs ~/Documents
 
 Now do another backup, just to show off the great deduplication::
 
-    $ borg create -v --stats Monday2 ~/Documents
+    $ borg create -v --stats docs ~/Documents
     Repository: /path/to/repo
-    Archive name: Monday2
+    Archive name: docs
     Archive fingerprint: 7714aef97c1a24539cc3dc73f79b060f14af04e2541da33d54c7ee8e81a00089
     Time (start): Mon, 2022-10-03 19:57:35 +0200
     Time (end):   Mon, 2022-10-03 19:57:35 +0200
@@ -158,11 +167,10 @@ https://www.borgbackup.org/support/fund.html
 Links
 -----
 
-* `Main website <https://borgbackup.readthedocs.io/>`_
+* `Main website <https://www.borgbackup.org/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
   `PyPI packages <https://pypi.org/project/borgbackup/>`_ and
   `Changelog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
-* `Offline documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
 * `GitHub <https://github.com/borgbackup/borg>`_ and
   `Issue tracker <https://github.com/borgbackup/borg/issues>`_.
 * `Web chat (IRC) <https://web.libera.chat/#borgbackup>`_ and
@@ -191,22 +199,13 @@ see ``docs/support.rst`` in the source distribution).
         :alt: Documentation
         :target: https://borgbackup.readthedocs.io/en/master/
 
-.. |build| image:: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=master
+.. |build| image:: https://github.com/borgbackup/borg/actions/workflows/ci.yml/badge.svg?branch=master
         :alt: Build Status (master)
         :target: https://github.com/borgbackup/borg/actions
 
 .. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
         :alt: Test Coverage
         :target: https://codecov.io/github/borgbackup/borg?branch=master
-
-.. |screencast_basic| image:: https://asciinema.org/a/133292.png
-        :alt: BorgBackup Basic Usage
-        :target: https://asciinema.org/a/133292?autoplay=1&speed=1
-        :width: 100%
-
-.. _installation: https://asciinema.org/a/133291?autoplay=1&speed=1
-
-.. _advanced usage: https://asciinema.org/a/133293?autoplay=1&speed=1
 
 .. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
         :alt: Best Practices Score

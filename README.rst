@@ -153,6 +153,8 @@ Now do another backup, just to show off the great deduplication::
     Deduplicated size: 520 B
 
 
+For demo videos, check out our homepage: https://www.borgbackup.org/#demo
+
 Helping, donations and bounties, becoming a Patron
 --------------------------------------------------
 
@@ -162,7 +164,7 @@ Spread the word, give feedback, help with documentation, testing or development.
 
 You can also give monetary support to the project, see here for details:
 
-https://www.borgbackup.org/support/fund.html
+https://www.borgbackup.org/#fund
 
 Links
 -----

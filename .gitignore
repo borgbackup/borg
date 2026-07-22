@@ -33,3 +33,7 @@ borg.exe
 .vagrant
 .eggs
 .DS_Store
+
+# Claude Code personal/local settings
+.claude/settings.local.json
+.claude/CLAUDE.local.md

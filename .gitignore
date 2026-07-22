@@ -25,7 +25,9 @@ src/borg/_version.py
 *.pyc
 *.pyd
 *.so
-.claude/
+# Claude Code personal/local settings (shared config .claude/CLAUDE.md + settings.json are tracked)
+.claude/settings.local.json
+.claude/CLAUDE.local.md
 .idea/
 .junie/
 .vscode/

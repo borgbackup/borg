@@ -39,8 +39,10 @@ cache/
     repository check results (pack id -> timestamp, result), as a hashtable with an
     appended integrity hash. Records of intact packs hold the check progress (partial
     checks, full checks' checkpointing) and are dropped when a check cycle completes.
-    Records of corrupt packs are kept for repair until the pack verifies intact or is
-    no longer listed in packs/.
+    With ``check --max-age`` they are kept across cycles instead and reused while
+    younger than the given age. Records of corrupt packs are kept for repair until
+    the pack verifies intact or is no longer listed in packs/. Records of packs no
+    longer listed in packs/ are pruned when a cycle completes.
 
 There is a list of pointers to archive objects in this directory:
 

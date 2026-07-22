@@ -1,0 +1,10 @@
+# Start the recording in a terminal of a well-defined size, no matter how big
+# the terminal is that ./record.sh was started from (asciinema records the size
+# of its terminal and the players use it to size the screencast).
+set stty_init "rows 30 cols 100"
+set timeout -1
+
+spawn -noecho asciinema rec --overwrite --idle-time-limit 2 \
+	--title "BorgBackup 1.4 demo" \
+	--command "expect -f /demo/demo.tcl" /tmp/borg14-demo.cast
+expect eof

@@ -2,6 +2,7 @@ import io
 import logging
 import os
 import sys
+import time
 from collections import namedtuple
 from hashlib import sha256
 
@@ -1194,6 +1195,99 @@ def test_check_partial_keeps_corrupt_record_across_runs(tmp_path):
         # a second run re-verifies it and keeps reporting it.
         assert repository.check(repair=False, max_duration=3600) is False
         assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
+
+
+def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
+    # with max_age, a pack recorded intact recently is not re-verified, and its record is kept.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        tracker.record(intact_id, ok=True)  # fresh timestamp
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_age=3600) is True
+        assert pack_key not in hashed_keys  # skipped, its record is fresh
+
+        after = PackTracker.load(repository.store)
+        assert after.table[intact_id].result == 1  # kept across the cycle
+
+
+def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
+    # with max_age, a pack whose intact record is older than max_age is re-verified.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        old_ts = int(time.time()) - 100
+        tracker.table[intact_id] = PackTracker.Entry(timestamp=old_ts, result=1)
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_age=50) is True
+        assert pack_key in hashed_keys  # stale, re-verified
+
+        after = PackTracker.load(repository.store)
+        assert after.table[intact_id].timestamp > old_ts  # record refreshed
+
+
+def test_check_max_age_reverifies_corrupt_even_when_fresh(tmp_path, monkeypatch):
+    # the age window only applies to intact records: a fresh corrupt record is still re-verified.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        tracker.record(intact_id, ok=False)  # fresh, but corrupt
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_age=3600) is True
+        assert pack_key in hashed_keys  # re-verified despite the fresh record
+
+
+def test_check_max_age_prunes_vanished_ok_record(tmp_path):
+    # with max_age, an intact record for a pack no longer listed is pruned at cycle end.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, _ = _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        tracker.record(intact_id, ok=True)
+        tracker.record(H(9), ok=True)  # no such pack in packs/
+        tracker.save()
+
+        assert repository.check(repair=False, max_age=3600) is True
+
+        after = PackTracker.load(repository.store)
+        assert intact_id in after.table
+        assert H(9) not in after.table
+
+
+def test_check_max_age_partial_progress(tmp_path, monkeypatch):
+    # a partial check with max_age skips packs with a fresh intact record and verifies the rest.
+    pack_a = fchunk(b"A", chunk_id=H(1))
+    pack_a_id = sha256(pack_a).digest()
+    pack_b = fchunk(b"BB", chunk_id=H(2))
+    pack_b_id = sha256(pack_b).digest()
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_a_id), pack_a)
+        repository.store_store("packs/" + bin_to_hex(pack_b_id), pack_b)
+
+        tracker = PackTracker.new(repository.store)
+        tracker.record(pack_a_id, ok=True)  # fresh
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_duration=3600, max_age=3600) is True
+        assert "packs/" + bin_to_hex(pack_a_id) not in hashed_keys
+        assert "packs/" + bin_to_hex(pack_b_id) in hashed_keys
+
+        after = PackTracker.load(repository.store)
+        assert pack_a_id in after.table and pack_b_id in after.table
 
 
 def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):

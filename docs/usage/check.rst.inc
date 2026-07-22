@@ -27,6 +27,8 @@ borg check
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--max-duration SECONDS``                   | perform only a partial repository check for at most SECONDS seconds (default: unlimited)                                    |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--format FORMAT``                          | specify format for the archive part (default: "{archive} {time} {id}")                                                      |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
     |                                                                                                                                                                                                                                                          |
     | :ref:`common_options`                                                                                                                                                                                                                                    |
@@ -69,6 +71,7 @@ borg check
         --repair          attempt to repair any inconsistencies found
         --find-lost-archives    attempt to find lost archives
         --max-duration SECONDS    perform only a partial repository check for at most SECONDS seconds (default: unlimited)
+        --format FORMAT    specify format for the archive part (default: "{archive} {time} {id}")
 
 
     :ref:`common_options`
@@ -149,6 +152,10 @@ Unless ``borg compact`` is called, these archives can be fully restored with
 ``--repair``. Please note that ``--find-lost-archives`` must read a lot of
 data from the repository and is thus very time-consuming. You cannot use
 ``--find-lost-archives`` with ``--repository-only``.
+
+You can influence how the archive part of the ``Analyzing archive ...`` output is
+formatted by giving a custom format using ``--format`` (see the ``borg repo-list``
+description for more details about the format string).
 
 About repair mode
 +++++++++++++++++

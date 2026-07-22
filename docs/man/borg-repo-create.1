@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-create" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-repo-create" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-repo-create \- Creates a new, empty repository.
 .SH SYNOPSIS
@@ -211,22 +211,27 @@ copy the crypt_key (used for authenticated encryption) from the key of the other
 # Local repository
 $ export BORG_REPO=/path/to/repo
 # Recommended AEAD cryptographic modes (key stored in the repository by default)
-$ borg repo\-create \-\-encryption=aes\-ocb
+$ borg repo\-create \-\-encryption=aes256\-ocb
 $ borg repo\-create \-\-encryption=chacha20\-poly1305
-$ borg repo\-create \-\-encryption=blake3\-aes\-ocb
-$ borg repo\-create \-\-encryption=blake3\-chacha20\-poly1305
 # No encryption (not recommended)
 $ borg repo\-create \-\-encryption=authenticated
-$ borg repo\-create \-\-encryption=authenticated\-blake3
 $ borg repo\-create \-\-encryption=none
 
-# The crypto suite (\-\-encryption) and where the key is stored (\-\-key\-location) are
-# chosen independently. \-\-key\-location defaults to repokey.
+# \-\-encryption (the cipher / AE algorithm) and \-\-id\-hash (the id hash function) are
+# chosen independently. \-\-id\-hash defaults to sha256; use blake3 if it is faster on
+# your hardware (run \(aqborg benchmark cpu\(aq to find out). The \(aqnone\(aq encryption only
+# supports the sha256 id hash.
+$ borg repo\-create \-\-encryption=aes256\-ocb \-\-id\-hash=blake3
+$ borg repo\-create \-\-encryption=chacha20\-poly1305 \-\-id\-hash=blake3
+$ borg repo\-create \-\-encryption=authenticated \-\-id\-hash=blake3
+
+# Where the key is stored (\-\-key\-location) is also chosen independently.
+# \-\-key\-location defaults to repokey.
 # repokey: stores the encrypted key inside the repository
-$ borg repo\-create \-\-encryption=aes\-ocb \-\-key\-location=repokey
+$ borg repo\-create \-\-encryption=aes256\-ocb \-\-key\-location=repokey
 # keyfile: stores the encrypted key in the config dir\(aqs keys/ subdir
 # (e.g. ~/.config/borg/keys/ on Linux, ~/Library/Application Support/borg/keys/ on macOS)
-$ borg repo\-create \-\-encryption=aes\-ocb \-\-key\-location=keyfile
+$ borg repo\-create \-\-encryption=aes256\-ocb \-\-key\-location=keyfile
 .EE
 .UNINDENT
 .UNINDENT

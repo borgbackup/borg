@@ -156,8 +156,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b22 (not released yet)
------------------------------------
+Version 2.0.0b22 (2026-07-22)
+-----------------------------
 
 Please note:
 
@@ -170,6 +170,8 @@ New features:
 
 - Packs - ongoing Google Summer of Code 2026 project of @mr-raj12! #8572
 
+  - read the full story in Mrityunjay Raj's blog post there:
+    https://mrraj.dev/borg
   - multiple chunks per pack, less latency impact, less storage space overhead!
   - BORG_PACK_MAX_COUNT/SIZE env vars to determine pack sizing
   - create, extract, delete, prune, compact, check (read-only) should work already
@@ -221,10 +223,6 @@ New features:
   precision, Unix epoch timestamps (``@...``), and ``Z`` / ``+HH:MM`` /
   ``[Region/City]`` timezone suffixes, #8776 #8715
 - json: support BORG_JSON_INDENT env var for JSON output formatting
-- implement --match-archives ``date:`` selector to match archives by creation
-  timestamp. It supports ISO-8601-like dates/times from year to fractional-second
-  precision, Unix epoch timestamps (``@...``), and ``Z`` / ``+HH:MM`` /
-  ``[Region/City]`` timezone suffixes. #8776
 
 Fixes:
 

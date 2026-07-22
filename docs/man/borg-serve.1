@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-serve" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg-serve" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg-serve \- Starts in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -141,12 +141,6 @@ The examples above use the \fBrestrict\fP directive and assume a POSIX
 compliant shell set as the user\(aqs login shell.
 This automatically blocks potentially dangerous SSH features, even when
 they are added in a future update. Thus, this option should be preferred.
-.sp
-If you are using OpenSSH server < 7.2, however, you must explicitly
-specify the SSH features to restrict and cannot simply use the \fBrestrict\fP option, as it
-was introduced in v7.2. We recommend using
-\fBno\-port\-forwarding,no\-X11\-forwarding,no\-pty,no\-agent\-forwarding,no\-user\-rc\fP
-in this case.
 .UNINDENT
 .UNINDENT
 .sp

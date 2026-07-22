@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-06-16" "" "borg backup tool"
+.TH "borg" "1" "2026-07-21" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -437,6 +437,16 @@ So, if you have an all\-zero MAC address or other reasons to better control the 
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
 use \%<FQDN@\:uniqueid>\&.
 .TP
+.B BORG_HOSTNAME
+When set, use this value as the hostname (instead of the auto\-detected one), e.g. to run borg
+on one host, but impersonate another host. This affects the hostname stored in newly created
+archives as well as the \fB{hostname}\fP placeholder.
+.TP
+.B BORG_USERNAME
+When set, use this value as the username (instead of the auto\-detected one), e.g. to run borg
+as one user, but impersonate another user. This affects the username stored in newly created
+archives as well as the \fB{user}\fP placeholder.
+.TP
 .B BORG_LOCK_WAIT
 You can set the default value for the \fB\-\-lock\-wait\fP option with this, so
 you do not need to give it as a command line option.
@@ -465,10 +475,6 @@ cache entries for backup sources other than the current sources.
 .B BORG_FILES_CACHE_TTL
 When set to a numeric value, this determines the maximum \(dqtime to live\(dq for the files cache
 entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
-.TP
-.B BORG_USE_CHUNKS_ARCHIVE
-When set to no (default: yes), the \fBchunks.archive.d\fP folder will not be used. This reduces
-disk space usage but slows down cache resyncs.
 .TP
 .B BORG_SHOW_SYSINFO
 When set to no (default: yes), system information (like OS, Python version, ...) in
@@ -560,6 +566,9 @@ Now you can init a fresh repo. Make sure you do not use the workaround any more.
 .TP
 .B Output formatting:
 .INDENT 7.0
+.TP
+.B BORG_CHECK_FORMAT
+Giving the default value for \fBborg check \-\-format=X\fP\&.
 .TP
 .B BORG_LIST_FORMAT
 Giving the default value for \fBborg list \-\-format=X\fP\&.
@@ -886,12 +895,23 @@ For more information, see: \%<https://\:xkcd\:.com/\:1179/>
 .sp
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
-TIMESPAN
+TIMESPAN / INTERVAL
 .sp
-Some options accept a TIMESPAN parameter, which can be given as a number of
-years (e.g. \fB2y\fP), months (e.g. \fB12m\fP), weeks (e.g. \fB2w\fP),
-days (e.g. \fB7d\fP), hours (e.g. \fB8H\fP), minutes (e.g. \fB30M\fP),
-or seconds (e.g. \fB150S\fP).
+Some options accept a TIMESPAN or an INTERVAL parameter, which can be given as
+a number of years (e.g. \fB2y\fP), months (e.g. \fB12m\fP), weeks (e.g. \fB2w\fP),
+days (e.g. \fB7d\fP), hours (e.g. \fB8H\fP), minutes (e.g. \fB30M\fP), or seconds
+(e.g. \fB150S\fP).
+.sp
+The \fBborg prune\fP \fB\-\-keep\-*\fP retention options accept either a plain count
+(e.g. \fB\-\-keep\-daily 7\fP, keeping up to 7 daily archives) or a time interval
+(e.g. \fB\-\-keep\-daily 7d\fP, keeping one daily archive per day within a 7\-day window).
+When using interval\-based retention, \fB\-\-from\fP may be specified to set the
+reference timestamp for the interval (defaults to the current time).
+.sp
+Please note that Borg treats months (e.g. \fB12m\fP) as fixed 31\-day periods
+rather than calendar months. As a result, \fB12m\fP corresponds to
+12 × 31 = 372 days. Similarly, years (e.g. \fB2y\fP) are treated as fixed
+365\-day periods and do not take leap years into account.
 .SS Resource Usage
 .sp
 Borg might use significant resources depending on the size of the data set it is dealing with.
@@ -910,15 +930,17 @@ server to get the approximate resource usage.
 .IP \(bu 2
 \fBborg create:\fP chunking, hashing, compression, encryption (high CPU usage)
 .IP \(bu 2
-\fBchunks cache sync:\fP quite heavy on CPU, doing lots of hash table operations
+\fBchunks index rebuild:\fP quite heavy on CPU, doing lots of hash table operations
 .IP \(bu 2
 \fBborg extract:\fP decryption, decompression (medium to high CPU usage)
 .IP \(bu 2
-\fBborg check:\fP similar to extract, but depends on options given
-.IP \(bu 2
-\fBborg prune/borg delete archive:\fP low to medium CPU usage
+\fBborg prune/borg delete archive:\fP quick, low CPU usage
 .IP \(bu 2
 \fBborg delete repo:\fP done on the server
+.IP \(bu 2
+\fBborg compact:\fP medium CPU usage
+.IP \(bu 2
+\fBborg check:\fP medium CPU usage, but depends on options given
 .UNINDENT
 .sp
 It will not use more than 100% of one CPU core as the code is currently single\-threaded.
@@ -928,11 +950,11 @@ expensive (if not).
 .TP
 .B CPU server:
 It usually does not need much CPU; it just deals with the key/value store
-(repository) and uses the repository index for that.
+(repository).
 .sp
 borg check: the repository check computes the checksums of all chunks
 (medium CPU usage)
-borg delete repo: low CPU usage
+borg compact: low to medium CPU usage
 .TP
 .B CPU (only for client/server operation):
 When using Borg in a client/server way with an ssh\-type repository, the SSH
@@ -943,12 +965,11 @@ large amounts of data.
 .B Memory (RAM) client:
 The chunks index and the files index are read into memory for performance
 reasons. Might need large amounts of memory (see below).
-Compression, especially lzma compression with high levels, might need substantial
+Compression, especially with high compression levels, might need substantial
 amounts of memory.
 .TP
 .B Memory (RAM) server:
-The server process will load the repository index into memory. Might need
-considerable amounts of memory, but less than on the client (see below).
+Usually rather low memory needs, much less than the client.
 .TP
 .B Chunks index (client only):
 Proportional to the number of data chunks in your repo. Lots of chunks
@@ -960,41 +981,19 @@ Proportional to the number of files in your last backups. Can be switched
 off (see create options), but the next backup might be much slower if you do.
 The speed benefit of using the files cache is proportional to file size.
 .TP
-.B Repository index (server only):
-Proportional to the number of data chunks in your repo. Lots of chunks
-in your repo imply a big repository index.
-It is possible to tweak the chunker parameters (see create options) to
-influence the number of chunks created.
-.TP
 .B Temporary files (client):
-Reading data and metadata from a FUSE\-mounted repository will consume up to
-the size of all deduplicated, small chunks in the repository. Big chunks
-will not be locally cached.
+TODO
 .TP
 .B Temporary files (server):
-A non\-trivial amount of data will be stored in the remote temporary directory
-for each client that connects to it. For some remotes, this can fill the
-default temporary directory in /tmp. This can be mitigated by ensuring the
-$TMPDIR, $TEMP, or $TMP environment variable is properly set for the sshd
-process.
-For some OSes, this can be done by setting the correct value in the
-\&.bashrc (or equivalent login config file for other shells); however, in
-other cases it may be necessary to first enable \fBPermitUserEnvironment yes\fP
-in your \fBsshd_config\fP file, then add \fBenvironment=\(dqTMPDIR=/my/big/tmpdir\(dq\fP
-at the start of the public key to be used in the \fBauthorized_keys\fP file.
+TODO
 .TP
 .B Cache files (client only):
-Contains the chunks index and files index (plus a collection of single\-
-archive chunk indexes), which might need huge amounts of disk space
-depending on archive count and size — see the FAQ for how to reduce this.
+Contains the files cache, which might become quite large depending on the
+amount and size of files.
 .TP
 .B Network (only for client/server operation):
 If your repository is remote, all deduplicated (and optionally compressed/
-encrypted) data has to go over the connection (\fBssh://\fP repository URL).
-If you use a locally mounted network filesystem, some additional copy
-operations used for transaction support also go over the connection. If
-you back up multiple sources to one target repository, additional traffic
-happens for cache resynchronization.
+encrypted) data has to go over the network connection.
 .UNINDENT
 .SS Support for file metadata
 .sp

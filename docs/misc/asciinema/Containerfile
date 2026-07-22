@@ -1,0 +1,48 @@
+# Environment for recording the borg2 demo screencast, see README.rst.
+#
+# Do NOT run the demo scripts outside of this container (or a VM): they install
+# borg, create users, mount filesystems and write to /media.
+#
+# Build and run it via ./record.sh - it exports the borg sources from git and
+# puts them into the build context as borg-src.tar.
+
+FROM debian:trixie-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      expect asciinema \
+      python3 python3-dev python3-venv \
+      build-essential pkg-config \
+      libssl-dev libacl1-dev liblz4-dev libzstd-dev libxxhash-dev \
+      libfuse3-dev fuse3 \
+      ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# We build borg from the sources of this checkout (and not from a release
+# binary), so the screencast always shows the CLI of the borg version we are
+# about to release.
+COPY borg-src.tar /tmp/
+# the exported sources have no .git, so setuptools-scm needs to be told the version
+ARG BORG_VERSION
+ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BORGBACKUP=${BORG_VERSION}
+RUN tar -xf /tmp/borg-src.tar -C /tmp \
+    && python3 -m venv /opt/borg \
+    && /opt/borg/bin/pip install --no-cache-dir /tmp/borg pyfuse3 \
+    && ln -s /opt/borg/bin/borg /usr/local/bin/borg \
+    && rm -rf /tmp/borg
+
+# The demo is recorded as a normal user, so the archives contain sane paths.
+RUN useradd --create-home --shell /bin/sh user \
+    && mkdir -p /media/backup \
+    && chown user:user /media/backup
+
+COPY demo-data.py demo.tcl record.exp entrypoint.sh /demo/
+
+# Generating the demo data takes a while, so we do it at build time and only
+# copy it into place when recording (which makes re-recording quick).
+RUN python3 /demo/demo-data.py /opt/demo-data \
+    && tar -xf /tmp/borg-src.tar -C /opt/demo-data --transform 's,^borg,projects/borg,' \
+    && rm -f /tmp/borg-src.tar
+
+ENTRYPOINT ["/demo/entrypoint.sh"]

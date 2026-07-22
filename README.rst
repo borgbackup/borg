@@ -1,7 +1,3 @@
-|screencast_basic|
-
-More screencasts: `installation`_, `advanced usage`_
-
 What is BorgBackup?
 -------------------
 
@@ -16,10 +12,8 @@ fully trusted targets.
 
 See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
-There is also an `offline documentation`_ available, in multiple formats.
 
 .. _installation manual: https://borgbackup.readthedocs.io/en/stable/installation.html
-.. _offline documentation: https://readthedocs.org/projects/borgbackup/downloads
 
 Main features
 ~~~~~~~~~~~~~
@@ -128,7 +122,7 @@ Now doing another backup, just to show off the great deduplication::
     -----------------------------------------------------------------------------
 
 
-For a graphical frontend, refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
+For demo videos, check out our homepage: https://www.borgbackup.org/#demo
 
 Helping, donations and bounties, becoming a Patron
 --------------------------------------------------
@@ -139,16 +133,15 @@ Spread the word, give feedback, help with documentation, testing or development.
 
 You can also give monetary support to the project, see there for details:
 
-https://www.borgbackup.org/support/fund.html
+https://www.borgbackup.org/#fund
 
 Links
 -----
 
-* `Main website <https://borgbackup.readthedocs.io/>`_
+* `Main website <https://www.borgbackup.org/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
   `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
   `Changelog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
-* `Offline documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
 * `GitHub <https://github.com/borgbackup/borg>`_ and
   `Issue tracker <https://github.com/borgbackup/borg/issues>`_.
 * `Web chat (IRC) <https://web.libera.chat/#borgbackup>`_ and
@@ -177,22 +170,13 @@ see ``docs/support.rst`` in the source distribution).
         :alt: Documentation
         :target: https://borgbackup.readthedocs.io/en/stable/
 
-.. |build| image:: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=1.4-maint
+.. |build| image:: https://github.com/borgbackup/borg/actions/workflows/ci.yml/badge.svg?branch=1.4-maint
         :alt: Build Status (1.4-maint)
         :target: https://github.com/borgbackup/borg/actions
 
 .. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=1.4-maint
         :alt: Test Coverage
         :target: https://codecov.io/github/borgbackup/borg?branch=1.4-maint
-
-.. |screencast_basic| image:: https://asciinema.org/a/133292.png
-        :alt: BorgBackup Basic Usage
-        :target: https://asciinema.org/a/133292?autoplay=1&speed=1
-        :width: 100%
-
-.. _installation: https://asciinema.org/a/133291?autoplay=1&speed=1
-
-.. _advanced usage: https://asciinema.org/a/133293?autoplay=1&speed=1
 
 .. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
         :alt: Best Practices Score

@@ -333,6 +333,36 @@ def test_webdav_header_injection(archivers, request):
             conn.close()
 
 
+def test_webdav_data_cache(archivers, request, monkeypatch):
+    # decrypted chunks are cached across requests, sized by BORG_MOUNT_DATA_CACHE_ENTRIES.
+    monkeypatch.setenv("BORG_MOUNT_DATA_CACHE_ENTRIES", "8")
+    archiver = request.getfixturevalue(archivers)
+    big = _create_archive(archiver)
+    args = SimpleNamespace(
+        sort_by="ts", match_archives=None, first=None, last=None, older=None, newer=None, oldest=None, newest=None
+    )
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        server = make_server(manifest, args, port=0)
+        assert server.data_cache._capacity == 8  # the env var is honored
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_address[1]}/test/input/big"
+            assert len(server.data_cache) == 0
+            status, _, body = get(url)  # first read populates the cache
+            assert status == 200 and body == big
+            assert len(server.data_cache) > 0  # the multi-chunk file cached some chunks
+            # a second (ranged) read hits the cache and must return identical bytes
+            status, _, body = get(url, headers={"Range": "bytes=0-99"})
+            assert status == 206 and body == big[:100]
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=10)
+
+
 def test_webdav_conditional_get(archivers, request):
     archiver = request.getfixturevalue(archivers)
     _create_archive(archiver)

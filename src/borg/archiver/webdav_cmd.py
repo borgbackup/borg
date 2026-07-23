@@ -85,6 +85,13 @@ class WebDAVMixIn:
           default (``FileSizeLimitInBytes`` registry value) - use a web browser
           or another WebDAV client to download bigger files.
 
+        Recently used file content chunks are kept decrypted in an in-memory cache,
+        so that the many small, sequential range requests a mounted file system
+        does for a big file do not re-fetch and re-decrypt the same chunk over and
+        over. As for ``borg mount``, the ``BORG_MOUNT_DATA_CACHE_ENTRIES`` environment
+        variable sets the number of cached chunks (default: number of CPUs);
+        additional memory usage can be up to the chunk size times this number.
+
         The command runs in the foreground until it is interrupted with Ctrl-C.
         """
         )

@@ -13,6 +13,7 @@ optional dependencies.
 
 import html
 import mimetypes
+import os
 import re
 import stat
 import threading
@@ -27,6 +28,7 @@ from . import __version__
 from .archive import Archive
 from .constants import *  # NOQA
 from .helpers import bin_to_hex, remove_surrogates
+from .helpers.lrucache import LRUCache
 from .logger import create_logger
 
 logger = create_logger(__name__)
@@ -435,6 +437,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
     # set on the handler class by make_server():
     vfs = None
     repo_lock = None
+    data_cache = None  # LRUCache: chunk id -> decrypted chunk data, shared across requests
 
     def version_string(self):
         # the base class would append sys_version, giving a trailing space if it is empty.
@@ -696,15 +699,13 @@ class WebDAVHandler(BaseHTTPRequestHandler):
             selected.append(entry)
             pos += entry.size
         remaining = end - start + 1
-        chunk_iter = pipeline.fetch_many(selected, ro_type=ROBJ_FILE_STREAM, replacement_chunk=False)
-        while remaining > 0:
-            # serialize repository access, but write to the client outside the lock,
-            # so one slow client cannot block other requests for the whole download.
+        for entry in selected:
+            if remaining <= 0:
+                break
+            # serialize repository and data cache access, but write to the client outside
+            # the lock, so one slow client cannot block other requests for the whole download.
             with self.repo_lock:
-                try:
-                    data = next(chunk_iter)
-                except StopIteration:
-                    break
+                data = self._get_chunk(pipeline, entry)
             if data is None:
                 # chunk missing in repository - never serve silently corrupted data:
                 # abort the connection, the client sees a short read (Content-Length mismatch).
@@ -721,6 +722,32 @@ class WebDAVHandler(BaseHTTPRequestHandler):
             self.wfile.write(data)
             remaining -= len(data)
 
+    def _get_chunk(self, pipeline, entry):
+        """Return the decrypted data of chunk *entry*, using the shared data cache.
+
+        Returns None if the chunk is missing in the repository. Must be called while
+        holding repo_lock (it guards both the repository and the data cache, and the
+        data cache's LRUCache is not thread-safe). The cache is keyed by chunk id
+        (a content hash), so it is valid across archives and requests. Reads of a big
+        file over a mounted file system tend to come as many small sequential range
+        requests hitting the same chunk - the cache avoids re-fetching and re-decrypting
+        it every time.
+
+        This complements, but does not duplicate, the repository's own pack cache:
+        fetch_many() -> Repository.get_many() caches whole packs (raw, still encrypted
+        and compressed on-disk bytes), whereas we cache the *decrypted+decompressed*
+        chunk data, i.e. the output of the per-chunk RepoObj.parse() that runs on every
+        fetch even on a pack cache hit. So the two layers save different work (repo I/O
+        vs. per-chunk decrypt+decompress).
+        """
+        try:
+            return self.data_cache[entry.id]
+        except KeyError:
+            data = next(pipeline.fetch_many([entry], ro_type=ROBJ_FILE_STREAM, replacement_chunk=False))
+            if data is not None:
+                self.data_cache[entry.id] = data
+            return data
+
     @staticmethod
     def _content_disposition(name):
         # File names from an archive can contain any byte except NUL and "/", including
@@ -736,6 +763,13 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
 
 
+def data_cache_capacity():
+    # number of decrypted chunks to keep cached; same knob as borg mount uses.
+    # default: number of CPUs (a small, non-zero value), see also borg mount --help.
+    capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
+    return max(1, capacity)
+
+
 def make_server(manifest, args, bind="127.0.0.1", port=8000):
     """Create a ThreadingHTTPServer serving the archives selected by *args*.
 
@@ -744,9 +778,13 @@ def make_server(manifest, args, bind="127.0.0.1", port=8000):
     """
     repo_lock = threading.RLock()
     vfs = ArchiveVFS(manifest, args, repo_lock)
+    capacity = data_cache_capacity()
+    logger.debug("webdav: data cache capacity: %d chunks", capacity)
+    data_cache = LRUCache(capacity=capacity)
 
-    handler_class = type("WebDAVHandler", (WebDAVHandler,), dict(vfs=vfs, repo_lock=repo_lock))
+    handler_class = type("WebDAVHandler", (WebDAVHandler,), dict(vfs=vfs, repo_lock=repo_lock, data_cache=data_cache))
     server = ThreadingHTTPServer((bind, port), handler_class)
     server.daemon_threads = True
     server.repo_lock = repo_lock
+    server.data_cache = data_cache
     return server

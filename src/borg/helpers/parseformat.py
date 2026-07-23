@@ -8,6 +8,7 @@ import os.path
 import re
 import shlex
 import stat
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
@@ -30,7 +31,7 @@ from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
-from ..platformflags import is_win32
+from ..platformflags import is_win32, is_darwin
 
 if TYPE_CHECKING:
     from ..item import ItemDiff
@@ -590,6 +591,17 @@ def _redact_url_credentials(url):
     return url
 
 
+def normalize_local_path(path):
+    """Normalize a local filesystem path's unicode form so paths compare equal regardless of how they were entered.
+
+    On macOS the filesystem returns paths in NFD (decomposed) form, while a path typed as a command line
+    argument is usually in NFC (composed) form. These look identical but are byte-different, which otherwise
+    makes borg believe a repository was relocated (see issue #2913). We normalize to NFD to match what the
+    macOS filesystem uses. On other platforms the path is returned unchanged.
+    """
+    return unicodedata.normalize("NFD", path) if is_darwin else path
+
+
 class Location:
     """Object representing a repository location"""
 
@@ -756,7 +768,7 @@ class Location:
 
     def canonical_path(self):
         if self.proto == "file":
-            return self.path
+            return normalize_local_path(self.path)
         if self.proto in ("rest", "ssh"):
             return (
                 f"{self.proto}://"

@@ -442,12 +442,15 @@ def render_page(title, rows, heading=None):
 
 
 def make_breadcrumbs(segments):
-    """Build h1 HTML for a path: each segment linked to its directory, for quick navigation."""
+    """Build h1 HTML for a path: each parent segment links to its directory (for quick
+    navigation); the last segment is the current directory and is shown as plain text."""
     parts = []
     href = "/"
-    for segment in segments:
+    last = len(segments) - 1
+    for i, segment in enumerate(segments):
         href += encode_path(segment) + "/"
-        parts.append(f'<a href="{href}">{html.escape(remove_surrogates(segment))}</a>')
+        text = html.escape(remove_surrogates(segment))
+        parts.append(text if i == last else f'<a href="{href}">{text}</a>')
     return "/".join(parts) + "/"
 
 

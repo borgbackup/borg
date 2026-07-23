@@ -127,9 +127,10 @@ def test_webdav_browse(archivers, request):
         assert '<a href="subdir/">subdir/</a>' in page
         # precise sizes in bytes, with dots as thousands separators
         assert ">5.242.880<" in page
-        # the heading is a breadcrumb (every path segment links to its directory), followed
-        # by an icon link to download the directory as a tar archive.
-        assert '<h1><a href="/test/">test</a>/<a href="/test/input/">input</a>/' '<a class="dl" href="?tar=1"' in page
+        # the heading is a breadcrumb: parent segments link to their directory, but the
+        # last segment (the current directory) is plain text. It is followed by an icon
+        # link to download the directory as a tar archive.
+        assert '<h1><a href="/test/">test</a>/input/<a class="dl" href="?tar=1"' in page
         # a non-ASCII (but everywhere-legal) name is percent-encoded in the link, shown as-is in text
         assert f'<a href="{UNICODE_NAME_ENC}">{UNICODE_NAME}</a>' in page
         # funny file name is html-escaped in text and percent-encoded in the link

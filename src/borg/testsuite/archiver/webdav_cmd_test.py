@@ -29,10 +29,17 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 # names, so files with such names can only be created (and thus tested) on non-Windows.
 FUNNY_NAME = "a <b>&c ä.txt"
 
+# a non-ASCII file name that is legal on every platform (including Windows), so the
+# percent-encoding of non-ASCII names is exercised everywhere - "grüße.txt" url-encodes
+# to "gr%C3%BC%C3%9Fe.txt" (ü -> %C3%BC, ß -> %C3%9F).
+UNICODE_NAME = "grüße.txt"
+UNICODE_NAME_ENC = "gr%C3%BC%C3%9Fe.txt"
+
 
 def _create_archive(archiver):
     create_regular_file(archiver.input_path, "file1", contents=b"data1")
     create_regular_file(archiver.input_path, "subdir/file2", contents=b"subdir data")
+    create_regular_file(archiver.input_path, UNICODE_NAME, contents=b"unicode data")
     if not is_win32:
         create_regular_file(archiver.input_path, FUNNY_NAME, contents=b"funny data")
     big = os.urandom(5 * 1024 * 1024)  # big enough for multiple chunks with default chunker params
@@ -119,6 +126,8 @@ def test_webdav_browse(archivers, request):
         assert ">5.242.880<" in page
         # the heading is a breadcrumb: every path segment links to its directory
         assert '<h1><a href="/test/">test</a>/<a href="/test/input/">input</a>/</h1>' in page
+        # a non-ASCII (but everywhere-legal) name is percent-encoded in the link, shown as-is in text
+        assert f'<a href="{UNICODE_NAME_ENC}">{UNICODE_NAME}</a>' in page
         # funny file name is html-escaped in text and percent-encoded in the link
         if not is_win32:
             assert "a &lt;b&gt;&amp;c ä.txt" in page
@@ -143,6 +152,10 @@ def test_webdav_download(archivers, request):
         assert status == 200
         assert body == big
         assert headers["Content-Length"] == str(len(big))
+        # a non-ASCII name (legal on all platforms) round-trips via its percent-encoded url
+        status, _, body = get(f"{base_url}/test/input/{UNICODE_NAME_ENC}")
+        assert status == 200
+        assert body == b"unicode data"
         # a file with a percent-encoded url (its name has html/url-special characters)
         if not is_win32:
             status, headers, body = get(base_url + "/test/input/a%20%3Cb%3E%26c%20%C3%A4.txt")
@@ -218,6 +231,8 @@ def test_webdav_propfind(archivers, request):
         assert "/test/input/" in hrefs
         assert "/test/input/subdir/" in hrefs
         assert "/test/input/file1" in hrefs
+        # a non-ASCII name is percent-encoded in the PROPFIND href on all platforms
+        assert f"/test/input/{UNICODE_NAME_ENC}" in hrefs
         if not is_win32:
             assert "/test/input/a%20%3Cb%3E%26c%20%C3%A4.txt" in hrefs
         assert prop_of(hrefs["/test/input/subdir/"], "{DAV:}resourcetype").find("{DAV:}collection") is not None

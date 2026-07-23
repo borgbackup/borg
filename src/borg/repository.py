@@ -239,10 +239,9 @@ class PackReader:
 class PackTracker:
     """Pack verification results, mapping pack_id -> (timestamp, result).
 
-    A cycle is one full pass over packs/; --max-duration may spread it over several partial checks.
-    Intact records (result=1) hold the cycle progress and are dropped when the cycle completes,
-    or kept across cycles when the cycle is finished with keep_ok. Corrupt records (result=0)
-    are kept across cycles until the pack verifies intact or is no longer listed in packs/.
+    Records are kept across checks: intact records (result=1) are reused by checks run with
+    max_age, corrupt records (result=0) are kept for repair and always re-verified. Records of
+    packs no longer listed in packs/ are pruned when a check finishes scanning packs/.
     Stored at cache/checked-packs as the serialized table with a sha256 over it appended.
     new() starts an empty tracker, load() reads the stored one.
     """
@@ -308,21 +307,11 @@ class PackTracker:
         """Return the ids of the packs recorded corrupt, sorted."""
         return sorted(pack_id for pack_id, entry in self.table.items() if not entry.result)
 
-    def drop_ok(self):
-        """Remove the intact-pack records, keeping the corrupt ones."""
-        # the keys are collected first because the table must not be mutated while iterating it.
-        for pack_id in [pack_id for pack_id, entry in self.table.items() if entry.result]:
-            del self.table[pack_id]
-
-    def finish_cycle(self, pack_ids, keep_ok=False):
-        """End a completed cycle: drop the intact records (unless keep_ok) and the records of packs
-        that are gone, then store the remaining records (or delete the stored object if none remain).
-
-        pack_ids is the set of pack ids listed in packs/ during this cycle; a record for an id not in
-        it refers to a pack that was deleted or compacted away.
+    def prune(self, pack_ids):
+        """Drop the records whose pack id is not in pack_ids (the set of pack ids listed in packs/),
+        then store the remaining records (or delete the stored object if none remain).
         """
-        if not keep_ok:
-            self.drop_ok()
+        # the keys are collected first because the table must not be mutated while iterating it.
         for pack_id in [pack_id for pack_id, _ in self.table.items() if pack_id not in pack_ids]:
             del self.table[pack_id]
         if len(self.table):
@@ -769,8 +758,8 @@ class Repository:
         corrupt packs and dropping those packs is left to repair, refs #8572. The ids of the packs
         found corrupt are kept in cache/checked-packs for repair, refs #9696.
 
-        max_age (seconds, 0 = off): keep the intact-pack records across cycles and skip packs whose
-        intact record is younger than max_age.
+        max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
+        max_age. Check results are always recorded and kept.
         """
 
         def verify(namespace, name):
@@ -795,16 +784,12 @@ class Repository:
         mode = "partial" if partial else "full"
         logger.info(f"Starting {mode} repository check")
         tracker = PackTracker.load(self.store)
-        if not partial and not max_age:
-            tracker.drop_ok()  # without max_age, a full check verifies every pack: start a new cycle
         if not len(tracker):
             logger.info("Starting from beginning.")
-        elif partial:
-            logger.info(f"Continuing check cycle, {len(tracker)} pack check results on record.")
         elif max_age:
             logger.info(f"{len(tracker)} pack check results on record, reusing those younger than max_age.")
         else:
-            logger.info(f"Starting from beginning, re-verifying {len(tracker)} packs recorded corrupt.")
+            logger.info(f"{len(tracker)} pack check results on record, verifying every pack.")
         t_start = time.monotonic()
         t_last_checkpoint = t_start
         index_files = index_errors = 0
@@ -839,7 +824,7 @@ class Repository:
                 pack_id = hex_to_bin(info.name)
                 entry = tracker.get(pack_id)
                 if entry is not None and entry.result:  # recorded intact; a corrupt one is verified again
-                    if not max_age or time.time() - entry.timestamp < max_age:
+                    if max_age and time.time() - entry.timestamp < max_age:
                         continue
                 pack_files += 1
                 ok = verify("packs", info.name)
@@ -853,15 +838,13 @@ class Repository:
                     logger.info(f"Checkpointing at pack {info.name}.")
                     tracker.save()
                 if partial and now > t_start + max_duration:
-                    logger.info(f"Finished partial repository check, {len(tracker)} packs checked so far.")
-                    tracker.save()
+                    logger.info(f"Finished partial repository check, {len(tracker)} pack check results on record.")
                     break
             else:
-                # scanned all packs without hitting the time limit: the cycle is done, drop its progress.
                 if pack_infos:
                     pack_pi.show(current=len(pack_infos))  # finish at 100%
                 logger.info("Finished checking packs.")
-                tracker.finish_cycle({hex_to_bin(info.name) for info in pack_infos}, keep_ok=bool(max_age))
+            tracker.prune({hex_to_bin(info.name) for info in pack_infos})
             pack_pi.finish()
         else:
             # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).

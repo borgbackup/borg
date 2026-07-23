@@ -69,15 +69,18 @@ def test_check_max_age(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
 
-    # --repair does not allow --max-age.
+    # --repair does not allow --max-age, and --max-duration requires --max-age.
     if archiver.FORK_DEFAULT:
         cmd(archiver, "check", "--repair", "--max-age=1d", exit_code=CommandError().exit_code)
+        cmd(archiver, "check", "--repository-only", "--max-duration=3600", exit_code=CommandError().exit_code)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "check", "--repair", "--max-age=1d")
+        with pytest.raises(CommandError):
+            cmd(archiver, "check", "--repository-only", "--max-duration=3600")
 
-    # a first check with --max-age records the results, a second one reuses them.
-    output = cmd(archiver, "check", "-v", "--repository-only", "--max-age=4w", exit_code=0)
+    # a check records its results, a later one with --max-age reuses them.
+    output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)
     assert "Starting full repository check" in output
     output = cmd(archiver, "check", "-v", "--repository-only", "--max-age=4w", exit_code=0)
     assert "reusing those younger than max_age" in output

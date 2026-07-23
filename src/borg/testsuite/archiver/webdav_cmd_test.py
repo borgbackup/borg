@@ -241,6 +241,24 @@ def test_webdav_propfind_body(archivers, request):
         with pytest.raises(urllib.error.HTTPError) as exc_info:
             propfind(base_url + "/test/input/file1", depth="0", body=b"<not-propfind/>")
         assert exc_info.value.code == 400
+        # bodies containing a DTD are rejected (entity expansion / "XML bomb" defense)
+        bomb = (
+            b'<?xml version="1.0"?><!DOCTYPE b [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;">]>'
+            b'<D:propfind xmlns:D="DAV:"><D:prop><D:displayname>&b;</D:displayname></D:prop></D:propfind>'
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            propfind(base_url + "/test/input/file1", depth="0", body=bomb)
+        assert exc_info.value.code == 400
+        # the DTD rejection is encoding-proof: a UTF-16 encoded DTD (whose bytes do
+        # not contain the ascii "<!DOCTYPE") must be rejected, too
+        utf16_bomb = (
+            '<?xml version="1.0" encoding="UTF-16"?>'
+            '<!DOCTYPE b [<!ENTITY a "aaaaaaaaaa">]>'
+            '<D:propfind xmlns:D="DAV:"><D:prop><D:displayname>&a;</D:displayname></D:prop></D:propfind>'
+        ).encode("utf-16")
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            propfind(base_url + "/test/input/file1", depth="0", body=utf16_bomb)
+        assert exc_info.value.code == 400
         # depth infinity is refused
         with pytest.raises(urllib.error.HTTPError) as exc_info:
             propfind(base_url + "/test/input/", depth="infinity")

@@ -21,6 +21,7 @@ from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote_to_bytes
 from xml.etree import ElementTree as ET
+from xml.parsers import expat
 
 from . import __version__
 from .archive import Archive
@@ -222,17 +223,42 @@ def iso8601(mtime_ns):
     return datetime.fromtimestamp(mtime_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def reject_dtd(body):
+    """Raise ValueError if *body* contains an XML DTD (<!DOCTYPE ...>).
+
+    A DTD is the only way to declare custom internal entities, so rejecting it
+    rules out entity expansion attacks ("billion laughs"). We use expat's own
+    doctype callback rather than a substring check on the raw bytes, so this is
+    independent of the document encoding (a DTD in e.g. UTF-16 does not contain
+    the ASCII bytes "<!DOCTYPE"). The callback fires at the start of the doctype
+    declaration, before any entity is declared or expanded.
+    """
+    parser = expat.ParserCreate()
+
+    def forbid_dtd(name, sysid, pubid, has_internal_subset):
+        raise ValueError("DTD in request body rejected")
+
+    parser.StartDoctypeDeclHandler = forbid_dtd
+    try:
+        parser.Parse(body if isinstance(body, bytes) else body.encode("utf-8"), True)
+    except expat.ExpatError:
+        pass  # malformed XML: the real parse below raises the canonical ParseError
+
+
 def parse_propfind(body):
     """Parse a PROPFIND request body.
 
     Returns a (mode, props) tuple: ("allprop", None), ("propname", None) or
     ("prop", [tag, ...]). Raises ValueError or ET.ParseError for bodies we do
-    not understand. Note: the maximum body size is limited by the caller and
-    expat has built-in protection against entity expansion attacks.
+    not understand.
     """
     if not body.strip():
         return "allprop", None  # RFC 4918: an empty body means allprop
-    root = ET.fromstring(body)
+    reject_dtd(body)
+    # DTDs are rejected above, so no internal entities can be declared and no
+    # entity expansion ("billion laughs" / "XML bomb") is possible - additionally,
+    # the request body is limited to 1 MiB by _read_body().
+    root = ET.fromstring(body)  # codeql[py/xml-bomb]: DTDs (thus custom entities) rejected by reject_dtd()
     if root.tag != "{DAV:}propfind":
         raise ValueError("root element is not DAV: propfind")
     if root.find("{DAV:}propname") is not None:

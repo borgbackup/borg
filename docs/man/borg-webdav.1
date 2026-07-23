@@ -97,12 +97,19 @@ over. As for \fBborg mount\fP, the \fBBORG_MOUNT_DATA_CACHE_ENTRIES\fP environme
 variable sets the number of cached chunks (default: number of CPUs);
 additional memory usage can be up to the chunk size times this number.
 .sp
-The command runs in the foreground until it is interrupted with Ctrl\-C.
+Unless the \fB\-\-foreground\fP option is given, the command daemonizes and runs
+in the background until it is stopped by sending it a signal (e.g. \fBkill\fP
+sends SIGTERM), which shuts the server down and releases the repository lock.
+In the foreground, ^C / SIGINT stops it. Daemonizing is not available on
+Windows, so the command always stays in the foreground there.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS options
 .INDENT 0.0
+.TP
+.B  \-f\fP,\fB  \-\-foreground
+stay in foreground, do not daemonize
 .TP
 .BI \-\-port \ PORT
 TCP port to listen on (on localhost); default: 8000

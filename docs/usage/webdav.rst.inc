@@ -15,6 +15,8 @@ borg webdav
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **options**                                                                                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-f``, ``--foreground``                     | stay in foreground, do not daemonize                                                                                        |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--port PORT``                              | TCP port to listen on (on localhost); default: 8000                                                                         |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
@@ -53,7 +55,8 @@ borg webdav
 
 
     options
-        --port PORT     TCP port to listen on (on localhost); default: 8000
+        -f, --foreground     stay in foreground, do not daemonize
+        --port PORT          TCP port to listen on (on localhost); default: 8000
 
 
     :ref:`common_options`
@@ -121,4 +124,8 @@ over. As for ``borg mount``, the ``BORG_MOUNT_DATA_CACHE_ENTRIES`` environment
 variable sets the number of cached chunks (default: number of CPUs);
 additional memory usage can be up to the chunk size times this number.
 
-The command runs in the foreground until it is interrupted with Ctrl-C.
+Unless the ``--foreground`` option is given, the command daemonizes and runs
+in the background until it is stopped by sending it a signal (e.g. ``kill``
+sends SIGTERM), which shuts the server down and releases the repository lock.
+In the foreground, ^C / SIGINT stops it. Daemonizing is not available on
+Windows, so the command always stays in the foreground there.

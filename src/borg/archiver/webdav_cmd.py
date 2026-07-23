@@ -1,9 +1,10 @@
+import os
 import threading
 import time
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
-from ..helpers import sig_int
+from ..helpers import sig_int, daemonizing, signal_handler
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -19,20 +20,44 @@ class WebDAVMixIn:
         from ..webdav import make_server
         from ..storelocking import LockRefresher
 
+        # bind the socket now (in the foreground), so a bind error (e.g. port in use) is
+        # reported here instead of in a detached background process. The listening socket
+        # survives the daemonizing fork below.
         server = make_server(manifest, args, port=args.port)
         host, port = server.server_address[:2]
-        print(f"Serving selected archives read-only on http://{host}:{port}/ - press Ctrl-C to stop.")
+        url = f"http://{host}:{port}/"
+
+        # daemonizing needs os.fork(), which does not exist on Windows - stay in the
+        # foreground there (borg webdav is meant to be usable on Windows, unlike borg mount).
+        daemonize = not args.foreground and hasattr(os, "fork")
+        if not args.foreground and not daemonize:
+            logger.info("Daemonizing is not supported on this platform, staying in the foreground.")
+
+        if daemonize:
+            print(f"Serving selected archives read-only on {url} in the background.")
+            with daemonizing(show_rc=getattr(args, "show_rc", False)) as (old_id, new_id):
+                # we forked, so the process holding the repository lock changed: migrate it.
+                manifest.repository.migrate_lock(old_id, new_id)
+        else:
+            print(f"Serving selected archives read-only on {url} - press Ctrl-C to stop.")
+
+        # From here on we run in the background (grandchild) process if daemonized, or in the
+        # same process otherwise. Threads must be started here, after the possible fork above,
+        # because threads do not survive fork().
         # keep the repository lock of an idle server alive, so it is not killed as stale (see #9872).
         lock_refreshing_thread = LockRefresher(manifest.repository.info, sleep_interval=60, lock=server.repo_lock)
         lock_refreshing_thread.start()
         # the first SIGINT only sets the sig_int flag (see SigIntManager), so serve in a
         # thread and poll the flag here, to shut down cleanly on the first Ctrl-C already.
+        # SIGTERM (the usual way to stop a daemon) also stops us, so the repo lock is released.
         server_thread = threading.Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
+        terminated = threading.Event()
         try:
-            while not sig_int:
-                time.sleep(0.1)
-            print("Shutting down...")
+            with signal_handler("SIGTERM", lambda sig_no, stack: terminated.set()):
+                while not sig_int and not terminated.is_set():
+                    time.sleep(0.1)
+            logger.info("webdav: shutting down.")
         finally:
             lock_refreshing_thread.terminate()
             server.shutdown()
@@ -92,11 +117,18 @@ class WebDAVMixIn:
         variable sets the number of cached chunks (default: number of CPUs);
         additional memory usage can be up to the chunk size times this number.
 
-        The command runs in the foreground until it is interrupted with Ctrl-C.
+        Unless the ``--foreground`` option is given, the command daemonizes and runs
+        in the background until it is stopped by sending it a signal (e.g. ``kill``
+        sends SIGTERM), which shuts the server down and releases the repository lock.
+        In the foreground, ^C / SIGINT stops it. Daemonizing is not available on
+        Windows, so the command always stays in the foreground there.
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_webdav.__doc__, epilog=webdav_epilog)
         subparsers.add_subcommand("webdav", subparser, help="serve archive contents via WebDAV / HTTP")
+        subparser.add_argument(
+            "-f", "--foreground", dest="foreground", action="store_true", help="stay in foreground, do not daemonize"
+        )
         subparser.add_argument(
             "--port",
             metavar="PORT",

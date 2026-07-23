@@ -775,10 +775,15 @@ class ItemDiff:
     def _time_diffs(self):
         attrs = ["ctime", "mtime"]
         for attr in attrs:
-            if attr in self._item1 and attr in self._item2 and self._item1.get(attr) != self._item2.get(attr):
-                ts1 = OutputTimestamp(safe_timestamp(self._item1.get(attr)))
-                ts2 = OutputTimestamp(safe_timestamp(self._item2.get(attr)))
-                self._changes[attr] = DiffChange(attr, {"item1": ts1, "item2": ts2},)
+            if attr in self._item1 and attr in self._item2:
+                ts1_ns = self._item1.get(attr)
+                ts2_ns = self._item2.get(attr)
+                if ts1_ns != ts2_ns:
+                    # pass ns so formatters can show the full sub-second precision,
+                    # the datetime in OutputTimestamp.ts only has microseconds.
+                    ts1 = OutputTimestamp(safe_timestamp(ts1_ns), ns=ts1_ns)
+                    ts2 = OutputTimestamp(safe_timestamp(ts2_ns), ns=ts2_ns)
+                    self._changes[attr] = DiffChange(attr, {"item1": ts1, "item2": ts2})
         return True
 
     def content(self):

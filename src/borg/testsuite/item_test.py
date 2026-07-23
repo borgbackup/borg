@@ -1,7 +1,7 @@
 import pytest
 
 from ..cache import ChunkListEntry
-from ..item import Item, chunks_contents_equal
+from ..item import Item, ItemDiff, chunks_contents_equal
 from ..helpers import StableDict
 from ..helpers.msgpack import Timestamp
 
@@ -173,3 +173,21 @@ def test_chunk_content_equal(chunk_a: str, chunk_b: str, chunks_equal):
     compare2 = chunks_contents_equal(iter(chunks_b), iter(chunks_a))
     assert compare1 == compare2
     assert compare1 == chunks_equal
+
+
+@pytest.mark.parametrize(
+    "ctime1_ns, ctime2_ns, change_expected",
+    [
+        (1000000000_000000_000, 1000000000_000000_000, False),  # identical
+        (1000000000_000000_000, 1000000000_000000_001, True),  # nanosecond difference
+        (1000000000_000000_000, 1000000000_000001_000, True),  # microsecond difference
+        (1000000000_000000_000, 1000000001_000000_000, True),  # second difference
+    ],
+)
+def test_item_diff_time_ns_resolution(ctime1_ns, ctime2_ns, change_expected):
+    """ItemDiff compares timestamps with full nanosecond resolution."""
+    item1 = Item(path="p", mode=0o100644, mtime=0, ctime=ctime1_ns)
+    item2 = Item(path="p", mode=0o100644, mtime=0, ctime=ctime2_ns)
+    diff = ItemDiff("p", item1, item2, iter([]), iter([]), can_compare_chunk_ids=True)
+    assert (diff.ctime() is not None) == change_expected
+    assert diff.mtime() is None

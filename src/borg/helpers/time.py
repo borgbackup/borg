@@ -106,6 +106,15 @@ def format_time(ts: datetime, format_spec=""):
     return ts.astimezone().strftime("%a, %Y-%m-%d %H:%M:%S %z" if format_spec == "" else format_spec)
 
 
+def format_time_ns(ts: datetime, ns: int):
+    """
+    Like format_time (default format), but with the seconds fraction in nanosecond precision,
+    taken from *ns* (the nanoseconds timestamp *ts* was derived from).
+    """
+    dt = ts.astimezone()
+    return f"{dt:%a, %Y-%m-%d %H:%M:%S}.{ns % 1_000_000_000:09d} {dt:%z}"
+
+
 def format_timedelta(td):
     """Format a timedelta in a human-friendly format."""
     ts = td.total_seconds()
@@ -179,8 +188,11 @@ def offset_n_months(from_ts, n_months):
 
 
 class OutputTimestamp:
-    def __init__(self, ts: datetime):
+    def __init__(self, ts: datetime, ns: int = None):
+        # ns optionally gives the nanoseconds timestamp *ts* was derived from,
+        # so the sub-second part can be output in full precision.
         self.ts = ts
+        self.ns = safe_ns(ns) if ns is not None else None
 
     def __format__(self, format_spec):
         # we want to output a timestamp in the user's local timezone
@@ -191,7 +203,12 @@ class OutputTimestamp:
 
     def isoformat(self):
         # we want to output a timestamp in the user's local timezone
-        return self.ts.astimezone().isoformat(timespec="microseconds")
+        if self.ns is None:
+            return self.ts.astimezone().isoformat(timespec="microseconds")
+        # nanosecond precision: datetime.isoformat can only do microseconds, so build
+        # "YYYY-MM-DDTHH:MM:SS" + ".<9-digit fraction>" + "+HH:MM" ourselves.
+        base = self.ts.astimezone().replace(microsecond=0).isoformat()
+        return f"{base[:19]}.{self.ns % 1_000_000_000:09d}{base[19:]}"
 
     to_json = isoformat
 

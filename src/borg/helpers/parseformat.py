@@ -26,7 +26,7 @@ from .errors import Error, CommandError
 from .fs import make_path_safe, slashify
 from .argparsing import Action, ArgumentError, ArgumentTypeError, register_type
 from .msgpack import Timestamp
-from .time import OutputTimestamp, format_time, safe_timestamp
+from .time import OutputTimestamp, format_time, format_time_ns, safe_timestamp
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
@@ -1295,7 +1295,13 @@ class DiffFormatter(BaseFormatter):
 
     def format_time(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)
-        return f"[{key}: {change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+        if not change:
+            return ""
+        # show the full nanosecond precision: time diffs are often sub-second (e.g. ctime
+        # updates of surviving hardlinks), second precision would render both timestamps
+        # identically.
+        ts1, ts2 = change.diff_data["item1"], change.diff_data["item2"]
+        return f"[{key}: {format_time_ns(ts1.ts, ts1.ns)} -> {format_time_ns(ts2.ts, ts2.ns)}]"
 
     def format_iso_time(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)

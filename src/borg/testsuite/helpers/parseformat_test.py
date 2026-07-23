@@ -3,6 +3,7 @@ import json
 import os
 
 import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -28,9 +29,10 @@ from ...helpers.parseformat import (
     swidth_slice,
     eval_escapes,
     ChunkerParams,
+    normalize_local_path,
 )
 from ...helpers.time import format_timedelta, parse_timestamp
-from ...platformflags import is_win32
+from ...platformflags import is_win32, is_darwin
 
 
 def test_bin_to_hex():
@@ -337,6 +339,33 @@ class TestLocationWithoutEnv:
         with pytest.raises(ValueError):
             # This is invalid due to the second colon. Correct: 'ssh://user@host/path'.
             Location("ssh://user@host:/path")
+
+
+def test_normalize_local_path():
+    nfc = unicodedata.normalize("NFC", "tëst")  # composed: ë is a single codepoint
+    nfd = unicodedata.normalize("NFD", "tëst")  # decomposed: e + combining diaeresis
+    assert nfc != nfd  # sanity: the two unicode forms really differ byte-wise
+    if is_darwin:
+        # on macOS both forms normalize to the same (NFD) form the filesystem uses
+        assert normalize_local_path(nfc) == normalize_local_path(nfd) == nfd
+    else:
+        # elsewhere it is a no-op
+        assert normalize_local_path(nfc) == nfc
+        assert normalize_local_path(nfd) == nfd
+
+
+def test_canonical_path_unicode_normalization(monkeypatch):
+    # regression test for #2913: a file repo path entered in NFC form (e.g. typed as an argument) and
+    # the same path in NFD form (e.g. derived from os.getcwd() on macOS) must yield the same canonical
+    # path, so borg does not mistake identical-looking paths for a repository relocation.
+    monkeypatch.delenv("BORG_REPO", raising=False)
+    nfc = unicodedata.normalize("NFC", "/absolute/tëst")
+    nfd = unicodedata.normalize("NFD", "/absolute/tëst")
+    if is_darwin:
+        assert Location(nfc).canonical_path() == Location(nfd).canonical_path()
+    else:
+        # on other platforms the filesystem does not normalize, so the forms stay distinct
+        assert Location(nfc).canonical_path() != Location(nfd).canonical_path()
 
 
 @pytest.mark.parametrize(

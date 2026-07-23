@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote_to_bytes
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as ET  # nosec B405 # DTDs rejected before parsing, see reject_dtd()
 from xml.parsers import expat
 
 from . import __version__
@@ -260,7 +260,7 @@ def parse_propfind(body):
     # DTDs are rejected above, so no internal entities can be declared and no
     # entity expansion ("billion laughs" / "XML bomb") is possible - additionally,
     # the request body is limited to 1 MiB by _read_body().
-    root = ET.fromstring(body)  # codeql[py/xml-bomb]: DTDs (thus custom entities) rejected by reject_dtd()
+    root = ET.fromstring(body)  # nosec B314 # codeql[py/xml-bomb]: DTDs rejected by reject_dtd() above
     if root.tag != "{DAV:}propfind":
         raise ValueError("root element is not DAV: propfind")
     if root.find("{DAV:}propname") is not None:

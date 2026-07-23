@@ -5,9 +5,12 @@
 import http.client
 import io
 import os
+import signal
+import socket
 import stat
 import tarfile
 import threading
+import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -223,6 +226,9 @@ def test_webdav_tar_subdir_and_head(archivers, request):
         assert status == 200
         assert headers["Content-Type"] == "application/x-tar"
         assert body == b""
+        # ?tar at the archive root exports the whole archive (no path prefix stripped)
+        _, tar = _get_tar(base_url + "/test/?tar=1")
+        assert "input/file1" in tar.getnames()
 
 
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
@@ -259,6 +265,23 @@ def test_webdav_errors(archivers, request):
                 http_request(base_url + "/test/input/file1", method)
             assert exc_info.value.code == 405
             assert "PROPFIND" in exc_info.value.headers["Allow"]
+        # a symlink is shown in listings but is not downloadable via GET
+        if are_symlinks_supported():
+            with pytest.raises(urllib.error.HTTPError) as exc_info:
+                get(base_url + "/test/input/link1")
+            assert exc_info.value.code == 403
+        # a PROPFIND body larger than 1 MiB is rejected: the server checks Content-Length
+        # and answers 413 without reading the oversized body.
+        conn = http.client.HTTPConnection(urlsplit(base_url).netloc)
+        try:
+            conn.putrequest("PROPFIND", "/test/input/file1", skip_accept_encoding=True)
+            conn.putheader("Depth", "0")
+            conn.putheader("Content-Length", str(1024 * 1024 + 1))
+            conn.endheaders()
+            conn.send(b"x")  # only a token byte; the header alone triggers the rejection
+            assert conn.getresponse().status == 413
+        finally:
+            conn.close()
 
 
 def test_webdav_options(archivers, request):
@@ -469,3 +492,68 @@ def test_webdav_conditional_get(archivers, request):
         # a non-matching etag serves the content normally
         status, _, body = get(url, headers={"If-None-Match": '"different"'})
         assert status == 200 and body == b"data1"
+
+
+@pytest.mark.skipif(is_win32 or not hasattr(os, "mkfifo"), reason="fifo (a special file) needs POSIX")
+def test_webdav_special_files(archivers, request):
+    # A named pipe stands in for special files (devices, fifos, sockets): it is shown in
+    # browser listings but not downloadable and not exposed via WebDAV - yet a tar download
+    # (which preserves metadata) does include it.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"data1")
+    os.mkfifo(os.path.join(archiver.input_path, "pipe"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    with webdav_server(archiver) as base_url:
+        # shown in the listing, but as plain text (not a download link)
+        status, _, body = get(base_url + "/test/input/")
+        assert status == 200
+        page = body.decode("utf-8")
+        assert "pipe" in page
+        assert 'href="pipe"' not in page
+        # a GET on it is refused (it is not a regular file)
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            get(base_url + "/test/input/pipe")
+        assert exc_info.value.code == 403
+        # not exposed via WebDAV (the protocol has no concept of a fifo)
+        _, _, xml_body = propfind(base_url + "/test/input/", depth="1")
+        assert not any("pipe" in href for href in propfind_hrefs(xml_body))
+        # but included in a tar download, as a fifo entry
+        _, tar = _get_tar(base_url + "/test/input/?tar=1")
+        assert tar.getmember("input/pipe").isfifo()
+
+
+def _free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+@pytest.mark.skipif(is_win32, reason="uses a POSIX signal to stop the foreground server")
+def test_webdav_command_serves_and_stops(archivers, request):
+    # exercise the actual `borg webdav` command (in the foreground): it must serve requests
+    # and, on SIGTERM, shut down cleanly and release the repository lock.
+    archiver = request.getfixturevalue(archivers)
+    _create_archive(archiver)
+    port = _free_port()
+    served = []
+
+    def client_then_stop():
+        base = f"http://127.0.0.1:{port}/"
+        for _ in range(100):  # wait until the server is up (do_webdav installs its handler by then)
+            try:
+                with urllib.request.urlopen(base) as response:
+                    served.append(response.status)
+                    break
+            except OSError:
+                time.sleep(0.1)
+        time.sleep(0.2)  # small margin so the SIGTERM handler is surely installed
+        os.kill(os.getpid(), signal.SIGTERM)  # ask the foreground server to stop
+
+    stopper = threading.Thread(target=client_then_stop, daemon=True)
+    stopper.start()
+    cmd(archiver, "webdav", "--foreground", "--port", str(port))  # blocks until stopped
+    stopper.join(timeout=10)
+    assert served == [200]  # the command actually served a request
+    # the repository lock was released on shutdown, so a following borg command still works
+    cmd(archiver, "repo-info")

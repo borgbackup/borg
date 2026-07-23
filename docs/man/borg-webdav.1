@@ -1,0 +1,123 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-webdav" "1" "2026-07-23" "" "borg backup tool"
+.SH Name
+borg-webdav \- Serve archive contents via a read-only HTTP server on localhost.
+.SH SYNOPSIS
+.sp
+borg [common options] webdav [options]
+.SH DESCRIPTION
+.sp
+This command serves the contents of the selected archives via a read\-only
+HTTP server, so files can be browsed and downloaded with a web browser.
+.sp
+The server listens on localhost (127.0.0.1) only and offers no
+authentication and no encryption \- anything that can connect to
+localhost TCP ports on the machine can read the served archive contents.
+.sp
+The top level lists the selected archives (use the archive filter options
+to select fewer archives); below that, the archive contents can be
+browsed like a directory tree. The directory tree of an archive is built
+in memory when it is first entered, so expect some delay for big archives.
+.sp
+Notes:
+.INDENT 0.0
+.IP \(bu 2
+Downloads via HTTP do not preserve any POSIX metadata (owner, group,
+mode, timestamps, xattrs, ACLs). Use \fBborg extract\fP or
+\fBborg export\-tar\fP for full\-fidelity restores.
+.IP \(bu 2
+Symbolic links are shown in the directory listings, but are neither
+followed nor downloadable. Special files (devices, fifos, sockets)
+are shown, but not downloadable.
+.IP \(bu 2
+Damaged files (with chunks missing in the repository) cause the
+download connection to be aborted \- the server never silently serves
+corrupted file content.
+.UNINDENT
+.sp
+The command runs in the foreground until it is interrupted with Ctrl\-C.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.BI \-\-port \ PORT
+TCP port to listen on (on localhost); default: 8000
+.UNINDENT
+.SS Archive filters
+.INDENT 0.0
+.TP
+.BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
+.TP
+.BI \-\-sort\-by \ KEYS
+Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
+.TP
+.BI \-\-first \ N
+consider the first N archives after other filters are applied
+.TP
+.BI \-\-last \ N
+consider the last N archives after other filters are applied
+.TP
+.BI \-\-oldest \ TIMESPAN
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
+.TP
+.BI \-\-newest \ TIMESPAN
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
+.TP
+.BI \-\-older \ TIMESPAN
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
+.TP
+.BI \-\-newer \ TIMESPAN
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+# Serve all archives of the repository on http://127.0.0.1:8000/,
+# then browse and download files with a web browser.
+$ borg webdav
+
+# Serve only one archive on a different port.
+$ borg webdav \-\-port 8123 \-\-match\-archives my\-archive
+.EE
+.UNINDENT
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

@@ -1,0 +1,400 @@
+"""Read-only HTTP server providing browser access to archive contents (``borg webdav``).
+
+Phase 1 implements plain HTTP only (GET/HEAD, HTML directory listings, file
+downloads), bound to localhost. WebDAV methods (OPTIONS/PROPFIND) for native
+mounting by Explorer/Finder/GVFS are planned to be added on top of this later.
+
+This module only uses the Python standard library, so it works without any
+optional dependencies.
+"""
+
+import html
+import mimetypes
+import stat
+import threading
+from datetime import datetime, timezone
+from email.utils import formatdate
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import quote, unquote_to_bytes
+
+from . import __version__
+from .archive import Archive
+from .constants import *  # NOQA
+from .helpers import bin_to_hex, remove_surrogates
+from .logger import create_logger
+
+logger = create_logger(__name__)
+
+DEFAULT_DIR_MODE = 0o40755
+
+
+class Node:
+    """A node in an archive's directory tree: a directory (children is a dict) or a leaf."""
+
+    __slots__ = ("mode", "mtime", "size", "chunks", "target", "children")
+
+    def __init__(self, mode, mtime=0, size=0, chunks=None, target=None, children=None):
+        self.mode = mode
+        self.mtime = mtime  # ns
+        self.size = size
+        self.chunks = chunks
+        self.target = target  # symlink target
+        self.children = children  # {name(str): Node} for directories, None otherwise
+
+    @property
+    def is_dir(self):
+        return self.children is not None
+
+
+class ArchiveVFS:
+    """Read-only view of the archives selected by the archive filter args.
+
+    The top level maps (deduplicated) archive names to lazily built directory trees.
+    All repository access happens under repo_lock, because borgstore connections are
+    not thread-safe.
+    """
+
+    def __init__(self, manifest, args, repo_lock):
+        self.manifest = manifest
+        self.repo_lock = repo_lock
+        archives = manifest.archives.list_considering(args)
+        # deduplicate archive names (archives of a series all share the same name)
+        name_counter = {}
+        for archive in archives:
+            name_counter[archive.name] = name_counter.get(archive.name, 0) + 1
+        self.archives = {}  # display name -> ArchiveInfo
+        for archive in archives:
+            name = archive.name
+            if name_counter[name] > 1:
+                name += f"-{bin_to_hex(archive.id):.8}"
+            self.archives[name] = archive
+        self._trees = {}  # display name -> (root Node, DownloadPipeline)
+
+    def get_root(self, name):
+        """Return (root Node, pipeline) for archive *name*, building the tree on first access."""
+        try:
+            return self._trees[name]
+        except KeyError:
+            pass
+        archive_info = self.archives[name]  # may raise KeyError -> 404
+        with self.repo_lock:
+            if name not in self._trees:  # re-check under lock
+                self._trees[name] = self._build_tree(archive_info)
+        return self._trees[name]
+
+    def _build_tree(self, archive_info):
+        logger.debug("webdav: building tree for archive %s ...", remove_surrogates(archive_info.name))
+        archive = Archive(self.manifest, archive_info.id)
+        archive_mtime = int(archive_info.ts.timestamp() * 1e9)
+        root = Node(DEFAULT_DIR_MODE, mtime=archive_mtime, children={})
+        for item in archive.iter_items():
+            segments = [s for s in item.path.split("/") if s]
+            if not segments:
+                continue
+            node = root
+            for segment in segments[:-1]:
+                child = node.children.get(segment)
+                if child is None or not child.is_dir:
+                    # intermediate directory not (yet) seen as an item: synthesize it
+                    child = Node(DEFAULT_DIR_MODE, mtime=archive_mtime, children={})
+                    node.children[segment] = child
+                node = child
+            name = segments[-1]
+            if stat.S_ISDIR(item.mode):
+                existing = node.children.get(name)
+                if existing is not None and existing.is_dir:
+                    # was synthesized before the dir item was seen: update metadata in place
+                    existing.mode = item.mode
+                    existing.mtime = item.mtime
+                else:
+                    node.children[name] = Node(item.mode, mtime=item.mtime, children={})
+            else:
+                node.children[name] = Node(
+                    item.mode,
+                    mtime=item.mtime,
+                    size=item.get_size(),
+                    chunks=item.get("chunks"),
+                    target=item.get("target"),
+                )
+        return root, archive.pipeline
+
+    def resolve(self, segments):
+        """Resolve path segments (first one is the archive name) to (Node, pipeline).
+
+        Raises KeyError if not found.
+        """
+        root, pipeline = self.get_root(segments[0])
+        node = root
+        for segment in segments[1:]:
+            if not node.is_dir:
+                raise KeyError(segment)
+            node = node.children[segment]
+        return node, pipeline
+
+
+def encode_path(path):
+    """Percent-encode a borg item path (str with surrogateescape) for use in a URL."""
+    return quote(path.encode("utf-8", "surrogateescape"))
+
+
+def decode_path(path):
+    """Decode a percent-encoded URL path to a borg item path (str with surrogateescape)."""
+    return unquote_to_bytes(path).decode("utf-8", "surrogateescape")
+
+
+def http_date(mtime_ns):
+    return formatdate(mtime_ns / 1e9, usegmt=True)
+
+
+def display_time(mtime_ns):
+    dt = datetime.fromtimestamp(mtime_ns / 1e9, tz=timezone.utc).astimezone()
+    return dt.isoformat(sep=" ", timespec="seconds")
+
+
+def display_size(size):
+    """Format a precise byte count with dots as thousands separators, e.g. '123.456.789'."""
+    return f"{size:,}".replace(",", ".")
+
+
+# the official borg logo (docs/_static/logo.svg, "borg" in vectorized Black Ops One),
+# without the background rect and with the fill color controlled via CSS currentColor.
+LOGO_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 133.333" role="img" aria-label="Borg">'
+    '<path transform="translate(20.9086, 32.2192)" fill="currentColor" d="M43.75 13.8021L26.6667 13.8021L26.6667 0'
+    "L53.3854 0L67.2396 13.8021L67.2396 27.8646L60.3125 34.7917L67.2396 41.7187L67.2396 55.3125L53.3854 69.1146"
+    "L26.6667 69.1146L26.6667 55.3125L43.75 55.3125L43.75 40.5729L26.6667 40.5729L26.6667 28.5417L43.75 28.5417ZM0 0"
+    'L23.0208 0L23.0208 69.1146L0 69.1146Z"/>'
+    '<path transform="translate(97.6794, 46.0213)" fill="currentColor" d="M62.1354 41.5104L48.3333 55.3125'
+    "L32.9167 55.3125L32.9167 42.3958L38.6458 42.3958L38.6458 13.8021L32.9167 13.8021L32.9167 0L48.3333 0"
+    "L62.1354 13.8021ZM23.2813 42.3958L29.2708 42.3958L29.2708 55.3125L13.8021 55.3125L0 41.5104L0 13.8021"
+    'L13.8021 0L29.2708 0L29.2708 13.8021L23.2813 13.8021Z"/>'
+    '<path transform="translate(170.231, 46.0213)" fill="currentColor" d="M36.5104 13.8021L26.7187 13.8021'
+    "L26.7187 7.76042L34.4271 0L48.3854 0L59.5833 12.9167L59.5833 27.2396L36.5104 27.2396ZM0 55.3125L0 0"
+    'L23.0208 0L23.0208 55.3125Z"/>'
+    '<path transform="translate(236.429, 46.0213)" fill="currentColor" d="M36.875 13.8021L26.6667 13.8021L26.6667 0'
+    "L46.0937 0L59.8958 13.8021L59.8958 60.7812L46.0937 74.6875L15.7292 74.6875L8.80208 67.7083L8.80208 62.6042"
+    "L36.875 62.6042ZM33.2292 42.3958L33.2292 48.4896L26.3542 55.3125L13.8021 55.3125L0 41.5104L0 13.8021L13.8021 0"
+    'L23.0208 0L23.0208 42.3958Z"/>'
+    "</svg>"
+)
+
+PAGE_TEMPLATE = """\
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{title}</title>
+<style>
+/* green-on-black terminal style, similar to www.borgbackup.org */
+:root {{ color-scheme: dark; }}
+body {{
+  background: #020503;
+  color: #d7e8da;
+  font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", "Segoe UI Mono",
+               "Roboto Mono", "Ubuntu Monospace", "Source Code Pro", monospace;
+  margin: 2em;
+}}
+h1 {{ color: #22d045; font-size: 1.4em; }}
+a {{ color: #22d045; text-decoration: none; }}
+a:hover {{ text-decoration: underline; }}
+table {{ border-collapse: collapse; }}
+th, td {{ text-align: left; padding: 0.25em 1.5em 0.25em 0; }}
+th {{ color: #8aa892; font-weight: normal; border-bottom: 1px solid rgba(34, 208, 69, 0.22); }}
+th.size, td.size {{ text-align: right; }}
+td.dim {{ color: #8aa892; }}
+tr:hover td {{ background: rgba(34, 208, 69, 0.07); }}
+.head {{ display: flex; justify-content: space-between; align-items: center; gap: 1em; }}
+.head a.logo {{ color: #22d045; flex: none; }}
+.head a.logo svg {{ width: 96px; height: 40px; display: block; }}
+</style>
+</head>
+<body>
+<div class="head">
+<h1>{title}</h1>
+<a class="logo" href="/">{logo}</a>
+</div>
+<table>
+<tr><th>Name</th><th class="size">Size</th><th>Modified</th></tr>
+{rows}
+</table>
+</body>
+</html>
+"""
+
+
+def render_page(title, rows):
+    page = PAGE_TEMPLATE.format(title=html.escape(title), rows="\n".join(rows), logo=LOGO_SVG)
+    return page.encode("utf-8")
+
+
+def make_row(href, text, size="", mtime_ns=None):
+    modified = display_time(mtime_ns) if mtime_ns is not None else ""
+    if href is not None:
+        name_cell = f'<a href="{href}">{html.escape(text)}</a>'
+    else:
+        name_cell = html.escape(text)
+    return f'<tr><td>{name_cell}</td><td class="size dim">{size}</td><td class="dim">{modified}</td></tr>'
+
+
+class WebDAVHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    server_version = f"borg-webdav/{__version__}"
+    sys_version = ""  # do not tell clients about the python version we use
+
+    # set on the handler class by make_server():
+    vfs = None
+    repo_lock = None
+
+    def version_string(self):
+        # the base class would append sys_version, giving a trailing space if it is empty.
+        return self.server_version
+
+    def log_message(self, format, *args):
+        logger.debug("webdav: %s - %s", self.address_string(), format % args)
+
+    def do_GET(self):
+        self._handle(head=False)
+
+    def do_HEAD(self):
+        self._handle(head=True)
+
+    def _method_not_allowed(self):
+        self.send_response(405)
+        self.send_header("Allow", "GET, HEAD")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    do_POST = do_PUT = do_DELETE = do_OPTIONS = do_PATCH = _method_not_allowed
+
+    def _handle(self, head):
+        try:
+            path, _, _query = self.path.partition("?")
+            path = decode_path(path)
+            segments = [s for s in path.split("/") if s]
+            if any(s in (".", "..") for s in segments):
+                self.send_error(404)
+                return
+            if not segments:
+                self._send_archive_list(head)
+                return
+            try:
+                node, pipeline = self.vfs.resolve(segments)
+            except KeyError:
+                self.send_error(404)
+                return
+            if node.is_dir:
+                if not path.endswith("/"):
+                    self._redirect_to_dir()
+                    return
+                self._send_dir_listing(segments, node, head)
+            elif stat.S_ISREG(node.mode):
+                self._send_file(segments[-1], node, pipeline, head)
+            elif stat.S_ISLNK(node.mode):
+                self.send_error(
+                    403, explain=f"symbolic link (target: {remove_surrogates(node.target or '?')}), not downloadable"
+                )
+            else:
+                self.send_error(403, explain="special file, not downloadable")
+        except BrokenPipeError:
+            self.close_connection = True
+        except Exception:
+            logger.exception("webdav: unhandled error while serving %s", self.requestline)
+            try:
+                self.send_error(500)
+            except OSError:
+                self.close_connection = True
+
+    def _redirect_to_dir(self):
+        path, _, _query = self.path.partition("?")
+        self.send_response(301)
+        self.send_header("Location", path + "/")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _send_page(self, page, head):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(page)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if not head:
+            self.wfile.write(page)
+
+    def _send_archive_list(self, head):
+        rows = []
+        for name in sorted(self.vfs.archives):
+            archive_info = self.vfs.archives[name]
+            mtime_ns = int(archive_info.ts.timestamp() * 1e9)
+            rows.append(make_row(encode_path(name) + "/", name + "/", mtime_ns=mtime_ns))
+        self._send_page(render_page("Archives", rows), head)
+
+    def _send_dir_listing(self, segments, node, head):
+        title = "/".join(remove_surrogates(s) for s in segments) + "/"
+        rows = [make_row("../", "..")]
+        children = sorted(node.children.items(), key=lambda kv: (not kv[1].is_dir, kv[0]))
+        for name, child in children:
+            display_name = remove_surrogates(name)
+            if child.is_dir:
+                rows.append(make_row(encode_path(name) + "/", display_name + "/", mtime_ns=child.mtime))
+            elif stat.S_ISREG(child.mode):
+                rows.append(
+                    make_row(encode_path(name), display_name, size=display_size(child.size), mtime_ns=child.mtime)
+                )
+            elif stat.S_ISLNK(child.mode):
+                text = f"{display_name} -> {remove_surrogates(child.target or '?')}"
+                rows.append(make_row(None, text, mtime_ns=child.mtime))
+            else:
+                rows.append(make_row(None, display_name, mtime_ns=child.mtime))
+        self._send_page(render_page(title, rows), head)
+
+    def _send_file(self, name, node, pipeline, head):
+        self.send_response(200)
+        ctype = mimetypes.guess_type(remove_surrogates(name), strict=False)[0] or "application/octet-stream"
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(node.size))
+        self.send_header("Last-Modified", http_date(node.mtime))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Disposition", self._content_disposition(name))
+        self.end_headers()
+        if head or not node.chunks:
+            return
+        chunk_iter = pipeline.fetch_many(node.chunks, ro_type=ROBJ_FILE_STREAM, replacement_chunk=False)
+        while True:
+            # serialize repository access, but write to the client outside the lock,
+            # so one slow client cannot block other requests for the whole download.
+            with self.repo_lock:
+                try:
+                    data = next(chunk_iter)
+                except StopIteration:
+                    break
+            if data is None:
+                # chunk missing in repository - never serve silently corrupted data:
+                # abort the connection, the client sees a short read (Content-Length mismatch).
+                logger.error(
+                    "webdav: chunk missing while serving %s, aborting the connection.", remove_surrogates(name)
+                )
+                self.close_connection = True
+                return
+            self.wfile.write(data)
+
+    @staticmethod
+    def _content_disposition(name):
+        fallback = remove_surrogates(name).encode("ascii", "replace").decode("ascii").replace('"', "'")
+        encoded = quote(name.encode("utf-8", "surrogateescape"))
+        return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
+
+
+def make_server(manifest, args, bind="127.0.0.1", port=8000):
+    """Create a ThreadingHTTPServer serving the archives selected by *args*.
+
+    The server object gets a repo_lock attribute; all repository access of the
+    server threads is serialized with it (use it for e.g. LockRefresher, too).
+    """
+    repo_lock = threading.RLock()
+    vfs = ArchiveVFS(manifest, args, repo_lock)
+
+    handler_class = type("WebDAVHandler", (WebDAVHandler,), dict(vfs=vfs, repo_lock=repo_lock))
+    server = ThreadingHTTPServer((bind, port), handler_class)
+    server.daemon_threads = True
+    server.repo_lock = repo_lock
+    return server

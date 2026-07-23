@@ -989,9 +989,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     """
     An ad-hoc chunks and files cache.
 
-    Chunks: it does not maintain accurate reference count.
-    Chunks that were not added during the current lifetime won't have correct size set (0 bytes)
-    and will have an infinite reference count (MAX_VALUE).
+    Chunks: Chunks that were not added during the current lifetime won't have correct size set (0 bytes).
 
     Files: if a previous_archive_id is given, ad-hoc build a in-memory files cache from that archive.
     """

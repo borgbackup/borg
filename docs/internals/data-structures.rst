@@ -553,16 +553,25 @@ run, its age is reset to 0, otherwise its age is incremented by one.
 If a file was not seen in BORG_FILES_CACHE_TTL backups, its cache entry is
 removed.
 
-The files cache is a python dictionary, storing python objects, which
-generates a lot of overhead.
+The files cache is a python dictionary. To keep the memory overhead of python
+objects low, the value is not kept as a python tuple, but in a "compressed" form:
+
+- the chunks list is reduced from (256bit chunk id, 32bit size) tuples to bare
+  32bit indexes into the chunks index (see ``ChunkIndex.k_to_idx``). The chunk
+  id and size are looked up from the chunks index again when the entry is used.
+  This only works while that chunks index is in memory.
+- the resulting entry is then msgpacked, so one dict value is a single ``bytes``
+  object instead of a nested structure of python objects.
 
 Borg can also work without using the files cache (saves memory if you have a
 lot of files or not much RAM free), then all files are assumed to have changed.
 This is usually much slower than with files cache.
 
 The on-disk format of the files cache is a stream of msgpacked tuples (key, value).
+There, the chunks list is stored in its uncompressed form (chunk id and size), as
+the chunks index indexes are only valid for one specific in-memory chunks index.
 Loading the files cache involves reading the file, one msgpack object at a time,
-unpacking it, and msgpacking the value (in an effort to save memory).
+unpacking it, and compressing the entry as described above.
 
 .. _index:
 
@@ -574,13 +583,40 @@ It is used to determine whether we already have a specific chunk.
 
 The chunks index is a key -> value mapping and contains:
 
-* key:
+* key (32 bytes):
 
   - chunk id_hash
-* value:
+* value (48 bytes, ``ChunkIndexEntry`` in ``borg.hashindex``):
 
-  - reference count (always MAX_VALUE as we do not refcount anymore)
-  - size (0 for prev. existing objects, we can't query their plaintext size)
+  - flags (32bit): ``F_USED`` (chunk is used / referenced), ``F_COMPRESS`` (chunk
+    shall get re-compressed), ``F_PENDING`` (the chunk is still buffered in the pack
+    writer, so its pack location is not resolved yet). The upper 8 bits are reserved
+    for system flags (currently ``F_NEW``) and are not visible to users of the index.
+  - size (32bit): plaintext chunk size, 0 if not known (see below)
+  - pack_id (32 bytes): id of the pack file the chunk's blob is stored in
+  - obj_offset (32bit): byte offset of the blob inside that pack file
+  - obj_size (32bit): blob length (header + encrypted_meta + encrypted_data)
+
+The last 3 values are the chunk's location, see :ref:`pack-index-entry`: reading a
+chunk is one ranged read of ``[obj_offset, obj_offset + obj_size)`` from
+``packs/<hex(pack_id)>``.
+
+So a chunks index entry is 32 + 48 == 80 bytes, and that is also exactly what it
+needs on disk (the serialized format is just key/value pairs, no padding, plus a
+small header). In memory, there is some additional overhead, see below.
+
+Not all of that is persisted, though: when an index fragment is written, flags and
+size are zeroed (only the chunk id and the pack location are of interest there).
+Thus, a chunks index that was just built from the repository has size == 0 for all
+its entries, no matter whether it came from the index fragments or from the slow
+rebuild (which reads the pack headers, where only the stored blob size is known,
+not the plaintext size).
+
+The plaintext size of an entry is only filled in while borg is running, for the
+chunks it actually processes: by ``borg create`` when it adds or re-uses a chunk,
+or when the files cache entries of a previous archive are loaded (their chunks
+lists have the plaintext sizes). So code using the chunks index must be prepared
+to see size == 0 and must not assume it is the real chunk size.
 
 The chunks index is a HashIndex_.
 
@@ -594,21 +630,31 @@ Here is the estimated memory usage of Borg - it's complicated::
   chunk_size ~= 2 ^ HASH_MASK_BITS  (for buzhash chunker, BLOCK_SIZE for fixed chunker)
   chunk_count ~= total_file_size / chunk_size
 
-  chunks_index_usage = chunk_count * 40
+  chunks_index_usage = chunk_count * 100
 
-  files_cache_usage = total_file_count * 240 + chunk_count * 165
+  files_cache_usage = total_file_count * 230 + chunk_count * 6
 
   mem_usage ~= chunks_index_usage + files_cache_usage
-             = chunk_count * 205 + total_file_count * 240
-
-Due to the hashtables, the best/usual/worst cases for memory allocation can
-be estimated like that::
-
-  mem_allocation = mem_usage / load_factor  # l_f = 0.25 .. 0.75
-
-  mem_allocation_peak = mem_allocation * (1 + growth_factor)  # g_f = 1.1 .. 2
+             = chunk_count * 106 + total_file_count * 230
 
 All units are Bytes.
+
+The 100 Bytes per chunks index entry are the 80 Bytes of the entry itself plus
+the overhead of the hash table it lives in (see HashIndex_): the keys/values
+arrays are over-allocated by up to 30%, and the bucket table adds another 4 Bytes
+per bucket at a load factor of 0.25 .. 0.5. So, depending on where between two
+resizes the index currently is, the real value is somewhere between 88 and 120
+Bytes per entry - 100 is a good average.
+
+The files cache numbers are for CPython on a 64bit platform: the ~230 Bytes per file
+cover the dict slot, the 32 Bytes path hash (as a python ``bytes`` object) and the
+fixed part of the msgpacked value; the ~6 Bytes per chunk are one msgpacked 32bit
+index into the chunks index.
+
+Both data structures grow by re-allocating and copying, so there are short-time
+peaks in memory usage while a resize happens (worst case about 2x the values
+computed above for the structure being resized). Usually this does not happen for
+all data structures at the same time, though.
 
 It is assuming every chunk is referenced exactly once (if you have a lot of
 duplicate chunks, you will have fewer chunks than estimated above).
@@ -617,26 +663,24 @@ It is also assuming that typical chunk size is 2^HASH_MASK_BITS (if you have
 a lot of files smaller than this statistical medium chunk size, you will have
 more chunks than estimated above, because 1 file is at least 1 chunk).
 
-The chunks index and files cache are all implemented as hash tables.
-A hash table must have a significant amount of unused entries to be fast -
-the so-called load factor gives the used/unused elements ratio.
-
-When a hash table gets full (load factor getting too high), it needs to be
-grown (allocate new, bigger hash table, copy all elements over to it, free old
-hash table) - this will lead to short-time peaks in memory usage each time this
-happens. Usually does not happen for all hashtables at the same time, though.
-For small hash tables, we start with a growth factor of 2, which comes down to
-~1.1x for big hash tables.
+The chunks index and files cache are both implemented as hash tables (the chunks
+index as a HashIndex_, the files cache as a python dict). A hash table must have a
+significant amount of unused entries to be fast - the so-called load factor gives
+the used/unused elements ratio.
 
 E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 
 a) with ``create --chunker-params buzhash,10,23,16,4095`` (custom):
 
-  mem_usage  =  2.8GiB
+  chunk_count = 16 Mi, chunks_index_usage = 1.56GiB, files_cache_usage = 0.32GiB
+
+  mem_usage  =  1.9GiB
 
 b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
 
-  mem_usage  =  0.31GiB
+  chunk_count = 512 Ki, chunks_index_usage = 0.05GiB, files_cache_usage = 0.23GiB
+
+  mem_usage  =  0.28GiB
 
 .. note:: There is also the ``--files-cache=disabled`` option to disable the files cache.
    You'll save some memory, but it will need to read / chunk all the files as
@@ -647,65 +691,69 @@ b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
 HashIndex
 ---------
 
-The chunks index is implemented as a hash table, with
-only one slot per bucket, spreading hash collisions to the following
-buckets. As a consequence the hash is just a start position for a linear
-search. If a key is looked up that is not in the table, then the hash table
-is searched from the start position (the hash) until the first empty
-bucket is reached.
+The chunks index is implemented on top of ``borghash.HashTableNT``, which comes from
+the separate `borghash <https://github.com/borgbackup/borghash>`_ package (Cython).
+``borg.hashindex.ChunkIndex`` only adds the borg specific parts on top of it: the
+``ChunkIndexEntry`` namedtuple / struct format and the handling of the system flags.
+
+``HashTableNT`` packs/unpacks the namedtuple value to/from ``bytes`` using a
+``struct.Struct`` and delegates the actual storage to ``borghash.HashTable``, which
+is a fixed key size / fixed value size ``bytes -> bytes`` mapping.
+
+Internally, ``HashTable`` is not one, but three arrays:
+
+- the *bucket table*, an array of ``uint32_t`` indexes into the keys/values arrays.
+  ``0xffffffff`` marks an empty bucket, ``0xfffffffe`` marks a deleted bucket
+  (tombstone); everything ``>= 0xffffff00`` is reserved, so the usable index range
+  (and thus the maximum number of entries) is a bit below 4Gi.
+- the *keys* array, holding ``key_size`` (32 for the chunks index) Bytes per entry.
+- the *values* array, holding ``value_size`` (48 for the chunks index) Bytes per entry.
+
+Keys and values are appended to their arrays in insertion order, so the index of a
+key in the keys array is stable while the hash table is in memory. The files cache
+uses that to "compress" chunk ids to 32bit numbers, see ``ChunkIndex.k_to_idx``.
+
+The bucket table has only one slot per bucket, spreading hash collisions to the
+following buckets. As a consequence the hash is just a start position for a linear
+search. If a key is looked up that is not in the table, then the bucket table is
+searched from the start position (the hash) until the first empty bucket is reached.
 
 This particular mode of operation is open addressing with linear probing.
 
-When the hash table is filled to 75%, its size is grown. When it's
-emptied to 25%, its size is shrunken. Operations on it have a variable
-complexity between constant and linear with low factor, and memory overhead
-varies between 33% and 300%.
+The bucket table is grown (by 2x) when the number of used buckets plus tombstones
+exceeds 50% of its capacity, and shrunken (to 40%, but never below 1000 buckets)
+when the number of used buckets drops below 10% of its capacity. So its load factor
+usually is between 0.25 and 0.5. That is cheap, because a bucket is only 4 Bytes -
+the bulk of the data is in the keys/values arrays, which are not hash tables and
+thus do not need any unused space for speed. They are just grown by 1.3x whenever
+they are full.
 
-If an element is deleted, and the slot behind the deleted element is not empty,
-then the element will leave a tombstone, a bucket marked as deleted. Tombstones
-are only removed by insertions using the tombstone's bucket, or by resizing
-the table. They present the same load to the hash table as a real entry,
-but do not count towards the regular load factor.
+If an element is deleted, its bucket is marked with a tombstone (the keys/values
+array slots are zeroed, but not reclaimed until the next rebuild). Tombstones are
+only removed by resizing / rebuilding the bucket table. They present the same load
+to the hash table as a real entry (recall that linear probing for an element not in
+the index stops at the first empty bucket), which is why they count towards the load
+factor that triggers the growth.
 
-Thus, if the number of empty slots becomes too low (recall that linear probing
-for an element not in the index stops at the first empty slot), the hash table
-is rebuilt. The maximum *effective* load factor, i.e. including tombstones, is 93%.
-
-Data in a HashIndex is always stored in little-endian format, which increases
-efficiency for almost everyone, since basically no one uses big-endian processors
-any more.
+Data in a HashIndex is stored in little-endian format, which increases efficiency
+for almost everyone, since basically no one uses big-endian processors any more.
 
 HashIndex does not use a hashing function, because all keys (save manifest) are
 outputs of a cryptographic hash or MAC and thus already have excellent distribution.
 Thus, HashIndex simply uses the first 32 bits of the key as its "hash".
 
-The format is easy to read and write, because the buckets array has the same layout
-in memory and on disk. Only the header formats differ. The on-disk header is
-``struct HashHeader``:
+The on-disk format does not mirror the in-memory layout - neither the bucket table
+nor the unused space of the keys/values arrays are written. A serialized HashIndex is:
 
-- First, the HashIndex magic, the eight byte ASCII string "BORG_IDX".
-- Second, the signed 32-bit number of entries (i.e. buckets which are not deleted and not empty).
-- Third, the signed 32-bit number of buckets, i.e. the length of the buckets array
-  contained in the file, and the modulus for index calculation.
-- Fourth, the signed 8-bit length of keys.
-- Fifth, the signed 8-bit length of values. This has to be at least four bytes.
+- First, a header: the eight byte ASCII string "BORGHASH", an ``uint32`` format
+  version and an ``uint32`` length of the metadata block (all little-endian).
+- Second, the metadata block, a JSON object with the key size, value size, byte
+  order, the value namedtuple's name / fields / struct format, the bucket table
+  capacity and the number of entries ("used").
+- Third, "used" times a (key, value) pair, without any padding or separators.
 
-All fields are packed.
-
-The HashIndex is *not* a general purpose data structure.
-The value size must be at least 4 bytes, and these first bytes are used for in-band
-signalling in the data structure itself.
-
-The constant MAX_VALUE (defined as 2**32-1025 = 4294966271) defines the valid range for
-these 4 bytes when interpreted as an uint32_t from 0 to MAX_VALUE (inclusive).
-The following reserved values beyond MAX_VALUE are currently in use (byte order is LE):
-
-- 0xffffffff marks empty buckets in the hash table
-- 0xfffffffe marks deleted buckets in the hash table
-
-HashIndex is implemented in C and wrapped with Cython in a class-based interface.
-The Cython wrapper checks every passed value against these reserved values and
-raises an AssertionError if they are used.
+So the on-disk size is ``entries * (key_size + value_size)`` plus a small header,
+i.e. exactly 80 Bytes per entry for the chunks index.
 
 .. _data-encryption:
 

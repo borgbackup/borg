@@ -16,18 +16,19 @@ import mimetypes
 import os
 import re
 import stat
+import tarfile
 import threading
 from datetime import datetime, timezone
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import quote, unquote_to_bytes
+from urllib.parse import parse_qs, quote, unquote_to_bytes
 from xml.etree import ElementTree as ET  # nosec B405 # only used to *build* response XML, never to parse input
 from xml.parsers import expat
 
 from . import __version__
 from .archive import Archive
 from .constants import *  # NOQA
-from .helpers import bin_to_hex, remove_surrogates
+from .helpers import bin_to_hex, remove_surrogates, HardLinkManager
 from .helpers.lrucache import LRUCache
 from .logger import create_logger
 
@@ -374,6 +375,17 @@ LOGO_SVG = (
     "</svg>"
 )
 
+# "download to tray" icon (inline SVG, color via currentColor), shown next to a
+# directory heading to download that directory as a tar archive.
+DOWNLOAD_ICON_SVG = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    'stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="download as tar">'
+    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
+    '<polyline points="7 10 12 15 17 10"/>'
+    '<line x1="12" y1="15" x2="12" y2="3"/>'
+    "</svg>"
+)
+
 PAGE_TEMPLATE = """\
 <!DOCTYPE html>
 <html>
@@ -392,6 +404,9 @@ body {{
 }}
 h1 {{ color: #22d045; font-size: 1.4em; }}
 h1 a {{ color: inherit; }}
+h1 a.dl {{ margin-left: 0.5em; opacity: 0.75; }}
+h1 a.dl:hover {{ opacity: 1; text-decoration: none; }}
+h1 a.dl svg {{ width: 0.85em; height: 0.85em; vertical-align: -0.06em; }}
 a {{ color: #22d045; text-decoration: none; }}
 a:hover {{ text-decoration: underline; }}
 table {{ border-collapse: collapse; }}
@@ -511,6 +526,11 @@ class WebDAVHandler(BaseHTTPRequestHandler):
             return None
         return segments, path.endswith("/")
 
+    def _wants_tar(self):
+        """True if the request asks for a tar download of a directory (``?tar`` or ``?tar=1``)."""
+        query = self.path.partition("?")[2]
+        return "tar" in parse_qs(query, keep_blank_values=True)
+
     def _read_body(self):
         """Read a request body; returns None (after sending an error) if that is not possible."""
         if self.headers.get("Transfer-Encoding"):
@@ -546,6 +566,9 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         if node.is_dir:
             if not dir_syntax:
                 self._redirect_to_dir(segments)
+                return
+            if self._wants_tar():
+                self._send_tar(segments, head)
                 return
             self._send_dir_listing(segments, node, head)
         elif stat.S_ISREG(node.mode):
@@ -643,7 +666,11 @@ class WebDAVHandler(BaseHTTPRequestHandler):
 
     def _send_dir_listing(self, segments, node, head):
         title = "/".join(remove_surrogates(s) for s in segments) + "/"
-        heading = make_breadcrumbs(segments)
+        # heading = breadcrumb path + an icon to download this directory as a tar archive
+        heading = make_breadcrumbs(segments) + (
+            '<a class="dl" href="?tar=1" title="Download this directory as a .tar archive'
+            f' (preserves metadata)">{DOWNLOAD_ICON_SVG}</a>'
+        )
         rows = [make_row("../", "..")]
         children = sorted(node.children.items(), key=lambda kv: (not kv[1].is_dir, kv[0]))
         for name, child in children:
@@ -737,6 +764,114 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 data = data[:remaining]
             self.wfile.write(data)
             remaining -= len(data)
+
+    def _send_chunked(self, data):
+        """Write one HTTP/1.1 chunked-transfer-encoding block; *data* must be non-empty."""
+        self.wfile.write(b"%x\r\n" % len(data))
+        self.wfile.write(data)
+        self.wfile.write(b"\r\n")
+
+    def _tar_warning(self, fmt, *args):
+        logger.warning("webdav: " + fmt, *args)
+
+    def _send_tar(self, segments, head):
+        """Stream the directory subtree at *segments* as a PAX tar archive.
+
+        Unlike a plain file download, a tar preserves POSIX metadata (owner, group,
+        mode, sub-second timestamps, symlinks, special files, xattrs, ACLs), so it is
+        the metadata-lossless way to restore a whole directory over HTTP. The reused
+        item -> TarInfo conversion (borg export-tar) needs the full item metadata, so
+        we re-iterate the archive items here rather than using the lightweight VFS tree.
+
+        The tar size is not known in advance (PAX header sizes vary), so we stream it
+        with chunked transfer encoding. Repository access (item iteration and chunk
+        fetching) is serialized under repo_lock, but each chunk is written to the client
+        outside the lock - so a slow client cannot block other requests, and the
+        LockRefresher can keep the repository lock alive during a long download.
+        """
+        # lazy import: pulling in the archiver package at module import time would be
+        # heavy (all subcommands) and risks an import cycle; by the time we serve a
+        # request the package is fully imported anyway.
+        from .archiver.tar_cmds import item_to_tarinfo, item_to_paxheaders
+
+        archive_name = segments[0]
+        prefix = "/".join(segments[1:])  # borg path of the requested dir ("" = whole archive)
+        # root the tar at the requested directory: strip everything above it from the paths.
+        parent = prefix.rsplit("/", 1)[0] if "/" in prefix else ""
+        strip = len(parent) + 1 if parent else 0
+
+        def want(item):
+            if not prefix:
+                return True
+            return item.path == prefix or item.path.startswith(prefix + "/")
+
+        download_name = segments[-1] + ".tar"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-tar")
+        # sanitized against header injection, see _content_disposition()
+        self.send_header(
+            "Content-Disposition", self._content_disposition(download_name)
+        )  # codeql[py/http-response-splitting]  # noqa: E501
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if head:
+            return
+
+        with self.repo_lock:
+            archive = Archive(self.vfs.manifest, self.vfs.archives[archive_name].id)
+            pipeline = archive.pipeline
+            item_iter = archive.iter_items(want)
+
+        hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> (stripped) path of the first link
+        complete = False
+        try:
+            while True:
+                with self.repo_lock:
+                    try:
+                        item = next(item_iter)
+                    except StopIteration:
+                        break
+                if strip:
+                    item.path = item.path[strip:]
+                tarinfo, needs_content = item_to_tarinfo(item, hlm, warning=self._tar_warning)
+                if tarinfo is None:
+                    continue  # unsupported item type, skipped (with a warning)
+                tarinfo.pax_headers = item_to_paxheaders("PAX", item)
+                self._send_chunked(tarinfo.tobuf(tarfile.PAX_FORMAT, tarfile.ENCODING, "surrogateescape"))
+                if needs_content and not self._send_tar_content(item, tarinfo.size, pipeline):
+                    return  # a chunk was missing: leave the chunked stream unterminated (see finally)
+            # end-of-archive marker (two zero blocks), then terminate the chunked stream.
+            self._send_chunked(b"\0" * (tarfile.BLOCKSIZE * 2))
+            self.wfile.write(b"0\r\n\r\n")
+            complete = True
+        finally:
+            if not complete:
+                # do not send the terminating 0-length chunk, so the client can tell the
+                # tar is truncated (never present a corrupt archive as if it were complete).
+                self.close_connection = True
+
+    def _send_tar_content(self, item, size, pipeline):
+        """Stream *item*'s file content into the tar, padded to a 512-byte block boundary.
+
+        Returns False (after logging) if a chunk is missing in the repository, so the
+        caller aborts the connection instead of emitting silently corrupted content.
+        """
+        for entry in item.get("chunks") or []:
+            # fetch under the lock, write to the client outside it (see _send_tar).
+            with self.repo_lock:
+                data = next(pipeline.fetch_many([entry], ro_type=ROBJ_FILE_STREAM, replacement_chunk=False))
+            if data is None:
+                logger.error(
+                    "webdav: chunk missing while streaming tar member %s, aborting the connection.",
+                    remove_surrogates(item.path),
+                )
+                return False
+            self._send_chunked(data)
+        padding = (tarfile.BLOCKSIZE - size % tarfile.BLOCKSIZE) % tarfile.BLOCKSIZE
+        if padding:
+            self._send_chunked(b"\0" * padding)
+        return True
 
     def _get_chunk(self, pipeline, entry):
         """Return the decrypted data of chunk *entry*, using the shared data cache.

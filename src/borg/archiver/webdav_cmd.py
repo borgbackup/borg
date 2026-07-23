@@ -94,15 +94,24 @@ class WebDAVMixIn:
         browsed like a directory tree. The directory tree of an archive is built
         in memory when it is first entered, so expect some delay for big archives.
 
+        Any directory can be downloaded as a tar archive by appending ``?tar`` to its
+        URL (the web browser listings show a download icon next to the heading for this).
+        Unlike a plain file
+        download, the tar preserves POSIX metadata (owner, group, mode, sub-second
+        timestamps, symlinks, special files, xattrs, ACLs), so it is the metadata-
+        lossless way to restore a whole directory tree over this server. It is a PAX
+        format tarball, streamed uncompressed.
+
         Notes:
 
-        - Downloads do not preserve any POSIX metadata (owner, group, mode,
-          timestamps, xattrs, ACLs). Use ``borg extract`` or ``borg export-tar``
-          for full-fidelity restores.
+        - Plain (non-tar) file downloads do not preserve any POSIX metadata (owner,
+          group, mode, timestamps, xattrs, ACLs). Use the ``?tar`` download above, or
+          ``borg extract`` / ``borg export-tar``, for full-fidelity restores.
         - Symbolic links and special files (devices, fifos, sockets) are shown
-          in the web browser listings, but are neither followed nor downloadable,
-          and they are not visible in WebDAV-mounted directories (WebDAV has no
-          concept of them).
+          in the web browser listings, but are neither followed nor downloadable
+          individually, and they are not visible in WebDAV-mounted directories
+          (WebDAV has no concept of them). They are, however, included in ``?tar``
+          downloads.
         - Damaged files (with chunks missing in the repository) cause the
           download connection to be aborted - the server never silently serves
           corrupted file content.

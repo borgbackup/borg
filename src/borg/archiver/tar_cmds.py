@@ -33,6 +33,119 @@ if hasattr(tarfile, "fully_trusted_filter"):
     tarfile.TarFile.extraction_filter = staticmethod(tarfile.fully_trusted_filter)  # type: ignore
 
 
+def item_to_tarinfo(item, hlm, *, warning=None):
+    """Transform a Borg *item* into a tarfile.TarInfo object.
+
+    Return a tuple (tarinfo, needs_content): *tarinfo* is None if the item cannot be
+    represented as a TarInfo (and should be skipped), else the TarInfo to write.
+    *needs_content* is True when the caller must append the item's file content (its
+    chunk data) after the header - this is the case for a regular file that is not a
+    tar hard link to an earlier one.
+
+    *hlm* is a HardLinkManager(id_type=bytes, info_type=str) mapping an already-emitted
+    file's hlid to its (tar) path, so later hard links become tar LNKTYPE references.
+    *warning* is an optional callback(format, *args) for reporting unsupported types.
+    """
+    tarinfo = tarfile.TarInfo()
+    tarinfo.name = item.path
+    tarinfo.mtime = item.mtime / 1e9
+    tarinfo.mode = stat.S_IMODE(item.mode)
+    tarinfo.uid = item.get("uid", 0)
+    tarinfo.gid = item.get("gid", 0)
+    tarinfo.uname = item.get("user", "")
+    tarinfo.gname = item.get("group", "")
+    # The linkname in tar has 2 uses:
+    # for symlinks it means the destination, while for hard links it refers to the file.
+    # Since hard links in tar have a different type code (LNKTYPE) the format might
+    # support hardlinking arbitrary objects (including symlinks and directories), but
+    # whether implementations actually support that is a whole different question...
+    tarinfo.linkname = ""
+
+    needs_content = False
+    modebits = stat.S_IFMT(item.mode)
+    if modebits == stat.S_IFREG:
+        tarinfo.type = tarfile.REGTYPE
+        if "hlid" in item:
+            linkname = hlm.retrieve(id=item.hlid)
+            if linkname is not None:
+                # the first hard link was already added to the archive, add a tar-hard-link reference to it.
+                tarinfo.type = tarfile.LNKTYPE
+                tarinfo.linkname = linkname
+            else:
+                tarinfo.size = item.get_size()
+                needs_content = True
+                hlm.remember(id=item.hlid, info=item.path)
+        else:
+            tarinfo.size = item.get_size()
+            needs_content = True
+    elif modebits == stat.S_IFDIR:
+        tarinfo.type = tarfile.DIRTYPE
+    elif modebits == stat.S_IFLNK:
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = item.target
+    elif modebits == stat.S_IFBLK:
+        tarinfo.type = tarfile.BLKTYPE
+        tarinfo.devmajor = os.major(item.rdev)
+        tarinfo.devminor = os.minor(item.rdev)
+    elif modebits == stat.S_IFCHR:
+        tarinfo.type = tarfile.CHRTYPE
+        tarinfo.devmajor = os.major(item.rdev)
+        tarinfo.devminor = os.minor(item.rdev)
+    elif modebits == stat.S_IFIFO:
+        tarinfo.type = tarfile.FIFOTYPE
+    else:
+        if warning is not None:
+            warning("%s: unsupported file type %o for tar export", remove_surrogates(item.path), modebits)
+        return None, False
+    return tarinfo, needs_content
+
+
+def item_to_paxheaders(format, item):
+    """Transform (parts of) a Borg *item* into a pax_headers dict."""
+    # PAX format
+    # ----------
+    # When using the PAX (POSIX) format, we can support some things that aren't possible
+    # with classic tar formats, including GNU tar, such as:
+    # - atime, ctime (DONE)
+    # - possibly Linux capabilities, security.* xattrs (TODO)
+    # - various additions supported by GNU tar in POSIX mode (TODO)
+    #
+    # BORG format
+    # -----------
+    # This is based on PAX, but additionally adds BORG.* pax headers.
+    # Additionally to the standard tar / PAX metadata and data, it transfers
+    # ALL borg item metadata in a BORG specific way.
+    #
+    ph = {}
+    # note: for mtime this is a bit redundant as it is already done by tarfile module,
+    #       but we just do it in our way to be consistent for sure.
+    for name in "atime", "ctime", "mtime":
+        if hasattr(item, name):
+            ns = getattr(item, name)
+            ph[name] = str(ns / 1e9)
+    if hasattr(item, "xattrs"):
+        for bkey, bvalue in item.xattrs.items():
+            # we have bytes key and bytes value, but the tarfile code
+            # expects str key and str value.
+            key = SCHILY_XATTR + bkey.decode("utf-8", errors="surrogateescape")
+            value = bvalue.decode("utf-8", errors="surrogateescape")
+            ph[key] = value
+    # Add POSIX access and default ACL if present
+    acl_access = item.get("acl_access")
+    if acl_access is not None:
+        ph[SCHILY_ACL_ACCESS] = acl_access.decode("utf-8", errors="surrogateescape")
+    acl_default = item.get("acl_default")
+    if acl_default is not None:
+        ph[SCHILY_ACL_DEFAULT] = acl_default.decode("utf-8", errors="surrogateescape")
+    if format == "BORG":  # BORG format additions
+        ph["BORG.item.version"] = "1"
+        # BORG.item.meta - just serialize all metadata we have:
+        meta_bin = msgpack.packb(item.as_dict())
+        meta_text = base64.b64encode(meta_bin).decode()
+        ph["BORG.item.meta"] = meta_text
+    return ph
+
+
 def get_tar_filter(fname, decompress):
     # Note that filter is None if fname is '-'.
     if fname.endswith((".tar.gz", ".tgz")):
@@ -121,125 +234,17 @@ class TarMixIn:
             else:
                 return ChunkIteratorFileWrapper(chunk_iterator)
 
-        def item_to_tarinfo(item, original_path):
-            """
-            Transform a Borg *item* into a tarfile.TarInfo object.
-
-            Return a tuple (tarinfo, stream), where stream may be a file-like object that represents
-            the file contents, if any, and is None otherwise. When *tarinfo* is None, the *item*
-            cannot be represented as a TarInfo object and should be skipped.
-            """
-            stream = None
-            tarinfo = tarfile.TarInfo()
-            tarinfo.name = item.path
-            tarinfo.mtime = item.mtime / 1e9
-            tarinfo.mode = stat.S_IMODE(item.mode)
-            tarinfo.uid = item.get("uid", 0)
-            tarinfo.gid = item.get("gid", 0)
-            tarinfo.uname = item.get("user", "")
-            tarinfo.gname = item.get("group", "")
-            # The linkname in tar has 2 uses:
-            # for symlinks it means the destination, while for hard links it refers to the file.
-            # Since hard links in tar have a different type code (LNKTYPE) the format might
-            # support hardlinking arbitrary objects (including symlinks and directories), but
-            # whether implementations actually support that is a whole different question...
-            tarinfo.linkname = ""
-
-            modebits = stat.S_IFMT(item.mode)
-            if modebits == stat.S_IFREG:
-                tarinfo.type = tarfile.REGTYPE
-                if "hlid" in item:
-                    linkname = hlm.retrieve(id=item.hlid)
-                    if linkname is not None:
-                        # the first hard link was already added to the archive, add a tar-hard-link reference to it.
-                        tarinfo.type = tarfile.LNKTYPE
-                        tarinfo.linkname = linkname
-                    else:
-                        tarinfo.size = item.get_size()
-                        stream = item_content_stream(item)
-                        hlm.remember(id=item.hlid, info=item.path)
-                else:
-                    tarinfo.size = item.get_size()
-                    stream = item_content_stream(item)
-            elif modebits == stat.S_IFDIR:
-                tarinfo.type = tarfile.DIRTYPE
-            elif modebits == stat.S_IFLNK:
-                tarinfo.type = tarfile.SYMTYPE
-                tarinfo.linkname = item.target
-            elif modebits == stat.S_IFBLK:
-                tarinfo.type = tarfile.BLKTYPE
-                tarinfo.devmajor = os.major(item.rdev)
-                tarinfo.devminor = os.minor(item.rdev)
-            elif modebits == stat.S_IFCHR:
-                tarinfo.type = tarfile.CHRTYPE
-                tarinfo.devmajor = os.major(item.rdev)
-                tarinfo.devminor = os.minor(item.rdev)
-            elif modebits == stat.S_IFIFO:
-                tarinfo.type = tarfile.FIFOTYPE
-            else:
-                self.print_warning(
-                    "%s: unsupported file type %o for tar export", remove_surrogates(item.path), modebits
-                )
-                return None, stream
-            return tarinfo, stream
-
-        def item_to_paxheaders(format, item):
-            """
-            Transform (parts of) a Borg *item* into a pax_headers dict.
-            """
-            # PAX format
-            # ----------
-            # When using the PAX (POSIX) format, we can support some things that aren't possible
-            # with classic tar formats, including GNU tar, such as:
-            # - atime, ctime (DONE)
-            # - possibly Linux capabilities, security.* xattrs (TODO)
-            # - various additions supported by GNU tar in POSIX mode (TODO)
-            #
-            # BORG format
-            # -----------
-            # This is based on PAX, but additionally adds BORG.* pax headers.
-            # Additionally to the standard tar / PAX metadata and data, it transfers
-            # ALL borg item metadata in a BORG specific way.
-            #
-            ph = {}
-            # note: for mtime this is a bit redundant as it is already done by tarfile module,
-            #       but we just do it in our way to be consistent for sure.
-            for name in "atime", "ctime", "mtime":
-                if hasattr(item, name):
-                    ns = getattr(item, name)
-                    ph[name] = str(ns / 1e9)
-            if hasattr(item, "xattrs"):
-                for bkey, bvalue in item.xattrs.items():
-                    # we have bytes key and bytes value, but the tarfile code
-                    # expects str key and str value.
-                    key = SCHILY_XATTR + bkey.decode("utf-8", errors="surrogateescape")
-                    value = bvalue.decode("utf-8", errors="surrogateescape")
-                    ph[key] = value
-            # Add POSIX access and default ACL if present
-            acl_access = item.get("acl_access")
-            if acl_access is not None:
-                ph[SCHILY_ACL_ACCESS] = acl_access.decode("utf-8", errors="surrogateescape")
-            acl_default = item.get("acl_default")
-            if acl_default is not None:
-                ph[SCHILY_ACL_DEFAULT] = acl_default.decode("utf-8", errors="surrogateescape")
-            if format == "BORG":  # BORG format additions
-                ph["BORG.item.version"] = "1"
-                # BORG.item.meta - just serialize all metadata we have:
-                meta_bin = msgpack.packb(item.as_dict())
-                meta_text = base64.b64encode(meta_bin).decode()
-                ph["BORG.item.meta"] = meta_text
-            return ph
-
         for item in archive.iter_items(filter):
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
-            tarinfo, stream = item_to_tarinfo(item, orig_path)
+            tarinfo, needs_content = item_to_tarinfo(item, hlm, warning=self.print_warning)
             if tarinfo:
                 if args.tar_format in ("BORG", "PAX"):
                     tarinfo.pax_headers = item_to_paxheaders(args.tar_format, item)
                 if output_list:
                     logging.getLogger("borg.output.list").info(remove_surrogates(orig_path))
+                stream = item_content_stream(item) if needs_content else None
                 tar.addfile(tarinfo, stream)
 
         if pi:

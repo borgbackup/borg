@@ -3,7 +3,10 @@
 # so these tests run without any optional dependency.
 
 import http.client
+import io
 import os
+import stat
+import tarfile
 import threading
 import urllib.error
 import urllib.request
@@ -124,8 +127,9 @@ def test_webdav_browse(archivers, request):
         assert '<a href="subdir/">subdir/</a>' in page
         # precise sizes in bytes, with dots as thousands separators
         assert ">5.242.880<" in page
-        # the heading is a breadcrumb: every path segment links to its directory
-        assert '<h1><a href="/test/">test</a>/<a href="/test/input/">input</a>/</h1>' in page
+        # the heading is a breadcrumb (every path segment links to its directory), followed
+        # by an icon link to download the directory as a tar archive.
+        assert '<h1><a href="/test/">test</a>/<a href="/test/input/">input</a>/' '<a class="dl" href="?tar=1"' in page
         # a non-ASCII (but everywhere-legal) name is percent-encoded in the link, shown as-is in text
         assert f'<a href="{UNICODE_NAME_ENC}">{UNICODE_NAME}</a>' in page
         # funny file name is html-escaped in text and percent-encoded in the link
@@ -162,6 +166,62 @@ def test_webdav_download(archivers, request):
             assert status == 200
             assert body == b"funny data"
             assert headers["Content-Type"].startswith("text/plain")
+
+
+def _get_tar(url):
+    """GET a ?tar download and return (headers, tarfile.TarFile opened on the body)."""
+    status, headers, body = get(url)
+    assert status == 200
+    assert headers["Content-Type"] == "application/x-tar"
+    # the size is not known in advance, so the tar is streamed with chunked encoding
+    assert headers.get("Transfer-Encoding") == "chunked"
+    assert "Content-Length" not in headers
+    tar = tarfile.open(fileobj=io.BytesIO(body), mode="r")  # raises if the tar is malformed/truncated
+    return headers, tar
+
+
+def test_webdav_tar(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    big = _create_archive(archiver)
+    with webdav_server(archiver) as base_url:
+        headers, tar = _get_tar(base_url + "/test/input/?tar=1")
+        # the download is offered as a .tar attachment named after the directory
+        assert 'filename="input.tar"' in headers["Content-Disposition"]
+        members = {m.name: m for m in tar.getmembers()}
+        # the tree is rooted at the requested directory ("input"), with its full contents
+        assert tar.extractfile("input/file1").read() == b"data1"
+        assert tar.extractfile("input/big").read() == big  # multi-chunk file, streamed + padded
+        assert tar.extractfile("input/subdir/file2").read() == b"subdir data"
+        assert tar.extractfile("input/" + UNICODE_NAME).read() == b"unicode data"
+        # unlike a plain file download, the tar preserves POSIX metadata: directories,
+        # sub-second mtime, owner/mode and - shown here - symlinks and hard links.
+        assert members["input/subdir"].isdir()
+        assert members["input/file1"].mode == stat.S_IMODE(os.stat(os.path.join(archiver.input_path, "file1")).st_mode)
+        if are_symlinks_supported():
+            assert members["input/link1"].issym()
+            assert members["input/link1"].linkname == "somewhere/else"
+        if are_hardlinks_supported():
+            # the hard link pair appears once as a regular file and once as a tar hard link,
+            # both resolving to the same content.
+            assert tar.extractfile("input/hardlink").read() == b"data1"
+            assert {members["input/file1"].type, members["input/hardlink"].type} == {tarfile.REGTYPE, tarfile.LNKTYPE}
+
+
+def test_webdav_tar_subdir_and_head(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    _create_archive(archiver)
+    with webdav_server(archiver) as base_url:
+        # a tar of a nested directory is rooted at that directory (paths stripped above it)
+        headers, tar = _get_tar(base_url + "/test/input/subdir/?tar=1")
+        assert 'filename="subdir.tar"' in headers["Content-Disposition"]
+        names = tar.getnames()
+        assert "subdir" in names and "subdir/file2" in names
+        assert not any(n.startswith("input/") for n in names)  # the "input/" prefix is stripped
+        # a HEAD request returns the tar headers but no body
+        status, headers, body = http_request(base_url + "/test/input/subdir/?tar=1", "HEAD")
+        assert status == 200
+        assert headers["Content-Type"] == "application/x-tar"
+        assert body == b""
 
 
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")

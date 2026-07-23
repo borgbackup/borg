@@ -69,17 +69,26 @@ to select fewer archives); below that, the archive contents can be
 browsed like a directory tree. The directory tree of an archive is built
 in memory when it is first entered, so expect some delay for big archives.
 .sp
+Any directory can be downloaded as a tar archive by appending \fB?tar\fP to its
+URL (the web browser listings show a download icon next to the heading for this).
+Unlike a plain file
+download, the tar preserves POSIX metadata (owner, group, mode, sub\-second
+timestamps, symlinks, special files, xattrs, ACLs), so it is the metadata\-
+lossless way to restore a whole directory tree over this server. It is a PAX
+format tarball, streamed uncompressed.
+.sp
 Notes:
 .INDENT 0.0
 .IP \(bu 2
-Downloads do not preserve any POSIX metadata (owner, group, mode,
-timestamps, xattrs, ACLs). Use \fBborg extract\fP or \fBborg export\-tar\fP
-for full\-fidelity restores.
+Plain (non\-tar) file downloads do not preserve any POSIX metadata (owner,
+group, mode, timestamps, xattrs, ACLs). Use the \fB?tar\fP download above, or
+\fBborg extract\fP / \fBborg export\-tar\fP, for full\-fidelity restores.
 .IP \(bu 2
 Symbolic links and special files (devices, fifos, sockets) are shown
-in the web browser listings, but are neither followed nor downloadable,
-and they are not visible in WebDAV\-mounted directories (WebDAV has no
-concept of them).
+in the web browser listings, but are neither followed nor downloadable
+individually, and they are not visible in WebDAV\-mounted directories
+(WebDAV has no concept of them). They are, however, included in \fB?tar\fP
+downloads.
 .IP \(bu 2
 Damaged files (with chunks missing in the repository) cause the
 download connection to be aborted \- the server never silently serves

@@ -487,7 +487,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
             return
         if node.is_dir:
             if not dir_syntax:
-                self._redirect_to_dir()
+                self._redirect_to_dir(segments)
                 return
             self._send_dir_listing(segments, node, head)
         elif stat.S_ISREG(node.mode):
@@ -556,10 +556,13 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 # symlinks and special files are not exposed via WebDAV
         return resources
 
-    def _redirect_to_dir(self):
-        path, _, _query = self.path.partition("?")
+    def _redirect_to_dir(self, segments):
+        # Build the redirect target by percent-encoding the parsed path segments:
+        # quote() only outputs URL-safe ASCII, so the Location value cannot contain
+        # CR/LF or other header-splitting characters, no matter what the client sent.
+        location = "/" + "/".join(encode_path(s) for s in segments) + "/"
         self.send_response(301)
-        self.send_header("Location", path + "/")
+        self.send_header("Location", location)  # codeql[py/http-response-splitting]
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -634,7 +637,8 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         self.send_header("ETag", etag)
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Disposition", self._content_disposition(name))
+        content_disposition = self._content_disposition(name)  # sanitized, see there
+        self.send_header("Content-Disposition", content_disposition)  # codeql[py/http-response-splitting]
         self.end_headers()
         if head or not node.chunks or node.size == 0:
             return
@@ -679,7 +683,15 @@ class WebDAVHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _content_disposition(name):
-        fallback = remove_surrogates(name).encode("ascii", "replace").decode("ascii").replace('"', "'")
+        # File names from an archive can contain any byte except NUL and "/", including
+        # CR/LF - a file name like 'x\r\nEvil-Header: ...' must not enable the client
+        # to be attacked via HTTP header injection ("response splitting"):
+        # - the fallback name replaces everything non-printable (this kills CR/LF) and
+        #   non-ascii, and the quotes that could end the quoted-string.
+        # - the RFC 8187 encoded name percent-encodes everything critical (quote()
+        #   only outputs URL-safe ASCII).
+        fallback = "".join(c if c.isprintable() else "_" for c in remove_surrogates(name))
+        fallback = fallback.encode("ascii", "replace").decode("ascii").replace('"', "'")
         encoded = quote(name.encode("utf-8", "surrogateescape"))
         return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
 

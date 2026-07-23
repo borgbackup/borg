@@ -2,6 +2,7 @@
 # The server is started in-process (no borg CLI invocation for the serving part),
 # so these tests run without any optional dependency.
 
+import http.client
 import os
 import threading
 import urllib.error
@@ -9,6 +10,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -275,6 +277,40 @@ def test_webdav_ranges(archivers, request):
             get(url, headers={"Range": f"bytes={size}-"})
         assert exc_info.value.code == 416
         assert exc_info.value.headers["Content-Range"] == f"bytes */{size}"
+
+
+def test_webdav_header_injection(archivers, request):
+    # File/directory names from an archive may contain CR/LF - names like
+    # "x\r\nEvil-Header: 1" must not be able to inject headers into responses
+    # that echo the name (Content-Disposition, Location), see CodeQL
+    # py/http-response-splitting and the OWASP article on response splitting.
+    archiver = request.getfixturevalue(archivers)
+    evil_file = "inj\r\nEvil-Header: 1"
+    evil_dir = "dir\r\nEvil-Header: 2"
+    create_regular_file(archiver.input_path, evil_file, contents=b"gotcha")
+    create_regular_file(archiver.input_path, evil_dir + "/inner", contents=b"inner")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    with webdav_server(archiver) as base_url:
+        host_port = urlsplit(base_url).netloc
+        # downloading the evil file: Content-Disposition must be sanitized
+        status, headers, body = get(f"{base_url}/test/input/inj%0D%0AEvil-Header%3A%201")
+        assert status == 200
+        assert body == b"gotcha"
+        assert "Evil-Header" not in headers
+        assert 'filename="inj__Evil-Header: 1"' in headers["Content-Disposition"]
+        assert "%0D%0A" in headers["Content-Disposition"]  # RFC 8187 encoded form
+        # the directory redirect: Location must be percent-encoded, no header injected
+        # (plain http.client here, so the 301 is not followed)
+        conn = http.client.HTTPConnection(host_port)
+        try:
+            conn.request("GET", "/test/input/dir%0D%0AEvil-Header%3A%202")
+            response = conn.getresponse()
+            assert response.status == 301
+            assert response.getheader("Evil-Header") is None
+            assert response.getheader("Location") == "/test/input/dir%0D%0AEvil-Header%3A%202/"
+        finally:
+            conn.close()
 
 
 def test_webdav_conditional_get(archivers, request):

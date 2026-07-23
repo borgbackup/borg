@@ -143,6 +143,16 @@ class ArchiveVFS:
         return node, pipeline
 
 
+def strip_crlf(value):
+    """Remove CR and LF from an HTTP header value, so it can never split the response.
+
+    The values we build are already newline-free (percent-encoded or non-printables
+    replaced), so this is defense in depth - and the explicit, recognizable form of the
+    CR/LF safety that we (and static analysers) rely on at the header sinks.
+    """
+    return value.replace("\r", "").replace("\n", "")
+
+
 def encode_path(path):
     """Percent-encode a borg item path (str with surrogateescape) for use in a URL."""
     return quote(path.encode("utf-8", "surrogateescape"))
@@ -644,9 +654,10 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         # Build the redirect target by percent-encoding the parsed path segments:
         # quote() only outputs URL-safe ASCII, so the Location value cannot contain
         # CR/LF or other header-splitting characters, no matter what the client sent.
-        location = "/" + "/".join(encode_path(s) for s in segments) + "/"
+        # The redundant strip_crlf() makes that guarantee explicit at the header sink.
+        location = strip_crlf("/" + "/".join(encode_path(s) for s in segments) + "/")
         self.send_response(301)
-        self.send_header("Location", location)  # codeql[py/http-response-splitting]
+        self.send_header("Location", location)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -726,8 +737,8 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         self.send_header("ETag", etag)
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("X-Content-Type-Options", "nosniff")
-        content_disposition = self._content_disposition(name)  # sanitized, see there
-        self.send_header("Content-Disposition", content_disposition)  # codeql[py/http-response-splitting]
+        content_disposition = self._content_disposition(name)  # CR/LF-sanitized, see there
+        self.send_header("Content-Disposition", content_disposition)
         self.end_headers()
         if head or not node.chunks or node.size == 0:
             return
@@ -813,7 +824,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         content_disposition = self._content_disposition(segments[-1] + ".tar")
         self.send_response(200)
         self.send_header("Content-Type", "application/x-tar")
-        self.send_header("Content-Disposition", content_disposition)  # codeql[py/http-response-splitting]
+        self.send_header("Content-Disposition", content_disposition)
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
@@ -913,7 +924,8 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         fallback = "".join(c if c.isprintable() else "_" for c in remove_surrogates(name))
         fallback = fallback.encode("ascii", "replace").decode("ascii").replace('"', "'")
         encoded = quote(name.encode("utf-8", "surrogateescape"))
-        return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
+        result = f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
+        return strip_crlf(result)  # no-op by construction, but makes the CR/LF safety explicit
 
 
 def data_cache_capacity():

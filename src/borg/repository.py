@@ -837,9 +837,12 @@ class Repository:
         if objs_errors == 0:
             logger.info(f"Finished {mode} repository check, no problems found.")
         elif repair:
-            logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
+            logger.error(
+                f"Finished {mode} repository check, {objs_errors} error(s) found "
+                f"(repository repair not implemented)."
+            )
         else:
-            logger.error(f"Finished {mode} repository check, errors found.")
+            logger.error(f"Finished {mode} repository check, {objs_errors} error(s) found.")
         return objs_errors == 0 or repair
 
     def list(self, limit=None, marker=None):

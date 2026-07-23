@@ -112,6 +112,8 @@ def test_webdav_browse(archivers, request):
         assert '<a href="subdir/">subdir/</a>' in page
         # precise sizes in bytes, with dots as thousands separators
         assert ">5.242.880<" in page
+        # the heading is a breadcrumb: every path segment links to its directory
+        assert '<h1><a href="/test/">test</a>/<a href="/test/input/">input</a>/</h1>' in page
         # funny file name is html-escaped in text and percent-encoded in the link
         assert "a &lt;b&gt;&amp;c ä.txt" in page
         assert 'href="a%20%3Cb%3E%26c%20%C3%A4.txt"' in page

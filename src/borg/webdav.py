@@ -347,6 +347,7 @@ body {{
   margin: 2em;
 }}
 h1 {{ color: #22d045; font-size: 1.4em; }}
+h1 a {{ color: inherit; }}
 a {{ color: #22d045; text-decoration: none; }}
 a:hover {{ text-decoration: underline; }}
 table {{ border-collapse: collapse; }}
@@ -362,7 +363,7 @@ tr:hover td {{ background: rgba(34, 208, 69, 0.07); }}
 </head>
 <body>
 <div class="head">
-<h1>{title}</h1>
+<h1>{heading}</h1>
 <a class="logo" href="/">{logo}</a>
 </div>
 <table>
@@ -374,9 +375,21 @@ tr:hover td {{ background: rgba(34, 208, 69, 0.07); }}
 """
 
 
-def render_page(title, rows):
-    page = PAGE_TEMPLATE.format(title=html.escape(title), rows="\n".join(rows), logo=LOGO_SVG)
+def render_page(title, rows, heading=None):
+    """Render a listing page; *title* is plain text, *heading* optional h1 HTML (default: the title)."""
+    heading = heading if heading is not None else html.escape(title)
+    page = PAGE_TEMPLATE.format(title=html.escape(title), heading=heading, rows="\n".join(rows), logo=LOGO_SVG)
     return page.encode("utf-8")
+
+
+def make_breadcrumbs(segments):
+    """Build h1 HTML for a path: each segment linked to its directory, for quick navigation."""
+    parts = []
+    href = "/"
+    for segment in segments:
+        href += encode_path(segment) + "/"
+        parts.append(f'<a href="{href}">{html.escape(remove_surrogates(segment))}</a>')
+    return "/".join(parts) + "/"
 
 
 def make_row(href, text, size="", mtime_ns=None):
@@ -585,6 +598,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
 
     def _send_dir_listing(self, segments, node, head):
         title = "/".join(remove_surrogates(s) for s in segments) + "/"
+        heading = make_breadcrumbs(segments)
         rows = [make_row("../", "..")]
         children = sorted(node.children.items(), key=lambda kv: (not kv[1].is_dir, kv[0]))
         for name, child in children:
@@ -600,7 +614,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 rows.append(make_row(None, text, mtime_ns=child.mtime))
             else:
                 rows.append(make_row(None, display_name, mtime_ns=child.mtime))
-        self._send_page(render_page(title, rows), head)
+        self._send_page(render_page(title, rows, heading=heading), head)
 
     def _send_file(self, name, node, pipeline, head):
         etag = make_etag(node)

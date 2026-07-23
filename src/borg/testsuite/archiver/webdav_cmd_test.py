@@ -16,6 +16,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...manifest import Manifest
+from ...platform import is_win32
 from ...repository import Repository
 from ...webdav import make_server
 from .. import are_symlinks_supported, are_hardlinks_supported
@@ -23,13 +24,17 @@ from . import RK_ENCRYPTION, cmd, create_regular_file, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
 
+# a file name that exercises HTML escaping and URL encoding. It contains characters
+# (< > and, for the injection test below, CR/LF) that are illegal in Windows file
+# names, so files with such names can only be created (and thus tested) on non-Windows.
 FUNNY_NAME = "a <b>&c ä.txt"
 
 
 def _create_archive(archiver):
     create_regular_file(archiver.input_path, "file1", contents=b"data1")
     create_regular_file(archiver.input_path, "subdir/file2", contents=b"subdir data")
-    create_regular_file(archiver.input_path, FUNNY_NAME, contents=b"funny data")
+    if not is_win32:
+        create_regular_file(archiver.input_path, FUNNY_NAME, contents=b"funny data")
     big = os.urandom(5 * 1024 * 1024)  # big enough for multiple chunks with default chunker params
     create_regular_file(archiver.input_path, "big", contents=big)
     if are_symlinks_supported():
@@ -115,8 +120,9 @@ def test_webdav_browse(archivers, request):
         # the heading is a breadcrumb: every path segment links to its directory
         assert '<h1><a href="/test/">test</a>/<a href="/test/input/">input</a>/</h1>' in page
         # funny file name is html-escaped in text and percent-encoded in the link
-        assert "a &lt;b&gt;&amp;c ä.txt" in page
-        assert 'href="a%20%3Cb%3E%26c%20%C3%A4.txt"' in page
+        if not is_win32:
+            assert "a &lt;b&gt;&amp;c ä.txt" in page
+            assert 'href="a%20%3Cb%3E%26c%20%C3%A4.txt"' in page
         if are_symlinks_supported():
             assert "link1 -&gt; somewhere/else" in page
             assert 'href="link1"' not in page  # symlinks are not downloadable
@@ -137,11 +143,12 @@ def test_webdav_download(archivers, request):
         assert status == 200
         assert body == big
         assert headers["Content-Length"] == str(len(big))
-        # a file in a subdirectory, with a percent-encoded url
-        status, headers, body = get(base_url + "/test/input/a%20%3Cb%3E%26c%20%C3%A4.txt")
-        assert status == 200
-        assert body == b"funny data"
-        assert headers["Content-Type"].startswith("text/plain")
+        # a file with a percent-encoded url (its name has html/url-special characters)
+        if not is_win32:
+            status, headers, body = get(base_url + "/test/input/a%20%3Cb%3E%26c%20%C3%A4.txt")
+            assert status == 200
+            assert body == b"funny data"
+            assert headers["Content-Type"].startswith("text/plain")
 
 
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
@@ -211,7 +218,8 @@ def test_webdav_propfind(archivers, request):
         assert "/test/input/" in hrefs
         assert "/test/input/subdir/" in hrefs
         assert "/test/input/file1" in hrefs
-        assert "/test/input/a%20%3Cb%3E%26c%20%C3%A4.txt" in hrefs
+        if not is_win32:
+            assert "/test/input/a%20%3Cb%3E%26c%20%C3%A4.txt" in hrefs
         assert prop_of(hrefs["/test/input/subdir/"], "{DAV:}resourcetype").find("{DAV:}collection") is not None
         # symlinks are not exposed via WebDAV
         assert not any("link1" in href for href in hrefs)
@@ -299,6 +307,7 @@ def test_webdav_ranges(archivers, request):
         assert exc_info.value.headers["Content-Range"] == f"bytes */{size}"
 
 
+@pytest.mark.skipif(is_win32, reason="cannot create files with CR/LF in the name on Windows")
 def test_webdav_header_injection(archivers, request):
     # File/directory names from an archive may contain CR/LF - names like
     # "x\r\nEvil-Header: 1" must not be able to inject headers into responses

@@ -4,7 +4,7 @@ from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
-from ..helpers import yes, ArchiveFormatter
+from ..helpers import interval, yes, ArchiveFormatter
 from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
@@ -44,6 +44,11 @@ class CheckMixIn:
             raise CommandError("--repository-only contradicts the --find-lost-archives option.")
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
+        if args.repair and args.max_age:
+            raise CommandError("--repair does not allow the --max-age option.")
+        if args.max_duration and not args.max_age:
+            # partial checks progress by skipping packs whose record is younger than max_age.
+            raise CommandError("--max-duration requires the --max-age option.")
         if args.max_duration and not args.repo_only:
             # when doing a partial repo check, we can only do a low-level check of the repository files.
             # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.
@@ -64,7 +69,8 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
-            if not repository.check(repair=args.repair, max_duration=args.max_duration):
+            max_age = int(args.max_age.total_seconds()) if args.max_age else 0
+            if not repository.check(repair=args.repair, max_duration=args.max_duration, max_age=max_age):
                 set_ec(EXIT_WARNING)
         if not args.repo_only and not archive_checker.check(
             repository,
@@ -119,17 +125,25 @@ class CheckMixIn:
         repository checks only, or pass ``--archives-only`` to run the archive checks
         only.
 
+        The ``--max-age`` option makes the check reuse the results of previous
+        repository checks: packs whose intact result is younger than the given
+        interval (e.g. ``--max-age=4w``) are skipped, spreading the verification
+        cost over repeated checks. Check results are recorded in any case;
+        ``--max-age`` only controls their reuse. Packs recorded corrupt are always
+        re-verified. ``--max-age`` cannot be combined with ``--repair``.
+
         The ``--max-duration`` option can be used to split a long-running repository
-        check into multiple partial checks. After the given number of seconds, the check
-        is interrupted. The next partial check will continue where the previous one
-        stopped, until the full repository has been checked. Assuming a complete check
-        would take 7 hours, then running a daily check with ``--max-duration=3600``
-        (1 hour) would result in one full repository check per week. Doing a full
-        repository check aborts any previous partial check; the next partial check will
-        restart from the beginning. With partial repository checks you can run neither
-        archive checks, nor enable repair mode. Consequently, if you want to use
-        ``--max-duration`` you must also pass ``--repository-only``, and must not pass
-        ``--archives-only``, nor ``--repair``.
+        check into multiple partial checks. After the given number of seconds, the
+        check is interrupted. Because a verified pack's result is recorded and
+        reused, ``--max-duration`` requires ``--max-age``: the next partial check
+        skips the recently verified packs and continues with the rest, until every
+        pack has a result younger than ``--max-age``. Assuming a complete check
+        would take 7 hours, then running a daily check with ``--max-duration=3600
+        --max-age=1w`` (1 hour) would result in one full repository verification
+        per week. With partial repository checks you can run neither archive
+        checks, nor enable repair mode. Consequently, if you want to use
+        ``--max-duration`` you must also pass ``--repository-only``, and must not
+        pass ``--archives-only``, nor ``--repair``.
 
         **Warning:** Please note that partial repository checks (i.e., running with
         ``--max-duration``) can only perform non-cryptographic checksum checks on the
@@ -218,6 +232,15 @@ class CheckMixIn:
         )
         subparser.add_argument(
             "--find-lost-archives", dest="find_lost_archives", action="store_true", help="attempt to find lost archives"
+        )
+        subparser.add_argument(
+            "--max-age",
+            metavar="INTERVAL",
+            dest="max_age",
+            type=interval,
+            default=None,
+            action=Highlander,
+            help="reuse intact-pack check results younger than INTERVAL (e.g. 4w)",
         )
         subparser.add_argument(
             "--max-duration",

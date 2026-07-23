@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote_to_bytes
-from xml.etree import ElementTree as ET  # nosec B405 # DTDs rejected before parsing, see reject_dtd()
+from xml.etree import ElementTree as ET  # nosec B405 # only used to *build* response XML, never to parse input
 from xml.parsers import expat
 
 from . import __version__
@@ -225,49 +225,65 @@ def iso8601(mtime_ns):
     return datetime.fromtimestamp(mtime_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def reject_dtd(body):
-    """Raise ValueError if *body* contains an XML DTD (<!DOCTYPE ...>).
-
-    A DTD is the only way to declare custom internal entities, so rejecting it
-    rules out entity expansion attacks ("billion laughs"). We use expat's own
-    doctype callback rather than a substring check on the raw bytes, so this is
-    independent of the document encoding (a DTD in e.g. UTF-16 does not contain
-    the ASCII bytes "<!DOCTYPE"). The callback fires at the start of the doctype
-    declaration, before any entity is declared or expanded.
-    """
-    parser = expat.ParserCreate()
-
-    def forbid_dtd(name, sysid, pubid, has_internal_subset):
-        raise ValueError("DTD in request body rejected")
-
-    parser.StartDoctypeDeclHandler = forbid_dtd
-    try:
-        parser.Parse(body if isinstance(body, bytes) else body.encode("utf-8"), True)
-    except expat.ExpatError:
-        pass  # malformed XML: the real parse below raises the canonical ParseError
-
-
 def parse_propfind(body):
     """Parse a PROPFIND request body.
 
     Returns a (mode, props) tuple: ("allprop", None), ("propname", None) or
-    ("prop", [tag, ...]). Raises ValueError or ET.ParseError for bodies we do
-    not understand.
+    ("prop", [tag, ...]), where each tag is a "{namespace}localname" string (the
+    same notation ElementTree uses). Raises ValueError for bodies we do not
+    understand.
+
+    We parse with expat directly (not with a higher-level XML library) so we can
+    reject any DTD via expat's StartDoctypeDeclHandler: a DTD is the only way to
+    declare custom internal entities, so rejecting it - before any entity can be
+    declared or expanded - makes entity expansion ("billion laughs" / "XML bomb")
+    impossible. Doing it in the doctype callback rather than by scanning the raw
+    bytes for "<!DOCTYPE" is encoding-proof (a DTD in e.g. UTF-16 does not contain
+    those ASCII bytes). We never expand or resolve entities, and _read_body()
+    additionally limits the request body to 1 MiB.
     """
+    if isinstance(body, str):
+        body = body.encode("utf-8")
     if not body.strip():
         return "allprop", None  # RFC 4918: an empty body means allprop
-    reject_dtd(body)
-    # DTDs are rejected above, so no internal entities can be declared and no
-    # entity expansion ("billion laughs" / "XML bomb") is possible - additionally,
-    # the request body is limited to 1 MiB by _read_body().
-    root = ET.fromstring(body)  # nosec B314 # codeql[py/xml-bomb]: DTDs rejected by reject_dtd() above
-    if root.tag != "{DAV:}propfind":
-        raise ValueError("root element is not DAV: propfind")
-    if root.find("{DAV:}propname") is not None:
+
+    # expat reports namespaced element names as "uri<sep>local"; using "}" as the
+    # separator and prefixing "{" yields the "{uri}local" notation used elsewhere.
+    parser = expat.ParserCreate(namespace_separator="}")
+    stack = []  # open elements, as "{uri}local"
+    saw_propname = [False]
+    saw_prop = [False]
+    prop_depth = [None]  # nesting depth of the <prop> element, once seen
+    props = []  # direct children of <prop> (the requested property names)
+
+    def forbid_dtd(name, sysid, pubid, has_internal_subset):
+        raise ValueError("DTD in request body rejected")
+
+    def start_element(name, attrs):
+        tag = "{" + name if "}" in name else name
+        stack.append(tag)
+        if len(stack) == 1 and tag != "{DAV:}propfind":
+            raise ValueError("root element is not DAV: propfind")
+        if len(stack) == 2 and tag == "{DAV:}propname":
+            saw_propname[0] = True
+        elif len(stack) == 2 and tag == "{DAV:}prop":
+            saw_prop[0] = True
+            prop_depth[0] = len(stack)
+        elif prop_depth[0] is not None and len(stack) == prop_depth[0] + 1:
+            props.append(tag)  # a requested property name
+
+    parser.StartDoctypeDeclHandler = forbid_dtd
+    parser.StartElementHandler = start_element
+    parser.EndElementHandler = lambda name: stack.pop()
+    try:
+        parser.Parse(body, True)
+    except expat.ExpatError as e:
+        raise ValueError(f"malformed PROPFIND body: {e}")
+
+    if saw_propname[0]:
         return "propname", None
-    prop = root.find("{DAV:}prop")
-    if prop is not None:
-        return "prop", [child.tag for child in prop]
+    if saw_prop[0]:
+        return "prop", props
     return "allprop", None  # allprop, maybe with an include element
 
 
@@ -556,7 +572,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
             return
         try:
             mode, requested = parse_propfind(body)
-        except (ET.ParseError, ValueError):
+        except ValueError:
             self.send_error(400, explain="invalid PROPFIND request body")
             return
         try:

@@ -1,8 +1,11 @@
-"""Read-only HTTP server providing browser access to archive contents (``borg webdav``).
+"""Read-only WebDAV / HTTP server providing access to archive contents (``borg webdav``).
 
-Phase 1 implements plain HTTP only (GET/HEAD, HTML directory listings, file
-downloads), bound to localhost. WebDAV methods (OPTIONS/PROPFIND) for native
-mounting by Explorer/Finder/GVFS are planned to be added on top of this later.
+Web browsers get HTML directory listings and file downloads (GET/HEAD, incl.
+Range requests and conditional requests). WebDAV clients (class 1: OPTIONS,
+PROPFIND) can mount the served archives as a read-only network file system -
+such clients are built into Windows Explorer, macOS Finder, the common Linux
+file managers (gvfs/KIO) and davfs2. All methods that would modify something
+(PUT, DELETE, PROPPATCH, MKCOL, COPY, MOVE, LOCK, ...) are rejected.
 
 This module only uses the Python standard library, so it works without any
 optional dependencies.
@@ -10,12 +13,14 @@ optional dependencies.
 
 import html
 import mimetypes
+import re
 import stat
 import threading
 from datetime import datetime, timezone
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote_to_bytes
+from xml.etree import ElementTree as ET
 
 from . import __version__
 from .archive import Archive
@@ -69,6 +74,8 @@ class ArchiveVFS:
                 name += f"-{bin_to_hex(archive.id):.8}"
             self.archives[name] = archive
         self._trees = {}  # display name -> (root Node, DownloadPipeline)
+        timestamps = [archive.ts for archive in archives]
+        self.root_mtime = int(max(timestamps).timestamp() * 1e9) if timestamps else 0
 
     def get_root(self, name):
         """Return (root Node, pipeline) for archive *name*, building the tree on first access."""
@@ -154,6 +161,151 @@ def display_time(mtime_ns):
 def display_size(size):
     """Format a precise byte count with dots as thousands separators, e.g. '123.456.789'."""
     return f"{size:,}".replace(",", ".")
+
+
+def guess_content_type(name):
+    return mimetypes.guess_type(remove_surrogates(name), strict=False)[0] or "application/octet-stream"
+
+
+def make_etag(node):
+    # archive contents are immutable, so mtime+size identify the content well enough.
+    return f'"{node.mtime:x}-{node.size:x}"'
+
+
+def parse_byte_range(header, size):
+    """Parse a Range header value against a resource of *size* bytes.
+
+    Returns (start, end) (both inclusive), None if the header shall be ignored
+    (serve the full body then), or "unsatisfiable" (respond with 416 then).
+    """
+    m = re.fullmatch(r"bytes=(\d*)-(\d*)", header.strip())
+    if not m:  # multiple ranges / other units: ignoring the header is allowed
+        return None
+    start_s, end_s = m.groups()
+    if not start_s and not end_s:
+        return None
+    if not start_s:  # suffix form: the last N bytes
+        n = int(end_s)
+        if n == 0 or size == 0:
+            return "unsatisfiable"
+        return max(size - n, 0), size - 1
+    start = int(start_s)
+    if start >= size:
+        return "unsatisfiable"
+    end = min(int(end_s), size - 1) if end_s else size - 1
+    if end < start:
+        return None
+    return start, end
+
+
+# WebDAV support (class 1, read-only), see RFC 4918.
+
+ET.register_namespace("D", "DAV:")
+
+ALLOWED_METHODS = "OPTIONS, GET, HEAD, PROPFIND"
+
+# all live properties this server can provide
+DAV_PROPS = (
+    "{DAV:}resourcetype",
+    "{DAV:}displayname",
+    "{DAV:}getcontentlength",
+    "{DAV:}getcontenttype",
+    "{DAV:}getlastmodified",
+    "{DAV:}creationdate",
+    "{DAV:}getetag",
+    "{DAV:}supportedlock",
+    "{DAV:}lockdiscovery",
+)
+
+
+def iso8601(mtime_ns):
+    return datetime.fromtimestamp(mtime_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def parse_propfind(body):
+    """Parse a PROPFIND request body.
+
+    Returns a (mode, props) tuple: ("allprop", None), ("propname", None) or
+    ("prop", [tag, ...]). Raises ValueError or ET.ParseError for bodies we do
+    not understand. Note: the maximum body size is limited by the caller and
+    expat has built-in protection against entity expansion attacks.
+    """
+    if not body.strip():
+        return "allprop", None  # RFC 4918: an empty body means allprop
+    root = ET.fromstring(body)
+    if root.tag != "{DAV:}propfind":
+        raise ValueError("root element is not DAV: propfind")
+    if root.find("{DAV:}propname") is not None:
+        return "propname", None
+    prop = root.find("{DAV:}prop")
+    if prop is not None:
+        return "prop", [child.tag for child in prop]
+    return "allprop", None  # allprop, maybe with an include element
+
+
+def make_prop_element(tag, name, node):
+    """Build the XML element for live property *tag* of resource *node*.
+
+    Returns None if the property is not defined for this resource.
+    """
+    elem = ET.Element(tag)
+    if tag == "{DAV:}resourcetype":
+        if node.is_dir:
+            ET.SubElement(elem, "{DAV:}collection")
+    elif tag == "{DAV:}displayname":
+        elem.text = remove_surrogates(name)
+    elif tag == "{DAV:}getlastmodified":
+        elem.text = http_date(node.mtime)
+    elif tag == "{DAV:}creationdate":
+        elem.text = iso8601(node.mtime)
+    elif tag == "{DAV:}getcontentlength":
+        if node.is_dir:
+            return None
+        elem.text = str(node.size)
+    elif tag == "{DAV:}getcontenttype":
+        if node.is_dir:
+            return None
+        elem.text = guess_content_type(name)
+    elif tag == "{DAV:}getetag":
+        if node.is_dir:
+            return None
+        elem.text = make_etag(node)
+    elif tag in ("{DAV:}supportedlock", "{DAV:}lockdiscovery"):
+        pass  # empty elements: locking is not supported
+    else:
+        return None
+    return elem
+
+
+def render_multistatus(resources, mode, requested):
+    """Render a PROPFIND result as a multistatus XML document (bytes).
+
+    *resources* is a list of (href, displayname, node) tuples, *mode* / *requested*
+    are the parse_propfind() results.
+    """
+    multistatus = ET.Element("{DAV:}multistatus")
+    for href, name, node in resources:
+        response = ET.SubElement(multistatus, "{DAV:}response")
+        ET.SubElement(response, "{DAV:}href").text = href
+        found = ET.Element("{DAV:}prop")
+        missing = ET.Element("{DAV:}prop")
+        if mode == "propname":
+            for tag in DAV_PROPS:
+                if make_prop_element(tag, name, node) is not None:
+                    ET.SubElement(found, tag)
+        else:
+            for tag in DAV_PROPS if mode == "allprop" else requested:
+                elem = make_prop_element(tag, name, node)
+                if elem is not None:
+                    found.append(elem)
+                else:
+                    missing.append(ET.Element(tag))
+        for prop, status in ((found, "200 OK"), (missing, "404 Not Found")):
+            if len(prop) or status == "200 OK":  # always emit the 200 propstat, even if empty
+                propstat = ET.SubElement(response, "{DAV:}propstat")
+                propstat.append(prop)
+                ET.SubElement(propstat, "{DAV:}status").text = f"HTTP/1.1 {status}"
+    return b'<?xml version="1.0" encoding="utf-8" ?>\n' + ET.tostring(multistatus)
 
 
 # the official borg logo (docs/_static/logo.svg, "borg" in vectorized Black Ops One),
@@ -253,48 +405,36 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         logger.debug("webdav: %s - %s", self.address_string(), format % args)
 
     def do_GET(self):
-        self._handle(head=False)
+        self._guarded(self._handle_get_head, False)
 
     def do_HEAD(self):
-        self._handle(head=True)
+        self._guarded(self._handle_get_head, True)
 
-    def _method_not_allowed(self):
-        self.send_response(405)
-        self.send_header("Allow", "GET, HEAD")
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Allow", ALLOWED_METHODS)
+        self.send_header("DAV", "1")
+        self.send_header("MS-Author-Via", "DAV")  # helps (older) Windows WebDAV clients
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    do_POST = do_PUT = do_DELETE = do_OPTIONS = do_PATCH = _method_not_allowed
+    def do_PROPFIND(self):
+        self._guarded(self._handle_propfind)
 
-    def _handle(self, head):
+    def _method_not_allowed(self):
+        # this is a read-only server, reject everything that would modify or lock something.
+        self.send_response(405)
+        self.send_header("Allow", ALLOWED_METHODS)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        self.close_connection = True  # we did not read a request body the client may have sent
+
+    do_POST = do_PUT = do_DELETE = do_PATCH = _method_not_allowed
+    do_PROPPATCH = do_MKCOL = do_COPY = do_MOVE = do_LOCK = do_UNLOCK = _method_not_allowed
+
+    def _guarded(self, method, *args):
         try:
-            path, _, _query = self.path.partition("?")
-            path = decode_path(path)
-            segments = [s for s in path.split("/") if s]
-            if any(s in (".", "..") for s in segments):
-                self.send_error(404)
-                return
-            if not segments:
-                self._send_archive_list(head)
-                return
-            try:
-                node, pipeline = self.vfs.resolve(segments)
-            except KeyError:
-                self.send_error(404)
-                return
-            if node.is_dir:
-                if not path.endswith("/"):
-                    self._redirect_to_dir()
-                    return
-                self._send_dir_listing(segments, node, head)
-            elif stat.S_ISREG(node.mode):
-                self._send_file(segments[-1], node, pipeline, head)
-            elif stat.S_ISLNK(node.mode):
-                self.send_error(
-                    403, explain=f"symbolic link (target: {remove_surrogates(node.target or '?')}), not downloadable"
-                )
-            else:
-                self.send_error(403, explain="special file, not downloadable")
+            method(*args)
         except BrokenPipeError:
             self.close_connection = True
         except Exception:
@@ -303,6 +443,118 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 self.send_error(500)
             except OSError:
                 self.close_connection = True
+
+    def _parse_segments(self):
+        """Parse self.path into decoded path segments; returns None for invalid paths."""
+        path, _, _query = self.path.partition("?")
+        path = decode_path(path)
+        segments = [s for s in path.split("/") if s]
+        if any(s in (".", "..") for s in segments):
+            return None
+        return segments, path.endswith("/")
+
+    def _read_body(self):
+        """Read a request body; returns None (after sending an error) if that is not possible."""
+        if self.headers.get("Transfer-Encoding"):
+            self.send_error(501, explain="request bodies with Transfer-Encoding are not supported")
+            self.close_connection = True
+            return None
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self.send_error(400)
+            self.close_connection = True
+            return None
+        if length < 0 or length > 1024 * 1024:
+            self.send_error(413)
+            self.close_connection = True
+            return None
+        return self.rfile.read(length)
+
+    def _handle_get_head(self, head):
+        parsed = self._parse_segments()
+        if parsed is None:
+            self.send_error(404)
+            return
+        segments, dir_syntax = parsed
+        if not segments:
+            self._send_archive_list(head)
+            return
+        try:
+            node, pipeline = self.vfs.resolve(segments)
+        except KeyError:
+            self.send_error(404)
+            return
+        if node.is_dir:
+            if not dir_syntax:
+                self._redirect_to_dir()
+                return
+            self._send_dir_listing(segments, node, head)
+        elif stat.S_ISREG(node.mode):
+            self._send_file(segments[-1], node, pipeline, head)
+        elif stat.S_ISLNK(node.mode):
+            self.send_error(
+                403, explain=f"symbolic link (target: {remove_surrogates(node.target or '?')}), not downloadable"
+            )
+        else:
+            self.send_error(403, explain="special file, not downloadable")
+
+    def _handle_propfind(self):
+        body = self._read_body()
+        if body is None:
+            return
+        parsed = self._parse_segments()
+        if parsed is None:
+            self.send_error(404)
+            return
+        depth = self.headers.get("Depth", "infinity").strip().lower()
+        if depth not in ("0", "1"):
+            # RFC 4918 allows servers to reject PROPFIND requests with unlimited depth.
+            self.send_error(403, explain="PROPFIND with Depth: infinity is not supported")
+            return
+        try:
+            mode, requested = parse_propfind(body)
+        except (ET.ParseError, ValueError):
+            self.send_error(400, explain="invalid PROPFIND request body")
+            return
+        try:
+            resources = self._propfind_resources(parsed[0], depth)
+        except KeyError:
+            self.send_error(404)
+            return
+        result = render_multistatus(resources, mode, requested)
+        self.send_response(207, "Multi-Status")
+        self.send_header("Content-Type", 'application/xml; charset="utf-8"')
+        self.send_header("Content-Length", str(len(result)))
+        self.end_headers()
+        self.wfile.write(result)
+
+    def _propfind_resources(self, segments, depth):
+        """Return the [(href, displayname, node), ...] a PROPFIND on *segments* refers to."""
+        resources = []
+        if not segments:  # server root: the list of archives
+            resources.append(("/", "/", Node(DEFAULT_DIR_MODE, mtime=self.vfs.root_mtime, children={})))
+            if depth == "1":
+                for name in sorted(self.vfs.archives):
+                    archive_info = self.vfs.archives[name]
+                    node = Node(DEFAULT_DIR_MODE, mtime=int(archive_info.ts.timestamp() * 1e9), children={})
+                    resources.append(("/" + encode_path(name) + "/", name, node))
+            return resources
+        node, _ = self.vfs.resolve(segments)  # may raise KeyError
+        if not (node.is_dir or stat.S_ISREG(node.mode)):
+            raise KeyError(segments[-1])  # symlinks and special files are not exposed via WebDAV
+        base = "/" + "/".join(encode_path(s) for s in segments)
+        if not node.is_dir:
+            return [(base, segments[-1], node)]
+        resources.append((base + "/", segments[-1], node))
+        if depth == "1":
+            for name, child in sorted(node.children.items()):
+                if child.is_dir:
+                    resources.append((f"{base}/{encode_path(name)}/", name, child))
+                elif stat.S_ISREG(child.mode):
+                    resources.append((f"{base}/{encode_path(name)}", name, child))
+                # symlinks and special files are not exposed via WebDAV
+        return resources
 
     def _redirect_to_dir(self):
         path, _, _query = self.path.partition("?")
@@ -348,18 +600,60 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         self._send_page(render_page(title, rows), head)
 
     def _send_file(self, name, node, pipeline, head):
-        self.send_response(200)
-        ctype = mimetypes.guess_type(remove_surrogates(name), strict=False)[0] or "application/octet-stream"
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(node.size))
+        etag = make_etag(node)
+        if_none_match = self.headers.get("If-None-Match")
+        if if_none_match:
+            client_tags = [t.strip() for t in if_none_match.split(",")]
+            if "*" in client_tags or etag in client_tags:
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.end_headers()
+                return
+        byte_range = None
+        range_header = self.headers.get("Range")
+        if range_header:
+            if_range = self.headers.get("If-Range")
+            if if_range is None or if_range.strip() == etag:
+                byte_range = parse_byte_range(range_header, node.size)
+        if byte_range == "unsatisfiable":
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{node.size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if byte_range:
+            start, end = byte_range
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {start}-{end}/{node.size}")
+        else:
+            start, end = 0, node.size - 1
+            self.send_response(200)
+        self.send_header("Content-Type", guess_content_type(name))
+        self.send_header("Content-Length", str(end - start + 1 if node.size else 0))
         self.send_header("Last-Modified", http_date(node.mtime))
+        self.send_header("ETag", etag)
+        self.send_header("Accept-Ranges", "bytes")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Disposition", self._content_disposition(name))
         self.end_headers()
-        if head or not node.chunks:
+        if head or not node.chunks or node.size == 0:
             return
-        chunk_iter = pipeline.fetch_many(node.chunks, ro_type=ROBJ_FILE_STREAM, replacement_chunk=False)
-        while True:
+        # select only the chunks overlapping the requested range, so nothing else
+        # gets fetched and decrypted (the chunk sizes are known in advance).
+        selected, first_offset, pos = [], 0, 0
+        for entry in node.chunks:
+            if pos + entry.size <= start:
+                pos += entry.size
+                continue
+            if pos > end:
+                break
+            if not selected:
+                first_offset = start - pos
+            selected.append(entry)
+            pos += entry.size
+        remaining = end - start + 1
+        chunk_iter = pipeline.fetch_many(selected, ro_type=ROBJ_FILE_STREAM, replacement_chunk=False)
+        while remaining > 0:
             # serialize repository access, but write to the client outside the lock,
             # so one slow client cannot block other requests for the whole download.
             with self.repo_lock:
@@ -375,7 +669,13 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 )
                 self.close_connection = True
                 return
+            if first_offset:
+                data = data[first_offset:]
+                first_offset = 0
+            if len(data) > remaining:
+                data = data[:remaining]
             self.wfile.write(data)
+            remaining -= len(data)
 
     @staticmethod
     def _content_disposition(name):

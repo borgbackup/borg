@@ -15,7 +15,7 @@ logger = create_logger()
 class WebDAVMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_webdav(self, args, repository, manifest):
-        """Serve archive contents via a read-only HTTP server on localhost."""
+        """Serve archive contents via a read-only WebDAV / HTTP server on localhost."""
         from ..webdav import make_server
         from ..storelocking import LockRefresher
 
@@ -45,7 +45,20 @@ class WebDAVMixIn:
         webdav_epilog = process_epilog(
             """
         This command serves the contents of the selected archives via a read-only
-        HTTP server, so files can be browsed and downloaded with a web browser.
+        WebDAV / HTTP server, so the archive contents can be:
+
+        - browsed and downloaded with a web browser,
+        - mounted as a read-only network file system, using the WebDAV client
+          built into most operating systems and file managers.
+
+        Mounting examples:
+
+        - Windows Explorer: "Map network drive" -> ``http://localhost:8000/``
+          (or on the command line: ``net use Z: http://localhost:8000/``).
+        - macOS Finder: "Go > Connect to Server" (Cmd-K) -> ``http://localhost:8000``.
+        - GNOME Files / KDE Dolphin: open ``dav://localhost:8000/``.
+        - Linux kernel mount: ``mount -t davfs http://localhost:8000/ /mnt/point``
+          (needs the davfs2 package).
 
         The server listens on localhost (127.0.0.1) only and offers no
         authentication and no encryption - anything that can connect to
@@ -58,21 +71,25 @@ class WebDAVMixIn:
 
         Notes:
 
-        - Downloads via HTTP do not preserve any POSIX metadata (owner, group,
-          mode, timestamps, xattrs, ACLs). Use ``borg extract`` or
-          ``borg export-tar`` for full-fidelity restores.
-        - Symbolic links are shown in the directory listings, but are neither
-          followed nor downloadable. Special files (devices, fifos, sockets)
-          are shown, but not downloadable.
+        - Downloads do not preserve any POSIX metadata (owner, group, mode,
+          timestamps, xattrs, ACLs). Use ``borg extract`` or ``borg export-tar``
+          for full-fidelity restores.
+        - Symbolic links and special files (devices, fifos, sockets) are shown
+          in the web browser listings, but are neither followed nor downloadable,
+          and they are not visible in WebDAV-mounted directories (WebDAV has no
+          concept of them).
         - Damaged files (with chunks missing in the repository) cause the
           download connection to be aborted - the server never silently serves
           corrupted file content.
+        - The Windows WebDAV client limits file downloads to about 47 MiB by
+          default (``FileSizeLimitInBytes`` registry value) - use a web browser
+          or another WebDAV client to download bigger files.
 
         The command runs in the foreground until it is interrupted with Ctrl-C.
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_webdav.__doc__, epilog=webdav_epilog)
-        subparsers.add_subcommand("webdav", subparser, help="serve archive contents via HTTP")
+        subparsers.add_subcommand("webdav", subparser, help="serve archive contents via WebDAV / HTTP")
         subparser.add_argument(
             "--port",
             metavar="PORT",

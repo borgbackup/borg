@@ -404,6 +404,12 @@ def test_webdav_header_injection(archivers, request):
         assert "Evil-Header" not in headers
         assert 'filename="inj__Evil-Header: 1"' in headers["Content-Disposition"]
         assert "%0D%0A" in headers["Content-Disposition"]  # RFC 8187 encoded form
+        # a tar download of the evil directory: its name feeds Content-Disposition, which
+        # must be sanitized too (the directory name becomes the tar file name).
+        status, headers, _ = get(f"{base_url}/test/input/dir%0D%0AEvil-Header%3A%202/?tar=1")
+        assert status == 200
+        assert "Evil-Header" not in headers
+        assert 'filename="dir__Evil-Header: 2.tar"' in headers["Content-Disposition"]
         # the directory redirect: Location must be percent-encoded, no header injected
         # (plain http.client here, so the 301 is not followed)
         conn = http.client.HTTPConnection(host_port)

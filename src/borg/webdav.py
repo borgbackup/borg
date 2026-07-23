@@ -805,13 +805,12 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 return True
             return item.path == prefix or item.path.startswith(prefix + "/")
 
-        download_name = segments[-1] + ".tar"
+        # download_name is derived from the client-supplied URL path, so sanitize it
+        # against header injection (CR/LF) just like a normal download, see there.
+        content_disposition = self._content_disposition(segments[-1] + ".tar")
         self.send_response(200)
         self.send_header("Content-Type", "application/x-tar")
-        # sanitized against header injection, see _content_disposition()
-        self.send_header(
-            "Content-Disposition", self._content_disposition(download_name)
-        )  # codeql[py/http-response-splitting]  # noqa: E501
+        self.send_header("Content-Disposition", content_disposition)  # codeql[py/http-response-splitting]
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()

@@ -663,10 +663,15 @@ class WebDAVHandler(BaseHTTPRequestHandler):
 
     def _redirect_to_dir(self, segments):
         # Build the redirect target by percent-encoding the parsed path segments:
-        # quote() only outputs URL-safe ASCII, so the Location value cannot contain
-        # CR/LF or other header-splitting characters, no matter what the client sent.
-        # The redundant strip_crlf() makes that guarantee explicit at the header sink.
-        location = strip_crlf("/" + "/".join(encode_path(s) for s in segments) + "/")
+        # quote() only outputs URL-safe ASCII for the path. Preserve the query string
+        # (e.g. "?tar=1") so redirecting a directory URL that lacks the trailing slash
+        # does not drop it. The query is already percent-encoded by the client; the
+        # strip_crlf() below removes any CR/LF, so the Location cannot split the response.
+        location = "/" + "/".join(encode_path(s) for s in segments) + "/"
+        query = self.path.partition("?")[2]
+        if query:
+            location += "?" + query
+        location = strip_crlf(location)
         self.send_response(301)
         self.send_header("Location", location)
         self.send_header("Content-Length", "0")

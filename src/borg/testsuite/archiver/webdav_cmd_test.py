@@ -229,6 +229,10 @@ def test_webdav_tar_subdir_and_head(archivers, request):
         # ?tar at the archive root exports the whole archive (no path prefix stripped)
         _, tar = _get_tar(base_url + "/test/?tar=1")
         assert "input/file1" in tar.getnames()
+        # a directory tar URL without the trailing slash redirects but keeps the query
+        # string, so the (urllib-followed) redirect still delivers the tar, not the listing
+        _, tar = _get_tar(base_url + "/test/input?tar=1")
+        assert "input/file1" in tar.getnames()
 
 
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")

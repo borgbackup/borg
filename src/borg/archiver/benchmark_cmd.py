@@ -199,8 +199,15 @@ class BenchmarkMixIn:
             ),
             # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
             (
-                "buzhash64,19,23,21,4095,2",
-                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, 2, sparse=False)",
+                "buzhash64,19,23,21,4095,2,enc=0",
+                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, 2, sparse=False, do_encrypt=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
+            (
+                "buzhash64,19,23,21,4095,2,enc=1",
+                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, 2, sparse=False, do_encrypt=True)",
                 "chunkit(ch)",
                 locals(),
             ),

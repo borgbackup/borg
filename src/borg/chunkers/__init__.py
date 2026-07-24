@@ -9,6 +9,7 @@ from .reader import *  # noqa
 def get_chunker(algo, *params, **kw):
     key = kw.get("key", None)
     sparse = kw.get("sparse", False)
+    do_encrypt = kw.get("do_encrypt", 0)  # 0 is much faster, 1 is more secure
     # key.chunk_seed only has 32 bits
     seed = key.chunk_seed if key is not None else 0
     if algo == "buzhash":
@@ -20,7 +21,9 @@ def get_chunker(algo, *params, **kw):
         bh64_key = (
             key.derive_key(salt=b"", domain=b"buzhash64", size=32, from_id_key=True) if key is not None else b"\0" * 32
         )
-        return ChunkerBuzHash64(bh64_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
+        return ChunkerBuzHash64(
+            bh64_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse, do_encrypt=do_encrypt
+        )
     if algo == "fastcdc":
         # keyed gear table, derived from the id key (own domain). params is
         # (chunk_min_exp, chunk_max_exp, hash_mask_bits, nc_level) - no window (Gear is window-less).

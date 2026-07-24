@@ -15,6 +15,32 @@ from ..crypto.low_level import CSPRNG
 from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 from .reader import FileReader, Chunk
 
+# OpenSSL imports for AES encryption
+cdef extern from "openssl/evp.h":
+    ctypedef struct EVP_CIPHER:
+        pass
+    ctypedef struct EVP_CIPHER_CTX:
+        pass
+    ctypedef struct ENGINE:
+        pass
+
+    const EVP_CIPHER * EVP_aes_128_ecb()
+
+    EVP_CIPHER_CTX *EVP_CIPHER_CTX_new()
+    void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
+
+    int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *impl,
+                           const unsigned char *key, const unsigned char *iv) nogil
+    int EVP_DecryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *impl,
+                           const unsigned char *key, const unsigned char *iv) nogil
+    int EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
+                          const unsigned char *in_, int inl) nogil
+    int EVP_DecryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
+                          const unsigned char *in_, int inl) nogil
+    int EVP_EncryptFinal_ex(EVP_CIPHER_CTX* ctx, unsigned char* out, int* outl) nogil
+    int EVP_DecryptFinal_ex(EVP_CIPHER_CTX* ctx, unsigned char* out, int* outl) nogil
+    int EVP_CIPHER_CTX_set_padding(EVP_CIPHER_CTX *ctx, int pad) nogil
+
 # Cyclic polynomial / buzhash
 #
 # https://en.wikipedia.org/wiki/Rolling_hash
@@ -40,7 +66,7 @@ cdef extern from *:
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)  # Deactivate negative indexing.
-cdef uint64_t* buzhash64_init_table(bytes key) except NULL:
+cdef uint64_t* buzhash64_init_table(bytes key):
     """
     Generate a balanced pseudo-random table deterministically from a 256-bit key.
     Balanced means that for each bit position 0..63, exactly 50% of the table values have the bit set to 1.
@@ -50,8 +76,6 @@ cdef uint64_t* buzhash64_init_table(bytes key) except NULL:
 
     cdef int i, j, bit_pos
     cdef uint64_t* table = <uint64_t*>malloc(2048)  # 256 * sizeof(uint64_t)
-    if table == NULL:
-        raise MemoryError("Failed to allocate buzhash64 table")
 
     # Initialize all values to 0
     for i in range(256):
@@ -78,8 +102,6 @@ cdef uint64_t _buzhash64(const unsigned char* data, size_t len, const uint64_t* 
     """Calculate the buzhash of the given data."""
     cdef uint64_t i
     cdef uint64_t sum = 0, imod
-    if len == 0:
-        return 0
     for i in range(len - 1, 0, -1):
         imod = i & 0x3f
         sum ^= BARREL_SHIFT64(h[data[0]], imod)
@@ -124,7 +146,11 @@ cdef class ChunkerBuzHash64:
     cdef size_t reader_block_size
     cdef bint sparse
 
-    def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, int nc_level=0, size_t normal_size=0, bint sparse=False):
+    # optional AES encryption for rolling hash based chunking decision
+    cdef bint do_encrypt
+    cdef Crypter crypter
+
+    def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, int nc_level=0, size_t normal_size=0, bint sparse=False, bint do_encrypt=False):
         self.table = NULL
         self.data = NULL
         min_size = 1 << chunk_min_exp
@@ -175,6 +201,10 @@ cdef class ChunkerBuzHash64:
         self.reader_block_size = 1024 * 1024
         self.sparse = sparse
 
+        self.do_encrypt = do_encrypt
+        if do_encrypt:
+            self.crypter = Crypter(key[:16])
+
     def __dealloc__(self):
         """Free the chunker's resources."""
         if self.table != NULL:
@@ -220,7 +250,7 @@ cdef class ChunkerBuzHash64:
 
     cdef object process(self) except *:
         """Process the chunker's buffer and return the next chunk."""
-        cdef uint64_t sum, mask
+        cdef uint64_t sum, esum, mask
         cdef uint64_t mask_s = self.mask_s, mask_l = self.mask_l
         cdef int nc_level = self.nc_level
         cdef size_t n, old_last, min_size = self.min_size, window_size = self.window_size
@@ -229,6 +259,7 @@ cdef class ChunkerBuzHash64:
         cdef uint8_t* stop_at
         cdef uint8_t* nc_stop
         cdef size_t did_bytes
+        cdef bint do_encrypt = self.do_encrypt
 
         if self.done:
             if self.bytes_read == self.bytes_yielded:
@@ -258,6 +289,7 @@ cdef class ChunkerBuzHash64:
         self.position += min_size
         self.remaining -= min_size
         sum = _buzhash64(self.data + self.position, window_size, self.table)
+        esum = self.crypter.encrypt64(sum) if do_encrypt else sum
 
         # Normalized chunking: pick the mask based on how far we are into the current chunk.
         # While below normal_size use the strict mask (lower cut probability), afterward the
@@ -272,7 +304,7 @@ cdef class ChunkerBuzHash64:
                 normal_pos = self.last + normal_size
                 mask = mask_s if self.position < normal_pos else mask_l
 
-            if not (self.remaining > window_size and (sum & mask) and not (self.eof and self.remaining <= window_size)):
+            if not (self.remaining > window_size and (esum & mask) and not (self.eof and self.remaining <= window_size)):
                 break
 
             p = self.data + self.position
@@ -284,8 +316,9 @@ cdef class ChunkerBuzHash64:
                 if nc_stop < stop_at:
                     stop_at = nc_stop
 
-            while p < stop_at and (sum & mask):
+            while p < stop_at and (esum & mask):
                 sum = _buzhash64_update(sum, p[0], p[window_size], window_size, self.table)
+                esum = self.crypter.encrypt64(sum) if do_encrypt else sum
                 p += 1
 
             did_bytes = p - (self.data + self.position)
@@ -373,3 +406,82 @@ def buzhash64_get_table(bytes key):
         return [table[i] for i in range(256)]
     finally:
         free(table)
+
+
+cdef class Crypter:
+    """AES128-ECB wrapper"""
+    cdef EVP_CIPHER_CTX * ctx
+    cdef const EVP_CIPHER * cipher
+    cdef uint8_t key[16]
+
+    def __init__(self, bytes key):
+        assert len(key) == 16, "bad key size"
+        self.key = key[:16]
+        self.ctx = EVP_CIPHER_CTX_new()
+        if self.ctx == NULL:
+            raise MemoryError("Failed to create cipher context")
+        self.cipher = EVP_aes_128_ecb()
+
+    def __dealloc__(self):
+        if self.ctx != NULL:
+            EVP_CIPHER_CTX_free(self.ctx)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef inline int encrypt(self, const uint8_t *plaintext, uint8_t *ciphertext):
+        cdef int out_len, final_len
+        if EVP_EncryptInit_ex(self.ctx, self.cipher, NULL, <const uint8_t *> <char *> self.key, NULL) != 1:
+            return 1
+        if EVP_CIPHER_CTX_set_padding(self.ctx, 0) != 1:
+            return 2
+        if EVP_EncryptUpdate(self.ctx, ciphertext, &out_len, plaintext, 16) != 1:
+            return 3
+        if out_len != 16:
+            return 4
+        if EVP_EncryptFinal_ex(self.ctx, ciphertext + out_len, &final_len) != 1:
+            return 5
+        if final_len != 0:
+            return 6
+        return 0  # OK
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef int decrypt(self, uint8_t *ciphertext, uint8_t *plaintext):
+        cdef int out_len, final_len
+        if EVP_DecryptInit_ex(self.ctx, self.cipher, NULL, <const uint8_t *> <char *> self.key, NULL) != 1:
+            return 1
+        if EVP_CIPHER_CTX_set_padding(self.ctx, 0) != 1:
+            return 2
+        if EVP_DecryptUpdate(self.ctx, plaintext, &out_len, ciphertext, 16) != 1:
+            return 3
+        if out_len != 16:
+            return 4
+        if EVP_DecryptFinal_ex(self.ctx, plaintext + out_len, &final_len) != 1:
+            return 5
+        if final_len != 0:
+            return 6
+        return 0
+
+    cdef inline uint64_t encrypt64(self, uint64_t v):
+        cdef uint64_t plaintext[2], ciphertext[2]
+        plaintext[0] = v
+        plaintext[1] = 0  # or v?
+        rc = self.encrypt(<uint8_t *>plaintext, <uint8_t *>ciphertext)
+        assert rc == 0, f"encrypt failed with rc={rc}"
+        return ciphertext[0]  # ^ ciphertext[1]?
+
+    def encrypt_bytes(self, bytes plaintext) -> bytes:  # Python callable for tests
+        cdef uint8_t _plaintext[16], _ciphertext[16]
+        assert len(plaintext) == 16, "invalid plaintext length"
+        _plaintext = plaintext[:16]
+        rc = self.encrypt(_plaintext, _ciphertext)
+        assert rc == 0, f"encrypt failed with rc={rc}"
+        return _ciphertext[:16]
+
+    def decrypt_bytes(self, bytes ciphertext) -> bytes:  # Python callable for tests
+        cdef uint8_t _ciphertext[16], _plaintext[16]
+        assert len(ciphertext) == 16, "invalid ciphertext length"
+        _ciphertext = ciphertext[:16]
+        rc = self.decrypt(_ciphertext, _plaintext)
+        assert rc == 0, f"decrypt failed with rc={rc}"
+        return _plaintext[:16]

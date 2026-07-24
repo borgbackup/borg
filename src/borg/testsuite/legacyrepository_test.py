@@ -879,7 +879,6 @@ def _get_mock_args():
     class MockArgs:
         umask = 0o077
         debug_topics = []
-        rsh = None
 
         def __contains__(self, item):
             # to behave like argparse.Namespace
@@ -950,10 +949,9 @@ def test_remote_rpc_exception_transport(remote_repository):
             assert len(e.exception_full) > 0
 
 
-def test_remote_ssh_cmd(remote_repository):
+def test_remote_ssh_cmd(remote_repository, monkeypatch):
+    monkeypatch.delenv("BORG_RSH", raising=False)
     with remote_repository:
-        args = _get_mock_args()
-        remote_repository._args = args
         assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "example.com"]
         assert remote_repository.ssh_cmd(Location("ssh://user@example.com/foo")) == ["ssh", "user@example.com"]
         assert remote_repository.ssh_cmd(Location("ssh://user@example.com:1234/foo")) == [
@@ -962,7 +960,7 @@ def test_remote_ssh_cmd(remote_repository):
             "1234",
             "user@example.com",
         ]
-        os.environ["BORG_RSH"] = "ssh --foo"
+        monkeypatch.setenv("BORG_RSH", "ssh --foo")
         assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "--foo", "example.com"]
 
 
@@ -987,6 +985,5 @@ def test_remote_borg_cmd(remote_repository, monkeypatch):
         args = _get_mock_args()
         monkeypatch.delenv("BORG_REMOTE_PATH")
         assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
-        args.rsh = "ssh -i foo"
-        remote_repository._args = args
+        monkeypatch.setenv("BORG_RSH", "ssh -i foo")
         assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]

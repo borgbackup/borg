@@ -320,8 +320,8 @@ a backup may be the following command::
    borg-server:~$ ssh \
       -R /run/borg/reponame.sock:/run/borg/reponame.sock \
       borgc@borg-client \
+      BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
       borg create \
-      --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
       --repo ssh://borg-server/path/to/repo archive /path_to_backup \
       ';' rm /run/borg/reponame.sock
 
@@ -393,7 +393,7 @@ Initiating borg command execution from *borg-server* (e.g. init)::
     eval $(ssh-agent) > /dev/null
     ssh-add -q ~/.ssh/borg-client_key
     echo 'your secure borg key passphrase' | \
-      ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"
+      ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg init --encryption repokey ssh://borgs@borg-server/~/repo"
     kill "${SSH_AGENT_PID}"
   )
 
@@ -419,7 +419,7 @@ Parentheses are not needed when using a dedicated bash process.
   * The keys meant to be loaded into the agent must be specified explicitly, not from default locations.
   * The *borg-client*'s entry in *borgs@borg-server:~/.ssh/authorized_keys* must be as restrictive as possible.
 
-``echo 'your secure borg key passphrase' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) borg --rsh 'ssh -o StrictHostKeyChecking=no' init --encryption repokey ssh://borgs@borg-server/~/repo"``
+``echo 'your secure borg key passphrase' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg init --encryption repokey ssh://borgs@borg-server/~/repo"``
 
   Run the *borg init* command on *borg-client*.
 

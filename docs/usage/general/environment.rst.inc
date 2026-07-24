@@ -65,8 +65,9 @@ General:
         A basic example conf can be found at ``docs/misc/logging.conf``.
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
-        a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options. Using
-        the ``--rsh CMD`` command line option overrides the environment variable.
+        a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options.
+        This is the replacement for the removed ``--rsh CMD`` command line option.
+        borg also gives this to borgstore as ``BORGSTORE_RSH``, except if that is already set.
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         This is the replacement for the removed ``--remote-path PATH`` command line option.

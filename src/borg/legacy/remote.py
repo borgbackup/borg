@@ -394,7 +394,7 @@ class LegacyRemoteRepository:
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""
-        rsh = self._args.rsh or os.environ.get("BORG_RSH", "ssh")
+        rsh = os.environ.get("BORG_RSH", "ssh")
         args = shlex.split(rsh)
         if location.port:
             args += ["-p", str(location.port)]

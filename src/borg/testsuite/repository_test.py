@@ -9,7 +9,7 @@ from borghash import HashTableNT
 
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
-from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter, PackReader
+from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
 from ..repository import PackTracker
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
@@ -32,6 +32,23 @@ def test_rest_serve_command_ssh(monkeypatch):
     cmd = rest_serve_command(Location("rest://user@host/repo/path"))
     assert cmd[:2] == ["ssh", "user@host"]
     assert cmd[-5:] == ["borg", "serve", "--rest", "--backend", "FILE:repo/path"]
+
+
+def test_propagate_rsh(monkeypatch):
+    # BORG_RSH is given to borgstore as BORGSTORE_RSH...
+    monkeypatch.setenv("BORG_RSH", "ssh -i /path/to/key")
+    monkeypatch.delenv("BORGSTORE_RSH", raising=False)
+    propagate_rsh()
+    assert os.environ["BORGSTORE_RSH"] == "ssh -i /path/to/key"
+    # ...except if BORGSTORE_RSH was set explicitly.
+    monkeypatch.setenv("BORGSTORE_RSH", "other-ssh")
+    propagate_rsh()
+    assert os.environ["BORGSTORE_RSH"] == "other-ssh"
+    # nothing to propagate if BORG_RSH is not set.
+    monkeypatch.delenv("BORG_RSH")
+    monkeypatch.delenv("BORGSTORE_RSH")
+    propagate_rsh()
+    assert "BORGSTORE_RSH" not in os.environ
 
 
 @pytest.fixture()

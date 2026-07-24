@@ -106,6 +106,17 @@ def rest_serve_command(location):
     ]
 
 
+def propagate_rsh():
+    """Give borgstore the remote shell command borg uses.
+
+    borg has BORG_RSH, borgstore has its own BORGSTORE_RSH - if only the borg one is set,
+    borgstore shall use it, too. An explicitly set BORGSTORE_RSH always wins.
+    """
+    borg_rsh = os.environ.get("BORG_RSH")
+    if borg_rsh and not os.environ.get("BORGSTORE_RSH"):
+        os.environ["BORGSTORE_RSH"] = borg_rsh
+
+
 def build_rest_backend(location):
     """Return a borgstore REST backend for a rest:// *location*, served by "borg serve --rest"."""
     return REST(base_url="http://stdio-backend", command=rest_serve_command(location))
@@ -465,6 +476,8 @@ class Repository:
             if cache_size:
                 ns_config["packs/"]["size"] = int(cache_size)
             cache_url = cache_dir.as_uri()
+
+        propagate_rsh()  # borgstore shall use the same remote shell command as borg
 
         try:
             if location.proto == "rest":

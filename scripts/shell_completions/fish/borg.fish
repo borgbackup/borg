@@ -90,7 +90,6 @@ complete -c borg -f      -l 'umask'                 -d 'Set umask to M [0077]'
 complete -c borg -f      -l 'upload-ratelimit'      -d 'Set network upload rate limit in KiB/s'
 complete -c borg -f      -l 'upload-buffer'         -d 'Set network upload buffer size in MiB'
 complete -c borg         -l 'debug-profile'         -d 'Write execution profile into FILE'
-complete -c borg         -l 'rsh'                   -d 'Use COMMAND instead of ssh'
 complete -c borg         -l 'socket'                -d 'Use UNIX domain socket at PATH'
 
 # borg analyze options

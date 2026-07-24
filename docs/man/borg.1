@@ -457,8 +457,9 @@ A basic example conf can be found at \fBdocs/misc/logging.conf\fP\&.
 .TP
 .B BORG_RSH
 When set, use this command instead of \fBssh\fP\&. This can be used to specify ssh options, such as
-a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options. Using
-the \fB\-\-rsh CMD\fP command line option overrides the environment variable.
+a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options.
+This is the replacement for the removed \fB\-\-rsh CMD\fP command line option.
+borg also gives this to borgstore as \fBBORGSTORE_RSH\fP, except if that is already set.
 .TP
 .B BORG_REMOTE_PATH
 When set, use the given path as borg executable on the remote (defaults to \(dqborg\(dq if unset).

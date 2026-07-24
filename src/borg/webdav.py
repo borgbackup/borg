@@ -474,7 +474,18 @@ def make_row(href, text, size="", mtime_ns=None):
 
 
 class WebDAVHandler(BaseHTTPRequestHandler):
+    # HTTP/1.1 keeps connections alive by default, so a client can reuse one connection
+    # for its many requests instead of reconnecting each time.
     protocol_version = "HTTP/1.1"
+    # Disable Nagle's algorithm (set TCP_NODELAY): its interaction with delayed ACKs can
+    # add ~40 ms to a small request/response, which really hurts WebDAV clients that issue
+    # lots of small PROPFIND/HEAD/GET requests.
+    disable_nagle_algorithm = True
+    # Buffer the response so the several small writes of one response (status line, headers,
+    # HTML rows, tar block framing) coalesce into few packets/syscalls; writes larger than
+    # the buffer (file/tar chunk data) still pass straight through. handle_one_request()
+    # flushes wfile after each request, so buffering does not delay the response.
+    wbufsize = 64 * 1024
     server_version = f"borg-webdav/{__version__}"
     sys_version = ""  # do not tell clients about the python version we use
 

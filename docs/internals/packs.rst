@@ -53,6 +53,22 @@ The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
 ``len(OBJ_MAGIC)`` + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
 ``REPOOBJ_HEADER_SIZE = len(OBJ_MAGIC) + 1 + 32 + 4 + 4 = 49``
 
+The header stays cleartext (traversal must be possible without a key). Format version ``0x02``
+(``OBJ_VERSION_HEADER_AAD``) binds its first 41 bytes (``OBJ_MAGIC`` + version + ``chunk_id`` --
+``REPOOBJ_HEADER_AAD_SIZE``) into the AEAD authentication of ``encrypted_meta`` and ``encrypted_data``
+as additional authenticated data (AAD: data that is authenticated together with the ciphertext, but
+not itself encrypted). ``meta_size`` and ``data_size`` are not included in the AAD, since they are
+only known after encryption; tampering with them still fails authentication, because it changes the
+length of the ciphertext slice being decrypted. A forged ``chunk_id``, version, or magic byte
+therefore fails AEAD authentication in ``RepoObj.parse()``/``parse_meta()``.
+
+Format version ``0x01`` (``OBJ_VERSION_NO_HEADER_AAD``) authenticates ``encrypted_meta`` and
+``encrypted_data`` with ``aad=chunk_id`` only, without the header bound in. ``RepoObj.format()``
+writes version ``0x02``; ``parse()``/``parse_meta()`` accept both versions.
+
+``iter_headers()`` (used for pack recovery/compaction, see below) reads the header without
+decrypting, so it does not check header AAD authentication.
+
 .. figure:: pack-objheader.png
     :width: 100%
     :figclass: figure-padded
@@ -60,7 +76,8 @@ The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
 
     The fixed 49-byte blob header. ``meta_size`` and ``data_size`` drive
     traversal; integrity comes from the content-addressed pack name and the
-    per-blob AEAD.
+    per-blob AEAD, which authenticates magic/version/chunk_id as additional
+    authenticated data.
 
 A reader locates the next blob by advancing::
 

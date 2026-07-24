@@ -258,10 +258,10 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key"""
         raise NotImplementedError
 
-    def encrypt(self, id, data):
+    def encrypt(self, id, data, header=b""):
         pass
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, header=b""):
         pass
 
     def assert_id(self, id, data):
@@ -340,10 +340,10 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, id, data):
+    def encrypt(self, id, data, header=b""):
         return b"".join([self.TYPE_STR, data])
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, header=b""):
         self.assert_type(data[0], id)
         return memoryview(data)[1:]
 
@@ -379,16 +379,17 @@ class AESKeyBase(KeyBase):
 
     logically_encrypted = True
 
-    def encrypt(self, id, data):
+    def encrypt(self, id, data, header=b""):
         # legacy, this is only used by the tests.
         next_iv = self.cipher.next_iv()
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, header=b""):
         self.assert_type(data[0], id)
         try:
             return self.cipher.decrypt(data)
-        except IntegrityError as e:
+        except low_level.IntegrityError as e:
+            # see AEADKeyBase.decrypt: same exception hierarchy.
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
@@ -978,10 +979,10 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         if manifest_data is not None:
             self.assert_type(manifest_data[0])
 
-    def encrypt(self, id, data):
+    def encrypt(self, id, data, header=b""):
         return b"".join([self.TYPE_STR, data])
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, header=b""):
         self.assert_type(data[0], id)
         return memoryview(data)[1:]
 
@@ -1071,17 +1072,19 @@ class AEADKeyBase(KeyBase):
             if not hmac.compare_digest(id_computed, id):
                 raise IntegrityError("Chunk %s: id verification failed" % bin_to_hex(id))
 
-    def encrypt(self, id, data):
+    def encrypt(self, id, data, header=b""):
         # to encrypt new data in this session we use always self.cipher and self.sessionid
+        # header is additional authenticated data (AAD): authenticated together with data, but not
+        # encrypted or returned.
         reserved = b"\0"
         iv = self.cipher.next_iv()
         if iv > self.MAX_IV:  # see the data-structures docs about why the IV range is enough
             raise IntegrityError("IV overflow, should never happen.")
         iv_48bit = iv.to_bytes(6, "big")
-        header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
-        return self.cipher.encrypt(data, header=header, iv=iv, aad=id)
+        envelope_header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
+        return self.cipher.encrypt(data, header=envelope_header, iv=iv, aad=header + id)
 
-    def decrypt(self, id, data):
+    def decrypt(self, id, data, header=b""):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
         self.assert_type(data[0], id)
         iv_48bit = data[2:8]
@@ -1089,8 +1092,9 @@ class AEADKeyBase(KeyBase):
         iv = int.from_bytes(iv_48bit, "big")
         cipher = self._get_cipher(sessionid, iv)
         try:
-            return cipher.decrypt(data, aad=id)
-        except IntegrityError as e:
+            return cipher.decrypt(data, aad=header + id)
+        except low_level.IntegrityError as e:
+            # cipher.decrypt raises low_level.IntegrityError; helpers.IntegrityError is a subclass of it.
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):

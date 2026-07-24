@@ -69,6 +69,7 @@ General:
         the ``--rsh CMD`` command line option overrides the environment variable.
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
+        This is the replacement for the removed ``--remote-path PATH`` command line option.
     BORG_REPO_PERMISSIONS
         Set repository permissions, see also: :ref:`borg_serve`
     BORG_FILES_CACHE_SUFFIX

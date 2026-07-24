@@ -404,7 +404,7 @@ borg help placeholders
 
 
 Repository URLs, ``--name``, ``-a`` / ``--match-archives``, ``--comment``
-and ``--remote-path`` values support these placeholders:
+and ``BORG_REMOTE_PATH`` values support these placeholders:
 
 {hostname}
     The (short) hostname of the machine.

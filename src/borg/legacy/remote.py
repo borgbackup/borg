@@ -388,13 +388,13 @@ class LegacyRemoteRepository:
         if testing:
             return env_vars + [sys.executable, "-m", "borg", "serve"] + opts + self.extra_test_args
         else:  # pragma: no cover
-            remote_path = args.remote_path or os.environ.get("BORG_REMOTE_PATH", "borg")
+            remote_path = os.environ.get("BORG_REMOTE_PATH", "borg")
             remote_path = replace_placeholders(remote_path)
             return env_vars + [remote_path, "serve"] + opts
 
     def ssh_cmd(self, location):
         """return a ssh command line that can be prefixed to a borg command line"""
-        rsh = self._args.rsh or os.environ.get("BORG_RSH", "ssh")
+        rsh = os.environ.get("BORG_RSH", "ssh")
         args = shlex.split(rsh)
         if location.port:
             args += ["-p", str(location.port)]

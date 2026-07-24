@@ -756,7 +756,18 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         content_disposition = self._content_disposition(name)  # CR/LF-sanitized, see there
         self.send_header("Content-Disposition", content_disposition)
         self.end_headers()
-        if head or not node.chunks or node.size == 0:
+        if head or node.size == 0:
+            return  # no body to send (and Content-Length is 0 for an empty file)
+        if not node.chunks:
+            # anomaly: a non-empty file with no chunks list (e.g. corrupted metadata). We
+            # already sent Content-Length > 0, so abort the connection instead of leaving
+            # the client waiting forever for body bytes that will never arrive.
+            logger.error(
+                "webdav: file %s has size %d but no chunks, aborting the connection.",
+                remove_surrogates(name),
+                node.size,
+            )
+            self.close_connection = True
             return
         # select only the chunks overlapping the requested range, so nothing else
         # gets fetched and decrypted (the chunk sizes are known in advance).
@@ -883,10 +894,21 @@ class WebDAVHandler(BaseHTTPRequestHandler):
     def _send_tar_content(self, item, size, pipeline):
         """Stream *item*'s file content into the tar, padded to a 512-byte block boundary.
 
-        Returns False (after logging) if a chunk is missing in the repository, so the
-        caller aborts the connection instead of emitting silently corrupted content.
+        Returns False (after logging) if the content cannot be produced in full (a chunk
+        missing in the repository, or a non-empty item with no chunks list), so the caller
+        aborts the connection instead of emitting a silently corrupted (short) tar member.
         """
-        for entry in item.get("chunks") or []:
+        chunks = item.get("chunks") or []
+        if size > 0 and not chunks:
+            # anomaly: a non-empty item with no chunks list (e.g. corrupted metadata). The
+            # tar header already declared size > 0, so we cannot emit a valid member.
+            logger.error(
+                "webdav: tar member %s has size %d but no chunks, aborting the connection.",
+                remove_surrogates(item.path),
+                size,
+            )
+            return False
+        for entry in chunks:
             # fetch under the lock, write to the client outside it (see _send_tar).
             with self.repo_lock:
                 data = next(pipeline.fetch_many([entry], ro_type=ROBJ_FILE_STREAM, replacement_chunk=False))

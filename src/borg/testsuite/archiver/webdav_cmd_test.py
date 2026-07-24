@@ -498,6 +498,40 @@ def test_webdav_conditional_get(archivers, request):
         assert status == 200 and body == b"data1"
 
 
+def test_webdav_file_without_chunks(archivers, request):
+    # An anomalous item - size > 0 but no chunks list (e.g. corrupted metadata) - must not
+    # leave the client hanging after an advertised Content-Length: the server aborts the
+    # connection instead, so the client sees a short read rather than waiting forever.
+    archiver = request.getfixturevalue(archivers)
+    _create_archive(archiver)
+    args = SimpleNamespace(
+        sort_by="ts", match_archives=None, first=None, last=None, older=None, newer=None, oldest=None, newest=None
+    )
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        server = make_server(manifest, args, port=0)
+        # corrupt the in-memory tree: pretend file1 is non-empty but has no chunks
+        node, _ = server.RequestHandlerClass.vfs.resolve(["test", "input", "file1"])
+        node.size = 5
+        node.chunks = None
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1])
+            conn.request("GET", "/test/input/file1")
+            response = conn.getresponse()
+            assert response.status == 200
+            assert response.getheader("Content-Length") == "5"  # a body was promised...
+            with pytest.raises(http.client.IncompleteRead):
+                response.read()  # ...but the connection is aborted with no body
+            conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=10)
+
+
 @pytest.mark.skipif(is_win32 or not hasattr(os, "mkfifo"), reason="fifo (a special file) needs POSIX")
 def test_webdav_special_files(archivers, request):
     # A named pipe stands in for special files (devices, fifos, sockets): it is shown in

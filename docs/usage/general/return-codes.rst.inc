@@ -11,8 +11,8 @@ Return code Meaning
             were warnings - you should check the log; logged as WARNING)
 2           generic error (such as a fatal error or a local/remote exception;
             the operation did not reach its normal end; logged as ERROR)
-3..99       specific error (see list below; logged as ERROR)
-100..127    specific warning (see list below; logged as WARNING)
+3..99       specific error (see below; logged as ERROR)
+100..127    specific warning (see below; logged as WARNING)
 128+N       terminated by signal N (e.g. 130 == SIGINT, Ctrl+C, or kill -2;
             logged as ERROR)
 =========== =======
@@ -37,4 +37,4 @@ by default. If you want Borg 2 to always exit with the generic error (rc 2)
 or generic warning (rc 1) code instead (like Borg 1 did), set the
 ``BORG_EXIT_CODES=legacy`` environment variable.
 
-For a list of all specific error and warning codes, see :ref:msgid.
+For a list of all specific error and warning codes, see :ref:`msgid`.

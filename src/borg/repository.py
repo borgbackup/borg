@@ -21,6 +21,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .helpers import get_cache_dir
+from .helpers import replace_placeholders
 from .helpers import sig_int
 from .helpers import ProgressIndicatorPercent
 from .helpers.lrucache import LRUCache
@@ -95,7 +96,7 @@ def rest_serve_command(location):
         borg_cmd = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "borg"]
         return borg_cmd + ["serve", "--rest", "--backend", backend_arg]
     # reach the remote borg via ssh
-    remote_path = os.environ.get("BORG_REMOTE_PATH", "borg")
+    remote_path = replace_placeholders(os.environ.get("BORG_REMOTE_PATH", "borg"))
     return ssh_cmd(location.user, location.host, location.port) + [
         remote_path,
         "serve",

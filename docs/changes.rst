@@ -106,6 +106,7 @@ Compatibility notes:
   - removed --noatime (default now, see also --atime)
   - removed --save-space option (does not change behaviour)
 - removed --bypass-lock option
+- removed --remote-path option (use the BORG_REMOTE_PATH environment variable)
 - removed borg config command (only worked locally anyway)
 - compact command now requires access to the borg key if the repo is encrypted
   or authenticated

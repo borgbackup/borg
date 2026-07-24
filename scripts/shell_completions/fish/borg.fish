@@ -87,7 +87,6 @@ complete -c borg -f      -l 'lock-wait'             -d 'Wait for lock max N seco
 complete -c borg -f      -l 'show-version'          -d 'Log version information'
 complete -c borg -f      -l 'show-rc'               -d 'Log the return code'
 complete -c borg -f      -l 'umask'                 -d 'Set umask to M [0077]'
-complete -c borg         -l 'remote-path'           -d 'Use PATH as remote borg executable'
 complete -c borg -f      -l 'upload-ratelimit'      -d 'Set network upload rate limit in KiB/s'
 complete -c borg -f      -l 'upload-buffer'         -d 'Set network upload buffer size in MiB'
 complete -c borg         -l 'debug-profile'         -d 'Write execution profile into FILE'

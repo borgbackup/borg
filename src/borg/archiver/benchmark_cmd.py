@@ -23,8 +23,6 @@ class BenchmarkMixIn:
             # we need to inherit some essential options from the "borg benchmark crud" invocation
             if args.rsh is not None:
                 cmd[1:1] = ["--rsh", args.rsh]
-            if args.remote_path is not None:
-                cmd[1:1] = ["--remote-path", args.remote_path]
             return self.parse_args(cmd)
 
         def measurement_run(repo, path):

@@ -548,13 +548,6 @@ def define_common_options(add_common_option):
         help="set umask to M (local only, default: %(default)04o)",
     )
     add_common_option(
-        "--remote-path",
-        metavar="PATH",
-        dest="remote_path",
-        action=Highlander,
-        help='use PATH as borg executable on the remote (default: "borg")',
-    )
-    add_common_option(
         "--upload-ratelimit",
         metavar="RATE",
         dest="upload_ratelimit",

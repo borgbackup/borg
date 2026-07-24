@@ -388,7 +388,7 @@ class LegacyRemoteRepository:
         if testing:
             return env_vars + [sys.executable, "-m", "borg", "serve"] + opts + self.extra_test_args
         else:  # pragma: no cover
-            remote_path = args.remote_path or os.environ.get("BORG_REMOTE_PATH", "borg")
+            remote_path = os.environ.get("BORG_REMOTE_PATH", "borg")
             remote_path = replace_placeholders(remote_path)
             return env_vars + [remote_path, "serve"] + opts
 

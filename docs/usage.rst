@@ -60,6 +60,7 @@ Usage
    usage/info
    usage/analyze
    usage/mount
+   usage/webdav
    usage/recreate
    usage/tar
 

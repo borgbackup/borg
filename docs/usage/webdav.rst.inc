@@ -1,0 +1,140 @@
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
+.. _borg_webdav:
+
+borg webdav
+-----------
+.. code-block:: none
+
+    borg [common options] webdav [options]
+
+.. only:: html
+
+    .. class:: borg-options-table
+
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    | **options**                                                                                                                                                                                                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-f``, ``--foreground``                     | stay in foreground, do not daemonize                                                                                        |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--port PORT``                              | TCP port to listen on (on localhost); default: 8000                                                                         |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
+    |                                                                                                                                                                                                                                                          |
+    | :ref:`common_options`                                                                                                                                                                                                                                    |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. See "borg help match-archives".                                               |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--first N``                                | consider the first N archives after other filters are applied                                                               |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--last N``                                 | consider the last N archives after other filters are applied                                                                |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.                          |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.                          |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+
+    .. raw:: html
+
+        <script type='text/javascript'>
+        $(document).ready(function () {
+            $('.borg-options-table colgroup').remove();
+        })
+        </script>
+
+.. only:: latex
+
+
+
+    options
+        -f, --foreground     stay in foreground, do not daemonize
+        --port PORT          TCP port to listen on (on localhost); default: 8000
+
+
+    :ref:`common_options`
+        |
+
+    Archive filters
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. See "borg help match-archives".
+        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
+        --first N                                consider the first N archives after other filters are applied
+        --last N                                 consider the last N archives after other filters are applied
+        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
+        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g., 7d or 12m.
+        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.
+
+
+Description
+~~~~~~~~~~~
+
+This command serves the contents of the selected archives via a read-only
+WebDAV / HTTP server, so the archive contents can be:
+
+- browsed and downloaded with a web browser,
+- mounted as a read-only network file system, using the WebDAV client
+  built into most operating systems and file managers.
+
+Mounting examples:
+
+- Windows Explorer: "Map network drive" -> ``http://localhost:8000/``
+  (or on the command line: ``net use Z: http://localhost:8000/``).
+- macOS Finder: "Go > Connect to Server" (Cmd-K) -> ``http://localhost:8000``.
+- GNOME Files / KDE Dolphin: open ``dav://localhost:8000/``.
+- Linux kernel mount: ``mount -t davfs http://localhost:8000/ /mnt/point``
+  (needs the davfs2 package).
+
+The server listens on localhost (127.0.0.1) only and offers no
+authentication and no encryption - anything that can connect to
+localhost TCP ports on the machine can read the served archive contents.
+
+The top level lists the selected archives (use the archive filter options
+to select fewer archives); below that, the archive contents can be
+browsed like a directory tree. The directory tree of an archive is built
+in memory when it is first entered, so expect some delay for big archives.
+
+Any directory can be downloaded as a tar archive by appending ``?tar`` to its
+URL (the web browser listings show a download icon next to the heading for this).
+Unlike a plain file
+download, the tar preserves POSIX metadata (owner, group, mode, sub-second
+timestamps, symlinks, special files, xattrs, ACLs), so it is the metadata-
+lossless way to restore a whole directory tree over this server. It is a PAX
+format tarball, streamed uncompressed.
+
+Notes:
+
+- Plain (non-tar) file downloads do not preserve any POSIX metadata (owner,
+  group, mode, timestamps, xattrs, ACLs). Use the ``?tar`` download above, or
+  ``borg extract`` / ``borg export-tar``, for full-fidelity restores.
+- Symbolic links and special files (devices, fifos, sockets) are shown
+  in the web browser listings, but are neither followed nor downloadable
+  individually, and they are not visible in WebDAV-mounted directories
+  (WebDAV has no concept of them). They are, however, included in ``?tar``
+  downloads.
+- Damaged files (with chunks missing in the repository) cause the
+  download connection to be aborted - the server never silently serves
+  corrupted file content.
+- The Windows WebDAV client limits file downloads to about 47 MiB by
+  default (``FileSizeLimitInBytes`` registry value) - use a web browser
+  or another WebDAV client to download bigger files.
+
+Recently used file content chunks are kept decrypted in an in-memory cache,
+so that the many small, sequential range requests a mounted file system
+does for a big file do not re-fetch and re-decrypt the same chunk over and
+over. As for ``borg mount``, the ``BORG_MOUNT_DATA_CACHE_ENTRIES`` environment
+variable sets the number of cached chunks (default: number of CPUs);
+additional memory usage can be up to the chunk size times this number.
+
+Unless the ``--foreground`` option is given, the command daemonizes and runs
+in the background until it is stopped by sending it a signal (e.g. ``kill``
+sends SIGTERM), which shuts the server down and releases the repository lock.
+In the foreground, ^C / SIGINT stops it. Daemonizing is not available on
+Windows, so the command always stays in the foreground there.

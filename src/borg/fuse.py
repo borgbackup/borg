@@ -95,7 +95,8 @@ def fuse_main():
 
 # on Linux, the kernel exposes POSIX ACLs via these special, binary encoded xattrs.
 # maps the xattr name to the borg item attribute holding the ACL text.
-ACL_XATTRS = {b"system.posix_acl_access": "acl_access", b"system.posix_acl_default": "acl_default"}
+# empty on platforms we can not do this for, so the mount just does not offer these xattrs there.
+ACL_XATTRS = {b"system.posix_acl_access": "acl_access", b"system.posix_acl_default": "acl_default"} if is_linux else {}
 
 # size of some LRUCaches (1 element per simultaneously open file)
 # note: _inode_cache might have rather large elements - Item.chunks can be large!
@@ -681,15 +682,14 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     def listxattr(self, inode, ctx=None):
         item = self.get_item(inode)
         names = list(item.get("xattrs", {}).keys())
-        if is_linux:
-            # expose the archived POSIX ACLs, so e.g. getfacl or tools copying from the mount can read them.
-            names.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if attr in item)
+        # expose the archived POSIX ACLs, so e.g. getfacl or tools copying from the mount can read them.
+        names.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if attr in item)
         return names
 
     @async_wrapper
     def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
-        if is_linux and name in ACL_XATTRS:
+        if name in ACL_XATTRS:
             acl = item.get(ACL_XATTRS[name])
             if acl is None:
                 raise llfuse.FUSEError(ENOATTR)

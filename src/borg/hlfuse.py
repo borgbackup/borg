@@ -39,7 +39,8 @@ BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
 
 # on Linux, the kernel exposes POSIX ACLs via these special, binary encoded xattrs.
 # maps the xattr name to the borg item attribute holding the ACL text.
-ACL_XATTRS = {"system.posix_acl_access": "acl_access", "system.posix_acl_default": "acl_default"}
+# empty on platforms we can not do this for, so the mount just does not offer these xattrs there.
+ACL_XATTRS = {"system.posix_acl_access": "acl_access", "system.posix_acl_default": "acl_default"} if is_linux else {}
 
 DEBUG_LOG: str | None = None  # os.path.join(os.getcwd(), "fuse_debug.log")
 
@@ -591,9 +592,8 @@ class borgfs(hlfuse.Operations, FuseBackend):
             raise hlfuse.FuseOSError(errno.ENOENT)
         item = self.get_inode(node.ino)
         result = [k.decode("utf-8", "surrogateescape") for k in item.get("xattrs", {}).keys()]
-        if is_linux:
-            # expose the archived POSIX ACLs, so e.g. getfacl or tools copying from the mount can read them.
-            result.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if attr in item)
+        # expose the archived POSIX ACLs, so e.g. getfacl or tools copying from the mount can read them.
+        result.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if attr in item)
         debug_log(f"listxattr -> {result}")
         return result
 
@@ -604,7 +604,7 @@ class borgfs(hlfuse.Operations, FuseBackend):
             raise hlfuse.FuseOSError(errno.ENOENT)
         item = self.get_inode(node.ino)
         name_str = name if isinstance(name, str) else name.decode("utf-8", "surrogateescape")
-        if is_linux and name_str in ACL_XATTRS:
+        if name_str in ACL_XATTRS:
             acl = item.get(ACL_XATTRS[name_str])
             if acl is None:
                 debug_log("getxattr -> ENOATTR")

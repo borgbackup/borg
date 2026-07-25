@@ -505,7 +505,7 @@ class Archiver(
                         # because the latter is insecure. Since these files may be shared over the
                         # internet we don't want a format that is impossible to interpret outside
                         # an insecure implementation.
-                        # See scripts/msgpack2marshal.py for a small script that turns a msgpack file
+                        # See "borg debug convert-profile" for turning such a msgpack file
                         # into a marshal file that can be read by e.g. pyprof2calltree.
                         # For local use it's unnecessary hassle, though, that's why .pyprof makes
                         # it compatible (see above).

@@ -30,7 +30,7 @@ Python profiling tools, since these use the "marshal" format, which is not inten
 to be secure (quoting the Python docs: "Never unmarshal data received from an untrusted
 or unauthenticated source.").
 
-The ``borg debug profile-convert`` command can be used to take a Borg profile and convert
+The ``borg debug convert-profile`` command can be used to take a Borg profile and convert
 it to a profile file that is compatible with the Python tools.
 
 Additionally, if the filename given via ``BORG_DEBUG_PROFILE`` ends with ".pyprof", a

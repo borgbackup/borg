@@ -548,22 +548,6 @@ def define_common_options(add_common_option):
         help="set umask to M (local only, default: %(default)04o)",
     )
     add_common_option(
-        "--upload-ratelimit",
-        metavar="RATE",
-        dest="upload_ratelimit",
-        type=int,
-        action=Highlander,
-        help="set network upload rate limit in kiByte/s (default: 0=unlimited)",
-    )  # legacy
-    add_common_option(
-        "--upload-buffer",
-        metavar="UPLOAD_BUFFER",
-        dest="upload_buffer",
-        type=int,
-        action=Highlander,
-        help="set network upload buffer size in MiB. (default: 0=no buffer)",
-    )  # legacy
-    add_common_option(
         "--debug-profile",
         metavar="FILE",
         dest="debug_profile",

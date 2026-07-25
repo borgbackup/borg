@@ -38,8 +38,6 @@ MSGID, MSG, ARGS, RESULT, LOG = "i", "m", "a", "r", "l"
 
 MAX_INFLIGHT = 100
 
-RATELIMIT_PERIOD = 0.1
-
 
 class ConnectionClosed(Error):
     """Connection closed by remote host."""
@@ -102,37 +100,12 @@ class ConnectionBrokenWithHint(Error):
 # servers still get compatible input.
 
 
-class SleepingBandwidthLimiter:
-    def __init__(self, limit):
-        if limit:
-            self.ratelimit = int(limit * RATELIMIT_PERIOD)
-            self.ratelimit_last = time.monotonic()
-            self.ratelimit_quota = self.ratelimit
-        else:
-            self.ratelimit = None
-
-    def write(self, fd, to_send):
-        if self.ratelimit:
-            now = time.monotonic()
-            if self.ratelimit_last + RATELIMIT_PERIOD <= now:
-                self.ratelimit_quota += self.ratelimit
-                if self.ratelimit_quota > 2 * self.ratelimit:
-                    self.ratelimit_quota = 2 * self.ratelimit
-                self.ratelimit_last = now
-            if self.ratelimit_quota == 0:
-                tosleep = self.ratelimit_last + RATELIMIT_PERIOD - now
-                time.sleep(tosleep)
-                self.ratelimit_quota += self.ratelimit
-                self.ratelimit_last = time.monotonic()
-            if len(to_send) > self.ratelimit_quota:
-                to_send = to_send[: self.ratelimit_quota]
-        try:
-            written = os.write(fd, to_send)
-        except BrokenPipeError:
-            raise ConnectionBrokenWithHint("Broken Pipe") from None
-        if self.ratelimit:
-            self.ratelimit_quota -= written
-        return written
+def write_to_fd(fd, to_send):
+    """os.write, but give a nicer exception if the pipe is broken."""
+    try:
+        return os.write(fd, to_send)
+    except BrokenPipeError:
+        raise ConnectionBrokenWithHint("Broken Pipe") from None
 
 
 def api(*, since, **kwargs_decorator):
@@ -249,8 +222,6 @@ class LegacyRemoteRepository:
         self.responses = {}
         self.async_responses = {}
         self.shutdown_time = None
-        self.ratelimit = SleepingBandwidthLimiter(args.upload_ratelimit * 1024 if args and args.upload_ratelimit else 0)
-        self.upload_buffer_size_limit = args.upload_buffer * 1024 * 1024 if args and args.upload_buffer else 0
         self.unpacker = get_limited_unpacker("client")
         self.server_version = None  # we update this after server sends its version
         self.p = None
@@ -415,7 +386,7 @@ class LegacyRemoteRepository:
         def send_buffer():
             if self.to_send:
                 try:
-                    written = self.ratelimit.write(self.stdin_fd, self.to_send.peek_front())
+                    written = write_to_fd(self.stdin_fd, self.to_send.peek_front())
                     self.tx_bytes += written
                     self.to_send.pop_front(written)
                 except OSError as e:
@@ -467,7 +438,6 @@ class LegacyRemoteRepository:
 
         calls = list(calls)
         waiting_for = []
-        maximum_to_send = 0 if wait else self.upload_buffer_size_limit
         send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
         try:
             while wait or calls:
@@ -565,7 +535,7 @@ class LegacyRemoteRepository:
                             # decode late, avoid partial utf-8 sequences.
                             _logger.warning("stderr: " + line.decode().strip())
                 if w:
-                    while (len(self.to_send) <= maximum_to_send) and calls and len(waiting_for) < MAX_INFLIGHT:
+                    while not self.to_send and calls and len(waiting_for) < MAX_INFLIGHT:
                         args = calls.pop(0)
                         self.msgid += 1
                         waiting_for.append(self.msgid)

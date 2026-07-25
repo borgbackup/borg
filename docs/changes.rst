@@ -110,6 +110,7 @@ Compatibility notes:
 - removed --rsh option (use the BORG_RSH environment variable)
 - removed --upload-ratelimit and --upload-buffer options (they only ever
   affected uploads to a borg 1.x repository via ssh://)
+- removed --iec option (use the BORG_IEC environment variable)
 - removed borg config command (only worked locally anyway)
 - compact command now requires access to the borg key if the repo is encrypted
   or authenticated

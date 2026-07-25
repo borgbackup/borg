@@ -71,6 +71,10 @@ General:
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         This is the replacement for the removed ``--remote-path PATH`` command line option.
+    BORG_IEC
+        When set to ``yes``, format sizes using IEC units (1KiB = 1024B) instead of
+        decimal units (1kB = 1000B).
+        This is the replacement for the removed ``--iec`` command line option.
     BORG_REPO_PERMISSIONS
         Set repository permissions, see also: :ref:`borg_serve`
     BORG_FILES_CACHE_SUFFIX

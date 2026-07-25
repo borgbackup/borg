@@ -18,6 +18,7 @@ from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
 from ..helpers import archivename_validator, FilesCacheMode, octal_int
 from ..helpers import eval_escapes
+from ..helpers import use_iec_units
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
 from ..helpers import dir_is_tagged
@@ -228,7 +229,7 @@ class CreateMixIn:
                 manifest,
                 progress=args.progress,
                 cache_mode=args.files_cache_mode,
-                iec=args.iec,
+                iec=use_iec_units(),
                 archive_name=args.name,
             ) as cache:
                 archive = Archive(
@@ -243,7 +244,7 @@ class CreateMixIn:
                     chunker_params=args.chunker_params,
                     start=t0,
                     log_json=args.log_json,
-                    iec=args.iec,
+                    iec=use_iec_units(),
                 )
                 metadata_collector = MetadataCollector(
                     noatime=not args.atime,
@@ -272,7 +273,7 @@ class CreateMixIn:
                     show_progress=args.progress,
                     sparse=args.sparse,
                     log_json=args.log_json,
-                    iec=args.iec,
+                    iec=use_iec_units(),
                     file_status_printer=self.print_file_status,
                     files_changed=args.files_changed,
                 )

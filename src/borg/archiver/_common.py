@@ -9,6 +9,7 @@ from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import SortBySpec, location_validator, Location, relative_time_marker_validator
 from ..helpers import Highlander, octal_int
+from ..helpers import use_iec_units
 from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
@@ -166,7 +167,7 @@ def with_repository(
                         progress=getattr(args, "progress", False),
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
                         start_backup=getattr(self, "start_backup", None),
-                        iec=getattr(args, "iec", False),
+                        iec=use_iec_units(),
                     ) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
                 else:
@@ -237,7 +238,7 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                         manifest_,
                         progress=False,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
-                        iec=getattr(args, "iec", False),
+                        iec=use_iec_units(),
                     ) as cache_:
                         kwargs["other_cache"] = cache_
                         return method(self, args, **kwargs)
@@ -264,7 +265,7 @@ def with_archive(method):
             noxattrs=getattr(args, "noxattrs", False),
             cache=kwargs.get("cache"),
             log_json=args.log_json,
-            iec=args.iec,
+            iec=use_iec_units(),
         )
         return method(self, args, repository=repository, manifest=manifest, archive=archive, **kwargs)
 
@@ -520,7 +521,6 @@ def define_common_options(add_common_option):
         "The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.",
     )
     add_common_option("-p", "--progress", dest="progress", action="store_true", help="show progress information")
-    add_common_option("--iec", dest="iec", action="store_true", help="format using IEC units (1KiB = 1024B)")
     add_common_option(
         "--log-json",
         dest="log_json",

@@ -16,6 +16,7 @@ from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex
 from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin, IntegrityError
 from ..helpers import ProgressIndicatorPercent
+from ..helpers import use_iec_units
 from ..manifest import Manifest
 from ..repository import Repository
 
@@ -537,7 +538,7 @@ class CompactMixIn:
             # is nothing to do and make compaction a silent no-op.
             repository.assert_writable()
         ArchiveGarbageCollector(
-            repository, manifest, stats=args.stats, iec=args.iec, threshold=args.threshold, dry_run=args.dry_run
+            repository, manifest, stats=args.stats, iec=use_iec_units(), threshold=args.threshold, dry_run=args.dry_run
         ).garbage_collect()
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):

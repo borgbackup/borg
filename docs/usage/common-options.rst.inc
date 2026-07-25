@@ -6,7 +6,6 @@
 --debug                  enable debug output, work on log level DEBUG
 --debug-topic TOPIC      enable TOPIC debugging (can be specified multiple times). The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.
 -p, --progress           show progress information
---iec                    format using IEC units (1KiB = 1024B)
 --log-json               Output one JSON object per log line instead of formatted text.
 --lock-wait SECONDS      wait at most SECONDS for acquiring a repository/cache lock (default: 10).
 --show-version           show/log the borg version

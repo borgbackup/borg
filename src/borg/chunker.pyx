@@ -124,6 +124,52 @@ def sparsemap(fd=None, fh=-1):
         dseek(curr, os.SEEK_SET, fd, fh)
 
 
+class ChunkerFailing:
+    """
+    This is a very simple chunker for testing purposes.
+
+    Reads block_size sized blocks. The map parameter controls the behaviour for each
+    block: 'R' (or 'r') == successful read, 'E' (or 'e') == I/O Error. Blocks beyond
+    the end of the map will behave like the last map character indicates.
+    """
+    def __init__(self, block_size, map):
+        self.block_size = block_size
+        # one char per block: r/R = successful read, e/E = I/O Error, e.g.: "rrrrErrrEEr"
+        # blocks beyond the map will behave like the last map char indicates.
+        map = map.upper()
+        if not set(map).issubset({'R', 'E'}):
+            raise ValueError('unsupported map character')
+        self.map = map
+        self.count = 0
+        self.chunking_time = 0.0  # not updated, just provided so that caller does not crash
+
+    def chunkify(self, fd=None, fh=-1, fmap=None):
+        """
+        Cut a file into chunks.
+
+        :param fd: Python file object
+        :param fh: OS-level file handle (if available),
+                   defaults to -1 which means not to use OS-level fd.
+        """
+        use_fh = fh >= 0
+        wanted = self.block_size
+        while True:
+            data = os.read(fh, wanted) if use_fh else fd.read(wanted)
+            got = len(data)
+            if got > 0:
+                idx = self.count if self.count < len(self.map) else -1
+                behaviour = self.map[idx]
+                self.count += 1
+                if behaviour == 'E':
+                    fname = None if use_fh else getattr(fd, 'name', None)
+                    raise OSError(errno.EIO, 'simulated I/O error', fname)
+                elif behaviour == 'R':
+                    yield Chunk(data, size=got, allocation=CH_DATA)
+            if got < wanted:
+                # we did not get enough data, looks like EOF.
+                return
+
+
 class ChunkerFixed:
     """
     This is a simple chunker for input data with data usually staying at same
@@ -289,6 +335,8 @@ def get_chunker(algo, *params, **kw):
     if algo == 'fixed':
         sparse = kw['sparse']
         return ChunkerFixed(*params, sparse=sparse)
+    if algo == 'fail':
+        return ChunkerFailing(*params)
     raise TypeError('unsupported chunker algo %r' % algo)
 
 

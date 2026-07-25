@@ -11,6 +11,7 @@ from ..platformflags import is_win32, is_linux, is_freebsd, is_netbsd, is_darwin
 from .base import ENOATTR
 from .base import SaveFile, sync_dir, fdatasync, safe_fadvise
 from .base import get_process_id, fqdn, hostname, hostid, swidth
+from .base import acl_text_to_xattr  # overridden below for platforms supporting it
 
 # work around pyinstaller "forgetting" to include the xattr module
 from . import xattr  # noqa: F401
@@ -20,6 +21,7 @@ platform_ug: ModuleType | None = None  # make mypy happy
 if is_linux:  # pragma: linux only
     from .linux import listxattr, getxattr, setxattr
     from .linux import acl_get, acl_set
+    from .linux import acl_text_to_xattr  # type: ignore[no-redef]
     from .linux import set_flags, get_flags
     from .linux import SyncFile
     from .posix import process_alive, local_pid_alive

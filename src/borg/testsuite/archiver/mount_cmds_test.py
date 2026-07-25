@@ -18,7 +18,8 @@ from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, has_any_fuse, ENOATTR
 from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
-from ..platform.platform_test import fakeroot_detected
+from ..platform.platform_test import fakeroot_detected, skipif_not_linux, skipif_fakeroot_detected
+from ..platform.platform_test import skipif_acls_not_working
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 
@@ -170,6 +171,62 @@ def test_fuse(archivers, request):
                 pass
             else:
                 raise
+
+
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+@skipif_not_linux
+@skipif_fakeroot_detected
+@skipif_acls_not_working
+def test_fuse_acls(archivers, request):
+    # on Linux, the FUSE mount exposes archived POSIX ACLs via the system.posix_acl_* xattrs.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    file_path = os.path.join(archiver.input_path, "file1")
+    access_acl = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n"
+    default_acl = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:r--:9999\ngroup:root:r--:9999\n"
+    platform.acl_set(file_path, {"acl_access": access_acl})
+    dir_path = os.path.join(archiver.input_path, "dir1")
+    os.mkdir(dir_path)
+    platform.acl_set(dir_path, {"acl_access": access_acl, "acl_default": default_acl})
+    cmd(archiver, "create", "archive", "input")
+    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
+    with fuse_mount(archiver, mountpoint, "-a", "archive"):
+        mounted_file = os.path.join(mountpoint, "archive", "input", "file1")
+        mounted_dir = os.path.join(mountpoint, "archive", "input", "dir1")
+        # the ACL xattrs must be listed:
+        assert "system.posix_acl_access" in os.listxattr(mounted_file)
+        assert "system.posix_acl_default" not in os.listxattr(mounted_file)
+        assert "system.posix_acl_access" in os.listxattr(mounted_dir)
+        assert "system.posix_acl_default" in os.listxattr(mounted_dir)
+        # the binary xattr values must be identical to what the kernel provides for the source fs objects:
+        try:
+            mounted_file_acl = os.getxattr(mounted_file, "system.posix_acl_access")
+        except OSError as e:
+            if e.errno == errno.ENOTSUP:
+                # the kernel refuses POSIX ACL xattr passthrough for FUSE mounts inside user
+                # namespaces (e.g. rootless containers) unless FUSE_POSIX_ACL is negotiated,
+                # which our FUSE implementations do not support.
+                pytest.skip("kernel refuses ACL xattrs on FUSE mounts inside user namespaces")
+            raise
+        assert mounted_file_acl == os.getxattr(file_path, "system.posix_acl_access")
+        for name in ("system.posix_acl_access", "system.posix_acl_default"):
+            assert os.getxattr(mounted_dir, name) == os.getxattr(dir_path, name)
+        # borg's own ACL code (going through libacl, like getfacl or tools copying
+        # from the mount would) must see the same ACLs through the mount:
+        item_src, item_mnt = {}, {}
+        platform.acl_get(file_path, item_src, os.stat(file_path))
+        platform.acl_get(mounted_file, item_mnt, os.stat(mounted_file))
+        assert item_src["acl_access"] == item_mnt["acl_access"]
+        item_src, item_mnt = {}, {}
+        platform.acl_get(dir_path, item_src, os.stat(dir_path))
+        platform.acl_get(mounted_dir, item_mnt, os.stat(mounted_dir))
+        assert item_src["acl_access"] == item_mnt["acl_access"]
+        assert item_src["acl_default"] == item_mnt["acl_default"]
+    # also check with --numeric-ids:
+    with fuse_mount(archiver, mountpoint, "-a", "archive", "--numeric-ids"):
+        mounted_file = os.path.join(mountpoint, "archive", "input", "file1")
+        assert os.getxattr(mounted_file, "system.posix_acl_access") == os.getxattr(file_path, "system.posix_acl_access")
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")

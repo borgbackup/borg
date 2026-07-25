@@ -74,8 +74,8 @@ from .helpers import msgpack
 from .storelocking import LockRefresher
 from .helpers.lrucache import LRUCache
 from .item import Item
-from .platform import uid2user, gid2group
-from .platformflags import is_darwin
+from .platform import uid2user, gid2group, acl_text_to_xattr
+from .platformflags import is_darwin, is_linux
 from .repository import Repository
 
 
@@ -92,6 +92,10 @@ def fuse_main():
     else:
         return llfuse.main(workers=1)
 
+
+# on Linux, the kernel exposes POSIX ACLs via these special, binary encoded xattrs.
+# maps the xattr name to the borg item attribute holding the ACL text.
+ACL_XATTRS = {b"system.posix_acl_access": "acl_access", b"system.posix_acl_default": "acl_default"}
 
 # size of some LRUCaches (1 element per simultaneously open file)
 # note: _inode_cache might have rather large elements - Item.chunks can be large!
@@ -676,11 +680,24 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     @async_wrapper
     def listxattr(self, inode, ctx=None):
         item = self.get_item(inode)
-        return item.get("xattrs", {}).keys()
+        names = list(item.get("xattrs", {}).keys())
+        if is_linux:
+            # expose the archived POSIX ACLs, so e.g. getfacl or tools copying from the mount can read them.
+            names.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if attr in item)
+        return names
 
     @async_wrapper
     def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
+        if is_linux and name in ACL_XATTRS:
+            acl = item.get(ACL_XATTRS[name])
+            if acl is None:
+                raise llfuse.FUSEError(ENOATTR)
+            try:
+                return acl_text_to_xattr(acl, numeric_ids=self.numeric_ids)
+            except ValueError:
+                logger.warning("mount: could not convert ACL of inode %d to the xattr representation", inode)
+                raise llfuse.FUSEError(errno.EIO) from None
         try:
             return item.get("xattrs", {})[name] or b""
         except KeyError:

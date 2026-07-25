@@ -100,7 +100,7 @@ Compatibility notes:
     now (was: UTC)
 - some deprecated options were removed:
 
-  - removed --remote-ratelimit (use --upload-ratelimit)
+  - removed --remote-ratelimit (dropped entirely, no replacement)
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)

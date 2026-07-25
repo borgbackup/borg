@@ -1,3 +1,5 @@
+.. _debugging:
+
 Debugging Facilities
 --------------------
 
@@ -21,8 +23,9 @@ what you are doing or if a trusted Borg developer tells you what to do.
 Borg has a ``--debug-topic TOPIC`` option to enable specific debugging messages. Topics
 are generally not documented.
 
-A ``--debug-profile FILE`` option exists which writes a profile of the main program's
-execution to a file. The format of these files is not directly compatible with the
+Setting the ``BORG_DEBUG_PROFILE`` environment variable to a filename writes a profile of
+the main program's execution to that file. Note that this applies to every borg invocation
+as long as the variable is set. The format of these files is not directly compatible with the
 Python profiling tools, since these use the "marshal" format, which is not intended
 to be secure (quoting the Python docs: "Never unmarshal data received from an untrusted
 or unauthenticated source.").
@@ -30,5 +33,5 @@ or unauthenticated source.").
 The ``borg debug profile-convert`` command can be used to take a Borg profile and convert
 it to a profile file that is compatible with the Python tools.
 
-Additionally, if the filename specified for ``--debug-profile`` ends with ".pyprof", a
+Additionally, if the filename given via ``BORG_DEBUG_PROFILE`` ends with ".pyprof", a
 Python-compatible profile is generated. This is only intended for local use by developers.

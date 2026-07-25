@@ -470,6 +470,13 @@ When set to \fByes\fP, format sizes using IEC units (1KiB = 1024B) instead of
 decimal units (1kB = 1000B).
 This is the replacement for the removed \fB\-\-iec\fP command line option.
 .TP
+.B BORG_DEBUG_PROFILE
+When set to a filename, write an execution profile in Borg format into that file
+(see \fIdebugging\fP). If the filename ends with \fB\&.pyprof\fP, a Python\-compatible
+profile is written instead.
+This is the replacement for the removed \fB\-\-debug\-profile\fP command line option.
+Note: every borg invocation writes the profile, so unset it again when you are done.
+.TP
 .B BORG_REPO_PERMISSIONS
 Set repository permissions, see also: \fIborg_serve\fP
 .TP

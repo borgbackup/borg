@@ -75,6 +75,12 @@ General:
         When set to ``yes``, format sizes using IEC units (1KiB = 1024B) instead of
         decimal units (1kB = 1000B).
         This is the replacement for the removed ``--iec`` command line option.
+    BORG_DEBUG_PROFILE
+        When set to a filename, write an execution profile in Borg format into that file
+        (see :ref:`debugging`). If the filename ends with ``.pyprof``, a Python-compatible
+        profile is written instead.
+        This is the replacement for the removed ``--debug-profile`` command line option.
+        Note: every borg invocation writes the profile, so unset it again when you are done.
     BORG_REPO_PERMISSIONS
         Set repository permissions, see also: :ref:`borg_serve`
     BORG_FILES_CACHE_SUFFIX

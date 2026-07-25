@@ -239,6 +239,31 @@ def test_header_aad_tamper_detected_at_key_layer(aead_key):
         aead_key.decrypt(id, encrypted, header=bytes(tampered_header_aad))
 
 
+def test_meta_data_slot_swap_detected(aead_key):
+    # meta_encrypted and data_encrypted carry different slot tags in their AAD, so splicing one
+    # into the other's position (fixing up meta_size/data_size to match the swapped lengths) must
+    # fail authentication instead of silently decrypting under the wrong slot.
+    repo_objs = RepoObj(aead_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    hdr_size = RepoObj.obj_header.size
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(cdata[:hdr_size]))
+    meta_encrypted = cdata[hdr_size : hdr_size + hdr.meta_size]
+    data_encrypted = cdata[hdr_size + hdr.meta_size :]
+
+    swapped_hdr = RepoObj.obj_header.pack(
+        hdr.magic, hdr.version, hdr.chunk_id, len(data_encrypted), len(meta_encrypted)
+    )
+    swapped = swapped_hdr + data_encrypted + meta_encrypted
+
+    with pytest.raises(IntegrityError):
+        repo_objs.parse_meta(id, swapped, ro_type=ROBJ_FILE_STREAM)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(id, swapped, ro_type=ROBJ_FILE_STREAM)
+
+
 def test_untampered_roundtrip_with_aead_key(aead_key):
     repo_objs = RepoObj(aead_key)
     data = b"foobar" * 10

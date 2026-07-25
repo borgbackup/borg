@@ -13,11 +13,13 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 OBJ_MAGIC = b"BORG_OBJ"
 
 # meta_encrypted/data_encrypted are AEAD-authenticated with aad=chunk_id. The header (magic, version,
-# chunk_id) is not authenticated.
+# chunk_id) is not authenticated, and meta/data are not bound to their slot.
 OBJ_VERSION_NO_HEADER_AAD = 0x01
-# meta_encrypted/data_encrypted are AEAD-authenticated with aad=header_aad+chunk_id, where header_aad
-# is the header prefix (magic, version, chunk_id, see REPOOBJ_HEADER_AAD_SIZE). format() writes this
-# version.
+# meta_encrypted/data_encrypted are AEAD-authenticated with aad=header_aad+slot_tag+chunk_id, where
+# header_aad is the header prefix (magic, version, chunk_id, see REPOOBJ_HEADER_AAD_SIZE) and slot_tag
+# is b"M" for meta_encrypted or b"D" for data_encrypted. The slot tag stops the two ciphertexts from
+# being swapped with each other; without it, both are encrypted under the same key and AAD, so nothing
+# authenticates which slot a given ciphertext belongs to. format() writes this version.
 OBJ_VERSION_HEADER_AAD = 0x02
 OBJ_VERSION = OBJ_VERSION_HEADER_AAD
 # Versions accepted by parse() and parse_meta().
@@ -31,6 +33,10 @@ REPOOBJ_HEADER_SIZE = 49
 # meta_size and data_size are excluded, since they are only known after encryption; tampering with them
 # still fails authentication, because it changes the length of the ciphertext slice being decrypted.
 REPOOBJ_HEADER_AAD_SIZE = 41
+
+# Slot tags appended to header_aad, binding each ciphertext to the slot it was encrypted for.
+META_AAD_TAG = b"M"
+DATA_AAD_TAG = b"D"
 
 
 class RepoObj:
@@ -93,11 +99,12 @@ class RepoObj:
             meta["clevel"] = clevel
             data_compressed = data  # is already compressed, is NOT prefixed by type/level bytes
             meta["csize"] = len(data_compressed)
-        # header_aad is the header prefix (magic, version, chunk_id), used as AEAD AAD for both meta and data.
+        # header_aad is the header prefix (magic, version, chunk_id); each slot adds its own tag on top,
+        # so meta_encrypted and data_encrypted authenticate under different AAD.
         header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
-        data_encrypted = self.key.encrypt(id, data_compressed, header=header_aad)
+        data_encrypted = self.key.encrypt(id, data_compressed, header=header_aad + DATA_AAD_TAG)
         meta_packed = msgpack.packb(meta)
-        meta_encrypted = self.key.encrypt(id, meta_packed, header=header_aad)
+        meta_encrypted = self.key.encrypt(id, meta_packed, header=header_aad + META_AAD_TAG)
         hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, id, len(meta_encrypted), len(data_encrypted))
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
@@ -122,10 +129,12 @@ class RepoObj:
                 f"object too small: expected at least {hdr_size + hdr.meta_size} bytes, got {len(obj)}"
             )
         # header_aad is read from the on-disk header bytes, so any change to magic/version/chunk_id changes
-        # header_aad and breaks decryption below. OBJ_VERSION_NO_HEADER_AAD objects have no header_aad.
+        # header_aad and breaks decryption below. OBJ_VERSION_NO_HEADER_AAD objects have no header_aad
+        # and no slot tag.
         header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE]) if hdr.version == OBJ_VERSION_HEADER_AAD else b""
+        meta_aad = header_aad + META_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
-        meta_packed = self.key.decrypt(id, meta_encrypted, header=header_aad)
+        meta_packed = self.key.decrypt(id, meta_encrypted, header=meta_aad)
         meta = msgpack.unpackb(meta_packed)
         if ro_type != ROBJ_DONTCARE and meta["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta['type']}")
@@ -160,15 +169,17 @@ class RepoObj:
         overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
         if overall_expected_size != len(obj):
             raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(obj)}")
-        # header_aad: see parse_meta().
+        # header_aad, meta_aad: see parse_meta().
         header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE]) if hdr.version == OBJ_VERSION_HEADER_AAD else b""
+        meta_aad = header_aad + META_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
+        data_aad = header_aad + DATA_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
-        meta_packed = self.key.decrypt(id, meta_encrypted, header=header_aad)
+        meta_packed = self.key.decrypt(id, meta_encrypted, header=meta_aad)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
         if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
         data_encrypted = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
-        data_compressed = self.key.decrypt(id, data_encrypted, header=header_aad)  # does not include type/level
+        data_compressed = self.key.decrypt(id, data_encrypted, header=data_aad)  # does not include type/level
         if decompress:
             ctype = meta_compressed["ctype"]
             clevel = meta_compressed["clevel"]

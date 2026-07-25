@@ -389,7 +389,7 @@ class AESKeyBase(KeyBase):
         try:
             return self.cipher.decrypt(data)
         except low_level.IntegrityError as e:
-            # see AEADKeyBase.decrypt: same exception hierarchy.
+            # TODO: see AEADKeyBase.decrypt for the follow-up PR this hunk belongs in.
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
@@ -1095,6 +1095,13 @@ class AEADKeyBase(KeyBase):
             return cipher.decrypt(data, aad=header + id)
         except low_level.IntegrityError as e:
             # cipher.decrypt raises low_level.IntegrityError; helpers.IntegrityError is a subclass of it.
+            # TODO: extract this hunk (and the matching one in AESKeyBase.decrypt) into its own PR,
+            # rebased before the pack header AAD binding PR. Before this change, both except clauses
+            # caught helpers.errors.IntegrityError, a subclass of low_level.IntegrityError, so they
+            # never matched the low_level.IntegrityError actually raised by cipher.decrypt(), and that
+            # exception propagated unwrapped instead of being turned into a
+            # "Chunk <id>: Could not decrypt [...]" IntegrityError. Fix: catch low_level.IntegrityError
+            # in both places, independent of the AAD/header work in this PR.
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):

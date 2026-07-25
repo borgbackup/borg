@@ -88,7 +88,6 @@ complete -c borg -f      -l 'show-version'          -d 'Log version information'
 complete -c borg -f      -l 'show-rc'               -d 'Log the return code'
 complete -c borg -f      -l 'umask'                 -d 'Set umask to M [0077]'
 complete -c borg         -l 'debug-profile'         -d 'Write execution profile into FILE'
-complete -c borg         -l 'socket'                -d 'Use UNIX domain socket at PATH'
 
 # borg analyze options
 complete -c borg -f -s a -l 'match-archives'        -d 'Only archive names matching PATTERN'        -n "__fish_seen_subcommand_from analyze"

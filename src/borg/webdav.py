@@ -18,6 +18,7 @@ import re
 import stat
 import tarfile
 import threading
+import unicodedata
 from datetime import datetime, timezone
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -40,7 +41,7 @@ DEFAULT_DIR_MODE = 0o40755
 class Node:
     """A node in an archive's directory tree: a directory (children is a dict) or a leaf."""
 
-    __slots__ = ("mode", "mtime", "size", "chunks", "target", "children")
+    __slots__ = ("mode", "mtime", "size", "chunks", "target", "children", "nfc_names")
 
     def __init__(self, mode, mtime=0, size=0, chunks=None, target=None, children=None):
         self.mode = mode
@@ -49,10 +50,44 @@ class Node:
         self.chunks = chunks
         self.target = target  # symlink target
         self.children = children  # {name(str): Node} for directories, None otherwise
+        self.nfc_names = None  # lazily built by lookup_child(), see there
 
     @property
     def is_dir(self):
         return self.children is not None
+
+
+def nfc(name):
+    """NFC-normalize *name*; names with surrogates (non-UTF-8 bytes) pass through unchanged."""
+    return unicodedata.normalize("NFC", name)
+
+
+def lookup_child(node, name):
+    """Return (child_name, child_node) for *name* in directory *node*. Raises KeyError.
+
+    An exact match always wins. If there is none, we retry comparing Unicode NFC forms:
+    file systems disagree about normalization (macOS decomposes, so its WebDAV client asks
+    for "gru<combining diaeresis>..." where the archive stores "grü..."), and an exact-only
+    lookup would answer 404 for a file the client just saw in our listing.
+
+    The NFC index is built lazily (only for directories that actually get such a request)
+    and skips names that are ambiguous, i.e. where several different names share one NFC
+    form - those keep requiring an exact match, so we never silently serve the wrong file.
+    """
+    try:
+        return name, node.children[name]
+    except KeyError:
+        pass
+    if node.nfc_names is None:
+        index = {}
+        for child_name in node.children:
+            key = nfc(child_name)
+            index[key] = None if key in index else child_name  # None marks an ambiguous key
+        node.nfc_names = index
+    child_name = node.nfc_names.get(nfc(name))
+    if child_name is None:
+        raise KeyError(name)
+    return child_name, node.children[child_name]
 
 
 class ArchiveVFS:
@@ -78,6 +113,7 @@ class ArchiveVFS:
                 name += f"-{bin_to_hex(archive.id):.8}"
             self.archives[name] = archive
         self._trees = {}  # display name -> (root Node, DownloadPipeline)
+        self.nfc_archives = None  # lazily built by lookup_archive(), see there
         timestamps = [archive.ts for archive in archives]
         self.root_mtime = int(max(timestamps).timestamp() * 1e9) if timestamps else 0
 
@@ -130,17 +166,40 @@ class ArchiveVFS:
         return root, archive.pipeline
 
     def resolve(self, segments):
-        """Resolve path segments (first one is the archive name) to (Node, pipeline).
+        """Resolve path segments (first one is the archive name) to (Node, pipeline, canonical).
+
+        *canonical* are the segments as they are actually stored in the archive: a client may
+        address a path in a different Unicode normalization than the archive uses (see
+        lookup_child()), and the stored spelling is what path-based operations (e.g. the tar
+        download, which matches item paths) have to use.
 
         Raises KeyError if not found.
         """
-        root, pipeline = self.get_root(segments[0])
+        archive_name = self.lookup_archive(segments[0])
+        root, pipeline = self.get_root(archive_name)
         node = root
+        canonical = [archive_name]
         for segment in segments[1:]:
             if not node.is_dir:
                 raise KeyError(segment)
-            node = node.children[segment]
-        return node, pipeline
+            name, node = lookup_child(node, segment)
+            canonical.append(name)
+        return node, pipeline, canonical
+
+    def lookup_archive(self, name):
+        """Return the stored archive name matching *name*. Raises KeyError if there is none."""
+        if name in self.archives:
+            return name
+        if self.nfc_archives is None:
+            index = {}
+            for archive_name in self.archives:
+                key = nfc(archive_name)
+                index[key] = None if key in index else archive_name
+            self.nfc_archives = index
+        archive_name = self.nfc_archives.get(nfc(name))
+        if archive_name is None:
+            raise KeyError(name)
+        return archive_name
 
 
 def strip_crlf(value):
@@ -583,7 +642,9 @@ class WebDAVHandler(BaseHTTPRequestHandler):
             self._send_archive_list(head)
             return
         try:
-            node, pipeline = self.vfs.resolve(segments)
+            # use the canonical (as stored in the archive) segments from here on, so that a
+            # request in a different Unicode normalization still names the stored items.
+            node, pipeline, segments = self.vfs.resolve(segments)
         except KeyError:
             self.send_error(404)
             return
@@ -645,7 +706,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                     node = Node(DEFAULT_DIR_MODE, mtime=int(archive_info.ts.timestamp() * 1e9), children={})
                     resources.append(("/" + encode_path(name) + "/", name, node))
             return resources
-        node, _ = self.vfs.resolve(segments)  # may raise KeyError
+        node, _, segments = self.vfs.resolve(segments)  # may raise KeyError
         if not (node.is_dir or stat.S_ISREG(node.mode)):
             raise KeyError(segments[-1])  # symlinks and special files are not exposed via WebDAV
         base = "/" + "/".join(encode_path(s) for s in segments)

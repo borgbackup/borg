@@ -11,6 +11,7 @@ import stat
 import tarfile
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -24,7 +25,7 @@ from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...platform import is_win32
 from ...repository import Repository
-from ...webdav import make_server
+from ...webdav import make_server, lookup_child, Node
 from .. import are_symlinks_supported, are_hardlinks_supported
 from . import RK_ENCRYPTION, cmd, create_regular_file, generate_archiver_tests
 
@@ -40,6 +41,9 @@ FUNNY_NAME = "a <b>&c ä.txt"
 # to "gr%C3%BC%C3%9Fe.txt" (ü -> %C3%BC, ß -> %C3%9F).
 UNICODE_NAME = "grüße.txt"
 UNICODE_NAME_ENC = "gr%C3%BC%C3%9Fe.txt"
+# the same name in NFD (decomposed: "u" + combining diaeresis) - the form the macOS WebDAV
+# client asks for, while the archive stores the composed (NFC) name above.
+UNICODE_NAME_NFD_ENC = "gru%CC%88%C3%9Fe.txt"
 
 
 def _create_archive(archiver):
@@ -498,6 +502,55 @@ def test_webdav_conditional_get(archivers, request):
         assert status == 200 and body == b"data1"
 
 
+def test_webdav_unicode_normalization(archivers, request):
+    # macOS decomposes file names, so its WebDAV client requests the NFD form of a name the
+    # archive stores composed (NFC) - looking names up verbatim only would answer 404 for a
+    # file the client just saw in our listing ("the file can't be found" in Finder).
+    archiver = request.getfixturevalue(archivers)
+    _create_archive(archiver)
+    with webdav_server(archiver) as base_url:
+        for encoded in UNICODE_NAME_ENC, UNICODE_NAME_NFD_ENC:
+            status, _, body = get(f"{base_url}/test/input/{encoded}")
+            assert status == 200
+            assert body == b"unicode data"
+            status, _, _ = propfind(f"{base_url}/test/input/{encoded}", depth="0")
+            assert status == 207
+        # a name that differs by more than normalization is still not found
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            get(base_url + "/test/input/gr%C3%B6%C3%9Fe.txt")  # "größe.txt", a different name
+        assert exc_info.value.code == 404
+
+
+def test_webdav_lookup_child():
+    # exact matches always win, and names that are ambiguous after normalization are only
+    # reachable by their exact spelling, so we never serve a different file than requested.
+    nfc_name = "grüße.txt"  # composed
+    nfd_name = unicodedata.normalize("NFD", nfc_name)  # decomposed
+    assert nfc_name != nfd_name
+
+    only_nfc = Node(0o40755, children={nfc_name: Node(0o100644)})
+    # the stored (composed) name is found by both spellings
+    assert lookup_child(only_nfc, nfc_name)[0] == nfc_name
+    assert lookup_child(only_nfc, nfd_name)[0] == nfc_name
+
+    only_nfd = Node(0o40755, children={nfd_name: Node(0o100644)})
+    assert lookup_child(only_nfd, nfd_name)[0] == nfd_name
+    assert lookup_child(only_nfd, nfc_name)[0] == nfd_name  # the other way round, too
+
+    # an archive may contain both spellings (they are different names on e.g. Linux):
+    # each one resolves to itself, exactly.
+    both = Node(0o40755, children={nfc_name: Node(0o100644), nfd_name: Node(0o100644)})
+    assert lookup_child(both, nfc_name)[0] == nfc_name
+    assert lookup_child(both, nfd_name)[0] == nfd_name
+
+    # a name with non-UTF-8 bytes (surrogate escapes) must not break normalization
+    weird = b"bad\xff.txt".decode("utf-8", "surrogateescape")
+    assert lookup_child(Node(0o40755, children={weird: Node(0o100644)}), weird)[0] == weird
+
+    with pytest.raises(KeyError):
+        lookup_child(only_nfc, "no-such-file.txt")
+
+
 def test_webdav_file_without_chunks(archivers, request):
     # An anomalous item - size > 0 but no chunks list (e.g. corrupted metadata) - must not
     # leave the client hanging after an advertised Content-Length: the server aborts the
@@ -512,7 +565,7 @@ def test_webdav_file_without_chunks(archivers, request):
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         server = make_server(manifest, args, port=0)
         # corrupt the in-memory tree: pretend file1 is non-empty but has no chunks
-        node, _ = server.RequestHandlerClass.vfs.resolve(["test", "input", "file1"])
+        node, _, _ = server.RequestHandlerClass.vfs.resolve(["test", "input", "file1"])
         node.size = 5
         node.chunks = None
         thread = threading.Thread(target=server.serve_forever, daemon=True)

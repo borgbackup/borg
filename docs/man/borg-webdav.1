@@ -1,0 +1,172 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-webdav" "1" "2026-07-23" "" "borg backup tool"
+.SH Name
+borg-webdav \- Serve archive contents via a read-only WebDAV / HTTP server on localhost.
+.SH SYNOPSIS
+.sp
+borg [common options] webdav [options]
+.SH DESCRIPTION
+.sp
+This command serves the contents of the selected archives via a read\-only
+WebDAV / HTTP server, so the archive contents can be:
+.INDENT 0.0
+.IP \(bu 2
+browsed and downloaded with a web browser,
+.IP \(bu 2
+mounted as a read\-only network file system, using the WebDAV client
+built into most operating systems and file managers.
+.UNINDENT
+.sp
+Mounting examples:
+.INDENT 0.0
+.IP \(bu 2
+Windows Explorer: \(dqMap network drive\(dq \-> \fBhttp://localhost:8000/\fP
+(or on the command line: \fBnet use Z: http://localhost:8000/\fP).
+.IP \(bu 2
+macOS Finder: \(dqGo > Connect to Server\(dq (Cmd\-K) \-> \fBhttp://localhost:8000\fP\&.
+.IP \(bu 2
+GNOME Files / KDE Dolphin: open \fBdav://localhost:8000/\fP\&.
+.IP \(bu 2
+Linux kernel mount: \fBmount \-t davfs http://localhost:8000/ /mnt/point\fP
+(needs the davfs2 package).
+.UNINDENT
+.sp
+The server listens on localhost (127.0.0.1) only and offers no
+authentication and no encryption \- anything that can connect to
+localhost TCP ports on the machine can read the served archive contents.
+.sp
+The top level lists the selected archives (use the archive filter options
+to select fewer archives); below that, the archive contents can be
+browsed like a directory tree. The directory tree of an archive is built
+in memory when it is first entered, so expect some delay for big archives.
+.sp
+Any directory can be downloaded as a tar archive by appending \fB?tar\fP to its
+URL (the web browser listings show a download icon next to the heading for this).
+Unlike a plain file
+download, the tar preserves POSIX metadata (owner, group, mode, sub\-second
+timestamps, symlinks, special files, xattrs, ACLs), so it is the metadata\-
+lossless way to restore a whole directory tree over this server. It is a PAX
+format tarball, streamed uncompressed.
+.sp
+Notes:
+.INDENT 0.0
+.IP \(bu 2
+Plain (non\-tar) file downloads do not preserve any POSIX metadata (owner,
+group, mode, timestamps, xattrs, ACLs). Use the \fB?tar\fP download above, or
+\fBborg extract\fP / \fBborg export\-tar\fP, for full\-fidelity restores.
+.IP \(bu 2
+Symbolic links and special files (devices, fifos, sockets) are shown
+in the web browser listings, but are neither followed nor downloadable
+individually, and they are not visible in WebDAV\-mounted directories
+(WebDAV has no concept of them). They are, however, included in \fB?tar\fP
+downloads.
+.IP \(bu 2
+Damaged files (with chunks missing in the repository) cause the
+download connection to be aborted \- the server never silently serves
+corrupted file content.
+.IP \(bu 2
+The Windows WebDAV client limits file downloads to about 47 MiB by
+default (\fBFileSizeLimitInBytes\fP registry value) \- use a web browser
+or another WebDAV client to download bigger files.
+.UNINDENT
+.sp
+Recently used file content chunks are kept decrypted in an in\-memory cache,
+so that the many small, sequential range requests a mounted file system
+does for a big file do not re\-fetch and re\-decrypt the same chunk over and
+over. As for \fBborg mount\fP, the \fBBORG_MOUNT_DATA_CACHE_ENTRIES\fP environment
+variable sets the number of cached chunks (default: number of CPUs);
+additional memory usage can be up to the chunk size times this number.
+.sp
+Unless the \fB\-\-foreground\fP option is given, the command daemonizes and runs
+in the background until it is stopped by sending it a signal (e.g. \fBkill\fP
+sends SIGTERM), which shuts the server down and releases the repository lock.
+In the foreground, ^C / SIGINT stops it. Daemonizing is not available on
+Windows, so the command always stays in the foreground there.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.B  \-f\fP,\fB  \-\-foreground
+stay in foreground, do not daemonize
+.TP
+.BI \-\-port \ PORT
+TCP port to listen on (on localhost); default: 8000
+.UNINDENT
+.SS Archive filters
+.INDENT 0.0
+.TP
+.BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
+.TP
+.BI \-\-sort\-by \ KEYS
+Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
+.TP
+.BI \-\-first \ N
+consider the first N archives after other filters are applied
+.TP
+.BI \-\-last \ N
+consider the last N archives after other filters are applied
+.TP
+.BI \-\-oldest \ TIMESPAN
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
+.TP
+.BI \-\-newest \ TIMESPAN
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
+.TP
+.BI \-\-older \ TIMESPAN
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
+.TP
+.BI \-\-newer \ TIMESPAN
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+# Serve all archives of the repository on http://127.0.0.1:8000/,
+# then browse and download files with a web browser.
+$ borg webdav
+
+# Serve only one archive on a different port.
+$ borg webdav \-\-port 8123 \-\-match\-archives my\-archive
+.EE
+.UNINDENT
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

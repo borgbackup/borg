@@ -94,6 +94,7 @@ from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
 from .undelete_cmd import UnDeleteMixIn
 from .version_cmd import VersionMixIn
+from .webdav_cmd import WebDAVMixIn
 
 
 class Archiver(
@@ -127,6 +128,7 @@ class Archiver(
     TransferMixIn,
     UnDeleteMixIn,
     VersionMixIn,
+    WebDAVMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
         self.lock_wait = lock_wait
@@ -316,6 +318,7 @@ class Archiver(
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
         self.build_parser_undelete(subparsers, common_parser, mid_common_parser)
         self.build_parser_version(subparsers, common_parser, mid_common_parser)
+        self.build_parser_webdav(subparsers, common_parser, mid_common_parser)
         return parser
 
     def get_args(self, argv, cmd):

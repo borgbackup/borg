@@ -585,8 +585,16 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.close_connection = True  # we did not read a request body the client may have sent
 
-    do_POST = do_PUT = do_DELETE = do_PATCH = _method_not_allowed
-    do_PROPPATCH = do_MKCOL = do_COPY = do_MOVE = do_LOCK = do_UNLOCK = _method_not_allowed
+    do_POST = _method_not_allowed
+    do_PUT = _method_not_allowed
+    do_DELETE = _method_not_allowed
+    do_PATCH = _method_not_allowed
+    do_PROPPATCH = _method_not_allowed
+    do_MKCOL = _method_not_allowed
+    do_COPY = _method_not_allowed
+    do_MOVE = _method_not_allowed
+    do_LOCK = _method_not_allowed
+    do_UNLOCK = _method_not_allowed
 
     def _guarded(self, method, *args):
         try:

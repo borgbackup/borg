@@ -22,16 +22,11 @@ these - the notes below matter mainly when *mounting* the server as a file syste
 
 **Windows Explorer** (the "WebClient" / mini-redirector)
 
-- Downloads are limited to about 47 MiB by default (the ``FileSizeLimitInBytes``
+- Downloads are limited to about 50 MB by default (the ``FileSizeLimitInBytes``
   registry value). Bigger files fail when copied from a mapped drive - use a web
   browser (including for the ``?tar`` directory download) or another WebDAV client.
 - The ``WebClient`` service must be running for ``net use`` / "Map network drive"
   to work; if it is stopped, mounting silently fails.
-- Windows refuses HTTP Basic authentication over plain HTTP by default (only over
-  HTTPS). This does not matter now (the server has no authentication), but it is a
-  wall for any future networked, authenticated setup.
-- Explorer is chatty (a PROPFIND per navigation, many short connections), so
-  browsing large directories over a mount can feel slow.
 
 **macOS Finder** (``mount_webdav`` / WebDAVFS)
 
@@ -48,8 +43,7 @@ these - the notes below matter mainly when *mounting* the server as a file syste
   a read-only server rejects. Set ``use_locks 0`` in ``davfs2.conf`` (or the
   per-mount config) to avoid the failed lock attempts. davfs2 also caches whole
   files in a local cache directory.
-- The GNOME (gvfs) and KDE (KIO) DAV backends work without such tweaks, but are
-  also PROPFIND-heavy on large directories.
+- The GNOME (gvfs) and KDE (KIO) DAV backends work without such tweaks.
 
 **Protocol-level (any client)**
 

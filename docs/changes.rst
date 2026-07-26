@@ -100,12 +100,18 @@ Compatibility notes:
     now (was: UTC)
 - some deprecated options were removed:
 
-  - removed --remote-ratelimit (use --upload-ratelimit)
+  - removed --remote-ratelimit (dropped entirely, no replacement)
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
   - removed --save-space option (does not change behaviour)
 - removed --bypass-lock option
+- removed --remote-path option (use the BORG_REMOTE_PATH environment variable)
+- removed --rsh option (use the BORG_RSH environment variable)
+- removed --upload-ratelimit and --upload-buffer options (they only ever
+  affected uploads to a borg 1.x repository via ssh://)
+- removed --iec option (use the BORG_IEC environment variable)
+- removed --debug-profile option (use the BORG_DEBUG_PROFILE environment variable)
 - removed borg config command (only worked locally anyway)
 - compact command now requires access to the borg key if the repo is encrypted
   or authenticated

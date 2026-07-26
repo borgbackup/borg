@@ -21,6 +21,7 @@ from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .helpers import get_cache_dir
+from .helpers import replace_placeholders
 from .helpers import sig_int
 from .helpers import ProgressIndicatorPercent
 from .helpers.lrucache import LRUCache
@@ -95,7 +96,7 @@ def rest_serve_command(location):
         borg_cmd = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "borg"]
         return borg_cmd + ["serve", "--rest", "--backend", backend_arg]
     # reach the remote borg via ssh
-    remote_path = os.environ.get("BORG_REMOTE_PATH", "borg")
+    remote_path = replace_placeholders(os.environ.get("BORG_REMOTE_PATH", "borg"))
     return ssh_cmd(location.user, location.host, location.port) + [
         remote_path,
         "serve",
@@ -103,6 +104,17 @@ def rest_serve_command(location):
         "--backend",
         backend_arg,
     ]
+
+
+def propagate_rsh():
+    """Give borgstore the remote shell command borg uses.
+
+    borg has BORG_RSH, borgstore has its own BORGSTORE_RSH - if only the borg one is set,
+    borgstore shall use it, too. An explicitly set BORGSTORE_RSH always wins.
+    """
+    borg_rsh = os.environ.get("BORG_RSH")
+    if borg_rsh and not os.environ.get("BORGSTORE_RSH"):
+        os.environ["BORGSTORE_RSH"] = borg_rsh
 
 
 def build_rest_backend(location):
@@ -464,6 +476,8 @@ class Repository:
             if cache_size:
                 ns_config["packs/"]["size"] = int(cache_size)
             cache_url = cache_dir.as_uri()
+
+        propagate_rsh()  # borgstore shall use the same remote shell command as borg
 
         try:
             if location.proto == "rest":

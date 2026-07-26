@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg" "1" "2026-07-25" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -457,12 +457,25 @@ A basic example conf can be found at \fBdocs/misc/logging.conf\fP\&.
 .TP
 .B BORG_RSH
 When set, use this command instead of \fBssh\fP\&. This can be used to specify ssh options, such as
-a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options. Using
-the \fB\-\-rsh CMD\fP command line option overrides the environment variable.
+a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP for other options.
+This is the replacement for the removed \fB\-\-rsh CMD\fP command line option.
+borg also gives this to borgstore as \fBBORGSTORE_RSH\fP, except if that is already set.
 .TP
 .B BORG_REMOTE_PATH
 When set, use the given path as borg executable on the remote (defaults to \(dqborg\(dq if unset).
-Using the \fB\-\-remote\-path PATH\fP command line option overrides the environment variable.
+This is the replacement for the removed \fB\-\-remote\-path PATH\fP command line option.
+.TP
+.B BORG_IEC
+When set to \fByes\fP, format sizes using IEC units (1KiB = 1024B) instead of
+decimal units (1kB = 1000B).
+This is the replacement for the removed \fB\-\-iec\fP command line option.
+.TP
+.B BORG_DEBUG_PROFILE
+When set to a filename, write an execution profile in Borg format into that file
+(see \fIdebugging\fP). If the filename ends with \fB\&.pyprof\fP, a Python\-compatible
+profile is written instead.
+This is the replacement for the removed \fB\-\-debug\-profile\fP command line option.
+Note: every borg invocation writes the profile, so unset it again when you are done.
 .TP
 .B BORG_REPO_PERMISSIONS
 Set repository permissions, see also: \fIborg_serve\fP

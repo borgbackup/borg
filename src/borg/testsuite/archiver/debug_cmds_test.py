@@ -10,16 +10,21 @@ from . import cmd, create_test_files, create_regular_file, generate_archiver_tes
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
-def test_debug_profile(archivers, request):
+def test_debug_profile(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test", "input", "--debug-profile=create.prof")
+    monkeypatch.setenv("BORG_DEBUG_PROFILE", "create.prof")
+    cmd(archiver, "create", "test", "input")
+    # the profile is written by every borg invocation, so switch it off for the conversion -
+    # it reads the profile we just wrote and would otherwise overwrite it while doing so.
+    monkeypatch.delenv("BORG_DEBUG_PROFILE")
     cmd(archiver, "debug", "convert-profile", "create.prof", "create.pyprof")
     stats = pstats.Stats("create.pyprof")
     stats.strip_dirs()
     stats.sort_stats("cumtime")
-    cmd(archiver, "create", "test2", "input", "--debug-profile=create.pyprof")
+    monkeypatch.setenv("BORG_DEBUG_PROFILE", "create.pyprof")
+    cmd(archiver, "create", "test2", "input")
     stats = pstats.Stats("create.pyprof")  # Only do this on trusted data!
     stats.strip_dirs()
     stats.sort_stats("cumtime")

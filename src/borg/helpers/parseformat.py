@@ -501,6 +501,11 @@ def SortBySpec(text):
     return text.replace("timestamp", "ts").replace("archive", "name")
 
 
+def use_iec_units():
+    """Shall sizes be formatted using IEC units (1KiB = 1024B)? See BORG_IEC."""
+    return os.environ.get("BORG_IEC", "no").strip().lower() in ("yes", "true", "1")
+
+
 def format_file_size(v, precision=2, sign=False, iec=False):
     """Format file size into a human friendly format"""
     fn = sizeof_fmt_iec if iec else sizeof_fmt_decimal

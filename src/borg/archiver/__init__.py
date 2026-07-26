@@ -480,15 +480,16 @@ class Archiver(
             raise Error("unsupported msgpack version")
         if is_slow_msgpack():
             logger.warning(PURE_PYTHON_MSGPACK_WARNING)
-        if args.debug_profile:
+        debug_profile = os.environ.get("BORG_DEBUG_PROFILE")
+        if debug_profile:
             # Import only when needed - avoids a further increase in startup time
             import cProfile
             import marshal
 
-            logger.debug("Writing execution profile to %s", args.debug_profile)
+            logger.debug("Writing execution profile to %s", debug_profile)
             # Open the file early, before running the main program, to avoid
             # a very late crash in case the specified path is invalid.
-            with open(args.debug_profile, "wb") as fd:
+            with open(debug_profile, "wb") as fd:
                 profiler = cProfile.Profile()
                 variables = dict(locals())
                 profiler.enable()
@@ -497,14 +498,14 @@ class Archiver(
                 finally:
                     profiler.disable()
                     profiler.snapshot_stats()
-                    if args.debug_profile.endswith(".pyprof"):
+                    if debug_profile.endswith(".pyprof"):
                         marshal.dump(profiler.stats, fd)
                     else:
                         # We use msgpack here instead of the marshal module used by cProfile itself,
                         # because the latter is insecure. Since these files may be shared over the
                         # internet we don't want a format that is impossible to interpret outside
                         # an insecure implementation.
-                        # See scripts/msgpack2marshal.py for a small script that turns a msgpack file
+                        # See "borg debug convert-profile" for turning such a msgpack file
                         # into a marshal file that can be read by e.g. pyprof2calltree.
                         # For local use it's unnecessary hassle, though, that's why .pyprof makes
                         # it compatible (see above).

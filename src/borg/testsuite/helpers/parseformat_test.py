@@ -28,6 +28,7 @@ from ...helpers.parseformat import (
     swidth_slice,
     eval_escapes,
     ChunkerParams,
+    use_iec_units,
 )
 from ...helpers.time import format_timedelta, parse_timestamp
 from ...platformflags import is_win32
@@ -549,6 +550,27 @@ def test_file_size(size, fmt):
 def test_file_size_iec(size, fmt):
     """test the size formatting routines"""
     assert format_file_size(size, iec=True) == fmt
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (None, False),
+        ("", False),
+        ("no", False),
+        ("0", False),
+        ("yes", True),
+        ("YES", True),
+        ("true", True),
+        ("1", True),
+    ],
+)
+def test_use_iec_units(monkeypatch, value, expected):
+    """IEC units are requested via the BORG_IEC environment variable"""
+    monkeypatch.delenv("BORG_IEC", raising=False)
+    if value is not None:
+        monkeypatch.setenv("BORG_IEC", value)
+    assert use_iec_units() is expected
 
 
 @pytest.mark.parametrize(

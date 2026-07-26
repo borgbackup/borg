@@ -4,7 +4,7 @@ from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
-from ..helpers import yes, ArchiveFormatter
+from ..helpers import yes, ArchiveFormatter, use_iec_units
 from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
@@ -80,7 +80,7 @@ class CheckMixIn:
             oldest=args.oldest,
             newest=args.newest,
             format=format,
-            iec=args.iec,
+            iec=use_iec_units(),
         ):
             set_ec(EXIT_WARNING)
             return

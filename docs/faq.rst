@@ -1030,12 +1030,10 @@ code).
 Is there a way to limit bandwidth with Borg?
 --------------------------------------------
 
-To limit upload (i.e. :ref:`borg_create`) bandwidth, use the
-``--remote-ratelimit`` option.
+Borg has no built-in bandwidth limiting - the ``--remote-ratelimit`` and
+``--upload-ratelimit`` options were removed.
 
-There is no built-in way to limit *download*
-(i.e. :ref:`borg_extract`) bandwidth, but limiting download bandwidth
-can be accomplished with pipeviewer_:
+For repositories accessed via ssh, bandwidth can be limited with pipeviewer_:
 
 Create a wrapper script:  /usr/local/bin/pv-wrapper
 

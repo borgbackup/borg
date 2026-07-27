@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ...crypto.key import BLAKE3_MT_THRESHOLD_KIB, get_blake3_mt_threshold
 from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey, keyfile_parse
 from ...crypto.key import AESCTRKey, Blake2AESCTRKey
 from ...crypto.key import AEADKeyBase
@@ -14,6 +15,7 @@ from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
 from ...crypto.key import identify_key
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
+from ...helpers import Error
 from ...helpers import IntegrityError
 from ...helpers import Location
 from ...helpers import msgpack
@@ -283,6 +285,23 @@ class TestKey:
         authenticated = key.encrypt(id, plaintext)
         # 0x50 is the key TYPE.
         assert authenticated == b"\x50" + plaintext
+
+    def test_blake3_mt_threshold_from_env(self, monkeypatch):
+        # the env var gives the threshold in KiB, get_blake3_mt_threshold() returns bytes
+        def threshold_for(env_value):
+            monkeypatch.setattr("borg.crypto.key._blake3_mt_threshold", None)  # drop the cache
+            if env_value is None:
+                monkeypatch.delenv("BORG_BLAKE3_MT_THRESHOLD", raising=False)
+            else:
+                monkeypatch.setenv("BORG_BLAKE3_MT_THRESHOLD", env_value)
+            return get_blake3_mt_threshold()
+
+        assert threshold_for(None) == BLAKE3_MT_THRESHOLD_KIB * 1024
+        for value, expected_kib in [("0", 0), ("1", 1), ("256", 256), ("1024", 1024)]:
+            assert threshold_for(value) == expected_kib * 1024
+        for invalid in ["", "yes", "64k", "1.5", "-1"]:
+            with pytest.raises(Error):
+                threshold_for(invalid)
 
 
 class TestTAM:

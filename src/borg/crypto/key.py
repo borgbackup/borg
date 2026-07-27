@@ -44,6 +44,48 @@ KEYFILE_ID = "BORG_KEY"
 # and its label is reserved (cannot be assigned to additionally added borg keys).
 ADMIN_LABEL = "admin"
 
+# From this input size on, blake3 may hash using its internal thread pool.
+#
+# Multi-threading is not a win at every size: blake3 parallelises over its binary hash tree,
+# so the speedup peaks at powers of two and decays in between, and for small inputs the thread
+# dispatch costs much more than it saves. Measured on a 12-core machine: 0.16x at 8 KiB (i.e.
+# 6x slower), still below 1x at 240 KiB, then 2.2x at 256 KiB, 3.3x at 512 KiB, 5.6x at 2 MiB.
+# 256 KiB was the smallest size that never lost there, so below it we keep hashing
+# single-threaded. Chunk sizes are content-defined, so we can not rely on hitting the sizes
+# that happen to parallelise well and have to be conservative.
+BLAKE3_MT_THRESHOLD_KIB = 256
+
+_blake3_mt_threshold: int | None = None  # cache for get_blake3_mt_threshold(), see there
+
+
+def get_blake3_mt_threshold() -> int:
+    """Determine from which input size on (in bytes) blake3 may hash multi-threaded.
+
+    The best value depends on the core count and thus differs per machine, so
+    BORG_BLAKE3_MT_THRESHOLD can override the default - use
+    scripts/blake3-optimize-mt-threshold.py to measure it on a specific machine.
+    The env var gives the threshold in KiB. 0 means "always multi-threaded", a very large
+    value effectively disables multi-threading.
+
+    This is called for every chunk, so the result is cached. The env var is evaluated on
+    first use rather than at import time, so that an invalid value is reported via borg's
+    normal error handling rather than as a traceback while importing.
+    """
+    global _blake3_mt_threshold
+    if _blake3_mt_threshold is None:
+        value = os.environ.get("BORG_BLAKE3_MT_THRESHOLD")
+        if value is None:
+            threshold_kib = BLAKE3_MT_THRESHOLD_KIB
+        else:
+            try:
+                threshold_kib = int(value)
+            except ValueError:
+                raise Error(f"BORG_BLAKE3_MT_THRESHOLD must be an integer (KiB), but is: {value!r}") from None
+            if threshold_kib < 0:
+                raise Error(f"BORG_BLAKE3_MT_THRESHOLD must not be negative, but is: {threshold_kib}")
+        _blake3_mt_threshold = threshold_kib * 1024
+    return _blake3_mt_threshold
+
 
 def is_keyfile(data: str | bytes, repoid: str | None = None) -> bool:
     # repoid is a hex str, if given. if given, we only accept keyfiles for that repo.
@@ -1013,7 +1055,10 @@ class ID_BLAKE3_256:
     IDHASH_NAME = "blake3"
 
     def id_hash(self, data):
-        return blake3(data, key=self.id_key).digest(length=32)
+        # blake3 can hash a single input in parallel. That only pays off for big enough
+        # inputs, see get_blake3_mt_threshold(). The id is the same either way.
+        max_threads = blake3.AUTO if len(data) >= get_blake3_mt_threshold() else 1
+        return blake3(data, key=self.id_key, max_threads=max_threads).digest(length=32)
 
 
 class Blake3AuthenticatedKey(ID_BLAKE3_256, AuthenticatedKeyBase):

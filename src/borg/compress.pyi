@@ -1,6 +1,10 @@
 from typing import Any
 
+ZSTD_JOB_SIZE_MIN: int
+ZSTD_MT_MIN_SIZE: int
+
 def get_compressor(name: str, **kwargs) -> Any: ...
+def get_zstd_mt_workers() -> int: ...
 
 class Compressor:
     def __init__(self, name: Any = ..., **kwargs) -> None: ...

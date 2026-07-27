@@ -101,6 +101,17 @@ General:
         set it, and can optionally show a chart of the measurements in your browser
         (``--html --open``).
         0 means "always multi-threaded", a very large value effectively disables multi-threading.
+    BORG_ZSTD_MT_WORKERS
+        When set to a numeric value, use that many threads to zstd-compress a single chunk
+        (default: the cpu count). 0 or 1 means single-threaded compression.
+        Only relevant when compressing with ``zstd``.
+        Chunks below 768KiB are always compressed single-threaded: libzstd will not use a
+        compression job smaller than 512KiB, so a small chunk gets split very unevenly and
+        multi-threading it would be slower than not doing it at all.
+        Multi-threading trades a little compression ratio for speed (measured at ``zstd,3``:
+        +0.05% archive size for 1MiB chunks, +0.64% for 8MiB ones, more at higher levels), and
+        it uses more cpu time in total to reduce the wallclock time. Set it to 1 if you would
+        rather have the smaller archive, or if borg has to share the cpu with other work.
     BORG_SHOW_SYSINFO
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.

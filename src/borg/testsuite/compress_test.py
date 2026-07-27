@@ -4,6 +4,8 @@ import zlib
 import pytest
 
 from ..compress import get_compressor, Compressor, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
+from ..compress import get_zstd_mt_workers
+from ..helpers import Error
 from ..helpers import CompressionSpec
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
 from ..helpers.argparsing import ArgumentTypeError
@@ -261,3 +263,20 @@ def test_robj_specific_obfuscation(data_length, expected_padding, robj_type):
     assert (
         len(compressed) == expected_padded_size
     ), f"For {data_length}, expected {expected_padded_size}, got {len(compressed)}"
+
+
+def test_zstd_mt_workers_from_env(monkeypatch):
+    def workers_for(env_value):
+        monkeypatch.setattr("borg.compress._zstd_mt_workers", None)  # drop the cache
+        if env_value is None:
+            monkeypatch.delenv("BORG_ZSTD_MT_WORKERS", raising=False)
+        else:
+            monkeypatch.setenv("BORG_ZSTD_MT_WORKERS", env_value)
+        return get_zstd_mt_workers()
+
+    assert workers_for(None) == (os.cpu_count() or 1)
+    for value, expected in [("0", 0), ("1", 1), ("4", 4)]:
+        assert workers_for(value) == expected
+    for invalid in ["", "yes", "4x", "1.5", "-1"]:
+        with pytest.raises(Error):
+            workers_for(invalid)

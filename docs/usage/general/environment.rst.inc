@@ -90,6 +90,17 @@ General:
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
+    BORG_BLAKE3_MT_THRESHOLD
+        When set to a numeric value, chunks of at least that many KiB get their id computed by
+        multi-threaded BLAKE3, smaller ones single-threaded (default: 256, i.e. 256KiB).
+        Only relevant for repositories using ``--id-hash blake3``.
+        Multi-threading only pays off for big enough chunks and the break-even point depends on
+        the machine's core count, so the default is deliberately conservative.
+        Run ``scripts/blake3-optimize-mt-threshold.py`` to measure the best value for your
+        machine - it sweeps input sizes, prints the recommended threshold and the command to
+        set it, and can optionally show a chart of the measurements in your browser
+        (``--html --open``).
+        0 means "always multi-threaded", a very large value effectively disables multi-threading.
     BORG_SHOW_SYSINFO
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.

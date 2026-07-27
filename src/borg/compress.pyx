@@ -16,6 +16,7 @@ decompressor.
 """
 
 import math
+import os
 import random
 from struct import Struct
 import sys
@@ -27,13 +28,58 @@ except ImportError:
     lzma = None
 
 from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
-from .helpers import Buffer, DecompressionError
+from .helpers import Buffer, DecompressionError, Error
 from .helpers.argparsing import ArgumentTypeError
 
 if sys.version_info >= (3, 14):
     from compression import zstd
 else:
     from backports import zstd
+
+# libzstd will not use a compression job smaller than this, no matter what job_size says.
+ZSTD_JOB_SIZE_MIN = 512 * 1024
+
+# Below this chunk size we compress single-threaded.
+#
+# zstd cuts a chunk into ceil(size / job_size) jobs, the last one being short, so a chunk only
+# a little bigger than one job is split very unevenly (e.g. 576KiB -> 512KiB + 64KiB). All
+# threads then wait for that one full-size job, which takes about as long as compressing the
+# whole chunk single-threaded would - but with the thread overhead added on top. Measured on a
+# 12-core machine, that is a real loss: 0.80x .. 0.91x at 544KiB (levels 1 .. 10), still
+# 0.90x .. 1.07x at 608KiB, break-even around 640KiB, then 1.21x .. 1.38x at 768KiB.
+# 768KiB (= 1.5 jobs) keeps some margin over break-even, as the overhead is machine dependent.
+ZSTD_MT_MIN_SIZE = 768 * 1024
+
+_zstd_mt_workers = None
+
+
+def get_zstd_mt_workers():
+    """How many threads libzstd may use to compress a single chunk.
+
+    Defaults to the cpu count, BORG_ZSTD_MT_WORKERS overrides it. 0 or 1 means
+    single-threaded compression, which also avoids the small loss of compression ratio
+    that splitting a chunk into jobs causes (measured at zstd,3: +0.05% for a 1MiB chunk,
+    +0.64% for an 8MiB one; higher levels lose a bit more as they rely on longer match
+    history).
+
+    This is called for every chunk, so the result is cached. The env var is evaluated on
+    first use rather than at import time, so that an invalid value is reported via borg's
+    normal error handling rather than as a traceback while importing.
+    """
+    global _zstd_mt_workers
+    if _zstd_mt_workers is None:
+        value = os.environ.get("BORG_ZSTD_MT_WORKERS")
+        if value is None:
+            workers = os.cpu_count() or 1
+        else:
+            try:
+                workers = int(value)
+            except ValueError:
+                raise Error(f"BORG_ZSTD_MT_WORKERS must be an integer, but is: {value!r}") from None
+            if workers < 0:
+                raise Error(f"BORG_ZSTD_MT_WORKERS must not be negative, but is: {workers}")
+        _zstd_mt_workers = workers
+    return _zstd_mt_workers
 
 cdef extern from "lz4.h":
     int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -303,7 +349,21 @@ class ZSTD(DecidingCompressor):
         self.level = level
 
     def _decide(self, meta, data):
-        zstd_data = zstd.compress(data, self.level)
+        # libzstd can compress a single chunk with a thread pool, but only if it is told to
+        # split it into jobs: the default job size is derived from the window log and swallows
+        # any chunk borg produces whole, so the workers would never engage. We ask for the
+        # smallest job libzstd accepts, which gives the most parallelism (and, as a trade-off,
+        # the largest ratio loss). See ZSTD_MT_MIN_SIZE for why small chunks are excluded.
+        workers = get_zstd_mt_workers()
+        if workers > 1 and len(data) >= ZSTD_MT_MIN_SIZE:
+            params = zstd.CompressionParameter
+            zstd_data = zstd.compress(data, options={
+                params.compression_level: self.level,
+                params.nb_workers: workers,
+                params.job_size: ZSTD_JOB_SIZE_MIN,
+            })
+        else:
+            zstd_data = zstd.compress(data, self.level)
         if len(zstd_data) < len(data):
             return self, (meta, zstd_data)
         else:

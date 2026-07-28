@@ -871,7 +871,7 @@ class Repository:
         t_start = time.monotonic()
         t_last_checkpoint = t_start
         index_files = index_errors = 0
-        pack_files = pack_errors = 0
+        pack_files = pack_errors = pack_skipped = 0
         # index and packs get separate progress indicators, each running from 0% to 100%.
         # the index is checked first and in full, on partial checks too: it is small, and index errors
         # stop the pack check below.
@@ -906,6 +906,7 @@ class Repository:
                 if entry is not None and entry.result and max_age:
                     age = time.time() - entry.timestamp
                     if -MAX_CLOCK_SKEW <= age < max_age:
+                        pack_skipped += 1
                         continue
                 pack_files += 1
                 ok = verify("packs", info.name)
@@ -931,23 +932,30 @@ class Repository:
             # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
         objs_errors = index_errors + pack_errors
-        logger.info(
-            f"Checked {index_files} index files ({index_errors} errors) and {pack_files} packs ({pack_errors} errors)."
+        summary = (
+            f"Checked {index_files} index files ({index_errors} errors) "
+            f"and {pack_files} packs ({pack_errors} errors)."
         )
-        if index_errors == 0:  # the packs were checked, so the corrupt records are from this check
-            corrupt_ids = tracker.corrupt_ids()
-            if corrupt_ids:
-                # one id per line (the list can be long).
-                logger.error(f"Found {len(corrupt_ids)} corrupt pack(s):")
-                for pack_id in corrupt_ids:
-                    logger.error(f"Corrupt pack: {bin_to_hex(pack_id)}")
-        if objs_errors == 0:
+        if pack_skipped:
+            summary += f" Reused {pack_skipped} recent pack check result(s)."
+        logger.info(summary)
+        # every pack recorded corrupt, not only those verified this run; empty if the index is
+        # corrupt, since then no packs were scanned.
+        corrupt_ids = tracker.corrupt_ids() if index_errors == 0 else []
+        if corrupt_ids:
+            # one id per line (the list can be long).
+            logger.error(f"Found {len(corrupt_ids)} corrupt pack(s):")
+            for pack_id in corrupt_ids:
+                logger.error(f"Corrupt pack: {bin_to_hex(pack_id)}")
+        # fail if this run found errors, or any pack is recorded corrupt.
+        problems = objs_errors != 0 or bool(corrupt_ids)
+        if not problems:
             logger.info(f"Finished {mode} repository check, no problems found.")
         elif repair:
             logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
         else:
             logger.error(f"Finished {mode} repository check, errors found.")
-        return objs_errors == 0 or repair
+        return not problems or repair
 
     def list(self, limit=None, marker=None):
         """

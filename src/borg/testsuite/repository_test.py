@@ -1215,6 +1215,38 @@ def test_check_partial_keeps_corrupt_record_across_runs(tmp_path):
         assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
 
 
+def test_check_partial_break_reports_unreached_corrupt_record(tmp_path, monkeypatch, caplog):
+    # a partial check that stops before re-reaching a carried-over corrupt record still fails and
+    # reports it, so the timeout does not hide known corruption.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, _ = _store_intact_pack(repository)
+        # a corrupt pack whose id sorts after the intact one, so the scan reaches the intact pack first.
+        corrupt_id = b"\xff" * 32
+        assert bin_to_hex(intact_id) < bin_to_hex(corrupt_id)
+        repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
+
+        tracker = PackTracker.new(repository.store)
+        tracker.record(corrupt_id, ok=False)  # recorded corrupt by an earlier check
+        tracker.save()
+
+        # jump the clock past max_duration once the first pack has been hashed, so the scan breaks
+        # before it reaches the corrupt pack.
+        clock = {"t": 0}
+        monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
+        orig_hash = repository.store.hash
+
+        def hash_then_advance(key):
+            result = orig_hash(key)
+            clock["t"] = 10**9
+            return result
+
+        monkeypatch.setattr(repository.store, "hash", hash_then_advance)
+
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert repository.check(repair=False, max_duration=1, max_age=3600) is False
+        assert f"Corrupt pack: {bin_to_hex(corrupt_id)}" in caplog.text
+
+
 def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
     # with max_age, a pack recorded intact recently is not re-verified, and its record is kept.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:

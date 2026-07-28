@@ -46,9 +46,12 @@ class CheckMixIn:
             raise CommandError("--repair does not allow --max-duration argument.")
         if args.repair and args.max_age:
             raise CommandError("--repair does not allow the --max-age option.")
+        if args.archives_only and args.max_age:
+            # --max-age only affects the repository check, which --archives-only skips.
+            raise CommandError("--archives-only does not allow the --max-age option.")
         if args.max_duration and not args.max_age:
             # partial checks progress by skipping packs whose record is younger than max_age.
-            raise CommandError("--max-duration requires the --max-age option.")
+            raise CommandError("--max-duration requires the --max-age option, e.g. --max-age=4w.")
         if args.max_duration and not args.repo_only:
             # when doing a partial repo check, we can only do a low-level check of the repository files.
             # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.

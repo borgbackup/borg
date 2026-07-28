@@ -1120,7 +1120,7 @@ def test_check_partial_skips_pack_recorded_intact(tmp_path, monkeypatch):
         assert pack_key not in hashed_keys  # skipped, not re-verified
 
 
-def test_check_full_ignores_recorded_set(tmp_path, monkeypatch):
+def test_check_without_max_age_verifies_all_but_keeps_records(tmp_path, monkeypatch):
     # without max_age, a check verifies every pack regardless of the recorded set, but keeps the records.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
@@ -1165,7 +1165,7 @@ def test_check_full_reports_corrupt_pack_ids(tmp_path, caplog):
         with caplog.at_level(logging.ERROR, logger="borg.repository"):
             assert repository.check(repair=False) is False
 
-        assert f"Corrupt packs: {bin_to_hex(corrupt_id)}" in caplog.text
+        assert f"Corrupt pack: {bin_to_hex(corrupt_id)}" in caplog.text
 
 
 def test_check_full_reverifies_carried_over_corrupt_record(tmp_path, monkeypatch):

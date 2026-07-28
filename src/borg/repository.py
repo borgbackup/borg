@@ -901,8 +901,11 @@ class Repository:
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
                 entry = tracker.get(pack_id)
-                if entry is not None and entry.result:  # recorded intact; a corrupt one is verified again
-                    if max_age and time.time() - entry.timestamp < max_age:
+                # skip the pack if its recorded intact result is younger than max_age; a timestamp up
+                # to MAX_CLOCK_SKEW in the future still counts as recent, further ahead it is re-verified.
+                if entry is not None and entry.result and max_age:
+                    age = time.time() - entry.timestamp
+                    if -MAX_CLOCK_SKEW <= age < max_age:
                         continue
                 pack_files += 1
                 ok = verify("packs", info.name)
@@ -934,7 +937,10 @@ class Repository:
         if index_errors == 0:  # the packs were checked, so the corrupt records are from this check
             corrupt_ids = tracker.corrupt_ids()
             if corrupt_ids:
-                logger.error("Corrupt packs: " + ", ".join(bin_to_hex(pack_id) for pack_id in corrupt_ids))
+                # one id per line (the list can be long).
+                logger.error(f"Found {len(corrupt_ids)} corrupt pack(s):")
+                for pack_id in corrupt_ids:
+                    logger.error(f"Corrupt pack: {bin_to_hex(pack_id)}")
         if objs_errors == 0:
             logger.info(f"Finished {mode} repository check, no problems found.")
         elif repair:

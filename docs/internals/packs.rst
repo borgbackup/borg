@@ -60,13 +60,15 @@ as additional authenticated data (AAD: data that is authenticated together with 
 not itself encrypted). ``meta_size`` and ``data_size`` are not included in the AAD, since they are
 only known after encryption; tampering with them still fails authentication, because it changes the
 length of the ciphertext slice being decrypted. A forged ``chunk_id``, version, or magic byte
-therefore fails AEAD authentication in ``RepoObj.parse()``/``parse_meta()``.
+therefore fails AEAD authentication in ``RepoObj.parse()``/``parse_meta()``. This binding only applies
+to the AEAD encryption modes (AES-256-OCB, ChaCha20-Poly1305); plaintext and authenticated-only key
+modes do not use AAD at all.
 
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
-AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data``. Without the tag, both slots
-would authenticate under the same key and AAD, and an attacker controlling repo storage could swap
-the two ciphertexts (adjusting ``meta_size``/``data_size`` to match) without failing authentication.
-The tag makes decryption of a ciphertext under the wrong slot fail.
+AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data`` -- binding each ciphertext to
+its slot. This stops an attacker controlling repo storage from swapping the two ciphertexts (adjusting
+``meta_size``/``data_size`` to match): decrypting a ciphertext under the wrong slot's AAD fails
+authentication.
 
 Format version ``0x01`` (``OBJ_VERSION_NO_HEADER_AAD``) authenticates ``encrypted_meta`` and
 ``encrypted_data`` with ``aad=chunk_id`` only, without the header bound in. ``RepoObj.format()``

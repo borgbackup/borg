@@ -12,14 +12,11 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 OBJ_MAGIC = b"BORG_OBJ"
 
-# meta_encrypted/data_encrypted are AEAD-authenticated with aad=chunk_id. The header (magic, version,
-# chunk_id) is not authenticated, and meta/data are not bound to their slot.
+# meta_encrypted/data_encrypted are AEAD-authenticated with aad=chunk_id.
 OBJ_VERSION_NO_HEADER_AAD = 0x01
-# meta_encrypted/data_encrypted are AEAD-authenticated with aad=header_aad+slot_tag+chunk_id, where
-# header_aad is the header prefix (magic, version, chunk_id, see REPOOBJ_HEADER_AAD_SIZE) and slot_tag
-# is b"M" for meta_encrypted or b"D" for data_encrypted. The slot tag stops the two ciphertexts from
-# being swapped with each other; without it, both are encrypted under the same key and AAD, so nothing
-# authenticates which slot a given ciphertext belongs to. format() writes this version.
+# meta_encrypted/data_encrypted are AEAD-authenticated with aad=header_aad+slot_tag+chunk_id. header_aad
+# is the header prefix (magic, version, chunk_id; REPOOBJ_HEADER_AAD_SIZE bytes). slot_tag is b"M" for
+# meta_encrypted, b"D" for data_encrypted, binding each ciphertext to its slot. format() writes this version.
 OBJ_VERSION_HEADER_AAD = 0x02
 OBJ_VERSION = OBJ_VERSION_HEADER_AAD
 # Versions accepted by parse() and parse_meta().
@@ -28,13 +25,12 @@ SUPPORTED_OBJ_VERSIONS = (OBJ_VERSION_NO_HEADER_AAD, OBJ_VERSION_HEADER_AAD)
 # Fixed header size per blob: OBJ_MAGIC(8) + version(1) + chunk_id(32) + meta_size(4) + data_size(4)
 REPOOBJ_HEADER_SIZE = 49
 
-# Size of the header prefix used as AEAD additional authenticated data (AAD, data that is authenticated
-# but not encrypted) for OBJ_VERSION_HEADER_AAD objects: OBJ_MAGIC(8) + version(1) + chunk_id(32).
-# meta_size and data_size are excluded, since they are only known after encryption; tampering with them
-# still fails authentication, because it changes the length of the ciphertext slice being decrypted.
-REPOOBJ_HEADER_AAD_SIZE = 41
+# Size of the header prefix used as AEAD AAD (additional authenticated data: authenticated together
+# with the ciphertext, but not itself encrypted) for OBJ_VERSION_HEADER_AAD objects: magic(8) +
+# version(1) + chunk_id(32). meta_size and data_size are excluded, since they are only known after
+# encryption; a change to either still fails authentication, by changing the ciphertext slice length.
+REPOOBJ_HEADER_AAD_SIZE = len(OBJ_MAGIC) + 1 + 32
 
-# Slot tags appended to header_aad, binding each ciphertext to the slot it was encrypted for.
 META_AAD_TAG = b"M"
 DATA_AAD_TAG = b"D"
 
@@ -84,6 +80,7 @@ class RepoObj:
         assert ro_type != ROBJ_DONTCARE
         meta["type"] = ro_type
         assert isinstance(id, bytes)
+        assert len(id) == 32  # struct format "32s" silently pads/truncates a wrong-length id
         assert isinstance(meta, dict)
         assert isinstance(data, (bytes, memoryview))
         assert compress or size is not None and ctype is not None and clevel is not None
@@ -99,8 +96,6 @@ class RepoObj:
             meta["clevel"] = clevel
             data_compressed = data  # is already compressed, is NOT prefixed by type/level bytes
             meta["csize"] = len(data_compressed)
-        # header_aad is the header prefix (magic, version, chunk_id); each slot adds its own tag on top,
-        # so meta_encrypted and data_encrypted authenticate under different AAD.
         header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
         data_encrypted = self.key.encrypt(id, data_compressed, header=header_aad + DATA_AAD_TAG)
         meta_packed = msgpack.packb(meta)
@@ -128,9 +123,7 @@ class RepoObj:
             raise IntegrityError(
                 f"object too small: expected at least {hdr_size + hdr.meta_size} bytes, got {len(obj)}"
             )
-        # header_aad is read from the on-disk header bytes, so any change to magic/version/chunk_id changes
-        # header_aad and breaks decryption below. OBJ_VERSION_NO_HEADER_AAD objects have no header_aad
-        # and no slot tag.
+        # header_aad, meta_aad: see OBJ_VERSION_HEADER_AAD above. b"" for OBJ_VERSION_NO_HEADER_AAD.
         header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE]) if hdr.version == OBJ_VERSION_HEADER_AAD else b""
         meta_aad = header_aad + META_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]

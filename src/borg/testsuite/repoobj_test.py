@@ -5,7 +5,7 @@ from ..crypto.key import PlaintextKey, CHPOKey
 from ..helpers import msgpack
 from ..helpers.errors import IntegrityError
 from ..repository import Repository
-from ..repoobj import RepoObj
+from ..repoobj import OBJ_MAGIC, OBJ_VERSION, OBJ_VERSION_NO_HEADER_AAD, REPOOBJ_HEADER_SIZE, RepoObj
 from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
 
@@ -135,8 +135,6 @@ def test_malformed_object_too_short(key):
 def test_malformed_object_inconsistent_sizes(key):
     # a valid-looking header that claims more meta/data than the object actually contains
     # must be rejected cleanly with IntegrityError.
-    from ..repoobj import OBJ_MAGIC, OBJ_VERSION
-
     repo_objs = RepoObj(key)
     id = repo_objs.id_hash(b"x")
     # huge meta_size, but no actual meta/data bytes follow the header
@@ -217,8 +215,6 @@ def test_tampered_header_magic_detected(aead_key):
 def test_header_aad_tamper_detected_at_key_layer(aead_key):
     # Calls key.encrypt()/key.decrypt() directly with header_aad, to check that every byte of
     # header_aad (magic, version, chunk_id) is authenticated, not just chunk_id.
-    from ..repoobj import OBJ_MAGIC, OBJ_VERSION
-
     data = b"foobar" * 10
     id = aead_key.id_hash(data)
     header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
@@ -278,8 +274,6 @@ def test_untampered_roundtrip_with_aead_key(aead_key):
 def test_version1_object_without_header_aad_still_readable(aead_key):
     # Builds an OBJ_VERSION_NO_HEADER_AAD object by hand (format() only writes OBJ_VERSION_HEADER_AAD)
     # and checks that parse()/parse_meta() still decrypt it.
-    from ..repoobj import OBJ_MAGIC, OBJ_VERSION_NO_HEADER_AAD, REPOOBJ_HEADER_SIZE
-
     repo_objs = RepoObj(aead_key)
     data = b"foobar" * 10
     id = repo_objs.id_hash(data)

@@ -97,9 +97,9 @@ class RepoObj:
             data_compressed = data  # is already compressed, is NOT prefixed by type/level bytes
             meta["csize"] = len(data_compressed)
         header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
-        data_encrypted = self.key.encrypt(id, data_compressed, header=header_aad + DATA_AAD_TAG)
+        data_encrypted = self.key.encrypt(id, data_compressed, aad=header_aad + DATA_AAD_TAG)
         meta_packed = msgpack.packb(meta)
-        meta_encrypted = self.key.encrypt(id, meta_packed, header=header_aad + META_AAD_TAG)
+        meta_encrypted = self.key.encrypt(id, meta_packed, aad=header_aad + META_AAD_TAG)
         hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, id, len(meta_encrypted), len(data_encrypted))
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
@@ -127,7 +127,7 @@ class RepoObj:
         header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE]) if hdr.version == OBJ_VERSION_HEADER_AAD else b""
         meta_aad = header_aad + META_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
-        meta_packed = self.key.decrypt(id, meta_encrypted, header=meta_aad)
+        meta_packed = self.key.decrypt(id, meta_encrypted, aad=meta_aad)
         meta = msgpack.unpackb(meta_packed)
         if ro_type != ROBJ_DONTCARE and meta["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta['type']}")
@@ -167,12 +167,12 @@ class RepoObj:
         meta_aad = header_aad + META_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
         data_aad = header_aad + DATA_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
-        meta_packed = self.key.decrypt(id, meta_encrypted, header=meta_aad)
+        meta_packed = self.key.decrypt(id, meta_encrypted, aad=meta_aad)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
         if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
         data_encrypted = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
-        data_compressed = self.key.decrypt(id, data_encrypted, header=data_aad)  # does not include type/level
+        data_compressed = self.key.decrypt(id, data_encrypted, aad=data_aad)  # does not include type/level
         if decompress:
             ctype = meta_compressed["ctype"]
             clevel = meta_compressed["clevel"]

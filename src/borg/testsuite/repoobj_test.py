@@ -218,21 +218,21 @@ def test_header_aad_tamper_detected_at_key_layer(aead_key):
     data = b"foobar" * 10
     id = aead_key.id_hash(data)
     header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
-    encrypted = aead_key.encrypt(id, data, header=header_aad)
+    encrypted = aead_key.encrypt(id, data, aad=header_aad)
 
-    assert aead_key.decrypt(id, encrypted, header=header_aad) == data
+    assert aead_key.decrypt(id, encrypted, aad=header_aad) == data
 
     # tamper the magic byte (offset 0) after encryption; decrypt gets a different header_aad than encrypt did.
     tampered_header_aad = bytearray(header_aad)
     tampered_header_aad[0] ^= 0x01
     with pytest.raises(IntegrityError):
-        aead_key.decrypt(id, encrypted, header=bytes(tampered_header_aad))
+        aead_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
 
     # tamper the version byte (offset 8) after encryption.
     tampered_header_aad = bytearray(header_aad)
     tampered_header_aad[8] ^= 0x01
     with pytest.raises(IntegrityError):
-        aead_key.decrypt(id, encrypted, header=bytes(tampered_header_aad))
+        aead_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
 
 
 def test_meta_data_slot_swap_detected(aead_key):
@@ -280,10 +280,10 @@ def test_version1_object_without_header_aad_still_readable(aead_key):
     meta = {"type": ROBJ_FILE_STREAM}
     meta, data_compressed = repo_objs.compressor.compress(meta, data)
 
-    # OBJ_VERSION_NO_HEADER_AAD encoding: header=b"", aad=chunk_id only.
-    data_encrypted = aead_key.encrypt(id, data_compressed, header=b"")
+    # OBJ_VERSION_NO_HEADER_AAD encoding: aad=chunk_id only, no header bound in.
+    data_encrypted = aead_key.encrypt(id, data_compressed, aad=b"")
     meta_packed = msgpack.packb(meta)
-    meta_encrypted = aead_key.encrypt(id, meta_packed, header=b"")
+    meta_encrypted = aead_key.encrypt(id, meta_packed, aad=b"")
     hdr = RepoObj.ObjHeader(OBJ_MAGIC, OBJ_VERSION_NO_HEADER_AAD, id, len(meta_encrypted), len(data_encrypted))
     cdata = RepoObj.obj_header.pack(*hdr) + meta_encrypted + data_encrypted
     assert len(RepoObj.obj_header.pack(*hdr)) == REPOOBJ_HEADER_SIZE

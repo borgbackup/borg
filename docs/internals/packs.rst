@@ -53,16 +53,14 @@ The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
 ``len(OBJ_MAGIC)`` + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
 ``REPOOBJ_HEADER_SIZE = len(OBJ_MAGIC) + 1 + 32 + 4 + 4 = 49``
 
-The header stays cleartext (traversal must be possible without a key). Format version ``0x02``
-(``OBJ_VERSION_HEADER_AAD``) binds its first 41 bytes (``OBJ_MAGIC`` + version + ``chunk_id`` --
-``REPOOBJ_HEADER_AAD_SIZE``) into the AEAD authentication of ``encrypted_meta`` and ``encrypted_data``
-as additional authenticated data (AAD: data that is authenticated together with the ciphertext, but
-not itself encrypted). ``meta_size`` and ``data_size`` are not included in the AAD, since they are
-only known after encryption; tampering with them still fails authentication, because it changes the
-length of the ciphertext slice being decrypted. A forged ``chunk_id``, version, or magic byte
-therefore fails AEAD authentication in ``RepoObj.parse()``/``parse_meta()``. This binding only applies
-to the AEAD encryption modes (AES-256-OCB, ChaCha20-Poly1305); plaintext and authenticated-only key
-modes do not use AAD at all.
+Format version ``0x02`` (``OBJ_VERSION_HEADER_AAD``) binds the header's first 41 bytes (``OBJ_MAGIC``
++ version + ``chunk_id`` -- ``REPOOBJ_HEADER_AAD_SIZE``) into the AEAD authentication of
+``encrypted_meta`` and ``encrypted_data`` as additional authenticated data (AAD: data that is
+authenticated together with the ciphertext, but not itself encrypted). This applies to the AEAD
+encryption modes (AES-256-OCB, ChaCha20-Poly1305). ``meta_size`` and ``data_size`` are excluded from
+the AAD, since they are only known after encryption; tampering with either still fails authentication,
+because it changes the length of the ciphertext slice being decrypted. A forged ``chunk_id``, version,
+or magic byte therefore fails AEAD authentication in ``RepoObj.parse()``/``parse_meta()``.
 
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
 AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data`` -- binding each ciphertext to

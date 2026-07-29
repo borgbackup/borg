@@ -75,6 +75,60 @@ def test_check_usage(archivers, request):
     assert "archive2" in output
 
 
+def test_check_soft_interrupt(archivers, request):
+    """A Ctrl-C during a read-only check stops at a safe boundary and raises 'Got Ctrl-C' (#7893).
+    It changes nothing, so a normal check still passes afterwards."""
+    from ...archive import ArchiveChecker
+    from ...helpers import sig_int, Error
+
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+
+    try:
+        with Repository(archiver.repository_path, exclusive=True) as repository:
+            # repository check: stops at a pack boundary, still reports no errors.
+            sig_int._sig_int_triggered = True
+            assert repository.check() is True
+        with Repository(archiver.repository_path, exclusive=True) as repository:
+            # archive check: runs finish(), then raises.
+            sig_int._sig_int_triggered = True
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                ArchiveChecker().check(repository, verify_data=True, sort_by="ts", format="{archive} {time} {id}")
+    finally:
+        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_check_repair_soft_interrupt(archivers, request, monkeypatch):
+    """A Ctrl-C after the first archive of a --repair archive check stops at the archive boundary, runs
+    finish() (dropping the chunk index, writing the manifest), then raises. A later check confirms the
+    repository is still consistent."""
+    from ...archive import ArchiveChecker
+    from ...manifest import Archives
+    from ...helpers import sig_int, Error
+
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)  # two archives
+
+    orig_create = Archives.create
+
+    def create_then_interrupt(self, *args, **kwargs):
+        orig_create(self, *args, **kwargs)
+        sig_int._sig_int_triggered = True  # one Ctrl-C after the first archive was rebuilt
+
+    monkeypatch.setattr(Archives, "create", create_then_interrupt)
+    try:
+        with Repository(archiver.repository_path, exclusive=True) as repository:
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                ArchiveChecker().check(repository, repair=True, sort_by="ts", format="{archive} {time} {id}")
+    finally:
+        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+
+    # a normal check does not rebuild archives, so the patched Archives.create never fires here
+    cmd(archiver, "check", exit_code=0)
+
+
 def test_date_matching(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)

@@ -32,7 +32,7 @@ from .helpers import BackupSymlinkParentError, BackupPathTraversalError
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
-from .helpers import Error, IntegrityError, set_ec
+from .helpers import Error, IntegrityError, set_ec, sig_int
 from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
 from .helpers import parse_timestamp, archive_ts_now, CompressionSpec
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
@@ -1929,12 +1929,25 @@ class ArchiveChecker:
                 rebuild_manifest = True
         if rebuild_manifest:
             self.manifest = self.rebuild_manifest()
-        if find_lost_archives:
+        # Skip the remaining scans on Ctrl-C, but still run finish() below.
+        if find_lost_archives and not sig_int:
             self.rebuild_archives_directory()
-        self.rebuild_archives(
-            match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
-        )
+        if not sig_int:
+            self.rebuild_archives(
+                match=match,
+                first=first,
+                last=last,
+                sort_by=sort_by,
+                older=older,
+                oldest=oldest,
+                newer=newer,
+                newest=newest,
+            )
+        # finish() drops the chunk index and writes the manifest; run it even on Ctrl-C so --repair
+        # leaves a valid index (#9850).
         self.finish()
+        if sig_int:
+            raise Error("Got Ctrl-C / SIGINT.")
         if self.error_found:
             logger.error("Archive consistency check complete, problems found.")
         else:
@@ -1987,6 +2000,8 @@ class ArchiveChecker:
             total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
         for chunk_id, _ in self.chunks.iteritems():
+            if sig_int:  # stop at a chunk boundary
+                break
             pi.show()
             try:
                 encrypted_data = self.repository.get(chunk_id)
@@ -2083,6 +2098,8 @@ class ArchiveChecker:
             msgid="check.rebuild_archives_directory",
         )
         for chunk_id, _ in self.chunks.iteritems():
+            if sig_int:  # stop at a chunk boundary
+                break
             pi.show()
             cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
             try:
@@ -2326,6 +2343,9 @@ class ArchiveChecker:
         # badly damaged repo does not throw away everything it already found.
         try:
             for i, info in enumerate(archive_infos):
+                if sig_int:
+                    # Break only between archives: --repair rewrites each archive as a whole below.
+                    break
                 pi.show(i)
                 archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
                 try:

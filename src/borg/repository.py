@@ -1019,6 +1019,10 @@ class Repository:
             pack_infos = store_list("packs")
             pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
             for info in pack_infos:
+                if sig_int:  # save progress so a later check resumes, then stop
+                    logger.info(f"Interrupted repository check, {len(tracker)} packs checked so far.")
+                    tracker.save()
+                    break
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)

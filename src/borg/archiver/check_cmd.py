@@ -3,8 +3,8 @@ import os
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
-from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
-from ..helpers import yes, ArchiveFormatter
+from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error, IntegrityError
+from ..helpers import yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
@@ -66,6 +66,8 @@ class CheckMixIn:
         if not args.archives_only:
             if not repository.check(repair=args.repair, max_duration=args.max_duration):
                 set_ec(EXIT_WARNING)
+            if sig_int:  # repository check interrupted; skip the archive check
+                raise Error("Got Ctrl-C / SIGINT.")
         if not args.repo_only and not archive_checker.check(
             repository,
             verify_data=args.verify_data,

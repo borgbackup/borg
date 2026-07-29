@@ -836,6 +836,10 @@ class Repository:
         corrupt packs and dropping those packs is left to repair, refs #8572. The ids of the packs
         found corrupt are kept in cache/checked-packs for repair, refs #9696.
 
+        Any pack on record as corrupt fails the check, including on a partial run that stops before
+        re-reaching it. The record clears when the pack verifies intact again, when compact removes
+        the pack, or when repair salvages and drops it (refs #8572).
+
         max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
         max_age. Check results are always recorded and kept.
         """
@@ -901,11 +905,12 @@ class Repository:
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
                 entry = tracker.get(pack_id)
-                # skip the pack if its recorded intact result is younger than max_age; a timestamp up
-                # to MAX_CLOCK_SKEW in the future still counts as recent, further ahead it is re-verified.
+                # skip the pack if its recorded intact result is younger than max_age. a future
+                # timestamp (writer clock ahead of ours) also counts as recent, tolerated up to
+                # MAX_CLOCK_SKEW or max_age ahead, whichever is smaller.
                 if entry is not None and entry.result and max_age:
                     age = time.time() - entry.timestamp
-                    if -MAX_CLOCK_SKEW <= age < max_age:
+                    if -min(MAX_CLOCK_SKEW, max_age) <= age < max_age:
                         pack_skipped += 1
                         continue
                 pack_files += 1

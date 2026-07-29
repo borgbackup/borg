@@ -15,7 +15,7 @@ from ..constants import *  # NOQA
 from ..helpers.datastruct import StableDict
 from ..helpers.errors import CommandError, Error
 from ..helpers.parseformat import bin_to_hex
-from ..helpers.time import parse_timestamp
+from ..helpers.time import parse_timestamp, compile_date_pattern, DatePatternError
 from ..item import ArchiveItem
 from ..patterns import get_regex_from_pattern
 
@@ -123,6 +123,13 @@ class LegacyArchives:
                 elif match.startswith("host:"):
                     wanted_host = match.removeprefix("host:")
                     archive_infos = [x for x in archive_infos if x.host == wanted_host]
+                elif match.startswith("date:"):
+                    wanted_date = match.removeprefix("date:")
+                    try:
+                        date_matches = compile_date_pattern(wanted_date)
+                    except DatePatternError as exc:
+                        raise CommandError(f"Invalid date pattern: {match} ({exc})")
+                    archive_infos = [x for x in archive_infos if date_matches(x.ts)]
                 else:
                     match = match.removeprefix("name:")
                     regex = get_regex_from_pattern(match)

@@ -371,6 +371,20 @@ def test_list_match_host():
     assert la.list(match=["host:laptop"]) == [i1]
 
 
+def test_list_match_date():
+    i1 = _archiveinfo("a", _id(1), ts=TS)  # 2020-06-01
+    i2 = _archiveinfo("b", _id(2), ts=TS2)  # 2021-06-01
+    la = _make_list_target([i1, i2])
+    assert la.list(match=["date:2020-06"]) == [i1]
+
+
+def test_list_match_date_invalid_raises():
+    i1 = _archiveinfo("a", _id(1))
+    la = _make_list_target([i1])
+    with pytest.raises(CommandError, match="Invalid date pattern"):
+        la.list(match=["date:not-a-date"])
+
+
 def test_list_match_tags():
     i1 = _archiveinfo("a", _id(1), tags=("prod", "db"))
     i2 = _archiveinfo("b", _id(2), tags=("dev",))

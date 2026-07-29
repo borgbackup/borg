@@ -4,7 +4,8 @@ import io
 import pytest
 
 from ...crypto.file_integrity import DetachedIntegrityCheckedFile, FileIntegrityError, IntegrityCheckedFile
-from ...crypto.file_integrity import SHA256FileHashingWrapper
+from ...crypto.file_integrity import SHA256FileHashingWrapper, XXH64FileHashingWrapper, SUPPORTED_ALGORITHMS
+from ...crypto.low_level import XXH64
 from ...platform import SyncFile
 
 
@@ -177,3 +178,64 @@ class TestSHA256FileHashingWrapper:
         # pure_hash=False appends the file length ("11" in this case) at exit
         expected_hash = hashlib.sha256(data + b"11").hexdigest()
         assert wrapper.hexdigest() == expected_hash
+
+
+class TestXXH64FileHashingWrapper:
+    # XXH64 support only exists to read borg 1.x repos during `borg transfer`, see #9935.
+    def test_registered(self):
+        assert SUPPORTED_ALGORITHMS["XXH64"] is XXH64FileHashingWrapper
+        assert XXH64FileHashingWrapper.ALGORITHM == "XXH64"
+
+    def test_pure_hash_write(self):
+        bio = io.BytesIO()
+        data = b"hello world"
+        with XXH64FileHashingWrapper(bio, write=True, pure_hash=True) as wrapper:
+            wrapper.write(data)
+            assert bio.getvalue() == data
+        assert wrapper.hexdigest() == XXH64(data).hexdigest()
+
+    def test_pure_hash_read(self):
+        data = b"hello world"
+        bio = io.BytesIO(data)
+        with XXH64FileHashingWrapper(bio, write=False, pure_hash=True) as wrapper:
+            assert wrapper.read() == data
+        assert wrapper.hexdigest() == XXH64(data).hexdigest()
+
+    def test_impure_hash_write(self):
+        bio = io.BytesIO()
+        data = b"hello world"
+        with XXH64FileHashingWrapper(bio, write=True, pure_hash=False) as wrapper:
+            wrapper.write(data)
+        # pure_hash=False appends the file length ("11" in this case) at exit
+        assert wrapper.hexdigest() == XXH64(data + b"11").hexdigest()
+
+
+class TestReadLegacyXXH64Integrity:
+    # simulate reading a borg 1.x file whose integrity data uses the XXH64 algorithm, #9935.
+    # borg 2.x writes SHA256, so to produce an XXH64 integrity file we make the writer use the
+    # XXH64 wrapper (as borg 1.x did), then read it back through the normal (SHA256-defaulting)
+    # reader, which must pick XXH64 from SUPPORTED_ALGORITHMS based on the stored algorithm.
+    def _write_xxh64_protected(self, tmpdir, payload, monkeypatch):
+        import borg.crypto.file_integrity as fi
+
+        monkeypatch.setattr(fi, "SHA256FileHashingWrapper", XXH64FileHashingWrapper)
+        path = str(tmpdir.join("file"))
+        with IntegrityCheckedFile(path, write=True) as fd:
+            fd.write(payload)
+        integrity_data = fd.integrity_data
+        monkeypatch.undo()
+        assert '"algorithm": "XXH64"' in integrity_data
+        return path, integrity_data
+
+    def test_verify_ok(self, tmpdir, monkeypatch):
+        path, integrity_data = self._write_xxh64_protected(tmpdir, b"borg 1.x payload", monkeypatch)
+        with IntegrityCheckedFile(path, write=False, integrity_data=integrity_data) as fd:
+            assert fd.read() == b"borg 1.x payload"
+
+    def test_verify_detects_corruption(self, tmpdir, monkeypatch):
+        path, integrity_data = self._write_xxh64_protected(tmpdir, b"borg 1.x payload", monkeypatch)
+        with open(path, "ab") as fd:
+            fd.write(b" tampered")
+        with pytest.raises(FileIntegrityError):
+            with IntegrityCheckedFile(path, write=False, integrity_data=integrity_data) as fd:
+                fd.read()

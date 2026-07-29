@@ -825,3 +825,174 @@ cdef class CSPRNG:
 
             # Swap items[i] and items[j]
             items[i], items[j] = items[j], items[i]
+
+
+# XXH64: a pure-cython, dependency-free implementation of the (non-cryptographic) xxHash-64 hash.
+#
+# This only exists to support `borg transfer` from borg 1.x repos, see #9935:
+# borg 1.x stored XXH64 checksums in the repository's index/hints integrity data, so we need
+# XXH64 to verify those files when opening a borg 1.x (legacy) repository. It is not used for
+# anything in borg 2.x native repos and MUST NOT be used as a security mechanism.
+#
+# Reference: https://github.com/Cyan4973/xxHash (algorithm is in the public domain / BSD-2-Clause).
+# The digest uses the canonical (big-endian) representation, matching what borg 1.x wrote
+# (it used the "xxhash" PyPI package, whose digest()/hexdigest() are big-endian).
+
+cdef extern from *:
+    """
+    #include <stdint.h>
+    /* xxHash-64 prime constants, defined as real uint64_t so there is no ambiguity
+       about the width/signedness of these (large) literals. */
+    static const uint64_t BORG_XXH64_P1 = 0x9E3779B185EBCA87ULL;
+    static const uint64_t BORG_XXH64_P2 = 0xC2B2AE3D27D4EB4FULL;
+    static const uint64_t BORG_XXH64_P3 = 0x165667B19E3779F9ULL;
+    static const uint64_t BORG_XXH64_P4 = 0x85EBCA77C2B2AE63ULL;
+    static const uint64_t BORG_XXH64_P5 = 0x27D4EB2F165667C5ULL;
+    """
+    const uint64_t BORG_XXH64_P1
+    const uint64_t BORG_XXH64_P2
+    const uint64_t BORG_XXH64_P3
+    const uint64_t BORG_XXH64_P4
+    const uint64_t BORG_XXH64_P5
+
+
+cdef inline uint64_t _xxh_rotl(uint64_t x, int r) noexcept:
+    return (x << r) | (x >> (64 - r))
+
+
+cdef inline uint64_t _xxh_round(uint64_t acc, uint64_t inp) noexcept:
+    acc += inp * BORG_XXH64_P2
+    acc = _xxh_rotl(acc, 31)
+    acc *= BORG_XXH64_P1
+    return acc
+
+
+cdef inline uint64_t _xxh_merge(uint64_t acc, uint64_t val) noexcept:
+    acc ^= _xxh_round(0, val)
+    acc = acc * BORG_XXH64_P1 + BORG_XXH64_P4
+    return acc
+
+
+# read 64/32 bits little-endian, byte-wise, so this is correct on both little- and big-endian hosts.
+cdef inline uint64_t _xxh_read64(const uint8_t *p) noexcept:
+    return (<uint64_t>p[0] | (<uint64_t>p[1] << 8) | (<uint64_t>p[2] << 16) | (<uint64_t>p[3] << 24) |
+            (<uint64_t>p[4] << 32) | (<uint64_t>p[5] << 40) | (<uint64_t>p[6] << 48) | (<uint64_t>p[7] << 56))
+
+
+cdef inline uint32_t _xxh_read32(const uint8_t *p) noexcept:
+    return (<uint32_t>p[0] | (<uint32_t>p[1] << 8) | (<uint32_t>p[2] << 16) | (<uint32_t>p[3] << 24))
+
+
+cdef class XXH64:
+    """
+    Streaming XXH64 hasher with an interface compatible with the "xxhash" PyPI package's xxh64
+    (as used by borg 1.x): XXH64([data], [seed]) then .update(data) and .digest()/.hexdigest().
+
+    See the comment above: this exists only to support `borg transfer` from borg 1.x repos, #9935.
+    """
+    cdef uint64_t v1, v2, v3, v4
+    cdef uint64_t total_len
+    cdef uint64_t seed
+    cdef uint8_t mem[32]
+    cdef unsigned int memsize
+
+    def __init__(self, data=b"", seed=0):
+        # coerce seed into a C uint64_t first, so the setup arithmetic below wraps in C
+        # (mod 2**64) instead of overflowing as an unbounded python int.
+        cdef uint64_t s = seed
+        self.seed = s
+        self.v1 = s + BORG_XXH64_P1 + BORG_XXH64_P2
+        self.v2 = s + BORG_XXH64_P2
+        self.v3 = s
+        self.v4 = s - BORG_XXH64_P1
+        self.total_len = 0
+        self.memsize = 0
+        if data:
+            self.update(data)
+
+    def update(self, data):
+        cdef Py_buffer view
+        PyObject_GetBuffer(data, &view, PyBUF_SIMPLE)
+        try:
+            self._update(<const uint8_t *> view.buf, view.len)
+        finally:
+            PyBuffer_Release(&view)
+
+    cdef void _update(self, const uint8_t *p, Py_ssize_t length) noexcept:
+        cdef const uint8_t *end = p + length
+        cdef const uint8_t *limit
+        cdef unsigned int fill
+        self.total_len += length
+        if self.memsize + length < 32:
+            # not enough (even together with buffered data) for a full 32-byte stripe: just buffer it.
+            memcpy(&self.mem[self.memsize], p, length)
+            self.memsize += <unsigned int> length
+            return
+        if self.memsize > 0:
+            # complete and process the buffered partial stripe first.
+            fill = 32 - self.memsize
+            memcpy(&self.mem[self.memsize], p, fill)
+            self.v1 = _xxh_round(self.v1, _xxh_read64(&self.mem[0]))
+            self.v2 = _xxh_round(self.v2, _xxh_read64(&self.mem[8]))
+            self.v3 = _xxh_round(self.v3, _xxh_read64(&self.mem[16]))
+            self.v4 = _xxh_round(self.v4, _xxh_read64(&self.mem[24]))
+            p += fill
+            self.memsize = 0
+        # process full 32-byte stripes directly from the input.
+        limit = end - 32
+        while p <= limit:
+            self.v1 = _xxh_round(self.v1, _xxh_read64(p)); p += 8
+            self.v2 = _xxh_round(self.v2, _xxh_read64(p)); p += 8
+            self.v3 = _xxh_round(self.v3, _xxh_read64(p)); p += 8
+            self.v4 = _xxh_round(self.v4, _xxh_read64(p)); p += 8
+        # buffer the remaining (< 32) bytes for the next update()/digest().
+        if p < end:
+            memcpy(&self.mem[0], p, end - p)
+            self.memsize = <unsigned int> (end - p)
+
+    def digest(self):
+        """Return the digest as 8 bytes, in canonical (big-endian) representation."""
+        cdef uint64_t h
+        cdef const uint8_t *p = &self.mem[0]
+        cdef const uint8_t *end = &self.mem[self.memsize]
+        cdef uint8_t out[8]
+        cdef int i
+        if self.total_len >= 32:
+            h = _xxh_rotl(self.v1, 1) + _xxh_rotl(self.v2, 7) + _xxh_rotl(self.v3, 12) + _xxh_rotl(self.v4, 18)
+            h = _xxh_merge(h, self.v1)
+            h = _xxh_merge(h, self.v2)
+            h = _xxh_merge(h, self.v3)
+            h = _xxh_merge(h, self.v4)
+        else:
+            h = self.seed + BORG_XXH64_P5
+        h += self.total_len
+        while p + 8 <= end:
+            h ^= _xxh_round(0, _xxh_read64(p))
+            h = _xxh_rotl(h, 27) * BORG_XXH64_P1 + BORG_XXH64_P4
+            p += 8
+        if p + 4 <= end:
+            h ^= <uint64_t> _xxh_read32(p) * BORG_XXH64_P1
+            h = _xxh_rotl(h, 23) * BORG_XXH64_P2 + BORG_XXH64_P3
+            p += 4
+        while p < end:
+            h ^= <uint64_t> p[0] * BORG_XXH64_P5
+            h = _xxh_rotl(h, 11) * BORG_XXH64_P1
+            p += 1
+        # final avalanche
+        h ^= h >> 33
+        h *= BORG_XXH64_P2
+        h ^= h >> 29
+        h *= BORG_XXH64_P3
+        h ^= h >> 32
+        for i in range(8):
+            out[i] = <uint8_t> (h >> (56 - 8 * i))  # big-endian
+        return PyBytes_FromStringAndSize(<char *> out, 8)
+
+    def hexdigest(self):
+        """Return the digest as a 16-character hex string (canonical, big-endian)."""
+        return self.digest().hex()
+
+
+def xxh64(data, seed=0):
+    """One-shot XXH64: return the 8-byte canonical (big-endian) digest of *data*."""
+    return XXH64(data, seed).digest()

@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timezone
 
-from ...helpers.time import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
+from ...helpers.time import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS, calculate_relative_offset
 
 
 def utcfromtimestamp(timestamp):
@@ -36,3 +36,18 @@ def test_safe_timestamps():
             utcfromtimestamp(beyond_y10k)
         assert utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2262, 1, 1)
         assert utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2262, 1, 1)
+
+
+def test_calculate_relative_offset_year_from_leap_day():
+    # regression test for #9967: year offset from Feb 29 must not crash on non-leap target year.
+    leap_day = datetime(2024, 2, 29, tzinfo=timezone.utc)
+    assert calculate_relative_offset("1y", leap_day, earlier=False) == datetime(2025, 2, 28, tzinfo=timezone.utc)
+    assert calculate_relative_offset("1y", leap_day, earlier=True) == datetime(2023, 2, 28, tzinfo=timezone.utc)
+    # target year is also a leap year -> keep Feb 29.
+    assert calculate_relative_offset("4y", leap_day, earlier=False) == datetime(2028, 2, 29, tzinfo=timezone.utc)
+
+
+def test_calculate_relative_offset_year_regular():
+    ts = datetime(2024, 6, 15, 12, 30, 45, tzinfo=timezone.utc)
+    assert calculate_relative_offset("2y", ts, earlier=False) == datetime(2026, 6, 15, 12, 30, 45, tzinfo=timezone.utc)
+    assert calculate_relative_offset("2y", ts, earlier=True) == datetime(2022, 6, 15, 12, 30, 45, tzinfo=timezone.utc)

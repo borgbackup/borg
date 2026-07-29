@@ -9,6 +9,7 @@ from hashlib import sha256
 import pytest
 from borghash import HashTableNT
 
+from ..constants import MAX_CLOCK_SKEW
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
 from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
@@ -1216,34 +1217,39 @@ def test_check_partial_keeps_corrupt_record_across_runs(tmp_path):
 
 
 def test_check_partial_break_reports_unreached_corrupt_record(tmp_path, monkeypatch, caplog):
-    # a partial check that stops before re-reaching a carried-over corrupt record still fails and
-    # reports it, so the timeout does not hide known corruption.
+    # a partial check that breaks before re-reaching a corrupt record from an earlier check still
+    # fails and reports that pack.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        intact_id, _ = _store_intact_pack(repository)
+        intact_id, intact_key = _store_intact_pack(repository)
         # a corrupt pack whose id sorts after the intact one, so the scan reaches the intact pack first.
         corrupt_id = b"\xff" * 32
         assert bin_to_hex(intact_id) < bin_to_hex(corrupt_id)
-        repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
+        corrupt_key = "packs/" + bin_to_hex(corrupt_id)
+        repository.store_store(corrupt_key, b"CORRUPT-does-not-match-name")
 
         tracker = PackTracker.new(repository.store)
         tracker.record(corrupt_id, ok=False)  # recorded corrupt by an earlier check
         tracker.save()
 
-        # jump the clock past max_duration once the first pack has been hashed, so the scan breaks
-        # before it reaches the corrupt pack.
-        clock = {"t": 0}
+        # freeze the clock, then jump it past max_duration right after the intact pack is hashed, so the
+        # pack loop breaks before it reaches the corrupt pack.
+        clock = {"t": 0.0}
         monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
+        hashed_keys = []
         orig_hash = repository.store.hash
 
-        def hash_then_advance(key):
+        def hash_and_advance(key):
+            hashed_keys.append(key)
             result = orig_hash(key)
-            clock["t"] = 10**9
+            if key == intact_key:
+                clock["t"] = 10**9
             return result
 
-        monkeypatch.setattr(repository.store, "hash", hash_then_advance)
+        monkeypatch.setattr(repository.store, "hash", hash_and_advance)
 
         with caplog.at_level(logging.ERROR, logger="borg.repository"):
             assert repository.check(repair=False, max_duration=1, max_age=3600) is False
+        assert corrupt_key not in hashed_keys  # the scan broke before reaching the corrupt pack
         assert f"Corrupt pack: {bin_to_hex(corrupt_id)}" in caplog.text
 
 
@@ -1282,6 +1288,40 @@ def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
 
         after = PackTracker.load(repository.store)
         assert after.table[intact_id].timestamp > old_ts  # record refreshed
+
+
+def test_check_max_age_skips_near_future_ok(tmp_path, monkeypatch):
+    # a record timestamped slightly in the future (clock skew between machines) still counts as
+    # recent, up to MAX_CLOCK_SKEW ahead, and is not re-verified.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        future_ts = int(time.time()) + MAX_CLOCK_SKEW // 2
+        tracker.table[intact_id] = PackTracker.Entry(timestamp=future_ts, result=1)
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_age=3600) is True
+        assert pack_key not in hashed_keys  # near-future timestamp still counts as recent
+
+
+def test_check_max_age_reverifies_far_future_ok(tmp_path, monkeypatch):
+    # a record dated more than MAX_CLOCK_SKEW into the future is not plausible clock skew and is
+    # re-verified.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        tracker = PackTracker.new(repository.store)
+        far_future_ts = int(time.time()) + MAX_CLOCK_SKEW + 3600
+        tracker.table[intact_id] = PackTracker.Entry(timestamp=far_future_ts, result=1)
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_age=3600) is True
+        assert pack_key in hashed_keys  # too far ahead to be clock skew, re-verified
 
 
 def test_check_max_age_reverifies_corrupt_even_when_fresh(tmp_path, monkeypatch):

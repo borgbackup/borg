@@ -132,7 +132,8 @@ class CheckMixIn:
         interval (e.g. ``--max-age=4w``) are skipped, spreading the verification
         cost over repeated checks. Check results are recorded in any case;
         ``--max-age`` only controls their reuse. Packs recorded corrupt are always
-        re-verified. ``--max-age`` cannot be combined with ``--repair``.
+        re-verified. ``--max-age`` affects only the repository check and cannot be
+        combined with ``--archives-only`` or ``--repair``.
 
         The ``--max-duration`` option can be used to split a long-running repository
         check into multiple partial checks. After the given number of seconds, the

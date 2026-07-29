@@ -78,13 +78,16 @@ def test_check_max_age(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
 
-    # --repair does not allow --max-age, and --max-duration requires --max-age.
+    # --repair and --archives-only do not allow --max-age, and --max-duration requires --max-age.
     if archiver.FORK_DEFAULT:
         cmd(archiver, "check", "--repair", "--max-age=1d", exit_code=CommandError().exit_code)
+        cmd(archiver, "check", "--archives-only", "--max-age=1d", exit_code=CommandError().exit_code)
         cmd(archiver, "check", "--repository-only", "--max-duration=3600", exit_code=CommandError().exit_code)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "check", "--repair", "--max-age=1d")
+        with pytest.raises(CommandError):
+            cmd(archiver, "check", "--archives-only", "--max-age=1d")
         with pytest.raises(CommandError):
             cmd(archiver, "check", "--repository-only", "--max-duration=3600")
 

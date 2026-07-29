@@ -142,7 +142,7 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
 
             match unit:
                 case "y":
-                    return from_ts.replace(year=from_ts.year + offset)
+                    return offset_n_months(from_ts, offset * 12)
                 case "m":
                     return offset_n_months(from_ts, offset)
                 case "w":
@@ -173,8 +173,15 @@ def offset_n_months(from_ts, n_months):
     following_month, year_of_following_month = get_month_and_year_from_total(total_months + 1)
     max_days_in_month = (datetime(year_of_following_month, following_month, 1) - timedelta(1)).day
 
-    return datetime(day=min(from_ts.day, max_days_in_month), month=target_month, year=target_year).replace(
-        tzinfo=from_ts.tzinfo
+    return datetime(
+        day=min(from_ts.day, max_days_in_month),
+        month=target_month,
+        year=target_year,
+        hour=from_ts.hour,
+        minute=from_ts.minute,
+        second=from_ts.second,
+        microsecond=from_ts.microsecond,
+        tzinfo=from_ts.tzinfo,
     )
 
 

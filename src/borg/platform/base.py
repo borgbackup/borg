@@ -85,6 +85,16 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     """
 
 
+def acl_text_to_xattr(acl, numeric_ids=False):
+    """
+    Convert an ACL from the borg item text representation to the binary representation
+    the platform's kernel uses for the ACL extended attributes (used by the FUSE mount).
+
+    Not supported on this platform.
+    """
+    raise NotImplementedError
+
+
 try:
     from os import lchflags  # type: ignore[attr-defined]
 

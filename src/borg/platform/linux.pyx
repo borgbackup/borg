@@ -1,6 +1,7 @@
 import os
 import re
 import stat
+import struct
 
 from .posix import posix_acl_use_stored_uid_gid
 from . import posix_ug
@@ -358,6 +359,59 @@ def acl_set(path, item, numeric_ids=False, fd=None):
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(default_acl)
+
+
+# Linux kernel POSIX ACL xattr representation,
+# see linux/include/uapi/linux/posix_acl_xattr.h and linux/include/linux/posix_acl.h.
+_ACL_XATTR_VERSION = 2
+_ACL_UNDEFINED_ID = 0xFFFFFFFF
+# maps the ACL entry type to the e_tag values used for (unnamed, named) entries of that type.
+_ACL_TAGS = {
+    'user': (0x01, 0x02),   # ACL_USER_OBJ, ACL_USER
+    'group': (0x04, 0x08),  # ACL_GROUP_OBJ, ACL_GROUP
+    'mask': (0x10, None),   # ACL_MASK
+    'other': (0x20, None),  # ACL_OTHER
+}
+_ACL_PERMS = {'r': 4, 'w': 2, 'x': 1, '-': 0}
+
+
+def acl_text_to_xattr(acl, numeric_ids=False):
+    """Convert an ACL from the borg item text representation (acl_access / acl_default)
+    to the binary representation the Linux kernel uses for the system.posix_acl_access /
+    system.posix_acl_default extended attributes.
+
+    If `numeric_ids` is True, the stored numeric ids are used, otherwise the stored
+    user/group names are mapped to local uids/gids (falling back to the stored ids).
+
+    Raises ValueError for ACL text that can not be converted.
+    """
+    assert isinstance(acl, bytes)
+    converter = posix_acl_use_stored_uid_gid if numeric_ids else acl_use_local_uid_gid
+    entries = []
+    try:
+        for entry in safe_decode(converter(acl)).split('\n'):
+            if not entry:
+                continue
+            typ, qualifier, perm = entry.split(':')[:3]
+            unnamed_tag, named_tag = _ACL_TAGS[typ]
+            if qualifier:
+                if named_tag is None:
+                    raise ValueError(f"unexpected qualifier in ACL entry: {entry}")
+                tag, qid = named_tag, int(qualifier)
+            else:
+                tag, qid = unnamed_tag, _ACL_UNDEFINED_ID
+            perms = 0
+            for p in perm:
+                perms |= _ACL_PERMS[p]
+            entries.append((tag, perms, qid))
+    except (IndexError, KeyError, ValueError) as e:
+        raise ValueError(f"unsupported ACL: {acl!r}") from e
+    # the kernel expects the entries in canonical order: owner, named users, owning group,
+    # named groups, mask, other - with named entries sorted by id. the stored text should
+    # already be in this order (libacl produces it), but do not rely on that.
+    entries.sort(key=lambda e: (e[0], e[2]))
+    return b''.join([struct.pack('<I', _ACL_XATTR_VERSION)] +
+                    [struct.pack('<HHI', tag, perms, qid) for tag, perms, qid in entries])
 
 
 cdef _sync_file_range(fd, offset, length, flags):

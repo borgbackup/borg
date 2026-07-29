@@ -71,7 +71,12 @@ class MountMixIn:
         This can be useful for browsing or restoring individual files.
 
         When restoring, take into account that the current FUSE implementation does
-        not support special fs flags and ACLs.
+        not support special fs flags. On Linux, POSIX ACLs of the archived fs objects
+        are exposed (read-only) via the ``system.posix_acl_access`` and
+        ``system.posix_acl_default`` extended attributes, so tools like ``getfacl`` or
+        ``rsync -A`` can read them from the mounted archive. Note that the mount does
+        not enforce the ACLs for permission checks. On other platforms, ACLs are not
+        supported.
 
         When mounting a repository, the top directories will be named like the
         archives and the directory structure below these will be loaded on-demand from

@@ -1,5 +1,8 @@
 import os
+import struct
 import tempfile
+
+import pytest
 
 from ...platform import acl_get, acl_set
 from .platform_test import skipif_not_linux, skipif_fakeroot_detected, skipif_acls_not_working, skipif_no_ubel_user
@@ -113,6 +116,48 @@ def test_non_ascii_acl():
     acl_access_numeric = get_acl(file.name, numeric_ids=True)["acl_access"]
     assert user_entry_numeric in acl_access_numeric
     assert group_entry_numeric in acl_access_numeric
+
+
+def test_acl_text_to_xattr():
+    from ...platform.linux import acl_text_to_xattr
+
+    acl = b"user::rw-\nuser:root:rw-:0\nuser:9999:r--:9999\ngroup::r--\ngroup:8888:rw-:8888\nmask::rw-\nother::r--"
+    binary = acl_text_to_xattr(acl, numeric_ids=True)
+    header, entries = binary[:4], binary[4:]
+    assert header == (2).to_bytes(4, "little")  # POSIX_ACL_XATTR_VERSION
+    parsed = [struct.unpack("<HHI", entries[i : i + 8]) for i in range(0, len(entries), 8)]
+    assert parsed == [
+        (0x01, 6, 0xFFFFFFFF),  # ACL_USER_OBJ  user::rw-
+        (0x02, 6, 0),  # ACL_USER  user:root:rw-:0
+        (0x02, 4, 9999),  # ACL_USER  user:9999:r--:9999
+        (0x04, 4, 0xFFFFFFFF),  # ACL_GROUP_OBJ  group::r--
+        (0x08, 6, 8888),  # ACL_GROUP  group:8888:rw-:8888
+        (0x10, 6, 0xFFFFFFFF),  # ACL_MASK  mask::rw-
+        (0x20, 4, 0xFFFFFFFF),  # ACL_OTHER  other::r--
+    ]
+    # unconvertible ACL text must raise ValueError:
+    with pytest.raises(ValueError):
+        acl_text_to_xattr(b"user:someuser:rw-")  # named entry without a stored numeric id
+    with pytest.raises(ValueError):
+        acl_text_to_xattr(b"flubber::rw-", numeric_ids=True)  # unknown entry type
+    with pytest.raises(ValueError):
+        acl_text_to_xattr(b"mask:0:rw-:0", numeric_ids=True)  # mask must not have a qualifier
+
+
+@skipif_acls_not_working
+def test_acl_text_to_xattr_matches_kernel():
+    from ...platform.linux import acl_text_to_xattr
+
+    file = tempfile.NamedTemporaryFile()
+    access = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n"
+    set_acl(file.name, access=access)
+    kernel_binary = os.getxattr(file.name, "system.posix_acl_access")
+    # borg stores the ACL as text - converting that back to the binary xattr
+    # representation must give exactly what the kernel produced itself.
+    item = get_acl(file.name)
+    assert acl_text_to_xattr(item["acl_access"]) == kernel_binary
+    item = get_acl(file.name, numeric_ids=True)
+    assert acl_text_to_xattr(item["acl_access"], numeric_ids=True) == kernel_binary
 
 
 def test_utils():

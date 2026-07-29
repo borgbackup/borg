@@ -178,9 +178,13 @@ def test_missing_file_chunk(archivers, request):
             pytest.fail("should not happen")  # convert 'fail'
 
     output = cmd(archiver, "check", exit_code=1)
-    assert "Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(killed_chunk.id) in output
+    assert src_file in output
     output = cmd(archiver, "check", "--repair", exit_code=0)
-    assert "Missing file chunk detected" in output  # repair is not changing anything, just reporting.
+    # repair is not changing anything, just reporting.
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(killed_chunk.id) in output
 
     # check does not modify the chunks list.
     for archive_name in ("archive1", "archive2"):
@@ -200,7 +204,7 @@ def test_missing_file_chunk(archivers, request):
 
     # check should not complain anymore about missing chunks:
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "Missing file chunk detected" not in output
+    assert "The following chunks are missing in the repository:" not in output
 
 
 def test_missing_archive_item_chunk(archivers, request):
@@ -483,11 +487,14 @@ def test_verify_data(archivers, request, init_args):
     # repair will find the defect chunk and remove it
     output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(chunk.id) in output
+    assert src_file in output
 
     # run with --verify-data again, it will notice the missing chunk.
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(chunk.id) in output
 
 
 def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):
@@ -571,12 +578,15 @@ def test_corrupted_file_chunk(archivers, request, init_args):
     # repair: the defect chunk will be removed.
     output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(chunk.id) in output
+    assert src_file in output
 
     # run normal check again
     cmd(archiver, "check", "--repository-only", exit_code=0)
     output = cmd(archiver, "check", "--archives-only", exit_code=1)
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert src_file in output
 
 
 @pytest.mark.skip(

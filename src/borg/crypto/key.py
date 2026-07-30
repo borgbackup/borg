@@ -1080,8 +1080,8 @@ class AEADKeyBase(KeyBase):
         if iv > self.MAX_IV:  # see the data-structures docs about why the IV range is enough
             raise IntegrityError("IV overflow, should never happen.")
         iv_48bit = iv.to_bytes(6, "big")
-        envelope_header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
-        return self.cipher.encrypt(data, header=envelope_header, iv=iv, aad=aad + id)
+        header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
+        return self.cipher.encrypt(data, header=header, iv=iv, aad=aad + id)
 
     def decrypt(self, id, data, aad=b""):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header

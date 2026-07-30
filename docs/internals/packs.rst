@@ -58,9 +58,9 @@ Format version ``0x02`` (``OBJ_VERSION_HEADER_AAD``) binds the header's first 41
 ``encrypted_meta`` and ``encrypted_data`` as additional authenticated data (AAD: data that is
 authenticated together with the ciphertext, but not itself encrypted). This applies to the AEAD
 encryption modes (AES-256-OCB, ChaCha20-Poly1305). ``meta_size`` and ``data_size`` are excluded from
-the AAD, since they are only known after encryption; tampering with either still fails authentication,
-because it changes the length of the ciphertext slice being decrypted. A forged ``chunk_id``, version,
-or magic byte therefore fails AEAD authentication in ``RepoObj.parse()``/``parse_meta()``.
+the AAD; tampering with either still fails authentication, because it changes the length of the
+ciphertext slice being decrypted. A forged ``chunk_id``, version, or magic byte therefore fails AEAD
+authentication in ``RepoObj.parse()``/``parse_meta()``.
 
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
 AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data`` -- binding each ciphertext to

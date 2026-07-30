@@ -5,7 +5,7 @@ from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..cache import get_archive_references, list_archive_reference_caches
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, Error, format_file_size, use_iec_units
+from ..helpers import bin_to_hex, Error, format_file_size
 from ..helpers import ProgressIndicatorPercent
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
@@ -38,7 +38,6 @@ class ArchiveAnalyzer:
         self.repository = repository
         assert isinstance(repository, Repository)
         self.manifest = manifest
-        self.iec = use_iec_units()
         self.difference_by_path = defaultdict(int)  # directory path -> count of chunks changed
 
     def analyze(self):
@@ -63,7 +62,7 @@ class ArchiveAnalyzer:
         logger.info("Finished archives analysis.")
 
     def fmt(self, value):
-        return format_file_size(value, iec=self.iec)
+        return format_file_size(value)
 
     def factor(self, stored, plaintext):
         """The compression factor stored/plaintext, or n/a if there is no plaintext size to relate to
@@ -89,7 +88,7 @@ class ArchiveAnalyzer:
         )
         for i, info in enumerate(archive_infos):
             references = get_archive_references(
-                self.repository, self.manifest, info.id, cached=bin_to_hex(info.id) in cached_hex_ids, iec=self.iec
+                self.repository, self.manifest, info.id, cached=bin_to_hex(info.id) in cached_hex_ids
             )
             for id, ref in references.ids.items():
                 entry = index.get(id)

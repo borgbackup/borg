@@ -502,25 +502,36 @@ def SortBySpec(text):
     return text.replace("timestamp", "ts").replace("archive", "name")
 
 
-def use_iec_units():
-    """Shall sizes be formatted using IEC units (1KiB = 1024B)? See BORG_IEC."""
-    return os.environ.get("BORG_IEC", "no").strip().lower() in ("yes", "true", "1")
+SIZE_UNITS = ("si", "iec", "raw")
+
+_warned_units: set[str] = set()  # invalid BORG_UNITS values already complained about
 
 
-def format_file_size(v, precision=2, sign=False, iec=False):
-    """Format file size into a human friendly format"""
-    fn = sizeof_fmt_iec if iec else sizeof_fmt_decimal
+def get_size_units():
+    """Which units shall sizes be formatted with: "si" (default), "iec" or "raw"? See BORG_UNITS."""
+    units = os.environ.get("BORG_UNITS", "").strip().lower()
+    if units in SIZE_UNITS:
+        return units
+    if units and units not in _warned_units:
+        _warned_units.add(units)
+        logger.warning(f"Invalid BORG_UNITS value {units!r}, must be one of {', '.join(SIZE_UNITS)}. Ignoring it.")
+    return "si"
+
+
+def format_file_size(v, precision=2, sign=False):
+    """Format file size into a human friendly format, using the units requested via BORG_UNITS."""
+    units = get_size_units()
+    if units == "raw":
+        # exact byte counts, so scripts can easily parse the output
+        v = round(v)  # v might be a float, e.g. a throughput value
+        return f"{v:{'+' if sign and v > 0 else ''}d} B"
+    fn = sizeof_fmt_iec if units == "iec" else sizeof_fmt_decimal
     return fn(v, suffix="B", sep=" ", precision=precision, sign=sign)
 
 
 class FileSize(int):
-    def __new__(cls, value, iec=False):
-        obj = int.__new__(cls, value)
-        obj.iec = iec
-        return obj
-
     def __format__(self, format_spec):
-        return format_file_size(int(self), iec=self.iec).__format__(format_spec)
+        return format_file_size(int(self)).__format__(format_spec)
 
 
 def parse_file_size(s):
@@ -979,7 +990,7 @@ class ArchiveFormatter(BaseFormatter):
         ("size", "nfiles"),
     )
 
-    def __init__(self, format, repository, manifest, key, *, iec=False, deleted=False):
+    def __init__(self, format, repository, manifest, key, *, deleted=False):
         static_data = {} | self.FIXED_KEYS  # here could be stuff on repo level, above archive level
         super().__init__(format, static_data)
         self.repository = repository
@@ -989,7 +1000,6 @@ class ArchiveFormatter(BaseFormatter):
         self.id = None
         self._archive = None
         self.deleted = deleted  # True if we want to deal with deleted archives.
-        self.iec = iec
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "hostname": partial(self.get_meta, "hostname", ""),
@@ -1031,7 +1041,7 @@ class ArchiveFormatter(BaseFormatter):
         if self._archive is None or self._archive.id != self.id:
             from ..archive import Archive
 
-            self._archive = Archive(self.manifest, self.id, iec=self.iec, deleted=self.deleted)
+            self._archive = Archive(self.manifest, self.id, deleted=self.deleted)
         return self._archive
 
     def get_meta(self, key, default=None):

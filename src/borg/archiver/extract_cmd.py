@@ -10,7 +10,6 @@ from ..helpers import archivename_validator, PathSpec
 from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import log_multi
-from ..helpers import use_iec_units
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
 from ..helpers.argparsing import ArgumentParser
@@ -122,10 +121,7 @@ class ExtractMixIn:
             pi.finish()
 
         if args.stats:
-            log_multi(
-                format_store_stats(repository.store.stats, iec=use_iec_units()),
-                logger=logging.getLogger("borg.output.stats"),
-            )
+            log_multi(format_store_stats(repository.store.stats), logger=logging.getLogger("borg.output.stats"))
 
     def build_parser_extract(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

@@ -127,7 +127,7 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
     repository = open_repository(archiver)
     with repository:
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
-        gc = ArchiveGarbageCollector(repository, manifest, stats=stats, iec=False, threshold=40.0)
+        gc = ArchiveGarbageCollector(repository, manifest, stats=stats, threshold=40.0)
 
         def interrupt():
             raise KeyboardInterrupt("simulated interruption before save_chunk_index")
@@ -171,7 +171,7 @@ def test_compact_soft_interrupt_persists_valid_index(archivers, request, monkeyp
         assert len(pack_names_before) >= 2  # need several packs to observe an early stop
 
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
-        gc = ArchiveGarbageCollector(repository, manifest, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest, stats=False, threshold=10)
 
         original_store_delete = repository.store_delete
         calls = []
@@ -228,7 +228,7 @@ def test_compact_packs_respects_threshold(tmp_path):
             flags = ChunkIndex.F_USED if H(i) in used else ChunkIndex.F_NONE
             repository.chunks[H(i)] = entry._replace(flags=flags)
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=40)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=40)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -278,7 +278,7 @@ def test_compact_superseded_duplicate(tmp_path):
             flags = ChunkIndex.F_USED if H(i) in used else ChunkIndex.F_NONE
             repository.chunks[H(i)] = entry._replace(flags=flags)
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -312,7 +312,7 @@ def test_compact_keeps_orphan_pack(tmp_path):
         repository.store_store(orphan_key, b"orphan pack bytes")
         assert "ab" * 32 in [info.name for info in repository.store_list("packs")]
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -342,7 +342,7 @@ def test_compact_keeps_unindexed_waste(tmp_path):
         # ... but H(1)'s big object becomes an unindexed superseded span (well over threshold if counted).
         del repository.chunks[H(1)]
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -377,7 +377,7 @@ def test_compact_reclaims_indexed_waste_only(tmp_path):
         repository.chunks[H(2)] = repository.chunks[H(2)]._replace(flags=ChunkIndex.F_USED)
         del repository.chunks[H(3)]  # its bytes remain in unindexed_pack as unindexed data
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -439,7 +439,7 @@ def test_compact_keeps_stale_index_entries(tmp_path):
         repository.chunks[H(0)] = repository.chunks[H(0)]._replace(flags=ChunkIndex.F_USED)
         repository.store_delete("packs/" + bin_to_hex(gone_pack))  # delete the pack file the index still references
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -460,7 +460,7 @@ def test_compact_skips_oversized_index_entry(tmp_path):
         entry = repository.chunks[H(0)]
         repository.chunks[H(0)] = entry._replace(flags=ChunkIndex.F_USED, obj_size=entry.obj_size + 10000)
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
 
@@ -492,7 +492,7 @@ def test_compact_packs_merges_tiny_packs(tmp_path, monkeypatch):
         total_bytes = sum(repository.store.info("packs/" + name).size for name in packs_before)
         assert total_bytes >= repository.pack_max_size  # combined size crosses the merge threshold
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
         assert gc.store_changed is True  # the merge changed the store
@@ -510,7 +510,7 @@ def test_compact_packs_merges_tiny_packs(tmp_path, monkeypatch):
 
         # a merged full-size pack is no longer tiny (the tiny limit is pack_max_size // 2 here), so a
         # second compact finds nothing to merge and leaves the store unchanged.
-        gc2 = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc2 = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc2.chunks = repository.chunks
         gc2.compact_packs()
         assert gc2.store_changed is False
@@ -537,7 +537,7 @@ def test_compact_packs_below_merge_size_gate_leaves_tiny_packs(tmp_path, monkeyp
         packs_before = {info.name for info in repository.store_list("packs")}
         assert len(packs_before) == 3
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
         assert gc.store_changed is False  # combined tiny bytes stay far below one full pack: leave them alone
@@ -566,7 +566,7 @@ def test_compact_packs_below_all_packs_gate_changes_nothing(tmp_path):
         packs_before = {info.name for info in repository.store_list("packs")}
         assert len(packs_before) == 2
 
-        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, iec=False, threshold=10)
+        gc = ArchiveGarbageCollector(repository, manifest=None, stats=False, threshold=10)
         gc.chunks = repository.chunks
         gc.compact_packs()
         assert gc.store_changed is False  # below the all-packs gate: nothing was touched

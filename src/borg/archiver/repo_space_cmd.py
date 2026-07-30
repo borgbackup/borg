@@ -26,7 +26,7 @@ class RepoSpaceMixIn:
                 data = os.urandom(storage_space_reserve_object_size)  # counter-act fs compression/dedup
                 repository.store_store(f"config/space-reserve.{i}", data)
                 size += len(data)
-            print(f"There is {format_file_size(size, iec=False)} reserved space in this repository now.")
+            print(f"There is {format_file_size(size)} reserved space in this repository now.")
         elif args.free_space:
             infos = repository.store_list("config")
             size = 0
@@ -35,7 +35,7 @@ class RepoSpaceMixIn:
                 if info.name.startswith("space-reserve."):
                     size += info.size
                     repository.store_delete(f"config/{info.name}")
-            print(f"Freed {format_file_size(size, iec=False)} in the repository.")
+            print(f"Freed {format_file_size(size)} in the repository.")
             print("Now run borg prune or borg delete plus borg compact to free more space.")
             print("After that, do not forget to reserve space again for next time!")
         else:  # print amount currently reserved
@@ -45,7 +45,7 @@ class RepoSpaceMixIn:
                 info = ItemInfo(*info)  # RPC does not give namedtuple
                 if info.name.startswith("space-reserve."):
                     size += info.size
-            print(f"There is {format_file_size(size, iec=False)} reserved space in this repository.")
+            print(f"There is {format_file_size(size)} reserved space in this repository.")
             print("In case you want to change the amount, use --free first to free all reserved space,")
             print("then use --reserve with the desired amount.")
 

@@ -71,10 +71,21 @@ General:
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         This is the replacement for the removed ``--remote-path PATH`` command line option.
-    BORG_IEC
-        When set to ``yes``, format sizes using IEC units (1KiB = 1024B) instead of
-        decimal units (1kB = 1000B).
-        This is the replacement for the removed ``--iec`` command line option.
+    BORG_UNITS
+        Determines how borg formats sizes in its human-readable output:
+
+        - ``si`` (default): decimal units, e.g. ``1.23 MB`` (1kB = 1000B)
+        - ``iec``: binary units, e.g. ``1.18 MiB`` (1KiB = 1024B)
+        - ``raw``: exact byte counts, e.g. ``1234567 B``
+
+        Use ``raw`` if you want to parse sizes with scripts (e.g. for monitoring),
+        so you do not have to deal with scaled values and different units.
+        Alternatively, use a command's ``--json`` output or, for the commands
+        supporting ``--format``, the size related format keys - sizes are given
+        as byte counts there anyway.
+
+        ``BORG_UNITS=iec`` is the replacement for the removed ``BORG_IEC`` environment
+        variable (and for the ``--iec`` command line option removed before that).
     BORG_DEBUG_PROFILE
         When set to a filename, write an execution profile in Borg format into that file
         (see :ref:`debugging`). If the filename ends with ``.pyprof``, a Python-compatible

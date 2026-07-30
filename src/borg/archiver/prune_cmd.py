@@ -9,7 +9,7 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
-from ..helpers import json_print, basic_json_data, use_iec_units
+from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import ArchiveInfo, Manifest
 
@@ -224,7 +224,7 @@ class PruneMixIn:
             format = "{archive}"
         else:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
-        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=use_iec_units())
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key)
 
         if args.json:
             output_data = []

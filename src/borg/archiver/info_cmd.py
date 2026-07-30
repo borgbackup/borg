@@ -4,7 +4,7 @@ from datetime import timedelta
 from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import format_timedelta, json_print, basic_json_data, archivename_validator, use_iec_units
+from ..helpers import format_timedelta, json_print, basic_json_data, archivename_validator
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -26,7 +26,7 @@ class InfoMixIn:
         output_data = []
 
         for i, archive_info in enumerate(archive_infos, 1):
-            archive = Archive(manifest, archive_info.id, cache=cache, iec=use_iec_units())
+            archive = Archive(manifest, archive_info.id, cache=cache)
             info = archive.info()
             if args.json:
                 output_data.append(info)

@@ -29,7 +29,7 @@ from ...helpers.parseformat import (
     swidth_slice,
     eval_escapes,
     ChunkerParams,
-    use_iec_units,
+    get_size_units,
     normalize_local_path,
 )
 from ...helpers.time import format_timedelta, parse_timestamp
@@ -576,30 +576,85 @@ def test_file_size(size, fmt):
         (-(2**20), "-1.00 MiB"),
     ],
 )
-def test_file_size_iec(size, fmt):
+def test_file_size_iec(monkeypatch, size, fmt):
     """test the size formatting routines"""
-    assert format_file_size(size, iec=True) == fmt
+    monkeypatch.setenv("BORG_UNITS", "iec")
+    assert format_file_size(size) == fmt
 
 
 @pytest.mark.parametrize(
-    "value, expected",
+    "units, expected",
     [
-        (None, False),
-        ("", False),
-        ("no", False),
-        ("0", False),
-        ("yes", True),
-        ("YES", True),
-        ("true", True),
-        ("1", True),
+        (None, "si"),  # BORG_UNITS not set
+        ("", "si"),
+        ("si", "si"),
+        ("iec", "iec"),
+        ("raw", "raw"),
+        ("IEC", "iec"),  # value is case insensitive
+        (" raw ", "raw"),  # and gets stripped
+        ("bytes", "si"),  # invalid value: warn and ignore
+        ("yes", "si"),  # the removed BORG_IEC's value is not accepted either
     ],
 )
-def test_use_iec_units(monkeypatch, value, expected):
-    """IEC units are requested via the BORG_IEC environment variable"""
-    monkeypatch.delenv("BORG_IEC", raising=False)
-    if value is not None:
-        monkeypatch.setenv("BORG_IEC", value)
-    assert use_iec_units() is expected
+def test_get_size_units(monkeypatch, units, expected):
+    """size units are requested via the BORG_UNITS environment variable"""
+    monkeypatch.delenv("BORG_UNITS", raising=False)
+    if units is not None:
+        monkeypatch.setenv("BORG_UNITS", units)
+    assert get_size_units() == expected
+
+
+def test_borg_iec_is_gone(monkeypatch):
+    """the removed BORG_IEC environment variable has no effect any more"""
+    monkeypatch.delenv("BORG_UNITS", raising=False)
+    monkeypatch.setenv("BORG_IEC", "yes")
+    assert get_size_units() == "si"
+    assert format_file_size(2**20) == "1.05 MB"
+
+
+def test_get_size_units_invalid_warns(monkeypatch, caplog):
+    """an invalid BORG_UNITS value is complained about, but only once"""
+    from ...helpers import parseformat
+
+    monkeypatch.delenv("BORG_UNITS", raising=False)
+    monkeypatch.setattr(parseformat, "_warned_units", set())
+    monkeypatch.setenv("BORG_UNITS", "kibibytes")
+    with caplog.at_level("WARNING"):
+        assert get_size_units() == "si"
+        assert get_size_units() == "si"
+    assert len([record for record in caplog.records if "kibibytes" in record.message]) == 1
+
+
+@pytest.mark.parametrize(
+    "size, kwargs, fmt",
+    [
+        (0, {}, "0 B"),
+        (1, {}, "1 B"),
+        (1234, {}, "1234 B"),  # not scaled down to 1.23 kB
+        (10**15, {}, "1000000000000000 B"),
+        (-1234, {}, "-1234 B"),
+        (1234, dict(precision=0), "1234 B"),  # precision does not matter
+        (1234, dict(sign=True), "+1234 B"),
+        (-1234, dict(sign=True), "-1234 B"),
+        (0, dict(sign=True), "0 B"),
+        (1234.56, {}, "1235 B"),  # a float (e.g. a throughput value) is rounded
+    ],
+)
+def test_file_size_raw(monkeypatch, size, kwargs, fmt):
+    """BORG_UNITS=raw gives exact byte counts, so scripts can easily parse them"""
+    monkeypatch.setenv("BORG_UNITS", "raw")
+    assert format_file_size(size, **kwargs) == fmt
+
+
+@pytest.mark.parametrize(
+    "units, fmt", [(None, "1.05 MB"), ("si", "1.05 MB"), ("iec", "1.00 MiB"), ("raw", "1048576 B")]  # si is the default
+)
+def test_file_size_units_from_env(monkeypatch, units, fmt):
+    """format_file_size uses the units requested via BORG_UNITS"""
+    monkeypatch.delenv("BORG_UNITS", raising=False)
+    if units is not None:
+        monkeypatch.setenv("BORG_UNITS", units)
+    assert format_file_size(2**20) == fmt
 
 
 @pytest.mark.parametrize(

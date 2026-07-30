@@ -4,7 +4,7 @@ import sys
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
-from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data, use_iec_units
+from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -26,9 +26,7 @@ class RepoListMixIn:
                 "BORG_REPO_LIST_FORMAT",
                 "{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}{NL}",
             )
-        formatter = ArchiveFormatter(
-            format, repository, manifest, manifest.key, iec=use_iec_units(), deleted=args.deleted
-        )
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, deleted=args.deleted)
 
         output_data = []
 

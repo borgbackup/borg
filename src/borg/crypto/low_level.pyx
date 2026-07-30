@@ -44,7 +44,6 @@ from math import ceil
 from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AsString
-from libc.stdlib cimport malloc, free
 from libc.stdint cimport uint8_t, uint32_t, uint64_t
 from libc.string cimport memset, memcpy
 
@@ -72,8 +71,6 @@ cdef extern from "openssl/evp.h":
 
     EVP_CIPHER_CTX *EVP_CIPHER_CTX_new()
     void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
-    void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
-    void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
 
     int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *impl,
                            const unsigned char *key, const unsigned char *iv)
@@ -288,6 +285,10 @@ cdef class AES256_CTR_BASE:
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
+        if len(envelope) < self.header_len + self.mac_len + self.iv_len_short:
+            # truncated data - handle it like any other corruption or tampering, instead of
+            # computing the MAC over negative lengths below.
+            raise IntegrityError('MAC Authentication failed: envelope too short')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
         cdef int aoffset = self.aad_offset
@@ -444,13 +445,13 @@ cdef class _AEAD_BASE:
     @classmethod
     def requirements_check(cls):
         """check whether library requirements for this ciphersuite are satisfied"""
-        raise NotImplemented  # override / implement in child class
+        raise NotImplementedError  # override / implement in child class
 
     def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         """
         init AEAD crypto
 
-        :param key: 256bit encrypt-then-mac key
+        :param key: 256bit AEAD key
         :param iv: 96bit initialisation vector / nonce
         :param header_len: expected length of header
         :param aad_offset: where in the header the authenticated data starts
@@ -557,7 +558,7 @@ cdef class _AEAD_BASE:
 
     def decrypt(self, envelope, aad=b''):
         """
-        authenticate aad + header + cdata (from envelope), ignore header bytes up to aad_offset.,
+        authenticate aad + header + cdata (from envelope), ignore header bytes up to aad_offset,
         return decrypted cdata.
         """
         # same limit as for encryption, see there: we must not decrypt more than 2^32 cipher
@@ -565,6 +566,10 @@ cdef class _AEAD_BASE:
         approx_block_count = self.block_count(len(envelope))  # sloppy, but good enough for borg
         if approx_block_count > 2**32:
             raise ValueError('too much data for one message (max 2^32 cipher blocks)')
+        if len(envelope) < self.header_len_expected + self.mac_len:
+            # truncated data - handle it like any other corruption or tampering, instead of
+            # confusing OpenSSL with negative lengths below.
+            raise IntegrityError('Authentication failed: envelope too short')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len_expected
         cdef int aoffset = self.aad_offset

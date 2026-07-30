@@ -8,13 +8,20 @@ on-disk object is::
     byte 1: body type (0 = plaintext JSON, 1 = sealed: HPKE(ed25519-sign || JSON))
     rest:   body
 
-The HPKE seal is bound (via aad) to the repository id, which both sides obtain from the
-repository they are talking to - it is never trusted from inside the ciphertext.
+The HPKE seal is bound (via aad) to the repository id and to the object name, both of
+which the reader obtains from the repository it is talking to - never from inside the
+ciphertext. Binding the name matters because the name is plaintext and thus under the
+untrusted server's control: without it the server could copy an old, validly signed
+"success" report to a new, later-sorting name and shadow a newer failure report. With it,
+a report only opens under the name its author gave it.
 
 Objects are append-only and named by publish time, so reports for different archive
 series never overwrite each other (e.g. a failed home backup is not masked by a later
 successful system backup). The namespace is bounded by ``borg monitor --keep=N``, which
 deletes all but the N newest objects.
+
+Object names order the objects for storage and cleanup only; which report is the *latest*
+one for a job is decided by the signed timestamp inside the report, never by the name.
 """
 
 import json
@@ -96,11 +103,24 @@ def build_report(
     return report
 
 
-def serialize(key, repo_id_bin, report):
-    """Serialize *report* into the on-disk object bytes, sealing it if the repo is encrypted."""
+def report_aad(repo_id_bin, name):
+    """Additional authenticated data a sealed report is bound to.
+
+    The repository id keeps a report from being transplanted into another repository, the
+    object *name* keeps the untrusted server from re-serving it under a different name.
+    The id has a fixed length, so plain concatenation is unambiguous.
+    """
+    return repo_id_bin + name.encode("utf-8")
+
+
+def serialize(key, repo_id_bin, name, report):
+    """Serialize *report* into the on-disk object bytes, sealing it if the repo is encrypted.
+
+    *name* is the object name the result will be stored under; it is bound into the seal.
+    """
     payload = json.dumps(report, sort_keys=True).encode("utf-8")
     if mon_crypto.is_signed_repo(key):
-        body = mon_crypto.seal_report(key, payload, repo_id_bin)
+        body = mon_crypto.seal_report(key, payload, report_aad(repo_id_bin, name))
         body_type = BODY_SEALED
     else:
         body = payload
@@ -108,12 +128,14 @@ def serialize(key, repo_id_bin, report):
     return bytes([FORMAT_VERSION, body_type]) + body
 
 
-def deserialize(monitor_key, repo_id_bin, data):
+def deserialize(monitor_key, repo_id_bin, name, data):
     """Return (report_dict, trusted: bool).
 
     *monitor_key* is the parsed (ed25519_public, hpke_secret) tuple, or None. A sealed
     report is verified+decrypted (trusted=True); a plaintext report is returned as-is
-    (trusted=False). Raises ValueError/IntegrityError on malformed or unverifiable data.
+    (trusted=False). *name* is the object name the data was read from - a sealed report
+    only opens under the name it was published as. Raises ValueError/IntegrityError on
+    malformed or unverifiable data.
     """
     if len(data) < 2 or data[0] != FORMAT_VERSION:
         raise ValueError("monitoring report: unsupported format version")
@@ -122,7 +144,7 @@ def deserialize(monitor_key, repo_id_bin, data):
         if monitor_key is None:
             raise ValueError("monitoring report is sealed but no BORG_MONITORING_KEY was given")
         ed_public, hpke_secret = monitor_key
-        payload = mon_crypto.open_report(ed_public, hpke_secret, body, repo_id_bin)
+        payload = mon_crypto.open_report(ed_public, hpke_secret, body, report_aad(repo_id_bin, name))
         trusted = True
     elif body_type == BODY_PLAIN:
         payload = body
@@ -135,8 +157,9 @@ def deserialize(monitor_key, repo_id_bin, data):
 def publish(repository, key, report):
     """Append *report* to the repository as a new object. Best-effort: never raise out."""
     try:
-        data = serialize(key, repository.id, report)
-        repository.store_store(f"{STORE_NAMESPACE}/{_new_object_name()}", data)
+        name = _new_object_name()
+        data = serialize(key, repository.id, name, report)
+        repository.store_store(f"{STORE_NAMESPACE}/{name}", data)
     except Exception as exc:
         logger.warning("Could not publish monitoring report: %s", exc)
 
@@ -174,17 +197,18 @@ def list_names(repository):
 
 
 def iter_reports(repository, monitor_key):
-    """Yield (report, trusted) for every stored report, oldest first.
+    """Yield (report, trusted) for every stored report, in storage order.
 
     Each report is verified and decrypted; an unverifiable one raises (it is not silently
-    skipped) so tampering surfaces.
+    skipped) so tampering surfaces. The order reports come in is *not* authenticated - the
+    caller must order them by the signed timestamp inside the report.
     """
     for name in list_names(repository):
         try:
             data = repository.store_load(f"{STORE_NAMESPACE}/{name}")
         except StoreObjectNotFound:
             continue  # raced with a concurrent --keep cleanup
-        yield deserialize(monitor_key, repository.id, data)
+        yield deserialize(monitor_key, repository.id, name, data)
 
 
 def prune_reports(repository, keep):

@@ -318,9 +318,16 @@ def OsOpen(*, flags, path=None, parent_fd=None, name=None, noatime=False, op="op
 
 
 class DownloadPipeline:
+    # A content data stream may reference the same chunk many times (e.g. the all-zero
+    # chunks of a sparse file, see issue #1678), thus cache the most recently parsed
+    # chunks, so repeated chunks do not get decrypted, authenticated and decompressed
+    # again. Chunks can be up to MAX_DATA_SIZE bytes, thus keep the cache small.
+    PARSED_CACHE_SIZE = 4
+
     def __init__(self, repository, repo_objs):
         self.repository = repository
         self.repo_objs = repo_objs
+        self.parsed_cache = LRUCache(capacity=self.PARSED_CACHE_SIZE)  # (id, ro_type) -> data
 
     def unpack_many(self, ids, *, filter=None):
         """
@@ -365,7 +372,11 @@ class DownloadPipeline:
                     logger.error(f"repository object {bin_to_hex(id)} missing, returning None.")
                     data = None
             else:
-                _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
+                try:
+                    data = self.parsed_cache[(id, ro_type)]
+                except KeyError:
+                    _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
+                    self.parsed_cache[(id, ro_type)] = data
             assert size is None or len(data) == size
             yield data
 

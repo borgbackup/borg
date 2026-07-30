@@ -8,10 +8,14 @@ from unittest.mock import Mock
 import pytest
 
 from . import rejected_dotdot_paths
+from ..cache import ChunkListEntry
+from ..constants import ROBJ_FILE_STREAM
 from ..crypto.key import PlaintextKey
-from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
+from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacker, valid_msgpacked_dict
+from ..archive import ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
 from ..helpers import msgpack
+from ..repoobj import RepoObj
 from ..item import Item, ArchiveItem
 from ..manifest import Archives, Manifest
 from ..platform import uid2user, gid2group, is_win32
@@ -191,6 +195,51 @@ def test_partial_cache_chunk_buffer():
     for id in chunks.chunks:
         unpacker.feed(cache.objects[id])
     assert data == [Item(internal_dict=d) for d in unpacker]
+
+
+class MockFetchRepo:
+    """serve repo objects from a dict, recording all requested ids."""
+
+    def __init__(self, objects):
+        self.objects = objects  # id -> cdata
+        self.requested_ids = []
+
+    def get_many(self, ids, read_data=True, raise_missing=True):
+        for id in ids:
+            self.requested_ids.append(id)
+            yield self.objects[id]
+
+
+def test_download_pipeline_parsed_cache():
+    # a content data stream may reference the same chunk many times (e.g. the all-zero
+    # chunks of a sparse file): repeated chunks shall be parsed (decrypted, authenticated,
+    # decompressed) only once, see issue #1678.
+    key = PlaintextKey(None)
+    repo_objs = RepoObj(key)
+    chunks_data = [b"foobar" * 100, b"\0" * 1000, b"barbaz" * 100]
+    entries = []
+    objects = {}
+    for data in chunks_data:
+        id = repo_objs.id_hash(data)
+        objects[id] = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
+        entries.append(ChunkListEntry(id, len(data)))
+    # reference the second chunk many times, interleaved with the other chunks
+    chunk_list = [entries[0]] + [entries[1]] * 5 + [entries[2]] + [entries[1]] * 5
+    repository = MockFetchRepo(objects)
+    pipeline = DownloadPipeline(repository, repo_objs)
+    parsed_ids = []
+    orig_parse = repo_objs.parse
+
+    def counting_parse(id, cdata, **kw):
+        parsed_ids.append(id)
+        return orig_parse(id, cdata, **kw)
+
+    repo_objs.parse = counting_parse
+    result = list(pipeline.fetch_many(chunk_list, ro_type=ROBJ_FILE_STREAM))
+    assert result == [chunks_data[0]] + [chunks_data[1]] * 5 + [chunks_data[2]] + [chunks_data[1]] * 5
+    # each distinct chunk was parsed only once, the repetitions were served from the cache
+    assert len(parsed_ids) == 3
+    assert len(set(parsed_ids)) == 3
 
 
 def make_chunks(items):

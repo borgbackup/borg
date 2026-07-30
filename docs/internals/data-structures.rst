@@ -408,6 +408,10 @@ Borg has these chunkers (the default is "fastcdc"):
 - "buzhash64": similar to "buzhash", but improved 64bit implementation
 - "fastcdc": variable, content-defined blocksize, uses the window-less, keyed
   Gear rolling hash (FastCDC_); faster than buzhash, same deduplication.
+- "rabin-aes": variable, content-defined blocksize; a rolling Rabin fingerprint
+  (secret polynomial) post-processed with AES-128, so the cut decision only
+  depends on the AES output ("UHF-then-PRF" construction). Strongest available
+  protection against chunk-size fingerprinting attacks.
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -513,6 +517,31 @@ distribution and reduces clamping at the min./max. chunk size.
 
 This is the default chunker (``fastcdc,19,23,21,2``), also used for the item
 metadata stream (with a finer granularity, ``fastcdc,15,19,17,2``).
+
+"rabin-aes" chunker
++++++++++++++++++++
+
+A "UHF-then-PRF" content-defined chunker, following the provably secure
+construction of `Breaking and Fixing Content-Defined Chunking
+<https://eprint.iacr.org/2025/558>`_ (Truong et al., 2025): a rolling Rabin
+fingerprint over GF(2)[x]/P(x) - with P a secret, random, irreducible
+polynomial of degree 63 - compresses the last 64 bytes into a digest
+(a universal hash), and AES-128 with a secret key is applied to that digest.
+The cut decision only looks at the AES output, so observed chunk boundaries
+are pseudo-random and do not provide usable equations about the chunking
+secrets, unlike chunkers that cut directly on (keyed) rolling hash bits.
+Both secrets are derived from the repository key material.
+
+This is the recommended chunker when resistance against chunk-size
+fingerprinting attacks matters most. It is slower than "fastcdc" (one AES
+block encryption per scanned byte), but still fast in absolute terms: the
+implementation batches the AES work through OpenSSL or uses AES hardware
+instructions (arm64 crypto extensions / x86-64 AES-NI) where available.
+
+``borg create --chunker-params rabin-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+
+The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
+level (0 disables it); 2 is a good default. E.g.: ``rabin-aes,19,23,21,2``.
 
 .. _cache:
 

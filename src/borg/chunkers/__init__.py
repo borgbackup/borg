@@ -1,6 +1,7 @@
 from .buzhash import Chunker
 from .buzhash64 import ChunkerBuzHash64
 from .fastcdc import ChunkerFastCDC
+from .rabin_aes import ChunkerRabinAES
 from .failing import ChunkerFailing
 from .fixed import ChunkerFixed
 from .reader import *  # noqa
@@ -28,6 +29,14 @@ def get_chunker(algo, *params, **kw):
             key.derive_key(salt=b"", domain=b"fastcdc", size=32, from_id_key=True) if key is not None else b"\0" * 32
         )
         return ChunkerFastCDC(fc_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
+    if algo == "rabin-aes":
+        # UHF-then-PRF chunker (secret Rabin polynomial + AES-128), derived from
+        # the id key (own domain). params is (chunk_min_exp, chunk_max_exp,
+        # hash_mask_bits, nc_level) - no window param (fixed 64-byte window).
+        ra_key = (
+            key.derive_key(salt=b"", domain=b"rabin-aes", size=32, from_id_key=True) if key is not None else b"\0" * 32
+        )
+        return ChunkerRabinAES(ra_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
     if algo == "fixed":
         return ChunkerFixed(*params, sparse=sparse)
     if algo == "fail":

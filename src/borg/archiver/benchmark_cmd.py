@@ -195,6 +195,13 @@ class BenchmarkMixIn:
             ),
             # fastcdc (window-less keyed gear hash); gear table creation is slow, keep it in setup
             ("fastcdc,19,23,21,2", "ch = get_chunker('fastcdc', 19, 23, 21, 2, sparse=False)", "chunkit(ch)", locals()),
+            # rabin-aes (UHF-then-PRF); polynomial sampling / table creation is slow, keep it in setup
+            (
+                "rabin-aes,19,23,21,2",
+                "ch = get_chunker('rabin-aes', 19, 23, 21, 2, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
             ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
         ]:
             dt = timeit(func, setup, number=number_default, globals=vars)

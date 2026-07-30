@@ -481,11 +481,14 @@ cdef class _AEAD_BASE:
         if iv is not None:
             self.set_iv(iv)
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
-        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
-        # IV we provide, thus we must not encrypt more than 2^32 cipher blocks with same IV).
+        # CHACHA20 has an internal 32bit block counter (besides the 96bit (12Byte) IV we give it),
+        # thus we must not encrypt more than 2^32 cipher blocks with the same (key, IV) pair.
+        # AES-OCB has no such counter (it derives the per-block offsets from the IV), but we apply
+        # the same limit to both ciphers: the check is cheap and can not trigger for borg messages
+        # anyway, as these are limited to MAX_DATA_SIZE.
         block_count = self.block_count(len(data))
         if block_count > 2**32:
-            raise ValueError('too much data, would overflow internal 32bit counter')
+            raise ValueError('too much data for one message (max 2^32 cipher blocks)')
         cdef int ilen = len(data)
         cdef int hlen = len(header)
         assert hlen == self.header_len_expected
@@ -554,11 +557,11 @@ cdef class _AEAD_BASE:
         authenticate aad + header + cdata (from envelope), ignore header bytes up to aad_offset.,
         return decrypted cdata.
         """
-        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
-        # IV we provide, thus we must not decrypt more than 2^32 cipher blocks with same IV):
+        # same limit as for encryption, see there: we must not decrypt more than 2^32 cipher
+        # blocks with the same (key, IV) pair.
         approx_block_count = self.block_count(len(envelope))  # sloppy, but good enough for borg
         if approx_block_count > 2**32:
-            raise ValueError('too much data, would overflow internal 32bit counter')
+            raise ValueError('too much data for one message (max 2^32 cipher blocks)')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len_expected
         cdef int aoffset = self.aad_offset
@@ -627,8 +630,9 @@ cdef class _AEAD_BASE:
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
-        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
-        # (12 byte) IV we provide, thus we only need to increment the IV by 1.
+        # the cipher blocks of a message do not consume IVs here (CHACHA20 counts them in its
+        # internal 32bit block counter, AES-OCB derives the per-block offsets from the 96bit
+        # (12 byte) IV we give it), thus we only need to increment the IV by 1 per message.
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + 1
 

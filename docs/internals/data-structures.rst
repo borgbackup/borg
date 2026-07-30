@@ -768,8 +768,9 @@ AEAD modes
 For new repositories, borg only uses modern AEAD ciphers: AES-OCB or CHACHA20-POLY1305.
 
 For each borg invocation, a new sessionkey is derived from the borg key material
-and the 48bit IV starts from 0 again (both ciphers internally add a 32bit counter
-to our IV, so we'll just count up by 1 per chunk).
+and the 48bit IV starts from 0 again. The cipher blocks of a chunk do not consume
+IVs here (CHACHA20-POLY1305 counts them in its internal 32bit block counter, AES-OCB
+derives the per-block offsets from the IV), so we just count up by 1 per chunk.
 
 The encryption layout is best seen at the bottom of this diagram:
 

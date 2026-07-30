@@ -20,6 +20,18 @@ logger = create_logger()
 DEFAULT_MAX_AGE = 25 * 3600
 
 
+def _report_time(report):
+    """The report's own (signed) publish time, or None if missing/unparsable.
+
+    Unsigned reports from a keyless (``none-*``) repo carry whatever the publisher - or the
+    server - put there, so this must not blow up on garbage.
+    """
+    try:
+        return parse_timestamp(report["time"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 class MonitorMixIn:
     @with_repository(manifest=False)
     def do_monitor(self, args, repository):
@@ -74,10 +86,14 @@ class MonitorMixIn:
 
         now = datetime.now(timezone.utc)
 
-        # Group by (host, user, command, archive). Reports are oldest-first, so the newest
-        # one per group wins - giving each distinct backup job its latest status
-        # independently. Including host/user means two hosts backing up the same archive
-        # series name (to the same repo) do not mask each other.
+        # Group by (host, user, command, archive), so each distinct backup job gets its
+        # latest status independently. Including host/user means two hosts backing up the
+        # same archive series name (to the same repo) do not mask each other.
+        #
+        # Within a group, the report with the newest *signed* time wins. The order
+        # iter_reports() yields comes from the object names, which are plaintext and thus
+        # under the untrusted server's control: picking by arrival order would let the
+        # server shadow a newer failure by re-serving an older, validly signed success.
         latest = {}
         for report, trusted in reports:
             if args.command and report.get("command") != args.command:
@@ -88,13 +104,20 @@ class MonitorMixIn:
                 continue
             if args.user and report.get("username") != args.user:
                 continue
+            ts = _report_time(report)
+            if ts is None:
+                # Not placeable in time, so it may neither win nor mask anything.
+                logger.warning("Ignoring monitoring report with missing/invalid time: %r", report.get("time"))
+                continue
             key = (report.get("hostname"), report.get("username"), report.get("command"), report.get("archive"))
-            latest[key] = (report, trusted)
+            previous = latest.get(key)
+            if previous is None or ts > previous[2]:
+                latest[key] = (report, trusted, ts)
 
         entries = []
         for key in sorted(latest, key=lambda k: tuple("" if v is None else str(v) for v in k)):
-            report, trusted = latest[key]
-            age = (now - parse_timestamp(report["time"])).total_seconds()
+            report, trusted, ts = latest[key]
+            age = (now - ts).total_seconds()
             entries.append({"report": report, "trusted": trusted, "age": age, "stale": age > args.max_age})
 
         self._monitor_output(args, entries)

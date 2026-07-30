@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 
 from ...constants import *  # NOQA
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
@@ -21,8 +22,30 @@ def _entries(archiver, *extra):
     return {(e["archive"] or e["command"]): e for e in data["entries"]}
 
 
+def _monitoring_dir(archiver):
+    return os.path.join(archiver.repository_path, "monitoring")
+
+
 def _monitoring_object_count(archiver):
-    return len(os.listdir(os.path.join(archiver.repository_path, "monitoring")))
+    return len(os.listdir(_monitoring_dir(archiver)))
+
+
+def _replay_oldest_under_newest_name(archiver):
+    """Copy the oldest report object to a name that sorts last, return the original names.
+
+    This is what an untrusted repository server can do: object names are plaintext, so it
+    can re-serve an old (validly signed) report as if it were the most recent one.
+    """
+    names = sorted(os.listdir(_monitoring_dir(archiver)))
+    replay = f"{'9' * 20}.baadf00d"
+    shutil.copyfile(os.path.join(_monitoring_dir(archiver), names[0]), os.path.join(_monitoring_dir(archiver), replay))
+    return names
+
+
+def _plain_report(archiver, name):
+    """Read an unsigned report object: 2 header bytes, then the JSON payload."""
+    with open(os.path.join(_monitoring_dir(archiver), name), "rb") as f:
+        return json.loads(f.read()[2:].decode("utf-8"))
 
 
 def test_create_publishes_report_and_monitor_reads_it(archivers, request, monkeypatch):
@@ -201,6 +224,34 @@ def test_monitor_unencrypted_repo_is_untrusted(archivers, request):
     # there is no monitoring key to export for a keyless (none-*) repo
     out = cmd(archiver, "monitor", "--key", fork=True, exit_code=EXIT_ERROR)
     assert "keyless" in out
+
+
+def test_replayed_report_is_refused(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"some data")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "series", "input")
+    cmd(archiver, "create", "series", "input")
+    _replay_oldest_under_newest_name(archiver)
+    monkeypatch.setenv("BORG_MONITORING_KEY", _monitoring_key(archiver))
+    # the object name is bound into the seal, so a report re-served under another name
+    # does not even open - the attempt surfaces instead of silently shadowing the newer one
+    output = cmd(archiver, "monitor", fork=True, exit_code=EXIT_ERROR)
+    assert "verification/decryption failed" in output
+
+
+def test_unsigned_replay_does_not_shadow_newer_report(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"some data")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", "series", "input")
+    cmd(archiver, "create", "series", "input")
+    names = _replay_oldest_under_newest_name(archiver)
+    newest_time = _plain_report(archiver, names[-1])["time"]
+    # unsigned reports can not be bound to their name, so the time inside the report - not
+    # the (server-controlled) object name - has to decide which one is the latest
+    data = json.loads(cmd(archiver, "monitor", "--json", exit_code=EXIT_WARNING))
+    assert [e["report"]["time"] for e in data["entries"]] == [newest_time]
 
 
 def test_monitor_key_export_is_deterministic(archivers, request):

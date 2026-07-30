@@ -153,58 +153,72 @@ def test_build_report_schema():
     assert "borg_version" in report and "time" in report
 
 
+NAME = "00000000000000000001.deadbeef"
+
+
 def test_sealed_report_roundtrip_and_trusted():
     key = make_key()
     repo_id = os.urandom(32)
     report = sample_report(repo_id.hex())
-    data = m.serialize(key, repo_id, report)
+    data = m.serialize(key, repo_id, NAME, report)
     assert data[0] == m.FORMAT_VERSION and data[1] == m.BODY_SEALED
     monitor_key = mc.parse_monitor_key(mc.export_monitor_key(key))
-    got, trusted = m.deserialize(monitor_key, repo_id, data)
+    got, trusted = m.deserialize(monitor_key, repo_id, NAME, data)
     assert got == report and trusted is True
 
 
 def test_sealed_report_rejects_wrong_repo_id():
     key = make_key()
     repo_id = os.urandom(32)
-    data = m.serialize(key, repo_id, sample_report(repo_id.hex()))
+    data = m.serialize(key, repo_id, NAME, sample_report(repo_id.hex()))
     monitor_key = mc.parse_monitor_key(mc.export_monitor_key(key))
     with pytest.raises(low_level.IntegrityError):
-        m.deserialize(monitor_key, os.urandom(32), data)
+        m.deserialize(monitor_key, os.urandom(32), NAME, data)
+
+
+def test_sealed_report_rejects_wrong_object_name():
+    # The server may not re-serve a report under a different (e.g. later-sorting) name to
+    # shadow a newer report: the name is bound into the seal.
+    key = make_key()
+    repo_id = os.urandom(32)
+    data = m.serialize(key, repo_id, NAME, sample_report(repo_id.hex()))
+    monitor_key = mc.parse_monitor_key(mc.export_monitor_key(key))
+    with pytest.raises(low_level.IntegrityError):
+        m.deserialize(monitor_key, repo_id, "99999999999999999999.deadbeef", data)
 
 
 def test_sealed_report_rejects_tamper():
     key = make_key()
     repo_id = os.urandom(32)
-    data = bytearray(m.serialize(key, repo_id, sample_report(repo_id.hex())))
+    data = bytearray(m.serialize(key, repo_id, NAME, sample_report(repo_id.hex())))
     data[-1] ^= 1
     monitor_key = mc.parse_monitor_key(mc.export_monitor_key(key))
     with pytest.raises(low_level.IntegrityError):
-        m.deserialize(monitor_key, repo_id, bytes(data))
+        m.deserialize(monitor_key, repo_id, NAME, bytes(data))
 
 
 def test_sealed_report_rejects_wrong_monitor_key():
     key = make_key()
     repo_id = os.urandom(32)
-    data = m.serialize(key, repo_id, sample_report(repo_id.hex()))
+    data = m.serialize(key, repo_id, NAME, sample_report(repo_id.hex()))
     wrong = mc.parse_monitor_key(mc.export_monitor_key(make_key()))
     with pytest.raises(low_level.IntegrityError):
-        m.deserialize(wrong, repo_id, data)
+        m.deserialize(wrong, repo_id, NAME, data)
 
 
 def test_sealed_report_requires_key():
     key = make_key()
     repo_id = os.urandom(32)
-    data = m.serialize(key, repo_id, sample_report(repo_id.hex()))
+    data = m.serialize(key, repo_id, NAME, sample_report(repo_id.hex()))
     with pytest.raises(ValueError):
-        m.deserialize(None, repo_id, data)
+        m.deserialize(None, repo_id, NAME, data)
 
 
 def test_plaintext_report_roundtrip_is_untrusted():
     key = ChecksumKey.__new__(ChecksumKey)
     repo_id = os.urandom(32)
     report = sample_report(repo_id.hex())
-    data = m.serialize(key, repo_id, report)
+    data = m.serialize(key, repo_id, NAME, report)
     assert data[1] == m.BODY_PLAIN
-    got, trusted = m.deserialize(None, repo_id, data)
+    got, trusted = m.deserialize(None, repo_id, NAME, data)
     assert got == report and trusted is False

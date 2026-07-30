@@ -26,7 +26,9 @@ one for a job is decided by the signed timestamp inside the report, never by the
 A plaintext body is only legitimate for a keyless (``none-*``) repository, which has no key to
 sign with. Once a monitoring key is configured, plaintext bodies are refused rather than
 reported as untrusted - otherwise the server could downgrade a failure it wants hidden
-into a mere warning by replacing the sealed report with an unsigned "success".
+into a mere warning by replacing the sealed report with an unsigned "success". What an
+unsigned body does contain is not trusted either: every report is shape-checked before
+the reader touches it, see validate_report().
 """
 
 import json
@@ -109,6 +111,35 @@ def build_report(
     return report
 
 
+# Fields the reader relies on: required ones must be present and of the given type,
+# optional ones only have to match their type if they are present at all. Anything else a
+# report carries is passed through untouched.
+REQUIRED_FIELDS = {"command": str, "time": str, "status": str, "rc": int}
+OPTIONAL_FIELDS = {"hostname": str, "username": str, "archive": str, "archive_id": str, "stats": dict}
+STATUS_VALUES = {"success", "warning", "error"}
+
+
+def validate_report(report):
+    """Return *report* if the reader can safely work with it, else raise ValueError.
+
+    The body of an unsigned report is whatever the untrusted server chooses to serve, so
+    its shape must not be taken on faith: a non-object body or a list where a string
+    belongs crashes borg monitor with a traceback, and a missing status would pass as a
+    success. A sealed report from a real client always satisfies this.
+    """
+    if not isinstance(report, dict):
+        raise ValueError("monitoring report: not a JSON object")
+    for field, field_type in REQUIRED_FIELDS.items():
+        if not isinstance(report.get(field), field_type):
+            raise ValueError(f"monitoring report: missing or invalid {field!r}")
+    for field, field_type in OPTIONAL_FIELDS.items():
+        if field in report and not isinstance(report[field], field_type):
+            raise ValueError(f"monitoring report: invalid {field!r}")
+    if report["status"] not in STATUS_VALUES:
+        raise ValueError(f"monitoring report: unknown status {report['status']!r}")
+    return report
+
+
 def report_aad(repo_id_bin, name):
     """Additional authenticated data a sealed report is bound to.
 
@@ -165,7 +196,7 @@ def deserialize(monitor_key, repo_id_bin, name, data):
         trusted = False
     else:
         raise ValueError("monitoring report: unknown body type")
-    return json.loads(payload.decode("utf-8")), trusted
+    return validate_report(json.loads(payload.decode("utf-8"))), trusted
 
 
 def publish(repository, key, report):

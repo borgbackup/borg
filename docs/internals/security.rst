@@ -184,6 +184,9 @@ Notable:
 - More modern and often faster AEAD ciphers instead of self-assembled stuff.
 - Due to the usage of session keys, which just start at 0 per session, IVs (nonces)
   do not need long-term special care here as they did for the legacy encryption modes.
+- The session key is also changed within a borg invocation if we encrypted a lot of data
+  with it (AES-OCB only, see :ref:`aead_usage_limits`). Reading is not affected by this,
+  because the session id is part of every message.
 - The id is now also input into the authentication tag computation.
   This strongly associates the id with the written data (== associates the key with
   the value). When later reading the data for some id, authentication will only

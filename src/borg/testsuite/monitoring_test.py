@@ -222,3 +222,15 @@ def test_plaintext_report_roundtrip_is_untrusted():
     assert data[1] == m.BODY_PLAIN
     got, trusted = m.deserialize(None, repo_id, NAME, data)
     assert got == report and trusted is False
+
+
+def test_plaintext_report_refused_when_monitor_key_is_configured():
+    # A configured key means this repo's own reports are sealed, so an unsigned one is an
+    # injection attempt - it must not be downgraded to a mere "untrusted" warning.
+    plain_key = ChecksumKey.__new__(ChecksumKey)
+    repo_id = os.urandom(32)
+    data = m.serialize(plain_key, repo_id, NAME, sample_report(repo_id.hex()))
+    assert data[1] == m.BODY_PLAIN
+    monitor_key = mc.parse_monitor_key(mc.export_monitor_key(make_key()))
+    with pytest.raises(low_level.IntegrityError):
+        m.deserialize(monitor_key, repo_id, NAME, data)

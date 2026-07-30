@@ -181,7 +181,8 @@ class MonitorMixIn:
             print(f"    archive:    {report.get('archive', '-')}")
             print(f"    time:       {report.get('time')}")
             print(f"    age:        {int(e['age'])}s (max {args.max_age}s){'  STALE' if e['stale'] else ''}")
-            print(f"    trusted:    {e['trusted']}{'' if e['trusted'] else '  (unsigned - repo is unencrypted)'}")
+            hint = "" if e["trusted"] else "  (unsigned - no BORG_MONITORING_KEY set, or repo is keyless)"
+            print(f"    trusted:    {e['trusted']}{hint}")
 
     def build_parser_monitor(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

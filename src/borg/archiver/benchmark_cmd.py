@@ -166,7 +166,7 @@ class BenchmarkMixIn:
         key_96 = os.urandom(12)
 
         import io
-        from ..chunkers import get_chunker  # noqa
+        from ..chunkers import get_chunker, release_chunk_data  # noqa
 
         if not args.json:
             print("Chunkers =======================================================")
@@ -176,8 +176,8 @@ class BenchmarkMixIn:
 
         def chunkit(ch):
             with io.BytesIO(random_10M) as data_file:
-                for _ in ch.chunkify(fd=data_file):
-                    pass
+                for chunk in ch.chunkify(fd=data_file):
+                    release_chunk_data(chunk.data)
 
         for spec, setup, func, vars in [
             (

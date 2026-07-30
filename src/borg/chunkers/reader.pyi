@@ -8,6 +8,7 @@ class _Chunk(NamedTuple):
     meta: dict[str, Any]
 
 def Chunk(data: bytes | None, **meta) -> type[_Chunk]: ...
+def release_chunk_data(data: bytes | memoryview | None) -> None: ...
 
 fmap_entry = tuple[int, int, bool]
 

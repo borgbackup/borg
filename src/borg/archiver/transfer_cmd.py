@@ -1,6 +1,6 @@
 from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive, cached_hash, DownloadPipeline
-from ..chunkers import get_chunker
+from ..chunkers import get_chunker, release_chunk_data
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import Error
@@ -55,19 +55,23 @@ def transfer_chunks(
             if not dry_run:
                 chunk_id, data = cached_hash(chunk, archive.key.id_hash)
                 size = len(data)
-                # Check if the chunk is already in the repository
-                chunk_present = cache.seen_chunk(chunk_id, size)
-                if chunk_present:
-                    chunk_entry = cache.reuse_chunk(chunk_id, size, archive.stats)
-                    present += size
-                else:
-                    # Add the new chunk to the repository
-                    chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=archive.stats, ro_type=ROBJ_FILE_STREAM)
-                    transfer += size
+                try:
+                    # Check if the chunk is already in the repository
+                    chunk_present = cache.seen_chunk(chunk_id, size)
+                    if chunk_present:
+                        chunk_entry = cache.reuse_chunk(chunk_id, size, archive.stats)
+                        present += size
+                    else:
+                        # Add the new chunk to the repository
+                        chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=archive.stats, ro_type=ROBJ_FILE_STREAM)
+                        transfer += size
+                finally:
+                    release_chunk_data(data)
                 chunks.append(chunk_entry)
             else:
                 # In dry-run mode, just estimate the size
-                size = len(chunk.data) if chunk.data is not None else chunk.size
+                size = len(chunk.data) if chunk.data is not None else chunk.meta["size"]
+                release_chunk_data(chunk.data)
                 transfer += size
     else:
         # Original implementation without re-chunking

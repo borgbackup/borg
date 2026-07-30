@@ -32,10 +32,27 @@ _Chunk.__doc__ = """\
     all-zero chunk from a HOLE range of a file (from a sparse hole):
         meta = {'allocation' = CH_HOLE, 'size' = size_of_chunk }
         data = None
+
+    Attention: after consuming a chunk, call release_chunk_data(chunk.data)!
+    Otherwise, the memory backing a memoryview is not freed timely (CPython)
+    or even never freed (pypy: dropped, but unreleased memoryviews over
+    C-API-created bytes objects are never reclaimed by the GC there).
 """
 
 def Chunk(data, **meta):
     return _Chunk(meta, data)
+
+
+def release_chunk_data(data):
+    """Release chunk data (as yielded by a chunker) after use.
+
+    Explicitly releasing the memoryview frees the underlying buffer timely.
+    This is especially important on pypy: there, a dropped (but not released)
+    memoryview over a C-API-created bytes object pins the buffer via cpyext
+    and the memory is never reclaimed, not even by gc.collect().
+    """
+    if isinstance(data, memoryview):
+        data.release()
 
 
 def dread(offset, size, fd=None, fh=-1):

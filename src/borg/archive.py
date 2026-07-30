@@ -22,7 +22,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunkers import get_chunker, Chunk
+from .chunkers import get_chunker, Chunk, release_chunk_data
 from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_from_repo
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .constants import *  # NOQA
@@ -436,6 +436,7 @@ class ChunkBuffer:
             alloc = chunk.meta["allocation"]
             if alloc == CH_DATA:
                 data = bytes(chunk.data)
+                release_chunk_data(chunk.data)
             elif alloc in (CH_ALLOC, CH_HOLE):
                 data = zeros[: chunk.meta["size"]]
             else:
@@ -1320,7 +1321,10 @@ class ChunksProcessor:
                 started_hashing = time.monotonic()
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 stats.hashing_time += time.monotonic() - started_hashing
-                chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, ro_type=ROBJ_FILE_STREAM)
+                try:
+                    chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, ro_type=ROBJ_FILE_STREAM)
+                finally:
+                    release_chunk_data(data)
                 return chunk_entry
 
         item.chunks = []
@@ -2420,9 +2424,12 @@ class ArchiveRecreater:
     def chunk_processor(self, target, chunk):
         chunk_id, data = cached_hash(chunk, self.key.id_hash)
         size = len(data)
-        if chunk_id in self.seen_chunks:
-            return self.cache.reuse_chunk(chunk_id, size, target.stats)
-        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, ro_type=ROBJ_FILE_STREAM)
+        try:
+            if chunk_id in self.seen_chunks:
+                return self.cache.reuse_chunk(chunk_id, size, target.stats)
+            chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, ro_type=ROBJ_FILE_STREAM)
+        finally:
+            release_chunk_data(data)
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry
 

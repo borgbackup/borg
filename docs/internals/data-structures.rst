@@ -816,6 +816,16 @@ acceptable. See issue #6501 for the details and for the computations.
   counted over **all** session keys, so - unlike the data volume limit - it can not be
   improved by starting more sessions.
 
+  For AES-OCB, the corresponding limit is much higher (its 128bit authentication tag
+  gives a term in the order of ``v * L / 2^128``), so the CHACHA20-POLY1305 limit is the
+  one to look at.
+
+We do **not** count or enforce the forgery attempts limit, we just document it here:
+a failed decryption means we got tampered or corrupted data and borg refuses it, usually
+aborting the whole command (``borg check`` and archive listing keep going, but only to
+report the damage). Getting anywhere near the limit computed above would require feeding
+borg a lot more tampered data than any real repository will ever hold.
+
 Starting a new session just means computing a new random session id and deriving a new
 session key from it (and counting the IV from 0 again). That is cheap and it does not
 need any special handling when reading, because the session id is part of every chunk

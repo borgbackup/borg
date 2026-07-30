@@ -1147,6 +1147,8 @@ class AEADKeyBase(KeyBase):
 
     def decrypt(self, id, data, aad=b""):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
+        # note: we deliberately do not count the failed decryptions (forgery attempts) here, although
+        # there is a limit for them also - see the "AEAD usage limits" docs and #6501 about why.
         self.assert_type(data[0], id)
         iv_48bit = data[2:8]
         sessionid = bytes(data[8:32])

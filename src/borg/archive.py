@@ -16,7 +16,7 @@ from itertools import groupby, zip_longest
 from collections.abc import Iterator
 from shutil import get_terminal_size
 
-from .platformflags import is_win32
+from .platformflags import is_win32, is_pypy
 from .logger import create_logger
 
 logger = create_logger()
@@ -831,7 +831,19 @@ Duration: {0.duration}
                     # backup_io would not catch) on platforms where os.link ignores follow_symlinks.
                     with backup_io("link"):
                         if os.link in os.supports_follow_symlinks:
-                            os.link(link_target, path, follow_symlinks=False)
+                            try:
+                                os.link(link_target, path, follow_symlinks=False)
+                            except OSError as os_error:
+                                # pypy advertises follow_symlinks support, but raises EINVAL when
+                                # the parameter is actually used (pypy bug) - emulate the secure
+                                # follow_symlinks=False behaviour documented above.
+                                if not (is_pypy and os_error.errno == errno.EINVAL):
+                                    raise
+                                if os.path.islink(link_target):
+                                    # we cannot hardlink the symlink itself, so make an equal symlink.
+                                    os.symlink(os.readlink(link_target), path)
+                                else:
+                                    os.link(link_target, path)
                         else:
                             os.link(link_target, path)
                 hardlink_set = True

@@ -21,7 +21,7 @@ from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns, granularity_sleep
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ...platform import get_birthtime_ns
-from ...platformflags import is_darwin, is_freebsd, is_win32
+from ...platformflags import is_darwin, is_freebsd, is_win32, is_pypy
 from . import (
     RK_ENCRYPTION,
     requires_hardlinks,
@@ -132,7 +132,10 @@ def test_extract_hardlinked_symlink_does_not_leak_target(archivers, request):
     h_path = os.path.join(archiver.output_path, "h")
     # "h" is a hardlink to the symlink itself (same inode as "s"), a faithful restore ...
     assert os.path.islink(h_path)
-    assert os.stat(h_path, follow_symlinks=False).st_ino == os.stat(s_path, follow_symlinks=False).st_ino
+    if not is_pypy:
+        # pypy's os.link(follow_symlinks=False) is broken, borg emulates it there by
+        # creating an equal symlink, which shares no inode with "s".
+        assert os.stat(h_path, follow_symlinks=False).st_ino == os.stat(s_path, follow_symlinks=False).st_ino
     # ... and NOT a hardlink to the external victim file's inode (that would be the leak).
     assert os.stat(h_path, follow_symlinks=False).st_ino != os.stat(victim_file).st_ino
     # the out-of-tree victim is untouched

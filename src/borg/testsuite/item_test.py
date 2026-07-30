@@ -4,6 +4,7 @@ from ..cache import ChunkListEntry
 from ..item import Item, chunks_contents_equal
 from ..helpers import StableDict
 from ..helpers.msgpack import Timestamp
+from ..platformflags import is_pypy
 
 
 def test_item_empty():
@@ -131,6 +132,7 @@ def test_item_dict_property():
     assert item.as_dict() == {"xattrs": {"foo": "bar", "bar": "baz"}}
 
 
+@pytest.mark.xfail(is_pypy, reason="setting undeclared attributes on cdef class instances is not blocked on pypy")
 def test_unknown_property():
     # We do not want the user to be able to set unknown attributes —
     # they will not appear in the .as_dict() result dictionary.

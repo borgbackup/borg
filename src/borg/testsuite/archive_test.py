@@ -9,7 +9,7 @@ import pytest
 
 from . import rejected_dotdot_paths
 from ..cache import ChunkListEntry
-from ..constants import ROBJ_FILE_STREAM
+from ..constants import ROBJ_FILE_STREAM, zeros
 from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacker, valid_msgpacked_dict
 from ..archive import ITEM_KEYS, Statistics
@@ -216,7 +216,8 @@ def test_download_pipeline_parsed_cache():
     # decompressed) only once, see issue #1678.
     key = PlaintextKey(None)
     repo_objs = RepoObj(key)
-    chunks_data = [b"foobar" * 100, b"\0" * 1000, b"barbaz" * 100]
+    # note: repeated, but not all-zero data, so it is not served via the zeros shortcut
+    chunks_data = [b"foobar" * 100, b"idletone" * 125, b"barbaz" * 100]
     entries = []
     objects = {}
     for data in chunks_data:
@@ -240,6 +241,45 @@ def test_download_pipeline_parsed_cache():
     # each distinct chunk was parsed only once, the repetitions were served from the cache
     assert len(parsed_ids) == 3
     assert len(set(parsed_ids)) == 3
+
+
+def test_download_pipeline_zero_chunks_served_locally():
+    # repeated all-zero chunks (e.g. from the holes of a sparse file) shall be served
+    # directly from the zeros constant, without repository access, see issue #1678.
+    key = PlaintextKey(None)
+    repo_objs = RepoObj(key)
+    data = b"foobar" * 100
+    data_id = repo_objs.id_hash(data)
+    objects = {data_id: repo_objs.format(data_id, {}, data, ro_type=ROBJ_FILE_STREAM)}
+    zero_size = 1000
+    zero_id = repo_objs.id_hash(zeros[:zero_size])
+    # note: the all-zero chunk is intentionally NOT in the repository objects,
+    # thus serving it can only work without repository access.
+    chunk_list = [
+        ChunkListEntry(zero_id, zero_size),
+        ChunkListEntry(data_id, len(data)),
+        ChunkListEntry(zero_id, zero_size),
+        ChunkListEntry(zero_id, zero_size),
+    ]
+    repository = MockFetchRepo(objects)
+    pipeline = DownloadPipeline(repository, repo_objs)
+    result = list(pipeline.fetch_many(chunk_list, ro_type=ROBJ_FILE_STREAM))
+    assert result == [zeros[:zero_size], data, zeros[:zero_size], zeros[:zero_size]]
+    assert repository.requested_ids == [data_id]
+    # now that the zero chunk id of this size is known, even a single occurrence
+    # is served locally:
+    repository.requested_ids.clear()
+    result = list(pipeline.fetch_many([ChunkListEntry(zero_id, zero_size)], ro_type=ROBJ_FILE_STREAM))
+    assert result == [zeros[:zero_size]]
+    assert repository.requested_ids == []
+    # but a single occurrence of an all-zero chunk of an unknown size is still
+    # fetched from the repository:
+    other_size = 500
+    other_id = repo_objs.id_hash(zeros[:other_size])
+    objects[other_id] = repo_objs.format(other_id, {}, zeros[:other_size], ro_type=ROBJ_FILE_STREAM)
+    result = list(pipeline.fetch_many([ChunkListEntry(other_id, other_size)], ro_type=ROBJ_FILE_STREAM))
+    assert result == [zeros[:other_size]]
+    assert repository.requested_ids == [other_id]
 
 
 def make_chunks(items):

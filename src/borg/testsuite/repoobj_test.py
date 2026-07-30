@@ -1,10 +1,11 @@
 import pytest
 
 from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
-from ..crypto.key import PlaintextKey
+from ..crypto.key import PlaintextKey, CHPOKey
+from ..helpers import msgpack
 from ..helpers.errors import IntegrityError
 from ..repository import Repository
-from ..repoobj import RepoObj
+from ..repoobj import OBJ_MAGIC, OBJ_VERSION, OBJ_VERSION_NO_HEADER_AAD, REPOOBJ_HEADER_SIZE, RepoObj
 from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
 
@@ -17,6 +18,15 @@ def repository(tmpdir):
 @pytest.fixture
 def key(repository):
     return PlaintextKey(repository)
+
+
+@pytest.fixture
+def aead_key(repository):
+    # AEAD key, needed to test header_aad authentication; PlaintextKey is unauthenticated.
+    key = CHPOKey(repository)
+    key.init_from_random_data()
+    key.init_ciphers()
+    return key
 
 
 def test_format_parse_roundtrip(key):
@@ -125,8 +135,6 @@ def test_malformed_object_too_short(key):
 def test_malformed_object_inconsistent_sizes(key):
     # a valid-looking header that claims more meta/data than the object actually contains
     # must be rejected cleanly with IntegrityError.
-    from ..repoobj import OBJ_MAGIC, OBJ_VERSION
-
     repo_objs = RepoObj(key)
     id = repo_objs.id_hash(b"x")
     # huge meta_size, but no actual meta/data bytes follow the header
@@ -161,3 +169,126 @@ def test_spoof_archive(key):
     # As Borg always gives the ro_type it intends to read, this should fail:
     with pytest.raises(IntegrityError):
         repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
+
+
+def _tamper(cdata, offset):
+    # flip one bit at the given byte offset of an otherwise-valid formatted object.
+    tampered = bytearray(cdata)
+    tampered[offset] ^= 0x01
+    return bytes(tampered)
+
+
+def test_tampered_header_chunk_id_detected(aead_key):
+    # chunk_id is part of header_aad, so tampering with it fails AEAD authentication in
+    # parse()/parse_meta().
+    repo_objs = RepoObj(aead_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    # chunk_id is at header offset 9..41 (after 8-byte magic + 1-byte version). It has no structural
+    # check, so tampering is detected only through AEAD authentication.
+    tampered = _tamper(cdata, offset=9)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse_meta(id, tampered, ro_type=ROBJ_FILE_STREAM)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(id, tampered, ro_type=ROBJ_FILE_STREAM)
+
+
+def test_tampered_header_magic_detected(aead_key):
+    # A tampered magic byte is rejected by the structural check (`hdr.magic != OBJ_MAGIC`) before
+    # key.decrypt() runs, so this does not test AEAD authentication of header_aad - see
+    # test_header_aad_tamper_detected_at_key_layer for that.
+    repo_objs = RepoObj(aead_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    # OBJ_MAGIC lives at header offset 0..8.
+    tampered = _tamper(cdata, offset=0)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse_meta(id, tampered, ro_type=ROBJ_FILE_STREAM)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(id, tampered, ro_type=ROBJ_FILE_STREAM)
+
+
+def test_header_aad_tamper_detected_at_key_layer(aead_key):
+    # Calls key.encrypt()/key.decrypt() directly with header_aad, to check that every byte of
+    # header_aad (magic, version, chunk_id) is authenticated, not just chunk_id.
+    data = b"foobar" * 10
+    id = aead_key.id_hash(data)
+    header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
+    encrypted = aead_key.encrypt(id, data, aad=header_aad)
+
+    assert aead_key.decrypt(id, encrypted, aad=header_aad) == data
+
+    # tamper the magic byte (offset 0) after encryption; decrypt gets a different header_aad than encrypt did.
+    tampered_header_aad = bytearray(header_aad)
+    tampered_header_aad[0] ^= 0x01
+    with pytest.raises(IntegrityError):
+        aead_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
+
+    # tamper the version byte (offset 8) after encryption.
+    tampered_header_aad = bytearray(header_aad)
+    tampered_header_aad[8] ^= 0x01
+    with pytest.raises(IntegrityError):
+        aead_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
+
+
+def test_meta_data_slot_swap_detected(aead_key):
+    # meta_encrypted and data_encrypted carry different slot tags in their AAD, so splicing one
+    # into the other's position (fixing up meta_size/data_size to match the swapped lengths) must
+    # fail authentication instead of silently decrypting under the wrong slot.
+    repo_objs = RepoObj(aead_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    hdr_size = RepoObj.obj_header.size
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(cdata[:hdr_size]))
+    meta_encrypted = cdata[hdr_size : hdr_size + hdr.meta_size]
+    data_encrypted = cdata[hdr_size + hdr.meta_size :]
+
+    swapped_hdr = RepoObj.obj_header.pack(
+        hdr.magic, hdr.version, hdr.chunk_id, len(data_encrypted), len(meta_encrypted)
+    )
+    swapped = swapped_hdr + data_encrypted + meta_encrypted
+
+    with pytest.raises(IntegrityError):
+        repo_objs.parse_meta(id, swapped, ro_type=ROBJ_FILE_STREAM)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(id, swapped, ro_type=ROBJ_FILE_STREAM)
+
+
+def test_untampered_roundtrip_with_aead_key(aead_key):
+    repo_objs = RepoObj(aead_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
+    assert got_data == data
+    assert got_meta["custom"] == "something"
+
+
+def test_version1_object_without_header_aad_still_readable(aead_key):
+    # Builds an OBJ_VERSION_NO_HEADER_AAD object by hand (format() only writes OBJ_VERSION_HEADER_AAD)
+    # and checks that parse()/parse_meta() still decrypt it.
+    repo_objs = RepoObj(aead_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    meta = {"type": ROBJ_FILE_STREAM}
+    meta, data_compressed = repo_objs.compressor.compress(meta, data)
+
+    # OBJ_VERSION_NO_HEADER_AAD encoding: aad=chunk_id only, no header bound in.
+    data_encrypted = aead_key.encrypt(id, data_compressed, aad=b"")
+    meta_packed = msgpack.packb(meta)
+    meta_encrypted = aead_key.encrypt(id, meta_packed, aad=b"")
+    hdr = RepoObj.ObjHeader(OBJ_MAGIC, OBJ_VERSION_NO_HEADER_AAD, id, len(meta_encrypted), len(data_encrypted))
+    cdata = RepoObj.obj_header.pack(*hdr) + meta_encrypted + data_encrypted
+    assert len(RepoObj.obj_header.pack(*hdr)) == REPOOBJ_HEADER_SIZE
+
+    got_meta = repo_objs.parse_meta(id, cdata, ro_type=ROBJ_FILE_STREAM)
+    assert got_meta["type"] == ROBJ_FILE_STREAM
+    got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
+    assert got_data == data

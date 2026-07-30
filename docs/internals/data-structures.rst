@@ -785,6 +785,29 @@ meaning you would run against other limitations (RAM, storage, time) way before 
 In practice, chunks are usually bigger, for big files even much bigger, giving an
 even higher limit.
 
+AEAD usage limits
+~~~~~~~~~~~~~~~~~
+
+The IV range is not what limits how much data may be encrypted with one session key,
+the security bounds of the ciphers are (see issue #6501 for the details):
+
+- AES-OCB: the attacker's advantage grows with the square of the amount of data
+  encrypted using one key (about ``6 * sigma^2 / 2^128``, ``sigma`` being the number
+  of 128bit cipher blocks, including the authenticated header). RFC 7253 derives from
+  this that one key should encrypt at most 2^48 blocks (4PiB), which corresponds to an
+  advantage of 2^-32. borg aims higher and starts a new session after 2^37 blocks
+  (2TiB), which corresponds to an advantage of about 2^-51.
+- CHACHA20-POLY1305: no such limit exists, its confidentiality bound does not depend
+  on the amount of data encrypted. Its integrity bound only limits the number of
+  **forgery attempts** (failed decryptions of tampered data, which borg refuses and
+  which are counted over all keys), not the amount of data encrypted.
+
+Starting a new session just means computing a new random session id and deriving a new
+session key from it (and counting the IV from 0 again). That is cheap and it does not
+need any special handling when reading, because the session id is part of every chunk
+header. Because the advantages of the individual session keys just add up, frequent
+session key changes also keep the total advantage low over the lifetime of a borg key.
+
 Legacy modes
 ~~~~~~~~~~~~
 

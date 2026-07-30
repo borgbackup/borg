@@ -191,6 +191,7 @@ Fixes:
 
 Other changes:
 
+- crypto: start a new session after encrypting 2TiB with one aes256-ocb session key, #6501
 - removed some global options (they were difficult to use and spammed the help output):
 
   - --remote-path -> BORG_REMOTE_PATH

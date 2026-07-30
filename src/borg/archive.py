@@ -6,7 +6,7 @@ import posixpath
 import stat
 import sys
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 from datetime import timedelta
 from functools import partial
@@ -318,9 +318,16 @@ def OsOpen(*, flags, path=None, parent_fd=None, name=None, noatime=False, op="op
 
 
 class DownloadPipeline:
+    # A content data stream may reference the same chunk many times (e.g. the all-zero
+    # chunks of a sparse file, see issue #1678), thus cache the most recently parsed
+    # chunks, so repeated chunks do not get decrypted, authenticated and decompressed
+    # again. Chunks can be up to MAX_DATA_SIZE bytes, thus keep the cache small.
+    PARSED_CACHE_SIZE = 4
+
     def __init__(self, repository, repo_objs):
         self.repository = repository
         self.repo_objs = repo_objs
+        self.parsed_cache = LRUCache(capacity=self.PARSED_CACHE_SIZE)  # (id, ro_type) -> data
 
     def unpack_many(self, ids, *, filter=None):
         """
@@ -356,7 +363,30 @@ class DownloadPipeline:
             sizes = [None] * len(ids)
         else:
             raise TypeError(f"unsupported or mixed element types: {chunks}")
-        for id, size, cdata in zip(ids, sizes, self.repository.get_many(ids, raise_missing=False)):
+        # All-zero chunks can be served directly from the zeros constant, without repository
+        # access, by comparing against the (memoized) id of an all-zero chunk of same size.
+        # Only compute that id for ids occurring repeatedly within this stream: a repeated id
+        # means repeating plaintext, which usually is a run of zeros (e.g. the "holes" of a
+        # sparse file, see issue #1678) - and the repetition also keeps the memoization
+        # effective, as it bounds the computations to a few chunk sizes.
+        id_hash = self.repo_objs.key.id_hash
+        counts = Counter(ids)
+        zero_flags = []
+        for id, size in zip(ids, sizes):
+            if size is None or not 0 < size <= len(zeros):
+                zero_flags.append(False)
+            elif counts[id] > 1:
+                zero_flags.append(id == zero_chunk_id(id_hash, size))
+            else:
+                # unique id: only compare against already memoized zero chunk ids (cheap).
+                zero_flags.append(id == zero_chunk_ids.get((id_hash, size)))
+        fetch_ids = [id for id, zero in zip(ids, zero_flags) if not zero]
+        fetched = self.repository.get_many(fetch_ids, raise_missing=False)
+        for id, size, zero in zip(ids, sizes, zero_flags):
+            if zero:
+                yield zeros[:size]
+                continue
+            cdata = next(fetched)
             if cdata is None:
                 if replacement_chunk and size is not None:
                     logger.error(f"repository object {bin_to_hex(id)} missing, returning {size} zero bytes.")
@@ -365,7 +395,11 @@ class DownloadPipeline:
                     logger.error(f"repository object {bin_to_hex(id)} missing, returning None.")
                     data = None
             else:
-                _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
+                try:
+                    data = self.parsed_cache[(id, ro_type)]
+                except KeyError:
+                    _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
+                    self.parsed_cache[(id, ro_type)] = data
             assert size is None or len(data) == size
             yield data
 
@@ -1244,6 +1278,17 @@ class MetadataCollector:
 zero_chunk_ids = LRUCache(10)  # type: ignore[var-annotated]
 
 
+def zero_chunk_id(id_hash, size):
+    """return the id of an all-zero chunk of length *size* (memoized)."""
+    assert 0 < size <= len(zeros)
+    try:
+        return zero_chunk_ids[(id_hash, size)]
+    except KeyError:
+        chunk_id = id_hash(memoryview(zeros)[:size])
+        zero_chunk_ids[(id_hash, size)] = chunk_id
+        return chunk_id
+
+
 def cached_hash(chunk, id_hash):
     allocation = chunk.meta["allocation"]
     if allocation == CH_DATA:
@@ -1253,11 +1298,7 @@ def cached_hash(chunk, id_hash):
         size = chunk.meta["size"]
         assert size <= len(zeros)
         data = memoryview(zeros)[:size]
-        try:
-            chunk_id = zero_chunk_ids[(id_hash, size)]
-        except KeyError:
-            chunk_id = id_hash(data)
-            zero_chunk_ids[(id_hash, size)] = chunk_id
+        chunk_id = zero_chunk_id(id_hash, size)
     else:
         raise ValueError("unexpected allocation type")
     return chunk_id, data

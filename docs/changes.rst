@@ -162,6 +162,19 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
+Version 2.0.0b23 (not released yet)
+-----------------------------------
+
+New features:
+
+- analyze: report the deduplicated size of a set of archives, #5741.
+  For the considered (matching) set of archives, ``borg analyze`` now reports the
+  deduplicated size of the set (union of referenced chunks, counted once) and the
+  exclusive size of the set (chunks referenced only by the set, i.e. the space that
+  deleting the whole set would free). Chunk ids and sizes are read from the
+  per-archive references cache maintained by ``borg compact``, so unchanged archives
+  usually do not need to be opened.
+
 Version 2.0.0b22 (2026-07-22)
 -----------------------------
 

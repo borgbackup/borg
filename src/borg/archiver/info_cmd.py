@@ -68,14 +68,12 @@ class InfoMixIn:
             """
         This command displays detailed information about the specified archive.
 
-        Please note that the deduplicated sizes of the individual archives do not add
-        up to the deduplicated size of the repository ("all archives"), because the two
-        mean different things:
+        The original size shown here is the total size of the archive's source data
+        (uncompressed, counting duplicate content per occurrence).
 
-        This archive / deduplicated size = amount of data stored ONLY for this archive
-        = unique chunks of this archive.
-        All archives / deduplicated size = amount of data stored in the repository
-        = all chunks in the repository.
+        Deduplicated sizes are not shown here (computing them per archive is expensive).
+        For the deduplicated size of a set of archives, use ``borg analyze``; for the
+        repository-wide deduplicated size, use ``borg compact --stats``.
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_info.__doc__, epilog=info_epilog)

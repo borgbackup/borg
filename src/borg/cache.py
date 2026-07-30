@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 
+from borghash import HashTableNT
 from borgstore.backends.errors import PermissionDenied
 
 from .logger import create_logger
@@ -894,6 +895,123 @@ def build_chunkindex_from_repo(
             repository, chunks, incremental=False, clear=False, force_write=True, delete_other=True
         )
     return chunks
+
+
+# per-archive cache of the objects an archive references, stored in the repo as
+# cache/referenced-by-archive.<archive id hex>. it lets a following compact or analyze skip re-scanning
+# an unchanged archive's items. the blob is: file_count (uint64 LE), content_size (uint64 LE), a
+# serialized HashTableNT mapping object id (32 bytes) -> plaintext object size (uint32), and a
+# sha256 of all of that appended for integrity.
+REFERENCED_BY_ARCHIVE = "referenced-by-archive."  # name prefix within the "cache" store namespace
+ArchiveReferenceEntry = namedtuple("ArchiveReferenceEntry", "size")
+ArchiveReferenceEntryFormatT = namedtuple("ArchiveReferenceEntryFormatT", "size")
+ArchiveReferenceEntryFormat = ArchiveReferenceEntryFormatT(size="I")  # uint32 plaintext size
+# what an archive references: the objects to mark used (id -> size) plus the tallies compact reports.
+# file_count and content_size are counted per occurrence (matching a full scan), so they cannot be
+# derived from the deduplicated ids table and are cached alongside it.
+ArchiveReferences = namedtuple("ArchiveReferences", "file_count content_size ids")
+
+
+def archive_reference_cache_name(archive_id: bytes) -> str:
+    """The store name of an archive's reference cache (well within borgstore's name length limit)."""
+    return f"cache/{REFERENCED_BY_ARCHIVE}{bin_to_hex(archive_id)}"
+
+
+def list_archive_reference_caches(repository) -> set:
+    """Return the set of archive ids (hex) that currently have a reference cache in the repo."""
+    hex_ids = set()
+    for info in repository.store_list("cache"):  # store_list yields ItemInfo namedtuples
+        if info.name.startswith(REFERENCED_BY_ARCHIVE):
+            hex_ids.add(info.name[len(REFERENCED_BY_ARCHIVE) :])
+    return hex_ids
+
+
+def load_archive_references(repository, archive_id: bytes):
+    """Load and verify an archive's references cache; return it, or None if it is missing/corrupted."""
+    try:
+        data = repository.store_load(archive_reference_cache_name(archive_id))
+    except StoreObjectNotFound:
+        return None
+    # the serialized blob has a sha256 of its content appended (the store name cannot also carry it,
+    # as borgstore's name length limit is too small for archive id hex + sha256 hex). a mismatch means
+    # the cache is corrupted; we then return None so the caller falls back to scanning the archive.
+    hex_id = bin_to_hex(archive_id)
+    if len(data) < 16 + 32 or hashlib.sha256(data[:-32]).digest() != data[-32:]:
+        logger.warning(f"Ignoring corrupted references cache of archive {hex_id}.")
+        return None
+    try:
+        with io.BytesIO(data[:-32]) as f:
+            file_count = int.from_bytes(f.read(8), "little")
+            content_size = int.from_bytes(f.read(8), "little")
+            ids = HashTableNT.read(f)
+    except ValueError:
+        logger.warning(f"Ignoring unreadable references cache of archive {hex_id}.")
+        return None
+    return ArchiveReferences(file_count=file_count, content_size=content_size, ids=ids)
+
+
+def store_archive_references(repository, archive_id: bytes, references) -> None:
+    """Serialize the references (a small header plus the id->size table, with a sha256 appended)."""
+    with io.BytesIO() as f:
+        f.write(references.file_count.to_bytes(8, "little"))
+        f.write(references.content_size.to_bytes(8, "little"))
+        references.ids.write(f)
+        data = f.getvalue()
+    data += hashlib.sha256(data).digest()
+    repository.store_store(archive_reference_cache_name(archive_id), data)
+
+
+def cleanup_archive_reference_caches(repository, stale_hex_ids: set) -> None:
+    """Delete reference caches belonging to archives that are not in the archives list anymore."""
+    for hex_id in stale_hex_ids:
+        try:
+            repository.store_delete(f"cache/{REFERENCED_BY_ARCHIVE}{hex_id}")
+        except StoreObjectNotFound:
+            pass
+    logger.debug(f"Removed {len(stale_hex_ids)} stale archive references caches.")
+
+
+def scan_archive_references(manifest, archive_id: bytes, *, iec: bool = False):
+    """Open the archive and scan its items, collecting the objects it references (id -> plaintext
+    size) plus its source file count and content size (both counted per occurrence, like a full
+    scan). Opening the archive fetches and decrypts its metadata and item-metadata objects."""
+    from .archive import Archive  # avoid circular import (archive.py imports from cache.py)
+
+    archive = Archive(manifest, archive_id, iec=iec)
+    ids = HashTableNT(key_size=32, value_type=ArchiveReferenceEntry, value_format=ArchiveReferenceEntryFormat)
+    # archive metadata objects: only their ids matter for GC, their content size is unknown here
+    # and not part of the source data size, so record them with size 0.
+    ids[archive.id] = ArchiveReferenceEntry(size=0)
+    for id in archive.metadata.item_ptrs:
+        ids[id] = ArchiveReferenceEntry(size=0)
+    for id in archive.metadata.items:
+        ids[id] = ArchiveReferenceEntry(size=0)
+    file_count, content_size = 0, 0
+    for item in archive.iter_items():
+        file_count += 1  # every fs object counts, not just regular files
+        if "chunks" in item:
+            for id, size in item.chunks:
+                content_size += size  # original, uncompressed content size, counted per occurrence
+                ids[id] = ArchiveReferenceEntry(size=size)
+    return ArchiveReferences(file_count=file_count, content_size=content_size, ids=ids)
+
+
+def get_archive_references(
+    repository, manifest, archive_id: bytes, *, cached: bool, iec: bool = False, store: bool = True
+):
+    """Return what the archive references, read from its per-archive cache in the repo if present,
+    else computed by scanning the archive and (when *store*) cached for next time.
+
+    On a cache hit the archive is not opened at all (that is the point of the cache): loading an
+    Archive fetches and decrypts its metadata and item-metadata objects, which is exactly the work
+    we want to skip for an unchanged archive.
+    """
+    references = load_archive_references(repository, archive_id) if cached else None
+    if references is None:
+        references = scan_archive_references(manifest, archive_id, iec=iec)
+        if store:
+            store_archive_references(repository, archive_id, references)
+    return references
 
 
 class ChunksMixin:

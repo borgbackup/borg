@@ -14,7 +14,6 @@ from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex
 from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin, IntegrityError
 from ..helpers import ProgressIndicatorPercent
-from ..helpers import use_iec_units
 from ..manifest import Manifest
 from ..repository import Repository
 
@@ -24,7 +23,7 @@ logger = create_logger()
 
 
 class ArchiveGarbageCollector:
-    def __init__(self, repository, manifest, *, stats, iec, threshold, dry_run=False):
+    def __init__(self, repository, manifest, *, stats, threshold, dry_run=False):
         self.repository = repository
         assert isinstance(repository, Repository)
         self.manifest = manifest
@@ -35,7 +34,6 @@ class ArchiveGarbageCollector:
         self.archives_count = None  # number of archives
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
         self.threshold = threshold  # rewrite a mixed pack only when its wasted-bytes fraction reaches this percent
-        self.iec = iec  # formats statistics using IEC units (1KiB = 1024B)
         self.dry_run = dry_run
         self.store_changed = False  # True once compact_packs() has changed the store (and its index)
 
@@ -160,7 +158,6 @@ class ArchiveGarbageCollector:
                 self.manifest,
                 info.id,
                 cached=bin_to_hex(info.id) in cached_hex_ids,
-                iec=self.iec,
                 store=not self.dry_run,
             )
             total_files += references.file_count  # every fs object counts, not just regular files
@@ -200,22 +197,18 @@ class ArchiveGarbageCollector:
             count = len(self.chunks)
             logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
             logger.info(
-                f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
+                f"Source data size was {format_file_size(self.total_size, precision=0)} "
                 f"in {self.total_files} files."
             )
-            logger.info(f"Deduplicated size is {format_file_size(deduplicated_size, precision=0, iec=self.iec)}.")
+            logger.info(f"Deduplicated size is {format_file_size(deduplicated_size, precision=0)}.")
             dedup_factor = deduplicated_size / self.total_size if self.total_size else 1.0
             logger.info(f"Deduplication factor is {dedup_factor:.2f}.")
-            logger.info(
-                f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "
-                f"in {count} objects."
-            )
+            logger.info(f"Repository size is {format_file_size(repo_size_after, precision=0)} " f"in {count} objects.")
             comp_factor = repo_size_after / deduplicated_size if deduplicated_size else 1.0
             logger.info(f"Compression factor is {comp_factor:.2f}.")
             if not self.dry_run:  # nothing was deleted on a dry run, so before == after
                 logger.info(
-                    f"Compaction saved "
-                    f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
+                    f"Compaction saved " f"{format_file_size(repo_size_before - repo_size_after, precision=0)}."
                 )
 
     def mark_soft_deleted_used(self):
@@ -228,7 +221,7 @@ class ArchiveGarbageCollector:
         for archive_info in self.manifest.archives.list(sort_by=["ts"], deleted=True):
             name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
             try:
-                archive = Archive(self.manifest, archive_info.id, iec=self.iec, deleted=True)
+                archive = Archive(self.manifest, archive_info.id, deleted=True)
                 missing = sum(not self._mark_object_used(id) for id in self._archive_object_ids(archive))
                 if missing:
                     logger.warning(
@@ -306,7 +299,7 @@ class ArchiveGarbageCollector:
         unindexed = sum(total - pack_indexed[pid] for pid, total in pack_total.items() if total > pack_indexed[pid])
         if unindexed:
             logger.info(
-                f"{format_file_size(unindexed, iec=self.iec)} in pack files is not covered by the index; "
+                f"{format_file_size(unindexed)} in pack files is not covered by the index; "
                 'redundant copies are reclaimed on pack rewrite, the rest by "borg check --repair".'
             )
 
@@ -357,7 +350,7 @@ class ArchiveGarbageCollector:
         if self.dry_run:
             freed = sum(pack_reclaim.values())
             logger.info(
-                f"Would free {format_file_size(freed, iec=self.iec)} by dropping {len(drop_packs)} "
+                f"Would free {format_file_size(freed)} by dropping {len(drop_packs)} "
                 f"packs, rewriting {len(rewrite_packs)} packs and merging {len(merge_packs)} tiny packs."
             )
             return repo_size_before, repo_size_before  # dry run: report only, change nothing
@@ -385,7 +378,7 @@ class ArchiveGarbageCollector:
         # objects cut from rewritten packs. reclaimed counts the bytes freed.
         deleted = sum(len(ids) for ids in forget.values()) + sum(len(ids) for ids in drop.values())
         reclaimed = sum(pack_reclaim.values())
-        logger.info(f"Deleting {deleted} unused objects, freeing {format_file_size(reclaimed, iec=self.iec)}...")
+        logger.info(f"Deleting {deleted} unused objects, freeing {format_file_size(reclaimed)}...")
         pi = ProgressIndicatorPercent(
             total=len(drop_packs) + len(rewrite_packs) + (1 if merge_packs else 0),
             msg="Compacting packs %3.1f%%",
@@ -437,7 +430,7 @@ class CompactMixIn:
             # is nothing to do and make compaction a silent no-op.
             repository.assert_writable()
         ArchiveGarbageCollector(
-            repository, manifest, stats=args.stats, iec=use_iec_units(), threshold=args.threshold, dry_run=args.dry_run
+            repository, manifest, stats=args.stats, threshold=args.threshold, dry_run=args.dry_run
         ).garbage_collect()
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):

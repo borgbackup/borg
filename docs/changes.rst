@@ -110,7 +110,7 @@ Compatibility notes:
 - removed --rsh option (use the BORG_RSH environment variable)
 - removed --upload-ratelimit and --upload-buffer options (they only ever
   affected uploads to a borg 1.x repository via ssh://)
-- removed --iec option (use the BORG_IEC environment variable)
+- removed --iec option (use the BORG_UNITS environment variable)
 - removed --debug-profile option (use the BORG_DEBUG_PROFILE environment variable)
 - removed borg config command (only worked locally anyway)
 - compact command now requires access to the borg key if the repo is encrypted
@@ -174,6 +174,11 @@ New features:
   deleting the whole set would free). Chunk ids and sizes are read from the
   per-archive references cache maintained by ``borg compact``, so unchanged archives
   usually do not need to be opened.
+- new ``BORG_UNITS`` environment variable, #5513.
+  It determines how sizes are formatted in human-readable output: ``si`` (default,
+  1kB = 1000B), ``iec`` (1KiB = 1024B) or ``raw`` (exact byte counts, e.g. for easy
+  parsing by monitoring scripts).
+  ``BORG_IEC`` was removed, use ``BORG_UNITS=iec`` instead.
 
 Version 2.0.0b22 (2026-07-22)
 -----------------------------

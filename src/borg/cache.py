@@ -198,7 +198,6 @@ class Cache:
         warn_if_unencrypted=True,
         progress=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
-        iec=False,
         archive_name=None,
         start_backup=None,
     ):
@@ -207,7 +206,6 @@ class Cache:
             path=path,
             warn_if_unencrypted=warn_if_unencrypted,
             progress=progress,
-            iec=iec,
             cache_mode=cache_mode,
             archive_name=archive_name,
             start_backup=start_backup,
@@ -971,13 +969,13 @@ def cleanup_archive_reference_caches(repository, stale_hex_ids: set) -> None:
     logger.debug(f"Removed {len(stale_hex_ids)} stale archive references caches.")
 
 
-def scan_archive_references(manifest, archive_id: bytes, *, iec: bool = False):
+def scan_archive_references(manifest, archive_id: bytes):
     """Open the archive and scan its items, collecting the objects it references (id -> plaintext
     size) plus its source file count and content size (both counted per occurrence, like a full
     scan). Opening the archive fetches and decrypts its metadata and item-metadata objects."""
     from .archive import Archive  # avoid circular import (archive.py imports from cache.py)
 
-    archive = Archive(manifest, archive_id, iec=iec)
+    archive = Archive(manifest, archive_id)
     ids = HashTableNT(key_size=32, value_type=ArchiveReferenceEntry, value_format=ArchiveReferenceEntryFormat)
     # archive metadata objects: only their ids matter for GC, their content size is unknown here
     # and not part of the source data size, so record them with size 0.
@@ -996,9 +994,7 @@ def scan_archive_references(manifest, archive_id: bytes, *, iec: bool = False):
     return ArchiveReferences(file_count=file_count, content_size=content_size, ids=ids)
 
 
-def get_archive_references(
-    repository, manifest, archive_id: bytes, *, cached: bool, iec: bool = False, store: bool = True
-):
+def get_archive_references(repository, manifest, archive_id: bytes, *, cached: bool, store: bool = True):
     """Return what the archive references, read from its per-archive cache in the repo if present,
     else computed by scanning the archive and (when *store*) cached for next time.
 
@@ -1008,7 +1004,7 @@ def get_archive_references(
     """
     references = load_archive_references(repository, archive_id) if cached else None
     if references is None:
-        references = scan_archive_references(manifest, archive_id, iec=iec)
+        references = scan_archive_references(manifest, archive_id)
         if store:
             store_archive_references(repository, archive_id, references)
     return references
@@ -1119,7 +1115,6 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         warn_if_unencrypted=True,
         progress=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
-        iec=False,
         archive_name=None,
         start_backup=None,
     ):

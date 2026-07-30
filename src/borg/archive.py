@@ -86,14 +86,14 @@ _STORE_STATS_ORDER += [
 del _method
 
 
-def format_store_stats(stats, iec=False):
+def format_store_stats(stats):
     """Render a borgstore stats dict as one "Store <name>: <value>" line per entry."""
 
     def format_value(key, value):
         if key.endswith("_throughput"):
-            return f"{format_file_size(value, iec=iec)}/s"
+            return f"{format_file_size(value)}/s"
         if key.endswith("_volume"):
-            return format_file_size(value, iec=iec)
+            return format_file_size(value)
         if key.endswith("_time"):
             return f"{value:.3f} seconds"
         if key.endswith("_ratio"):
@@ -106,9 +106,8 @@ def format_store_stats(stats, iec=False):
 
 
 class Statistics:
-    def __init__(self, output_json=False, iec=False):
+    def __init__(self, output_json=False):
         self.output_json = output_json
-        self.iec = iec
         self.osize = self.usize = self.nfiles = 0
         self.last_progress = 0  # timestamp when last progress was shown
         self.files_stats = defaultdict(int)
@@ -124,7 +123,7 @@ class Statistics:
     def __add__(self, other):
         if not isinstance(other, Statistics):
             raise TypeError("can only add Statistics objects")
-        stats = Statistics(self.output_json, self.iec)
+        stats = Statistics(self.output_json)
         stats.osize = self.osize + other.osize
         stats.usize = self.usize + other.usize
         stats.nfiles = self.nfiles + other.nfiles
@@ -160,7 +159,7 @@ Files changed while reading: {files_changed_while_reading}
             files_changed_while_reading=self.files_stats["C"],
         )
         if self.store_stats:
-            result += format_store_stats(self.store_stats, iec=self.iec) + "\n"
+            result += format_store_stats(self.store_stats) + "\n"
         return result
 
     def __repr__(self):
@@ -170,7 +169,7 @@ Files changed while reading: {files_changed_while_reading}
 
     def as_dict(self):
         return {
-            "original_size": FileSize(self.osize, iec=self.iec),
+            "original_size": FileSize(self.osize),
             "nfiles": self.nfiles,
             "hashing_time": self.hashing_time,
             "chunking_time": self.chunking_time,
@@ -190,11 +189,11 @@ Files changed while reading: {files_changed_while_reading}
 
     @property
     def osize_fmt(self):
-        return format_file_size(self.osize, iec=self.iec)
+        return format_file_size(self.osize)
 
     @property
     def usize_fmt(self):
-        return format_file_size(self.usize, iec=self.iec)
+        return format_file_size(self.usize)
 
     def show_progress(self, item=None, final=False, stream=None, dt=None):
         now = time.monotonic()
@@ -518,7 +517,6 @@ class Archive:
         start=None,
         end=None,
         log_json=False,
-        iec=False,
         deleted=False,
     ):
         name_is_id = isinstance(name, bytes)
@@ -534,8 +532,7 @@ class Archive:
         self.repo_objs = manifest.repo_objs
         self.repository = manifest.repository
         self.cache = cache
-        self.stats = Statistics(output_json=log_json, iec=iec)
-        self.iec = iec
+        self.stats = Statistics(output_json=log_json)
         self.show_progress = progress
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
@@ -738,7 +735,7 @@ Duration: {0.duration}
         return metadata
 
     def calc_stats(self, cache, want_unique=True):
-        stats = Statistics(iec=self.iec)
+        stats = Statistics()
         stats.usize = 0  # this is expensive to compute
         stats.nfiles = self.metadata.nfiles
         stats.osize = self.metadata.size
@@ -1318,7 +1315,6 @@ class FilesystemObjectProcessors:
         show_progress,
         sparse,
         log_json,
-        iec,
         file_status_printer=None,
         files_changed="mtime" if is_win32 else "ctime",
     ):
@@ -1332,7 +1328,7 @@ class FilesystemObjectProcessors:
         self.files_changed = files_changed
 
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
-        self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
+        self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
         self.chunker = get_chunker(*chunker_params, key=key, sparse=sparse)
 
@@ -1616,7 +1612,6 @@ class TarfileObjectProcessors:
         chunker_params,
         show_progress,
         log_json,
-        iec,
         file_status_printer=None,
     ):
         self.cache = cache
@@ -1626,7 +1621,7 @@ class TarfileObjectProcessors:
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
 
-        self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
+        self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
         self.chunker = get_chunker(*chunker_params, key=key, sparse=False)
         self.hlm = HardLinkManager(id_type=str, info_type=list)  # normalized/safe path -> chunks
 
@@ -1829,7 +1824,6 @@ class ArchiveChecker:
         newer=None,
         oldest=None,
         newest=None,
-        iec=False,
     ):
         """Perform a set of checks on 'repository'
 
@@ -1841,7 +1835,6 @@ class ArchiveChecker:
         :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
         :param format: format string used to describe an archive in the log output
-        :param iec: format sizes using IEC units (1KiB = 1024B)
         """
         if not isinstance(repository, Repository):
             logger.error("Checking legacy repositories is not supported.")
@@ -1850,7 +1843,6 @@ class ArchiveChecker:
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.format = format
-        self.iec = iec
         self.repository = repository
         # A normal (non-repair) archives check trusts the in-repo index: the repository check verified
         # each index object's sha256, and the index is the authoritative record of which chunks exist,
@@ -2210,7 +2202,7 @@ class ArchiveChecker:
         else:
             archive_infos = self.manifest.archives.list(sort_by=sort_by)
         num_archives = len(archive_infos)
-        formatter = ArchiveFormatter(self.format, self.repository, self.manifest, self.key, iec=self.iec)
+        formatter = ArchiveFormatter(self.format, self.repository, self.manifest, self.key)
 
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Checking archives %3.1f%%", step=0.1, msgid="check.rebuild_archives"

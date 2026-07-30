@@ -9,7 +9,6 @@ from ..constants import *  # NOQA
 from ..helpers import HardLinkManager, IncludePatternNeverMatchedWarning
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import dash_open
-from ..helpers import use_iec_units
 from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
@@ -293,7 +292,6 @@ class TarMixIn:
             chunker_params=args.chunker_params,
             show_progress=args.progress,
             log_json=args.log_json,
-            iec=use_iec_units(),
             file_status_printer=self.print_file_status,
         )
 

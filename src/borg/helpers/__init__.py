@@ -39,7 +39,7 @@ from .parseformat import (
     partial_format,
     DatetimeWrapper,
 )
-from .parseformat import format_file_size, parse_file_size, FileSize, use_iec_units
+from .parseformat import format_file_size, parse_file_size, FileSize, get_size_units
 from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal, Location, text_validator
 from .parseformat import format_line, replace_placeholders, PlaceholderError, relative_time_marker_validator
 from .parseformat import format_archive, parse_stringified_list, clean_lines

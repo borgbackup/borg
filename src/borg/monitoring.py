@@ -22,6 +22,11 @@ deletes all but the N newest objects.
 
 Object names order the objects for storage and cleanup only; which report is the *latest*
 one for a job is decided by the signed timestamp inside the report, never by the name.
+
+A plaintext body is only legitimate for a keyless (``none-*``) repository, which has no key to
+sign with. Once a monitoring key is configured, plaintext bodies are refused rather than
+reported as untrusted - otherwise the server could downgrade a failure it wants hidden
+into a mere warning by replacing the sealed report with an unsigned "success".
 """
 
 import json
@@ -38,6 +43,7 @@ from . import __version__
 from . import platform
 from .constants import EXIT_SUCCESS, EXIT_WARNING, EXIT_WARNING_BASE, EXIT_SIGNAL_BASE
 from .crypto import monitoring as mon_crypto
+from .crypto.low_level import IntegrityError
 from .helpers import bin_to_hex, get_ec
 from .helpers.time import archive_ts_now
 
@@ -132,10 +138,10 @@ def deserialize(monitor_key, repo_id_bin, name, data):
     """Return (report_dict, trusted: bool).
 
     *monitor_key* is the parsed (ed25519_public, hpke_secret) tuple, or None. A sealed
-    report is verified+decrypted (trusted=True); a plaintext report is returned as-is
-    (trusted=False). *name* is the object name the data was read from - a sealed report
-    only opens under the name it was published as. Raises ValueError/IntegrityError on
-    malformed or unverifiable data.
+    report is verified+decrypted (trusted=True); a plaintext report is only accepted if no
+    monitoring key is configured, and then it is untrusted (trusted=False). *name* is the
+    object name the data was read from - a sealed report only opens under the name it was
+    published as. Raises ValueError/IntegrityError on malformed or unverifiable data.
     """
     if len(data) < 2 or data[0] != FORMAT_VERSION:
         raise ValueError("monitoring report: unsupported format version")
@@ -147,6 +153,14 @@ def deserialize(monitor_key, repo_id_bin, name, data):
         payload = mon_crypto.open_report(ed_public, hpke_secret, body, report_aad(repo_id_bin, name))
         trusted = True
     elif body_type == BODY_PLAIN:
+        if monitor_key is not None:
+            # A monitoring key exists, so this repo's own reports are always sealed: an
+            # unsigned one can only have been put there by someone else. Accepting it as a
+            # mere warning would let the server downgrade a failure it wants hidden.
+            raise IntegrityError(
+                "unsigned monitoring report, but this repository's reports are signed "
+                "(injected by the repository server?)"
+            )
         payload = body
         trusted = False
     else:

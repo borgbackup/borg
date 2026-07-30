@@ -2,8 +2,10 @@
 
 API:
 
-    encrypt(data, header=b'', aad_offset=0) -> envelope
-    decrypt(envelope, header_len=0, aad_offset=0) -> data
+    encrypt(data, header=b'', iv=None, aad=b'') -> envelope
+    decrypt(envelope, aad=b'') -> data
+
+header_len and aad_offset are given to the ciphersuite class when creating it, see below.
 
 Envelope layout:
 
@@ -25,12 +27,13 @@ garbage.
 
 Newly designed envelope layouts can just authenticate the whole header.
 
-IV handling:
+IV handling (CS is one of the ciphersuite classes below - the AEAD ones take a single key,
+the legacy AES-CTR ones a mac_key and an enc_key):
 
     iv = ...  # just never repeat!
-    cs = CS(hmac_key, enc_key, iv=iv)
-    envelope = cs.encrypt(data, header, aad_offset)
-    iv = cs.next_iv(len(data))
+    cs = CS(..., iv=iv, header_len=header_len, aad_offset=aad_offset)
+    envelope = cs.encrypt(data, header=header)
+    iv = cs.next_iv()
     (repeat)
 """
 

@@ -21,14 +21,22 @@
 
 typedef struct RA_CTX RA_CTX;
 
+/* Number of 256-entry rolling tables passed to ra_new, in this order:
+ * [0] out_tbl:   b * x^504 mod P (single-step removal of the leaving byte)
+ * [1] red_tbl:   t * x^63  mod P (reduction of the 8 bits shifted above bit 62)
+ * [2] w1_tbl:    t * x^71  mod P (stride-2 step: reduction of bits 71..78)
+ * [3] out8_tbl:  b * x^512 mod P (stride-2 removal, newer byte)
+ * [4] out16_tbl: b * x^520 mod P (stride-2 removal, older byte)
+ * Tables 2..4 are algebraic combinations of 0..1; they enable the two-lane
+ * (even/odd position) rolling that halves the dependency-chain latency. */
+#define RA_TABLES 5
+
 /* Create a kernel context.
- * out_tbl[b] = poly(b) * x^504 mod P  (removal of the byte leaving the 64-byte window)
- * red_tbl[t] = poly(t) * x^63  mod P  (reduction of the 8 bits shifted above bit 62)
+ * tables: RA_TABLES * 256 uint64 entries, see above.
  * aes_key: 16 bytes (AES-128).
  * force_sw: nonzero forces the portable OpenSSL path (for tests/benchmarks).
  * Returns NULL on allocation/OpenSSL failure. */
-RA_CTX *ra_new(const uint64_t out_tbl[256], const uint64_t red_tbl[256],
-               const uint8_t aes_key[16], int force_sw);
+RA_CTX *ra_new(const uint64_t *tables, const uint8_t aes_key[16], int force_sw);
 
 void ra_free(RA_CTX *ctx);
 

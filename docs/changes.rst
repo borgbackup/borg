@@ -255,7 +255,7 @@ New features:
   - buzhash64: add normalized chunking (better chunk size distribution, less clamping)
   - rabin-aes: new chunker with cryptographically sound resistance against
     chunk-size fingerprinting (UHF-then-PRF: secret Rabin polynomial + AES-128,
-    following eprint 2025/558); uses AES hw acceleration or OpenSSL, ~450+ MB/s
+    following eprint 2025/558); uses AES hw acceleration or OpenSSL, ~700 MB/s
 - borg keys:
 
   - locate the borg key automatically in the key directory or in the repository, #9743

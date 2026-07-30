@@ -8,11 +8,20 @@
 #include "rabin_aes_impl.h"
 
 #define M55 ((((uint64_t)1) << 55) - 1)
+#define M47 ((((uint64_t)1) << 47) - 1)
 
 struct RA_CTX {
-    uint64_t out_tbl[256];
-    uint64_t red_tbl[256];
-    uint8_t rk[11][16]; /* AES-128 round keys, for the hardware paths */
+    /* rolling tables; all entries are mod-P remainders (< 2^63).
+     * The single-step tables define the digest; the double-step tables are
+     * algebraically derived from them (see ra_roll2) and exist only so that
+     * two independent "lanes" (even/odd positions) can advance with stride 2,
+     * halving the load-use latency chain that limits single-step rolling. */
+    uint64_t out_tbl[256];   /* b * x^504 mod P (single-step removal) */
+    uint64_t red_tbl[256];   /* t * x^63  mod P (reduce 8 bits above bit 62) */
+    uint64_t w1_tbl[256];    /* t * x^71  mod P (reduce bits 71..78, stride-2 step) */
+    uint64_t out8_tbl[256];  /* b * x^512 mod P (stride-2 removal, newer byte) */
+    uint64_t out16_tbl[256]; /* b * x^520 mod P (stride-2 removal, older byte) */
+    uint8_t rk[11][16];      /* AES-128 round keys, for the hardware paths */
     EVP_CIPHER_CTX *evp;
     int use_hw;
 };
@@ -40,6 +49,19 @@ static inline uint64_t ra_roll(const RA_CTX *c, uint64_t d, uint8_t byte_out, ui
 {
     d ^= c->out_tbl[byte_out];
     return (((d & M55) << 8) | byte_in) ^ c->red_tbl[d >> 55];
+}
+
+/* Advance the digest by TWO bytes in one step (exact composition of two
+ * ra_roll steps, expanded using linearity over GF(2)):
+ *   d' = d*x^16 ^ o0*x^520 ^ o1*x^512 ^ i0*x^8 ^ i1   (mod P)
+ * where (o0, i0) belong to the first composed step and (o1, i1) to the second.
+ * d*x^16 mod P reduces the top 16 bits of d via two independent lookups.
+ * Used to run two independent even/odd lanes; bit-identical to ra_roll twice. */
+static inline uint64_t ra_roll2(const RA_CTX *c, uint64_t d,
+                                uint8_t o0, uint8_t o1, uint8_t i0, uint8_t i1)
+{
+    uint64_t delta = c->out16_tbl[o0] ^ c->out8_tbl[o1] ^ (((uint64_t)i0) << 8) ^ i1;
+    return ((d & M47) << 16) ^ c->red_tbl[(d >> 47) & 0xFF] ^ c->w1_tbl[d >> 55] ^ delta;
 }
 
 uint64_t ra_digest64(const RA_CTX *c, const uint8_t *q)
@@ -86,6 +108,44 @@ static void aes128_expand(const uint8_t key[16], uint8_t rk[11][16])
     }
 }
 
+/* --- two-lane digest fill (shared by the portable path) ----------------- */
+
+/* Compute the digests for positions [0, m), writing each as an AES input
+ * block (digest LE in bytes 0..7; bytes 8..15 must already be zero) into inb.
+ * On entry *d_io is the digest at position -1; on return, at position m-1.
+ * Uses two independent even/odd lanes advancing with stride 2 so the two
+ * dependency chains overlap; bit-identical to m single ra_roll steps. */
+static inline void ra_fill2(const RA_CTX *c, const uint8_t *q, const uint8_t *qo,
+                            size_t m, uint64_t *d_io, uint8_t *inb)
+{
+    uint64_t d = *d_io, da, db;
+    size_t i;
+
+    if (m == 1) {
+        d = ra_roll(c, d, qo[0], q[0]);
+        store_le64(inb, d);
+        *d_io = d;
+        return;
+    }
+    db = ra_roll(c, d, qo[0], q[0]);                /* even lane: d_0 */
+    da = ra_roll2(c, d, qo[0], qo[1], q[0], q[1]);  /* odd lane:  d_1 */
+    store_le64(inb, db);
+    store_le64(inb + 16, da);
+    for (i = 2; i + 1 < m; i += 2) {
+        db = ra_roll2(c, db, qo[i - 1], qo[i], q[i - 1], q[i]);
+        da = ra_roll2(c, da, qo[i], qo[i + 1], q[i], q[i + 1]);
+        store_le64(inb + i * 16, db);
+        store_le64(inb + (i + 1) * 16, da);
+    }
+    if (i < m) { /* odd m: one even-lane step left for position m-1 */
+        db = ra_roll2(c, db, qo[i - 1], qo[i], q[i - 1], q[i]);
+        store_le64(inb + i * 16, db);
+        *d_io = db;
+    } else {
+        *d_io = da;
+    }
+}
+
 /* --- portable path: batched AES via OpenSSL EVP ------------------------ */
 
 /* sub-batch size (blocks); 512 * 16 B = 8 KiB in/out buffers on the stack */
@@ -95,7 +155,6 @@ static int64_t ra_scan_evp(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *dige
 {
     uint8_t inb[RA_SB * 16];
     uint8_t outb[RA_SB * 16];
-    uint64_t dig[RA_SB];
     uint64_t d = *digest;
     size_t base = 0;
     int outlen;
@@ -103,21 +162,18 @@ static int64_t ra_scan_evp(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *dige
     memset(inb, 0, sizeof(inb)); /* bytes 8..15 of each block stay zero */
     while (base < n) {
         const uint8_t *q = p + base;
-        const uint8_t *q_out = q - 64;
         size_t m = n - base;
         if (m > RA_SB)
             m = RA_SB;
-        for (size_t i = 0; i < m; i++) {
-            d = ra_roll(c, d, q_out[i], q[i]);
-            dig[i] = d;
-            store_le64(inb + i * 16, d);
-        }
+        ra_fill2(c, q, q - 64, m, &d, inb);
         outlen = 0;
         if (!EVP_EncryptUpdate(c->evp, outb, &outlen, inb, (int)(m * 16)) || outlen != (int)(m * 16))
             return -2; /* OpenSSL failure; caller raises */
         for (size_t i = 0; i < m; i++) {
             if ((load_le64(outb + i * 16) & mask) == 0) {
-                *digest = dig[i];
+                /* recompute the digest at the cut position (cheaper than
+                 * storing all digests: one 64-byte warm-up per chunk) */
+                *digest = ra_digest64(c, q + i - 63);
                 return (int64_t)(base + i);
             }
         }
@@ -127,7 +183,18 @@ static int64_t ra_scan_evp(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *dige
     return -1;
 }
 
-/* --- hardware path: arm64 crypto extension ----------------------------- */
+/* --- hardware paths ----------------------------------------------------
+ *
+ * Both hardware paths process groups of 8 positions: the two Rabin lanes
+ * advance 4 stride-2 steps each (two independent latency chains), then the
+ * 8 digests are encrypted with interleaved AES instructions, which execute
+ * on different ports than the table loads and thus overlap with the next
+ * group's Rabin work.
+ *
+ * Loop invariant: entering a group at position i, db = digest at i and
+ * da = digest at i+1 (both already computed); the group emits digests for
+ * i..i+7 and prepares db/da for i+8/i+9 (reading bytes up to q[i+9], hence
+ * the i + 10 <= n loop bound). */
 
 #if defined(__aarch64__) && defined(__ARM_FEATURE_AES)
 #define RA_HAVE_HW 1
@@ -160,28 +227,36 @@ static inline uint8x16_t ra_aes1_neon(const uint8x16_t k[11], uint8x16_t b)
 static int64_t ra_scan_hw(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
 {
     uint8x16_t k[11];
-    uint64_t d = *digest;
-    const uint8_t *q_out = p - 64;
+    uint64_t d = *digest, da, db;
+    const uint8_t *qo = p - 64;
     size_t i = 0;
+    int lanes_live = 0;
 
     for (int j = 0; j < 11; j++)
         k[j] = vld1q_u8(c->rk[j]);
 
-    while (i + 8 <= n) {
+    if (n >= 10) {
+        db = ra_roll(c, d, qo[0], p[0]);               /* d_0 */
+        da = ra_roll2(c, d, qo[0], qo[1], p[0], p[1]); /* d_1 */
+        lanes_live = 1;
+    }
+
+    while (lanes_live && i + 10 <= n) {
         uint64_t dg[8];
         uint8x16_t b0, b1, b2, b3, b4, b5, b6, b7;
 
-        /* serial Rabin chain for the next 8 positions */
-        d = ra_roll(c, d, q_out[i + 0], p[i + 0]); dg[0] = d;
-        d = ra_roll(c, d, q_out[i + 1], p[i + 1]); dg[1] = d;
-        d = ra_roll(c, d, q_out[i + 2], p[i + 2]); dg[2] = d;
-        d = ra_roll(c, d, q_out[i + 3], p[i + 3]); dg[3] = d;
-        d = ra_roll(c, d, q_out[i + 4], p[i + 4]); dg[4] = d;
-        d = ra_roll(c, d, q_out[i + 5], p[i + 5]); dg[5] = d;
-        d = ra_roll(c, d, q_out[i + 6], p[i + 6]); dg[6] = d;
-        d = ra_roll(c, d, q_out[i + 7], p[i + 7]); dg[7] = d;
+        dg[0] = db;
+        dg[1] = da;
+        db = ra_roll2(c, db, qo[i + 1], qo[i + 2], p[i + 1], p[i + 2]); dg[2] = db;
+        da = ra_roll2(c, da, qo[i + 2], qo[i + 3], p[i + 2], p[i + 3]); dg[3] = da;
+        db = ra_roll2(c, db, qo[i + 3], qo[i + 4], p[i + 3], p[i + 4]); dg[4] = db;
+        da = ra_roll2(c, da, qo[i + 4], qo[i + 5], p[i + 4], p[i + 5]); dg[5] = da;
+        db = ra_roll2(c, db, qo[i + 5], qo[i + 6], p[i + 5], p[i + 6]); dg[6] = db;
+        da = ra_roll2(c, da, qo[i + 6], qo[i + 7], p[i + 6], p[i + 7]); dg[7] = da;
+        /* prepare the next group's invariant (digests at i+8, i+9) */
+        db = ra_roll2(c, db, qo[i + 7], qo[i + 8], p[i + 7], p[i + 8]);
+        da = ra_roll2(c, da, qo[i + 8], qo[i + 9], p[i + 8], p[i + 9]);
 
-        /* 8 independent AES-128 encryptions, interleaved to fill the AES pipes */
         b0 = vreinterpretq_u8_u64(vcombine_u64(vcreate_u64(dg[0]), vcreate_u64(0)));
         b1 = vreinterpretq_u8_u64(vcombine_u64(vcreate_u64(dg[1]), vcreate_u64(0)));
         b2 = vreinterpretq_u8_u64(vcombine_u64(vcreate_u64(dg[2]), vcreate_u64(0)));
@@ -231,10 +306,21 @@ static int64_t ra_scan_hw(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *diges
         }
         i += 8;
     }
-    /* tail: single blocks */
+    /* tail: single positions. If the lanes ran, db already is the digest at
+     * position i; check it first, then continue with single-step rolls. */
+    if (lanes_live && i < n) {
+        uint8x16_t b = vreinterpretq_u8_u64(vcombine_u64(vcreate_u64(db), vcreate_u64(0)));
+        b = ra_aes1_neon(k, b);
+        if ((vgetq_lane_u64(vreinterpretq_u64_u8(b), 0) & mask) == 0) {
+            *digest = db;
+            return (int64_t)i;
+        }
+        d = db;
+        i++;
+    }
     while (i < n) {
         uint8x16_t b;
-        d = ra_roll(c, d, q_out[i], p[i]);
+        d = ra_roll(c, d, qo[i], p[i]);
         b = vreinterpretq_u8_u64(vcombine_u64(vcreate_u64(d), vcreate_u64(0)));
         b = ra_aes1_neon(k, b);
         if ((vgetq_lane_u64(vreinterpretq_u64_u8(b), 0) & mask) == 0) {
@@ -247,8 +333,6 @@ static int64_t ra_scan_hw(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *diges
     return -1;
 }
 
-/* --- hardware path: x86-64 AES-NI -------------------------------------- */
-
 #elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
 #define RA_HAVE_HW 1
 #define RA_KIND_HW "aes-ni"
@@ -260,63 +344,108 @@ static int ra_hw_available(void)
     return __builtin_cpu_supports("aes") && __builtin_cpu_supports("sse2");
 }
 
+__attribute__((target("aes,sse2"))) static inline __m128i
+ra_aes1_ni(const uint8_t rk[11][16], __m128i b)
+{
+    b = _mm_xor_si128(b, _mm_loadu_si128((const __m128i *)rk[0]));
+    for (int r = 1; r < 10; r++)
+        b = _mm_aesenc_si128(b, _mm_loadu_si128((const __m128i *)rk[r]));
+    return _mm_aesenclast_si128(b, _mm_loadu_si128((const __m128i *)rk[10]));
+}
+
 __attribute__((target("aes,sse2"))) static int64_t
 ra_scan_hw(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
 {
-    __m128i k[11];
-    uint64_t d = *digest;
-    const uint8_t *q_out = p - 64;
+    uint64_t d = *digest, da, db;
+    const uint8_t *qo = p - 64;
     size_t i = 0;
+    int lanes_live = 0;
 
-    for (int j = 0; j < 11; j++)
-        k[j] = _mm_loadu_si128((const __m128i *)c->rk[j]);
+    if (n >= 10) {
+        db = ra_roll(c, d, qo[0], p[0]);               /* d_0 */
+        da = ra_roll2(c, d, qo[0], qo[1], p[0], p[1]); /* d_1 */
+        lanes_live = 1;
+    }
 
-    while (i + 4 <= n) {
-        uint64_t dg[4];
-        __m128i b0, b1, b2, b3;
+    while (lanes_live && i + 10 <= n) {
+        uint64_t dg[8];
+        __m128i b0, b1, b2, b3, b4, b5, b6, b7, kr;
 
-        d = ra_roll(c, d, q_out[i + 0], p[i + 0]); dg[0] = d;
-        d = ra_roll(c, d, q_out[i + 1], p[i + 1]); dg[1] = d;
-        d = ra_roll(c, d, q_out[i + 2], p[i + 2]); dg[2] = d;
-        d = ra_roll(c, d, q_out[i + 3], p[i + 3]); dg[3] = d;
+        dg[0] = db;
+        dg[1] = da;
+        db = ra_roll2(c, db, qo[i + 1], qo[i + 2], p[i + 1], p[i + 2]); dg[2] = db;
+        da = ra_roll2(c, da, qo[i + 2], qo[i + 3], p[i + 2], p[i + 3]); dg[3] = da;
+        db = ra_roll2(c, db, qo[i + 3], qo[i + 4], p[i + 3], p[i + 4]); dg[4] = db;
+        da = ra_roll2(c, da, qo[i + 4], qo[i + 5], p[i + 4], p[i + 5]); dg[5] = da;
+        db = ra_roll2(c, db, qo[i + 5], qo[i + 6], p[i + 5], p[i + 6]); dg[6] = db;
+        da = ra_roll2(c, da, qo[i + 6], qo[i + 7], p[i + 6], p[i + 7]); dg[7] = da;
+        db = ra_roll2(c, db, qo[i + 7], qo[i + 8], p[i + 7], p[i + 8]);
+        da = ra_roll2(c, da, qo[i + 8], qo[i + 9], p[i + 8], p[i + 9]);
 
-        b0 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[0]), k[0]);
-        b1 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[1]), k[0]);
-        b2 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[2]), k[0]);
-        b3 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[3]), k[0]);
+        /* 8 blocks in flight; round keys are re-loaded per round (they stay
+         * hot in L1) to keep register pressure within the 16 XMM registers */
+        kr = _mm_loadu_si128((const __m128i *)c->rk[0]);
+        b0 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[0]), kr);
+        b1 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[1]), kr);
+        b2 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[2]), kr);
+        b3 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[3]), kr);
+        b4 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[4]), kr);
+        b5 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[5]), kr);
+        b6 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[6]), kr);
+        b7 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[7]), kr);
         for (int r = 1; r < 10; r++) {
-            b0 = _mm_aesenc_si128(b0, k[r]);
-            b1 = _mm_aesenc_si128(b1, k[r]);
-            b2 = _mm_aesenc_si128(b2, k[r]);
-            b3 = _mm_aesenc_si128(b3, k[r]);
+            kr = _mm_loadu_si128((const __m128i *)c->rk[r]);
+            b0 = _mm_aesenc_si128(b0, kr);
+            b1 = _mm_aesenc_si128(b1, kr);
+            b2 = _mm_aesenc_si128(b2, kr);
+            b3 = _mm_aesenc_si128(b3, kr);
+            b4 = _mm_aesenc_si128(b4, kr);
+            b5 = _mm_aesenc_si128(b5, kr);
+            b6 = _mm_aesenc_si128(b6, kr);
+            b7 = _mm_aesenc_si128(b7, kr);
         }
-        b0 = _mm_aesenclast_si128(b0, k[10]);
-        b1 = _mm_aesenclast_si128(b1, k[10]);
-        b2 = _mm_aesenclast_si128(b2, k[10]);
-        b3 = _mm_aesenclast_si128(b3, k[10]);
+        kr = _mm_loadu_si128((const __m128i *)c->rk[10]);
+        b0 = _mm_aesenclast_si128(b0, kr);
+        b1 = _mm_aesenclast_si128(b1, kr);
+        b2 = _mm_aesenclast_si128(b2, kr);
+        b3 = _mm_aesenclast_si128(b3, kr);
+        b4 = _mm_aesenclast_si128(b4, kr);
+        b5 = _mm_aesenclast_si128(b5, kr);
+        b6 = _mm_aesenclast_si128(b6, kr);
+        b7 = _mm_aesenclast_si128(b7, kr);
 
         {
-            uint64_t cs[4];
+            uint64_t cs[8];
             cs[0] = (uint64_t)_mm_cvtsi128_si64(b0);
             cs[1] = (uint64_t)_mm_cvtsi128_si64(b1);
             cs[2] = (uint64_t)_mm_cvtsi128_si64(b2);
             cs[3] = (uint64_t)_mm_cvtsi128_si64(b3);
-            for (int j = 0; j < 4; j++) {
+            cs[4] = (uint64_t)_mm_cvtsi128_si64(b4);
+            cs[5] = (uint64_t)_mm_cvtsi128_si64(b5);
+            cs[6] = (uint64_t)_mm_cvtsi128_si64(b6);
+            cs[7] = (uint64_t)_mm_cvtsi128_si64(b7);
+            for (int j = 0; j < 8; j++) {
                 if ((cs[j] & mask) == 0) {
                     *digest = dg[j];
                     return (int64_t)(i + j);
                 }
             }
         }
-        i += 4;
+        i += 8;
+    }
+    if (lanes_live && i < n) {
+        __m128i b = ra_aes1_ni(c->rk, _mm_set_epi64x(0, (long long)db));
+        if (((uint64_t)_mm_cvtsi128_si64(b) & mask) == 0) {
+            *digest = db;
+            return (int64_t)i;
+        }
+        d = db;
+        i++;
     }
     while (i < n) {
         __m128i b;
-        d = ra_roll(c, d, q_out[i], p[i]);
-        b = _mm_xor_si128(_mm_set_epi64x(0, (long long)d), k[0]);
-        for (int r = 1; r < 10; r++)
-            b = _mm_aesenc_si128(b, k[r]);
-        b = _mm_aesenclast_si128(b, k[10]);
+        d = ra_roll(c, d, qo[i], p[i]);
+        b = ra_aes1_ni(c->rk, _mm_set_epi64x(0, (long long)d));
         if (((uint64_t)_mm_cvtsi128_si64(b) & mask) == 0) {
             *digest = d;
             return (int64_t)i;
@@ -333,14 +462,16 @@ ra_scan_hw(RA_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mas
 
 /* --- context management and dispatch ----------------------------------- */
 
-RA_CTX *ra_new(const uint64_t out_tbl[256], const uint64_t red_tbl[256],
-               const uint8_t aes_key[16], int force_sw)
+RA_CTX *ra_new(const uint64_t tables[RA_TABLES * 256], const uint8_t aes_key[16], int force_sw)
 {
     RA_CTX *c = calloc(1, sizeof(RA_CTX));
     if (c == NULL)
         return NULL;
-    memcpy(c->out_tbl, out_tbl, sizeof(c->out_tbl));
-    memcpy(c->red_tbl, red_tbl, sizeof(c->red_tbl));
+    memcpy(c->out_tbl, tables + 0 * 256, sizeof(c->out_tbl));
+    memcpy(c->red_tbl, tables + 1 * 256, sizeof(c->red_tbl));
+    memcpy(c->w1_tbl, tables + 2 * 256, sizeof(c->w1_tbl));
+    memcpy(c->out8_tbl, tables + 3 * 256, sizeof(c->out8_tbl));
+    memcpy(c->out16_tbl, tables + 4 * 256, sizeof(c->out16_tbl));
     aes128_expand(aes_key, c->rk);
 #if RA_HAVE_HW
     c->use_hw = !force_sw && ra_hw_available();

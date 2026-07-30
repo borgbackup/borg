@@ -56,7 +56,8 @@ from .reader import FileReader, Chunk
 cdef extern from "rabin_aes_impl.h":
     ctypedef struct RA_CTX:
         pass
-    RA_CTX *ra_new(const uint64_t *out_tbl, const uint64_t *red_tbl, const uint8_t *aes_key, int force_sw)
+    int RA_TABLES
+    RA_CTX *ra_new(const uint64_t *tables, const uint8_t *aes_key, int force_sw)
     void ra_free(RA_CTX *ctx)
     const char *ra_kind(const RA_CTX *ctx)
     uint64_t ra_digest64(const RA_CTX *ctx, const uint8_t *q)
@@ -140,19 +141,29 @@ def _sample_polynomial(rng):
 
 
 def _build_tables(p):
-    """Build the two rolling tables for P.
+    """Build the rolling tables for P (order must match RA_TABLES in the C kernel).
 
-    out_tbl[b] = poly(b) * x^504 mod P   (remove the byte leaving the window;
-                                          504 = 8 * (window_size - 1))
-    red_tbl[t] = poly(t) * x^63 mod P    (reduce the 8 bits shifted above bit 62)
+    out_tbl[b]   = poly(b) * x^504 mod P  (remove the byte leaving the window;
+                                           504 = 8 * (window_size - 1))
+    red_tbl[t]   = poly(t) * x^63 mod P   (reduce the 8 bits shifted above bit 62)
+    w1_tbl[t]    = poly(t) * x^71 mod P   (stride-2 step: reduce bits 71..78)
+    out8_tbl[b]  = poly(b) * x^512 mod P  (stride-2 removal, newer byte)
+    out16_tbl[b] = poly(b) * x^520 mod P  (stride-2 removal, older byte)
+
+    The last three are algebraic combinations of the first two; they let the C
+    kernel run two independent even/odd rolling lanes (see rabin_aes_impl.c)
+    without changing any cut point.
     """
     out_tbl = [_poly_mod(b << (8 * (_WINDOW_SIZE - 1)), p) for b in range(256)]
     red_tbl = [_poly_mod(t << _DEG, p) for t in range(256)]
-    return out_tbl, red_tbl
+    w1_tbl = [_poly_mod(t << (_DEG + 8), p) for t in range(256)]
+    out8_tbl = [_poly_mod(b << (8 * _WINDOW_SIZE), p) for b in range(256)]
+    out16_tbl = [_poly_mod(b << (8 * (_WINDOW_SIZE + 1)), p) for b in range(256)]
+    return out_tbl, red_tbl, w1_tbl, out8_tbl, out16_tbl
 
 
 def _derive(bytes key):
-    """Derive (aes_key, P, out_tbl, red_tbl) deterministically from a 256-bit key.
+    """Derive (aes_key, P, tables) deterministically from a 256-bit key.
 
     Frozen derivation order (changing it changes all cut points and thus breaks
     deduplication against existing repos): first the 16-byte AES key, then P
@@ -161,8 +172,8 @@ def _derive(bytes key):
     rng = CSPRNG(key)
     aes_key = rng.random_bytes(16)
     p = _sample_polynomial(rng)
-    out_tbl, red_tbl = _build_tables(p)
-    return aes_key, p, out_tbl, red_tbl
+    tables = _build_tables(p)
+    return aes_key, p, tables
 
 
 cdef class ChunkerRabinAES:
@@ -191,9 +202,8 @@ cdef class ChunkerRabinAES:
     cdef bint sparse
 
     def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int nc_level=0, size_t normal_size=0, bint sparse=False):
-        cdef uint64_t c_out[256]
-        cdef uint64_t c_red[256]
-        cdef int i
+        cdef uint64_t c_tables[5 * 256]
+        cdef int i, t
         self.ctx = NULL
         self.data = NULL
         min_size = 1 << chunk_min_exp
@@ -222,12 +232,13 @@ cdef class ChunkerRabinAES:
             self.mask_l = self.chunk_mask
             self.normal_size = 0
 
-        aes_key, p, out_tbl, red_tbl = _derive(key)
-        for i in range(256):
-            c_out[i] = out_tbl[i]
-            c_red[i] = red_tbl[i]
+        aes_key, p, tables = _derive(key)
+        assert len(tables) == RA_TABLES
+        for t in range(len(tables)):
+            for i in range(256):
+                c_tables[t * 256 + i] = tables[t][i]
         force_sw = os.environ.get("BORG_RABIN_AES_FORCE_EVP", "") not in ("", "0")
-        self.ctx = ra_new(c_out, c_red, aes_key, 1 if force_sw else 0)
+        self.ctx = ra_new(c_tables, aes_key, 1 if force_sw else 0)
         if self.ctx == NULL:
             raise MemoryError("Failed to set up rabin-aes kernel")
 
@@ -410,11 +421,11 @@ cdef class ChunkerRabinAES:
 
 def rabin_aes_get_polynomial(bytes key):
     """Get the secret irreducible polynomial P derived from <key> (for tests)."""
-    aes_key, p, out_tbl, red_tbl = _derive(key)
+    aes_key, p, tables = _derive(key)
     return p
 
 
 def rabin_aes_get_tables(bytes key):
     """Get the (out_tbl, red_tbl) rolling tables derived from <key> (for tests)."""
-    aes_key, p, out_tbl, red_tbl = _derive(key)
-    return out_tbl, red_tbl
+    aes_key, p, tables = _derive(key)
+    return tables[0], tables[1]

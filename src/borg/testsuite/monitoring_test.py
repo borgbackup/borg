@@ -238,3 +238,50 @@ def test_plaintext_report_refused_when_monitor_key_is_configured():
     monitor_key = mc.parse_monitor_key(mc.export_monitor_key(make_key()))
     with pytest.raises(low_level.IntegrityError):
         m.deserialize(monitor_key, repo_id, NAME, data)
+
+
+# --- validation of untrusted report contents -------------------------------------------
+
+
+def test_validate_report_accepts_a_real_report():
+    report = sample_report("cc" * 32)
+    assert m.validate_report(report) is report
+    # the optional fields borg actually publishes are accepted, too
+    report["hostname"], report["username"] = "somehost", "someuser"
+    assert m.validate_report(report) is report
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        ["not", "a", "dict"],  # a non-object body would crash report.get()
+        "a string",
+        None,
+        {},  # no fields at all
+        {"command": "create", "status": "success", "rc": 0},  # no time
+        {"command": "create", "time": "2026-06-17T11:59:58+00:00", "status": "success"},  # no rc
+        {"command": "create", "time": 12345, "status": "success", "rc": 0},  # time not a string
+        {"command": ["create"], "time": "2026-06-17T11:59:58+00:00", "status": "success", "rc": 0},
+        # an unhashable value in a grouping field would crash the reader
+        {
+            "command": "create",
+            "time": "2026-06-17T11:59:58+00:00",
+            "status": "success",
+            "rc": 0,
+            "archive": ["unhashable"],
+        },
+        # an unknown status would count as "not an error", i.e. as a success
+        {"command": "create", "time": "2026-06-17T11:59:58+00:00", "status": "all good", "rc": 0},
+    ],
+)
+def test_validate_report_rejects_unusable_bodies(body):
+    with pytest.raises(ValueError):
+        m.validate_report(body)
+
+
+def test_deserialize_rejects_unusable_plaintext_body():
+    # what an unencrypted repo (or an injecting server) can serve must not reach the reader
+    repo_id = os.urandom(32)
+    data = bytes([m.FORMAT_VERSION, m.BODY_PLAIN]) + b'["not", "a", "dict"]'
+    with pytest.raises(ValueError):
+        m.deserialize(None, repo_id, NAME, data)

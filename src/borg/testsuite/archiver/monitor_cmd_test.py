@@ -282,6 +282,20 @@ def test_injected_unsigned_report_is_refused(archivers, request, monkeypatch):
     assert "unsigned" in output
 
 
+def test_malformed_unsigned_report_gives_a_clean_error(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"some data")
+    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "create", "series", "input")
+    # an unencrypted repo's reports are unsigned, so their contents are whatever the
+    # server serves: borg monitor must refuse them, not crash on them
+    name = sorted(os.listdir(_monitoring_dir(archiver)))[0]
+    _write_plain_report(archiver, name, ["not", "a", "dict"])
+    output = cmd(archiver, "monitor", fork=True, exit_code=EXIT_ERROR)
+    assert "monitoring report" in output
+    assert "Traceback" not in output
+
+
 def test_monitor_key_export_is_deterministic(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

@@ -5,6 +5,7 @@ from hmac import compare_digest
 from collections.abc import Callable
 from pathlib import Path
 
+from .low_level import XXH64
 from ..helpers import IntegrityError
 from ..logger import create_logger
 
@@ -110,7 +111,19 @@ class SHA256FileHashingWrapper(FileHashingWrapper):
     FACTORY = hashlib.sha256
 
 
-SUPPORTED_ALGORITHMS = {SHA256FileHashingWrapper.ALGORITHM: SHA256FileHashingWrapper}
+class XXH64FileHashingWrapper(FileHashingWrapper):
+    # This only exists to support `borg transfer` from borg 1.x repos, see #9935:
+    # borg 1.x wrote XXH64 integrity data for the repo index/hints files, so we need
+    # XXH64 to verify those when reading a borg 1.x (legacy) repository. borg 2.x writes
+    # SHA256 (see SHA256FileHashingWrapper), so XXH64 is only ever used for reading here.
+    ALGORITHM = "XXH64"
+    FACTORY = XXH64
+
+
+SUPPORTED_ALGORITHMS = {
+    SHA256FileHashingWrapper.ALGORITHM: SHA256FileHashingWrapper,
+    XXH64FileHashingWrapper.ALGORITHM: XXH64FileHashingWrapper,
+}
 
 
 class FileIntegrityError(IntegrityError):

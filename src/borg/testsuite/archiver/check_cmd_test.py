@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from ...archive import ChunkBuffer
+from ...archive import ChunkBuffer, ArchiveChecker
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, IntegrityError
 from ...manifest import Manifest
@@ -179,8 +179,12 @@ def test_missing_file_chunk(archivers, request):
 
     output = cmd(archiver, "check", exit_code=1)
     assert "The following chunks are missing in the repository:" in output
-    assert bin_to_hex(killed_chunk.id) in output
-    assert src_file in output
+    # archive1 and archive2 share src_file, so the missing chunk appears once, with both archives
+    # listed on its single reference line.
+    assert output.count(bin_to_hex(killed_chunk.id)) == 1
+    ref_lines = [line for line in output.splitlines() if src_file in line]
+    assert len(ref_lines) == 1
+    assert "archive1" in ref_lines[0] and "archive2" in ref_lines[0]
     output = cmd(archiver, "check", "--repair", exit_code=0)
     # repair is not changing anything, just reporting.
     assert "The following chunks are missing in the repository:" in output
@@ -205,6 +209,33 @@ def test_missing_file_chunk(archivers, request):
     # check should not complain anymore about missing chunks:
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "The following chunks are missing in the repository:" not in output
+
+
+def test_missing_file_chunk_report_truncated(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+
+    # remove several distinct file chunks, so more missing chunks exist than the (patched) report limit.
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    killed_ids = []
+    with repository:
+        for item in archive.iter_items():
+            if "chunks" not in item or not item.chunks:
+                continue
+            chunk_id = item.chunks[-1].id
+            if chunk_id not in killed_ids:
+                repository.delete(chunk_id)
+                killed_ids.append(chunk_id)
+            if len(killed_ids) >= 3:
+                break
+    assert len(killed_ids) >= 2  # need several distinct missing chunks to exercise truncation
+
+    # cap the report to a single chunk, so the remaining missing chunks are truncated.
+    with patch.object(ArchiveChecker, "MAX_MISSING_CHUNKS", 1):
+        output = cmd(archiver, "check", exit_code=1)
+    assert "The following chunks are missing in the repository:" in output
+    assert output.count("- Chunk ") == 1  # only one chunk is detailed
+    assert "only the first 1 missing chunks are listed" in output  # the rest are noted as truncated
 
 
 def test_missing_archive_item_chunk(archivers, request):

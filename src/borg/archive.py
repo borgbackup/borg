@@ -1849,6 +1849,11 @@ class RobustUnpacker:
 
 
 class ArchiveChecker:
+    # Bound how many missing file chunks rebuild_archives buffers for its end-of-run report,
+    # so checking a badly damaged repo with very many missing chunks can not exhaust memory.
+    MAX_MISSING_CHUNKS = 10000  # max. distinct missing chunk ids kept for the report
+    MAX_REFS_PER_CHUNK = 100  # max. referencing files kept per missing chunk
+
     def __init__(self):
         self.error_found = False
         self.key = None
@@ -2130,8 +2135,28 @@ class ArchiveChecker:
     ):
         """Analyze and rebuild archives, expecting some damage and trying to make stuff consistent again."""
 
-        missing_chunk_size: dict = {}  # chunk_id -> chunk size in bytes
-        missing_chunk_refs: defaultdict = defaultdict(lambda: defaultdict(set))  # chunk_id -> {path: {archive_name}}
+        # Missing file chunks, collected during the per-archive checks and reported grouped as
+        # chunk -> files -> archives after all archives were analyzed. Bounded by
+        # MAX_MISSING_CHUNKS / MAX_REFS_PER_CHUNK.
+        missing_chunks = {}  # chunk_id -> [size, {path: {archive_name}}]
+        missing_chunks_truncated = False  # True once the MAX_MISSING_CHUNKS cap was hit
+        missing_refs_truncated = set()  # chunk_ids whose MAX_REFS_PER_CHUNK cap was hit
+
+        def record_missing_chunk(archive_name, path, chunk_id, size):
+            nonlocal missing_chunks_truncated
+            entry = missing_chunks.get(chunk_id)
+            if entry is None:
+                if len(missing_chunks) >= self.MAX_MISSING_CHUNKS:
+                    missing_chunks_truncated = True
+                    return
+                entry = missing_chunks[chunk_id] = [size, {}]
+            refs = entry[1]
+            if path in refs:
+                refs[path].add(archive_name)
+            elif len(refs) < self.MAX_REFS_PER_CHUNK:
+                refs[path] = {archive_name}
+            else:
+                missing_refs_truncated.add(chunk_id)
 
         def add_callback(chunk):
             id_ = self.key.id_hash(chunk)
@@ -2149,11 +2174,7 @@ class ArchiveChecker:
                     self.chunks.update_pack_info(pack_results)
 
         def verify_file_chunks(archive_name, item):
-            """Verify that all file chunks are present.
-
-            Record each missing chunk's size in missing_chunk_size and, in missing_chunk_refs, the
-            file path and archive it occurs in. Log each missing chunk at debug level.
-            """
+            """Verify that all of a file's chunks are present, collecting any missing ones for the report."""
             offset = 0
             for chunk in item.chunks:
                 chunk_id, size = chunk
@@ -2163,8 +2184,7 @@ class ArchiveChecker:
                             archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
                         )
                     )
-                    missing_chunk_size[chunk_id] = size
-                    missing_chunk_refs[chunk_id][item.path].add(archive_name)
+                    record_missing_chunk(archive_name, item.path, chunk_id, size)
                     self.error_found = True
                 offset += size
             if "size" in item:
@@ -2179,15 +2199,19 @@ class ArchiveChecker:
                     )
 
         def report_missing_chunks():
-            """Log the missing chunks, each with its size and the files and archives referencing it."""
-            if not missing_chunk_refs:
+            """Report the collected missing chunks, grouped as chunk -> files -> archives."""
+            if not missing_chunks:
                 return
             logger.error("The following chunks are missing in the repository:")
-            for chunk_id, refs in missing_chunk_refs.items():
-                logger.error(f"- Chunk {bin_to_hex(chunk_id)}, {missing_chunk_size[chunk_id]:,} bytes")
+            for chunk_id, (size, refs) in missing_chunks.items():
+                logger.error(f"- Chunk {bin_to_hex(chunk_id)}, {size:,} bytes")
                 for path in sorted(refs):
                     archive_names = ", ".join(sorted(refs[path]))
                     logger.error(f"    - {path}: {archive_names}")
+                if chunk_id in missing_refs_truncated:
+                    logger.error(f"    - ... (only the first {self.MAX_REFS_PER_CHUNK} files are listed)")
+            if missing_chunks_truncated:
+                logger.error(f"... (only the first {self.MAX_MISSING_CHUNKS} missing chunks are listed)")
 
         def robust_iterator(archive):
             """Iterates through all archive items

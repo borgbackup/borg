@@ -3,6 +3,7 @@ import os
 import pytest
 
 from ...constants import *  # NOQA
+from ...helpers import CommandError
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, requires_hardlinks
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -30,6 +31,45 @@ def test_list_hash(archivers, request):
     output = cmd(archiver, "list", "test", "--format", "{sha256} {path}{NL}")
     assert "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0 input/amb" in output
     assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
+
+
+def test_list_format_invalid_key(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    if archiver.FORK_DEFAULT:
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "list", "test", "--format", "{nosuchkey}", exit_code=expected_ec)
+        assert "Invalid format keys: nosuchkey" in output
+    else:
+        with pytest.raises(CommandError, match="Invalid format keys: nosuchkey"):
+            cmd(archiver, "list", "test", "--format", "{nosuchkey}")
+
+
+def test_list_format_invalid_format_string(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    if archiver.FORK_DEFAULT:
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "list", "test", "--format", "{path", exit_code=expected_ec)
+        assert "Invalid format string" in output
+    else:
+        with pytest.raises(CommandError, match="Invalid format string"):
+            cmd(archiver, "list", "test", "--format", "{path")
+
+
+def test_list_hash_blake3(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "empty_file", size=0)
+    create_regular_file(archiver.input_path, "amb", contents=b"a" * 1000000)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "list", "test", "--format", "{blake3} {path}{NL}")
+    assert "616f575a1b58d4c9797d4217b9730ae5e6eb319d76edef6549b46f4efe31ff8b input/amb" in output
+    assert "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262 input/empty_file" in output
 
 
 def test_list_chunk_counts(archivers, request):

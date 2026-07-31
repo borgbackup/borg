@@ -142,6 +142,7 @@ Keys available only when listing files in an archive:
 - fingerprint: Fingerprint of the file content (may have false negatives), format: H(conditions)-H(chunk_ids)
 - blake2b
 - blake2s
+- blake3
 - md5
 - sha1
 - sha224

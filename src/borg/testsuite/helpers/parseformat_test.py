@@ -31,7 +31,11 @@ from ...helpers.parseformat import (
     ChunkerParams,
     get_size_units,
     normalize_local_path,
+    ArchiveFormatter,
+    DiffFormatter,
+    ItemFormatter,
 )
+from ...helpers.errors import CommandError
 from ...helpers.time import format_timedelta, parse_timestamp
 from ...platformflags import is_win32, is_darwin
 
@@ -735,6 +739,25 @@ def test_format_line_erroneous():
         assert format_line("{now!r}", data)
     with pytest.raises(PlaceholderError):
         assert format_line("{now.__class__.__module__.__builtins__}", data)
+
+
+@pytest.mark.parametrize("formatter", (ArchiveFormatter, DiffFormatter, ItemFormatter))
+def test_validate_format(formatter):
+    formatter.validate_format("")
+    formatter.validate_format("{NL}{TAB}")
+    for key in formatter.known_keys():
+        formatter.validate_format("{" + key + "}")
+    with pytest.raises(CommandError, match="Invalid format keys: nosuchkey"):
+        formatter.validate_format("{nosuchkey}")
+    with pytest.raises(CommandError, match="Invalid format string"):
+        formatter.validate_format("{NL")
+
+
+def test_validate_format_item_hashes():
+    # the hash keys are only in KEY_GROUPS, not in KEY_DESCRIPTIONS, see known_keys()
+    for key in ("blake3", "md5", "sha256"):
+        assert key in ItemFormatter.known_keys()
+        ItemFormatter.validate_format("{" + key + "} {path}{NL}")
 
 
 def test_replace_placeholders():

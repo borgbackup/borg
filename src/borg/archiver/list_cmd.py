@@ -27,6 +27,8 @@ class ListMixIn:
             format = "{path}{NL}"
         else:
             format = os.environ.get("BORG_LIST_FORMAT", "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
+        # check the format before doing any work with it (also: the ItemFormatter is only built later)
+        ItemFormatter.validate_format(format)
 
         archive_info = manifest.archives.get_one([args.name])
 

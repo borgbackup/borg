@@ -22,6 +22,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 import yaml
+from blake3 import blake3
 
 from .errors import Error, CommandError
 from .fs import make_path_safe, slashify
@@ -924,6 +925,7 @@ class BaseFormatter(metaclass=abc.ABCMeta):
     KEY_GROUPS: ClassVar[tuple[tuple[str, ...], ...]] = (("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),)
 
     def __init__(self, format: str, static: dict[str, Any]) -> None:
+        self.validate_format(format)
         self.format = partial_format(format, static)
         self.static_data = static
 
@@ -956,13 +958,22 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         return "\n".join(help)
 
     @classmethod
+    def known_keys(cls) -> set[str]:
+        """the keys this formatter supports in a format string"""
+        # some keys are only in KEY_GROUPS (e.g. the hash keys of ItemFormatter), thus we look at both.
+        keys = set(cls.KEY_DESCRIPTIONS)
+        keys.update(key for group in cls.KEY_GROUPS for key in group)
+        keys.update(cls.FIXED_KEYS)
+        return keys
+
+    @classmethod
     def validate_format(cls, format):
         """raise a CommandError if format is malformed or uses keys this formatter does not know"""
         try:
             format_keys = {key for _, key, _, _ in Formatter().parse(format) if key}
         except ValueError as err:
             raise CommandError(f"Invalid format string: {err}")
-        unknown_keys = format_keys - set(cls.KEY_DESCRIPTIONS) - set(cls.FIXED_KEYS)
+        unknown_keys = format_keys - cls.known_keys()
         if unknown_keys:
             raise CommandError(f"Invalid format keys: {', '.join(sorted(unknown_keys))}")
 
@@ -1061,9 +1072,9 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    # we provide the hash algos from python stdlib (except shake_*).
+    # we provide the hash algos from python stdlib (except shake_*) and blake3.
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
-    hash_algorithms = set(hashlib.algorithms_guaranteed).difference({"shake_128", "shake_256"})
+    hash_algorithms = set(hashlib.algorithms_guaranteed).difference({"shake_128", "shake_256"}) | {"blake3"}
     KEY_DESCRIPTIONS = {
         "type": "file type (file, dir, symlink, ...)",
         "mode": "file mode (as in stat)",
@@ -1193,7 +1204,9 @@ class ItemFormatter(BaseFormatter):
     def hash_item(self, hash_function, item):
         if "chunks" not in item:
             return ""
-        if hash_function in self.hash_algorithms:
+        if hash_function == "blake3":
+            hash = blake3()
+        else:
             hash = hashlib.new(hash_function)
         for data in self.archive.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
             hash.update(data)

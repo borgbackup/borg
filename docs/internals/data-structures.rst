@@ -416,6 +416,9 @@ Borg has these chunkers (the default is "fastcdc"):
   hash over the Goldilocks prime field (the reference construction of the
   underlying paper); about half the rabin-aes speed, mainly a comparison
   baseline.
+- "toeplitz-aes": like "rabin-aes", but the universal hash is a tabulated
+  LFSR/Toeplitz hash (secret 2 KiB table, fixed public polynomial); same
+  speed as "rabin-aes" with the best collision bound of the three.
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -563,6 +566,25 @@ well-understood comparison baseline.
 
 The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
 level (0 disables it); 2 is a good default. E.g.: ``goldilocks-aes,19,23,21,2``.
+
+"toeplitz-aes" chunker
+++++++++++++++++++++++
+
+Like "rabin-aes", but the universal hash is a tabulated LFSR-based Toeplitz
+hash (Krawczyk, CRYPTO '94): the digest of the 64-byte window is
+sum_j x^(63-j) * T[b_j] over GF(2)[x] mod P, where T is a secret random
+table of 256 64-bit values (2 KiB of key material) and P is a *fixed public*
+irreducible polynomial of degree 64. The AES-128 PRF layer is the same as
+for "rabin-aes". Two distinct windows collide with probability exactly
+2^-64 over the choice of T - the best possible bound for a 64-bit digest,
+and unconditional (no secret polynomial sampling). The rolling update
+contains no secret-dependent memory access. Speed is on par with
+"rabin-aes". See :doc:`chunker` for a comparison of all chunkers.
+
+``borg create --chunker-params toeplitz-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+
+The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
+level (0 disables it); 2 is a good default. E.g.: ``toeplitz-aes,19,23,21,2``.
 
 .. _cache:
 

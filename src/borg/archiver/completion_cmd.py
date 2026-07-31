@@ -716,6 +716,7 @@ class CompletionMixIn:
             "fastcdc,19,23,21,2",
             "rabin-aes,19,23,21,2",
             "goldilocks-aes,19,23,21,2",
+            "toeplitz-aes,19,23,21,2",
         ]
         chunker_params_choices_str = " ".join(chunker_params_choices)
 

@@ -209,6 +209,13 @@ class BenchmarkMixIn:
                 "chunkit(ch)",
                 locals(),
             ),
+            # toeplitz-aes (UHF-then-PRF, tabulated Toeplitz hash); table creation in setup
+            (
+                "toeplitz-aes,19,23,21,2",
+                "ch = get_chunker('toeplitz-aes', 19, 23, 21, 2, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
             ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
         ]:
             dt = timeit(func, setup, number=number_default, globals=vars)

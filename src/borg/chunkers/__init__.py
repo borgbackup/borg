@@ -3,6 +3,7 @@ from .buzhash64 import ChunkerBuzHash64
 from .fastcdc import ChunkerFastCDC
 from .rabin_aes import ChunkerRabinAES
 from .goldilocks_aes import ChunkerGoldilocksAES
+from .toeplitz_aes import ChunkerToeplitzAES
 from .failing import ChunkerFailing
 from .fixed import ChunkerFixed
 from .reader import *  # noqa
@@ -48,6 +49,16 @@ def get_chunker(algo, *params, **kw):
             else b"\0" * 32
         )
         return ChunkerGoldilocksAES(gl_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
+    if algo == "toeplitz-aes":
+        # like rabin-aes, but with a tabulated LFSR/Toeplitz hash as the UHF
+        # (secret 2 KiB table, fixed public polynomial). Same param shape:
+        # (chunk_min_exp, chunk_max_exp, hash_mask_bits, nc_level).
+        tp_key = (
+            key.derive_key(salt=b"", domain=b"toeplitz-aes", size=32, from_id_key=True)
+            if key is not None
+            else b"\0" * 32
+        )
+        return ChunkerToeplitzAES(tp_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
     if algo == "fixed":
         return ChunkerFixed(*params, sparse=sparse)
     if algo == "fail":

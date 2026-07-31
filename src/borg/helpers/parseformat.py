@@ -358,7 +358,7 @@ def ChunkerParams(s):
                 "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
             )
         return CH_FASTCDC, chunk_min, chunk_max, chunk_mask, nc_level
-    if algo in (CH_RABIN_AES, CH_GOLDILOCKS_AES):
+    if algo in (CH_RABIN_AES, CH_GOLDILOCKS_AES, CH_TOEPLITZ_AES):
         # <algo>, chunk_min, chunk_max, chunk_mask, nc_level
         # both UHF-then-PRF chunkers have a fixed 64-byte window, so there is no window_size field.
         # nc_level is required; use nc_level 0 to disable normalized chunking.

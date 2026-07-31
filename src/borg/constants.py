@@ -135,6 +135,7 @@ CH_BUZHASH64 = "buzhash64"
 CH_FASTCDC = "fastcdc"
 CH_RABIN_AES = "rabin-aes"
 CH_GOLDILOCKS_AES = "goldilocks-aes"
+CH_TOEPLITZ_AES = "toeplitz-aes"
 CH_FIXED = "fixed"
 CH_FAIL = "fail"
 
@@ -156,6 +157,8 @@ BUZHASH64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, 
 RABIN_AES_PARAMS = (CH_RABIN_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
 # goldilocks-aes: same param shape as rabin-aes (fixed 64-byte window).
 GOLDILOCKS_AES_PARAMS = (CH_GOLDILOCKS_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
+# toeplitz-aes: same param shape as rabin-aes (fixed 64-byte window).
+TOEPLITZ_AES_PARAMS = (CH_TOEPLITZ_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
 CHUNKER_PARAMS = FASTCDC_PARAMS  # the default chunker for file content data
 
 # chunker params for the items metadata stream, finer granularity

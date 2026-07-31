@@ -51,7 +51,7 @@ def test_chunkpoints_rabin_aes_unchanged():
     # Future chunker optimizations must not change this, or existing repos will bloat.
     overall_hash = H(b"".join(runs))
     print(overall_hash.hex())
-    assert overall_hash == hex_to_bin("83c89b4d89f7b653e53efd6b42607da01dccdb44d9c73d58f7fe03f30b8e785d")
+    assert overall_hash == hex_to_bin("f502d8da9dc338ff6949d89cdb545ff690bba8919263a17010c2a4995031d7ef")
 
 
 def test_rabin_aes_kernels_identical():
@@ -119,9 +119,9 @@ def test_rabin_aes_shift_resilience():
 
 
 def test_rabin_aes_polynomial():
-    # P must be a degree-63 irreducible polynomial, deterministically derived from the key
+    # P must be a degree-64 irreducible polynomial, deterministically derived from the key
     p0 = rabin_aes_get_polynomial(key0)
-    assert p0.bit_length() - 1 == 63
+    assert p0.bit_length() - 1 == 64
     assert p0 & 1  # constant term set (otherwise divisible by x)
     assert _is_irreducible(p0)
     assert p0 == rabin_aes_get_polynomial(key0)
@@ -132,12 +132,12 @@ def test_rabin_aes_polynomial():
     assert len(out_tbl) == 256 and len(red_tbl) == 256
     for v in out_tbl + red_tbl:
         assert isinstance(v, int)
-        assert 0 <= v < 2**63  # all table entries are mod-P remainders
+        assert 0 <= v < 2**64  # all table entries are mod-P remainders
     # spot check the tables against the polynomial: entry b is (b << shift) mod P
     for b in (0, 1, 2, 128, 255):
         v = b << 504
-        while v.bit_length() - 1 >= 63:
-            v ^= p0 << (v.bit_length() - 1 - 63)
+        while v.bit_length() - 1 >= 64:
+            v ^= p0 << (v.bit_length() - 1 - 64)
         assert out_tbl[b] == v
 
 

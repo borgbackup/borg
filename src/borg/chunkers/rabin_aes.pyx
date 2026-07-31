@@ -25,21 +25,23 @@ from .reader import FileReader, Chunk
 #
 #   1. a rolling *universal hash function* (UHF) compresses the last w bytes
 #      into a short digest; here: a Rabin fingerprint over GF(2)[x]/P(x) with
-#      a secret random irreducible polynomial P of degree 63, over a 64-byte
+#      a secret random irreducible polynomial P of degree 64, over a 64-byte
 #      window (the same UHF family restic uses, with a bigger polynomial).
+#      P's degree-64 coefficient is implicit: the digest fills a uint64 and
+#      the C kernel's left shifts naturally discard the reduced-away bits.
 #   2. a *PRF* (AES-128 with a secret key) is applied to the digest; the cut
 #      decision looks only at the PRF output (low bits of the first 8
 #      ciphertext bytes, little-endian): cut iff (AES(digest) & mask) == 0.
 #
 # An attacker who observes cut positions sees only PRF outputs; the digest and
 # P remain hidden behind AES. Two windows colliding under the UHF is the only
-# residual leakage (they necessarily get equal decisions); for a degree-63
+# residual leakage (they necessarily get equal decisions); for a degree-64
 # random irreducible P the collision probability of two distinct 64-byte
-# windows is <= 511/2^62 ~= 2^-53.
+# windows is <= 511/2^63 ~= 2^-54.
 #
 # Security notes (honest limits):
 #  * The FSWC-RoR proof bound (eprint 2025/558, Thm 4.5 analogue) degrades
-#    with the square of the number of processed positions; with a 63-bit
+#    with the square of the number of processed positions; with a 64-bit
 #    digest it stays meaningful up to roughly tens of GiB per chunker key.
 #    Beyond that, no *attack* is known - but the guarantee is heuristic, like
 #    everything else in this area except a wider-digest construction.
@@ -66,7 +68,7 @@ cdef extern from "rabin_aes_impl.h":
 
 # --- GF(2)[x] polynomial helpers (pure Python, used at chunker setup only) ---
 
-_DEG = 63  # degree of the secret irreducible polynomial P
+_DEG = 64  # degree of the secret irreducible polynomial P (top bit implicit in C)
 _WINDOW_SIZE = 64  # bytes; window polynomial degree is 8 * 64 - 1 = 511
 
 # spread table for GF(2) squaring: 8 bits -> 16 bits with zeros interleaved
@@ -106,10 +108,10 @@ def _poly_gcd(a, b):
 
 
 def _is_irreducible(p):
-    """Rabin's irreducibility test for deg(p) == 63 (prime factors of 63: 3, 7).
+    """Rabin's irreducibility test for deg(p) == 64 (prime factors of 64: 2).
 
-    p is irreducible iff x^(2^63) == x (mod p) and gcd(x^(2^(63/q)) - x, p) == 1
-    for q in {3, 7}, i.e. for the exponents 21 and 9.
+    p is irreducible iff x^(2^64) == x (mod p) and gcd(x^(2^(64/2)) - x, p) == 1,
+    i.e. for the exponent 32.
     """
     assert p.bit_length() - 1 == _DEG
     x = 2  # the polynomial "x"
@@ -117,25 +119,24 @@ def _is_irreducible(p):
     saved = {}
     for i in range(1, _DEG + 1):
         r = _poly_sq_mod(r, p)
-        if i in (9, 21):
+        if i == 32:
             saved[i] = r
     if r != x:
         return False
-    for e in (21, 9):
-        if _poly_gcd(p, saved[e] ^ x) != 1:
-            return False
+    if _poly_gcd(p, saved[32] ^ x) != 1:
+        return False
     return True
 
 
 def _sample_polynomial(rng):
-    """Sample a random irreducible polynomial of degree 63 from the CSPRNG.
+    """Sample a random irreducible polynomial of degree 64 from the CSPRNG.
 
-    The polynomial has its degree-63 and constant coefficients set; the 62
-    middle coefficients are random. About 1 in 63 candidates is irreducible.
+    The polynomial has its degree-64 and constant coefficients set; the 63
+    middle coefficients are random. About 1 in 64 candidates is irreducible.
     """
     while True:
         v = int.from_bytes(rng.random_bytes(8), "little")
-        p = (1 << _DEG) | (v & ((1 << _DEG) - 1)) | 1
+        p = (1 << _DEG) | (v & ((1 << _DEG) - 2)) | 1
         if _is_irreducible(p):
             return p
 
@@ -145,8 +146,8 @@ def _build_tables(p):
 
     out_tbl[b]   = poly(b) * x^504 mod P  (remove the byte leaving the window;
                                            504 = 8 * (window_size - 1))
-    red_tbl[t]   = poly(t) * x^63 mod P   (reduce the 8 bits shifted above bit 62)
-    w1_tbl[t]    = poly(t) * x^71 mod P   (stride-2 step: reduce bits 71..78)
+    red_tbl[t]   = poly(t) * x^64 mod P   (reduce the 8 bits shifted above bit 63)
+    w1_tbl[t]    = poly(t) * x^72 mod P   (stride-2 step: reduce bits 72..79)
     out8_tbl[b]  = poly(b) * x^512 mod P  (stride-2 removal, newer byte)
     out16_tbl[b] = poly(b) * x^520 mod P  (stride-2 removal, older byte)
 

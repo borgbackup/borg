@@ -23,8 +23,8 @@ typedef struct RA_CTX RA_CTX;
 
 /* Number of 256-entry rolling tables passed to ra_new, in this order:
  * [0] out_tbl:   b * x^504 mod P (single-step removal of the leaving byte)
- * [1] red_tbl:   t * x^63  mod P (reduction of the 8 bits shifted above bit 62)
- * [2] w1_tbl:    t * x^71  mod P (stride-2 step: reduction of bits 71..78)
+ * [1] red_tbl:   t * x^64  mod P (reduction of the 8 bits shifted above bit 63)
+ * [2] w1_tbl:    t * x^72  mod P (stride-2 step: reduction of bits 72..79)
  * [3] out8_tbl:  b * x^512 mod P (stride-2 removal, newer byte)
  * [4] out16_tbl: b * x^520 mod P (stride-2 removal, older byte)
  * Tables 2..4 are algebraic combinations of 0..1; they enable the two-lane

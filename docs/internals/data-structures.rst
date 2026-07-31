@@ -525,7 +525,7 @@ A "UHF-then-PRF" content-defined chunker, following the provably secure
 construction of `Breaking and Fixing Content-Defined Chunking
 <https://eprint.iacr.org/2025/558>`_ (Truong et al., 2025): a rolling Rabin
 fingerprint over GF(2)[x]/P(x) - with P a secret, random, irreducible
-polynomial of degree 63 - compresses the last 64 bytes into a digest
+polynomial of degree 64 - compresses the last 64 bytes into a digest
 (a universal hash), and AES-128 with a secret key is applied to that digest.
 The cut decision only looks at the AES output, so observed chunk boundaries
 are pseudo-random and do not provide usable equations about the chunking

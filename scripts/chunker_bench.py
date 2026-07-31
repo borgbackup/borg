@@ -131,7 +131,7 @@ def chunk_stats(algo, data, min_exp, max_exp, mask_bits, win, nc_level=0, normal
     if algo == "buzhash64":
         params.append(nc_level)  # nc_level is a positional param
         kw["normal_size"] = normal_size
-    elif algo in ("fastcdc", "rabin-aes"):
+    elif algo in ("fastcdc", "rabin-aes", "goldilocks-aes"):
         params = [min_exp, max_exp, mask_bits, nc_level]  # window-less param shape
         kw["normal_size"] = normal_size
     chunker = get_chunker(algo, *params, **kw)
@@ -292,7 +292,7 @@ def main():
     variants = []
     for algo in args.algo:
         variants.append((algo, 0))
-        if algo in ("buzhash64", "fastcdc", "rabin-aes") and args.nc_level > 0:
+        if algo in ("buzhash64", "fastcdc", "rabin-aes", "goldilocks-aes") and args.nc_level > 0:
             variants.append((algo, args.nc_level))
 
     for algo, nc in variants:

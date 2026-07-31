@@ -202,6 +202,13 @@ class BenchmarkMixIn:
                 "chunkit(ch)",
                 locals(),
             ),
+            # goldilocks-aes (UHF-then-PRF, prime-field comparison chunker); table creation in setup
+            (
+                "goldilocks-aes,19,23,21,2",
+                "ch = get_chunker('goldilocks-aes', 19, 23, 21, 2, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
             ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
         ]:
             dt = timeit(func, setup, number=number_default, globals=vars)

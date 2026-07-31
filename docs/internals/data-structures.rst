@@ -412,6 +412,10 @@ Borg has these chunkers (the default is "fastcdc"):
   (secret polynomial) post-processed with AES-128, so the cut decision only
   depends on the AES output ("UHF-then-PRF" construction). Strongest available
   protection against chunk-size fingerprinting attacks.
+- "goldilocks-aes": like "rabin-aes", but the universal hash is a polynomial
+  hash over the Goldilocks prime field (the reference construction of the
+  underlying paper); about half the rabin-aes speed, mainly a comparison
+  baseline.
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -542,6 +546,23 @@ instructions (arm64 crypto extensions / x86-64 AES-NI) where available.
 
 The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
 level (0 disables it); 2 is a good default. E.g.: ``rabin-aes,19,23,21,2``.
+
+"goldilocks-aes" chunker
+++++++++++++++++++++++++
+
+Like "rabin-aes", but the universal hash is the reference construction of the
+same paper: a polynomial hash over the Goldilocks prime field GF(p) with
+p = 2^64 - 2^32 + 1, evaluated at a secret random point K over the same
+64-byte window. The AES-128 PRF layer and the security properties are the
+same as for "rabin-aes" (the two-window collision bound is even slightly
+better). It is about half as fast as "rabin-aes" - prime-field multiplies
+instead of table lookups in the rolling hash - and is provided mainly as a
+well-understood comparison baseline.
+
+``borg create --chunker-params goldilocks-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+
+The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
+level (0 disables it); 2 is a good default. E.g.: ``goldilocks-aes,19,23,21,2``.
 
 .. _cache:
 

@@ -59,6 +59,8 @@ buzhash64_source = "src/borg/chunkers/buzhash64.pyx"
 fastcdc_source = "src/borg/chunkers/fastcdc.pyx"
 rabin_aes_source = "src/borg/chunkers/rabin_aes.pyx"
 rabin_aes_impl_source = "src/borg/chunkers/rabin_aes_impl.c"
+goldilocks_aes_source = "src/borg/chunkers/goldilocks_aes.pyx"
+goldilocks_aes_impl_source = "src/borg/chunkers/goldilocks_aes_impl.c"
 reader_source = "src/borg/chunkers/reader.pyx"
 hashindex_source = "src/borg/hashindex.pyx"
 item_source = "src/borg/item.pyx"
@@ -78,6 +80,7 @@ cython_sources = [
     buzhash64_source,
     fastcdc_source,
     rabin_aes_source,
+    goldilocks_aes_source,
     reader_source,
     hashindex_source,
     item_source,
@@ -176,6 +179,13 @@ if not on_rtd:
         dict(extra_compile_args=cflags),
     )
 
+    # goldilocks-aes likewise (same PRF layer, different rolling hash)
+    goldilocks_aes_ext_kwargs = members_appended(
+        dict(sources=[goldilocks_aes_source, goldilocks_aes_impl_source], include_dirs=["src/borg/chunkers"]),
+        crypto_ext_lib,
+        dict(extra_compile_args=cflags),
+    )
+
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
         lib_ext_kwargs(pc, "BORG_LIBLZ4_PREFIX", "lz4", "liblz4", ">= 1.7.0"),
@@ -203,6 +213,7 @@ if not on_rtd:
         Extension("borg.chunkers.buzhash64", [buzhash64_source], extra_compile_args=cflags),
         Extension("borg.chunkers.fastcdc", [fastcdc_source], extra_compile_args=cflags),
         Extension("borg.chunkers.rabin_aes", **rabin_aes_ext_kwargs),
+        Extension("borg.chunkers.goldilocks_aes", **goldilocks_aes_ext_kwargs),
         Extension("borg.chunkers.reader", [reader_source], extra_compile_args=cflags),
     ]
 

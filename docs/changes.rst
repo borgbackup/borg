@@ -256,6 +256,9 @@ New features:
   - rabin-aes: new chunker with cryptographically sound resistance against
     chunk-size fingerprinting (UHF-then-PRF: secret Rabin polynomial + AES-128,
     following eprint 2025/558); uses AES hw acceleration or OpenSSL, ~700 MB/s
+  - goldilocks-aes: new chunker, like rabin-aes but with the reference universal
+    hash of eprint 2025/558 (Goldilocks prime-field polynomial hash); about half
+    the rabin-aes speed, mainly a comparison baseline
 - borg keys:
 
   - locate the borg key automatically in the key directory or in the repository, #9743

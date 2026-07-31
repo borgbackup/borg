@@ -2,6 +2,7 @@ from .buzhash import Chunker
 from .buzhash64 import ChunkerBuzHash64
 from .fastcdc import ChunkerFastCDC
 from .rabin_aes import ChunkerRabinAES
+from .goldilocks_aes import ChunkerGoldilocksAES
 from .failing import ChunkerFailing
 from .fixed import ChunkerFixed
 from .reader import *  # noqa
@@ -37,6 +38,16 @@ def get_chunker(algo, *params, **kw):
             key.derive_key(salt=b"", domain=b"rabin-aes", size=32, from_id_key=True) if key is not None else b"\0" * 32
         )
         return ChunkerRabinAES(ra_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
+    if algo == "goldilocks-aes":
+        # like rabin-aes, but with the Goldilocks prime-field polynomial hash as
+        # the UHF (the reference construction of eprint 2025/558). Same param
+        # shape: (chunk_min_exp, chunk_max_exp, hash_mask_bits, nc_level).
+        gl_key = (
+            key.derive_key(salt=b"", domain=b"goldilocks-aes", size=32, from_id_key=True)
+            if key is not None
+            else b"\0" * 32
+        )
+        return ChunkerGoldilocksAES(gl_key, *params, normal_size=kw.get("normal_size", 0), sparse=sparse)
     if algo == "fixed":
         return ChunkerFixed(*params, sparse=sparse)
     if algo == "fail":

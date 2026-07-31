@@ -358,14 +358,12 @@ def ChunkerParams(s):
                 "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
             )
         return CH_FASTCDC, chunk_min, chunk_max, chunk_mask, nc_level
-    if algo == CH_RABIN_AES:
-        # rabin-aes, chunk_min, chunk_max, chunk_mask, nc_level
-        # rabin-aes has a fixed 64-byte window, so there is no window_size field.
+    if algo in (CH_RABIN_AES, CH_GOLDILOCKS_AES):
+        # <algo>, chunk_min, chunk_max, chunk_mask, nc_level
+        # both UHF-then-PRF chunkers have a fixed 64-byte window, so there is no window_size field.
         # nc_level is required; use nc_level 0 to disable normalized chunking.
         if count != 5:
-            raise ArgumentTypeError(
-                "rabin-aes chunker params must be: rabin-aes,chunk_min,chunk_max,chunk_mask,nc_level"
-            )
+            raise ArgumentTypeError(f"{algo} chunker params must be: {algo},chunk_min,chunk_max,chunk_mask,nc_level")
         chunk_min, chunk_max, chunk_mask = (int(p) for p in params[1:4])
         nc_level = int(params[4])
         if not (chunk_min <= chunk_mask <= chunk_max):
@@ -383,7 +381,7 @@ def ChunkerParams(s):
             raise ArgumentTypeError(
                 "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
             )
-        return CH_RABIN_AES, chunk_min, chunk_max, chunk_mask, nc_level
+        return algo, chunk_min, chunk_max, chunk_mask, nc_level
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 numeric params, buzhash);
     # the isdigit check keeps misspelled/incomplete algo specs out of the compat branch.
     if (algo == CH_BUZHASH and count == 5) or (

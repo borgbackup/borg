@@ -167,18 +167,47 @@ Version 2.0.0b23 (not released yet)
 
 New features:
 
-- analyze: report the deduplicated size of a set of archives, #5741.
-  For the considered (matching) set of archives, ``borg analyze`` now reports the
-  deduplicated size of the set (union of referenced chunks, counted once) and the
-  exclusive size of the set (chunks referenced only by the set, i.e. the space that
-  deleting the whole set would free). Chunk ids and sizes are read from the
-  per-archive references cache maintained by ``borg compact``, so unchanged archives
-  usually do not need to be opened.
-- new ``BORG_UNITS`` environment variable, #5513.
-  It determines how sizes are formatted in human-readable output: ``si`` (default,
-  1kB = 1000B), ``iec`` (1KiB = 1024B) or ``raw`` (exact byte counts, e.g. for easy
-  parsing by monitoring scripts).
-  ``BORG_IEC`` was removed, use ``BORG_UNITS=iec`` instead.
+- faster:
+
+  - use multi-threaded zstd compression for big chunks, #9961
+  - use multi-threaded blake3 hashing for big chunks, #9958
+  - extract: avoid refetching/reparsing repeated chunks, #1678
+  - fetch_many: serve all-zero chunks without repository access; also cache
+    recently parsed chunks, #1678
+- webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
+  replacement for `borg mount` in some use cases, #9942
+- mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
+- analyze: report deduplicated size of a set of archives, #5741
+- BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
+
+Fixes:
+
+- re-add XXH64 to read borg 1.x integrity data, #9935
+- support date: archive patterns for --from-borg1, #9949
+- fix calculate_relative_offset year offset for Feb 29, #9967
+- bind pack object header into AEAD authentication
+- fix false repo relocation warning on macOS due to NFC/NFD path differences, #2913
+- release chunk data memoryviews (fixes PyPy memory leak), #1755, #9978
+
+Other changes:
+
+- removed some global options (they were difficult to use and spammed the help output):
+
+  - --remote-path -> BORG_REMOTE_PATH
+  - --rsh -> BORG_RSH
+  - --iec -> BORG_UNITS=iec
+  - --debug-profile -> BORG_DEBUG_PROFILE
+  - --upload-ratelimit (needs to be reimplemented in borgstore)
+  - --upload-buffer
+- docs:
+
+  - update README
+  - new borg2 demo screencast (see www.borgbackup.org), #6303
+  - fix/refactor return codes documentation, #9905
+  - fix chunks index / memory usage internals documentation, #9937
+  - update help for some commands, #9948
+  - fix grammar/typos, #9972
+
 
 Version 2.0.0b22 (2026-07-22)
 -----------------------------

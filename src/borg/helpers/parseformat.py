@@ -925,6 +925,7 @@ class BaseFormatter(metaclass=abc.ABCMeta):
     KEY_GROUPS: ClassVar[tuple[tuple[str, ...], ...]] = (("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),)
 
     def __init__(self, format: str, static: dict[str, Any]) -> None:
+        self.validate_format(format)
         self.format = partial_format(format, static)
         self.static_data = static
 
@@ -957,13 +958,22 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         return "\n".join(help)
 
     @classmethod
+    def known_keys(cls) -> set[str]:
+        """the keys this formatter supports in a format string"""
+        # some keys are only in KEY_GROUPS (e.g. the hash keys of ItemFormatter), thus we look at both.
+        keys = set(cls.KEY_DESCRIPTIONS)
+        keys.update(key for group in cls.KEY_GROUPS for key in group)
+        keys.update(cls.FIXED_KEYS)
+        return keys
+
+    @classmethod
     def validate_format(cls, format):
         """raise a CommandError if format is malformed or uses keys this formatter does not know"""
         try:
             format_keys = {key for _, key, _, _ in Formatter().parse(format) if key}
         except ValueError as err:
             raise CommandError(f"Invalid format string: {err}")
-        unknown_keys = format_keys - set(cls.KEY_DESCRIPTIONS) - set(cls.FIXED_KEYS)
+        unknown_keys = format_keys - cls.known_keys()
         if unknown_keys:
             raise CommandError(f"Invalid format keys: {', '.join(sorted(unknown_keys))}")
 

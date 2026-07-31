@@ -32,6 +32,17 @@ def test_list_hash(archivers, request):
     assert "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 input/empty_file" in output
 
 
+def test_list_hash_blake3(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "empty_file", size=0)
+    create_regular_file(archiver.input_path, "amb", contents=b"a" * 1000000)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "list", "test", "--format", "{blake3} {path}{NL}")
+    assert "616f575a1b58d4c9797d4217b9730ae5e6eb319d76edef6549b46f4efe31ff8b input/amb" in output
+    assert "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262 input/empty_file" in output
+
+
 def test_list_chunk_counts(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "empty_file", size=0)

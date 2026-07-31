@@ -22,6 +22,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 import yaml
+from blake3 import blake3
 
 from .errors import Error, CommandError
 from .fs import make_path_safe, slashify
@@ -1061,9 +1062,9 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    # we provide the hash algos from python stdlib (except shake_*).
+    # we provide the hash algos from python stdlib (except shake_*) and blake3.
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
-    hash_algorithms = set(hashlib.algorithms_guaranteed).difference({"shake_128", "shake_256"})
+    hash_algorithms = set(hashlib.algorithms_guaranteed).difference({"shake_128", "shake_256"}) | {"blake3"}
     KEY_DESCRIPTIONS = {
         "type": "file type (file, dir, symlink, ...)",
         "mode": "file mode (as in stat)",
@@ -1193,7 +1194,9 @@ class ItemFormatter(BaseFormatter):
     def hash_item(self, hash_function, item):
         if "chunks" not in item:
             return ""
-        if hash_function in self.hash_algorithms:
+        if hash_function == "blake3":
+            hash = blake3()
+        else:
             hash = hashlib.new(hash_function)
         for data in self.archive.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
             hash.update(data)

@@ -26,7 +26,7 @@ from .testsuite.chunkers.fixed_self_test import ChunkerFixedTestCase
 
 SELFTEST_CASES = [CryptoTestCase, ChunkerTestCase, ChunkerFixedTestCase]
 
-SELFTEST_COUNT = 17
+SELFTEST_COUNT = 19
 
 
 class SelfTestResult(TestResult):

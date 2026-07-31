@@ -177,6 +177,33 @@ class CryptoTestCase(BaseTestCase):
             hdr_mac_iv_cdata_corrupted = hdr_mac_iv_cdata[:1] + b"\0" + hdr_mac_iv_cdata[2:]
             self.assert_raises(IntegrityError, lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
+    def test_AEAD_truncated_envelope(self):
+        # a truncated envelope (shorter than header + auth tag) is corrupted/tampered data
+        # and must raise IntegrityError (not crash or raise some other exception type).
+        key = b"X" * 32
+        iv_int = 0
+        data = b"foo" * 10
+        header = b"\x12\x34\x56" + iv_int.to_bytes(12, "big")
+        for cs_cls in (AES256_OCB, CHACHA20_POLY1305):
+            cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
+            hdr_mac_iv_cdata = cs.encrypt(data, header=header)
+            for length in (0, 1, len(header), len(header) + 16 - 1):  # auth tag is 16 bytes
+                cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=1)
+                self.assert_raises(IntegrityError, lambda: cs.decrypt(hdr_mac_iv_cdata[:length]))
+
+    def test_AE_truncated_envelope(self):
+        # same for the legacy AES256-CTR modes: header + mac (32) + iv (8) is the minimum.
+        mac_key = b"Y" * 32
+        enc_key = b"X" * 32
+        iv_int = 0
+        data = b"foo" * 10
+        header = b"\x42"
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv_int, header_len=len(header), aad_offset=1)
+        hdr_mac_iv_cdata = cs.encrypt(data, header=header)
+        for length in (0, 1, len(header) + 32 + 8 - 1):
+            cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv_int, header_len=len(header), aad_offset=1)
+            self.assert_raises(IntegrityError, lambda: cs.decrypt(hdr_mac_iv_cdata[:length]))
+
     def test_AEAD_with_more_AAD(self):
         # test giving extra aad to the .encrypt() and .decrypt() calls
         key = b"X" * 32

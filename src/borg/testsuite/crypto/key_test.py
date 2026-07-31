@@ -10,6 +10,7 @@ from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
 from ...crypto.key import AESCTRKey, Blake2AESCTRKey
 from ...crypto.key import AEADKeyBase
 from ...crypto.key import AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey
+from ...crypto.key import AES_OCB_MAX_SESSION_BLOCKS
 from ...crypto.key import Blake3AuthenticatedKey
 from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
@@ -252,6 +253,36 @@ class TestKey:
             plaintext_changed = plaintext + b"1"
             with pytest.raises(IntegrityError):
                 key.assert_id(id, plaintext_changed)
+
+    def test_ocb_session_key_rollover(self, monkeypatch):
+        # aes256-ocb must not encrypt too much data with one session key, see #6501.
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = AESOCBKey.create(self.MockRepository(), self.MockArgs())
+        assert key.MAX_SESSION_BLOCKS == AES_OCB_MAX_SESSION_BLOCKS
+        monkeypatch.setattr(key, "MAX_SESSION_BLOCKS", 32)  # 512B, way below the real limit
+        plaintext = b"1234567890123456"  # one cipher block
+        id = key.id_hash(plaintext)
+        chunks = [key.encrypt(id, plaintext) for _ in range(20)]
+        sessionids = [chunk[8:32] for chunk in chunks]  # see Layout
+        ivs = [int.from_bytes(chunk[2:8], "big") for chunk in chunks]
+        assert len(set(sessionids)) > 1  # borg started new sessions
+        for previous, current, iv in zip(sessionids, sessionids[1:], ivs[1:]):
+            if current != previous:
+                assert iv == 1  # a new session counts the IV from the beginning again
+            else:
+                assert iv > 1
+        for chunk in chunks:  # no matter which session key was used, we can read it all
+            assert key.decrypt(id, chunk) == plaintext
+
+    def test_chpo_no_session_key_rollover(self, monkeypatch):
+        # chacha20-poly1305 has no limit on the amount of data encrypted with one key, see #6501.
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = CHPOKey.create(self.MockRepository(), self.MockArgs())
+        assert key.MAX_SESSION_BLOCKS is None
+        plaintext = b"1234567890123456"
+        id = key.id_hash(plaintext)
+        chunks = [key.encrypt(id, plaintext) for _ in range(20)]
+        assert len({chunk[8:32] for chunk in chunks}) == 1
 
     def test_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")

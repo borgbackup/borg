@@ -768,8 +768,9 @@ AEAD modes
 For new repositories, borg only uses modern AEAD ciphers: AES-OCB or CHACHA20-POLY1305.
 
 For each borg invocation, a new sessionkey is derived from the borg key material
-and the 48bit IV starts from 0 again (both ciphers internally add a 32bit counter
-to our IV, so we'll just count up by 1 per chunk).
+and the 48bit IV starts from 0 again. The cipher blocks of a chunk do not consume
+IVs here (CHACHA20-POLY1305 counts them in its internal 32bit block counter, AES-OCB
+derives the per-block offsets from the IV), so we just count up by 1 per chunk.
 
 The encryption layout is best seen at the bottom of this diagram:
 
@@ -779,11 +780,58 @@ The encryption layout is best seen at the bottom of this diagram:
 
 No special IV/counter management is needed here due to the use of session keys.
 
-A 48 bit IV is way more than needed: If you only backed up 4kiB chunks (2^12B),
-the IV would "limit" the data encrypted in one session to 2^(12+48)B == 2.3 exabytes,
-meaning you would run against other limitations (RAM, storage, time) way before that.
-In practice, chunks are usually bigger, for big files even much bigger, giving an
-even higher limit.
+The 48 bit IV limits the number of **messages** (chunks and metadata objects) that we
+encrypt with one session key to 2^48 - borg refuses to encrypt more rather than reusing
+an IV. That is way more than needed: even if you only backed up 4kiB chunks (2^12B),
+2^48 messages would be 2^(12+48)B == 1.2 exabytes of input data, meaning you would run
+against other limitations (RAM, storage, time) way before that.
+
+How much **data** we may encrypt with one session key is a different question, which is
+not answered by the IV size, but by the security bounds of the ciphers, see below.
+
+.. _aead_usage_limits:
+
+AEAD usage limits
+~~~~~~~~~~~~~~~~~
+
+The relevant quantities are the number of encrypted messages (q), the amount of data
+encrypted with one key and the number of forgery attempts (v, decryptions of tampered
+data that borg refuses). ``p`` is the attacker's success probability we still consider
+acceptable. See issue #6501 for the details and for the computations.
+
+- **Number of messages** (both ciphers): limited to 2^48 per session key by the IV size,
+  see above. This is never the binding limit for either cipher.
+- **Data volume** (AES-OCB): the attacker's advantage grows with the square of the amount
+  of data encrypted using one key: about ``6 * sigma^2 / 2^128``, ``sigma`` being the
+  number of 128bit cipher blocks, including the authenticated header. RFC 7253 derives
+  from this bound that one key should encrypt at most 2^48 blocks (4PiB), which
+  corresponds to p == 2^-32. borg aims higher and starts a new session after 2^37 blocks
+  (2TiB), which corresponds to p == 2^-51 per session key.
+
+  CHACHA20-POLY1305 does not have such a limit at all: its confidentiality bound does not
+  depend on the amount of data encrypted.
+- **Forgery attempts** (CHACHA20-POLY1305): ``v <= p * 2^103 / (L' + 1)``, ``L'`` being
+  the message length (payload plus authenticated header) in 128bit blocks. For borg's
+  biggest messages, that is about 2^33 forgery attempts at p == 2^-50, so an attacker
+  would have to make borg read more than 100PiB of tampered data. Note that this is
+  counted over **all** session keys, so - unlike the data volume limit - it can not be
+  improved by starting more sessions.
+
+  For AES-OCB, the corresponding limit is much higher (its 128bit authentication tag
+  gives a term in the order of ``v * L / 2^128``), so the CHACHA20-POLY1305 limit is the
+  one to look at.
+
+We do **not** count or enforce the forgery attempts limit, we just document it here:
+a failed decryption means we got tampered or corrupted data and borg refuses it, usually
+aborting the whole command (``borg check`` and archive listing keep going, but only to
+report the damage). Getting anywhere near the limit computed above would require feeding
+borg a lot more tampered data than any real repository will ever hold.
+
+Starting a new session just means computing a new random session id and deriving a new
+session key from it (and counting the IV from 0 again). That is cheap and it does not
+need any special handling when reading, because the session id is part of every chunk
+header. Because the advantages of the individual session keys just add up, frequent
+session key changes also keep the total advantage low over the lifetime of a borg key.
 
 Legacy modes
 ~~~~~~~~~~~~

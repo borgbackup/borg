@@ -3,8 +3,9 @@ import hmac
 import os
 import textwrap
 from hashlib import sha256
+from math import ceil
 from pathlib import Path
-from typing import Literal, ClassVar
+from typing import Literal, ClassVar, Optional
 from collections.abc import Callable
 
 from ..logger import create_logger
@@ -1092,6 +1093,14 @@ class AEADKeyBase(KeyBase):
 
     MAX_IV = 2**48 - 1
 
+    # Maximum amount of data (in 128bit cipher blocks, counting plaintext **and** AAD) that we
+    # encrypt using one session key. When this is exceeded, we just start a new session (see
+    # new_session): that is cheap (one sha256) and fully transparent, because the sessionID
+    # travels in every chunk header, so old chunks stay decryptable.
+    #
+    # None means "no limit needed for this ciphersuite", see the subclasses for the reasoning.
+    MAX_SESSION_BLOCKS: Optional[int] = None
+
     # default storage; an individual key's actual storage is tracked per-instance in self.storage.
     STORAGE = KeyBlobStorage.REPO
     # an AEAD key may be stored as a keyfile or inside the repository (see borg key change-location).
@@ -1121,6 +1130,14 @@ class AEADKeyBase(KeyBase):
         # aad is additional authenticated data: authenticated together with data, but not encrypted
         # or returned.
         reserved = b"\0"
+        if self.MAX_SESSION_BLOCKS is not None:
+            # blocks the cipher will process for this message: payload and AAD are separate strings
+            # and thus rounded up separately, +2 covers the per-message cipher setup.
+            header_len = 1 + 1 + 6 + 24  # see Layout
+            blocks = ceil(len(data) / 16) + ceil((header_len + len(aad) + len(id)) / 16) + 2
+            if self.session_blocks + blocks > self.MAX_SESSION_BLOCKS:
+                self.new_session()  # do not encrypt more than that with the same session key
+            self.session_blocks += blocks
         iv = self.cipher.next_iv()
         if iv > self.MAX_IV:  # see the data-structures docs about why the IV range is enough
             raise IntegrityError("IV overflow, should never happen.")
@@ -1130,6 +1147,8 @@ class AEADKeyBase(KeyBase):
 
     def decrypt(self, id, data, aad=b""):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
+        # note: we deliberately do not count the failed decryptions (forgery attempts) here, although
+        # there is a limit for them also - see the "AEAD usage limits" docs and #6501 about why.
         self.assert_type(data[0], id)
         iv_48bit = data[2:8]
         sessionid = bytes(data[8:32])
@@ -1180,8 +1199,13 @@ class AEADKeyBase(KeyBase):
 
     def init_ciphers(self, manifest_data=None, iv=0):
         # in every new session we start with a fresh sessionid and at iv == 0, manifest_data and iv params are ignored
+        self.new_session()
+
+    def new_session(self):
+        """start a new session: fresh random sessionid, fresh session key, iv counting from 0 again"""
         self.sessionid = os.urandom(24)
         self.cipher = self._get_cipher(self.sessionid, iv=0)
+        self.session_blocks = 0  # cipher blocks encrypted using the current session key
 
 
 # Each of these is one unified key class per crypto suite. A key of this class may be stored either as
@@ -1189,12 +1213,29 @@ class AEADKeyBase(KeyBase):
 # a class distinction. The class is selected from the manifest's key-type byte (see identify_key), which
 # only encodes the crypto suite (there is exactly one type byte per suite now).
 
+# AES-OCB has a birthday-type bound: an attacker's advantage in distinguishing the ciphertexts from
+# random is about 6 * sigma^2 / 2^128, sigma being the number of 128bit cipher blocks encrypted using
+# one key (Krovetz/Rogaway OCB3, Theorem 1; RFC 7253 states this as s^2 / 2^128 and derives its "use
+# a key for at most 2^48 blocks (4PiB)" rule of thumb from it - that is an advantage of 2^-32).
+# We aim higher and use 2^37 blocks (2TiB) per session key, giving an advantage of about 2^-51, which
+# is in line with the target probability used in the examples of draft-irtf-cfrg-aead-limits.
+# Rolling the session key this often is practically free and it is also what helps in the multi-key
+# setting: the advantages of the individual session keys just add up, so the quantity that matters
+# over the lifetime of the borg key is sum(sigma_i^2), not (sum sigma_i)^2, see #6501.
+AES_OCB_MAX_SESSION_BLOCKS = 2**37  # 2TiB
+
+# chacha20-poly1305 does not need such a limit: its confidentiality bound does not depend on the
+# amount of data encrypted at all (draft-irtf-cfrg-aead-limits 6.3.1: CA <= 0) and its integrity bound
+# only limits the number of **forgery attempts** (failed decryptions), which is counted over all keys
+# (7.2.1) and thus can not be improved by using more session keys anyway.
+
 
 class AESOCBKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
     TYPE = KeyType.AESOCB
     TYPES_ACCEPTABLE = {TYPE}
     ENC_NAME = "aes256-ocb"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
     CIPHERSUITE = AES256_OCB
+    MAX_SESSION_BLOCKS = AES_OCB_MAX_SESSION_BLOCKS
 
 
 class CHPOKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
@@ -1209,6 +1250,7 @@ class Blake3AESOCBKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
     TYPES_ACCEPTABLE = {TYPE}
     ENC_NAME = "aes256-ocb"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
     CIPHERSUITE = AES256_OCB
+    MAX_SESSION_BLOCKS = AES_OCB_MAX_SESSION_BLOCKS
 
 
 class Blake3CHPOKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):

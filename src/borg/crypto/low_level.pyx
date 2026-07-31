@@ -2,8 +2,10 @@
 
 API:
 
-    encrypt(data, header=b'', aad_offset=0) -> envelope
-    decrypt(envelope, header_len=0, aad_offset=0) -> data
+    encrypt(data, header=b'', iv=None, aad=b'') -> envelope
+    decrypt(envelope, aad=b'') -> data
+
+header_len and aad_offset are given to the ciphersuite class when creating it, see below.
 
 Envelope layout:
 
@@ -25,12 +27,13 @@ garbage.
 
 Newly designed envelope layouts can just authenticate the whole header.
 
-IV handling:
+IV handling (CS is one of the ciphersuite classes below - the AEAD ones take a single key,
+the legacy AES-CTR ones a mac_key and an enc_key):
 
     iv = ...  # just never repeat!
-    cs = CS(hmac_key, enc_key, iv=iv)
-    envelope = cs.encrypt(data, header, aad_offset)
-    iv = cs.next_iv(len(data))
+    cs = CS(..., iv=iv, header_len=header_len, aad_offset=aad_offset)
+    envelope = cs.encrypt(data, header=header)
+    iv = cs.next_iv()
     (repeat)
 """
 
@@ -41,7 +44,6 @@ from math import ceil
 from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AsString
-from libc.stdlib cimport malloc, free
 from libc.stdint cimport uint8_t, uint32_t, uint64_t
 from libc.string cimport memset, memcpy
 
@@ -69,8 +71,6 @@ cdef extern from "openssl/evp.h":
 
     EVP_CIPHER_CTX *EVP_CIPHER_CTX_new()
     void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
-    void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
-    void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
 
     int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *impl,
                            const unsigned char *key, const unsigned char *iv)
@@ -285,6 +285,10 @@ cdef class AES256_CTR_BASE:
         """
         authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
+        if len(envelope) < self.header_len + self.mac_len + self.iv_len_short:
+            # truncated data - handle it like any other corruption or tampering, instead of
+            # computing the MAC over negative lengths below.
+            raise IntegrityError('MAC Authentication failed: envelope too short')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
         cdef int aoffset = self.aad_offset
@@ -441,13 +445,13 @@ cdef class _AEAD_BASE:
     @classmethod
     def requirements_check(cls):
         """check whether library requirements for this ciphersuite are satisfied"""
-        raise NotImplemented  # override / implement in child class
+        raise NotImplementedError  # override / implement in child class
 
     def __init__(self, key, iv=None, header_len=0, aad_offset=0):
         """
         init AEAD crypto
 
-        :param key: 256bit encrypt-then-mac key
+        :param key: 256bit AEAD key
         :param iv: 96bit initialisation vector / nonce
         :param header_len: expected length of header
         :param aad_offset: where in the header the authenticated data starts
@@ -481,11 +485,14 @@ cdef class _AEAD_BASE:
         if iv is not None:
             self.set_iv(iv)
         assert self.blocks == 0, 'iv needs to be set before encrypt is called'
-        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
-        # IV we provide, thus we must not encrypt more than 2^32 cipher blocks with same IV).
+        # CHACHA20 has an internal 32bit block counter (besides the 96bit (12Byte) IV we give it),
+        # thus we must not encrypt more than 2^32 cipher blocks with the same (key, IV) pair.
+        # AES-OCB has no such counter (it derives the per-block offsets from the IV), but we apply
+        # the same limit to both ciphers: the check is cheap and can not trigger for borg messages
+        # anyway, as these are limited to MAX_DATA_SIZE.
         block_count = self.block_count(len(data))
         if block_count > 2**32:
-            raise ValueError('too much data, would overflow internal 32bit counter')
+            raise ValueError('too much data for one message (max 2^32 cipher blocks)')
         cdef int ilen = len(data)
         cdef int hlen = len(header)
         assert hlen == self.header_len_expected
@@ -551,14 +558,18 @@ cdef class _AEAD_BASE:
 
     def decrypt(self, envelope, aad=b''):
         """
-        authenticate aad + header + cdata (from envelope), ignore header bytes up to aad_offset.,
+        authenticate aad + header + cdata (from envelope), ignore header bytes up to aad_offset,
         return decrypted cdata.
         """
-        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit (12Byte)
-        # IV we provide, thus we must not decrypt more than 2^32 cipher blocks with same IV):
+        # same limit as for encryption, see there: we must not decrypt more than 2^32 cipher
+        # blocks with the same (key, IV) pair.
         approx_block_count = self.block_count(len(envelope))  # sloppy, but good enough for borg
         if approx_block_count > 2**32:
-            raise ValueError('too much data, would overflow internal 32bit counter')
+            raise ValueError('too much data for one message (max 2^32 cipher blocks)')
+        if len(envelope) < self.header_len_expected + self.mac_len:
+            # truncated data - handle it like any other corruption or tampering, instead of
+            # confusing OpenSSL with negative lengths below.
+            raise IntegrityError('Authentication failed: envelope too short')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len_expected
         cdef int aoffset = self.aad_offset
@@ -627,8 +638,9 @@ cdef class _AEAD_BASE:
 
     def next_iv(self):
         # call this after encrypt() to get the next iv (int) for the next encrypt() call
-        # AES-OCB, CHACHA20 ciphers all add a internal 32bit counter to the 96bit
-        # (12 byte) IV we provide, thus we only need to increment the IV by 1.
+        # the cipher blocks of a message do not consume IVs here (CHACHA20 counts them in its
+        # internal 32bit block counter, AES-OCB derives the per-block offsets from the 96bit
+        # (12 byte) IV we give it), thus we only need to increment the IV by 1 per message.
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + 1
 

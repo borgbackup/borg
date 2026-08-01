@@ -136,24 +136,24 @@ CH_FASTCDC = "fastcdc"
 CH_FIXED = "fixed"
 CH_FAIL = "fail"
 
-# buzhash chunker params
+# chunker params
 CHUNK_MIN_EXP = 19  # 2**19 == 512 KiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8 MiB
-HASH_WINDOW_SIZE = 0xFFF  # 4095 B
+HASH_WINDOW_SIZE = 0xFFF  # 4095 B (buzhash / buzhash64 only, fastcdc is window-less)
 HASH_MASK_BITS = 21  # results in ~2 MiB chunks statistically
 
-# buzhash64-only: normalized chunking level (0 disables it). buzhash (32bit) does not support this
-# and must stay bit-compatible to borg 1.x, so it has no nc_level param.
+# not supported by buzhash (32bit): it must stay bit-compatible to borg 1.x, so it has no nc_level param.
 NC_LEVEL = 2  # FastCDC-style normalized chunking: tightens chunk-size distribution (much lower variance)
 
 # defaults, use --chunker-params to override
-CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
-CHUNKER64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, NC_LEVEL)
 # fastcdc uses a window-less Gear hash, so it has no window_size parameter.
 FASTCDC_PARAMS = (CH_FASTCDC, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
+BUZHASH_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
+BUZHASH64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, NC_LEVEL)
+CHUNKER_PARAMS = FASTCDC_PARAMS  # the default chunker for file content data
 
 # chunker params for the items metadata stream, finer granularity
-ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)
+ITEMS_CHUNKER_PARAMS = (CH_FASTCDC, 15, 19, 17, NC_LEVEL)
 
 # normal on-disk data, allocated (but not written, all zeros), not allocated hole (all zeros)
 CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2

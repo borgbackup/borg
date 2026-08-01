@@ -399,7 +399,7 @@ A chunk is stored as an object as well, of course.
 Chunks
 ~~~~~~
 
-Borg has these chunkers:
+Borg has these chunkers (the default is "fastcdc"):
 
 - "fixed": a simple, low cpu overhead, fixed blocksize chunker, optionally
   supporting a header block of different size.
@@ -466,7 +466,7 @@ which narrows down where cuts may be made, greatly reducing the amount of data
 that is actually hashed for content-defined chunking.
 
 ``borg create --chunker-params buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
-can be used to tune the chunker parameters, the default is:
+can be used to tune the chunker parameters, the usual values are:
 
 - CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
 - CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
@@ -500,9 +500,19 @@ Like "buzhash64", the Gear table is cryptographically derived from secret key
 material, so chunk cut points are unpredictable without the key.
 
 ``borg create --chunker-params fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+can be used to tune the chunker parameters, the default is:
 
-There is no window size (Gear is window-less). NC_LEVEL is the normalized
-chunking level (0 disables it); 2 is a good default. E.g.: ``fastcdc,19,23,21,2``.
+- CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
+- CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
+- HASH_MASK_BITS = 21 (target chunk size ~= 2^21 B = 2 MiB)
+- NC_LEVEL = 2 (normalized chunking level, 0 disables it)
+
+There is no window size (Gear is window-less). Normalized chunking varies the
+cut-point mask around the target size, which tightens the chunk-size
+distribution and reduces clamping at the min./max. chunk size.
+
+This is the default chunker (``fastcdc,19,23,21,2``), also used for the item
+metadata stream (with a finer granularity, ``fastcdc,15,19,17,2``).
 
 .. _cache:
 

@@ -814,10 +814,12 @@ def test_eval_escapes():
 @pytest.mark.parametrize(
     "chunker_params, expected_return",
     [
-        ("default", ("buzhash", 19, 23, 21, 4095)),
+        ("default", ("fastcdc", 19, 23, 21, 2)),
         ("19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
         ("buzhash,19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
         ("10,23,16,4095", ("buzhash", 10, 23, 16, 4095)),
+        ("buzhash64,19,23,21,4095,2", ("buzhash64", 19, 23, 21, 4095, 2)),
+        ("fastcdc,19,23,21,2", ("fastcdc", 19, 23, 21, 2)),
         ("fixed,4096", ("fixed", 4096, 0)),
         ("fixed,4096,200", ("fixed", 4096, 200)),
     ],

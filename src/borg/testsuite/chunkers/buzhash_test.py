@@ -75,14 +75,14 @@ def test_buzhash_chunksize_distribution():
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
 def test_fuzz_buzhash(worker):
-    # Fuzz the default chunker (buzhash) with random and uniform data of misc. sizes and seeds 0 or random int32 values.
+    # Fuzz the buzhash chunker with random and uniform data of misc. sizes and seeds 0 or random int32 values.
     def rnd_int32():
         uint = random.getrandbits(32)
         return uint if uint < 2**31 else uint - 2**32
 
-    # decompose CHUNKER_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size)
-    algo, min_exp, max_exp, mask_bits, win_size = CHUNKER_PARAMS
-    assert algo == CH_BUZHASH  # default chunker must be buzhash here
+    # decompose BUZHASH_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size)
+    algo, min_exp, max_exp, mask_bits, win_size = BUZHASH_PARAMS
+    assert algo == CH_BUZHASH
 
     seeds = [0] + [rnd_int32() for _ in range(50)]
     sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]

@@ -53,7 +53,7 @@ Examples
 
     # Make a big effort in fine-grained deduplication (big chunk management
     # overhead, needs a lot of RAM and disk space; see the formula in the internals docs):
-    $ borg create --chunker-params buzhash,10,23,16,4095 small /smallstuff
+    $ borg create --chunker-params fastcdc,10,23,16,2 small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
     $ borg create --read-special --chunker-params fixed,4194304 my-sdx /dev/sdX

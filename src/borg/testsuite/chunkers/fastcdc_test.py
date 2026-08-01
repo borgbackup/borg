@@ -9,7 +9,7 @@ from . import cf, cf_expand
 from ...chunkers import ChunkerFastCDC, get_chunker
 from ...chunkers.fastcdc import fastcdc_get_gear_table
 from ...constants import *  # NOQA
-from ...helpers import hex_to_bin
+from ...helpers import ChunkerParams, hex_to_bin
 
 
 # from os.urandom(32)
@@ -106,10 +106,21 @@ def test_fastcdc_get_chunker():
     assert b"".join(a) == data
 
 
+def test_fastcdc_is_the_default_chunker():
+    # both the file content data chunker and the item metadata stream chunker default to fastcdc
+    assert CHUNKER_PARAMS == FASTCDC_PARAMS
+    assert CHUNKER_PARAMS[0] == CH_FASTCDC
+    assert ITEMS_CHUNKER_PARAMS[0] == CH_FASTCDC
+    # the defaults must be valid chunker params and must give working chunkers
+    for params in (CHUNKER_PARAMS, ITEMS_CHUNKER_PARAMS):
+        assert ChunkerParams(",".join(str(p) for p in params)) == params
+        data = os.urandom(1024 * 1024)
+        chunks = cf_expand(get_chunker(*params, key=None).chunkify(BytesIO(data)))
+        assert b"".join(chunks) == data
+
+
 def test_fastcdc_params_parsing():
     from argparse import ArgumentTypeError
-
-    from ...helpers import ChunkerParams
 
     # fastcdc, chunk_min, chunk_max, chunk_mask, nc_level (no window field)
     assert ChunkerParams("fastcdc,19,23,21,2") == (CH_FASTCDC, 19, 23, 21, 2)

@@ -244,6 +244,11 @@ New features:
 - Chunkers:
 
   - fastcdc: new chunker (keyed Gear hash, normalized chunking, ~1.3x faster), #9824
+  - fastcdc is the new default chunker, for file content data as well as for the
+    item metadata stream, #9957. Compared to the previous default "buzhash", it is
+    faster and its Gear table is derived from secret key material (instead of only
+    XORing a 32bit seed into the table), so chunk cut points are much harder to
+    predict without the key (better resistance against fingerprinting attacks).
   - buzhash64: add normalized chunking (better chunk size distribution, less clamping)
 - borg keys:
 

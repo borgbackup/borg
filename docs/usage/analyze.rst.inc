@@ -17,6 +17,8 @@ borg analyze
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--by-name``                                | decompose the whole repository by archive name (not combinable with archive filters)                                        |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--json``                                   | format output as JSON                                                                                                       |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
     |                                                                                                                                                                                                                                                          |
     | :ref:`common_options`                                                                                                                                                                                                                                    |
@@ -53,7 +55,8 @@ borg analyze
 
 
     options
-        --by-name     decompose the whole repository by archive name (not combinable with archive filters)
+        --by-name    decompose the whole repository by archive name (not combinable with archive filters)
+        --json     format output as JSON
 
 
     :ref:`common_options`
@@ -132,3 +135,12 @@ You can use that list to find directories with a lot of "activity" — maybe som
 are temporary or cache directories you forgot to exclude. To avoid including these unwanted
 directories in your backups, you can carefully exclude them in ``borg create`` (for future
 backups) or use ``borg recreate`` to recreate existing archives without them.
+
+**JSON output**
+
+With ``--json``, the same numbers are emitted as a single JSON object instead of the text
+report, with raw byte values rather than formatted sizes. The default mode fills the
+*dedup_size* and *hotspots* keys, ``--by-name`` fills the *by_name* key. The compression
+factor is not included: it is ``stored_size / source_size``.
+
+See :ref:`json_output` for the object's structure.

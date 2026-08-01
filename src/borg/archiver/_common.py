@@ -280,6 +280,7 @@ rst_plain_text_references = {
     "key_files": "Internals -> Data structures and file formats -> Key files",
     "borg_key_export": "borg key export --help",
     "internals_hashindex": "Internals -> Data structures and file formats -> HashIndex",
+    "json_output": "Internals -> All about JSON: How to develop frontends",
 }
 
 

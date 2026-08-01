@@ -1,10 +1,11 @@
+import json
 import pathlib
 import re
 
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import Error
+from ...helpers import Error, format_file_size
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
@@ -192,3 +193,127 @@ def test_analyze_dedup_size_single_archive(archivers, request):
     assert re.search(r"Deduplicated size of set:\s*1\.00 kB", output)
     # file1 is also in other-1, so nothing is exclusive to only-1
     assert re.search(r"Exclusive size of set:\s*0 B", output)
+
+
+def test_analyze_json(archivers, request):
+    """--json reports the same numbers as the text report, as raw byte values."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    input_path = pathlib.Path(archiver.input_path)
+
+    # same layout as test_analyze_dedup_size: each file is one 1000 byte chunk.
+    (input_path / "shared").write_text("s" * 1000)
+    (input_path / "a_only").write_text("a" * 1000)
+    cmd(archiver, "create", "userA-1", archiver.input_path)
+    cmd(archiver, "create", "userA-2", archiver.input_path)
+
+    (input_path / "a_only").unlink()
+    (input_path / "b_only").write_text("b" * 1000)
+    cmd(archiver, "create", "userB-1", archiver.input_path)
+
+    json_output = cmd(archiver, "analyze", "-a", "sh:userA-*", "--json")
+    dedup_size = json.loads(json_output)["dedup_size"]
+    assert dedup_size["considered_archives"] == 2
+    assert dedup_size["total_archives"] == 3
+    assert dedup_size["whole_repository"] is False
+    assert dedup_size["deduplicated"]["source_size"] == 2000  # {shared, a_only}
+    assert dedup_size["exclusive"]["source_size"] == 1000  # {a_only}, "shared" is also in userB-1
+    assert dedup_size["unreferenced"] == {"stored_size": 0, "chunks": 0}
+    assert dedup_size["missing_chunks"] == 0
+    assert dedup_size["total_chunks"] > 0
+
+    # the stored sizes are compression dependent, so relate them to the text report instead of
+    # hardcoding them: both columns of a row are what the text report formats from these values.
+    text = cmd(archiver, "analyze", "-a", "sh:userA-*")
+    for key, label in [("deduplicated", "Deduplicated size of set:"), ("exclusive", "Exclusive size of set:")]:
+        source, stored = dedup_size[key]["source_size"], dedup_size[key]["stored_size"]
+        assert stored > 0
+        row = rf"^{re.escape(label)}\s+{re.escape(format_file_size(source))}\s+{re.escape(format_file_size(stored))}\s"
+        assert re.search(row, text, re.MULTILINE)
+
+    # the text report itself is not printed in JSON mode
+    assert "Deduplicated size of set:" not in json_output
+
+
+def test_analyze_json_whole_repository(archivers, request):
+    """Without an archive filter every chunk is trivially exclusive, so no exclusive size is given."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    input_path = pathlib.Path(archiver.input_path)
+    (input_path / "file1").write_text("x" * 1000)
+    cmd(archiver, "create", "one", archiver.input_path)
+    (input_path / "file2").write_text("y" * 1000)
+    cmd(archiver, "create", "two", archiver.input_path)
+
+    dedup_size = json.loads(cmd(archiver, "analyze", "--json"))["dedup_size"]
+    assert dedup_size["whole_repository"] is True
+    assert dedup_size["considered_archives"] == 2
+    assert dedup_size["total_archives"] == 2
+    assert dedup_size["deduplicated"]["source_size"] == 2000
+    assert "exclusive" not in dedup_size
+
+
+def test_analyze_json_hotspots(archivers, request):
+    """The hot spots are a list of path/size objects, busiest first; null if they were not computed."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    input_path = pathlib.Path(archiver.input_path)
+
+    (input_path / "file1").write_text("1")
+    cmd(archiver, "create", "archive", archiver.input_path)
+
+    # only one matching archive: nothing to compare against, so hot spots are not computed
+    assert json.loads(cmd(archiver, "analyze", "-a", "archive", "--json"))["hotspots"] is None
+
+    (input_path / "file2").write_text("22")
+    cmd(archiver, "create", "archive", archiver.input_path)
+
+    # the 2nd archive added one chunk of 2 bytes below the input directory
+    hotspots = json.loads(cmd(archiver, "analyze", "-a", "archive", "--json"))["hotspots"]
+    assert [hotspot for hotspot in hotspots if hotspot["path"].endswith("/input")] == [
+        {"path": str(input_path).removeprefix("/"), "size": 2}
+    ]
+    # busiest directory first, as in the text report
+    assert [hotspot["size"] for hotspot in hotspots] == sorted((hotspot["size"] for hotspot in hotspots), reverse=True)
+
+
+def test_analyze_json_by_name(archivers, request):
+    """--by-name --json decomposes the repository into per-name exclusive, shared and unreferenced."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    input_path = pathlib.Path(archiver.input_path)
+
+    # same layout as test_analyze_by_name
+    (input_path / "shared").write_text("s" * 1000)
+    (input_path / "a_only").write_text("a" * 1000)
+    cmd(archiver, "create", "alpha", archiver.input_path)
+    cmd(archiver, "create", "alpha", archiver.input_path)
+
+    (input_path / "a_only").unlink()
+    (input_path / "b_only").write_text("b" * 1000)
+    cmd(archiver, "create", "beta", archiver.input_path)
+
+    result = json.loads(cmd(archiver, "analyze", "--by-name", "--json"))
+    assert "dedup_size" not in result and "hotspots" not in result
+    by_name = result["by_name"]
+
+    assert by_name["archives"] == 3
+    assert {entry["name"]: entry["archives"] for entry in by_name["names"]} == {"alpha": 2, "beta": 1}
+    assert {entry["name"]: entry["source_size"] for entry in by_name["names"]} == {"alpha": 1000, "beta": 1000}
+    assert by_name["shared"]["source_size"] == 1000
+    assert by_name["total"]["archives"] == 3
+    assert by_name["total"]["source_size"] == 3000  # 1000 alpha + 1000 beta + 1000 shared
+    assert by_name["total"]["stored_size"] > 0
+    assert by_name["missing_chunks"] == 0
+
+    # every chunk is counted in exactly one row, so the rows add up to the total
+    for size in ("source_size", "stored_size"):
+        assert sum(entry[size] for entry in by_name["names"]) + by_name["shared"][size] == by_name["total"][size]
+    # biggest exclusive consumer first
+    assert [entry["stored_size"] for entry in by_name["names"]] == sorted(
+        (entry["stored_size"] for entry in by_name["names"]), reverse=True
+    )

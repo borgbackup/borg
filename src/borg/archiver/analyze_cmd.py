@@ -5,7 +5,7 @@ from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..cache import get_archive_references, list_archive_reference_caches
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, Error, format_file_size
+from ..helpers import basic_json_data, bin_to_hex, Error, format_file_size, json_print
 from ..helpers import ProgressIndicatorPercent
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
@@ -42,23 +42,40 @@ class ArchiveAnalyzer:
 
     def analyze(self):
         logger.info("Starting archives analysis...")
+        json_data = {} if self.args.json else None
         if self.args.by_name:
             # the decomposition is inherently repository-wide: "shared" and "unreferenced" can only
             # be determined by looking at every archive, so archive filters must not be applied.
             filters = ["match_archives", "first", "last", "older", "newer", "oldest", "newest"]
             if any(getattr(self.args, name, None) for name in filters):
                 raise Error("--by-name analyzes the whole repository and cannot be combined with archive filters.")
-            self.analyze_by_name()
+            by_name = self.analyze_by_name()
+            if json_data is None:
+                self.report_by_name(by_name)
+            else:
+                json_data["by_name"] = by_name
         else:
             considered_infos = self.manifest.archives.list_considering(self.args)
             if not considered_infos:
                 raise Error("No archives match the given selection criteria.")
-            self.analyze_dedup_size(considered_infos)
+            dedup_size = self.analyze_dedup_size(considered_infos)
+            if json_data is None:
+                self.report_dedup_size(dedup_size)
+            else:
+                json_data["dedup_size"] = dedup_size
             if len(considered_infos) >= 2:
                 self.analyze_hotspots(considered_infos)
-                self.report_hotspots()
+                hotspots = self.hotspots()
             else:
                 logger.info("Skipping hot-spot analysis (needs at least 2 matching archives).")
+                hotspots = None  # not computed, as opposed to computed and empty
+            if json_data is None:
+                if hotspots is not None:
+                    self.report_hotspots(hotspots)
+            else:
+                json_data["hotspots"] = hotspots
+        if json_data is not None:
+            json_print(basic_json_data(self.manifest, extra=json_data))
         logger.info("Finished archives analysis.")
 
     def fmt(self, value):
@@ -101,7 +118,7 @@ class ArchiveAnalyzer:
         pi.finish()
         return missing
 
-    def analyze_by_name(self) -> None:
+    def analyze_by_name(self) -> dict:
         """Decompose the whole repository by archive name.
 
         Archives sharing a name form a series, so a name usually groups all backups of one source;
@@ -114,6 +131,8 @@ class ArchiveAnalyzer:
 
         This needs only a single pass over all archives: each chunk records the name that first
         referenced it, and a reference from a different name sets the F_MULTI bit.
+
+        Returns the decomposition as raw byte values, for report_by_name() or --json.
         """
         all_infos = self.manifest.archives.list()  # non-deleted archives
         if not all_infos:
@@ -159,6 +178,29 @@ class ArchiveAnalyzer:
 
         total_plaintext = shared[0] + sum(v[0] for v in exclusive.values())
         total_stored = shared[1] + sum(v[1] for v in exclusive.values())
+
+        return {
+            "archives": len(all_infos),
+            # biggest exclusive consumer first - that is what one would act on
+            "names": [
+                {
+                    "name": name,
+                    "archives": archives_per_name[name],
+                    "source_size": exclusive[name][0],
+                    "stored_size": exclusive[name][1],
+                }
+                for name in sorted(names, key=lambda n: exclusive[n][1], reverse=True)
+            ],
+            "shared": {"source_size": shared[0], "stored_size": shared[1]},
+            "unreferenced": {"stored_size": unref_stored, "chunks": unref_count},
+            "total": {"archives": len(all_infos), "source_size": total_plaintext, "stored_size": total_stored},
+            "total_chunks": total_count,
+            "missing_chunks": missing,
+        }
+
+    def report_by_name(self, data) -> None:
+        """Print the --by-name decomposition computed by analyze_by_name()."""
+        names = [entry["name"] for entry in data["names"]]
         width = min(max([30] + [len(name) for name in names]), 60)
 
         def row(label, archives, source, stored, *, source_known=True):
@@ -169,19 +211,24 @@ class ArchiveAnalyzer:
         print()
         print("Repository decomposition by archive name")
         print("=" * (width + 51))
-        print(f"{len(all_infos)} archive(s) with {len(names)} distinct name(s)")
+        print(f"{data['archives']} archive(s) with {len(names)} distinct name(s)")
         print()
         print(f"{'name':<{width}}{'archives':>10}{'source':>14}{'stored':>14}{'compression':>13}")
-        # biggest exclusive consumer first - that is what one would act on
-        for name in sorted(names, key=lambda n: exclusive[n][1], reverse=True):
-            source, stored = exclusive[name]
-            row(name, archives_per_name[name], source, stored)
-        row("(shared by 2+ names)", "", shared[0], shared[1])
-        row("(unreferenced)", "", 0, unref_stored, source_known=False)
+        for entry in data["names"]:
+            row(entry["name"], entry["archives"], entry["source_size"], entry["stored_size"])
+        row("(shared by 2+ names)", "", data["shared"]["source_size"], data["shared"]["stored_size"])
+        row("(unreferenced)", "", 0, data["unreferenced"]["stored_size"], source_known=False)
         print("-" * (width + 51))
-        row("total (deduplicated)", len(all_infos), total_plaintext, total_stored)
+        row(
+            "total (deduplicated)",
+            data["total"]["archives"],
+            data["total"]["source_size"],
+            data["total"]["stored_size"],
+        )
         print()
-        print(f"Unreferenced: {unref_count} of {total_count} chunks in the repository index.")
+        print(
+            f"Unreferenced: {data['unreferenced']['chunks']} of {data['total_chunks']} chunks in the repository index."
+        )
         print()
         print("Each chunk is counted in exactly one row, so the rows add up to the total.")
         print("A name row shows what is exclusive to it: no archive of another name references these")
@@ -197,8 +244,8 @@ class ArchiveAnalyzer:
         print(f"{'':<12}   archives count as unreferenced (borg compact keeps them if the")
         print(f"{'':<12}   repository is damaged).")
 
-    def analyze_dedup_size(self, considered_infos) -> None:
-        """Compute and report the deduplicated size of the considered set of archives.
+    def analyze_dedup_size(self, considered_infos) -> dict:
+        """Compute the deduplicated size of the considered set of archives.
 
         For both the plaintext (uncompressed source) size and the stored (compressed, as stored in
         the repository) size, two figures are reported:
@@ -221,6 +268,8 @@ class ArchiveAnalyzer:
         plaintext size (which is 0 in the repo index) from the per-archive references cache. These
         in-memory mutations are never persisted: write_chunkindex_to_repo() zeroes flags and size,
         and close() only serializes F_NEW entries (there are none here).
+
+        Returns the sizes as raw byte values, for report_dedup_size() or --json.
         """
         considered_ids = {info.id for info in considered_infos}
         all_infos = self.manifest.archives.list()  # non-deleted archives; the rest = all - considered
@@ -252,28 +301,54 @@ class ArchiveAnalyzer:
         # chunk is trivially exclusive to it, so that line would just repeat the deduplicated size.
         whole_repo = not rest_infos
 
+        data = {
+            "considered_archives": len(considered_infos),
+            "total_archives": len(all_infos),
+            "whole_repository": whole_repo,
+            "deduplicated": {"source_size": set_plaintext, "stored_size": set_stored},
+            "unreferenced": {"stored_size": unref_stored, "chunks": unref_count},
+            "total_chunks": total_count,
+            "missing_chunks": missing,
+        }
+        if not whole_repo:
+            data["exclusive"] = {"source_size": excl_plaintext, "stored_size": excl_stored}
+        return data
+
+    def report_dedup_size(self, data) -> None:
+        """Print the deduplicated sizes computed by analyze_dedup_size()."""
+        whole_repo = data["whole_repository"]
+
         def row(label, source, stored, *, source_known=True):
             sizes = f"{self.fmt(source) if source_known else 'n/a':>14}{self.fmt(stored):>14}"
             ratio = self.factor(stored, source) if source_known else "n/a"
             print(f"{label:<26}{sizes}{ratio:>13}")
 
+        considered = data["considered_archives"]
+        total_archives = data["total_archives"]
+        deduplicated = data["deduplicated"]
+        unreferenced = data["unreferenced"]
+
         print()
         if whole_repo:
             print("Deduplicated size of the whole repository")
             print("=" * 67)
-            print(f"Archives: {len(all_infos)} (all archives in the repository)")
+            print(f"Archives: {total_archives} (all archives in the repository)")
         else:
-            print(f"Deduplicated size of the {len(considered_infos)} considered archive(s)")
+            print(f"Deduplicated size of the {considered} considered archive(s)")
             print("=" * 67)
-            print(f"Considered archives: {len(considered_infos)} (of {len(all_infos)} in the repository)")
+            print(f"Considered archives: {considered} (of {total_archives} in the repository)")
         print()
         print(f"{'':26}{'source':>14}{'stored':>14}{'compression':>13}")
-        row("Deduplicated size:" if whole_repo else "Deduplicated size of set:", set_plaintext, set_stored)
+        row(
+            "Deduplicated size:" if whole_repo else "Deduplicated size of set:",
+            deduplicated["source_size"],
+            deduplicated["stored_size"],
+        )
         if not whole_repo:
-            row("Exclusive size of set:", excl_plaintext, excl_stored)
-        row("Unreferenced chunks:", 0, unref_stored, source_known=False)
+            row("Exclusive size of set:", data["exclusive"]["source_size"], data["exclusive"]["stored_size"])
+        row("Unreferenced chunks:", 0, unreferenced["stored_size"], source_known=False)
         print()
-        print(f"Unreferenced: {unref_count} of {total_count} chunks in the repository index.")
+        print(f"Unreferenced: {unreferenced['chunks']} of {data['total_chunks']} chunks in the repository index.")
         print()
         if whole_repo:
             print(f"{'source':<12} = uncompressed source data size (each chunk counted once)")
@@ -341,13 +416,21 @@ class ArchiveAnalyzer:
             if directory_path not in base:
                 analyze_path_change(directory_path)
 
-    def report_hotspots(self):
+    def hotspots(self) -> list:
+        """The hot spots collected by analyze_hotspots(), busiest directory first."""
+        return [
+            {"path": directory_path, "size": self.difference_by_path[directory_path]}
+            for directory_path in sorted(
+                self.difference_by_path, key=lambda p: self.difference_by_path[p], reverse=True
+            )
+        ]
+
+    def report_hotspots(self, hotspots):
         print()
         print("chunks added or removed by directory path")
         print("=========================================")
-        for directory_path in sorted(self.difference_by_path, key=lambda p: self.difference_by_path[p], reverse=True):
-            difference = self.difference_by_path[directory_path]
-            print(f"{directory_path}: {difference}")
+        for hotspot in hotspots:
+            print(f"{hotspot['path']}: {hotspot['size']}")
 
 
 class AnalyzeMixIn:
@@ -420,6 +503,15 @@ class AnalyzeMixIn:
             are temporary or cache directories you forgot to exclude. To avoid including these unwanted
             directories in your backups, you can carefully exclude them in ``borg create`` (for future
             backups) or use ``borg recreate`` to recreate existing archives without them.
+
+            **JSON output**
+
+            With ``--json``, the same numbers are emitted as a single JSON object instead of the text
+            report, with raw byte values rather than formatted sizes. The default mode fills the
+            *dedup_size* and *hotspots* keys, ``--by-name`` fills the *by_name* key. The compression
+            factor is not included: it is ``stored_size / source_size``.
+
+            See :ref:`json_output` for the object's structure.
             """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_analyze.__doc__, epilog=analyze_epilog)
@@ -430,4 +522,5 @@ class AnalyzeMixIn:
             action="store_true",
             help="decompose the whole repository by archive name (not combinable with archive filters)",
         )
+        subparser.add_argument("--json", action="store_true", help="format output as JSON")
         define_archive_filters_group(subparser)

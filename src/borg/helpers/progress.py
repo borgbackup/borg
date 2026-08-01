@@ -1,10 +1,31 @@
 import logging
 import json
+import os
 import time
 
 from ..logger import create_logger
 
 logger = create_logger()
+
+DEFAULT_PROGRESS_FPS = 5.0  # progress updates per second, the traditional rate
+
+_warned_fps: set[str] = set()  # invalid BORG_PROGRESS_FPS values already complained about
+
+
+def get_progress_dt():
+    """Minimum time between progress updates [seconds], 1 / BORG_PROGRESS_FPS [updates per second]."""
+    fps_str = os.environ.get("BORG_PROGRESS_FPS", "").strip()
+    if fps_str:
+        try:
+            fps = float(fps_str)
+        except ValueError:
+            fps = 0.0
+        if fps > 0.0:
+            return 1.0 / fps
+        if fps_str not in _warned_fps:
+            _warned_fps.add(fps_str)
+            logger.warning(f"Invalid BORG_PROGRESS_FPS value {fps_str!r}, must be a number > 0. Ignoring it.")
+    return 1.0 / DEFAULT_PROGRESS_FPS
 
 
 class ProgressIndicatorBase:

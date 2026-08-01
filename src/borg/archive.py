@@ -41,7 +41,7 @@ from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_jso
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
-from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
 from .helpers import os_open, flags_normal, flags_dir
 from .helpers import os_stat
 from .helpers import msgpack
@@ -713,7 +713,7 @@ Duration: {0.duration}
         if show_progress and self.show_progress:
             if stats is None:
                 stats = self.stats
-            stats.show_progress(item=item, dt=0.2)
+            stats.show_progress(item=item, dt=get_progress_dt())
         self.items_buffer.add(item)
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
@@ -1329,7 +1329,7 @@ class ChunksProcessor:
             chunk_entry = chunk_processor(chunk)
             item.chunks.append(chunk_entry)
             if show_progress:
-                stats.show_progress(item=item, dt=0.2)
+                stats.show_progress(item=item, dt=get_progress_dt())
 
 
 def maybe_exclude_by_attr(item):

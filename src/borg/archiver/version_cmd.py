@@ -1,3 +1,5 @@
+import json
+
 from .. import __version__
 from ..constants import *  # NOQA
 from ..helpers.argparsing import ArgumentParser
@@ -20,7 +22,12 @@ class VersionMixIn:
                 server_version = repository.server_version
         else:
             server_version = client_version
-        print(f"{format_version(client_version)} / {format_version(server_version)}")
+        client_version = format_version(client_version)
+        server_version = format_version(server_version)
+        if getattr(args, "json", False):
+            print(json.dumps({"client": client_version, "server": server_version}))
+        else:
+            print(f"{client_version} / {server_version}")
 
     def build_parser_version(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -45,6 +52,10 @@ class VersionMixIn:
             $ borg version --from-borg1 ssh://borg@borgbackup:repo
             1.4.0a / 1.2.7
 
+            # machine-readable output
+            $ borg version --json /mnt/backup
+            {"client": "1.4.0a", "server": "1.4.0a"}
+
         Due to the version tuple format used in Borg client/server negotiation, only
         a simplified version is displayed (as provided by borg.version.format_version).
 
@@ -52,4 +63,7 @@ class VersionMixIn:
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_version.__doc__, epilog=version_epilog)
+        subparser.add_argument(
+            "--json", action="store_true", help="display the client and server versions as a JSON object"
+        )
         subparsers.add_subcommand("version", subparser, help="display the Borg client and server versions")

@@ -101,6 +101,59 @@ General:
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
+    BORG_ASSERT_ID
+        Comma-separated list of the places where borg shall verify that a chunk's content matches
+        its chunk id (``chunkid == id_hash(content)``) after decrypting and decompressing it.
+        Verifying costs a full hash pass over everything that is read at such a place.
+
+        Default (variable not set)::
+
+            BORG_ASSERT_ID=repair,transfer,rechunk
+
+        These are the place names that can be listed:
+
+        read
+            Every read that decompresses a chunk: ``borg extract``, ``borg mount``,
+            ``borg export-tar``, ``borg diff``, ... This is by far the most data borg reads, so
+            this place is **not** in the default, see the explanation below.
+        repair
+            ``borg check --repair``. It rebuilds archives from the item metadata stream it reads,
+            re-packing it into new chunks with freshly computed ids, and it recreates manifest and
+            archives directory entries from what it reads.
+        transfer
+            ``borg transfer``, for everything it reads from the source repository. Transferring
+            re-anchors the content in another repository, which is a trust boundary.
+        rechunk
+            ``borg recreate --chunker-params ...``, i.e. re-chunking reads. Re-chunking computes
+            new chunk ids from the content it reads, so a violation would not be noticeable any
+            more afterwards. (Re-chunking in ``borg transfer`` is covered by ``transfer``.)
+
+        An unknown place name is an error. An empty value (``BORG_ASSERT_ID=``) verifies at none of
+        these places, but still where borg always verifies (see below).
+
+        Why ``read`` is not in the default: for encrypted repositories (all the AEAD ciphersuites),
+        the chunk id is part of the AEAD additional authenticated data, so a successful decryption
+        already proves that a holder of the repository key deliberately stored exactly this
+        ciphertext for exactly this chunk id. A malicious or buggy **repository** can therefore not
+        swap, splice or substitute objects, whether the id is verified on read or not. What the id
+        check adds is the detection of chunks whose content does not match their id, which only a
+        malicious or compromised **borg client that had your borg key** could have written (e.g. to
+        poison future deduplication). If that is in your threat model - e.g. because some machines
+        writing into the repository are not fully trusted - add ``read`` to the list::
+
+            BORG_ASSERT_ID=read,repair,transfer,rechunk
+
+        Otherwise, running ``borg check --verify-data`` periodically is recommended: it is the
+        audit that re-certifies the invariant for all chunks in the background, instead of on
+        every read.
+
+        Independent of this variable, borg always verifies the chunk id:
+
+        - in ``borg check --verify-data``. That audit is what makes not verifying elsewhere
+          defensible, so it is not configurable (there is no ``verify_data`` place name).
+        - for ``authenticated`` and ``none`` mode repositories: there is no AEAD there, so the id
+          check *is* the read path's integrity check and switching it off would remove it
+          completely. Same for reading borg 1.x repositories (``borg transfer``).
     BORG_BLAKE3_MT_THRESHOLD
         When set to a numeric value, chunks of at least that many KiB get their id computed by
         multi-threaded BLAKE3, smaller ones single-threaded (default: 256, i.e. 256KiB).

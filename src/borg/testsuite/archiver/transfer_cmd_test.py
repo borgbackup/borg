@@ -11,11 +11,19 @@ from contextlib import contextmanager
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import open_item
+from ...helpers import open_item, IntegrityError
 from ...helpers.time import parse_timestamp
 from ...helpers.parseformat import parse_file_size, ChunkerParams
 from ..platform.platform_test import is_win32
-from . import cmd, create_regular_file, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
+from . import (
+    cmd,
+    create_regular_file,
+    create_test_files,
+    RK_ENCRYPTION,
+    open_archive,
+    generate_archiver_tests,
+    write_wrong_content_chunk,
+)
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
 
@@ -369,6 +377,33 @@ def test_transfer(archivers, request, monkeypatch):
     cmd(archiver, "transfer", other_repo1)
     cmd(archiver, "transfer", other_repo1, "--dry-run")
     check_repo()
+
+
+@pytest.mark.parametrize("rechunkify", [False, True])
+def test_transfer_wrong_chunk_content(archivers, request, monkeypatch, rechunkify):
+    # transferring re-anchors the content in another repository, so the chunkid == id_hash(content)
+    # invariant is re-certified there, even though reads do not check it by default, see #9994.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        create_regular_file(archiver.input_path, "file1", size=100000)
+        cmd(archiver, "create", "arch1", "input")
+        archive, repository = open_archive(archiver.repository_path, "arch1")
+        with repository:
+            for item in archive.iter_items():
+                if item.path.endswith("file1"):
+                    chunk = item.chunks[-1]
+                    break
+            write_wrong_content_chunk(archive, repository, chunk.id)
+
+    monkeypatch.delenv("BORG_ASSERT_ID", raising=False)
+    args = ["transfer", other_repo1]
+    if rechunkify:
+        args += ["--chunker-params=buzhash,10,23,16,4095"]
+    with pytest.raises(IntegrityError):  # local (not forked): the Error propagates instead of setting the rc
+        cmd(archiver, *args)
 
 
 def test_transfer_archive_metadata(archivers, request, monkeypatch):

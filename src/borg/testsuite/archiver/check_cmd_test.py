@@ -8,11 +8,20 @@ import pytest
 
 from ...archive import ChunkBuffer
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack, CommandError
+from ...helpers import bin_to_hex, msgpack, CommandError, IntegrityError
 from ...manifest import Manifest
 from ...repository import Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
-from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
+from . import (
+    cmd,
+    src_file,
+    create_src_archive,
+    open_archive,
+    generate_archiver_tests,
+    read_chunk,
+    write_wrong_content_chunk,
+    RK_ENCRYPTION,
+)
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -479,6 +488,62 @@ def test_verify_data(archivers, request, init_args):
     # run with --verify-data again, it will notice the missing chunk.
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
     assert f"{src_file}: Missing file chunk detected" in output
+
+
+def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):
+    # a chunk whose content does not match its id (only an evil borg client that had the repo key could
+    # have written it): the AEAD layer authenticates it just fine, only the id check notices, see #9994.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith(src_file):
+                chunk = item.chunks[-1]
+                break
+        write_wrong_content_chunk(archive, repository, chunk.id)
+
+    # by default, reads do not check the id/content invariant, so this is not noticed:
+    monkeypatch.delenv("BORG_ASSERT_ID", raising=False)
+    cmd(archiver, "extract", "archive1", exit_code=0)
+    # ... but check --verify-data always checks it:
+    output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
+    assert f"{bin_to_hex(chunk.id)}, integrity error" in output
+    assert "id verification failed" in output
+
+    # with "read" in BORG_ASSERT_ID, reads check it too:
+    monkeypatch.setenv("BORG_ASSERT_ID", "read")
+    with pytest.raises(IntegrityError):  # local (not forked): the Error propagates instead of setting the rc
+        cmd(archiver, "extract", "archive1")
+
+
+def test_repair_wrong_item_metadata_chunk_content(archivers, request, monkeypatch):
+    # check --repair re-packs the item metadata stream it reads into new chunks with freshly computed ids,
+    # so it re-certifies the id/content invariant, even though reads do not check it by default, see #9994.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        chunk_id = archive.metadata.items[0]  # first chunk of the item metadata stream
+        data = read_chunk(archive, repository, chunk_id, ro_type=ROBJ_ARCHIVE_STREAM)
+        # append a msgpack nil: the item stream still unpacks (so a read that does not check the id gets
+        # away with it), but the content does not hash to the chunk id any more.
+        write_wrong_content_chunk(archive, repository, chunk_id, ro_type=ROBJ_ARCHIVE_STREAM, wrong_data=data + b"\xc0")
+
+    monkeypatch.delenv("BORG_ASSERT_ID", raising=False)
+    # a normal archives check reads the item metadata stream, but does not check the id:
+    output = cmd(archiver, "check", "--archives-only", exit_code=1)
+    assert "id verification failed" not in output
+    # --repair rebuilds the archive from what it reads, so there it is checked:
+    output = cmd(archiver, "check", "--repair", "--archives-only", exit_code=0)
+    assert f"{bin_to_hex(chunk_id)}" in output
+    assert "id verification failed" in output
 
 
 @pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none"]])

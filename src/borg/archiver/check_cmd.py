@@ -143,6 +143,10 @@ class CheckMixIn:
         guaranteed for encrypted repositories against attackers without access to the keys.
         You cannot use ``--verify-data`` with ``--repository-only``.
 
+        ``--verify-data`` also always verifies that each chunk's content matches its chunk id,
+        which normal reads do not do by default (see ``BORG_ASSERT_ID``). Running it periodically
+        is therefore recommended.
+
         The ``--find-lost-archives`` option will also scan the whole repository, but
         tells Borg to search for lost archive metadata. If Borg encounters any archive
         metadata that does not match an archive directory entry (including

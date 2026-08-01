@@ -1,13 +1,58 @@
+import os
 from collections import namedtuple
 from struct import Struct
 
 from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
-from .helpers.errors import IntegrityError
+from .helpers.errors import Error, IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR
 
 # Workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
+
+# The places where parse() verifies chunkid == id_hash(content) only if the user asks for it.
+# The user picks the places via BORG_ASSERT_ID (comma-separated), see the docs of that env var.
+ASSERT_ID_PLACES = (
+    "read",  # the general read path: extract, mount, export-tar, diff, ...
+    "repair",  # borg check --repair
+    "transfer",  # borg transfer (everything it reads from the source repo)
+    "rechunk",  # borg recreate --chunker-params (re-chunking reads)
+)
+# The places that always verify and thus can not be configured: borg check --verify-data is the
+# audit that re-certifies the id/content invariant for all chunks of a repository - it is what makes
+# not verifying elsewhere defensible, so it must not be switchable.
+ASSERT_ID_PLACES_MANDATORY = ("verify_data",)  # borg check --verify-data
+# Default value of the BORG_ASSERT_ID env var: verify everywhere except on the (hot) general read
+# path - there, the AEAD authentication already covers what a repository could do to us, see
+# AEADKeyBase.assert_id.
+BORG_ASSERT_ID_DEFAULT = ("repair", "transfer", "rechunk")
+# Reads through a RepoObj are attributed to this place unless a command sets another one.
+ASSERT_ID_PLACE_DEFAULT = "read"
+
+
+def get_assert_id_places():
+    """Determine the configurable places that shall verify the chunk id, see the BORG_ASSERT_ID docs.
+
+    Note: this only decides for keys that authenticate reads independently of the id hash (the AEAD
+    ciphersuites, see KeyBase.id_check_is_authentication) - for all other keys, the id check is the
+    read path authentication itself and thus always happens, no matter what is configured here.
+    The same is true for ASSERT_ID_PLACES_MANDATORY.
+    """
+    value = os.environ.get("BORG_ASSERT_ID")
+    if value is None:
+        return frozenset(BORG_ASSERT_ID_DEFAULT)
+    places = frozenset(place.strip() for place in value.split(",") if place.strip())
+    invalid = places - set(ASSERT_ID_PLACES)
+    if invalid:
+        problems = []
+        mandatory = sorted(invalid & set(ASSERT_ID_PLACES_MANDATORY))
+        if mandatory:
+            problems.append(f"{', '.join(mandatory)}: always verifies, can not be configured")
+        unknown = sorted(invalid - set(ASSERT_ID_PLACES_MANDATORY))
+        if unknown:
+            problems.append(f"{', '.join(unknown)}: invalid place name(s)")
+        raise Error(f"BORG_ASSERT_ID: {'; '.join(problems)}. Valid place names are: {', '.join(ASSERT_ID_PLACES)}.")
+    return places
 
 
 OBJ_MAGIC = b"BORG_OBJ"
@@ -61,6 +106,17 @@ class RepoObj:
         # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates
         # the default used by those commands who do take a --compression argument.
         self.compressor = LZ4_COMPRESSOR
+        # Where shall the chunk id be verified over the plaintext? See parse() and the BORG_ASSERT_ID docs.
+        self.assert_id_places = get_assert_id_places()
+        # The place reads through this RepoObj are attributed to. Commands that are a trust boundary for
+        # the id/content invariant (transfer, re-chunking, check --repair) set their own place, see
+        # set_assert_id_place.
+        self.assert_id_place = ASSERT_ID_PLACE_DEFAULT
+
+    def set_assert_id_place(self, place: str) -> None:
+        """Attribute all reads through this RepoObj to <place>, see the BORG_ASSERT_ID docs."""
+        assert place in ASSERT_ID_PLACES + ASSERT_ID_PLACES_MANDATORY
+        self.assert_id_place = place
 
     def id_hash(self, data: bytes) -> bytes:
         return self.key.id_hash(data)
@@ -134,7 +190,13 @@ class RepoObj:
         return meta
 
     def parse(
-        self, id: bytes, cdata: bytes, decompress: bool = True, want_compressed: bool = False, ro_type: str = None
+        self,
+        id: bytes,
+        cdata: bytes,
+        decompress: bool = True,
+        want_compressed: bool = False,
+        ro_type: str = None,
+        assert_id_place: str = None,
     ) -> tuple[dict, bytes]:
         """
         Parse a repo object into metadata and data (decrypt it, maybe decompress, maybe verify if the chunk plaintext
@@ -145,6 +207,10 @@ class RepoObj:
         - decompress=True, want_compressed=True: slow, verifying. returns compressed data (caller wants to reuse it).
         - decompress=False, want_compressed=True: quick, not verifying. returns compressed data (caller wants to reuse).
         - decompress=False, want_compressed=False: invalid
+
+        assert_id_place gives the place this specific read happens at (see the BORG_ASSERT_ID docs); if not
+        given, the RepoObj's place is used (see set_assert_id_place). Places in ASSERT_ID_PLACES_MANDATORY
+        always verify, the others only if the user asked for them.
         """
         assert isinstance(ro_type, str)
         assert not (not decompress and not want_compressed), "invalid parameter combination!"
@@ -186,7 +252,19 @@ class RepoObj:
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)
             meta, data = compressor.decompress(dict(meta_compressed), data_compressed[:psize])
-            if not AUTHENTICATED_NO_KEY:
+            # For keys where the id check is the read-path authentication ("authenticated" and "none" mode),
+            # it always has to happen - skipping it would remove all integrity checking from reads.
+            # For the AEAD keys, the ciphertext is already authenticated for this specific chunk id (the id is
+            # in the AAD), so the id check only adds detection of chunks whose plaintext does not match their id
+            # - which only an evil/broken borg client that had the repo key could have written. Whether that
+            # extra full-plaintext hash pass is worth it depends on the place we read at, see BORG_ASSERT_ID.
+            place = assert_id_place if assert_id_place is not None else self.assert_id_place
+            assert_id = (
+                self.key.id_check_is_authentication
+                or place in ASSERT_ID_PLACES_MANDATORY
+                or place in self.assert_id_places
+            )
+            if assert_id and not AUTHENTICATED_NO_KEY:
                 self.key.assert_id(id, data)
         else:
             meta, data = None, None

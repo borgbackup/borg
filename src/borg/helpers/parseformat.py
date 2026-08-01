@@ -507,12 +507,21 @@ replace_placeholders = PlaceholderReplacer()
 
 
 def PathSpec(text):
+    """A path inside an archive."""
     if not text:
         raise ArgumentTypeError("Empty strings are not accepted as paths.")
     return text
 
 
 def FilesystemPathSpec(text):
+    """A path (file or directory) in the local filesystem."""
+    if not text:
+        raise ArgumentTypeError("Empty strings are not accepted as paths.")
+    return slashify(text)
+
+
+def FilesystemDirSpec(text):
+    """A directory in the local filesystem."""
     if not text:
         raise ArgumentTypeError("Empty strings are not accepted as paths.")
     return slashify(text)

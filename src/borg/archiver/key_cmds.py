@@ -3,7 +3,7 @@ import os
 from ..constants import *  # NOQA
 from ..crypto.key import KEY_LOCATIONS
 from ..crypto.keymanager import KeyManager
-from ..helpers import PathSpec, CommandError
+from ..helpers import FilesystemPathSpec, CommandError
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -189,7 +189,9 @@ class KeysMixIn:
             parents=[common_parser], description=self.do_key_export.__doc__, epilog=key_export_epilog
         )
         key_parsers.add_subcommand("export", subparser, help="export a borg key for backup")
-        subparser.add_argument("path", metavar="PATH", nargs="?", type=PathSpec, help="where to store the backup")
+        subparser.add_argument(
+            "path", metavar="PATH", nargs="?", type=FilesystemPathSpec, help="where to store the backup"
+        )
         export_select = subparser.add_mutually_exclusive_group()
         export_select.add_argument("--label", metavar="LABEL", dest="label", help="export the borg key with this label")
         export_select.add_argument(
@@ -231,7 +233,11 @@ class KeysMixIn:
         )
         key_parsers.add_subcommand("import", subparser, help="import the repository key from backup")
         subparser.add_argument(
-            "path", metavar="PATH", nargs="?", type=PathSpec, help="path to the backup ('-' to read from stdin)"
+            "path",
+            metavar="PATH",
+            nargs="?",
+            type=FilesystemPathSpec,
+            help="path to the backup ('-' to read from stdin)",
         )
         subparser.add_argument(
             "--paper",

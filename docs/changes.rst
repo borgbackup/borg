@@ -179,6 +179,7 @@ New features:
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
 - analyze: report deduplicated size of a set of archives, #5741
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
+- BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
 
 Fixes:
 

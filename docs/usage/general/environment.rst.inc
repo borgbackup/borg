@@ -86,6 +86,12 @@ General:
 
         ``BORG_UNITS=iec`` is the replacement for the removed ``BORG_IEC`` environment
         variable (and for the ``--iec`` command line option removed before that).
+    BORG_PROGRESS_FPS
+        How often the ``--progress`` output is updated at most, in updates per
+        second (default: 5). Fractional values are allowed, e.g.
+        ``BORG_PROGRESS_FPS=0.1`` limits it to one update every 10 seconds.
+        Lower values are useful when the output goes into a logfile rather than
+        to an interactive terminal.
     BORG_DEBUG_PROFILE
         When set to a filename, write an execution profile in Borg format into that file
         (see :ref:`debugging`). If the filename ends with ``.pyprof``, a Python-compatible

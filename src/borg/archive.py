@@ -41,7 +41,7 @@ from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_jso
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
-from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
 from .helpers import os_open, flags_normal, flags_dir
 from .helpers import os_stat
 from .helpers import msgpack
@@ -109,7 +109,7 @@ class Statistics:
     def __init__(self, output_json=False):
         self.output_json = output_json
         self.osize = self.usize = self.nfiles = 0
-        self.last_progress = 0  # timestamp when last progress was shown
+        self.last_progress = float("-inf")  # monotonic timestamp when progress was last shown, -inf: never
         self.files_stats = defaultdict(int)
         self.chunking_time = 0.0
         self.hashing_time = 0.0
@@ -195,9 +195,9 @@ Files changed while reading: {files_changed_while_reading}
     def usize_fmt(self):
         return format_file_size(self.usize)
 
-    def show_progress(self, item=None, final=False, stream=None, dt=None):
+    def show_progress(self, item=None, final=False, stream=None):
         now = time.monotonic()
-        if dt is None or now - self.last_progress > dt:
+        if final or now - self.last_progress > get_progress_dt():
             stream = stream or sys.stderr
             self.last_progress = now
             if self.output_json:
@@ -713,7 +713,7 @@ Duration: {0.duration}
         if show_progress and self.show_progress:
             if stats is None:
                 stats = self.stats
-            stats.show_progress(item=item, dt=0.2)
+            stats.show_progress(item=item)
         self.items_buffer.add(item)
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
@@ -1329,7 +1329,7 @@ class ChunksProcessor:
             chunk_entry = chunk_processor(chunk)
             item.chunks.append(chunk_entry)
             if show_progress:
-                stats.show_progress(item=item, dt=0.2)
+                stats.show_progress(item=item)
 
 
 def maybe_exclude_by_attr(item):

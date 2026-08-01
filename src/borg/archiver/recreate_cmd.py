@@ -166,7 +166,7 @@ class RecreateMixIn:
             default=None,
             action=Highlander,
             help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. "
+            "HASH_MASK_BITS, NC_LEVEL) or `default` to use the chunker defaults. "
             "default: do not rechunk",
         )
 

@@ -110,8 +110,8 @@ def test_fuzz_bh64(worker):
     def rnd_key():
         return os.urandom(32)
 
-    # decompose CHUNKER64_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size, nc_level)
-    algo, min_exp, max_exp, mask_bits, win_size, nc_level = CHUNKER64_PARAMS
+    # decompose BUZHASH64_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size, nc_level)
+    algo, min_exp, max_exp, mask_bits, win_size, nc_level = BUZHASH64_PARAMS
     assert algo == CH_BUZHASH64  # default chunker must be buzhash64 here
 
     keys = [b"\0" * 32] + [rnd_key() for _ in range(10)]

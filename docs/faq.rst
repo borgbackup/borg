@@ -834,7 +834,7 @@ Compared to simply copying files (e.g. with ``rsync``), Borg has more work to do
 This can make creation of the first archive slower, but saves time
 and disk space on subsequent runs. Here what Borg does when you run ``borg create``:
 
-- Borg chunks the file (using the relatively expensive buzhash algorithm)
+- Borg chunks the file (using content-defined chunking, which needs to look at every byte)
 - It then computes the "id" of the chunk (hmac-sha256 (slow, except
   if your CPU has sha256 acceleration) or blake2b (fast, in software))
 - Then it checks whether this chunk is already in the repo (local hashtable lookup,

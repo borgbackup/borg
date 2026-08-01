@@ -6,6 +6,7 @@ from datetime import datetime
 import pytest
 
 from ...constants import *  # NOQA
+from ...helpers import IntegrityError
 from .. import changedir, are_hardlinks_supported
 from . import (
     _create_test_caches,
@@ -19,6 +20,8 @@ from . import (
     cmd,
     create_regular_file,
     create_test_files,
+    open_archive,
+    write_wrong_content_chunk,
     RK_ENCRYPTION,
 )
 
@@ -153,6 +156,31 @@ def test_recreate_rechunkify(archivers, request):
     # TODO: this is a rather weak test, it could be improved by comparing the IDs in the chunk lists,
     # to make sure that everything is completely deduplicated now (both files have identical chunks).
     assert num_chunks1 == num_chunks2
+
+
+def test_recreate_rechunkify_wrong_chunk_content(archivers, request, monkeypatch):
+    # re-chunking computes new chunk ids from the content it reads, so it re-certifies the
+    # chunkid == id_hash(content) invariant, even though reads do not check it by default, see #9994.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    create_regular_file(archiver.input_path, "file1", size=100000)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input", "--chunker-params", "7,9,8,127")
+    archive, repository = open_archive(archiver.repository_path, "test")
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith("file1"):
+                chunk = item.chunks[-1]
+                break
+        write_wrong_content_chunk(archive, repository, chunk.id)
+
+    monkeypatch.delenv("BORG_ASSERT_ID", raising=False)
+    # without re-chunking, recreate does not read the file content chunks at all:
+    cmd(archiver, "recreate", "--exclude", "filename_never_matches", "-a", "test")
+    with pytest.raises(IntegrityError):  # local (not forked): the Error propagates instead of setting the rc
+        cmd(archiver, "recreate", "--chunker-params", "fixed,4096", "-a", "test")
 
 
 def test_recreate_fixed_rechunkify(archivers, request):

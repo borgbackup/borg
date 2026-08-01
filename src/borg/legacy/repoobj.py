@@ -12,6 +12,11 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
 class RepoObj1:  # legacy
+    def set_assert_id_place(self, place: str) -> None:
+        # borg 1.x crypto has no AEAD with the chunk id in the AAD, so the id check is a needed part of
+        # the read path here: parse always does it and there is nothing to configure (see BORG_ASSERT_ID).
+        pass
+
     @classmethod
     def extract_crypted_data(cls, data: bytes) -> bytes:
         # used for crypto type detection

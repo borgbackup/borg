@@ -1898,6 +1898,14 @@ class ArchiveChecker:
         if self.key is None:
             self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
+        if repair:
+            # --repair re-anchors content: it re-packs the item metadata stream it reads into new chunks
+            # with freshly computed ids (see add_callback in rebuild_archives) and it recreates archives
+            # directory entries from archive metadata content. Just like re-chunking, that would turn a
+            # chunk whose content does not match its id into valid data under a new id, and the violation
+            # could not be noticed afterwards. So everything read here is read at the "repair" place, which
+            # re-certifies chunkid == id_hash(content) by default, see BORG_ASSERT_ID.
+            self.repo_objs.set_assert_id_place("repair")
         if verify_data:
             self.verify_data()
         rebuild_manifest = False
@@ -1985,8 +1993,12 @@ class ArchiveChecker:
                     defect_chunks.append(chunk_id)
             else:
                 try:
-                    # we must decompress, so it'll call assert_id() in there:
-                    self.repo_objs.parse(chunk_id, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
+                    # we must decompress, so it'll call assert_id() in there.
+                    # this is the audit that re-certifies the id/content invariant, so it reads at its own
+                    # place, which always verifies and can not be switched off, see BORG_ASSERT_ID.
+                    self.repo_objs.parse(
+                        chunk_id, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE, assert_id_place="verify_data"
+                    )
                 except IntegrityErrorBase as integrity_error:
                     self.error_found = True
                     errors += 1
@@ -2004,8 +2016,14 @@ class ArchiveChecker:
                     # from the underlying media.
                     try:
                         encrypted_data = self.repository.get(defect_chunk)
-                        # we must decompress, so it'll call assert_id() in there:
-                        self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
+                        # we must decompress, so it'll call assert_id() in there (see above):
+                        self.repo_objs.parse(
+                            defect_chunk,
+                            encrypted_data,
+                            decompress=True,
+                            ro_type=ROBJ_DONTCARE,
+                            assert_id_place="verify_data",
+                        )
                     except IntegrityErrorBase:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
                         # keeping the other chunks. update_index=False: finish() rebuilds the index from
@@ -2358,6 +2376,11 @@ class ArchiveRecreater:
         self.rechunkify = chunker_params is not None
         if self.rechunkify:
             logger.debug("Rechunking archives to %s", chunker_params)
+            # Re-chunking computes new ids from the plaintext we read, so a chunk whose content does not match
+            # its id would just silently become a valid chunk under a new id and the violation could not be
+            # noticed any more. Thus we read at the "rechunk" place, which re-certifies the id/content
+            # invariant by default, like borg transfer does, see BORG_ASSERT_ID.
+            self.repo_objs.set_assert_id_place("rechunk")
         self.chunker_params = chunker_params or CHUNKER_PARAMS
         self.compression = compression or CompressionSpec("none")
         self.seen_chunks = set()

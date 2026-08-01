@@ -174,6 +174,8 @@ New features:
   - extract: avoid refetching/reparsing repeated chunks, #1678
   - fetch_many: serve all-zero chunks without repository access; also cache
     recently parsed chunks, #1678
+  - do not verify the chunk id on every read from an encrypted repo (the AEAD
+    authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042

@@ -279,6 +279,14 @@ class KeyBase:
     # id_key dummy, needs to be overwritten by subclass
     id_key: bytes = None
 
+    # Is assert_id() the read path's authentication mechanism for this key class?
+    # True (the default, e.g. for the "authenticated" and "none" modes): decrypt() verifies nothing, so the keyed
+    # id hash (resp. the plain sha256 for "none") *is* the only integrity/authenticity check a read has and thus
+    # must never be skipped - skipping would silently demote "authenticated" to "none".
+    # False (the AEAD key classes): every read is authenticated by the AEAD tag, with the chunk id in the AAD,
+    # independently of assert_id() - see AEADKeyBase.assert_id for what assert_id adds on top of that.
+    id_check_is_authentication: ClassVar[bool] = True
+
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then
     # that may be *technically* called encryption, but for all intents and purposes
@@ -1106,6 +1114,9 @@ class AEADKeyBase(KeyBase):
     # an AEAD key may be stored as a keyfile or inside the repository (see borg key change-location).
     LOCATION_CONFIGURABLE = True
 
+    # the AEAD tag authenticates every read on its own, assert_id only adds the "evil client" detection below.
+    id_check_is_authentication = False
+
     def assert_id(self, id, data):
         # Comparing the id hash here would not be needed any more for the new AEAD crypto **IF** we
         # could be sure that chunks were created by normal (not tampered, not evil) borg code:
@@ -1119,7 +1130,12 @@ class AEADKeyBase(KeyBase):
         # repository using this bad chunkid as key (violating the usual chunkid == id_hash(data)).
         # Later, when reading such a bad chunk, AEAD-auth-and-decrypt would not notice any
         # issue and decrypt successfully.
-        # Thus, to notice such evil borg activity, we must check for such violations here:
+        # Thus, to notice such evil borg activity, we must check for such violations here.
+        #
+        # As only that (rather special) threat is left here, this check is mostly optional for AEAD
+        # keys (it was mandatory from #7362/#7367 until #9994): RepoObj.parse calls it at the places
+        # BORG_ASSERT_ID lists (by default: the places that re-anchor content - check --repair,
+        # transfer, re-chunking), plus always in check --verify-data, see id_check_is_authentication.
         if id and id != Manifest.MANIFEST_ID:
             id_computed = self.id_hash(data)
             if not hmac.compare_digest(id_computed, id):

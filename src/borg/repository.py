@@ -1,6 +1,7 @@
 import io
 import os
 import sys
+import threading
 import time
 from collections import defaultdict, namedtuple
 from pathlib import Path
@@ -126,18 +127,38 @@ class PackWriter:
     """Buffers chunks into a pack file and writes it to the store when full.
 
     add() buffers a (chunk_id, cdata) pair and marks the chunk pending (F_PENDING);
-    flush() writes the pack and sets each entry's pack_id, obj_offset and obj_size,
-    clearing F_PENDING.
+    when the pack is full, it is built, hashed and stored, and each entry's pack_id,
+    obj_offset and obj_size are set, clearing F_PENDING.
+
+    With async_store (the default), a full pack is handed to a background store-thread
+    (at most one in flight), so the caller can assemble the next pack while the previous
+    one is hashed and stored (#9988).  The ChunkIndex is only ever touched by the calling
+    thread: the store-thread's results (or error) are applied when it is joined, at the
+    next pack boundary or flush().  Consequently, add() returns the *previous* pack's
+    results while the current pack's store is in flight, and a store error surfaces one
+    pack later, from whichever add()/flush() call joins the store-thread.
+
+    flush() is a barrier: it joins an in-flight store and writes the current buffer
+    synchronously, so afterwards nothing is buffered or in flight and no chunk written
+    through this writer is F_PENDING anymore.
 
     The ChunkIndex comes from the repository, or from an explicit chunks index when
     there is no repository (see the chunks property).
 
     max_count bounds how many chunks a pack holds; max_size bounds its byte size.
-    flush() fires when either limit is reached.  Set a limit to None to disable it;
+    A pack is written when either limit is reached.  Set a limit to None to disable it;
     at least one must be set, otherwise the pack buffer is unbounded.
     """
 
-    def __init__(self, store, *, max_count=None, max_size=None, chunks=None, repository=None):
+    class _Outcome:
+        """What one pack store produced: filled in by _store_pieces, applied by _apply_outcome."""
+
+        def __init__(self, pending_ids):
+            self.pending_ids = pending_ids  # chunk ids to drop from the index if the store fails
+            self.results = None  # list of (chunk_id, pack_id, obj_offset, obj_size) on success
+            self.error = None  # the store exception on failure
+
+    def __init__(self, store, *, max_count=None, max_size=None, chunks=None, repository=None, async_store=True):
         if repository is None and chunks is None:
             raise ValueError("PackWriter requires either a repository or an explicit chunks index")
         if max_count is None and max_size is None:
@@ -146,9 +167,11 @@ class PackWriter:
         self.max_count = max_count  # None = no count limit
         self.max_size = max_size  # None = no size limit
         self.repository = repository
+        self.async_store = async_store
         self._chunks = chunks  # used when there is no repository
         self._pieces = []  # list of (chunk_id, cdata)
         self._size = 0  # byte size of buffered pieces
+        self._inflight = None  # (thread, outcome) of the pack store-thread, at most one in flight
 
     @property
     def chunks(self):
@@ -159,57 +182,130 @@ class PackWriter:
         return self._chunks
 
     def add(self, chunk_id, cdata):
-        """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
+        """Buffer a chunk.
+
+        When the chunk fills the pack, the pack is written and the results of the
+        *previously* written pack (with async_store) or of this pack (without) are
+        returned as a list of (chunk_id, pack_id, obj_offset, obj_size) tuples.
+        Returns None when there is nothing to report.
+        """
         self.chunks.add(chunk_id, 0)  # size: plaintext chunk size, set by the cache layer
         self._pieces.append((chunk_id, cdata))
         self._size += len(cdata)
         if (self.max_count is not None and len(self._pieces) >= self.max_count) or (
             self.max_size is not None and self._size >= self.max_size
         ):
+            if self.async_store:
+                results = self.join_inflight()  # apply the previous pack's store, or raise its error
+                self._handoff()  # current pack -> background store-thread
+                return results
             return self.flush()
         return None
 
-    def flush(self):
-        """Write the current pack to the store.
+    def _take_pieces(self):
+        """Take the buffered pieces, leaving an empty buffer."""
+        pieces, self._pieces, self._size = self._pieces, [], 0
+        return pieces
 
-        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples --
-        one entry per chunk that was written.  Returns None if there was nothing
-        to flush.  Always updates the ChunkIndex with the real pack_id and obj_offset.
+    def _store_pieces(self, pieces, outcome):
+        """Build, hash and store one pack; record the results or the error in *outcome*.
+
+        Runs in the store-thread (async) or inline in the calling thread (sync/flush).
+        Touches only the store (borgstore >= 0.6 serializes all Store operations
+        internally, see borgstore #206), never the ChunkIndex.
         """
-        if not self._pieces:
-            return None
-
-        # Build the pack bytes once by joining all pieces (avoids O(n^2) copies
-        # that incremental string concatenation would cause in Python).
-        pack_data = b"".join(cdata for _, cdata in self._pieces)
-
-        # Name the pack by the SHA-256 of its bytes: the name commits to the stored content,
-        # so borgstore can verify and cache the file.
-        pack_id = sha256(pack_data).digest()
-
-        # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
-        results = []
-        offset = 0
-        for chunk_id, cdata in self._pieces:
-            obj_size = len(cdata)
-            results.append((chunk_id, pack_id, offset, obj_size))
-            offset += obj_size
-
-        key = "packs/" + bin_to_hex(pack_id)
-        pending_ids = [chunk_id for chunk_id, _ in self._pieces]
         try:
-            self.store.store(key, pack_data)
-        except Exception:
+            # Build the pack bytes once by joining all pieces (avoids O(n^2) copies
+            # that incremental string concatenation would cause in Python).
+            pack_data = b"".join(cdata for _, cdata in pieces)
+
+            # Name the pack by the SHA-256 of its bytes: the name commits to the stored content,
+            # so borgstore can verify and cache the file.
+            pack_id = sha256(pack_data).digest()
+
+            # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
+            results = []
+            offset = 0
+            for chunk_id, cdata in pieces:
+                obj_size = len(cdata)
+                results.append((chunk_id, pack_id, offset, obj_size))
+                offset += obj_size
+
+            self.store.store("packs/" + bin_to_hex(pack_id), pack_data)
+        except BaseException as exc:  # incl. KeyboardInterrupt: it must not vanish with the thread
+            outcome.error = exc
+        else:
+            outcome.results = results
+
+    def _apply_outcome(self, outcome):
+        """Apply one finished pack store to the ChunkIndex (calling thread only).
+
+        On success, set the real pack locations (clearing F_PENDING) and return the results;
+        on failure, drop the failed pack's index entries and raise the store error.
+        """
+        if outcome.error is not None:
             # the pack was not stored: drop the index entries for its chunks.
-            for chunk_id in pending_ids:
+            for chunk_id in outcome.pending_ids:
                 if chunk_id in self.chunks:  # a chunk_id may appear more than once in this pack
                     del self.chunks[chunk_id]
+            raise outcome.error
+        self.chunks.update_pack_info(outcome.results)  # set the real location and clear F_PENDING
+        return outcome.results
+
+    def _handoff(self):
+        """Hand the buffered pieces to a background store-thread (at most one in flight)."""
+        assert self._inflight is None, "join_inflight() must run before handing off another pack"
+        pieces = self._take_pieces()
+        outcome = self._Outcome([chunk_id for chunk_id, _ in pieces])
+        thread = threading.Thread(target=self._store_pieces, args=(pieces, outcome), name="borg-pack-store")
+        self._inflight = (thread, outcome)
+        thread.start()
+
+    def _drop_buffered(self):
+        """Drop the buffered pieces and their (still pending) index entries.
+
+        Called when a pack store failed: the caller is aborting, so chunks not yet handed
+        to the store die with it.  Dropping their entries keeps the index free of F_PENDING
+        leftovers, like the sync store path does, so the close()-time index persist works.
+        """
+        pieces = self._take_pieces()
+        for chunk_id, _ in pieces:
+            if chunk_id in self.chunks:  # a chunk_id may appear more than once in the buffer
+                del self.chunks[chunk_id]
+
+    def join_inflight(self):
+        """Wait for an in-flight pack store and apply it to the index.
+
+        Returns its results, None when nothing was in flight.  If the store failed, the
+        writer is emptied (see _drop_buffered) and the store error is raised.
+        """
+        if self._inflight is None:
+            return None
+        thread, outcome = self._inflight
+        thread.join()
+        self._inflight = None
+        try:
+            return self._apply_outcome(outcome)
+        except BaseException:
+            self._drop_buffered()
             raise
-        finally:
-            self._pieces = []  # cleared on success and on failure
-            self._size = 0
-        self.chunks.update_pack_info(results)  # set the real location and clear F_PENDING
-        return results
+
+    def flush(self):
+        """Write the current pack to the store.  This is a barrier: any in-flight store
+        is joined first and the current buffer is written synchronously, so afterwards
+        no chunk written through this writer is F_PENDING anymore.
+
+        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples covering
+        every chunk written by this flush (including a joined in-flight pack), or
+        None if there was nothing to do.
+        """
+        results = self.join_inflight() or []
+        if self._pieces:
+            pieces = self._take_pieces()
+            outcome = self._Outcome([chunk_id for chunk_id, _ in pieces])
+            self._store_pieces(pieces, outcome)
+            results += self._apply_outcome(outcome)
+        return results or None
 
 
 class PackReader:
@@ -550,6 +646,8 @@ class Repository:
                 # permissions are not given to the (remote) backend here; they are enforced on the
                 # server side by "borg serve --rest --permissions ...".
                 backend = build_rest_backend(location)
+                # note: borgstore >= 0.6 Store serializes all its operations internally, so the
+                # PackWriter store-thread and the main thread can share it (borgstore #206).
                 self.store = Store(backend=backend, config=ns_config, cache_url=cache_url)
             else:
                 self.store = Store(url, config=ns_config, permissions=permissions, cache_url=cache_url)
@@ -716,7 +814,11 @@ class Repository:
             max_size = int(max_size_env)
         else:
             max_size = None if max_count is not None else DEFAULT_PACK_MAX_SIZE
-        self._pack_writer = PackWriter(self.store, repository=self, max_count=max_count, max_size=max_size)
+        # BORG_PACK_ASYNC=no disables the background store-thread (debugging aid, see PackWriter).
+        async_store = os.environ.get("BORG_PACK_ASYNC", "yes") != "no"
+        self._pack_writer = PackWriter(
+            self.store, repository=self, max_count=max_count, max_size=max_size, async_store=async_store
+        )
         self.opened = True
 
     @property
@@ -774,6 +876,15 @@ class Repository:
 
     def close(self):
         if self._pack_writer is not None:
+            try:
+                # normally a no-op: flush() is a barrier and runs before close().  when close() runs
+                # while unwinding an error, a pack store may still be in flight: join it, so a stored
+                # pack gets recorded in the index and a failed one gets its index entries dropped.
+                self._pack_writer.join_inflight()
+            except Exception as exc:
+                # do not raise: we are closing, probably unwinding an error already; raising here
+                # would just mask that original error.
+                logger.warning("pack store failed during close: %s", exc)
             assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
         # close() may run again after the store was already closed (idempotent close), so we can
         # only persist while the store is open. Persisting is also a no-op unless chunks were added
@@ -934,7 +1045,7 @@ class Repository:
         result = []
         for chunk_id, entry in self.chunks.iteritems():
             if self.chunks.is_pending(chunk_id):
-                continue  # buffered in PackWriter, not flushed to a pack yet
+                continue  # buffered in PackWriter (or its store still in flight), not read-able yet
             if collect:
                 result.append((chunk_id, entry.obj_size))
                 if len(result) == limit:
@@ -951,8 +1062,14 @@ class Repository:
                 raise self.ObjectNotFound(id, str(self._location))
             return None
         if self.chunks.is_pending(id):
-            # buffered but not flushed; a chunk must be flushed before any read, so this is a code
-            # bug (wrong flush/index ordering), not a missing object: raise regardless of raise_missing.
+            # the chunk may be in a pack whose background store is still in flight:
+            # join it, which resolves the chunk's pack location (read barrier).
+            self._pack_writer.join_inflight()
+            entry = self.chunks.get(id)  # re-fetch, the join updated the entry
+        if entry is None or self.chunks.is_pending(id):
+            # still pending: buffered but not flushed; a chunk must be flushed before any read, so this
+            # is a code bug (wrong flush/index ordering), not a missing object: raise regardless of
+            # raise_missing.  entry None: the join failed sometime earlier and dropped the entry.
             raise self.PackLocationUnknown(id, str(self._location))
         pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
@@ -1033,8 +1150,10 @@ class Repository:
         """put a repo object
 
         Buffers the chunk in the pack writer.  When the chunk fills the pack and
-        triggers a flush, returns a list of (chunk_id, pack_id, obj_offset, obj_size)
-        tuples, one per chunk written to disk by that flush; otherwise returns None.
+        triggers a pack write, returns a list of (chunk_id, pack_id, obj_offset, obj_size)
+        tuples, one per written chunk; otherwise returns None.  With the background
+        store-thread (see PackWriter), the returned tuples are those of the *previous*
+        pack, whose store was joined before handing off the current one.
         """
         self._lock_refresh()
         data_size = len(data)

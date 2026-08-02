@@ -211,7 +211,9 @@ def test_multi_object_pack_roundtrip(repo_fixtures, request):
         repository._pack_writer.max_count = 2  # this test is written for exactly two objects per pack
         repository.put(H(0), chunk0)
         assert repository.chunks.is_pending(H(0))  # buffered: the pack is not full yet
-        repository.put(H(1), chunk1)  # fills the pack, flushing both objects at once
+        repository.put(H(1), chunk1)  # fills the pack, writing both objects at once
+        # the full pack went to a background store-thread; join it so the entries are resolved
+        repository._pack_writer.join_inflight()
         # both objects share one pack, written exactly once, laid out in put() order
         pack_id = repository.chunks[H(0)].pack_id
         assert not repository.chunks.is_pending(H(0))
@@ -761,7 +763,7 @@ def test_pack_writer_n1_flush():
     store = MockStore()
     chunk_id = b"c" * 32
     cdata = b"payload"
-    pw = PackWriter(store, max_count=1, chunks=ChunkIndex())
+    pw = PackWriter(store, max_count=1, chunks=ChunkIndex(), async_store=False)
     results = pw.add(chunk_id, cdata)
     assert results is not None
     assert len(results) == 1
@@ -776,7 +778,7 @@ def test_pack_writer_n2_flush():
     store = MockStore()
     id1, id2 = b"a" * 32, b"b" * 32
     data1, data2 = b"first", b"second"
-    pw = PackWriter(store, max_count=2, chunks=ChunkIndex())
+    pw = PackWriter(store, max_count=2, chunks=ChunkIndex(), async_store=False)
     assert pw.add(id1, data1) is None
     results = pw.add(id2, data2)
     assert results is not None
@@ -790,7 +792,7 @@ def test_pack_writer_n2_flush():
 def test_pack_writer_flushes_on_max_size():
     # max_count is high, so the flush is driven by max_size alone.
     store = MockStore()
-    pw = PackWriter(store, max_count=100, max_size=10, chunks=ChunkIndex())
+    pw = PackWriter(store, max_count=100, max_size=10, chunks=ChunkIndex(), async_store=False)
     assert pw.add(b"a" * 32, b"12345") is None
     results = pw.add(b"b" * 32, b"67890")
     assert results is not None
@@ -799,14 +801,14 @@ def test_pack_writer_flushes_on_max_size():
 
 def test_pack_writer_max_size_none_is_count_only():
     store = MockStore()
-    pw = PackWriter(store, max_count=2, max_size=None, chunks=ChunkIndex())
+    pw = PackWriter(store, max_count=2, max_size=None, chunks=ChunkIndex(), async_store=False)
     assert pw.add(b"a" * 32, b"x" * 10_000) is None
     assert pw.add(b"b" * 32, b"y" * 10_000) is not None
 
 
 def test_pack_writer_max_count_none_is_size_only():
     store = MockStore()
-    pw = PackWriter(store, max_count=None, max_size=10, chunks=ChunkIndex())
+    pw = PackWriter(store, max_count=None, max_size=10, chunks=ChunkIndex(), async_store=False)
     assert pw.add(b"a" * 32, b"12345") is None
     assert pw.add(b"b" * 32, b"67890") is not None
 
@@ -822,7 +824,7 @@ def test_pack_writer_rolls_back_index_on_failed_store():
     # later identical chunk would dedup against -- silent data loss (#9744 review).
     chunks = ChunkIndex()
     chunk_id = b"e" * 32
-    pw = PackWriter(FailingPackStore(MockStore()), max_count=1, chunks=chunks)
+    pw = PackWriter(FailingPackStore(MockStore()), max_count=1, chunks=chunks, async_store=False)
     with pytest.raises(OSError):
         pw.add(chunk_id, b"payload")  # max_count=1 -> add() flushes immediately and fails
     assert chunks.get(chunk_id) is None  # rolled back: no phantom entry left behind
@@ -839,7 +841,7 @@ def test_failed_store_phantom_not_persisted(tmp_path):
         # so one store models "just the pack write broke" (PackWriter and the index share a
         # store in production). the failing store is thus load-bearing for every assertion below.
         repository.store = FailingPackStore(repository.store)
-        pw = PackWriter(repository.store, max_count=1, repository=repository)
+        pw = PackWriter(repository.store, max_count=1, repository=repository, async_store=False)
         with pytest.raises(OSError):
             pw.add(chunk_id, fchunk(b"DATA"))
         assert repository.chunks.get(chunk_id) is None  # rolled back from the in-memory index ...
@@ -847,6 +849,63 @@ def test_failed_store_phantom_not_persisted(tmp_path):
         write_chunkindex_to_repo(repository, repository.chunks, incremental=True)
         reloaded = build_chunkindex_from_repo(repository)
         assert reloaded.get(chunk_id) is None
+
+
+def test_pack_writer_async_defers_results():
+    # With async_store (the default), a full pack goes to a background store-thread and add()
+    # returns the *previous* pack's results; flush() is a barrier returning whatever is left (#9988).
+    store = MockStore()
+    id1, id2, id3 = b"a" * 32, b"b" * 32, b"c" * 32
+    data1, data2, data3 = b"first", b"second", b"third"
+    chunks = ChunkIndex()
+    pw = PackWriter(store, max_count=1, chunks=chunks)
+    assert pw.add(id1, data1) is None  # pack 1 handed to the store-thread, nothing to report yet
+    results = pw.add(id2, data2)  # joins pack 1's store, hands off pack 2
+    assert results == [(id1, sha256(data1).digest(), 0, len(data1))]
+    assert not chunks.is_pending(id1)  # the join resolved pack 1's entries
+    assert pw.add(id3, data3) == [(id2, sha256(data2).digest(), 0, len(data2))]
+    assert pw.flush() == [(id3, sha256(data3).digest(), 0, len(data3))]  # barrier: joins pack 3
+    for chunk_id in (id1, id2, id3):
+        assert not chunks.is_pending(chunk_id)
+
+
+def test_pack_writer_async_flush_combines_inflight_and_buffered():
+    # flush() with a store in flight *and* buffered pieces returns the results of both packs.
+    store = MockStore()
+    id1, id2 = b"a" * 32, b"b" * 32
+    pw = PackWriter(store, max_count=1, chunks=ChunkIndex())
+    assert pw.add(id1, b"first") is None  # in flight
+    pw.max_count = 2  # keep the next piece buffered
+    assert pw.add(id2, b"second") is None  # buffered
+    results = pw.flush()
+    assert [chunk_id for chunk_id, _, _, _ in results] == [id1, id2]
+
+
+def test_pack_writer_async_error_surfaces_at_join():
+    # A background store failure surfaces at the next join (here: the add() that fills the next
+    # pack), and the writer rolls back the failed pack's index entries *and* drops the buffered
+    # pieces, so no phantom/pending entries stay behind for the close()-time index persist (#9744).
+    chunks = ChunkIndex()
+    id1, id2 = b"e" * 32, b"f" * 32
+    pw = PackWriter(FailingPackStore(MockStore()), max_count=1, chunks=chunks)
+    assert pw.add(id1, b"payload") is None  # handed off; the failure is not visible yet
+    with pytest.raises(OSError):
+        pw.add(id2, b"moredata")  # joins the failed store of pack 1
+    assert chunks.get(id1) is None  # rolled back: no phantom entry left behind
+    assert chunks.get(id2) is None  # buffered piece dropped along with the aborting command
+    assert not pw._pieces  # writer is empty, close() will not trip over leftovers
+
+
+def test_pack_writer_async_get_waits_for_inflight_store(tmp_path):
+    # get() of a chunk whose pack store is still in flight must join the store-thread and
+    # then read normally (read barrier), instead of raising PackLocationUnknown.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository._pack_writer.max_count = 2
+        chunk0, chunk1 = fchunk(b"foo", chunk_id=H(0)), fchunk(b"bar", chunk_id=H(1))
+        repository.put(H(0), chunk0)
+        repository.put(H(1), chunk1)  # fills the pack -> handed to the store-thread
+        assert repository.get(H(0)) == chunk0  # waits for the store-thread, then reads
+        assert repository.get(H(1)) == chunk1
 
 
 def test_get_read_data_false_with_range(tmp_path):

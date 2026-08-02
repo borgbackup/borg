@@ -95,6 +95,10 @@ SVG_NAME_MAX = 32  # characters that fit into the name column
 
 # Fills are set per class so that the chart can follow the reader's colour
 # scheme; GitHub renders the file in an <img>, where the media query applies.
+# The bars use the green of the logo (docs/_static/logo.svg).  That green is
+# made for a dark background - on white it only reaches a contrast of 1.9:1,
+# below the 3:1 that WCAG asks for graphics - so the light scheme darkens it
+# while keeping the hue.
 SVG_STYLE = """\
 <style>
     text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif }
@@ -103,12 +107,12 @@ SVG_STYLE = """\
     .name { font-size: 12px; fill: #1f2328 }
     .subtitle, .footer, .count { font-size: 11px; fill: #59636e }
     .count { font-size: 12px; text-anchor: end }
-    .bar { fill: #4c74b9 }
+    .bar { fill: #00a000 }
     @media (prefers-color-scheme: dark) {
         .bg { fill: #0d1117 }
         .title, .name { fill: #e6edf3 }
         .subtitle, .footer, .count { fill: #9198a1 }
-        .bar { fill: #4493f8 }
+        .bar { fill: #00dd00 }
     }
 </style>"""
 

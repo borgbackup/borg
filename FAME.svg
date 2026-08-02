@@ -6,12 +6,12 @@
     .name { font-size: 12px; fill: #1f2328 }
     .subtitle, .footer, .count { font-size: 11px; fill: #59636e }
     .count { font-size: 12px; text-anchor: end }
-    .bar { fill: #4c74b9 }
+    .bar { fill: #00a000 }
     @media (prefers-color-scheme: dark) {
         .bg { fill: #0d1117 }
         .title, .name { fill: #e6edf3 }
         .subtitle, .footer, .count { fill: #9198a1 }
-        .bar { fill: #4493f8 }
+        .bar { fill: #00dd00 }
     }
 </style>
 <rect class="bg" x="0" y="0" width="760" height="524" rx="6"/>

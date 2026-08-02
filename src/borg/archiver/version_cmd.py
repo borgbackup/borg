@@ -1,5 +1,6 @@
 from .. import __version__
 from ..constants import *  # NOQA
+from ..helpers import json_print
 from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
@@ -20,7 +21,14 @@ class VersionMixIn:
                 server_version = repository.server_version
         else:
             server_version = client_version
-        print(f"{format_version(client_version)} / {format_version(server_version)}")
+
+        formatted_client_version = format_version(client_version)
+        formatted_server_version = format_version(server_version)
+        if args.json:
+            version_info = {"client": formatted_client_version, "server": formatted_server_version}
+            json_print(version_info)
+        else:
+            print(f"{formatted_client_version} / {formatted_server_version}")
 
     def build_parser_version(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -53,3 +61,4 @@ class VersionMixIn:
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_version.__doc__, epilog=version_epilog)
         subparsers.add_subcommand("version", subparser, help="display the Borg client and server versions")
+        subparser.add_argument("--json", action="store_true", help="format output as JSON")

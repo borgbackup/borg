@@ -133,8 +133,10 @@ cdef class ChunkerFastCDC:
         """Fill the chunker's buffer with more data."""
         cdef ssize_t n
         cdef object chunk
+        cdef const unsigned char* src
 
-        memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
+        with nogil:
+            memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
         self.position -= self.last
         self.last = 0
         n = self.buf_size - self.position - self.remaining
@@ -147,9 +149,12 @@ cdef class ChunkerFastCDC:
 
         if n > 0:
             if chunk.meta["allocation"] == CH_DATA:
-                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(chunk.data), n)
+                src = <const unsigned char*>PyBytes_AsString(chunk.data)
+                with nogil:
+                    memcpy(self.data + self.position + self.remaining, src, n)
             else:
-                memset(self.data + self.position + self.remaining, 0, n)
+                with nogil:
+                    memset(self.data + self.position + self.remaining, 0, n)
             self.remaining += n
             self.bytes_read += n
         else:
@@ -220,12 +225,13 @@ cdef class ChunkerFastCDC:
                     stop = self.data + normal_pos
 
             cut = NULL
-            while p < stop:
-                fp = (fp << 1) + gear[p[0]]
-                if (fp & mask) == 0:
-                    cut = p
-                    break
-                p += 1
+            with nogil:
+                while p < stop:
+                    fp = (fp << 1) + gear[p[0]]
+                    if (fp & mask) == 0:
+                        cut = p
+                        break
+                    p += 1
 
             if cut != NULL:
                 p = cut + 1  # cut right after the byte that triggered the boundary

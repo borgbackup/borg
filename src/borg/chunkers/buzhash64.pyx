@@ -35,7 +35,7 @@ cdef extern from *:
    """
    #define BARREL_SHIFT64(v, shift) (((v) << (shift)) | ((v) >> (((64 - (shift)) & 0x3f))))
    """
-   uint64_t BARREL_SHIFT64(uint64_t v, uint64_t shift)
+   uint64_t BARREL_SHIFT64(uint64_t v, uint64_t shift) nogil
 
 
 @cython.boundscheck(False)  # Deactivate bounds checking
@@ -74,7 +74,7 @@ cdef uint64_t* buzhash64_init_table(bytes key) except NULL:
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)  # Deactivate negative indexing.
 @cython.cdivision(True)  # Use C division/modulo semantics for integer division.
-cdef uint64_t _buzhash64(const unsigned char* data, size_t len, const uint64_t* h):
+cdef uint64_t _buzhash64(const unsigned char* data, size_t len, const uint64_t* h) noexcept nogil:
     """Calculate the buzhash of the given data."""
     cdef uint64_t i
     cdef uint64_t sum = 0, imod
@@ -90,7 +90,7 @@ cdef uint64_t _buzhash64(const unsigned char* data, size_t len, const uint64_t* 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)  # Deactivate negative indexing.
 @cython.cdivision(True)  # Use C division/modulo semantics for integer division.
-cdef uint64_t _buzhash64_update(uint64_t sum, unsigned char remove, unsigned char add, size_t len, const uint64_t* h):
+cdef uint64_t _buzhash64_update(uint64_t sum, unsigned char remove, unsigned char add, size_t len, const uint64_t* h) noexcept nogil:
     """Update the buzhash with a new byte."""
     cdef uint64_t lenmod = len & 0x3f
     return BARREL_SHIFT64(sum, 1) ^ BARREL_SHIFT64(h[remove], lenmod) ^ h[add]
@@ -188,9 +188,11 @@ cdef class ChunkerBuzHash64:
         """Fill the chunker's buffer with more data."""
         cdef ssize_t n
         cdef object chunk
+        cdef const unsigned char* src
 
         # Move remaining data to the beginning of the buffer
-        memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
+        with nogil:
+            memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
         self.position -= self.last
         self.last = 0
         n = self.buf_size - self.position - self.remaining
@@ -206,10 +208,13 @@ cdef class ChunkerBuzHash64:
             # Only copy data if it's not a hole
             if chunk.meta["allocation"] == CH_DATA:
                 # Copy data from chunk to our buffer
-                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(chunk.data), n)
+                src = <const unsigned char*>PyBytes_AsString(chunk.data)
+                with nogil:
+                    memcpy(self.data + self.position + self.remaining, src, n)
             else:
                 # For holes, fill with zeros using memset
-                memset(self.data + self.position + self.remaining, 0, n)
+                with nogil:
+                    memset(self.data + self.position + self.remaining, 0, n)
 
             self.remaining += n
             self.bytes_read += n
@@ -257,7 +262,8 @@ cdef class ChunkerBuzHash64:
         # window starts at the potential cutting place.
         self.position += min_size
         self.remaining -= min_size
-        sum = _buzhash64(self.data + self.position, window_size, self.table)
+        with nogil:
+            sum = _buzhash64(self.data + self.position, window_size, self.table)
 
         # Normalized chunking: pick the mask based on how far we are into the current chunk.
         # While below normal_size use the strict mask (lower cut probability), afterward the
@@ -284,9 +290,10 @@ cdef class ChunkerBuzHash64:
                 if nc_stop < stop_at:
                     stop_at = nc_stop
 
-            while p < stop_at and (sum & mask):
-                sum = _buzhash64_update(sum, p[0], p[window_size], window_size, self.table)
-                p += 1
+            with nogil:
+                while p < stop_at and (sum & mask):
+                    sum = _buzhash64_update(sum, p[0], p[window_size], window_size, self.table)
+                    p += 1
 
             did_bytes = p - (self.data + self.position)
             self.position += did_bytes

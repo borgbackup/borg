@@ -16,15 +16,22 @@ later refactored away, so it is not what we rank by.
 
 Author identities are merged via .mailmap, so fix duplicates there rather than
 here.
+
+FAME.md is left alone if only the generation date would change, so that running
+this regularly (see .github/workflows/fame.yml) does not produce a diff for a
+week in which the statistics did not move.
 """
 
 import argparse
 import json
+import re
 import subprocess
 from datetime import date
 from pathlib import Path
 
 BRANCH = "master"
+
+DATE_LINE = re.compile(r"^Generated on \d{4}-\d{2}-\d{2} ", re.MULTILINE)
 
 # Generated and binary-ish files would drown out hand-written code.  Excalidraw
 # scenes are the worst offenders: they are pretty-printed JSON, so a single
@@ -84,6 +91,11 @@ def render(rows, total, contributors):
     return preamble + "\n".join(table) + "\n"
 
 
+def same_statistics(old, new):
+    """Return True if the two FAME.md contents differ only in the generation date."""
+    return DATE_LINE.sub("Generated on ", old) == DATE_LINE.sub("Generated on ", new)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--top", type=int, default=0, metavar="N", help="only list the top N contributors")
@@ -95,7 +107,11 @@ def main():
     if args.top:
         rows = rows[: args.top]
     output = repo / "FAME.md"
-    output.write_text(render(rows, total, contributors), encoding="utf-8")
+    new = render(rows, total, contributors)
+    if output.exists() and same_statistics(output.read_text(encoding="utf-8"), new):
+        print(f"{output} is up to date ({len(rows)} of {contributors} contributors)")
+        return
+    output.write_text(new, encoding="utf-8")
     print(f"wrote {output} ({len(rows)} of {contributors} contributors)")
 
 

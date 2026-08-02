@@ -248,6 +248,70 @@ class PackReader:
             offset += obj_size
 
 
+def check_pack_objects(pack_hex, obj_ranges, pack_size):
+    """Validate a pack's indexed objects against the pack's file size.
+
+    obj_ranges: the offset-ordered (obj_offset, obj_size) ranges of the pack's indexed objects.
+    An overlap between objects, or an object claiming to end past the pack file (pack_size bytes),
+    means index corruption and raises IntegrityError.
+    """
+    covered = 0
+    for offset, size in obj_ranges:
+        if offset < covered:
+            raise IntegrityError(
+                f'pack {pack_hex}: overlapping objects at offset {offset} (index corruption), run "borg check"'
+            )
+        covered = offset + size
+    if covered > pack_size:
+        raise IntegrityError(
+            f'pack {pack_hex}: object extends past end of file at offset {covered} (index corruption), run "borg check"'
+        )
+
+
+def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size):
+    """Find the superseded duplicates among a pack's gap bytes (bytes no index entry covers).
+
+    A gap holds a chunk copy stored again elsewhere, or objects from a backup that crashed before
+    writing its index. Walk each gap's object headers: an object whose chunk id the index maps to a
+    different location is a superseded duplicate (the id is a keyed MAC of the plaintext, so equal
+    ids mean equal content) and its bytes are redundant. An object whose id is not in the index
+    (borg check --repair re-indexes it) or whose entry points back at this offset (its only copy)
+    is not reported. A header that does not parse or overruns its gap ends the walk over that gap.
+
+    obj_ranges: the offset-ordered, validated (obj_offset, obj_size) ranges of the pack's indexed
+    objects; the gaps are the byte ranges between (and after) them.
+    Returns the offset-ordered list of (offset, size) ranges holding superseded duplicates.
+    """
+    # find the gaps: byte ranges no indexed object covers.
+    gaps = []  # (start, end) of each gap, offset-ordered
+    cursor = 0
+    for offset, size in obj_ranges:
+        if offset > cursor:
+            gaps.append((cursor, offset))
+        cursor = offset + size
+    if cursor < pack_size:
+        gaps.append((cursor, pack_size))
+
+    drop_ranges = []  # (obj_offset, obj_size) of superseded duplicates, offset-ordered
+    hdr_size = RepoObj.obj_header.size
+    for gstart, gend in gaps:
+        offset = gstart
+        while offset < gend:
+            hdr_data = reader.read(offset, hdr_size)
+            if len(hdr_data) < hdr_size:
+                break
+            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+            obj_size = hdr_size + hdr.meta_size + hdr.data_size
+            if hdr.magic != OBJ_MAGIC or offset + obj_size > gend:
+                break
+            if hdr.chunk_id in chunks:
+                entry = chunks[hdr.chunk_id]
+                if entry.pack_id != pack_id or entry.obj_offset != offset:
+                    drop_ranges.append((offset, obj_size))
+            offset += obj_size
+    return drop_ranges
+
+
 class PackTracker:
     """Packs verified in the current check cycle, mapping pack_id -> (timestamp, result).
 
@@ -1045,65 +1109,21 @@ class Repository:
             located.append((entry.obj_offset, obj_id, entry.obj_size, keep))
         located.sort()
 
-        # walk objects in offset order. covered is the end offset of the last object; an overlap
-        # (offset < covered) is index corruption. record the dropped objects' byte ranges; every other
-        # byte (kept objects and gaps that no index entry covers) is copied into the new pack unchanged.
-        drop_ranges = []  # (obj_offset, obj_size) of dropped objects, offset-ordered
-        covered = 0
-        for offset, obj_id, size, keep in located:
-            if offset < covered:
-                raise IntegrityError(
-                    f"pack {bin_to_hex(pack_id)}: overlapping objects at offset {offset} (index corruption), "
-                    f'run "borg check"'
-                )
-            covered = offset + size
-            if not keep:
-                drop_ranges.append((offset, size))
-
-        # reject an object that ends past the pack file: store.defrag would short-read it into a
-        # truncated object in the new pack, then the intact source pack is deleted.
+        # validate the listed objects. an overlap is index corruption; so is an object ending past
+        # the pack file: store.defrag would short-read it into a truncated object in the new pack,
+        # then the intact source pack is deleted.
         pack_size = self.store.info(pack_key).size
-        if covered > pack_size:
-            raise IntegrityError(
-                f"pack {bin_to_hex(pack_id)}: object extends past end of file at offset {covered} "
-                f'(index corruption), run "borg check"'
-            )
+        obj_ranges = [(offset, size) for offset, _, size, _ in located]
+        check_pack_objects(bin_to_hex(pack_id), obj_ranges, pack_size)
 
-        # find the gaps: byte ranges no listed object covers (a chunk copy stored again elsewhere, or
-        # objects from a backup that crashed before writing its index).
-        gaps = []  # (start, end) of each gap, offset-ordered
-        cursor = 0
-        for offset, obj_id, size, keep in located:
-            if offset > cursor:
-                gaps.append((cursor, offset))
-            cursor = offset + size
-        if cursor < pack_size:
-            gaps.append((cursor, pack_size))
-
-        # walk each gap's object headers. drop an object whose chunk id the index maps to a different
-        # location: that entry is the authoritative copy (the id is a keyed MAC of the plaintext, so
-        # equal ids mean equal content) and these bytes are redundant. keep an object whose id is not in
-        # the index (borg check --repair re-indexes it) or whose entry points back at this offset (its
-        # only copy). a header that does not parse or overruns its gap ends the walk over that gap.
+        # record the dropped objects' byte ranges; every other byte (kept objects and gaps that no
+        # index entry covers) is copied into the new pack unchanged. superseded duplicates found in
+        # the gaps are dropped along with them (see superseded_gap_ranges).
         # TODO(#9868 follow-up): classify gaps in compact_packs pass 1 too, so superseded bytes count
         # toward the rewrite threshold and a wholly superseded orphan pack can be dropped outright.
+        drop_ranges = [(offset, size) for offset, _, size, keep in located if not keep]
         reader = PackReader(store=self.store, pack_id=pack_id)
-        hdr_size = RepoObj.obj_header.size
-        for gstart, gend in gaps:
-            offset = gstart
-            while offset < gend:
-                hdr_data = reader.read(offset, hdr_size)
-                if len(hdr_data) < hdr_size:
-                    break
-                hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
-                obj_size = hdr_size + hdr.meta_size + hdr.data_size
-                if hdr.magic != OBJ_MAGIC or offset + obj_size > gend:
-                    break
-                if hdr.chunk_id in chunks:
-                    entry = chunks[hdr.chunk_id]
-                    if entry.pack_id != pack_id or entry.obj_offset != offset:
-                        drop_ranges.append((offset, obj_size))
-                offset += obj_size
+        drop_ranges += superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size)
         drop_ranges.sort()
         dropped_bytes = sum(size for _, size in drop_ranges)  # on-disk bytes this rewrite frees, for --stats
 
@@ -1207,19 +1227,7 @@ class Repository:
 
         # validate every remaining pack before writing anything (see docstring).
         for pid in pack_ids:
-            covered = 0
-            for offset, _, size in per_pack[pid]:
-                if offset < covered:
-                    raise IntegrityError(
-                        f"pack {bin_to_hex(pid)}: overlapping objects at offset {offset} "
-                        f'(index corruption), run "borg check"'
-                    )
-                covered = offset + size
-            if covered > pack_size[pid]:
-                raise IntegrityError(
-                    f"pack {bin_to_hex(pid)}: object extends past end of file at offset {covered} "
-                    f'(index corruption), run "borg check"'
-                )
+            check_pack_objects(bin_to_hex(pid), ((offset, size) for offset, _, size in per_pack[pid]), pack_size[pid])
 
         # greedily batch whole pack files so each output pack stays within max_size, in sorted id
         # order so batch composition is reproducible.
@@ -1268,6 +1276,106 @@ class Repository:
                     logger.warning(f"Pack {bin_to_hex(pid)} to merge was already gone.")
             pi.show(increase=1)
         pi.finish()
+
+    def transform_pack(self, pack_id, ids, transform, *, chunks=None, before_change=None):
+        """Rewrite pack <pack_id>, passing each indexed object's bytes through <transform>.
+
+        ids: the chunk ids of this pack's objects. Must cover every object the chunk index lists
+            for this pack (same contract as compact_pack's keep_ids/drop_ids): an unlisted indexed
+            object would keep its bytes in the new pack, but its index entry would go stale when
+            the old pack is deleted.
+        transform: called as transform(chunk_id, obj_bytes) with an object's stored bytes; returns
+            the replacement bytes, or obj_bytes itself (the identical bytes object) to keep the
+            object unchanged. The chunk id (and thus the plaintext) must not change; sizes may.
+        chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
+            updates to. Must be the index <ids> was derived from. Default: self.chunks.
+        before_change: called once, just before the first store modification; use it to invalidate
+            stored chunk indexes for crash safety (see #9748). Not called when the pack is kept.
+
+        The whole pack file is loaded into memory (bounded by the pack size limit). Gap bytes
+        (bytes no index entry covers) are handled like in compact_pack: an object superseded by a
+        copy stored elsewhere is dropped, all other unindexed bytes are copied into the new pack
+        unchanged, to be handled by "borg check --repair". An overlap between indexed objects, or
+        an object claiming to end past the pack file, means index corruption and raises
+        IntegrityError, before anything is written.
+
+        If every object is kept and no gap bytes are dropped, the store and the chunk index are not
+        touched at all. Otherwise the new pack (named sha256 of its content) is stored, the indexed
+        objects are repointed at it, and the old pack is deleted last, so the objects' bytes are
+        never the only copy.
+
+        Returns (new_pack_id, new_size): the rewritten pack's id and byte size, or
+        (pack_id, <old size>) when the pack was kept unchanged.
+
+        Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
+        index back to the store afterwards.
+        """
+        self._lock_refresh()
+        if chunks is None:
+            chunks = self.chunks
+        pack_hex = bin_to_hex(pack_id)
+        pack_key = "packs/" + pack_hex
+
+        pack_contents = self.store.load(pack_key)
+        pack_size = len(pack_contents)
+        reader = PackReader(pack_id=pack_id, pack_contents=pack_contents)
+
+        # collect the listed objects' ranges, ordered by offset, and validate them (see docstring).
+        located = []  # (obj_offset, obj_id, obj_size)
+        for obj_id in ids:
+            entry = chunks[obj_id]
+            assert entry.pack_id == pack_id, f"{bin_to_hex(obj_id)} is not in pack {pack_hex}"
+            located.append((entry.obj_offset, obj_id, entry.obj_size))
+        located.sort()
+        obj_ranges = [(offset, size) for offset, _, size in located]
+        check_pack_objects(pack_hex, obj_ranges, pack_size)
+        drop_ranges = superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size)
+
+        # assemble the new pack in offset order: transformed objects, dropped ranges skipped, all
+        # other bytes copied verbatim. the two range lists never overlap (drops lie in gaps), so a
+        # single offset-sorted walk over both handles the interleaving.
+        events = [(offset, size, obj_id) for offset, obj_id, size in located]
+        events += [(offset, size, None) for offset, size in drop_ranges]  # None: a range to drop
+        events.sort(key=lambda event: event[0])
+        pieces = []  # byte spans of the new pack, in order
+        new_locations = []  # (obj_id, new_offset, new_size) of each object
+        changed = bool(drop_ranges)
+        cursor = 0  # position in the old pack
+        new_offset = 0  # position in the new pack
+        for offset, size, obj_id in events:
+            if offset > cursor:  # verbatim span (gap bytes) before this event
+                pieces.append(pack_contents[cursor:offset])
+                new_offset += offset - cursor
+            if obj_id is not None:
+                obj_bytes = pack_contents[offset : offset + size]
+                new_bytes = transform(obj_id, obj_bytes)
+                if new_bytes is not obj_bytes:
+                    changed = True
+                pieces.append(new_bytes)
+                new_locations.append((obj_id, new_offset, len(new_bytes)))
+                new_offset += len(new_bytes)
+            # else: a dropped range, skip its bytes
+            cursor = offset + size
+        if cursor < pack_size:  # verbatim span after the last event
+            pieces.append(pack_contents[cursor:])
+
+        if not changed:
+            return pack_id, pack_size
+        pack_data = b"".join(pieces)
+        new_pack_id = sha256(pack_data).digest()
+        if new_pack_id == pack_id:  # the transforms reproduced the pack byte-identically
+            return pack_id, pack_size
+
+        if before_change is not None:
+            before_change()
+        # store the new pack before touching the index or the old pack, so a failure leaves
+        # everything unchanged.
+        self.store.store("packs/" + bin_to_hex(new_pack_id), pack_data)
+        chunks.update_pack_info([(obj_id, new_pack_id, offset, size) for obj_id, offset, size in new_locations])
+        # delete the old pack last, after the new one is stored and indexed, so the objects' bytes
+        # are never the only copy.
+        self.store_delete(pack_key)
+        return new_pack_id, len(pack_data)
 
     def break_lock(self):
         Lock(self.store).break_lock()

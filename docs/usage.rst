@@ -40,6 +40,7 @@ Usage
    usage/repo-space
    usage/repo-list
    usage/repo-info
+   usage/repo-compress
    usage/repo-delete
    usage/serve
    usage/version

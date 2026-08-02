@@ -299,11 +299,19 @@ class PackWriter:
     def _drop_buffered(self):
         """Drop the buffered pieces and their (still pending) index entries.
 
-        Called when a pack store failed: the caller is aborting, so chunks not yet handed
-        to the store die with it.  Dropping their entries keeps the index free of F_PENDING
-        leftovers, like the sync store path does, so the close()-time index persist works.
+        Called when a pack store failed or the caller is unwinding an exception: the caller
+        is aborting, so chunks not yet handed to the store die with it.  Dropping their
+        entries keeps the index free of F_PENDING leftovers, like the sync store path does,
+        so the close()-time index persist works.
         """
         pieces = self._take_pieces()
+        if self.repository is not None and not self.repository.is_chunk_index_loaded:
+            # no in-memory index: the buffered chunks have no entries left to delete.  going
+            # through self.chunks would build the index from the repo, and this helper only
+            # ever runs while aborting -- that I/O can fail and mask the error being unwound.
+            # invalidate_chunk_index() is what leaves this state behind; its callers all flush
+            # first or never buffer, so this keeps the helper safe either way.
+            return
         for chunk_id, _ in pieces:
             if chunk_id in self.chunks:  # a chunk_id may appear more than once in the buffer
                 del self.chunks[chunk_id]
@@ -745,6 +753,12 @@ class Repository:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None and self._pack_writer is not None:
+            # unwinding an exception: chunks still buffered in the pack writer were never
+            # stored, so they die with the aborted operation.  drop them (and their
+            # F_PENDING index entries) so close() neither trips its flush assertion --
+            # which would mask the original exception -- nor persists pending entries.
+            self._pack_writer._drop_buffered()
         self.close()
 
     @property

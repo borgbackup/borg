@@ -1,6 +1,6 @@
 # Contributors
 
-371 people have contributed to Borg, with 10,601 commits in total.
+372 people have contributed to Borg, with 10,603 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
@@ -21,7 +21,7 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,039 | 76,746 | 461 |
+| Thomas Waldmann | 7,040 | 76,741 | 461 |
 | Marian Beermann | 1,140 | 8,400 | 157 |
 | Jonas Borgström | 560 | 1,029 | 38 |
 | Antoine Beaupré | 285 | 441 | 33 |
@@ -191,6 +191,7 @@ show up there, so the number understates early contributions.  Generated files
 | user062 | 2 | 0 | 0 |
 | Paweł Kotiuk | 1 | 2 | 1 |
 | borkd | 1 | 37 | 1 |
+| ThomasWaldmann | 1 | 6 | 1 |
 | Daniel Dent | 1 | 2 | 1 |
 | Lars K.W. Gohlke | 1 | 1 | 1 |
 | Kevin Yin | 1 | 3 | 1 |

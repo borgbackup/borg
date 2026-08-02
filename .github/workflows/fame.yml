@@ -10,19 +10,16 @@
 # is fine for generated files, but keep it in mind if this workflow ever starts
 # touching code.
 #
-# Merging such a pull request pushes FAME.md and triggers this workflow again;
-# that run regenerates the same files, finds no diff and opens nothing, so it
-# just costs a minute of runner time.
+# Deliberately not triggered by pushes to FAME.md: the "Lines" column is blame
+# of the current checkout, so it moves with almost every commit, and merging one
+# of these pull requests would immediately produce the next one.  Both files are
+# always written by the same run, so they cannot drift apart on their own.
 
 name: FAME
 
 on:
   schedule:
     - cron: '17 4 * * 1'  # Mondays at 04:17 UTC
-  push:
-    branches: [ master ]
-    paths:
-    - 'FAME.md'           # keep the chart in sync when the table changes
   workflow_dispatch:      # Allow manual trigger
 
 concurrency:

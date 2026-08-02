@@ -125,6 +125,10 @@ def collect():
     )
     fame = json.loads(out)
     rows = [(name, commits, loc, files) for name, loc, commits, files, *_percentages in fame["data"]]
+    # git-fame leaves people with the same commit count in its own order, which
+    # is stable for a given checkout but not across checkouts, so equal ranks
+    # would shuffle from one run to the next.  Break the tie ourselves.
+    rows.sort(key=lambda row: (-row[1], -row[2], row[0]))
     return rows, fame["total"]
 
 

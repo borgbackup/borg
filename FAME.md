@@ -1,6 +1,6 @@
 # Contributors
 
-370 people have contributed to Borg, with 10,585 commits in total.
+371 people have contributed to Borg, with 10,601 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
@@ -21,11 +21,11 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,024 | 75,119 | 454 |
+| Thomas Waldmann | 7,039 | 76,746 | 461 |
 | Marian Beermann | 1,140 | 8,400 | 157 |
 | Jonas Borgström | 560 | 1,029 | 38 |
 | Antoine Beaupré | 285 | 441 | 33 |
-| Mrityunjay Raj | 198 | 7,988 | 102 |
+| Mrityunjay Raj | 198 | 7,917 | 102 |
 | Andrey Bienkowski | 72 | 210 | 16 |
 | Ted Lawson | 71 | 4,606 | 39 |
 | Thalian | 63 | 594 | 32 |
@@ -34,9 +34,9 @@ show up there, so the number understates early contributions.  Generated files
 | Dan Christensen | 40 | 5 | 2 |
 | dependabot[bot] | 37 | 46 | 7 |
 | Rayyan Ansari | 34 | 91 | 12 |
-| Abdel-Rahman | 30 | 4 | 3 |
+| Abdel-Rahman | 30 | 3 | 3 |
 | Manuel Riel | 28 | 94 | 6 |
-| Nehalenniæ Oudin | 26 | 49 | 11 |
+| Nehalenniæ Oudin | 26 | 48 | 11 |
 | anarcat | 24 | 34 | 4 |
 | Hugo Wallenburg | 23 | 1,189 | 13 |
 | Michael Hanselmann | 22 | 71 | 3 |
@@ -241,6 +241,7 @@ show up there, so the number understates early contributions.  Generated files
 | Reiko Asakura | 1 | 11 | 2 |
 | Mher Kazandjian | 1 | 6 | 1 |
 | Mike | 1 | 23 | 1 |
+| Vedant Patel | 1 | 40 | 3 |
 | Ceesjan Luiten | 1 | 1 | 1 |
 | Vagrant Cascadian | 1 | 1 | 1 |
 | Nic Donaldson | 1 | 26 | 1 |

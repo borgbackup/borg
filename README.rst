@@ -166,6 +166,14 @@ You can also give monetary support to the project, see here for details:
 
 https://www.borgbackup.org/#fund
 
+Thanks to everyone who has helped so far - these are the people with the most
+commits, see `FAME.md <https://github.com/borgbackup/borg/blob/master/FAME.md>`_
+for the full list:
+
+.. image:: https://raw.githubusercontent.com/borgbackup/borg/master/FAME.svg
+   :alt: Borg contributors by commit count
+   :target: https://github.com/borgbackup/borg/blob/master/FAME.md
+
 Links
 -----
 

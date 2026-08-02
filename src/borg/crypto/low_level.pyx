@@ -49,13 +49,13 @@ from libc.string cimport memset, memcpy
 
 
 
-cdef extern from "openssl/crypto.h":
+cdef extern from "openssl/crypto.h" nogil:
     int CRYPTO_memcmp(const void *a, const void *b, size_t len)
 
 cdef extern from "openssl/opensslv.h":
     long OPENSSL_VERSION_NUMBER
 
-cdef extern from "openssl/evp.h":
+cdef extern from "openssl/evp.h" nogil:
     ctypedef struct EVP_MD:
         pass
     ctypedef struct EVP_CIPHER:
@@ -298,6 +298,7 @@ cdef class AES256_CTR_BASE:
         cdef unsigned char *odata = NULL
         cdef int olen
         cdef int offset
+        cdef int rc
         cdef unsigned char mac_buf[32]
         assert sizeof(mac_buf) == self.mac_len
 
@@ -317,9 +318,11 @@ cdef class AES256_CTR_BASE:
             if not EVP_DecryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.enc_key, iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
             offset = 0
-            if not EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                     <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len_short,
-                                     ilen-hlen-self.mac_len-self.iv_len_short):
+            with nogil:
+                rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                       <const unsigned char*> idata.buf+hlen+self.mac_len+self.iv_len_short,
+                                       ilen-hlen-self.mac_len-self.iv_len_short)
+            if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
             if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
@@ -508,6 +511,7 @@ cdef class _AEAD_BASE:
         cdef unsigned char *odata = NULL
         cdef int olen
         cdef int offset
+        cdef int rc
 
         try:
             odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
@@ -536,7 +540,9 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_EncryptUpdate failed')
             if not EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen):
                 raise CryptoError('EVP_EncryptUpdate failed')
-            if not EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen):
+            with nogil:
+                rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
+            if not rc:
                 raise CryptoError('EVP_EncryptUpdate failed')
             offset += olen
             if not EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen):
@@ -582,6 +588,7 @@ cdef class _AEAD_BASE:
         cdef unsigned char *odata = NULL
         cdef int olen
         cdef int offset
+        cdef int rc
 
         try:
             odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
@@ -603,9 +610,11 @@ cdef class _AEAD_BASE:
             if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen):
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset = 0
-            if not EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                     <const unsigned char*> idata.buf+hlen+self.mac_len,
-                                     ilen-hlen-self.mac_len):
+            with nogil:
+                rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
+                                       <const unsigned char*> idata.buf+hlen+self.mac_len,
+                                       ilen-hlen-self.mac_len)
+            if not rc:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
@@ -868,30 +877,30 @@ cdef extern from *:
     const uint64_t BORG_XXH64_P5
 
 
-cdef inline uint64_t _xxh_rotl(uint64_t x, int r) noexcept:
+cdef inline uint64_t _xxh_rotl(uint64_t x, int r) noexcept nogil:
     return (x << r) | (x >> (64 - r))
 
 
-cdef inline uint64_t _xxh_round(uint64_t acc, uint64_t inp) noexcept:
+cdef inline uint64_t _xxh_round(uint64_t acc, uint64_t inp) noexcept nogil:
     acc += inp * BORG_XXH64_P2
     acc = _xxh_rotl(acc, 31)
     acc *= BORG_XXH64_P1
     return acc
 
 
-cdef inline uint64_t _xxh_merge(uint64_t acc, uint64_t val) noexcept:
+cdef inline uint64_t _xxh_merge(uint64_t acc, uint64_t val) noexcept nogil:
     acc ^= _xxh_round(0, val)
     acc = acc * BORG_XXH64_P1 + BORG_XXH64_P4
     return acc
 
 
 # read 64/32 bits little-endian, byte-wise, so this is correct on both little- and big-endian hosts.
-cdef inline uint64_t _xxh_read64(const uint8_t *p) noexcept:
+cdef inline uint64_t _xxh_read64(const uint8_t *p) noexcept nogil:
     return (<uint64_t>p[0] | (<uint64_t>p[1] << 8) | (<uint64_t>p[2] << 16) | (<uint64_t>p[3] << 24) |
             (<uint64_t>p[4] << 32) | (<uint64_t>p[5] << 40) | (<uint64_t>p[6] << 48) | (<uint64_t>p[7] << 56))
 
 
-cdef inline uint32_t _xxh_read32(const uint8_t *p) noexcept:
+cdef inline uint32_t _xxh_read32(const uint8_t *p) noexcept nogil:
     return (<uint32_t>p[0] | (<uint32_t>p[1] << 8) | (<uint32_t>p[2] << 16) | (<uint32_t>p[3] << 24))
 
 
@@ -926,11 +935,12 @@ cdef class XXH64:
         cdef Py_buffer view
         PyObject_GetBuffer(data, &view, PyBUF_SIMPLE)
         try:
-            self._update(<const uint8_t *> view.buf, view.len)
+            with nogil:
+                self._update(<const uint8_t *> view.buf, view.len)
         finally:
             PyBuffer_Release(&view)
 
-    cdef void _update(self, const uint8_t *p, Py_ssize_t length) noexcept:
+    cdef void _update(self, const uint8_t *p, Py_ssize_t length) noexcept nogil:
         cdef const uint8_t *end = p + length
         cdef const uint8_t *limit
         cdef unsigned int fill

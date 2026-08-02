@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" width="1000" height="660" role="img"
+     aria-labelledby="t d" font-family="ui-sans-serif, system-ui, 'Helvetica Neue', Arial, sans-serif">
+  <title id="t">We are Borg - redundancy is futile, your files will be deduplicated</title>
+  <desc id="d">A Borg cube pulls in a pile of 14 files with a tractor beam and emits a
+    neat chunk store containing only 4 unique chunks, each with a reference count.</desc>
+
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1218"/>
+      <stop offset="1" stop-color="#070a0e"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7ee787" stop-opacity="0"/>
+      <stop offset="1" stop-color="#7ee787" stop-opacity="0.30"/>
+    </linearGradient>
+    <linearGradient id="out" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7ee787" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#7ee787" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <g id="file">
+      <path d="M0 4a4 4 0 0 1 4-4h17l12 12v31a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4z"/>
+      <path d="M21 0l12 12H24a3 3 0 0 1-3-3z" fill="#000" opacity=".30"/>
+      <g fill="#000" opacity=".22">
+        <rect x="6" y="23" width="21" height="3" rx="1.5"/>
+        <rect x="6" y="30" width="21" height="3" rx="1.5"/>
+        <rect x="6" y="37" width="13" height="3" rx="1.5"/>
+      </g>
+    </g>
+  </defs>
+
+  <rect width="1000" height="660" fill="url(#sky)"/>
+
+  <!-- stars -->
+  <g fill="#9fb3c8" opacity=".5">
+    <circle cx="62" cy="96" r="1.1"/><circle cx="147" cy="63" r="1.5"/><circle cx="238" cy="108" r="1"/>
+    <circle cx="331" cy="72" r="1.3"/><circle cx="404" cy="102" r="1"/><circle cx="486" cy="30" r="1.4"/>
+    <circle cx="571" cy="99" r="1"/><circle cx="649" cy="34" r="1.2"/><circle cx="742" cy="104" r="1"/>
+    <circle cx="828" cy="62" r="1.5"/><circle cx="914" cy="97" r="1.1"/><circle cx="967" cy="141" r="1"/>
+    <circle cx="34" cy="204" r="1.3"/><circle cx="88" cy="352" r="1"/><circle cx="46" cy="418" r="1.2"/>
+    <circle cx="636" cy="440" r="1"/><circle cx="978" cy="316" r="1.3"/><circle cx="20" cy="286" r="1"/>
+    <circle cx="962" cy="223" r="1"/><circle cx="386" cy="458" r="1.2"/><circle cx="58" cy="600" r="1.1"/>
+    <circle cx="944" cy="588" r="1.3"/><circle cx="106" cy="516" r="1"/><circle cx="898" cy="642" r="1"/>
+  </g>
+
+  <!-- headline -->
+  <!-- "WE ARE BORG" as outlines, set in the borg logo typeface Black Ops One
+       (James Grieshaber, SIL OFL 1.1) - see docs/_static/logo_font.txt.
+       60px, 20px tracking, centered on x=500, baseline y=68. -->
+  <path fill="#7ee787" aria-hidden="true" d="M194.91 68.00 183.28 29.12H196.17L201.88 50.48L205.78 34.16L210.84 52.62L206.66 68.00ZM217.00 68.00 206.33 29.12H219.40L229.36 68.00ZM230.74 65.98 225.46 45.27 229.48 29.12H241.28ZM263.95 68.00V29.12H276.90V44.53H289.29V52.03H276.90V68.00ZM287.01 40.37V36.65H278.95V29.12H299.19V40.37ZM278.95 68.00V60.24H286.25V56.34H299.19V68.00ZM388.09 68.00 386.45 63.75H373.74L376.43 56.05H383.46L373.06 29.12H385.69L401.19 68.00ZM357.77 68.00 371.66 30.88 377.40 46.32 370.28 68.00ZM439.88 56.34V48.81H449.60V36.89H439.88V29.12H454.67L462.47 36.89V48.55L456.43 54.58L463.78 68.00H449.96L444.45 56.34ZM424.88 68.00V29.12H437.83V68.00ZM488.41 68.00V29.12H501.36V44.53H513.75V52.03H501.36V68.00ZM511.47 40.37V36.65H503.41V29.12H523.66V40.37ZM503.41 68.00V60.24H510.71V56.34H523.66V68.00ZM600.40 68.00V60.24H610.00V51.95H600.40V45.18H610.00V36.89H600.40V29.12H615.42L623.22 36.89V44.80L619.32 48.69L623.22 52.59V60.24L615.42 68.00ZM585.40 68.00V29.12H598.34V68.00ZM668.18 68.00V60.09H673.13V37.00H668.18V29.12H678.23L686.08 36.89V60.24L678.23 68.00ZM656.17 68.00 648.29 60.24V36.89L656.17 29.12H666.13V37.00H661.26V60.09H666.13V68.00ZM727.06 56.34V48.81H736.78V36.89H727.06V29.12H741.85L749.64 36.89V48.55L743.61 54.58L750.96 68.00H737.13L731.63 56.34ZM712.06 68.00V29.12H725.00V68.00ZM783.30 68.00 775.53 60.24V36.89L783.30 29.12H788.48V60.24H799.58V68.00ZM800.17 40.78V36.89H790.53V29.12H806.32L813.12 36.89V40.78ZM801.64 68.00V54.14H795.34V46.44H813.12V68.00Z"/>
+  <text x="500" y="110" text-anchor="middle" fill="#e6edf3" font-size="26" font-weight="700">
+    Redundancy is futile, your files will be deduplicated!</text>
+
+  <g transform="translate(0,44)">
+    <!-- tractor beam -->
+    <polygon points="400,208 400,318 96,382 96,104" fill="url(#beam)"/>
+    <polygon points="400,208 400,318 96,382 96,104" fill="none" stroke="#7ee787" stroke-opacity=".22"/>
+
+    <!-- output beam -->
+    <polygon points="600,214 600,306 660,286 660,234" fill="url(#out)"/>
+
+    <!-- incoming pile: 14 files, 4 distinct flavours -->
+    <g>
+      <use href="#file" transform="translate(140,150) scale(.85) rotate(-12,16.5,23.5)" fill="#6ea8fe"/>
+      <use href="#file" transform="translate(196,132) scale(.85) rotate(8,16.5,23.5)"   fill="#f2789b"/>
+      <use href="#file" transform="translate(252,158) scale(.85) rotate(-5,16.5,23.5)"  fill="#f6c945"/>
+      <use href="#file" transform="translate(308,138) scale(.85) rotate(14,16.5,23.5)"  fill="#6ea8fe"/>
+      <use href="#file" transform="translate(150,214) scale(.85) rotate(6,16.5,23.5)"   fill="#b58cf6"/>
+      <use href="#file" transform="translate(206,196) scale(.85) rotate(-9,16.5,23.5)"  fill="#6ea8fe"/>
+      <use href="#file" transform="translate(262,222) scale(.85) rotate(11,16.5,23.5)"  fill="#f2789b"/>
+      <use href="#file" transform="translate(318,202) scale(.85) rotate(-4,16.5,23.5)"  fill="#f6c945"/>
+      <use href="#file" transform="translate(138,278) scale(.85) rotate(-7,16.5,23.5)"  fill="#f2789b"/>
+      <use href="#file" transform="translate(194,262) scale(.85) rotate(13,16.5,23.5)"  fill="#f6c945"/>
+      <use href="#file" transform="translate(250,286) scale(.85) rotate(-11,16.5,23.5)" fill="#b58cf6"/>
+      <use href="#file" transform="translate(306,266) scale(.85) rotate(5,16.5,23.5)"   fill="#6ea8fe"/>
+      <use href="#file" transform="translate(172,330) scale(.85) rotate(9,16.5,23.5)"   fill="#f6c945"/>
+      <use href="#file" transform="translate(284,338) scale(.85) rotate(-8,16.5,23.5)"  fill="#b58cf6"/>
+    </g>
+
+    <!-- files being assimilated along the beam -->
+    <g opacity="0">
+      <use href="#file" transform="scale(.7)" fill="#f6c945"/>
+      <animateMotion path="M120,300 L392,258" dur="3.2s" begin="0s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.18;.72;1" dur="3.2s" begin="0s" repeatCount="indefinite"/>
+    </g>
+    <g opacity="0">
+      <use href="#file" transform="scale(.7)" fill="#6ea8fe"/>
+      <animateMotion path="M110,170 L392,232" dur="3.2s" begin="1.1s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.18;.72;1" dur="3.2s" begin="1.1s" repeatCount="indefinite"/>
+    </g>
+    <g opacity="0">
+      <use href="#file" transform="scale(.7)" fill="#b58cf6"/>
+      <animateMotion path="M116,246 L392,246" dur="3.2s" begin="2.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.18;.72;1" dur="3.2s" begin="2.2s" repeatCount="indefinite"/>
+    </g>
+
+    <!-- the cube -->
+    <g>
+      <polygon points="400,168 500,110 600,168 500,226" fill="#2b3440"/>
+      <polygon points="400,168 500,226 500,346 400,288" fill="#161d26"/>
+      <polygon points="600,168 500,226 500,346 600,288" fill="#1f2833"/>
+
+      <g stroke="#7ee787" stroke-opacity=".28" stroke-width="1">
+        <!-- left face -->
+        <path d="M425,182.5V302.5M450,197V317M475,211.5V331.5M400,198l100,58M400,228l100,58M400,258l100,58"/>
+        <!-- right face -->
+        <path d="M525,211.5V331.5M550,197V317M575,182.5V302.5M500,256l100,-58M500,286l100,-58M500,316l100,-58"/>
+        <!-- top face -->
+        <path d="M425,153.5l100,58M450,139l100,58M475,124.5l100,58M425,182.5l100,-58M450,197l100,-58M475,211.5l100,-58"/>
+      </g>
+
+      <g fill="#7ee787" opacity=".85">
+        <rect x="432" y="216" width="12" height="5" rx="1"/>
+        <rect x="458" y="252" width="18" height="5" rx="1"/>
+        <rect x="412" y="244" width="8" height="5" rx="1"/>
+        <rect x="536" y="228" width="14" height="5" rx="1"/>
+        <rect x="562" y="272" width="10" height="5" rx="1"/>
+        <rect x="520" y="300" width="16" height="5" rx="1"/>
+      </g>
+
+      <circle cx="500" cy="168" r="6" fill="#7ee787" filter="url(#glow)">
+        <animate attributeName="opacity" values="1;.35;1" dur="2.4s" repeatCount="indefinite"/>
+      </circle>
+
+      <polygon points="400,168 500,110 600,168 600,288 500,346 400,288"
+               fill="none" stroke="#7ee787" stroke-opacity=".55"/>
+      <path d="M500,226V346" stroke="#7ee787" stroke-opacity=".35"/>
+    </g>
+
+    <!-- chunk store -->
+    <g>
+      <rect x="662" y="128" width="298" height="230" rx="10" fill="#0f151c" stroke="#7ee787" stroke-opacity=".35"/>
+      <text x="682" y="156" fill="#7ee787" font-size="12" font-weight="700" letter-spacing="2.5">CHUNK STORE</text>
+      <path d="M682,168H940" stroke="#7ee787" stroke-opacity=".2"/>
+
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#cbd5e1">
+        <use href="#file" transform="translate(684,178) scale(.55)" fill="#6ea8fe"/>
+        <text x="716" y="204">a3f9e1c0…</text><text x="938" y="204" text-anchor="end" fill="#7ee787">×4</text>
+        <use href="#file" transform="translate(684,222) scale(.55)" fill="#f2789b"/>
+        <text x="716" y="248">7c2b0455…</text><text x="938" y="248" text-anchor="end" fill="#7ee787">×3</text>
+        <use href="#file" transform="translate(684,266) scale(.55)" fill="#f6c945"/>
+        <text x="716" y="292">de5518af…</text><text x="938" y="292" text-anchor="end" fill="#7ee787">×4</text>
+        <use href="#file" transform="translate(684,310) scale(.55)" fill="#b58cf6"/>
+        <text x="716" y="336">0f81aa93…</text><text x="938" y="336" text-anchor="end" fill="#7ee787">×3</text>
+      </g>
+    </g>
+
+    <!-- labels -->
+    <text x="240" y="404" text-anchor="middle" fill="#8b9bb0" font-size="13" letter-spacing="1.5">
+      14 FILES · YOUR DISTINCTIVENESS</text>
+    <text x="811" y="404" text-anchor="middle" fill="#8b9bb0" font-size="13" letter-spacing="1.5">
+      4 CHUNKS · ONLY THE DISTINCT PART</text>
+  </g>
+
+  <!-- caption -->
+  <g>
+    <rect x="148" y="486" width="704" height="150" rx="12" fill="#0f151c" stroke="#22303d"/>
+    <text x="176" y="532" fill="#7ee787" font-size="30"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">$ borg create assimilation-{now} /</text>
+    <text x="176" y="578" fill="#8b9bb0" font-size="28">Your uniqueness has been added to our own.</text>
+    <text x="176" y="614" fill="#8b9bb0" font-size="28">The rest has been deduplicated.</text>
+  </g>
+</svg>

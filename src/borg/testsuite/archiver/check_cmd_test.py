@@ -16,6 +16,7 @@ from . import (
     cmd,
     src_file,
     create_src_archive,
+    create_regular_file,
     open_archive,
     generate_archiver_tests,
     read_chunk,
@@ -236,6 +237,34 @@ def test_missing_file_chunk_report_truncated(archivers, request):
     assert "The following chunks are missing in the repository:" in output
     assert output.count("- Chunk ") == 1  # only one chunk is detailed
     assert "only the first 1 missing chunks are listed" in output  # the rest are noted as truncated
+
+
+def test_missing_file_chunk_refs_truncated(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # several distinct files with identical content dedup to the same chunk, so a single missing
+    # chunk ends up referenced by many files, which exercises the per-chunk reference cap.
+    for i in range(5):
+        create_regular_file(archiver.input_path, f"samefile{i}", contents=b"same content for dedup")
+    cmd(archiver, "create", "archive1", "input")
+
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    killed_id = None
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith("samefile0"):
+                killed_id = item.chunks[0].id
+                repository.delete(killed_id)
+                break
+    assert killed_id is not None
+
+    # cap references per chunk to 2, so the remaining referencing files are truncated.
+    with patch.object(ArchiveChecker, "MAX_REFS_PER_CHUNK", 2):
+        output = cmd(archiver, "check", exit_code=1)
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(killed_id) in output
+    assert "only the first 2 files are listed" in output  # the remaining referencing files are truncated
 
 
 def test_missing_archive_item_chunk(archivers, request):

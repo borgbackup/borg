@@ -2204,7 +2204,7 @@ class ArchiveChecker:
                 return
             logger.error("The following chunks are missing in the repository:")
             for chunk_id, (size, refs) in missing_chunks.items():
-                logger.error(f"- Chunk {bin_to_hex(chunk_id)}, {size:,} bytes")
+                logger.error(f"- Chunk {bin_to_hex(chunk_id)}, {format_file_size(size)}")
                 for path in sorted(refs):
                     archive_names = ", ".join(sorted(refs[path]))
                     logger.error(f"    - {path}: {archive_names}")

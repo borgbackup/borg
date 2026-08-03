@@ -4,8 +4,9 @@ from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
-from ..helpers import interval, yes, ArchiveFormatter
+from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter
 from ..helpers.argparsing import ArgumentParser
+from ..helpers.time import archive_ts_now, calculate_relative_offset
 
 from ..logger import create_logger
 
@@ -45,6 +46,8 @@ class CheckMixIn:
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
         if args.repair and args.max_age:
+            # reusing recorded results during repair depends on repository repair (refs #8572), which
+            # does not exist yet, so repair verifies every pack.
             raise CommandError("--repair does not allow the --max-age option.")
         if args.archives_only and args.max_age:
             # --max-age only affects the repository check, which --archives-only skips.
@@ -53,9 +56,8 @@ class CheckMixIn:
             # partial checks progress by skipping packs whose record is younger than max_age.
             raise CommandError("--max-duration requires the --max-age option, e.g. --max-age=4w.")
         if args.max_duration and not args.repo_only:
-            # when doing a partial repo check, we can only do a low-level check of the repository files.
-            # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.
-            # also, there is no max_duration support in the archives check code anyway.
+            # --max-duration time-boxes the repository pack check only; the archives check has no
+            # max_duration support and builds its own chunk index, so it cannot be split this way.
             raise CommandError("--repository-only is required for --max-duration support.")
         if not args.repo_only:
             # if we need the key later for the archives check, ask NOW for the passphrase! #1931
@@ -72,7 +74,13 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
-            max_age = int(args.max_age.total_seconds()) if args.max_age else 0
+            if args.max_age:
+                # resolve the relative marker (e.g. 4w, 12m) to a concrete age in seconds; calendar
+                # units (m, y) are measured against now, like --older / --newer.
+                now = archive_ts_now()
+                max_age = int((now - calculate_relative_offset(args.max_age, now, earlier=True)).total_seconds())
+            else:
+                max_age = 0
             if not repository.check(repair=args.repair, max_duration=args.max_duration, max_age=max_age):
                 set_ec(EXIT_WARNING)
         if not args.repo_only and not archive_checker.check(
@@ -129,8 +137,8 @@ class CheckMixIn:
 
         The ``--max-age`` option makes the check reuse the results of previous
         repository checks: packs whose intact result is younger than the given
-        interval (e.g. ``--max-age=4w``) are skipped, spreading the verification
-        cost over repeated checks. Check results are recorded in any case;
+        timespan (e.g. ``--max-age=4w`` or ``--max-age=12m``) are skipped, spreading
+        the verification cost over repeated checks. Check results are recorded in any case;
         ``--max-age`` only controls their reuse. Packs recorded corrupt are always
         re-verified. ``--max-age`` affects only the repository check and cannot be
         combined with ``--archives-only`` or ``--repair``.
@@ -242,12 +250,12 @@ class CheckMixIn:
         )
         subparser.add_argument(
             "--max-age",
-            metavar="INTERVAL",
+            metavar="TIMESPAN",
             dest="max_age",
-            type=interval,
+            type=relative_time_marker_validator,
             default=None,
             action=Highlander,
-            help="reuse intact-pack check results younger than INTERVAL (e.g. 4w)",
+            help="reuse intact-pack check results younger than TIMESPAN, e.g. 4w or 12m",
         )
         subparser.add_argument(
             "--max-duration",

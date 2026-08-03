@@ -841,7 +841,8 @@ class Repository:
         the pack, or when repair salvages and drops it (refs #8572).
 
         max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
-        max_age. Check results are always recorded and kept.
+        max_age, tolerating up to MAX_CLOCK_SKEW of clock skew at both ends of the window. Check
+        results are always recorded and kept.
         """
 
         def verify(namespace, name):
@@ -869,7 +870,7 @@ class Repository:
         if not len(tracker):
             logger.info("Starting from beginning.")
         elif max_age:
-            logger.info(f"{len(tracker)} pack check results on record, reusing those younger than max_age.")
+            logger.info(f"{len(tracker)} pack check results on record, reusing those younger than --max-age.")
         else:
             logger.info(f"{len(tracker)} pack check results on record, verifying every pack.")
         t_start = time.monotonic()
@@ -905,12 +906,14 @@ class Repository:
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
                 entry = tracker.get(pack_id)
-                # skip the pack if its recorded intact result is younger than max_age. a future
-                # timestamp (writer clock ahead of ours) also counts as recent, tolerated up to
-                # MAX_CLOCK_SKEW or max_age ahead, whichever is smaller.
+                # skip the pack if its recorded intact result is younger than max_age. the timestamp
+                # is written by whichever client ran the earlier check, so it may be off by up to
+                # MAX_CLOCK_SKEW against our clock in either direction; tolerate that much skew at both
+                # ends of the window, but never more than the window itself.
                 if entry is not None and entry.result and max_age:
                     age = time.time() - entry.timestamp
-                    if -min(MAX_CLOCK_SKEW, max_age) <= age < max_age:
+                    skew = min(MAX_CLOCK_SKEW, max_age)
+                    if -skew <= age <= max_age + skew:
                         pack_skipped += 1
                         continue
                 pack_files += 1

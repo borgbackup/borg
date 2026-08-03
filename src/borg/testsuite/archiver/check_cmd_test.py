@@ -95,7 +95,7 @@ def test_check_max_age(archivers, request):
     output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)
     assert "Starting full repository check" in output
     output = cmd(archiver, "check", "-v", "--repository-only", "--max-age=4w", exit_code=0)
-    assert "reusing those younger than max_age" in output
+    assert "reusing those younger than --max-age" in output
     assert "no problems found" in output
 
 

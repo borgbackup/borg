@@ -1272,22 +1272,41 @@ def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
 
 
 def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
-    # with max_age, a pack whose intact record is older than max_age is re-verified.
+    # with max_age, a pack whose intact record is older than max_age plus the skew tolerance is re-verified.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
+        max_age = 50
         tracker = PackTracker.new(repository.store)
-        old_ts = int(time.time()) - 100
+        old_ts = int(time.time()) - (max_age + MAX_CLOCK_SKEW + 100)  # clearly beyond max_age + skew
         tracker.table[intact_id] = PackTracker.Entry(timestamp=old_ts, result=1)
         tracker.save()
 
         hashed_keys = _spy_hash(repository, monkeypatch)
 
-        assert repository.check(repair=False, max_age=50) is True
+        assert repository.check(repair=False, max_age=max_age) is True
         assert pack_key in hashed_keys  # stale, re-verified
 
         after = PackTracker.load(repository.store)
         assert after.table[intact_id].timestamp > old_ts  # record refreshed
+
+
+def test_check_max_age_skips_stale_within_skew(tmp_path, monkeypatch):
+    # a record older than max_age but within MAX_CLOCK_SKEW of it still counts as recent (writer clock
+    # behind ours), so it is not re-verified.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, pack_key = _store_intact_pack(repository)
+
+        max_age = MAX_CLOCK_SKEW * 2  # wide window, so the skew tolerance is MAX_CLOCK_SKEW
+        tracker = PackTracker.new(repository.store)
+        past_ts = int(time.time()) - (max_age + MAX_CLOCK_SKEW // 2)  # past the window, within skew
+        tracker.table[intact_id] = PackTracker.Entry(timestamp=past_ts, result=1)
+        tracker.save()
+
+        hashed_keys = _spy_hash(repository, monkeypatch)
+
+        assert repository.check(repair=False, max_age=max_age) is True
+        assert pack_key not in hashed_keys  # within MAX_CLOCK_SKEW past the window, still recent
 
 
 def test_check_max_age_skips_near_future_ok(tmp_path, monkeypatch):

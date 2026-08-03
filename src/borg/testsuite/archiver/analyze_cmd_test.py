@@ -273,9 +273,13 @@ def test_analyze_json_hotspots(archivers, request):
 
     # the 2nd archive added one chunk of 2 bytes below the input directory
     hotspots = json.loads(cmd(archiver, "analyze", "-a", "archive", "--json"))["hotspots"]
-    assert [hotspot for hotspot in hotspots if hotspot["path"].endswith("/input")] == [
-        {"path": str(input_path).removeprefix("/"), "size": 2}
-    ]
+    assert [hotspot["size"] for hotspot in hotspots if hotspot["path"].endswith("/input")] == [2]
+    # paths and sizes are the ones the text report prints. Archived paths are normalized
+    # (a Windows "D:/x" is stored as "D/x"), so compare against the report rather than
+    # rebuilding the path here.
+    text = cmd(archiver, "analyze", "-a", "archive")
+    for hotspot in hotspots:
+        assert f"{hotspot['path']}: {hotspot['size']}" in text
     # busiest directory first, as in the text report
     assert [hotspot["size"] for hotspot in hotspots] == sorted((hotspot["size"] for hotspot in hotspots), reverse=True)
 

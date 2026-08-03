@@ -261,6 +261,21 @@ def test_download_pipeline_parsed_cache():
     assert len(set(parsed_ids)) == 3
 
 
+@pytest.mark.parametrize("replacement_chunk", [False, True])
+def test_download_pipeline_missing_chunk(replacement_chunk):
+    # a chunk missing in the repository is either replaced by all-zero data of the
+    # correct size, or reported as None - and never blows up on the size check.
+    key = PlaintextKey(None)
+    repo_objs = RepoObj(key)
+    data = b"foobar" * 100
+    id = repo_objs.id_hash(data)
+    repository = MockFetchRepo({id: None})  # the object is gone
+    pipeline = DownloadPipeline(repository, repo_objs)
+    chunk_list = [ChunkListEntry(id, len(data))]
+    result = list(pipeline.fetch_many(chunk_list, ro_type=ROBJ_FILE_STREAM, replacement_chunk=replacement_chunk))
+    assert result == [zeros[: len(data)] if replacement_chunk else None]
+
+
 def test_download_pipeline_zero_chunks_served_locally():
     # repeated all-zero chunks (e.g. from the holes of a sparse file) shall be served
     # directly from the zeros constant, without repository access, see issue #1678.

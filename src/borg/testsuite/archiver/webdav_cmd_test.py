@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from ...constants import *  # NOQA
+from ...archive import Archive
 from ...manifest import Manifest
 from ...platform import is_win32
 from ...repository import Repository
@@ -578,6 +579,41 @@ def test_webdav_file_without_chunks(archivers, request):
             assert response.getheader("Content-Length") == "5"  # a body was promised...
             with pytest.raises(http.client.IncompleteRead):
                 response.read()  # ...but the connection is aborted with no body
+            conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=10)
+
+
+def test_webdav_damaged_file(archivers, request):
+    # A file with a chunk missing in the repository must never be served as if it were
+    # intact: the server aborts the connection, so the client sees a short read.
+    archiver = request.getfixturevalue(archivers)
+    _create_archive(archiver)
+    args = SimpleNamespace(
+        sort_by="ts", match_archives=None, first=None, last=None, older=None, newer=None, oldest=None, newest=None
+    )
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        archive = Archive(manifest, manifest.archives.get("test").id)
+        for item in archive.iter_items():
+            if item.path.endswith("big"):
+                repository.delete(item.chunks[-1].id)  # get rid of a chunk of "big"
+                break
+        else:
+            assert False  # missed the file
+        server = make_server(manifest, args, port=0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1])
+            conn.request("GET", "/test/input/big")
+            response = conn.getresponse()
+            assert response.status == 200
+            with pytest.raises(http.client.IncompleteRead):
+                response.read()  # the connection is aborted where the chunk is missing
             conn.close()
         finally:
             server.shutdown()

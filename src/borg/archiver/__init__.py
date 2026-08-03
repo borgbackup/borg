@@ -85,6 +85,7 @@ from .repo_compress_cmd import RepoCompressMixIn
 from .recreate_cmd import RecreateMixIn
 from .rename_cmd import RenameMixIn
 from .repo_create_cmd import RepoCreateMixIn
+from .monitor_cmd import MonitorMixIn
 from .repo_info_cmd import RepoInfoMixIn
 from .repo_delete_cmd import RepoDeleteMixIn
 from .repo_list_cmd import RepoListMixIn
@@ -114,6 +115,7 @@ class Archiver(
     KeysMixIn,
     ListMixIn,
     LocksMixIn,
+    MonitorMixIn,
     MountMixIn,
     PruneMixIn,
     RecreateMixIn,
@@ -305,6 +307,7 @@ class Archiver(
         self.build_parser_keys(subparsers, common_parser, mid_common_parser)
         self.build_parser_list(subparsers, common_parser, mid_common_parser)
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
+        self.build_parser_monitor(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)
         self.build_parser_prune(subparsers, common_parser, mid_common_parser)
         self.build_parser_repo_compress(subparsers, common_parser, mid_common_parser)

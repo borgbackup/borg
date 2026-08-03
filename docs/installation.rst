@@ -162,10 +162,10 @@ following dependencies first. For the libraries you will also need their
 development header files (sometimes in a separate `-dev` or `-devel` package).
 
 * `Python 3`_ >= 3.11.0
-* OpenSSL_ >= 1.1.1 (LibreSSL will not work)
+* OpenSSL_ >= 3.2.0 (LibreSSL will not work)
 * libacl_ (which depends on libattr_)
 * liblz4_ >= 1.7.0 (r129)
-* libffi (required for argon2-cffi-bindings)
+
 * pkg-config (cli tool) - Borg uses this to discover header and library
   locations automatically. Alternatively, you can also point to them via some
   environment variables, see setup.py.

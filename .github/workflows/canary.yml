@@ -18,13 +18,7 @@ jobs:
       matrix:
         include:
           # A representative subset of environments
-          - os: ubuntu-24.04
-            python-version: '3.11'
-            toxenv: py311-llfuse
-          - os: ubuntu-24.04
-            python-version: '3.12'
-            toxenv: py312-pyfuse3
-          - os: ubuntu-24.04
+          - os: ubuntu-26.04
             python-version: '3.14'
             toxenv: py314-mfusepy
           - os: macos-15
@@ -125,7 +119,7 @@ jobs:
 
       - name: Build python venv
         run: |
-          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          # building some packages in the venv fails, so we try to use the system packages
           python -m venv --system-site-packages env
           . env/bin/activate
           # python -m pip install --upgrade pip

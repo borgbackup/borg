@@ -29,6 +29,7 @@ sys.path += [os.path.dirname(__file__)]
 
 is_win32 = sys.platform.startswith("win32")
 is_openbsd = sys.platform.startswith("openbsd")
+is_netbsd = sys.platform.startswith("netbsd")
 
 # Number of threads to use for cythonize, not used on Windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != "spawn" else None
@@ -144,7 +145,7 @@ if not on_rtd:
         )
 
     if is_win32:
-        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=1.1.1", lib_subdir="")
+        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=3.2.0", lib_subdir="")
     elif is_openbsd:
         # Use OpenSSL (not LibreSSL) because we need AES-OCB via the EVP API. Link
         # it statically to avoid conflicting with shared libcrypto from the base
@@ -155,8 +156,16 @@ if not on_rtd:
             include_dirs=[os.path.join(openssl_prefix, "include", openssl_name)],
             extra_objects=[os.path.join(openssl_prefix, "lib", openssl_name, "libcrypto.a")],
         )
+    elif is_netbsd and os.environ.get("BORG_OPENSSL_PREFIX"):
+        # Similarly for NetBSD, if we built a custom OpenSSL, link it statically
+        # to avoid dynamic linker conflicts with the system OpenSSL loaded by Python.
+        openssl_prefix = os.environ.get("BORG_OPENSSL_PREFIX")
+        crypto_ext_lib = dict(
+            include_dirs=[os.path.join(openssl_prefix, "include")],
+            extra_objects=[os.path.join(openssl_prefix, "lib", "libcrypto.a")],
+        )
     else:
-        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=1.1.1")
+        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=3.2.0")
 
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)

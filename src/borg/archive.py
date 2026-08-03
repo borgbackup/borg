@@ -399,7 +399,7 @@ class DownloadPipeline:
                 except KeyError:
                     _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
                     self.parsed_cache[(id, ro_type)] = data
-            assert size is None or len(data) == size
+            assert data is None or size is None or len(data) == size
             yield data
 
 

@@ -1,11 +1,11 @@
 # Contributors
 
-371 people have contributed to Borg, with 10,601 commits in total.
+372 people have contributed to Borg, with 10,607 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-08-02 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-08-03 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,9 +21,9 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,039 | 76,746 | 461 |
+| Thomas Waldmann | 7,044 | 76,773 | 461 |
 | Marian Beermann | 1,140 | 8,400 | 157 |
-| Jonas Borgström | 560 | 1,029 | 38 |
+| Jonas Borgström | 560 | 1,028 | 38 |
 | Antoine Beaupré | 285 | 441 | 33 |
 | Mrityunjay Raj | 198 | 7,917 | 102 |
 | Andrey Bienkowski | 72 | 210 | 16 |
@@ -40,82 +40,82 @@ show up there, so the number understates early contributions.  Generated files
 | anarcat | 24 | 34 | 4 |
 | Hugo Wallenburg | 23 | 1,189 | 13 |
 | Michael Hanselmann | 22 | 71 | 3 |
-| Björn Ketelaars | 17 | 33 | 6 |
 | SanskritFritz | 17 | 258 | 1 |
+| Björn Ketelaars | 17 | 33 | 6 |
 | Lee Bousfield | 14 | 160 | 9 |
 | Alan Jenkins | 14 | 38 | 2 |
-| Robin Schneider | 13 | 19 | 8 |
 | Daniel Rudolf | 13 | 230 | 14 |
-| Jürg Rast | 12 | 73 | 11 |
+| Robin Schneider | 13 | 19 | 8 |
 | Elmar Hoffmann | 12 | 90 | 6 |
+| Jürg Rast | 12 | 73 | 11 |
 | Ronny Pfannschmidt | 12 | 20 | 4 |
 | mh4ckt3mh4ckt1c4s | 11 | 0 | 0 |
+| finefoot | 10 | 18 | 3 |
 | Teemu Toivanen | 10 | 16 | 2 |
 | Lauri Niskanen | 10 | 5 | 2 |
-| finefoot | 10 | 18 | 3 |
 | James Buren | 10 | 2 | 2 |
-| Per Guth | 9 | 1 | 1 |
-| rugk | 9 | 13 | 5 |
-| Ed Blackman | 9 | 13 | 3 |
-| Carlo Teubner | 9 | 3 | 3 |
 | Emmo Emminghaus | 9 | 80 | 10 |
-| Josh Soref | 8 | 3 | 3 |
+| Ed Blackman | 9 | 13 | 3 |
+| rugk | 9 | 13 | 5 |
+| Carlo Teubner | 9 | 3 | 3 |
+| Per Guth | 9 | 1 | 1 |
 | Jakob Schnitzer | 8 | 35 | 1 |
+| Josh Soref | 8 | 3 | 3 |
 | Gianfranco Costamagna | 7 | 10 | 6 |
 | Frank Sachsenheim | 7 | 2 | 1 |
 | Hartmut Goebel | 7 | 0 | 0 |
-| Michael Deyaso | 6 | 170 | 14 |
-| Alf Mikula | 6 | 19 | 1 |
 | William D. Jones | 6 | 250 | 6 |
-| Felix Schwarz | 6 | 4 | 2 |
+| Michael Deyaso | 6 | 170 | 14 |
 | Peter Gerber | 6 | 103 | 9 |
+| Alf Mikula | 6 | 19 | 1 |
+| Felix Schwarz | 6 | 4 | 2 |
 | Alexander-N | 6 | 0 | 0 |
 | Paul D | 5 | 185 | 46 |
-| Mark Edgington | 5 | 10 | 3 |
+| Simon Frei | 5 | 174 | 3 |
 | Dominik Stadler | 5 | 77 | 1 |
-| infectormp | 5 | 18 | 2 |
+| elandorr | 5 | 40 | 3 |
 | remyabel | 5 | 25 | 3 |
 | Alexander 'Leo' Bergolth | 5 | 24 | 3 |
-| Simon Frei | 5 | 174 | 3 |
-| elandorr | 5 | 40 | 3 |
+| infectormp | 5 | 18 | 2 |
+| Mark Edgington | 5 | 10 | 3 |
 | step21 | 5 | 1 | 1 |
 | Radu Ciorba | 5 | 0 | 0 |
+| Charlie Herz | 4 | 628 | 5 |
+| Robert Blenis | 4 | 90 | 4 |
+| Ebuzer Celil Durmaz | 4 | 80 | 5 |
+| Franco Ayala | 4 | 39 | 6 |
 | Suryansh Pal | 4 | 36 | 9 |
 | 8bit | 4 | 30 | 5 |
-| Ryan Polley | 4 | 12 | 4 |
-| Steve Groesz | 4 | 22 | 1 |
-| Thomas Kluyver | 4 | 8 | 2 |
-| Robert Blenis | 4 | 90 | 4 |
-| Josh Holland | 4 | 3 | 2 |
-| Charlie Herz | 4 | 628 | 5 |
 | oxiedi | 4 | 26 | 1 |
-| Franco Ayala | 4 | 39 | 6 |
-| Ebuzer Celil Durmaz | 4 | 80 | 5 |
+| Steve Groesz | 4 | 22 | 1 |
+| Ryan Polley | 4 | 12 | 4 |
 | Artem Sheremet | 4 | 10 | 1 |
+| Thomas Kluyver | 4 | 8 | 2 |
+| Josh Holland | 4 | 3 | 2 |
 | Narendra Vardi | 4 | 3 | 1 |
 | Alexander Pyhalov | 4 | 0 | 0 |
-| Will | 3 | 21 | 4 |
-| Lukas Fleischer | 3 | 23 | 2 |
-| Daniel Reichelt | 3 | 25 | 5 |
-| Stephen | 3 | 10 | 2 |
-| Stefan Tatschner | 3 | 3 | 1 |
 | Stephan Herbers | 3 | 49 | 2 |
-| ntova | 3 | 33 | 8 |
-| Dmitry Astapov | 3 | 8 | 1 |
-| Helmut Grohne | 3 | 11 | 1 |
-| Andrea Gelmini | 3 | 18 | 13 |
-| Martin Richtarsky | 3 | 34 | 4 |
-| Michael Gajda | 3 | 23 | 2 |
-| jungle-boogie | 3 | 13 | 1 |
-| Thomas Harold | 3 | 1 | 1 |
-| Gregor Kleen | 3 | 8 | 3 |
-| kmq | 3 | 15 | 1 |
-| Luke Dashjr | 3 | 4 | 1 |
-| Divyesh | 3 | 1 | 1 |
-| eoli3n | 3 | 22 | 1 |
-| Oleg Drokin | 3 | 16 | 1 |
 | Charmi Kadi | 3 | 46 | 2 |
+| Martin Richtarsky | 3 | 34 | 4 |
+| ntova | 3 | 33 | 8 |
+| Daniel Reichelt | 3 | 25 | 5 |
+| Lukas Fleischer | 3 | 23 | 2 |
+| Michael Gajda | 3 | 23 | 2 |
+| eoli3n | 3 | 22 | 1 |
+| Will | 3 | 21 | 4 |
+| Andrea Gelmini | 3 | 18 | 13 |
+| Oleg Drokin | 3 | 16 | 1 |
+| kmq | 3 | 15 | 1 |
+| jungle-boogie | 3 | 13 | 1 |
+| Helmut Grohne | 3 | 11 | 1 |
+| Stephen | 3 | 10 | 2 |
+| Dmitry Astapov | 3 | 8 | 1 |
+| Gregor Kleen | 3 | 8 | 3 |
 | valtron | 3 | 7 | 1 |
+| Luke Dashjr | 3 | 4 | 1 |
+| Stefan Tatschner | 3 | 3 | 1 |
+| Divyesh | 3 | 1 | 1 |
+| Thomas Harold | 3 | 1 | 1 |
 | Danny Edel | 3 | 0 | 0 |
 | Jeff Rizzo | 3 | 0 | 0 |
 | Piotr Pawlow | 3 | 0 | 0 |
@@ -123,50 +123,50 @@ show up there, so the number understates early contributions.  Generated files
 | William Bonnaventure | 3 | 0 | 0 |
 | Zhuoyun Wei | 3 | 0 | 0 |
 | jhemmje | 3 | 0 | 0 |
-| Samuel | 2 | 4 | 3 |
-| trxvorr | 2 | 103 | 7 |
-| Jerry Jacobs | 2 | 12 | 3 |
-| jetchirag | 2 | 9 | 3 |
-| bbx0 | 2 | 3 | 1 |
-| wormingdead | 2 | 5 | 1 |
-| azrdev | 2 | 2 | 1 |
-| jan | 2 | 3 | 1 |
-| Samuel BF | 2 | 2 | 1 |
-| zDEFz | 2 | 27 | 1 |
-| Ioannis Cherouvim | 2 | 32 | 2 |
-| AJ Jordan | 2 | 2 | 1 |
-| Markus Engelbrecht | 2 | 3 | 1 |
 | Thomas Portmann | 2 | 206 | 5 |
-| Leo Famulari | 2 | 1 | 1 |
-| Fabian Fröhlich | 2 | 4 | 1 |
-| Andreas Gruhler | 2 | 3 | 1 |
-| Cthulhux | 2 | 1 | 1 |
-| Russell Davis | 2 | 1 | 1 |
-| Kurt Yoder | 2 | 8 | 1 |
-| Jonas Schäfer | 2 | 13 | 1 |
-| a1346054 | 2 | 4 | 3 |
-| Sophie Herold | 2 | 2 | 2 |
-| ReethuVinta | 2 | 20 | 2 |
-| textshell | 2 | 1 | 1 |
-| Saurav Sachidanand | 2 | 2 | 1 |
-| Łukasz Stelmach | 2 | 14 | 2 |
-| Vaskebjoern | 2 | 5 | 1 |
-| Joachim Breitner | 2 | 15 | 1 |
-| Matthew Glazar | 2 | 18 | 3 |
-| Max-Julian Pogner | 2 | 15 | 1 |
-| Atharva Varpe | 2 | 23 | 1 |
-| Lapinot | 2 | 24 | 4 |
-| Soumik Dutta | 2 | 85 | 3 |
-| Eric Wolf | 2 | 51 | 4 |
-| snsmac | 2 | 6 | 2 |
+| Ken Kundert | 2 | 149 | 4 |
+| trxvorr | 2 | 103 | 7 |
 | Syed Ali Ghazi Ejaz | 2 | 90 | 4 |
 | David Rambo | 2 | 87 | 3 |
+| Soumik Dutta | 2 | 85 | 3 |
+| Eric Wolf | 2 | 51 | 4 |
 | Divyansh Agrawal | 2 | 43 | 4 |
+| Ioannis Cherouvim | 2 | 32 | 2 |
+| zDEFz | 2 | 27 | 1 |
+| Lapinot | 2 | 24 | 4 |
+| Atharva Varpe | 2 | 23 | 1 |
+| ReethuVinta | 2 | 20 | 2 |
+| Matthew Glazar | 2 | 18 | 3 |
+| Joachim Breitner | 2 | 15 | 1 |
+| Max-Julian Pogner | 2 | 15 | 1 |
+| Łukasz Stelmach | 2 | 14 | 2 |
+| Jonas Schäfer | 2 | 13 | 1 |
+| Jerry Jacobs | 2 | 12 | 3 |
 | kmille | 2 | 11 | 2 |
+| jetchirag | 2 | 9 | 3 |
+| Kurt Yoder | 2 | 8 | 1 |
 | nain | 2 | 6 | 1 |
-| Ken Kundert | 2 | 149 | 4 |
-| Cam Hutchison | 2 | 1 | 1 |
+| snsmac | 2 | 6 | 2 |
+| Vaskebjoern | 2 | 5 | 1 |
+| wormingdead | 2 | 5 | 1 |
+| Fabian Fröhlich | 2 | 4 | 1 |
+| Samuel | 2 | 4 | 3 |
+| a1346054 | 2 | 4 | 3 |
+| Andreas Gruhler | 2 | 3 | 1 |
+| Markus Engelbrecht | 2 | 3 | 1 |
+| bbx0 | 2 | 3 | 1 |
+| jan | 2 | 3 | 1 |
+| AJ Jordan | 2 | 2 | 1 |
 | MultisampledNight | 2 | 2 | 1 |
+| Samuel BF | 2 | 2 | 1 |
+| Saurav Sachidanand | 2 | 2 | 1 |
+| Sophie Herold | 2 | 2 | 2 |
+| azrdev | 2 | 2 | 1 |
+| Cam Hutchison | 2 | 1 | 1 |
+| Cthulhux | 2 | 1 | 1 |
+| Leo Famulari | 2 | 1 | 1 |
+| Russell Davis | 2 | 1 | 1 |
+| textshell | 2 | 1 | 1 |
 | Abogical | 2 | 0 | 0 |
 | Andrew Skalski | 2 | 0 | 0 |
 | Brian Johnson | 2 | 0 | 0 |
@@ -189,89 +189,90 @@ show up there, so the number understates early contributions.  Generated files
 | motwok | 2 | 0 | 0 |
 | sven | 2 | 0 | 0 |
 | user062 | 2 | 0 | 0 |
-| Paweł Kotiuk | 1 | 2 | 1 |
-| borkd | 1 | 37 | 1 |
-| Daniel Dent | 1 | 2 | 1 |
-| Lars K.W. Gohlke | 1 | 1 | 1 |
-| Kevin Yin | 1 | 3 | 1 |
-| Eddie Carswell | 1 | 4 | 1 |
-| vancheese | 1 | 28 | 8 |
-| Benedikt Seidl | 1 | 116 | 1 |
-| Michael Bauer | 1 | 2 | 1 |
-| Aleksey Korol | 1 | 95 | 1 |
-| Coenraad Loubser | 1 | 1 | 1 |
-| ebabcock93 | 1 | 84 | 1 |
-| Tavlor | 1 | 3 | 1 |
-| dataprolet | 1 | 5 | 1 |
-| Tom Denley | 1 | 2 | 2 |
-| Uriel | 1 | 30 | 1 |
-| Jonathan Rascher | 1 | 1 | 1 |
-| Fredrik Mikker | 1 | 1 | 1 |
-| Robert Marcano | 1 | 1 | 1 |
-| Jubjub | 1 | 6 | 1 |
-| Alexander Meshcheryakov | 1 | 2 | 1 |
-| Stefano Probst | 1 | 1 | 1 |
-| jminer74 | 1 | 2 | 1 |
-| tree-wall | 1 | 2 | 1 |
-| Florent Hemmi | 1 | 5 | 1 |
-| Svein Ove Aas | 1 | 1 | 1 |
-| Antonio Larrosa | 1 | 12 | 1 |
-| Andreas Vögele | 1 | 1 | 1 |
-| ahtaarra | 1 | 1 | 1 |
-| Jens Diemer | 1 | 1 | 1 |
-| Dee Newcum | 1 | 1 | 1 |
-| Marc Kohaupt | 1 | 1 | 1 |
-| abebeos | 1 | 4 | 1 |
-| remyabel2 | 1 | 13 | 1 |
-| James Rowell | 1 | 8 | 1 |
-| targhs | 1 | 1 | 1 |
-| Alexandr Kozlinskiy | 1 | 4 | 1 |
-| Christian Paul | 1 | 1 | 1 |
-| Sitaram Chamarty | 1 | 23 | 1 |
-| philippje | 1 | 2 | 1 |
-| Mateusz Konieczny | 1 | 3 | 1 |
-| James Vasile | 1 | 36 | 1 |
-| Maltimore | 1 | 2 | 1 |
-| Greg Grossmeier | 1 | 7 | 1 |
-| Jonathan Zacsh | 1 | 21 | 1 |
-| Rohan salunke | 1 | 76 | 9 |
-| Stefan Majewsky | 1 | 1 | 1 |
-| Atemu | 1 | 11 | 2 |
-| Dominik Tugend | 1 | 3 | 1 |
-| Reiko Asakura | 1 | 11 | 2 |
-| Mher Kazandjian | 1 | 6 | 1 |
-| Mike | 1 | 23 | 1 |
-| Vedant Patel | 1 | 40 | 3 |
-| Ceesjan Luiten | 1 | 1 | 1 |
-| Vagrant Cascadian | 1 | 1 | 1 |
-| Nic Donaldson | 1 | 26 | 1 |
-| TawfeeqShaik | 1 | 6 | 1 |
-| Xiaocheng Song | 1 | 60 | 4 |
-| Jim Paris | 1 | 2 | 1 |
-| vhadzhiev | 1 | 2 | 1 |
 | Tarrailt | 1 | 371 | 8 |
-| Sam H | 1 | 24 | 2 |
-| Leo Antunes | 1 | 5 | 1 |
-| Matt Van Horn | 1 | 1 | 1 |
-| Mike Mason | 1 | 38 | 3 |
-| edvatar | 1 | 16 | 2 |
-| goebbe | 1 | 4 | 1 |
-| MartinKurtz | 1 | 1 | 1 |
-| nyuszika7h | 1 | 3 | 1 |
-| Divyansh Singh | 1 | 1 | 1 |
-| Phil Kulin | 1 | 4 | 1 |
-| Félix Sipma | 1 | 13 | 1 |
-| Graham Stockton | 1 | 7 | 1 |
-| Peter Zangerl | 1 | 1 | 1 |
-| lexa-a | 1 | 31 | 1 |
-| Nikolaus Rath | 1 | 7 | 1 |
+| Benedikt Seidl | 1 | 116 | 1 |
 | axapaxa | 1 | 105 | 2 |
-| Abhijeet | 1 | 1 | 1 |
+| Aleksey Korol | 1 | 95 | 1 |
+| ebabcock93 | 1 | 84 | 1 |
+| Rohan salunke | 1 | 76 | 9 |
+| Xiaocheng Song | 1 | 60 | 4 |
+| Vedant Patel | 1 | 40 | 3 |
+| Mike Mason | 1 | 38 | 3 |
+| borkd | 1 | 37 | 1 |
+| James Vasile | 1 | 36 | 1 |
+| lexa-a | 1 | 31 | 1 |
+| Uriel | 1 | 30 | 1 |
+| vancheese | 1 | 28 | 8 |
+| Nic Donaldson | 1 | 26 | 1 |
+| Sam H | 1 | 24 | 2 |
+| Mike | 1 | 23 | 1 |
+| Sitaram Chamarty | 1 | 23 | 1 |
+| Jonathan Zacsh | 1 | 21 | 1 |
+| edvatar | 1 | 16 | 2 |
+| Félix Sipma | 1 | 13 | 1 |
+| remyabel2 | 1 | 13 | 1 |
+| Antonio Larrosa | 1 | 12 | 1 |
+| Atemu | 1 | 11 | 2 |
+| Reiko Asakura | 1 | 11 | 2 |
+| James Rowell | 1 | 8 | 1 |
+| Graham Stockton | 1 | 7 | 1 |
+| Greg Grossmeier | 1 | 7 | 1 |
+| Nikolaus Rath | 1 | 7 | 1 |
 | Dark Dragon | 1 | 6 | 1 |
+| Jubjub | 1 | 6 | 1 |
+| Mher Kazandjian | 1 | 6 | 1 |
+| TawfeeqShaik | 1 | 6 | 1 |
+| ThomasWaldmann | 1 | 6 | 1 |
+| Florent Hemmi | 1 | 5 | 1 |
+| Leo Antunes | 1 | 5 | 1 |
+| dataprolet | 1 | 5 | 1 |
+| Alexandr Kozlinskiy | 1 | 4 | 1 |
+| Eddie Carswell | 1 | 4 | 1 |
+| Phil Kulin | 1 | 4 | 1 |
+| abebeos | 1 | 4 | 1 |
+| goebbe | 1 | 4 | 1 |
+| Dominik Tugend | 1 | 3 | 1 |
+| Kevin Yin | 1 | 3 | 1 |
+| Mateusz Konieczny | 1 | 3 | 1 |
+| Tavlor | 1 | 3 | 1 |
+| Zhou Qiankang | 1 | 3 | 1 |
+| nyuszika7h | 1 | 3 | 1 |
+| Alexander Meshcheryakov | 1 | 2 | 1 |
+| Daniel Dent | 1 | 2 | 1 |
+| Jim Paris | 1 | 2 | 1 |
+| Maltimore | 1 | 2 | 1 |
+| Michael Bauer | 1 | 2 | 1 |
+| Paweł Kotiuk | 1 | 2 | 1 |
+| Tom Denley | 1 | 2 | 2 |
+| jminer74 | 1 | 2 | 1 |
+| philippje | 1 | 2 | 1 |
+| tree-wall | 1 | 2 | 1 |
+| vhadzhiev | 1 | 2 | 1 |
+| Abhijeet | 1 | 1 | 1 |
+| Andreas Vögele | 1 | 1 | 1 |
+| Ceesjan Luiten | 1 | 1 | 1 |
+| Christian Paul | 1 | 1 | 1 |
+| Coenraad Loubser | 1 | 1 | 1 |
+| Dee Newcum | 1 | 1 | 1 |
+| Divyansh Singh | 1 | 1 | 1 |
 | Emil M George | 1 | 1 | 1 |
+| Fredrik Mikker | 1 | 1 | 1 |
 | Hauke Rehfeld | 1 | 1 | 1 |
 | Ivan Shapovalov | 1 | 1 | 1 |
-| Zhou Qiankang | 1 | 3 | 1 |
+| Jens Diemer | 1 | 1 | 1 |
+| Jonathan Rascher | 1 | 1 | 1 |
+| Lars K.W. Gohlke | 1 | 1 | 1 |
+| Marc Kohaupt | 1 | 1 | 1 |
+| MartinKurtz | 1 | 1 | 1 |
+| Matt Van Horn | 1 | 1 | 1 |
+| Peter Zangerl | 1 | 1 | 1 |
+| Robert Marcano | 1 | 1 | 1 |
+| Stefan Majewsky | 1 | 1 | 1 |
+| Stefano Probst | 1 | 1 | 1 |
+| Svein Ove Aas | 1 | 1 | 1 |
+| Vagrant Cascadian | 1 | 1 | 1 |
+| ahtaarra | 1 | 1 | 1 |
+| targhs | 1 | 1 | 1 |
 | Adam Kouse | 1 | 0 | 0 |
 | Aidan Woods | 1 | 0 | 0 |
 | Aiman | 1 | 0 | 0 |

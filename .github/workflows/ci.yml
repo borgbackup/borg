@@ -135,6 +135,8 @@ jobs:
       id-token: write
       attestations: write
     strategy:
+      # entries with "allow-failure": true (e.g. prerelease pythons) do not fail
+      # the matrix, see continue-on-error below.
       fail-fast: true
       # noinspection YAMLSchemaValidation
       matrix: >-
@@ -145,7 +147,8 @@ jobs:
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3", "store_cache": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
+              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }' || '{
             "include": [
@@ -155,7 +158,8 @@ jobs:
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
               {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
               {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
-              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"}
+              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"},
+              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }'
         ) }}
@@ -163,6 +167,10 @@ jobs:
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
+    # Python 3.15 is not released yet, so do not fail the whole matrix if it (or a
+    # dependency not having wheels / not compiling for it yet) breaks.
+    # Remove the "allow-failure" matrix entries once 3.15 is final.
+    continue-on-error: ${{ matrix.allow-failure || false }}
     # macOS machines can be slow, if overloaded.
     timeout-minutes: 360
 

@@ -358,4 +358,73 @@ class FileReader:
             # Otherwise, all chunks were CH_ALLOC
             return Chunk(None, size=bytes_read, allocation=CH_ALLOC)
 
+    def readinto(self, target, size):
+        """
+        Read up to 'size' bytes from the file directly into 'target' (a writable
+        buffer, e.g. a memoryview over the caller's scan buffer).
+
+        Unlike read(), this does not allocate or combine intermediate byte
+        objects: each byte is copied exactly once, from the buffered file block
+        into 'target'. Ranges stemming from holes / all-zero blocks are written
+        as zero bytes ('target' may contain stale data). The caller detects
+        all-zero chunks itself at chunk granularity, so no allocation type is
+        returned.
+
+        :param target: writable buffer, len(target) >= size
+        :param size: number of bytes to read
+        :return: number of bytes written to target (0 at EOF).
+        """
+        # Initialize if not already done
+        if self.blockify_gen is None:
+            self.buffer = []
+            self.offset = 0
+            self.remaining_bytes = 0
+            self.blockify_gen = self.reader.blockify()
+
+        # If we don't have enough data in the buffer, try to fill it
+        while self.remaining_bytes < size:
+            if not self._fill_buffer():
+                # No more data available, return what we have
+                break
+
+        if not self.buffer:
+            return 0
+
+        with memoryview(target) as tv:
+            bytes_to_read = min(size, self.remaining_bytes)
+            bytes_read = 0
+            while bytes_read < bytes_to_read and self.buffer:
+                chunk = self.buffer[0]
+                chunk_size = chunk.meta["size"]
+                allocation = chunk.meta["allocation"]
+                data = chunk.data
+
+                if allocation not in (CH_DATA, CH_HOLE, CH_ALLOC):
+                    raise ValueError(f"Invalid allocation type: {allocation}")
+
+                # Calculate how much we can read from this chunk
+                available = chunk_size - self.offset
+                to_read = min(available, bytes_to_read - bytes_read)
+
+                if allocation == CH_DATA:
+                    assert data is not None
+                    # one memcpy: block -> target (the source slice is a view, not a copy)
+                    with memoryview(data) as dv:
+                        tv[bytes_read:bytes_read + to_read] = dv[self.offset:self.offset + to_read]
+                else:
+                    # holes / all-zero blocks: write zeros (target may contain stale data)
+                    tv[bytes_read:bytes_read + to_read] = zeros[:to_read]
+
+                bytes_read += to_read
+
+                # Update offset or remove chunk if fully consumed
+                if to_read < available:
+                    self.offset += to_read
+                else:
+                    self.offset = 0
+                    self.buffer.pop(0)
+
+                self.remaining_bytes -= to_read
+
+        return bytes_read
 

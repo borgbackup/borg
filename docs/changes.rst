@@ -197,6 +197,10 @@ New features:
     bit-identical (1-byte granularity, same golden chunk points)
   - buzhash64: SIMD scan kernel (same technique and dispatch), ~1.5x faster
     on Apple Silicon; cut points stay bit-identical
+  - zero-copy fill: the file reader writes data (and zeros for sparse holes)
+    directly into the chunker's scan buffer, replacing several per-byte copy
+    chains; fastcdc ~+40%, buzhash64 ~+20%, buzhash ~+15%,
+    rabin-aes/toeplitz-aes ~+16%, goldilocks-aes ~+9%
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042

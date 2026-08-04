@@ -150,8 +150,6 @@ cdef class ChunkerFastCDC:
     cdef int fill(self) except 0:
         """Fill the chunker's buffer with more data."""
         cdef ssize_t n
-        cdef object chunk
-        cdef const unsigned char* src
 
         with nogil:
             memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
@@ -162,17 +160,13 @@ cdef class ChunkerFastCDC:
         if self.eof or n == 0:
             return 1
 
-        chunk = self.file_reader.read(n)
-        n = chunk.meta["size"]
-
         if n > 0:
-            if chunk.meta["allocation"] == CH_DATA:
-                src = <const unsigned char*>PyBytes_AsString(chunk.data)
-                with nogil:
-                    memcpy(self.data + self.position + self.remaining, src, n)
-            else:
-                with nogil:
-                    memset(self.data + self.position + self.remaining, 0, n)
+            # zero-copy path: the reader writes file data (and zeros for holes)
+            # directly into the scan buffer - one memcpy per byte instead of
+            # slice/join/copy chains through intermediate bytes objects.
+            n = self.file_reader.readinto(
+                <uint8_t[:n]>(self.data + self.position + self.remaining), n)
+        if n > 0:
             self.remaining += n
             self.bytes_read += n
         else:

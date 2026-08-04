@@ -79,7 +79,7 @@ where = ["src"]
 
 [tool.setuptools.exclude-package-data]
 # ...except the source files which have been compiled (C extensions):
-"*" = ["*.c", "*.h", "*.pyx"]
+"*" = ["*.c", "*.h", "*.pyx", "*.pxd"]
 
 [build-system]
 requires = ["setuptools>=78.1.1", "wheel", "pkgconfig", "Cython>=3.0.3", "setuptools-scm[toml]"]

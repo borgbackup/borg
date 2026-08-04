@@ -14,6 +14,11 @@ if is_win32:
 else:
     hiddenimports = ['borg.platform.posix', 'borghash', 'rich._unicode_data.unicode17-0-0']
 
+# The *-aes chunkers cimport their shared base class (ChunkerPHTE), so they import
+# that module at C level when initializing - PyInstaller can not see this by
+# static analysis of the Python sources.
+hiddenimports.append('borg.chunkers.phte_chunker')
+
 block_cipher = None
 
 a = Analysis([os.path.join(basepath, 'src', 'borg', '__main__.py'), ],

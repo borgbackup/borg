@@ -253,6 +253,15 @@ New features:
     XORing a 32bit seed into the table), so chunk cut points are much harder to
     predict without the key (better resistance against fingerprinting attacks).
   - buzhash64: add normalized chunking (better chunk size distribution, less clamping)
+  - rabin-aes: new chunker with cryptographically sound resistance against
+    chunk-size fingerprinting (UHF-then-PRF: secret Rabin polynomial + AES-128,
+    following eprint 2025/558); uses AES hw acceleration or OpenSSL, ~700 MB/s
+  - goldilocks-aes: new chunker, like rabin-aes but with the reference universal
+    hash of eprint 2025/558 (Goldilocks prime-field polynomial hash); about half
+    the rabin-aes speed, mainly a comparison baseline
+  - toeplitz-aes: new chunker, like rabin-aes but with a tabulated LFSR/Toeplitz
+    hash as the universal hash (secret 2 KiB table, fixed public polynomial);
+    optimal 2^-64 collision bound, fastest of the three AES chunkers
 - borg keys:
 
   - locate the borg key automatically in the key directory or in the repository, #9743

@@ -44,5 +44,6 @@ hash table of all chunks that already exist.
 
     internals/security
     internals/data-structures
+    internals/chunker
     internals/packs
     internals/frontends

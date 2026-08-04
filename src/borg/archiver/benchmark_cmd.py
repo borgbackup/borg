@@ -180,12 +180,9 @@ class BenchmarkMixIn:
                     release_chunk_data(chunk.data)
 
         for spec, setup, func, vars in [
-            (
-                "buzhash,19,23,21,4095",
-                "ch = get_chunker('buzhash', 19, 23, 21, 4095, sparse=False)",
-                "chunkit(ch)",
-                locals(),
-            ),
+            ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
+            # fastcdc (window-less keyed gear hash); gear table creation is slow, keep it in setup
+            ("fastcdc,19,23,21,2", "ch = get_chunker('fastcdc', 19, 23, 21, 2, sparse=False)", "chunkit(ch)", locals()),
             # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
             (
                 "buzhash64,19,23,21,4095,2",
@@ -193,9 +190,33 @@ class BenchmarkMixIn:
                 "chunkit(ch)",
                 locals(),
             ),
-            # fastcdc (window-less keyed gear hash); gear table creation is slow, keep it in setup
-            ("fastcdc,19,23,21,2", "ch = get_chunker('fastcdc', 19, 23, 21, 2, sparse=False)", "chunkit(ch)", locals()),
-            ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
+            (
+                "buzhash,19,23,21,4095",
+                "ch = get_chunker('buzhash', 19, 23, 21, 4095, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            # toeplitz-aes (UHF-then-PRF, tabulated Toeplitz hash); table creation in setup
+            (
+                "toeplitz-aes,19,23,21,2",
+                "ch = get_chunker('toeplitz-aes', 19, 23, 21, 2, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            # rabin-aes (UHF-then-PRF); polynomial sampling / table creation is slow, keep it in setup
+            (
+                "rabin-aes,19,23,21,2",
+                "ch = get_chunker('rabin-aes', 19, 23, 21, 2, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            # goldilocks-aes (UHF-then-PRF, prime-field comparison chunker); table creation in setup
+            (
+                "goldilocks-aes,19,23,21,2",
+                "ch = get_chunker('goldilocks-aes', 19, 23, 21, 2, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
         ]:
             dt = timeit(func, setup, number=number_default, globals=vars)
             if args.json:

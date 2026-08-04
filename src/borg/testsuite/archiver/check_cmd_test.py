@@ -212,8 +212,9 @@ def test_missing_file_chunk(archivers, request):
     assert "The following chunks are missing in the repository:" not in output
 
 
-def test_missing_file_chunk_report_truncated(archivers, request):
-    archiver = request.getfixturevalue(archivers)
+def test_missing_file_chunk_report_truncated(archiver):
+    # local-only: this patches ArchiveChecker.MAX_MISSING_CHUNKS in-process, which has no effect
+    # when borg runs as a separate process (binary_archiver), so it must not be parametrized.
     check_cmd_setup(archiver)
 
     # remove several distinct file chunks, so more missing chunks exist than the (patched) report limit.
@@ -243,9 +244,11 @@ def test_missing_file_chunk_refs_truncated(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
-    # several distinct files with identical content dedup to the same chunk, so a single missing
-    # chunk ends up referenced by many files, which exercises the per-chunk reference cap.
-    for i in range(5):
+    # many distinct files with identical content dedup to the same chunk, so a single missing chunk
+    # ends up referenced by more files than MAX_REFS_PER_CHUNK, which exercises the per-chunk cap
+    # without patching (so it works in binary mode too, where borg runs as a separate process).
+    cap = ArchiveChecker.MAX_REFS_PER_CHUNK
+    for i in range(cap + 1):
         create_regular_file(archiver.input_path, f"samefile{i}", contents=b"same content for dedup")
     cmd(archiver, "create", "archive1", "input")
 
@@ -259,12 +262,10 @@ def test_missing_file_chunk_refs_truncated(archivers, request):
                 break
     assert killed_id is not None
 
-    # cap references per chunk to 2, so the remaining referencing files are truncated.
-    with patch.object(ArchiveChecker, "MAX_REFS_PER_CHUNK", 2):
-        output = cmd(archiver, "check", exit_code=1)
+    output = cmd(archiver, "check", exit_code=1)
     assert "The following chunks are missing in the repository:" in output
     assert bin_to_hex(killed_id) in output
-    assert "only the first 2 files are listed" in output  # the remaining referencing files are truncated
+    assert f"only the first {cap} files are listed" in output  # the remaining referencing files are truncated
 
 
 def test_missing_archive_item_chunk(archivers, request):

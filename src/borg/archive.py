@@ -2138,19 +2138,21 @@ class ArchiveChecker:
         # Missing file chunks, collected during the per-archive checks and reported grouped as
         # chunk -> files -> archives after all archives were analyzed. Bounded by
         # MAX_MISSING_CHUNKS / MAX_REFS_PER_CHUNK.
-        missing_chunks = {}  # chunk_id -> [size, {path: {archive_name}}]
+        missing_chunks = {}  # chunk_id -> (size, {path: {archive_name}})
         missing_chunks_truncated = False  # True once the MAX_MISSING_CHUNKS cap was hit
         missing_refs_truncated = set()  # chunk_ids whose MAX_REFS_PER_CHUNK cap was hit
+        missing_refs_total = 0  # total missing chunk references seen (every file x chunk occurrence, uncapped)
 
         def record_missing_chunk(archive_name, path, chunk_id, size):
-            nonlocal missing_chunks_truncated
+            nonlocal missing_chunks_truncated, missing_refs_total
+            missing_refs_total += 1
             entry = missing_chunks.get(chunk_id)
             if entry is None:
                 if len(missing_chunks) >= self.MAX_MISSING_CHUNKS:
                     missing_chunks_truncated = True
                     return
-                entry = missing_chunks[chunk_id] = [size, {}]
-            refs = entry[1]
+                entry = missing_chunks[chunk_id] = (size, {})
+            size, refs = entry
             if path in refs:
                 refs[path].add(archive_name)
             elif len(refs) < self.MAX_REFS_PER_CHUNK:
@@ -2211,7 +2213,10 @@ class ArchiveChecker:
                 if chunk_id in missing_refs_truncated:
                     logger.error(f"    - ... (only the first {self.MAX_REFS_PER_CHUNK} files are listed)")
             if missing_chunks_truncated:
-                logger.error(f"... (only the first {self.MAX_MISSING_CHUNKS} missing chunks are listed)")
+                logger.error(
+                    f"... (only the first {self.MAX_MISSING_CHUNKS} missing chunks are listed; "
+                    f"{missing_refs_total} missing chunk references total)"
+                )
 
         def robust_iterator(archive):
             """Iterates through all archive items

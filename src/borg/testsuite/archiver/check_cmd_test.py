@@ -180,9 +180,12 @@ def test_missing_file_chunk(archivers, request):
 
     output = cmd(archiver, "check", exit_code=1)
     assert "The following chunks are missing in the repository:" in output
-    # archive1 and archive2 share src_file, so the missing chunk appears once, with both archives
-    # listed on its single reference line.
-    assert output.count(bin_to_hex(killed_chunk.id)) == 1
+    # archive1 and archive2 share src_file, so the missing chunk is grouped once, with both archives
+    # listed on its single reference line (the id also appears once in the streamed "Missing chunk
+    # detected" line emitted while the archives are analyzed).
+    killed_hex = bin_to_hex(killed_chunk.id)
+    chunk_header_lines = [ln for ln in output.splitlines() if ln.startswith("- Chunk ") and killed_hex in ln]
+    assert len(chunk_header_lines) == 1
     ref_lines = [line for line in output.splitlines() if src_file in line]
     assert len(ref_lines) == 1
     assert "archive1" in ref_lines[0] and "archive2" in ref_lines[0]

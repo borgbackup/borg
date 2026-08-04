@@ -1851,8 +1851,8 @@ class RobustUnpacker:
 class ArchiveChecker:
     # Bound how many missing file chunks rebuild_archives buffers for its end-of-run report,
     # so checking a badly damaged repo with very many missing chunks can not exhaust memory.
-    MAX_MISSING_CHUNKS = 10000  # max. distinct missing chunk ids kept for the report
-    MAX_REFS_PER_CHUNK = 100  # max. referencing files kept per missing chunk
+    MAX_MISSING_CHUNKS = 1000  # max. distinct missing chunk ids kept for the grouped report
+    MAX_REFS_PER_CHUNK = 10  # max. referencing files kept per missing chunk
 
     def __init__(self):
         self.error_found = False
@@ -2152,6 +2152,8 @@ class ArchiveChecker:
                     missing_chunks_truncated = True
                     return
                 entry = missing_chunks[chunk_id] = (size, {})
+                # one line per chunk id (not per file), so an interrupted check still logs what it found.
+                logger.error(f"Missing chunk detected: {bin_to_hex(chunk_id)}, {format_file_size(size)}.")
             size, refs = entry
             if path in refs:
                 refs[path].add(archive_name)
@@ -2319,63 +2321,68 @@ class ArchiveChecker:
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Checking archives %3.1f%%", step=0.1, msgid="check.rebuild_archives"
         )
-        for i, info in enumerate(archive_infos):
-            pi.show(i)
-            archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
-            try:
-                formatted = formatter.format_item(info, jsonline=False)
-            except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityErrorBase):
-                # keys like {comment} need the archive metadata, which is damaged or missing here.
-                # use the values from the archive directory entry, they are always available.
-                formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
-            logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
-            if archive_id not in self.chunks:
-                logger.error(f"Archive metadata block {archive_id_hex} is missing!")
-                self.error_found = True
+        # report the missing chunks collected so far even if the loop is interrupted (Ctrl-C) or aborts
+        # with an exception (e.g. the "Unknown archive metadata version" raise below), so a check of a
+        # badly damaged repo does not throw away everything it already found.
+        try:
+            for i, info in enumerate(archive_infos):
+                pi.show(i)
+                archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
+                try:
+                    formatted = formatter.format_item(info, jsonline=False)
+                except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityErrorBase):
+                    # keys like {comment} need the archive metadata, which is damaged or missing here.
+                    # use the values from the archive directory entry, they are always available.
+                    formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
+                logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
+                if archive_id not in self.chunks:
+                    logger.error(f"Archive metadata block {archive_id_hex} is missing!")
+                    self.error_found = True
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    continue
+                cdata = self.repository.get(archive_id)
+                try:
+                    _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
+                except IntegrityErrorBase as integrity_error:
+                    logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
+                    self.error_found = True
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    continue
+                archive = self.key.unpack_archive(data)
+                archive = ArchiveItem(internal_dict=archive)
+                if archive.version != 2:
+                    raise Exception("Unknown archive metadata version")
+                items_buffer = ChunkBuffer(self.key)
+                items_buffer.write_chunk = add_callback
+                for item in robust_iterator(archive):
+                    if "chunks" in item:
+                        verify_file_chunks(info.name, item)
+                    items_buffer.add(item)
+                items_buffer.flush(flush=True)
                 if self.repair:
-                    logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                    self.manifest.archives.delete_by_id(archive_id)
-                else:
-                    logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                continue
-            cdata = self.repository.get(archive_id)
-            try:
-                _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
-            except IntegrityErrorBase as integrity_error:
-                logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
-                self.error_found = True
-                if self.repair:
-                    logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                    self.manifest.archives.delete_by_id(archive_id)
-                else:
-                    logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                continue
-            archive = self.key.unpack_archive(data)
-            archive = ArchiveItem(internal_dict=archive)
-            if archive.version != 2:
-                raise Exception("Unknown archive metadata version")
-            items_buffer = ChunkBuffer(self.key)
-            items_buffer.write_chunk = add_callback
-            for item in robust_iterator(archive):
-                if "chunks" in item:
-                    verify_file_chunks(info.name, item)
-                items_buffer.add(item)
-            items_buffer.flush(flush=True)
-            if self.repair:
-                archive.item_ptrs = archive_put_items(
-                    items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
-                )
-                data = self.key.pack_metadata(archive.as_dict())
-                new_archive_id = self.key.id_hash(data)
-                logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
-                logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
-                cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
-                add_reference(new_archive_id, len(data), cdata)
-                self.manifest.archives.create(info.name, new_archive_id, info.ts)
-                if archive_id != new_archive_id:
-                    self.manifest.archives.delete_by_id(archive_id)
-        pi.finish()
-        report_missing_chunks()
+                    archive.item_ptrs = archive_put_items(
+                        items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
+                    )
+                    data = self.key.pack_metadata(archive.as_dict())
+                    new_archive_id = self.key.id_hash(data)
+                    logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
+                    logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
+                    cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
+                    add_reference(new_archive_id, len(data), cdata)
+                    self.manifest.archives.create(info.name, new_archive_id, info.ts)
+                    if archive_id != new_archive_id:
+                        self.manifest.archives.delete_by_id(archive_id)
+        finally:
+            pi.finish()
+            report_missing_chunks()
 
     def finish(self):
         if self.repair:

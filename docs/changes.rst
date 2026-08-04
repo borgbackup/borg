@@ -176,6 +176,27 @@ New features:
     recently parsed chunks, #1678
   - do not verify the chunk id on every read from an encrypted repo (the AEAD
     authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
+- Chunkers:
+
+  - fastcdc is the new default chunker, for file content data as well as for the
+    item metadata stream, #9957. Compared to the previous default "buzhash", it is
+    faster and its Gear table is derived from secret key material (instead of only
+    XORing a 32bit seed into the table), so chunk cut points are much harder to
+    predict without the key (better resistance against fingerprinting attacks).
+  - rabin-aes: new chunker with cryptographically sound resistance against
+    chunk-size fingerprinting (UHF-then-PRF: secret Rabin polynomial + AES-128,
+    following eprint 2025/558); uses AES hw acceleration or OpenSSL, ~700 MB/s
+  - goldilocks-aes: new chunker, like rabin-aes but with the reference universal
+    hash of eprint 2025/558 (Goldilocks prime-field polynomial hash); about half
+    the rabin-aes speed, mainly a comparison baseline
+  - toeplitz-aes: new chunker, like rabin-aes but with a tabulated LFSR/Toeplitz
+    hash as the universal hash (secret 2 KiB table, fixed public polynomial);
+    optimal 2^-64 collision bound, fastest of the three AES chunkers
+  - fastcdc: SIMD-accelerated scan kernel (NEON on aarch64, AVX2 on x86-64,
+    blocked scalar elsewhere), ~1.4x faster on Apple Silicon; cut points stay
+    bit-identical (1-byte granularity, same golden chunk points)
+  - buzhash64: SIMD scan kernel (same technique and dispatch), ~1.5x faster
+    on Apple Silicon; cut points stay bit-identical
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
@@ -247,26 +268,8 @@ New features:
 - Chunkers:
 
   - fastcdc: new chunker (keyed Gear hash, normalized chunking, ~1.3x faster), #9824
-  - fastcdc: SIMD-accelerated scan kernel (NEON on aarch64, AVX2 on x86-64,
-    blocked scalar elsewhere), ~1.4x faster on Apple Silicon; cut points stay
-    bit-identical (1-byte granularity, same golden chunk points)
-  - buzhash64: blocked/AVX2 scan kernel using the same technique, ~1.6x
-    faster on Apple Silicon; cut points stay bit-identical
-  - fastcdc is the new default chunker, for file content data as well as for the
-    item metadata stream, #9957. Compared to the previous default "buzhash", it is
-    faster and its Gear table is derived from secret key material (instead of only
-    XORing a 32bit seed into the table), so chunk cut points are much harder to
-    predict without the key (better resistance against fingerprinting attacks).
   - buzhash64: add normalized chunking (better chunk size distribution, less clamping)
-  - rabin-aes: new chunker with cryptographically sound resistance against
-    chunk-size fingerprinting (UHF-then-PRF: secret Rabin polynomial + AES-128,
-    following eprint 2025/558); uses AES hw acceleration or OpenSSL, ~700 MB/s
-  - goldilocks-aes: new chunker, like rabin-aes but with the reference universal
-    hash of eprint 2025/558 (Goldilocks prime-field polynomial hash); about half
-    the rabin-aes speed, mainly a comparison baseline
-  - toeplitz-aes: new chunker, like rabin-aes but with a tabulated LFSR/Toeplitz
-    hash as the universal hash (secret 2 KiB table, fixed public polynomial);
-    optimal 2^-64 collision bound, fastest of the three AES chunkers
+
 - borg keys:
 
   - locate the borg key automatically in the key directory or in the repository, #9743

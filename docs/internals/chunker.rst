@@ -69,12 +69,12 @@ The chunkers at a glance
 name           speed     dedup        fingerprinting resistance   notes
 ============== ========= ============ =========================== =====================================
 fixed          fastest   positional   n/a (no content dependency) fixed block size; for disk images
-buzhash        fast      good         weak (seed only)            borg 1.x compatible dedup
-buzhash64      fast      good         improved, but not sound     keyed, normalized chunking
 fastcdc        fastest   good         improved, but not sound     keyed, window-less Gear hash
+buzhash64      fast      good         improved, but not sound     keyed, normalized chunking
+buzhash        fast      good         weak (seed only)            borg 1.x compatible dedup
+toeplitz-aes   medium    good         strong (AES-based)          best collision bound, secret table
 rabin-aes      medium    good         strong (AES-based)          secret polynomial + AES
 goldilocks-aes slower    good         strong (AES-based)          reference construction, comparison
-toeplitz-aes   medium    good         strong (AES-based)          best collision bound, secret table
 ============== ========= ============ =========================== =====================================
 
 Recommendations
@@ -160,26 +160,6 @@ and groups of 8 interleaved AES blocks on the hardware paths.
 The three universal hashes
 ++++++++++++++++++++++++++
 
-``rabin-aes``
-    Rabin fingerprint over GF(2)[x] mod a *secret, random, irreducible*
-    ``P`` of degree 64 (top bit implicit; table-driven rolling). Two distinct
-    64-byte windows differ by a polynomial of degree <= 511, which has at
-    most 7 irreducible degree-64 factors out of ~2^58 candidates:
-    ε ≈ 2^-55, probabilistic over the sampled ``P``. Key material: 8 bytes
-    (the polynomial), found by rejection sampling with Rabin's irreducibility
-    test. Note: the reduction table is indexed by digest bits, i.e. there is
-    a secret-dependent memory access in the hot loop.
-
-``goldilocks-aes``
-    The paper's reference UHF: polynomial evaluation hash over GF(p),
-    p = 2^64 - 2^32 + 1, at a secret uniform point ``K``, byte-wise Horner
-    over the window. The difference of two distinct windows is a nonzero
-    polynomial in ``K`` of degree <= 63: ε <= 63/p ≈ 2^-58. Key material:
-    8 bytes. All table indices are plaintext bytes (no secret-dependent
-    loads); the rolling multiply keeps every state canonical since the state
-    feeds AES verbatim. Verified bit-equivalent (states and ciphertexts) to
-    the authors' artifact implementation.
-
 ``toeplitz-aes``
     Tabulated LFSR-based Toeplitz hashing (Krawczyk, CRYPTO '94):
     ``digest = sum_j x^(63-j) * T[b_j]`` over GF(2)[x] mod a *fixed public*
@@ -201,6 +181,26 @@ The three universal hashes
     algebra is why the classic buzhash window is 4095 and not 4096: with the
     window a multiple of the word size, a uniform run hashes to a constant
     independent of its byte value.
+
+``rabin-aes``
+    Rabin fingerprint over GF(2)[x] mod a *secret, random, irreducible*
+    ``P`` of degree 64 (top bit implicit; table-driven rolling). Two distinct
+    64-byte windows differ by a polynomial of degree <= 511, which has at
+    most 7 irreducible degree-64 factors out of ~2^58 candidates:
+    ε ≈ 2^-55, probabilistic over the sampled ``P``. Key material: 8 bytes
+    (the polynomial), found by rejection sampling with Rabin's irreducibility
+    test. Note: the reduction table is indexed by digest bits, i.e. there is
+    a secret-dependent memory access in the hot loop.
+
+``goldilocks-aes``
+    The paper's reference UHF: polynomial evaluation hash over GF(p),
+    p = 2^64 - 2^32 + 1, at a secret uniform point ``K``, byte-wise Horner
+    over the window. The difference of two distinct windows is a nonzero
+    polynomial in ``K`` of degree <= 63: ε <= 63/p ≈ 2^-58. Key material:
+    8 bytes. All table indices are plaintext bytes (no secret-dependent
+    loads); the rolling multiply keeps every state canonical since the state
+    feeds AES verbatim. Verified bit-equivalent (states and ciphertexts) to
+    the authors' artifact implementation.
 
 Constructions considered and rejected: Gear as the UHF (triangular aging
 gives ε ≈ 1/2 via the oldest byte), hardware CRC (fixed public polynomial,

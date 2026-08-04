@@ -403,11 +403,14 @@ Borg has these chunkers (the default is "fastcdc"):
 
 - "fixed": a simple, low cpu overhead, fixed blocksize chunker, optionally
   supporting a header block of different size.
-- "buzhash": variable, content-defined blocksize, uses a rolling hash
-  computed by the Buzhash_ algorithm.
-- "buzhash64": similar to "buzhash", but improved 64bit implementation
 - "fastcdc": variable, content-defined blocksize, uses the window-less, keyed
   Gear rolling hash (FastCDC_); faster than buzhash, same deduplication.
+- "buzhash64": similar to "buzhash", but improved 64bit implementation
+- "buzhash": variable, content-defined blocksize, uses a rolling hash
+  computed by the Buzhash_ algorithm.
+- "toeplitz-aes": like "rabin-aes", but the universal hash is a tabulated
+  LFSR/Toeplitz hash (secret 2 KiB table, fixed public polynomial); same
+  speed as "rabin-aes" with the best collision bound of the three.
 - "rabin-aes": variable, content-defined blocksize; a rolling Rabin fingerprint
   (secret polynomial) post-processed with AES-128, so the cut decision only
   depends on the AES output ("UHF-then-PRF" construction). Strongest available
@@ -416,9 +419,6 @@ Borg has these chunkers (the default is "fastcdc"):
   hash over the Goldilocks prime field (the reference construction of the
   underlying paper); about half the rabin-aes speed, mainly a comparison
   baseline.
-- "toeplitz-aes": like "rabin-aes", but the universal hash is a tabulated
-  LFSR/Toeplitz hash (secret 2 KiB table, fixed public polynomial); same
-  speed as "rabin-aes" with the best collision bound of the three.
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -443,6 +443,42 @@ The fixed chunker also supports processing sparse files (reading only the ranges
 with data and seeking over the empty hole ranges).
 
 ``borg create --sparse --chunker-params fixed,BLOCK_SIZE[,HEADER_SIZE]``
+
+"fastcdc" chunker
++++++++++++++++++
+
+FastCDC_ content-defined chunker using the Gear rolling hash. Unlike buzhash it
+is window-less (each byte's influence simply decays out of the hash), so its
+update is cheaper and it chunks noticeably faster, while producing the same
+deduplication and (with normalized chunking) the same chunk-size distribution.
+
+Like "buzhash64", the Gear table is cryptographically derived from secret key
+material, so chunk cut points are unpredictable without the key.
+
+``borg create --chunker-params fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+can be used to tune the chunker parameters, the default is:
+
+- CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
+- CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
+- HASH_MASK_BITS = 21 (target chunk size ~= 2^21 B = 2 MiB)
+- NC_LEVEL = 2 (normalized chunking level, 0 disables it)
+
+There is no window size (Gear is window-less). Normalized chunking varies the
+cut-point mask around the target size, which tightens the chunk-size
+distribution and reduces clamping at the min./max. chunk size.
+
+This is the default chunker (``fastcdc,19,23,21,2``), also used for the item
+metadata stream (with a finer granularity, ``fastcdc,15,19,17,2``).
+
+"buzhash64" chunker
++++++++++++++++++++
+
+Similar to "buzhash", but using 64bit wide hash values.
+
+The buzhash table is cryptographically derived from secret key material.
+
+These changes should improve resistance against attacks and also solve
+some of the issues of the original (32bit / XORed table) implementation.
 
 "buzhash" chunker
 +++++++++++++++++
@@ -489,41 +525,24 @@ for the repository, and stored encrypted in the keyfile. This is to prevent
 chunk size based fingerprinting attacks on your encrypted repo contents (to
 guess what files you have based on a specific set of chunk sizes).
 
-"buzhash64" chunker
-+++++++++++++++++++
+"toeplitz-aes" chunker
+++++++++++++++++++++++
 
-Similar to "buzhash", but using 64bit wide hash values.
+Like "rabin-aes", but the universal hash is a tabulated LFSR-based Toeplitz
+hash (Krawczyk, CRYPTO '94): the digest of the 64-byte window is
+sum_j x^(63-j) * T[b_j] over GF(2)[x] mod P, where T is a secret random
+table of 256 64-bit values (2 KiB of key material) and P is a *fixed public*
+irreducible polynomial of degree 64. The AES-128 PRF layer is the same as
+for "rabin-aes". Two distinct windows collide with probability exactly
+2^-64 over the choice of T - the best possible bound for a 64-bit digest,
+and unconditional (no secret polynomial sampling). The rolling update
+contains no secret-dependent memory access. Speed is on par with
+"rabin-aes". See :doc:`chunker` for a comparison of all chunkers.
 
-The buzhash table is cryptographically derived from secret key material.
+``borg create --chunker-params toeplitz-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
 
-These changes should improve resistance against attacks and also solve
-some of the issues of the original (32bit / XORed table) implementation.
-
-"fastcdc" chunker
-+++++++++++++++++
-
-FastCDC_ content-defined chunker using the Gear rolling hash. Unlike buzhash it
-is window-less (each byte's influence simply decays out of the hash), so its
-update is cheaper and it chunks noticeably faster, while producing the same
-deduplication and (with normalized chunking) the same chunk-size distribution.
-
-Like "buzhash64", the Gear table is cryptographically derived from secret key
-material, so chunk cut points are unpredictable without the key.
-
-``borg create --chunker-params fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
-can be used to tune the chunker parameters, the default is:
-
-- CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
-- CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
-- HASH_MASK_BITS = 21 (target chunk size ~= 2^21 B = 2 MiB)
-- NC_LEVEL = 2 (normalized chunking level, 0 disables it)
-
-There is no window size (Gear is window-less). Normalized chunking varies the
-cut-point mask around the target size, which tightens the chunk-size
-distribution and reduces clamping at the min./max. chunk size.
-
-This is the default chunker (``fastcdc,19,23,21,2``), also used for the item
-metadata stream (with a finer granularity, ``fastcdc,15,19,17,2``).
+The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
+level (0 disables it); 2 is a good default. E.g.: ``toeplitz-aes,19,23,21,2``.
 
 "rabin-aes" chunker
 +++++++++++++++++++
@@ -566,25 +585,6 @@ well-understood comparison baseline.
 
 The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
 level (0 disables it); 2 is a good default. E.g.: ``goldilocks-aes,19,23,21,2``.
-
-"toeplitz-aes" chunker
-++++++++++++++++++++++
-
-Like "rabin-aes", but the universal hash is a tabulated LFSR-based Toeplitz
-hash (Krawczyk, CRYPTO '94): the digest of the 64-byte window is
-sum_j x^(63-j) * T[b_j] over GF(2)[x] mod P, where T is a secret random
-table of 256 64-bit values (2 KiB of key material) and P is a *fixed public*
-irreducible polynomial of degree 64. The AES-128 PRF layer is the same as
-for "rabin-aes". Two distinct windows collide with probability exactly
-2^-64 over the choice of T - the best possible bound for a 64-bit digest,
-and unconditional (no secret polynomial sampling). The rolling update
-contains no secret-dependent memory access. Speed is on par with
-"rabin-aes". See :doc:`chunker` for a comparison of all chunkers.
-
-``borg create --chunker-params toeplitz-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
-
-The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
-level (0 disables it); 2 is a good default. E.g.: ``toeplitz-aes,19,23,21,2``.
 
 .. _cache:
 

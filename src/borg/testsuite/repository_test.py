@@ -1058,7 +1058,7 @@ def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
 
 
 def test_check_partial_rechecks_pack_recorded_corrupt(tmp_path):
-    # a pack recorded corrupt earlier is re-verified, so the corruption keeps being reported.
+    # a pack recorded corrupt earlier is re-verified and reported again.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         corrupt_id = H(1)  # stored content does not hash to this name
         repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
@@ -1272,13 +1272,13 @@ def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
 
 
 def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
-    # with max_age, a pack whose intact record is older than max_age plus the skew tolerance is re-verified.
+    # with max_age, a pack whose intact record is older than max_age is re-verified.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
         max_age = 50
         tracker = PackTracker.new(repository.store)
-        old_ts = int(time.time()) - (max_age + MAX_CLOCK_SKEW + 100)  # clearly beyond max_age + skew
+        old_ts = int(time.time()) - (max_age + 100)  # clearly beyond max_age
         tracker.table[intact_id] = PackTracker.Entry(timestamp=old_ts, result=1)
         tracker.save()
 
@@ -1291,27 +1291,25 @@ def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
         assert after.table[intact_id].timestamp > old_ts  # record refreshed
 
 
-def test_check_max_age_skips_stale_within_skew(tmp_path, monkeypatch):
-    # a record older than max_age but within MAX_CLOCK_SKEW of it still counts as recent (writer clock
-    # behind ours), so it is not re-verified.
+def test_check_max_age_reverifies_stale_within_skew(tmp_path, monkeypatch):
+    # a record past max_age gets no skew tolerance: it is re-verified even within MAX_CLOCK_SKEW of it.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        max_age = MAX_CLOCK_SKEW * 2  # wide window, so the skew tolerance is MAX_CLOCK_SKEW
+        max_age = MAX_CLOCK_SKEW * 2  # window wider than MAX_CLOCK_SKEW
         tracker = PackTracker.new(repository.store)
-        past_ts = int(time.time()) - (max_age + MAX_CLOCK_SKEW // 2)  # past the window, within skew
+        past_ts = int(time.time()) - (max_age + MAX_CLOCK_SKEW // 2)  # just past the window
         tracker.table[intact_id] = PackTracker.Entry(timestamp=past_ts, result=1)
         tracker.save()
 
         hashed_keys = _spy_hash(repository, monkeypatch)
 
         assert repository.check(repair=False, max_age=max_age) is True
-        assert pack_key not in hashed_keys  # within MAX_CLOCK_SKEW past the window, still recent
+        assert pack_key in hashed_keys  # past max_age, re-verified
 
 
 def test_check_max_age_skips_near_future_ok(tmp_path, monkeypatch):
-    # with a window wider than MAX_CLOCK_SKEW, a record timestamped up to MAX_CLOCK_SKEW into the
-    # future (writer clock ahead of ours) still counts as recent and is not re-verified.
+    # a future timestamp (writer clock ahead of ours) up to MAX_CLOCK_SKEW is tolerated and skipped.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
@@ -1323,12 +1321,11 @@ def test_check_max_age_skips_near_future_ok(tmp_path, monkeypatch):
         hashed_keys = _spy_hash(repository, monkeypatch)
 
         assert repository.check(repair=False, max_age=MAX_CLOCK_SKEW * 2) is True
-        assert pack_key not in hashed_keys  # within MAX_CLOCK_SKEW ahead, still counts as recent
+        assert pack_key not in hashed_keys  # within MAX_CLOCK_SKEW ahead, skipped
 
 
 def test_check_max_age_reverifies_far_future_ok(tmp_path, monkeypatch):
-    # with a window wider than MAX_CLOCK_SKEW, a record more than MAX_CLOCK_SKEW into the future is
-    # not plausible clock skew and is re-verified.
+    # a future timestamp more than MAX_CLOCK_SKEW ahead exceeds the skew tolerance and is re-verified.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
@@ -1340,7 +1337,7 @@ def test_check_max_age_reverifies_far_future_ok(tmp_path, monkeypatch):
         hashed_keys = _spy_hash(repository, monkeypatch)
 
         assert repository.check(repair=False, max_age=MAX_CLOCK_SKEW * 2) is True
-        assert pack_key in hashed_keys  # too far ahead to be clock skew, re-verified
+        assert pack_key in hashed_keys  # more than MAX_CLOCK_SKEW ahead, re-verified
 
 
 def test_check_max_age_reverifies_future_beyond_small_window(tmp_path, monkeypatch):

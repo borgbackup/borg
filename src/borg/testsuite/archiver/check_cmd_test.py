@@ -79,17 +79,25 @@ def test_check_max_age(archivers, request):
     check_cmd_setup(archiver)
 
     # --repair and --archives-only do not allow --max-age, and --max-duration requires --max-age.
+    # a zero span like 0d resolves to max_age=0 (no reuse), so it must not satisfy the guards either.
     if archiver.FORK_DEFAULT:
         cmd(archiver, "check", "--repair", "--max-age=1d", exit_code=CommandError().exit_code)
+        cmd(archiver, "check", "--repair", "--max-age=0d", exit_code=CommandError().exit_code)
         cmd(archiver, "check", "--archives-only", "--max-age=1d", exit_code=CommandError().exit_code)
         cmd(archiver, "check", "--repository-only", "--max-duration=3600", exit_code=CommandError().exit_code)
+        ec = CommandError().exit_code
+        cmd(archiver, "check", "--repository-only", "--max-duration=3600", "--max-age=0d", exit_code=ec)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "check", "--repair", "--max-age=1d")
         with pytest.raises(CommandError):
+            cmd(archiver, "check", "--repair", "--max-age=0d")
+        with pytest.raises(CommandError):
             cmd(archiver, "check", "--archives-only", "--max-age=1d")
         with pytest.raises(CommandError):
             cmd(archiver, "check", "--repository-only", "--max-duration=3600")
+        with pytest.raises(CommandError):
+            cmd(archiver, "check", "--repository-only", "--max-duration=3600", "--max-age=0d")
 
     # a check records its results, a later one with --max-age reuses them.
     output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)

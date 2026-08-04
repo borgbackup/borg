@@ -43,21 +43,30 @@ class CheckMixIn:
             )
         if args.repo_only and args.find_lost_archives:
             raise CommandError("--repository-only contradicts the --find-lost-archives option.")
+        # resolve the marker (e.g. 4w, 12m) to seconds; calendar units (m, y) count from now, as for
+        # --older/--newer. the validator returns a string (truthy even for a zero span like 0d), so
+        # the --max-duration guard below tests max_age, the resolved value, not args.max_age.
+        if args.max_age is not None:
+            now = archive_ts_now()
+            max_age = int((now - calculate_relative_offset(args.max_age, now, earlier=True)).total_seconds())
+        else:
+            max_age = 0
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
-        if args.repair and args.max_age:
-            # reusing recorded results during repair depends on repository repair (refs #8572), which
-            # does not exist yet, so repair verifies every pack.
+        if args.repair and args.max_age is not None:
+            # repair verifies every pack; reusing recorded results during repair needs repository
+            # repair (refs #8572).
             raise CommandError("--repair does not allow the --max-age option.")
-        if args.archives_only and args.max_age:
-            # --max-age only affects the repository check, which --archives-only skips.
+        if args.archives_only and args.max_age is not None:
+            # --max-age only affects the repository check; --archives-only skips it.
             raise CommandError("--archives-only does not allow the --max-age option.")
-        if args.max_duration and not args.max_age:
-            # partial checks progress by skipping packs whose record is younger than max_age.
+        if args.max_duration and not max_age:
+            # a partial check advances by skipping packs younger than max_age, so it needs a nonzero
+            # window (--max-age=0d resolves to 0).
             raise CommandError("--max-duration requires the --max-age option, e.g. --max-age=4w.")
         if args.max_duration and not args.repo_only:
-            # --max-duration time-boxes the repository pack check only; the archives check has no
-            # max_duration support and builds its own chunk index, so it cannot be split this way.
+            # --max-duration limits only the repository check; the archives check has no max_duration
+            # support.
             raise CommandError("--repository-only is required for --max-duration support.")
         if not args.repo_only:
             # if we need the key later for the archives check, ask NOW for the passphrase! #1931
@@ -74,13 +83,6 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
-            if args.max_age:
-                # resolve the relative marker (e.g. 4w, 12m) to a concrete age in seconds; calendar
-                # units (m, y) are measured against now, like --older / --newer.
-                now = archive_ts_now()
-                max_age = int((now - calculate_relative_offset(args.max_age, now, earlier=True)).total_seconds())
-            else:
-                max_age = 0
             if not repository.check(repair=args.repair, max_duration=args.max_duration, max_age=max_age):
                 set_ec(EXIT_WARNING)
         if not args.repo_only and not archive_checker.check(

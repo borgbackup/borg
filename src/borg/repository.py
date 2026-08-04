@@ -836,13 +836,13 @@ class Repository:
         corrupt packs and dropping those packs is left to repair, refs #8572. The ids of the packs
         found corrupt are kept in cache/checked-packs for repair, refs #9696.
 
-        Any pack on record as corrupt fails the check, including on a partial run that stops before
-        re-reaching it. The record clears when the pack verifies intact again, when compact removes
-        the pack, or when repair salvages and drops it (refs #8572).
+        A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
+        it. The record clears at the check that finds the pack intact again or gone (removed by
+        compact, or salvaged and dropped by repair; refs #8572); prune() does this from packs/.
 
         max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
-        max_age, tolerating up to MAX_CLOCK_SKEW of clock skew at both ends of the window. Check
-        results are always recorded and kept.
+        max_age, accepting a future timestamp up to MAX_CLOCK_SKEW (clock skew). Results are recorded
+        regardless of max_age.
         """
 
         def verify(namespace, name):
@@ -906,14 +906,12 @@ class Repository:
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
                 entry = tracker.get(pack_id)
-                # skip the pack if its recorded intact result is younger than max_age. the timestamp
-                # is written by whichever client ran the earlier check, so it may be off by up to
-                # MAX_CLOCK_SKEW against our clock in either direction; tolerate that much skew at both
-                # ends of the window, but never more than the window itself.
+                # skip a pack recorded intact within the last max_age seconds. the timestamp is set
+                # by the client that ran the earlier check; accept a future one (negative age) up to
+                # MAX_CLOCK_SKEW, and re-verify anything at or past max_age.
                 if entry is not None and entry.result and max_age:
                     age = time.time() - entry.timestamp
-                    skew = min(MAX_CLOCK_SKEW, max_age)
-                    if -skew <= age <= max_age + skew:
+                    if -min(MAX_CLOCK_SKEW, max_age) <= age < max_age:
                         pack_skipped += 1
                         continue
                 pack_files += 1
@@ -947,8 +945,8 @@ class Repository:
         if pack_skipped:
             summary += f" Reused {pack_skipped} recent pack check result(s)."
         logger.info(summary)
-        # every pack recorded corrupt, not only those verified this run; empty if the index is
-        # corrupt, since then no packs were scanned.
+        # corrupt_ids() is every pack recorded corrupt, including from earlier runs. with a corrupt
+        # index the packs were not scanned, so report nothing.
         corrupt_ids = tracker.corrupt_ids() if index_errors == 0 else []
         if corrupt_ids:
             # one id per line (the list can be long).

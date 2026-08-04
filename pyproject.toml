@@ -31,7 +31,7 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
   "borghash ~= 0.1.0",
-  "borgstore[rest] ~= 0.5.5",
+  "borgstore[rest,blake3] ~= 0.6.0",
   "msgpack >=1.0.3, <=1.2.1",
   "packaging",
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0.
@@ -41,7 +41,8 @@ dependencies = [
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
   "jsonargparse>=4.47.0",
   "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
-  "blake3>=1.0.0,!=1.0.9",  # 1.0.9 does not build on windows/msys2/mingw
+  "blake3 >= 1.0; sys_platform != 'win32'",
+  "blake3 >= 1.0,!=1.0.9; sys_platform == 'win32'",  # 1.0.9 does not build on windows/msys2/mingw
   "tzdata; sys_platform == 'win32'",  # zoneinfo has no system tz database on Windows (date: named zones)
 ]
 
@@ -52,9 +53,9 @@ mfusepy = ["mfusepy >= 3.1.0, <4.0.0"]  # fuse 2+3, high-level
 # a pypi release of borgbackup can't contain a dependency on github!
 # mfusepym = ["mfusepy @ git+https://github.com/mxmlnkn/mfusepy.git@master"]
 nofuse = []
-s3 = ["borgstore[rest,s3] ~= 0.5.5"]
-sftp = ["borgstore[rest,sftp] ~= 0.5.5"]
-rclone = ["borgstore[rest,rclone] ~= 0.5.5"]
+s3 = ["borgstore[rest,blake3,s3] ~= 0.6.0"]
+sftp = ["borgstore[rest,blake3,sftp] ~= 0.6.0"]
+rclone = ["borgstore[rest,blake3,rclone] ~= 0.6.0"]
 cockpit = ["textual>=6.8.0"]  # might also work with older versions, untested
 
 [project.urls]

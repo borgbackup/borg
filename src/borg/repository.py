@@ -274,11 +274,20 @@ class PackWriter:
         assert self._inflight is None, "join_inflight() must run before handing off another pack"
         pieces = self._take_pieces()
         outcome = self._Outcome([chunk_id for chunk_id, _ in pieces])
+        # daemon: normally irrelevant, because flush() and close() always join the thread
+        # (also while unwinding a Ctrl-C), so it is never still running at interpreter
+        # shutdown.  it is a safety net for the pathological case of a store that hangs
+        # (e.g. a dead sftp/rest connection without timeout) on a path that never joins:
+        # exiting then beats hanging forever in threading._shutdown.  losing an unjoined
+        # store costs nothing: its index entries are only applied at the join, and all
+        # backends write to a temp name + rename (or have the server verify a content
+        # hash), so an aborted store can leave garbage, but never a corrupt pack.
         thread = threading.Thread(
             target=self._store_pieces,
             args=(pieces, outcome),
             kwargs=dict(trace=self.trace_store),
             name="borg-pack-store",
+            daemon=True,
         )
         self._inflight = (thread, outcome)
         thread.start()

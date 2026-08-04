@@ -27,6 +27,11 @@ jobs:
           - os: ubuntu-24.04
             python-version: '3.14'
             toxenv: py314-mfusepy
+          - os: ubuntu-24.04
+            # 3.15 is not released yet - fail-fast is off, so a broken prerelease
+            # python (or a dependency without 3.15 wheels) only reddens this entry.
+            python-version: '3.15-dev'
+            toxenv: py315-mfusepy
           - os: macos-15
             python-version: '3.14'
             toxenv: py314-none

@@ -54,6 +54,7 @@ if not is_win32:
 compress_source = "src/borg/compress.pyx"
 crypto_ll_source = "src/borg/crypto/low_level.pyx"
 crypto_legacy_ll_source = "src/borg/legacy/crypto/low_level.pyx"
+chunker_base_source = "src/borg/chunkers/base.pyx"
 buzhash_source = "src/borg/chunkers/buzhash.pyx"
 buzhash64_source = "src/borg/chunkers/buzhash64.pyx"
 buzhash64_impl_source = "src/borg/chunkers/buzhash64_impl.c"
@@ -81,6 +82,7 @@ cython_sources = [
     compress_source,
     crypto_ll_source,
     crypto_legacy_ll_source,
+    chunker_base_source,
     buzhash_source,
     buzhash64_source,
     fastcdc_source,
@@ -223,6 +225,7 @@ if not on_rtd:
         Extension("borg.compress", **compress_ext_kwargs),
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
+        Extension("borg.chunkers.base", [chunker_base_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash", [buzhash_source], extra_compile_args=cflags),
         Extension(
             "borg.chunkers.buzhash64",

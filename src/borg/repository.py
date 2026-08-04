@@ -900,6 +900,15 @@ class Repository:
         if index_errors == 0:
             # packs are the bulk of the work and the part --max-duration spreads over several checks.
             pack_infos = store_list("packs")
+            if partial:
+                # a partial check stops after max_duration; verify the least-recently-checked packs
+                # first so repeated runs cover every pack. sort by recorded check time, unrecorded
+                # (time 0) first.
+                def recorded_ts(info):
+                    entry = tracker.get(hex_to_bin(info.name))
+                    return entry.timestamp if entry is not None else 0
+
+                pack_infos.sort(key=recorded_ts)
             pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
             for info in pack_infos:
                 self._lock_refresh()

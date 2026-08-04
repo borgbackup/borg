@@ -140,10 +140,13 @@ class CheckMixIn:
         The ``--max-age`` option makes the check reuse the results of previous
         repository checks: packs whose intact result is younger than the given
         timespan (e.g. ``--max-age=4w`` or ``--max-age=12m``) are skipped, spreading
-        the verification cost over repeated checks. Check results are recorded in any case;
-        ``--max-age`` only controls their reuse. Packs recorded corrupt are always
-        re-verified. ``--max-age`` affects only the repository check and cannot be
-        combined with ``--archives-only`` or ``--repair``.
+        the verification cost over repeated checks. The timespan uses the same markers
+        as ``--older``/``--newer``: ``d``, ``w``, ``H``, ``M``, ``S`` are exact spans,
+        while ``m`` and ``y`` are calendar units counted from now (so ``12m`` equals
+        ``1y``). Check results are recorded in any case; ``--max-age`` only controls
+        their reuse. Packs recorded corrupt are always re-verified. ``--max-age``
+        affects only the repository check and cannot be combined with
+        ``--archives-only`` or ``--repair``.
 
         The ``--max-duration`` option can be used to split a long-running repository
         check into multiple partial checks. After the given number of seconds, the

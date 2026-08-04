@@ -1414,6 +1414,45 @@ def test_check_max_age_partial_progress(tmp_path, monkeypatch):
         assert pack_a_id in after.table and pack_b_id in after.table
 
 
+def test_check_partial_verifies_least_recently_checked_first(tmp_path, monkeypatch):
+    # a partial check verifies the least-recently-checked packs first. with a budget for one pack, the
+    # pack with the oldest recorded result is verified, though its id sorts last.
+    max_age = 3600
+    recent_id = b"\x00" * 32  # sorts first by id
+    older_id = b"\xff" * 32  # sorts last by id
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        for pid in (recent_id, older_id):
+            repository.store_store("packs/" + bin_to_hex(pid), b"content-" + pid[:4])
+
+        now = int(time.time())
+        tracker = PackTracker.new(repository.store)
+        # both records are past max_age, so both need re-verification; the more recently recorded pack
+        # has the id that sorts first.
+        tracker.table[recent_id] = PackTracker.Entry(timestamp=now - (max_age + 100), result=1)
+        tracker.table[older_id] = PackTracker.Entry(timestamp=now - (max_age + 100000), result=1)
+        tracker.save()
+
+        # freeze the clock and jump it past max_duration after the first hash, so exactly one pack is
+        # verified this run.
+        clock = {"t": 0.0}
+        monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
+        hashed_keys = []
+        orig_hash = repository.store.hash
+
+        def hash_and_advance(key):
+            hashed_keys.append(key)
+            result = orig_hash(key)
+            clock["t"] = 10**9
+            return result
+
+        monkeypatch.setattr(repository.store, "hash", hash_and_advance)
+
+        repository.check(repair=False, max_duration=1, max_age=max_age)
+
+        pack_hashes = [key for key in hashed_keys if key.startswith("packs/")]
+        assert pack_hashes == ["packs/" + bin_to_hex(older_id)]  # the oldest recorded pack
+
+
 def test_check_max_age_reuses_records_of_plain_check(tmp_path, monkeypatch):
     # a check without max_age records its results, a later check with max_age reuses them.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:

@@ -168,6 +168,8 @@ class PackWriter:
         self.max_size = max_size  # None = no size limit
         self.repository = repository
         self.async_store = async_store
+        # BORG_PACK_TRACE=yes prints store-thread lifecycle markers to stderr, see _trace.
+        self.trace_store = os.environ.get("BORG_PACK_TRACE", "no") == "yes"
         self._chunks = chunks  # used when there is no repository
         self._pieces = []  # list of (chunk_id, cdata)
         self._size = 0  # byte size of buffered pieces
@@ -207,13 +209,24 @@ class PackWriter:
         pieces, self._pieces, self._size = self._pieces, [], 0
         return pieces
 
-    def _store_pieces(self, pieces, outcome):
+    @staticmethod
+    def _trace(char, trace):
+        """Emit one lifecycle marker of the background store-thread to stderr:
+        < thread started, H hashing starts, S storing starts, > thread finished.
+        Only active with BORG_PACK_TRACE=yes (debugging aid: visualizes how pack
+        stores overlap with the assembly of the next pack, #9988)."""
+        if trace:
+            sys.stderr.write(char)
+            sys.stderr.flush()
+
+    def _store_pieces(self, pieces, outcome, trace=False):
         """Build, hash and store one pack; record the results or the error in *outcome*.
 
-        Runs in the store-thread (async) or inline in the calling thread (sync/flush).
-        Touches only the store (borgstore >= 0.6 serializes all Store operations
-        internally, see borgstore #206), never the ChunkIndex.
+        Runs in the store-thread (async, trace=True) or inline in the calling thread
+        (sync/flush).  Touches only the store (borgstore >= 0.6 serializes all Store
+        operations internally, see borgstore #206), never the ChunkIndex.
         """
+        self._trace("<", trace)
         try:
             # Build the pack bytes once by joining all pieces (avoids O(n^2) copies
             # that incremental string concatenation would cause in Python).
@@ -221,6 +234,7 @@ class PackWriter:
 
             # Name the pack by the SHA-256 of its bytes: the name commits to the stored content,
             # so borgstore can verify and cache the file.
+            self._trace("H", trace)
             pack_id = sha256(pack_data).digest()
 
             # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
@@ -231,11 +245,14 @@ class PackWriter:
                 results.append((chunk_id, pack_id, offset, obj_size))
                 offset += obj_size
 
+            self._trace("S", trace)
             self.store.store("packs/" + bin_to_hex(pack_id), pack_data)
         except BaseException as exc:  # incl. KeyboardInterrupt: it must not vanish with the thread
             outcome.error = exc
         else:
             outcome.results = results
+        finally:
+            self._trace(">", trace)
 
     def _apply_outcome(self, outcome):
         """Apply one finished pack store to the ChunkIndex (calling thread only).
@@ -257,7 +274,12 @@ class PackWriter:
         assert self._inflight is None, "join_inflight() must run before handing off another pack"
         pieces = self._take_pieces()
         outcome = self._Outcome([chunk_id for chunk_id, _ in pieces])
-        thread = threading.Thread(target=self._store_pieces, args=(pieces, outcome), name="borg-pack-store")
+        thread = threading.Thread(
+            target=self._store_pieces,
+            args=(pieces, outcome),
+            kwargs=dict(trace=self.trace_store),
+            name="borg-pack-store",
+        )
         self._inflight = (thread, outcome)
         thread.start()
 

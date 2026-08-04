@@ -247,6 +247,11 @@ New features:
 - Chunkers:
 
   - fastcdc: new chunker (keyed Gear hash, normalized chunking, ~1.3x faster), #9824
+  - fastcdc: SIMD-accelerated scan kernel (NEON on aarch64, AVX2 on x86-64,
+    blocked scalar elsewhere), ~1.4x faster on Apple Silicon; cut points stay
+    bit-identical (1-byte granularity, same golden chunk points)
+  - buzhash64: blocked/AVX2 scan kernel using the same technique, ~1.6x
+    faster on Apple Silicon; cut points stay bit-identical
   - fastcdc is the new default chunker, for file content data as well as for the
     item metadata stream, #9957. Compared to the previous default "buzhash", it is
     faster and its Gear table is derived from secret key material (instead of only

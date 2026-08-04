@@ -2,6 +2,8 @@
 
 
 
+import os
+
 import cython
 import time
 
@@ -14,6 +16,12 @@ from ..crypto.low_level import CSPRNG
 
 from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 from .reader import FileReader, Chunk
+
+cdef extern from "buzhash64_impl.h":
+    size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
+                     const uint8_t *p_rem, const uint8_t *p_add,
+                     size_t n, uint64_t *sum, uint64_t mask, int force_scalar) nogil
+    const char *bz64_kernel_name(int force_scalar)
 
 # Cyclic polynomial / buzhash
 #
@@ -113,6 +121,8 @@ cdef class ChunkerBuzHash64:
     cdef size_t normal_size       # chunk length at which we switch mask_s -> mask_l
     cdef int nc_level             # normalized chunking level (0 = disabled)
     cdef uint64_t* table
+    cdef uint64_t* table_rot
+    cdef int force_scalar
     cdef uint8_t* data
     cdef object _fd  # Python object for file descriptor
     cdef int fh
@@ -125,7 +135,10 @@ cdef class ChunkerBuzHash64:
     cdef bint sparse
 
     def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, int nc_level=0, size_t normal_size=0, bint sparse=False):
+        cdef int i_rot
+        cdef uint64_t lenmod
         self.table = NULL
+        self.table_rot = NULL
         self.data = NULL
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
@@ -158,6 +171,15 @@ cdef class ChunkerBuzHash64:
             self.mask_l = self.chunk_mask
             self.normal_size = 0
         self.table = buzhash64_init_table(key)
+        # precomputed ROTL(table[b], window_size % 64): saves one rotate per byte
+        # in the scan kernels (bit-identical, see buzhash64_impl.c)
+        self.table_rot = <uint64_t*>malloc(2048)
+        if self.table_rot == NULL:
+            raise MemoryError("Failed to allocate buzhash64 rotated table")
+        lenmod = <uint64_t>hash_window_size & 0x3f
+        for i_rot in range(256):
+            self.table_rot[i_rot] = BARREL_SHIFT64(self.table[i_rot], lenmod)
+        self.force_scalar = 1 if os.environ.get("BORG_BUZHASH64_FORCE_SCALAR", "") not in ("", "0") else 0
         self.buf_size = max_size
         self.data = <uint8_t*>malloc(self.buf_size)
         if self.data == NULL:
@@ -180,9 +202,17 @@ cdef class ChunkerBuzHash64:
         if self.table != NULL:
             free(self.table)
             self.table = NULL
+        if self.table_rot != NULL:
+            free(self.table_rot)
+            self.table_rot = NULL
         if self.data != NULL:
             free(self.data)
             self.data = NULL
+
+    @property
+    def kernel(self):
+        """Which scan kernel this chunker uses: 'neon', 'avx2', 'blocked' or 'scalar'."""
+        return (<bytes>bz64_kernel_name(self.force_scalar)).decode("ascii")
 
     cdef int fill(self) except 0:
         """Fill the chunker's buffer with more data."""
@@ -233,7 +263,8 @@ cdef class ChunkerBuzHash64:
         cdef uint8_t* p
         cdef uint8_t* stop_at
         cdef uint8_t* nc_stop
-        cdef size_t did_bytes
+        cdef size_t did_bytes, span
+        cdef int force_scalar = self.force_scalar
 
         if self.done:
             if self.bytes_read == self.bytes_yielded:
@@ -290,12 +321,10 @@ cdef class ChunkerBuzHash64:
                 if nc_stop < stop_at:
                     stop_at = nc_stop
 
+            span = stop_at - p
             with nogil:
-                while p < stop_at and (sum & mask):
-                    sum = _buzhash64_update(sum, p[0], p[window_size], window_size, self.table)
-                    p += 1
-
-            did_bytes = p - (self.data + self.position)
+                did_bytes = bz64_scan(self.table, self.table_rot, p, p + window_size,
+                                      span, &sum, mask, force_scalar)
             self.position += did_bytes
             self.remaining -= did_bytes
 

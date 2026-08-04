@@ -176,3 +176,26 @@ def test_fuzz_fastcdc(worker):
             with BytesIO(data) as bio:
                 parts = cf_expand(chunker.chunkify(bio))
             assert b"".join(parts) == data
+
+
+def test_fastcdc_kernels_identical():
+    # the SIMD scan kernel (neon/avx2/blocked, auto-selected) and the plain
+    # sequential Gear loop must produce identical cut points.
+    data = os.urandom(4 * 1024 * 1024)
+    key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
+
+    def sizes(chunker):
+        return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
+
+    default = ChunkerFastCDC(key0, 10, 16, 14, 2)
+    sizes_default = sizes(default)
+    os.environ["BORG_FASTCDC_FORCE_SCALAR"] = "1"
+    try:
+        forced = ChunkerFastCDC(key0, 10, 16, 14, 2)
+        assert forced.kernel == "scalar"
+        sizes_scalar = sizes(forced)
+    finally:
+        del os.environ["BORG_FASTCDC_FORCE_SCALAR"]
+    assert sizes_default == sizes_scalar
+    # whatever kernel was selected by default, it must be a known one
+    assert default.kernel in ("neon", "avx2", "blocked", "scalar")

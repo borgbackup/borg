@@ -1,0 +1,259 @@
+/* buzhash64 chunker scan kernel, see buzhash64_impl.h and buzhash64.pyx.
+ *
+ * The sequential loop (test-then-update) is
+ *     while (sum & mask) != 0:
+ *         sum = ROTL1(sum) ^ ROTL_lenmod(T[out]) ^ T[in]
+ * with mask occupying the LOW bits. The update is GF(2)-linear and the
+ * rotation is a bijection, so a block of 8 positions can be computed and
+ * tested in parallel, bit-identically and - unlike the fastcdc kernel's
+ * pre-filter - with an EXACT test:
+ *
+ *     sum_j = R^j(sum_0) ^ XOR_{t<j} R^(j-1-t)(D_t),   D_t = Trot[out_t] ^ T[in_t]
+ *     H_j  := R^(8-j)(sum_j) = R^8(sum_0) ^ S_j
+ *     S_j   = XOR_{t<j} u_t,   u_t = R^(7-t)(D_t)      (plain prefix XOR, depth-3 tree)
+ *     (sum_j & mask) == 0  <=>  (H_j & R^(8-j)(mask)) == 0
+ *
+ * (rotation loses no bits, so the rotated-mask test is exact - no false
+ * positives, no false negatives). On a hit, the block is re-scanned with the
+ * sequential loop to locate the earliest position and produce the exit sum;
+ * on no hit, sum_8 = H_8 continues the chain exactly.
+ *
+ * Trot[b] = ROTL(T[b], window_size % 64) is precomputed by the caller, which
+ * also removes one rotate per byte from the sequential path.
+ *
+ * Kernel dispatch mirrors fastcdc_impl.c: NEON on aarch64 (baseline there),
+ * AVX2 on x86-64 (runtime-detected), blocked scalar elsewhere, sequential
+ * when forced. Measured on Apple M-series (64 MiB, window 4095, 21-bit
+ * mask): sequential 1150, blocked scalar 2340, NEON 2260 MB/s - NEON and
+ * blocked are a tie here (throughput and energy, within noise), because the
+ * XOR/AND/compare test also runs well on the scalar ALUs; the symmetric
+ * dispatch is kept for consistency across the SIMD chunker kernels.
+ * All kernels return bit-identical results. */
+
+#include <string.h>
+
+#include "buzhash64_impl.h"
+
+#define BZ_ROTL(x, k) (((x) << ((k) & 63)) | ((x) >> ((64 - (k)) & 63)))
+
+/* --- sequential reference loop (also: block re-scan and tail) ----------- */
+
+static size_t bz64_scan_seq(const uint64_t *T, const uint64_t *Trot,
+                            const uint8_t *pr, const uint8_t *pa,
+                            size_t n, uint64_t *sum_io, uint64_t mask)
+{
+    uint64_t sum = *sum_io;
+    size_t j = 0;
+    while (j < n && (sum & mask) != 0) {
+        sum = BZ_ROTL(sum, 1) ^ Trot[pr[j]] ^ T[pa[j]];
+        j++;
+    }
+    *sum_io = sum;
+    return j;
+}
+
+/* Load the block's 8 out/in byte pairs (via two 8-byte data loads) and
+ * compute the aligned-domain prefix XORs s[0..7] with a depth-3 tree.
+ * Endianness-independent: bytes are extracted by shifting. */
+static inline void bz64_block_prefix(const uint64_t *T, const uint64_t *Trot,
+                                     const uint8_t *pr, const uint8_t *pa, uint64_t s[8])
+{
+    uint64_t wr, wa;
+    memcpy(&wr, pr, 8);
+    memcpy(&wa, pa, 8);
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    wr = __builtin_bswap64(wr);
+    wa = __builtin_bswap64(wa);
+#endif
+    uint64_t u0 = BZ_ROTL(Trot[(uint8_t)wr] ^ T[(uint8_t)wa], 7);
+    uint64_t u1 = BZ_ROTL(Trot[(uint8_t)(wr >> 8)] ^ T[(uint8_t)(wa >> 8)], 6);
+    uint64_t u2 = BZ_ROTL(Trot[(uint8_t)(wr >> 16)] ^ T[(uint8_t)(wa >> 16)], 5);
+    uint64_t u3 = BZ_ROTL(Trot[(uint8_t)(wr >> 24)] ^ T[(uint8_t)(wa >> 24)], 4);
+    uint64_t u4 = BZ_ROTL(Trot[(uint8_t)(wr >> 32)] ^ T[(uint8_t)(wa >> 32)], 3);
+    uint64_t u5 = BZ_ROTL(Trot[(uint8_t)(wr >> 40)] ^ T[(uint8_t)(wa >> 40)], 2);
+    uint64_t u6 = BZ_ROTL(Trot[(uint8_t)(wr >> 48)] ^ T[(uint8_t)(wa >> 48)], 1);
+    uint64_t u7 = Trot[(uint8_t)(wr >> 56)] ^ T[(uint8_t)(wa >> 56)];
+    uint64_t t01 = u0 ^ u1, t23 = u2 ^ u3, t45 = u4 ^ u5, t67 = u6 ^ u7;
+    uint64_t s4 = t01 ^ t23, s6 = s4 ^ t45, s8 = s6 ^ t67;
+    s[0] = u0;
+    s[1] = t01;
+    s[2] = t01 ^ u2;
+    s[3] = s4;
+    s[4] = s4 ^ u4;
+    s[5] = s6;
+    s[6] = s6 ^ u6;
+    s[7] = s8;
+}
+
+/* --- blocked scalar (the default kernel) --------------------------------- */
+
+static size_t bz64_scan_blocked(const uint64_t *T, const uint64_t *Trot,
+                                const uint8_t *pr, const uint8_t *pa,
+                                size_t n, uint64_t *sum_io, uint64_t mask)
+{
+    uint64_t sum = *sum_io;
+    uint64_t M[8], s[8];
+    size_t j = 0;
+
+    for (int k = 0; k < 8; k++)
+        M[k] = BZ_ROTL(mask, 7 - k);
+    while (j + 8 <= n && (sum & mask) != 0) {
+        bz64_block_prefix(T, Trot, pr + j, pa + j, s);
+        uint64_t c = BZ_ROTL(sum, 8);
+        uint64_t hit = 0;
+        for (int k = 0; k < 8; k++)
+            hit |= (((c ^ s[k]) & M[k]) == 0);
+        if (hit) {
+            size_t r = bz64_scan_seq(T, Trot, pr + j, pa + j, 8, &sum, mask); /* exact re-scan */
+            *sum_io = sum;
+            return j + r;
+        }
+        sum = c ^ s[7]; /* = sum_8 exactly */
+        j += 8;
+    }
+    if (j < n)
+        j += bz64_scan_seq(T, Trot, pr + j, pa + j, n - j, &sum, mask);
+    *sum_io = sum;
+    return j;
+}
+
+/* --- NEON (aarch64 baseline, always available) -------------------------- */
+
+#if defined(__aarch64__)
+#define BZ_KIND "neon"
+
+#include <arm_neon.h>
+
+static size_t bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
+                             const uint8_t *pr, const uint8_t *pa,
+                             size_t n, uint64_t *sum_io, uint64_t mask)
+{
+    uint64_t sum = *sum_io;
+    uint64_t s[8];
+    size_t j = 0;
+    uint64x2_t M12 = {BZ_ROTL(mask, 7), BZ_ROTL(mask, 6)};
+    uint64x2_t M34 = {BZ_ROTL(mask, 5), BZ_ROTL(mask, 4)};
+    uint64x2_t M56 = {BZ_ROTL(mask, 3), BZ_ROTL(mask, 2)};
+    uint64x2_t M78 = {BZ_ROTL(mask, 1), mask};
+
+    while (j + 8 <= n && (sum & mask) != 0) {
+        bz64_block_prefix(T, Trot, pr + j, pa + j, s);
+        uint64_t c = BZ_ROTL(sum, 8);
+        uint64x2_t Cv = vdupq_n_u64(c);
+        uint64x2_t z12 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[0], s[1]}), M12));
+        uint64x2_t z34 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[2], s[3]}), M34));
+        uint64x2_t z56 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[4], s[5]}), M56));
+        uint64x2_t z78 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[6], s[7]}), M78));
+        uint64x2_t any = vorrq_u64(vorrq_u64(z12, z34), vorrq_u64(z56, z78));
+        if (vmaxvq_u32(vreinterpretq_u32_u64(any))) {
+            size_t r = bz64_scan_seq(T, Trot, pr + j, pa + j, 8, &sum, mask); /* exact re-scan */
+            *sum_io = sum;
+            return j + r;
+        }
+        sum = c ^ s[7];
+        j += 8;
+    }
+    if (j < n)
+        j += bz64_scan_seq(T, Trot, pr + j, pa + j, n - j, &sum, mask);
+    *sum_io = sum;
+    return j;
+}
+
+static int bz64_simd_available(void)
+{
+    return 1;
+}
+
+/* --- AVX2 (x86-64, runtime detected) ------------------------------------ */
+
+#elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+#define BZ_KIND "avx2"
+
+#include <immintrin.h>
+
+__attribute__((target("avx2"))) static size_t
+bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
+               const uint8_t *pr, const uint8_t *pa,
+               size_t n, uint64_t *sum_io, uint64_t mask)
+{
+    uint64_t sum = *sum_io;
+    uint64_t s[8];
+    size_t j = 0;
+    /* _mm256_set_epi64x takes arguments high lane first */
+    __m256i M1 = _mm256_set_epi64x((long long)BZ_ROTL(mask, 4), (long long)BZ_ROTL(mask, 5),
+                                   (long long)BZ_ROTL(mask, 6), (long long)BZ_ROTL(mask, 7));
+    __m256i M2 = _mm256_set_epi64x((long long)mask, (long long)BZ_ROTL(mask, 1),
+                                   (long long)BZ_ROTL(mask, 2), (long long)BZ_ROTL(mask, 3));
+    __m256i zero = _mm256_setzero_si256();
+
+    while (j + 8 <= n && (sum & mask) != 0) {
+        bz64_block_prefix(T, Trot, pr + j, pa + j, s);
+        uint64_t c = BZ_ROTL(sum, 8);
+        __m256i C = _mm256_set1_epi64x((long long)c);
+        __m256i H1 = _mm256_xor_si256(C, _mm256_loadu_si256((const __m256i *)&s[0]));
+        __m256i H2 = _mm256_xor_si256(C, _mm256_loadu_si256((const __m256i *)&s[4]));
+        __m256i z1 = _mm256_cmpeq_epi64(_mm256_and_si256(H1, M1), zero);
+        __m256i z2 = _mm256_cmpeq_epi64(_mm256_and_si256(H2, M2), zero);
+        __m256i any = _mm256_or_si256(z1, z2);
+        if (!_mm256_testz_si256(any, any)) {
+            size_t r = bz64_scan_seq(T, Trot, pr + j, pa + j, 8, &sum, mask); /* exact re-scan */
+            *sum_io = sum;
+            return j + r;
+        }
+        sum = c ^ s[7];
+        j += 8;
+    }
+    if (j < n)
+        j += bz64_scan_seq(T, Trot, pr + j, pa + j, n - j, &sum, mask);
+    *sum_io = sum;
+    return j;
+}
+
+static int bz64_simd_available(void)
+{
+    return __builtin_cpu_supports("avx2");
+}
+
+#else
+#define BZ_KIND "blocked"
+
+static size_t bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
+                             const uint8_t *pr, const uint8_t *pa,
+                             size_t n, uint64_t *sum_io, uint64_t mask)
+{
+    return bz64_scan_blocked(T, Trot, pr, pa, n, sum_io, mask);
+}
+
+static int bz64_simd_available(void)
+{
+    return 0;
+}
+
+#endif
+
+/* --- dispatch ----------------------------------------------------------- */
+
+/* resolved once; a racy double-init writes the same value, so it is benign */
+static int bz64_use_simd = -1;
+
+size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
+                 const uint8_t *p_rem, const uint8_t *p_add,
+                 size_t n, uint64_t *sum, uint64_t mask, int force_scalar)
+{
+    if (force_scalar)
+        return bz64_scan_seq(table, table_rot, p_rem, p_add, n, sum, mask);
+    if (bz64_use_simd < 0)
+        bz64_use_simd = bz64_simd_available();
+    if (bz64_use_simd)
+        return bz64_scan_simd(table, table_rot, p_rem, p_add, n, sum, mask);
+    return bz64_scan_blocked(table, table_rot, p_rem, p_add, n, sum, mask);
+}
+
+const char *bz64_kernel_name(int force_scalar)
+{
+    if (force_scalar)
+        return "scalar";
+    if (bz64_use_simd < 0)
+        bz64_use_simd = bz64_simd_available();
+    return bz64_use_simd ? BZ_KIND : "blocked";
+}

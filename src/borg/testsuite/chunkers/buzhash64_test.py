@@ -140,3 +140,26 @@ def test_fuzz_bh64(worker):
                 parts = cf_expand(chunker.chunkify(bio))
             reconstructed = b"".join(parts)
             assert reconstructed == data
+
+
+def test_buzhash64_kernels_identical():
+    # the blocked/AVX2 scan kernel (auto-selected) and the plain sequential
+    # loop must produce identical cut points.
+    data = os.urandom(4 * 1024 * 1024)
+    key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
+
+    def sizes(chunker):
+        return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
+
+    default = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
+    sizes_default = sizes(default)
+    os.environ["BORG_BUZHASH64_FORCE_SCALAR"] = "1"
+    try:
+        forced = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
+        assert forced.kernel == "scalar"
+        sizes_scalar = sizes(forced)
+    finally:
+        del os.environ["BORG_BUZHASH64_FORCE_SCALAR"]
+    assert sizes_default == sizes_scalar
+    # whatever kernel was selected by default, it must be a known one
+    assert default.kernel in ("neon", "avx2", "blocked", "scalar")

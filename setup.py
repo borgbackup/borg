@@ -56,7 +56,9 @@ crypto_ll_source = "src/borg/crypto/low_level.pyx"
 crypto_legacy_ll_source = "src/borg/legacy/crypto/low_level.pyx"
 buzhash_source = "src/borg/chunkers/buzhash.pyx"
 buzhash64_source = "src/borg/chunkers/buzhash64.pyx"
+buzhash64_impl_source = "src/borg/chunkers/buzhash64_impl.c"
 fastcdc_source = "src/borg/chunkers/fastcdc.pyx"
+fastcdc_impl_source = "src/borg/chunkers/fastcdc_impl.c"
 rabin_aes_source = "src/borg/chunkers/rabin_aes.pyx"
 rabin_aes_impl_source = "src/borg/chunkers/rabin_aes_impl.c"
 goldilocks_aes_source = "src/borg/chunkers/goldilocks_aes.pyx"
@@ -222,8 +224,18 @@ if not on_rtd:
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash", [buzhash_source], extra_compile_args=cflags),
-        Extension("borg.chunkers.buzhash64", [buzhash64_source], extra_compile_args=cflags),
-        Extension("borg.chunkers.fastcdc", [fastcdc_source], extra_compile_args=cflags),
+        Extension(
+            "borg.chunkers.buzhash64",
+            [buzhash64_source, buzhash64_impl_source],
+            include_dirs=["src/borg/chunkers"],
+            extra_compile_args=cflags,
+        ),
+        Extension(
+            "borg.chunkers.fastcdc",
+            [fastcdc_source, fastcdc_impl_source],
+            include_dirs=["src/borg/chunkers"],
+            extra_compile_args=cflags,
+        ),
         Extension("borg.chunkers.phte_chunker", [phte_chunker_source], extra_compile_args=cflags),
         Extension("borg.chunkers.rabin_aes", **rabin_aes_ext_kwargs),
         Extension("borg.chunkers.goldilocks_aes", **goldilocks_aes_ext_kwargs),

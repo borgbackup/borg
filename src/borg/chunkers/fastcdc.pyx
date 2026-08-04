@@ -1,10 +1,12 @@
 # cython: language_level=3
 
+import os
+
 import cython
 import time
 
 from cpython.bytes cimport PyBytes_AsString
-from libc.stdint cimport uint8_t, uint64_t
+from libc.stdint cimport uint8_t, uint64_t, int64_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove, memset
 
@@ -12,6 +14,10 @@ from ..crypto.low_level import CSPRNG
 
 from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 from .reader import FileReader, Chunk
+
+cdef extern from "fastcdc_impl.h":
+    int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int force_scalar) nogil
+    const char *fc_kernel_name(int force_scalar)
 
 # FastCDC content-defined chunker (Xia et al., USENIX ATC 2016).
 #
@@ -26,6 +32,11 @@ from .reader import FileReader, Chunk
 #
 # It implements the same FastCDC techniques the buzhash64 chunker uses: sub-minimum cut-point
 # skipping, normalized chunking (strict/loose mask around a "normal" size), and min/max clamping.
+#
+# The inner scan runs in a C kernel (fastcdc_impl.c) with SIMD implementations (NEON on
+# aarch64, AVX2 on x86-64, blocked scalar elsewhere) that are bit-identical to the plain
+# sequential Gear loop: every byte position is tested, cuts and hash state are exactly the
+# same, only faster. BORG_FASTCDC_FORCE_SCALAR=1 forces the sequential loop (for tests).
 
 
 @cython.boundscheck(False)
@@ -78,6 +89,7 @@ cdef class ChunkerFastCDC:
     cdef object file_reader
     cdef size_t reader_block_size
     cdef bint sparse
+    cdef int force_scalar
 
     def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int nc_level=0, size_t normal_size=0, bint sparse=False):
         self.gear = NULL
@@ -103,6 +115,7 @@ cdef class ChunkerFastCDC:
             self.mask_s = self.chunk_mask
             self.mask_l = self.chunk_mask
             self.normal_size = 0
+        self.force_scalar = 1 if os.environ.get("BORG_FASTCDC_FORCE_SCALAR", "") not in ("", "0") else 0
         self.gear = fastcdc_init_gear(key)
         self.buf_size = max_size
         self.data = <uint8_t*>malloc(self.buf_size)
@@ -128,6 +141,11 @@ cdef class ChunkerFastCDC:
         if self.data != NULL:
             free(self.data)
             self.data = NULL
+
+    @property
+    def kernel(self):
+        """Which scan kernel this chunker uses: 'neon', 'avx2', 'blocked' or 'scalar'."""
+        return (<bytes>fc_kernel_name(self.force_scalar)).decode("ascii")
 
     cdef int fill(self) except 0:
         """Fill the chunker's buffer with more data."""
@@ -166,10 +184,11 @@ cdef class ChunkerFastCDC:
         cdef uint64_t fp = 0, mask, mask_s = self.mask_s, mask_l = self.mask_l
         cdef int nc_level = self.nc_level
         cdef size_t n, old_last, min_size = self.min_size
-        cdef size_t normal_size = self.normal_size, normal_pos, chunk_len, did
+        cdef size_t normal_size = self.normal_size, normal_pos, chunk_len, did, span
+        cdef int64_t r
+        cdef int force_scalar = self.force_scalar
         cdef uint8_t* p
         cdef uint8_t* stop
-        cdef uint8_t* cut
         cdef uint64_t* gear = self.gear
 
         if self.done:
@@ -224,25 +243,18 @@ cdef class ChunkerFastCDC:
                 if (self.data + normal_pos) < stop:
                     stop = self.data + normal_pos
 
-            cut = NULL
+            span = stop - p
             with nogil:
-                while p < stop:
-                    fp = (fp << 1) + gear[p[0]]
-                    if (fp & mask) == 0:
-                        cut = p
-                        break
-                    p += 1
+                r = fc_scan(gear, p, span, &fp, mask, force_scalar)
 
-            if cut != NULL:
-                p = cut + 1  # cut right after the byte that triggered the boundary
-                did = p - (self.data + self.position)
+            if r >= 0:
+                did = <size_t>r + 1  # cut right after the byte that triggered the boundary
                 self.position += did
                 self.remaining -= did
                 break
             else:
-                did = p - (self.data + self.position)
-                self.position += did
-                self.remaining -= did
+                self.position += span
+                self.remaining -= span
 
         old_last = self.last
         self.last = self.position

@@ -160,11 +160,11 @@ class RepoObj:
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
 
-    def parse_meta(self, id: bytes, cdata: bytes, ro_type: str) -> dict:
+    def parse_meta(self, id: bytes, cdata: bytes | memoryview, ro_type: str) -> dict:
         # when calling parse_meta, enough cdata needs to be supplied to contain completely the
         # meta_len_hdr and the encrypted, packed metadata. it is allowed to provide more cdata.
         assert isinstance(id, bytes)
-        assert isinstance(cdata, bytes)
+        assert isinstance(cdata, (bytes, memoryview))
         assert isinstance(ro_type, str)
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
@@ -192,7 +192,7 @@ class RepoObj:
     def parse(
         self,
         id: bytes,
-        cdata: bytes,
+        cdata: bytes | memoryview,
         decompress: bool = True,
         want_compressed: bool = False,
         ro_type: str = None,
@@ -215,7 +215,7 @@ class RepoObj:
         assert isinstance(ro_type, str)
         assert not (not decompress and not want_compressed), "invalid parameter combination!"
         assert isinstance(id, bytes)
-        assert isinstance(cdata, bytes)
+        assert isinstance(cdata, (bytes, memoryview))
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
         if len(obj) < hdr_size:

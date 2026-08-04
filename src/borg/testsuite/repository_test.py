@@ -351,9 +351,12 @@ def test_get_reuses_cached_pack(repo_fixtures, request):
         list(repository.get_many([H(0), H(1)]))  # loads the whole pack into the cache
 
         loads_before = repository.store.stats["load_calls"]
-        assert repository.get(H(0)) == reference
+        cached = repository.get(H(0))
+        assert cached == reference
+        assert isinstance(cached, memoryview)  # a cached-pack read returns a memoryview into the pack
         assert repository.store.stats["load_calls"] - loads_before == 0  # sliced from the cached pack
-        assert repository.get(H(1), read_data=False)  # read_data=False also peeks the cache
+        meta_only = repository.get(H(1), read_data=False)
+        assert meta_only and isinstance(meta_only, bytes)  # read_data=False returns header+meta bytes
         assert repository.store.stats["load_calls"] - loads_before == 0
 
 
@@ -1234,3 +1237,16 @@ def test_pack_reader_iter_headers_reads_through_store(tmp_path):
         repository.store_store("packs/" + bin_to_hex(pack_id), pack)
         reader = PackReader(repository.store, pack_id)
         assert list(reader.iter_headers()) == [(H(47), 0, len(obj1)), (H(48), len(obj1), len(obj2))]
+
+
+def test_pack_reader_in_memory_read_returns_view():
+    # read() over an in-memory pack returns a memoryview into pack_contents.
+    obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))
+    obj2 = fchunk(b"d2", meta=b"m2", chunk_id=H(2))
+    pack = bytearray(obj1 + obj2)  # bytearray so a write shows through a view
+    reader = PackReader(pack_contents=pack)
+    view = reader.read(len(obj1), len(obj2))
+    assert isinstance(view, memoryview)
+    assert bytes(view) == obj2
+    pack[len(obj1)] ^= 0xFF  # a write to pack_contents is visible through the view
+    assert view[0] == obj2[0] ^ 0xFF

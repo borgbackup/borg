@@ -225,9 +225,9 @@ class PackReader:
         self.pack_contents = pack_contents
 
     def read(self, offset, size):
-        # read from the in-memory pack if we have it, else range-read from the store
+        # in-memory pack: return a memoryview into pack_contents. store: range-read bytes.
         if self.pack_contents is not None:
-            return self.pack_contents[offset : offset + size]
+            return memoryview(self.pack_contents)[offset : offset + size]
         return self.store.load(self.key, offset=offset, size=size)
 
     def iter_headers(self):
@@ -990,7 +990,8 @@ class Repository:
                 meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
-                return hdr + meta
+                # hdr, meta are memoryviews for an in-memory pack; return them concatenated as bytes.
+                return bytes(hdr) + bytes(meta)
         except StoreObjectNotFound:
             if raise_missing:
                 raise self.ObjectNotFound(id, str(self._location)) from None

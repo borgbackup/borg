@@ -1083,8 +1083,9 @@ def _spy_hash(repository, monkeypatch):
     return hashed_keys
 
 
-def _store_intact_pack(repository):
-    intact = fchunk(b"INTACT", chunk_id=H(1))
+def _store_intact_pack(repository, chunk_id=H(1)):
+    # a distinct chunk_id yields distinct bytes and thus a distinct sha256 pack id.
+    intact = fchunk(b"INTACT", chunk_id=chunk_id)
     intact_id = sha256(intact).digest()
     pack_key = "packs/" + bin_to_hex(intact_id)
     repository.store_store(pack_key, intact)
@@ -1414,43 +1415,34 @@ def test_check_max_age_partial_progress(tmp_path, monkeypatch):
         assert pack_a_id in after.table and pack_b_id in after.table
 
 
-def test_check_partial_verifies_least_recently_checked_first(tmp_path, monkeypatch):
-    # a partial check verifies the least-recently-checked packs first. with a budget for one pack, the
-    # pack with the oldest recorded result is verified, though its id sorts last.
+def test_check_partial_orders_stale_oldest_first_and_skips_fresh(tmp_path, monkeypatch):
+    # a partial check skips packs whose intact record is younger than max_age and verifies the rest
+    # least-recently-checked first. the sort orders by recorded time, not pack id: the older record is
+    # on the pack whose id sorts later, so an id-ordered scan would verify the two stale packs in the
+    # other order.
     max_age = 3600
-    recent_id = b"\x00" * 32  # sorts first by id
-    older_id = b"\xff" * 32  # sorts last by id
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        for pid in (recent_id, older_id):
-            repository.store_store("packs/" + bin_to_hex(pid), b"content-" + pid[:4])
+        fresh_id, fresh_key = _store_intact_pack(repository, chunk_id=H(1))
+        id2, _ = _store_intact_pack(repository, chunk_id=H(2))
+        id3, _ = _store_intact_pack(repository, chunk_id=H(3))
+        older_id, newer_id = (id2, id3) if id2 > id3 else (id3, id2)
+        older_key = "packs/" + bin_to_hex(older_id)
+        newer_key = "packs/" + bin_to_hex(newer_id)
 
         now = int(time.time())
         tracker = PackTracker.new(repository.store)
-        # both records are past max_age, so both need re-verification; the more recently recorded pack
-        # has the id that sorts first.
-        tracker.table[recent_id] = PackTracker.Entry(timestamp=now - (max_age + 100), result=1)
-        tracker.table[older_id] = PackTracker.Entry(timestamp=now - (max_age + 100000), result=1)
+        tracker.table[fresh_id] = PackTracker.Entry(timestamp=now - 10, result=1)  # within max_age
+        tracker.table[older_id] = PackTracker.Entry(timestamp=now - (max_age + 1000), result=1)
+        tracker.table[newer_id] = PackTracker.Entry(timestamp=now - (max_age + 100), result=1)
         tracker.save()
 
-        # freeze the clock and jump it past max_duration after the first hash, so exactly one pack is
-        # verified this run.
-        clock = {"t": 0.0}
-        monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
-        hashed_keys = []
-        orig_hash = repository.store.hash
+        hashed_keys = _spy_hash(repository, monkeypatch)
 
-        def hash_and_advance(key):
-            hashed_keys.append(key)
-            result = orig_hash(key)
-            clock["t"] = 10**9
-            return result
-
-        monkeypatch.setattr(repository.store, "hash", hash_and_advance)
-
-        repository.check(repair=False, max_duration=1, max_age=max_age)
+        assert repository.check(repair=False, max_duration=3600, max_age=max_age) is True
 
         pack_hashes = [key for key in hashed_keys if key.startswith("packs/")]
-        assert pack_hashes == ["packs/" + bin_to_hex(older_id)]  # the oldest recorded pack
+        assert fresh_key not in pack_hashes  # skipped, record younger than max_age
+        assert pack_hashes == [older_key, newer_key]  # oldest record first, ignoring id order
 
 
 def test_check_max_age_reuses_records_of_plain_check(tmp_path, monkeypatch):

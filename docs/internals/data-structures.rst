@@ -38,10 +38,11 @@ cache/
   checked-packs
     repository check results (pack id -> timestamp, result), as a hashtable with an
     appended integrity hash. Records are kept across checks: ``check --max-age``
-    skips packs whose intact record is younger than the given age, which also lets
-    partial checks (``--max-duration``) continue where a previous one stopped.
-    Records of corrupt packs are kept for repair and always re-verified. Records of
-    packs no longer listed in packs/ are pruned when a check finishes.
+    skips packs whose intact record is younger than the given age, and partial checks
+    (``--max-duration``) verify the least-recently-checked packs first so repeated
+    runs cover the whole repository. Records of corrupt packs are kept for repair and
+    always re-verified. Records of packs no longer listed in packs/ are pruned when a
+    check finishes.
 
 There is a list of pointers to archive objects in this directory:
 

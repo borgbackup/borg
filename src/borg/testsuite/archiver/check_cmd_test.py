@@ -78,15 +78,13 @@ def test_check_max_age(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
 
-    # --repair and --archives-only do not allow --max-age, and --max-duration requires --max-age.
-    # a zero span like 0d resolves to max_age=0 (no reuse), so it must not satisfy the guards either.
+    # --repair and --archives-only do not allow --max-age; 0d is a valid value (resolves to no reuse).
+    # --max-duration needs --repository-only, but not --max-age: a partial check advances on its own.
     if archiver.FORK_DEFAULT:
         cmd(archiver, "check", "--repair", "--max-age=1d", exit_code=CommandError().exit_code)
         cmd(archiver, "check", "--repair", "--max-age=0d", exit_code=CommandError().exit_code)
         cmd(archiver, "check", "--archives-only", "--max-age=1d", exit_code=CommandError().exit_code)
-        cmd(archiver, "check", "--repository-only", "--max-duration=3600", exit_code=CommandError().exit_code)
-        ec = CommandError().exit_code
-        cmd(archiver, "check", "--repository-only", "--max-duration=3600", "--max-age=0d", exit_code=ec)
+        cmd(archiver, "check", "--max-duration=3600", exit_code=CommandError().exit_code)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "check", "--repair", "--max-age=1d")
@@ -95,9 +93,10 @@ def test_check_max_age(archivers, request):
         with pytest.raises(CommandError):
             cmd(archiver, "check", "--archives-only", "--max-age=1d")
         with pytest.raises(CommandError):
-            cmd(archiver, "check", "--repository-only", "--max-duration=3600")
-        with pytest.raises(CommandError):
-            cmd(archiver, "check", "--repository-only", "--max-duration=3600", "--max-age=0d")
+            cmd(archiver, "check", "--max-duration=3600")
+
+    # a partial check runs without --max-age.
+    cmd(archiver, "check", "--repository-only", "--max-duration=3600", exit_code=0)
 
     # a check records its results, a later one with --max-age reuses them.
     output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)

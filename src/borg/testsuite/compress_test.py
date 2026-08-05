@@ -1,5 +1,7 @@
 import os
+import random
 import zlib
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -49,6 +51,35 @@ def test_lz4_buffer_allocation(monkeypatch):
     assert len(incompressible_data) == 50 * 2**20
     assert len(cdata) >= len(incompressible_data)
     assert incompressible_data == c.decompress(meta, cdata)[1]
+
+
+def test_lz4_threaded():
+    # LZ4 must not share one scratch buffer between threads, see issue #10032.
+    # Without a per-thread buffer, concurrent (de)compression silently produces wrong
+    # output: the threads write their results into the same bytearray.
+    threads = 8
+    rounds = 50
+
+    def make_data(seed):
+        # compressible (so that lz4 does not bail out to "no compression"), but distinct
+        # per thread, so that output of one thread showing up in another one is detected.
+        rnd = random.Random(seed)
+        words = [bytes([rnd.randrange(256)]) * 64 for _ in range(16)]
+        data = bytearray()
+        while len(data) < 2**20:
+            data += rnd.choice(words)
+        return bytes(data)
+
+    def roundtrip(seed):
+        c = Compressor("lz4")
+        data = make_data(seed)
+        for _ in range(rounds):
+            meta, cdata = c.compress({}, data)
+            assert c.decompress(meta, cdata)[1] == data
+
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        # list() so that exceptions raised in the worker threads are re-raised here
+        list(executor.map(roundtrip, range(threads)))
 
 
 @pytest.mark.parametrize("invalid_cdata", [b"\xff\xfftotalcrap", b"\x08\x00notreallyzlib"])

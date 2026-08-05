@@ -173,39 +173,87 @@ static int fc_simd_available(void)
 
 #include <immintrin.h>
 
+/* Load the block's 8 gear values (via one 8-byte data load), without the
+ * shifts and the prefix sum: the vector kernels do those in the vector
+ * domain. Endianness-independent: bytes are extracted by shifting. */
+static inline void fc_block_gear(const uint64_t *gear, const uint8_t *p, uint64_t g[8])
+{
+    uint64_t w;
+    memcpy(&w, p, 8);
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    w = __builtin_bswap64(w);
+#endif
+    g[0] = gear[(uint8_t)w];
+    g[1] = gear[(uint8_t)(w >> 8)];
+    g[2] = gear[(uint8_t)(w >> 16)];
+    g[3] = gear[(uint8_t)(w >> 24)];
+    g[4] = gear[(uint8_t)(w >> 32)];
+    g[5] = gear[(uint8_t)(w >> 40)];
+    g[6] = gear[(uint8_t)(w >> 48)];
+    g[7] = gear[(uint8_t)(w >> 56)];
+}
+
+/* The 8-lane candidate test in two 256-bit vectors, with the aligned domain
+ * built in the vector domain: vpsllvq applies the per-lane shifts, then an
+ * inclusive prefix sum inside each 4-lane half (two vpermq+vpaddq steps) plus
+ * a broadcast of the low half's total into the high half.
+ *
+ * Only the 8 gear table lookups stay scalar, and they are done one block
+ * ahead into a double buffer: a 32-byte vector load placed right after the
+ * eight 8-byte scalar stores that filled it cannot use store-to-load
+ * forwarding and stalls, twice per block. Loading block i+1 while block i is
+ * tested puts a full loop body between the stores and the load, so the stores
+ * have retired by then and the stall disappears. Before this, the stalls made
+ * the AVX2 kernel slower than the blocked scalar one. */
 __attribute__((target("avx2"))) static int64_t
 fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {
     uint64_t fp = *fp_io;
-    uint64_t s[8];
+    uint64_t g[16]; /* double buffer: block being tested + block being loaded */
     /* _mm256_set_epi64x takes arguments high lane first */
-    __m256i M1 = _mm256_set_epi64x((long long)(mask << 4), (long long)(mask << 5),
-                                   (long long)(mask << 6), (long long)(mask << 7));
-    __m256i M2 = _mm256_set_epi64x((long long)mask, (long long)(mask << 1),
-                                   (long long)(mask << 2), (long long)(mask << 3));
-    __m256i zero = _mm256_setzero_si256();
+    const __m256i M1 = _mm256_set_epi64x((long long)(mask << 4), (long long)(mask << 5),
+                                         (long long)(mask << 6), (long long)(mask << 7));
+    const __m256i M2 = _mm256_set_epi64x((long long)mask, (long long)(mask << 1),
+                                         (long long)(mask << 2), (long long)(mask << 3));
+    const __m256i SL = _mm256_set_epi64x(4, 5, 6, 7); /* lanes 0..3 <<= 7..4 */
+    const __m256i SH = _mm256_set_epi64x(0, 1, 2, 3); /* lanes 4..7 <<= 3..0 */
+    const __m256i zero = _mm256_setzero_si256();
     size_t i = 0;
+    int cur = 0;
 
-    for (; i + 8 <= n; i += 8) {
-        fc_block_prefix(gear, p + i, s);
-        uint64_t c = fp << 8;
-        __m256i C = _mm256_set1_epi64x((long long)c);
-        __m256i H1 = _mm256_add_epi64(C, _mm256_loadu_si256((const __m256i *)&s[0]));
-        __m256i H2 = _mm256_add_epi64(C, _mm256_loadu_si256((const __m256i *)&s[4]));
-        __m256i z1 = _mm256_cmpeq_epi64(_mm256_and_si256(H1, M1), zero);
-        __m256i z2 = _mm256_cmpeq_epi64(_mm256_and_si256(H2, M2), zero);
-        __m256i any = _mm256_or_si256(z1, z2);
-        if (!_mm256_testz_si256(any, any)) {
-            int64_t r = fc_scan_seq(gear, p + i, 8, &fp, mask); /* exact recheck */
-            if (r >= 0) {
-                *fp_io = fp;
-                return (int64_t)i + r;
+    if (n >= 16) {
+        fc_block_gear(gear, p, g);
+        for (; i + 16 <= n; i += 8, cur ^= 8) {
+            fc_block_gear(gear, p + i + 8, g + (cur ^ 8)); /* one block ahead */
+            __m256i lo = _mm256_sllv_epi64(_mm256_loadu_si256((const __m256i *)(g + cur)), SL);
+            __m256i hi = _mm256_sllv_epi64(_mm256_loadu_si256((const __m256i *)(g + cur + 4)), SH);
+            /* inclusive prefix sum inside each half: rotate the lanes up by 1
+             * resp. 2 (vpermq), zero the lanes rotated in, add */
+            lo = _mm256_add_epi64(lo, _mm256_blend_epi32(_mm256_permute4x64_epi64(lo, 0x93), zero, 0x03));
+            lo = _mm256_add_epi64(lo, _mm256_blend_epi32(_mm256_permute4x64_epi64(lo, 0x4E), zero, 0x0F));
+            hi = _mm256_add_epi64(hi, _mm256_blend_epi32(_mm256_permute4x64_epi64(hi, 0x93), zero, 0x03));
+            hi = _mm256_add_epi64(hi, _mm256_blend_epi32(_mm256_permute4x64_epi64(hi, 0x4E), zero, 0x0F));
+            hi = _mm256_add_epi64(hi, _mm256_permute4x64_epi64(lo, 0xFF)); /* carry s[3] */
+            uint64_t c = fp << 8;
+            __m256i C = _mm256_set1_epi64x((long long)c);
+            __m256i H1 = _mm256_add_epi64(C, lo);
+            __m256i H2 = _mm256_add_epi64(C, hi);
+            __m256i z1 = _mm256_cmpeq_epi64(_mm256_and_si256(H1, M1), zero);
+            __m256i z2 = _mm256_cmpeq_epi64(_mm256_and_si256(H2, M2), zero);
+            __m256i any = _mm256_or_si256(z1, z2);
+            if (!_mm256_testz_si256(any, any)) {
+                int64_t r = fc_scan_seq(gear, p + i, 8, &fp, mask); /* exact recheck */
+                if (r >= 0) {
+                    *fp_io = fp;
+                    return (int64_t)i + r;
+                }
+            } else {
+                fp = c + (uint64_t)_mm_cvtsi128_si64(_mm256_castsi256_si128(
+                             _mm256_permute4x64_epi64(hi, 0xFF))); /* s[7] */
             }
-        } else {
-            fp = c + s[7];
         }
     }
-    if (i < n) {
+    if (i < n) { /* up to 15 bytes here (one block more than the scalar kernels) */
         int64_t r = fc_scan_seq(gear, p + i, n - i, &fp, mask);
         if (r >= 0) {
             *fp_io = fp;
@@ -220,38 +268,59 @@ fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, 
 
 #define FC_KIND_512 "avx512"
 
-/* The same 8-lane candidate test as the AVX2 kernel, in one 512-bit vector:
- * vptestnmq fuses the AND and the ==0 test per lane into a mask register,
- * so the whole test is broadcast + load + add + testn + branch. Only the
- * test narrows; the scalar prefix work (fc_block_prefix) is shared. */
+/* The same 8-lane candidate test as the AVX2 kernel, but the aligned domain
+ * fits in one 512-bit vector: vpsllvq applies the per-lane shifts (lane j <<
+ * (7-j)), three valignq+vpaddq steps turn the shifted gear values into the
+ * inclusive prefix sums s[0..7] in one pass instead of two halves plus a
+ * carry, and vptestnmq fuses the AND and the ==0 test into a mask register.
+ *
+ * The gear lookups are pipelined one block ahead exactly as in the AVX2
+ * kernel above, for the same store-to-load forwarding reason.
+ *
+ * The serial chain stays short: only fp = c + s[7] (scalar add + shift per
+ * 8 bytes) is carried across blocks, and s[7] is read out of the vector with
+ * vpermq off that chain. */
 __attribute__((target("avx512f"))) static int64_t
 fc_scan_simd512(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {
     uint64_t fp = *fp_io;
-    uint64_t s[8];
+    uint64_t g[16]; /* double buffer: block being tested + block being loaded */
     /* _mm512_set_epi64 takes arguments high lane first: lane j = mask << (7-j) */
-    __m512i M = _mm512_set_epi64((long long)mask, (long long)(mask << 1),
-                                 (long long)(mask << 2), (long long)(mask << 3),
-                                 (long long)(mask << 4), (long long)(mask << 5),
-                                 (long long)(mask << 6), (long long)(mask << 7));
+    const __m512i M = _mm512_set_epi64((long long)mask, (long long)(mask << 1),
+                                       (long long)(mask << 2), (long long)(mask << 3),
+                                       (long long)(mask << 4), (long long)(mask << 5),
+                                       (long long)(mask << 6), (long long)(mask << 7));
+    const __m512i SH = _mm512_set_epi64(0, 1, 2, 3, 4, 5, 6, 7); /* lane j <<= 7-j */
+    const __m512i Z = _mm512_setzero_si512();
     size_t i = 0;
+    int cur = 0;
 
-    for (; i + 8 <= n; i += 8) {
-        fc_block_prefix(gear, p + i, s);
-        uint64_t c = fp << 8;
-        __m512i H = _mm512_add_epi64(_mm512_set1_epi64((long long)c),
-                                     _mm512_loadu_si512((const void *)s));
-        if (_mm512_testn_epi64_mask(H, M)) {
-            int64_t r = fc_scan_seq(gear, p + i, 8, &fp, mask); /* exact recheck */
-            if (r >= 0) {
-                *fp_io = fp;
-                return (int64_t)i + r;
+    if (n >= 16) {
+        fc_block_gear(gear, p, g);
+        for (; i + 16 <= n; i += 8, cur ^= 8) {
+            fc_block_gear(gear, p + i + 8, g + (cur ^ 8)); /* one block ahead */
+            /* u = shifted gear values, then the inclusive prefix sum over the
+             * 8 lanes (Hillis-Steele: shift lanes up by 1, 2, 4 and add;
+             * _mm512_alignr_epi64(u, Z, 8-k) shifts up by k, zero-filling) */
+            __m512i u = _mm512_sllv_epi64(_mm512_loadu_si512((const void *)(g + cur)), SH);
+            u = _mm512_add_epi64(u, _mm512_alignr_epi64(u, Z, 7));
+            u = _mm512_add_epi64(u, _mm512_alignr_epi64(u, Z, 6));
+            u = _mm512_add_epi64(u, _mm512_alignr_epi64(u, Z, 4));
+            uint64_t c = fp << 8;
+            __m512i H = _mm512_add_epi64(_mm512_set1_epi64((long long)c), u);
+            if (_mm512_testn_epi64_mask(H, M)) {
+                int64_t r = fc_scan_seq(gear, p + i, 8, &fp, mask); /* exact recheck */
+                if (r >= 0) {
+                    *fp_io = fp;
+                    return (int64_t)i + r;
+                }
+            } else {
+                fp = c + (uint64_t)_mm_cvtsi128_si64(_mm512_castsi512_si128(
+                             _mm512_permutexvar_epi64(_mm512_set1_epi64(7), u))); /* s[7] */
             }
-        } else {
-            fp = c + s[7];
         }
     }
-    if (i < n) {
+    if (i < n) { /* up to 15 bytes here (one block more than the other kernels) */
         int64_t r = fc_scan_seq(gear, p + i, n - i, &fp, mask);
         if (r >= 0) {
             *fp_io = fp;

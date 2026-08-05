@@ -1946,6 +1946,10 @@ class ArchiveChecker:
         # finish() writes the manifest and a consistent chunk index; run it on Ctrl-C too (#9850).
         self.finish()
         if sig_int:
+            if self.error_found:
+                logger.error("Archive consistency check interrupted, problems found so far.")
+            else:
+                logger.info("Archive consistency check interrupted, no problems found so far.")
             raise Error("Got Ctrl-C / SIGINT.")
         if self.error_found:
             logger.error("Archive consistency check complete, problems found.")

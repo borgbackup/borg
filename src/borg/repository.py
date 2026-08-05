@@ -1067,6 +1067,7 @@ class Repository:
             logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
         else:
             logger.error(f"Finished {mode} repository check, errors found.")
+        # True means the checked objects were clean; on Ctrl-C that covers only the packs seen so far.
         return objs_errors == 0 or repair
 
     def list(self, limit=None, marker=None):

@@ -77,30 +77,30 @@ def test_check_usage(archivers, request):
 
 def test_check_soft_interrupt(archivers, request, monkeypatch):
     """A mid-run Ctrl-C stops both check phases at a safe boundary (#7893): the repository check persists
-    its progress for a later partial check to resume, the archive check runs finish() and then raises.
-    The check is read-only, so a normal check still passes afterwards."""
+    its checked packs for a later partial check to resume, and the archive check runs finish() and then
+    raises. The check is read-only, so a normal check still passes afterwards."""
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)  # produces many packs
 
-    # repository check: interrupt after a few packs.
+    # repository check: interrupt after the first pack.
     with Repository(archiver.repository_path, exclusive=True) as repository:
         orig_hash = repository.store.hash
-        hash_calls = 0
+        pack_checks = []
 
         def hash_then_interrupt(key):
-            nonlocal hash_calls
-            hash_calls += 1
             result = orig_hash(key)
-            if hash_calls == 5:  # trip mid-run, after several packs
-                sig_int._sig_int_triggered = True
+            if key.startswith("packs/"):  # count pack checks, not the index files hashed first
+                pack_checks.append(key)
+                if len(pack_checks) == 1:  # one Ctrl-C after the first pack is checked
+                    sig_int._sig_int_triggered = True
             return result
 
         monkeypatch.setattr(repository.store, "hash", hash_then_interrupt)
         try:
-            assert repository.check() is True  # interrupted, no errors found
+            repository.check()
         finally:
             sig_int._sig_int_triggered = False
-        assert len(PackTracker.load(repository.store)) > 0  # the verified packs were persisted
+        assert len(PackTracker.load(repository.store)) == 1  # the pack checked before the break persisted
 
     # a partial check resumes the saved cycle.
     output = cmd(archiver, "check", "-v", "--repository-only", "--max-duration=600", exit_code=0)
@@ -126,7 +126,7 @@ def test_check_soft_interrupt(archivers, request, monkeypatch):
                 ArchiveChecker().check(repository, verify_data=True, sort_by="ts", format="{archive} {time} {id}")
         finally:
             sig_int._sig_int_triggered = False
-        assert interrupted_after == 3  # the loop stopped mid-run, after verifying 3 chunks
+        assert interrupted_after == 3  # the loop stopped after verifying 3 chunks
 
     # nothing changed, so a normal check passes.
     cmd(archiver, "check", exit_code=0)

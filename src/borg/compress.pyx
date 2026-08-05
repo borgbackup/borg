@@ -20,6 +20,7 @@ import os
 import random
 from struct import Struct
 import sys
+import threading
 import zlib
 
 try:
@@ -86,7 +87,30 @@ cdef extern from "lz4.h":
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_compressBound(int inputSize) nogil
 
-buffer = Buffer(bytearray, size=0)
+_thread_local = threading.local()
+
+
+def get_buffer():
+    """Return the scratch buffer of the calling thread, creating it on first use.
+
+    The LZ4 code below uses a scratch buffer to avoid allocating a new output buffer for
+    every single chunk. Chunks are (de)compressed concurrently by multiple threads, so
+    that buffer must not be shared: two threads getting the same bytearray would write
+    into it at the same time, silently corrupting each other's output.
+
+    Thread-locals are the right granularity here (rather than per compressor instance):
+    compressor instances are shared between threads (e.g. LZ4_COMPRESSOR, used by Auto),
+    while a buffer that belongs to a thread is by definition only used by that thread.
+
+    A thread's buffer stays allocated until the thread ends, and it only ever grows, so
+    a pool of N worker threads may hold N buffers. That is the same behaviour as before,
+    just no longer limited to the one buffer of the main thread.
+    """
+    try:
+        return _thread_local.buffer
+    except AttributeError:
+        buffer = _thread_local.buffer = Buffer(bytearray, size=0)
+        return buffer
 
 cdef class CompressorBase:
     """
@@ -259,7 +283,7 @@ class LZ4(DecidingCompressor):
         cdef char *source = idata
         cdef char *dest
         osize = LZ4_compressBound(isize)
-        buf = buffer.get(osize)
+        buf = get_buffer().get(osize)
         dest = <char *> buf
         with nogil:
             osize = LZ4_compress_default(source, dest, isize, osize)
@@ -283,6 +307,7 @@ class LZ4(DecidingCompressor):
         # a bit more than 8MB is enough for the usual data sizes yielded by the chunker.
         # allocate more if isize * 3 is already bigger, to avoid having to resize often.
         osize = max(int(1.1 * 2**23), isize * 3)
+        buffer = get_buffer()
         while True:
             try:
                 buf = buffer.get(osize)

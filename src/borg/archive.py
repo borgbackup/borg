@@ -1929,10 +1929,10 @@ class ArchiveChecker:
                 rebuild_manifest = True
         if rebuild_manifest:
             self.manifest = self.rebuild_manifest()
-        # Skip the remaining scans on Ctrl-C, but still run finish() below.
-        if find_lost_archives and not sig_int:
-            self.rebuild_archives_directory()
+        # On Ctrl-C, skip the remaining scans.
         if not sig_int:
+            if find_lost_archives:
+                self.rebuild_archives_directory()
             self.rebuild_archives(
                 match=match,
                 first=first,
@@ -1943,8 +1943,7 @@ class ArchiveChecker:
                 newer=newer,
                 newest=newest,
             )
-        # finish() drops the chunk index and writes the manifest; run it even on Ctrl-C so --repair
-        # leaves a valid index (#9850).
+        # finish() writes the manifest and a consistent chunk index; run it on Ctrl-C too (#9850).
         self.finish()
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")
@@ -1995,14 +1994,16 @@ class ArchiveChecker:
         logger.info("Starting cryptographic data integrity verification...")
         chunks_count = len(self.chunks)
         errors = 0
+        verified = 0  # chunks actually verified
         defect_chunks = []
         pi = ProgressIndicatorPercent(
             total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
         for chunk_id, _ in self.chunks.iteritems():
-            if sig_int:  # stop at a chunk boundary
+            if sig_int:
                 break
             pi.show()
+            verified += 1
             try:
                 encrypted_data = self.repository.get(chunk_id)
             except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
@@ -2058,11 +2059,20 @@ class ArchiveChecker:
                 for defect_chunk in defect_chunks:
                     logger.debug("chunk %s is defect.", bin_to_hex(defect_chunk))
         log = logger.error if errors else logger.info
-        log(
-            "Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.",
-            chunks_count,
-            errors,
-        )
+        if sig_int:
+            log(
+                "Interrupted cryptographic data integrity verification, "
+                "verified %d of %d chunks with %d integrity errors.",
+                verified,
+                chunks_count,
+                errors,
+            )
+        else:
+            log(
+                "Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.",
+                verified,
+                errors,
+            )
 
     def rebuild_manifest(self):
         """Rebuild the manifest object."""
@@ -2098,7 +2108,7 @@ class ArchiveChecker:
             msgid="check.rebuild_archives_directory",
         )
         for chunk_id, _ in self.chunks.iteritems():
-            if sig_int:  # stop at a chunk boundary
+            if sig_int:
                 break
             pi.show()
             cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
@@ -2145,7 +2155,10 @@ class ArchiveChecker:
                         logger.warning(f"Would create archives directory entry for {name} {archive_id_hex}.")
 
         pi.finish()
-        logger.info("Rebuilding missing archives directory entries completed.")
+        if sig_int:
+            logger.info("Rebuilding missing archives directory entries interrupted.")
+        else:
+            logger.info("Rebuilding missing archives directory entries completed.")
 
     def rebuild_archives(
         self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None
@@ -2344,7 +2357,7 @@ class ArchiveChecker:
         try:
             for i, info in enumerate(archive_infos):
                 if sig_int:
-                    # Break only between archives: --repair rewrites each archive as a whole below.
+                    # Break only between archives, as --repair rewrites each archive as a whole.
                     break
                 pi.show(i)
                 archive_id, archive_id_hex = info.id, bin_to_hex(info.id)

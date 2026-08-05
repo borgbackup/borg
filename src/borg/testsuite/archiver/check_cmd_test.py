@@ -6,11 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from ...archive import ChunkBuffer, ArchiveChecker
+from ...archive import ArchiveChecker, ChunkBuffer
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack, CommandError, IntegrityError
-from ...manifest import Manifest
-from ...repository import Repository
+from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
+from ...manifest import Archives, Manifest
+from ...repository import PackTracker, Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
     cmd,
@@ -75,39 +75,67 @@ def test_check_usage(archivers, request):
     assert "archive2" in output
 
 
-def test_check_soft_interrupt(archivers, request):
-    """A Ctrl-C during a read-only check stops at a safe boundary and raises 'Got Ctrl-C' (#7893).
-    It changes nothing, so a normal check still passes afterwards."""
-    from ...archive import ArchiveChecker
-    from ...helpers import sig_int, Error
-
+def test_check_soft_interrupt(archivers, request, monkeypatch):
+    """A mid-run Ctrl-C stops both check phases at a safe boundary (#7893): the repository check persists
+    its progress for a later partial check to resume, the archive check runs finish() and then raises.
+    The check is read-only, so a normal check still passes afterwards."""
     archiver = request.getfixturevalue(archivers)
-    check_cmd_setup(archiver)
+    check_cmd_setup(archiver)  # produces many packs
 
-    try:
-        with Repository(archiver.repository_path, exclusive=True) as repository:
-            # repository check: stops at a pack boundary, still reports no errors.
-            sig_int._sig_int_triggered = True
-            assert repository.check() is True
-        with Repository(archiver.repository_path, exclusive=True) as repository:
-            # archive check: runs finish(), then raises.
-            sig_int._sig_int_triggered = True
+    # repository check: interrupt after a few packs.
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        orig_hash = repository.store.hash
+        hash_calls = 0
+
+        def hash_then_interrupt(key):
+            nonlocal hash_calls
+            hash_calls += 1
+            result = orig_hash(key)
+            if hash_calls == 5:  # trip mid-run, after several packs
+                sig_int._sig_int_triggered = True
+            return result
+
+        monkeypatch.setattr(repository.store, "hash", hash_then_interrupt)
+        try:
+            assert repository.check() is True  # interrupted, no errors found
+        finally:
+            sig_int._sig_int_triggered = False
+        assert len(PackTracker.load(repository.store)) > 0  # the verified packs were persisted
+
+    # a partial check resumes the saved cycle.
+    output = cmd(archiver, "check", "-v", "--repository-only", "--max-duration=600", exit_code=0)
+    assert "Continuing check cycle" in output
+
+    # archive check: interrupt verify_data after 3 chunks.
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        orig_get = repository.get
+        get_calls = 0
+        interrupted_after = None
+
+        def get_then_interrupt(*args, **kwargs):
+            nonlocal get_calls, interrupted_after
+            get_calls += 1
+            if get_calls == 3:  # trip mid-loop, after 3 chunks
+                sig_int._sig_int_triggered = True
+                interrupted_after = get_calls
+            return orig_get(*args, **kwargs)
+
+        monkeypatch.setattr(repository, "get", get_then_interrupt)
+        try:
             with pytest.raises(Error, match="Got Ctrl-C"):
                 ArchiveChecker().check(repository, verify_data=True, sort_by="ts", format="{archive} {time} {id}")
-    finally:
-        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+        finally:
+            sig_int._sig_int_triggered = False
+        assert interrupted_after == 3  # the loop stopped mid-run, after verifying 3 chunks
 
+    # nothing changed, so a normal check passes.
     cmd(archiver, "check", exit_code=0)
 
 
 def test_check_repair_soft_interrupt(archivers, request, monkeypatch):
     """A Ctrl-C after the first archive of a --repair archive check stops at the archive boundary, runs
-    finish() (dropping the chunk index, writing the manifest), then raises. A later check confirms the
-    repository is still consistent."""
-    from ...archive import ArchiveChecker
-    from ...manifest import Archives
-    from ...helpers import sig_int, Error
-
+    finish() (dropping the chunk index, writing the manifest), then raises. No archive is lost, and a
+    second --repair finishes the job so a following check reports the repository consistent."""
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)  # two archives
 
@@ -124,8 +152,16 @@ def test_check_repair_soft_interrupt(archivers, request, monkeypatch):
                 ArchiveChecker().check(repository, repair=True, sort_by="ts", format="{archive} {time} {id}")
     finally:
         sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+    # restore the real method; monkeypatch.undo() would also drop the autouse env (BORG_TESTONLY_WEAKEN_KDF).
+    monkeypatch.setattr(Archives, "create", orig_create)
 
-    # a normal check does not rebuild archives, so the patched Archives.create never fires here
+    # both archives survive the interrupt between archives.
+    output = cmd(archiver, "repo-list", exit_code=0)
+    assert "archive1" in output
+    assert "archive2" in output
+
+    # a second --repair finishes the job; a plain check then finds no problems.
+    cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
 
 

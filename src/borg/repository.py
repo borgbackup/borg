@@ -1019,7 +1019,7 @@ class Repository:
             pack_infos = store_list("packs")
             pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
             for info in pack_infos:
-                if sig_int:  # save progress so a later check resumes, then stop
+                if sig_int:  # on Ctrl-C, persist checked packs, then stop
                     logger.info(f"Interrupted repository check, {len(tracker)} packs checked so far.")
                     tracker.save()
                     break
@@ -1059,7 +1059,10 @@ class Repository:
             f"Checked {index_files} index files ({index_errors} errors) and {pack_files} packs ({pack_errors} errors)."
         )
         if objs_errors == 0:
-            logger.info(f"Finished {mode} repository check, no problems found.")
+            if sig_int:
+                logger.info(f"Interrupted {mode} repository check, no problems found so far.")
+            else:
+                logger.info(f"Finished {mode} repository check, no problems found.")
         elif repair:
             logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
         else:

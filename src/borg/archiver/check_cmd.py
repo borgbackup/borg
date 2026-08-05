@@ -162,6 +162,14 @@ class CheckMixIn:
         formatted by giving a custom format using ``--format`` (see the ``borg repo-list``
         description for more details about the format string).
 
+        If the ``borg check`` process receives a SIGINT signal (Ctrl-C), it stops at the
+        next safe boundary (a pack boundary during the repository check, an archive boundary
+        during the archive check), leaving the repository and its chunk index in a consistent
+        state. A partial repository check (``--max-duration``) saves its progress so a later
+        partial check resumes where it stopped; a full check restarts from the beginning.
+        With ``--repair``, an interrupted archive check may leave some archives already
+        repaired and others not yet processed, so run ``borg check --repair`` again to finish.
+
         About repair mode
         +++++++++++++++++
 

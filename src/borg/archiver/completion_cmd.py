@@ -2,8 +2,10 @@
 Shell completion support for Borg commands.
 
 This module implements the `borg completion` command, which generates shell completion
-scripts for bash and zsh. It uses the shtab library for basic completion generation
-and extends it with custom dynamic completions for Borg-specific argument types.
+scripts for bash, zsh, tcsh and fish. It uses the shtab library for basic completion
+generation and extends it with custom dynamic completions for Borg-specific argument
+types, via a per-shell preamble of completion functions that the generated script
+refers to.
 
 Dynamic Completions
 -------------------
@@ -13,7 +15,7 @@ The following argument types have intelligent, context-aware completion:
 1. Archive names/IDs (archivename_validator):
    - Completes archive names by default (e.g., "my-backup-2024")
    - Completes archive IDs when prefixed with "aid:" (e.g., "aid:12345678")
-   - In zsh, shows archive metadata (name, timestamp, user@host) as descriptions
+   - In zsh and fish, shows archive metadata (name, timestamp, user@host) as descriptions
    - Respects --repo/-r flags to query the correct repository
 
 2. Sort keys (SortBySpec):
@@ -30,8 +32,10 @@ The following argument types have intelligent, context-aware completion:
 5. Chunker parameters (ChunkerParams):
    - Suggests chunker param examples (default, fixed,4194304, buzhash,19,23,21,4095, etc.)
 
-6. Paths (PathSpec):
-   - Completes directories using standard shell directory completion
+6. Paths (PathSpec, FilesystemPathSpec, FilesystemDirSpec):
+   - Completes files and directories for arguments taking a filesystem path
+     (FilesystemPathSpec, e.g. PATH, EXCLUDEFILE, TARFILE), and directories only
+     for arguments taking a directory (FilesystemDirSpec, e.g. MOUNTPOINT)
 
 7. Help topics:
    - Completes help command topics and subcommand names
@@ -59,6 +63,8 @@ from ..helpers import (
     SortBySpec,
     FilesCacheMode,
     PathSpec,
+    FilesystemPathSpec,
+    FilesystemDirSpec,
     ChunkerParams,
     CompressionSpec,
     tag_validator,
@@ -626,6 +632,163 @@ _borg_help_topics() {
 }
 """
 
+# Global fish preamble providing the dynamic completion functions the generated
+# script refers to (the fish counterparts of the bash/zsh ones above).
+FISH_PREAMBLE_TMPL = r"""
+# derive repo context from the command line: --repo=V, --repo V, -r=V, -rV, or -r V
+function _borg_repo_args
+    set -l tokens (commandline -opc)
+    set -l n (count $tokens)
+    for i in (seq 2 $n)
+        set -l w $tokens[$i]
+        switch "$w"
+            case '--repo=*'
+                printf '%s\n' --repo (string replace -- '--repo=' '' $w)
+                return
+            case '-r=*'
+                printf '%s\n' -r (string replace -- '-r=' '' $w)
+                return
+            case '--repo' '-r'
+                if test $i -lt $n
+                    printf '%s\n' $w $tokens[(math $i + 1)]
+                end
+                return
+            case '-r*'
+                printf '%s\n' -r (string replace -r -- '^-r' '' $w)
+                return
+        end
+    end
+end
+
+# Complete archive names, or archive IDs when the current token starts with "aid:"
+function _borg_complete_archive
+    set -l cur (commandline -ct)
+    set -l repo_args (_borg_repo_args)
+    if string match -q -- 'aid:*' $cur
+        set -l prefix (string replace -- 'aid:' '' $cur)
+        if test -n "$prefix"; and not string match -qr -- '^[0-9a-fA-F]+$' $prefix
+            return
+        end
+        # ask borg for IDs with metadata; avoid prompts and suppress stderr
+        borg repo-list $repo_args --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' \
+            2>/dev/null </dev/null | while read -l -d \t id archive atime userhost
+            test -z "$id"; and continue
+            # Print only the first 8 hex digits of the ID, with metadata as description.
+            printf 'aid:%s\t%s (%s %s)\n' (string sub -l 8 -- $id) $archive $atime $userhost
+        end
+    else
+        borg repo-list $repo_args --format '{archive}{NL}' 2>/dev/null </dev/null
+    end
+end
+
+# Complete tags from the repository
+function _borg_complete_tags
+    set -l repo_args (_borg_repo_args)
+    borg repo-list $repo_args --format '{tags}{NL}' 2>/dev/null </dev/null \
+        | string split ',' | string trim | string match -v '' | sort -u
+end
+
+# Complete compression spec options
+function _borg_complete_compression_spec
+    printf '%s\n' {COMP_SPEC_CHOICES}
+end
+
+# Complete chunker params options
+function _borg_complete_chunker_params
+    printf '%s\n' {CHUNKER_PARAMS_CHOICES}
+end
+
+# Complete relative time markers
+function _borg_complete_relative_time
+    printf '%s\n' {RELATIVE_TIME_CHOICES}
+end
+
+# Complete file size values
+function _borg_complete_file_size
+    printf '%s\n' {FILE_SIZE_CHOICES}
+end
+
+function _borg_help_topics
+    printf '%s\n' {HELP_CHOICES}
+end
+
+# Complete timestamp (file path or ISO timestamp)
+function _borg_complete_timestamp
+    set -l cur (commandline -ct)
+    if string match -qr -- '^(/|\.)' $cur
+        __fish_complete_path $cur
+    else
+        # Suggest current timestamp in ISO format
+        date +%Y-%m-%dT%H:%M:%S%z | string replace -r -- '(\d\d)$' ':$1'
+    end
+end
+
+# Split the current token into an --opt= prefix (if any), the already selected
+# comma-separated keys (with trailing comma) and set $_borg_csv_prefix_eq,
+# $_borg_csv_head and $_borg_csv_selected accordingly.
+function _borg_csv_scan
+    set -l cur (commandline -ct)
+    set -g _borg_csv_prefix_eq ''
+    set -l val $cur
+    if string match -q -- '*=*' $cur
+        set -g _borg_csv_prefix_eq (string replace -r -- '=.*$' '=' $cur)
+        set val (string replace -r -- '^[^=]*=' '' $cur)
+    end
+    set -g _borg_csv_head ''
+    if string match -q -- '*,*' $val
+        set -g _borg_csv_head (string replace -r -- '[^,]*$' '' $val)
+    end
+    set -g _borg_csv_selected (string split -- ',' $_borg_csv_head)
+end
+
+# Emit one candidate for a comma-separated list option, in both the plain and
+# the --opt=value form (fish matches whichever fits the current token).
+function _borg_csv_emit
+    printf '%s\n' "$_borg_csv_head$argv"
+    if test -n "$_borg_csv_prefix_eq"
+        printf '%s\n' "$_borg_csv_prefix_eq$_borg_csv_head$argv"
+    end
+end
+
+# Complete comma-separated sort keys for any option with type=SortBySpec.
+function _borg_complete_sortby
+    _borg_csv_scan
+    for k in {SORT_KEYS}
+        if contains -- $k $_borg_csv_selected
+            continue
+        end
+        _borg_csv_emit $k
+    end
+end
+
+# Complete comma-separated files cache mode tokens for options with type=FilesCacheMode.
+function _borg_complete_filescachemode
+    _borg_csv_scan
+    # If 'disabled' is already selected, there is nothing else to suggest.
+    if contains -- disabled $_borg_csv_selected
+        return
+    end
+    for k in {FCM_KEYS}
+        # skip duplicates
+        if contains -- $k $_borg_csv_selected
+            continue
+        end
+        # do not suggest 'disabled' if any other token is already selected
+        if test -n "$_borg_csv_head"; and test "$k" = disabled
+            continue
+        end
+        # ctime/mtime are mutually exclusive: don't suggest the other if one is present
+        if test "$k" = ctime; and contains -- mtime $_borg_csv_selected
+            continue
+        end
+        if test "$k" = mtime; and contains -- ctime $_borg_csv_selected
+            continue
+        end
+        _borg_csv_emit $k
+    end
+end
+"""
+
 
 def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict):
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
@@ -652,6 +815,12 @@ def _attach_help_completion(parser: ArgumentParser, completion_dict: dict):
             action.complete = completion_dict  # type: ignore[attr-defined]
 
 
+# File completion. shtab's fish variant calls __fish_complete_path without arguments,
+# which only completes paths relative to the cwd - pass the current token, so that
+# absolute paths (and paths in other directories) complete as well, see tqdm/shtab#245.
+FILE = {**shtab.FILE, "fish": "(__fish_complete_path (commandline -ct))"}
+
+
 class CompletionMixIn:
     def do_completion(self, args):
         """Output shell completion script for the given shell."""
@@ -659,33 +828,33 @@ class CompletionMixIn:
         # adds dynamic completion for archive IDs with the aid: prefix for all ARCHIVE
         # arguments (identified by archivename_validator). It reuses `borg repo-list`
         # to enumerate archives and does not introduce any new commands or caching.
-        parser = self.build_parser()
-        _attach_completion(
-            parser, archivename_validator, {"bash": "_borg_complete_archive", "zsh": "_borg_complete_archive"}
-        )
-        _attach_completion(parser, SortBySpec, {"bash": "_borg_complete_sortby", "zsh": "_borg_complete_sortby"})
-        _attach_completion(
-            parser, FilesCacheMode, {"bash": "_borg_complete_filescachemode", "zsh": "_borg_complete_filescachemode"}
-        )
-        _attach_completion(
-            parser,
-            CompressionSpec,
-            {"bash": "_borg_complete_compression_spec", "zsh": "_borg_complete_compression_spec"},
-        )
+
+        # The script shall always complete the "borg" command, no matter how borg was
+        # invoked while generating it (e.g. as "python -m borg", where prog would be
+        # "__main__.py" - the shells would then complete that instead of "borg").
+        prog, self.prog = self.prog, "borg"
+        try:
+            parser = self.build_parser()
+        finally:
+            self.prog = prog
+
+        def for_all_shells(fn_name):
+            # same-named completion function in the bash, zsh and fish preambles;
+            # fish needs a command substitution to call it
+            return {"bash": fn_name, "zsh": fn_name, "fish": f"({fn_name})"}
+
+        _attach_completion(parser, archivename_validator, for_all_shells("_borg_complete_archive"))
+        _attach_completion(parser, SortBySpec, for_all_shells("_borg_complete_sortby"))
+        _attach_completion(parser, FilesCacheMode, for_all_shells("_borg_complete_filescachemode"))
+        _attach_completion(parser, CompressionSpec, for_all_shells("_borg_complete_compression_spec"))
         _attach_completion(parser, PathSpec, shtab.DIRECTORY)
-        _attach_completion(
-            parser, ChunkerParams, {"bash": "_borg_complete_chunker_params", "zsh": "_borg_complete_chunker_params"}
-        )
-        _attach_completion(parser, tag_validator, {"bash": "_borg_complete_tags", "zsh": "_borg_complete_tags"})
-        _attach_completion(
-            parser,
-            relative_time_marker_validator,
-            {"bash": "_borg_complete_relative_time", "zsh": "_borg_complete_relative_time"},
-        )
-        _attach_completion(parser, timestamp, {"bash": "_borg_complete_timestamp", "zsh": "_borg_complete_timestamp"})
-        _attach_completion(
-            parser, parse_file_size, {"bash": "_borg_complete_file_size", "zsh": "_borg_complete_file_size"}
-        )
+        _attach_completion(parser, FilesystemPathSpec, FILE)
+        _attach_completion(parser, FilesystemDirSpec, shtab.DIRECTORY)
+        _attach_completion(parser, ChunkerParams, for_all_shells("_borg_complete_chunker_params"))
+        _attach_completion(parser, tag_validator, for_all_shells("_borg_complete_tags"))
+        _attach_completion(parser, relative_time_marker_validator, for_all_shells("_borg_complete_relative_time"))
+        _attach_completion(parser, timestamp, for_all_shells("_borg_complete_timestamp"))
+        _attach_completion(parser, parse_file_size, for_all_shells("_borg_complete_file_size"))
 
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
@@ -693,8 +862,7 @@ class CompletionMixIn:
             if isinstance(action, ActionSubCommands):
                 help_choices.extend(action.choices.keys())
 
-        help_completion_fn = "_borg_help_topics"
-        _attach_help_completion(parser, {"bash": help_completion_fn, "zsh": help_completion_fn})
+        _attach_help_completion(parser, for_all_shells("_borg_help_topics"))
 
         # Build preambles using partial_format to avoid escaping braces etc.
         sort_keys = " ".join(AI_HUMAN_SORT_KEYS)
@@ -737,15 +905,10 @@ class CompletionMixIn:
             "FILE_SIZE_CHOICES": file_size_choices_str,
             "HELP_CHOICES": help_choices,
         }
-        bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
-        zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
-
-        if args.shell == "bash":
-            preambles = [bash_preamble]
-        elif args.shell == "zsh":
-            preambles = [zsh_preamble]
-        else:
-            preambles = []
+        preamble_templates = {"bash": BASH_PREAMBLE_TMPL, "zsh": ZSH_PREAMBLE_TMPL, "fish": FISH_PREAMBLE_TMPL}
+        template = preamble_templates.get(args.shell)
+        # Build the preamble using partial_format to avoid escaping braces etc.
+        preambles = [partial_format(template, mapping)] if template else []
         script = parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles)
         print(script)
 

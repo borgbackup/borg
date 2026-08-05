@@ -7,6 +7,7 @@ import time
 
 from ..constants import *  # NOQA
 from ..helpers import format_file_size, CompressionSpec
+from ..helpers import FilesystemDirSpec
 from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
@@ -391,7 +392,9 @@ class BenchmarkMixIn:
             "crud", subparser, help="benchmarks Borg CRUD (create, extract, update, delete)."
         )
 
-        subparser.add_argument("path", metavar="PATH", help="path where to create benchmark input data")
+        subparser.add_argument(
+            "path", metavar="PATH", type=FilesystemDirSpec, help="path where to create benchmark input data"
+        )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")
 
         bench_cpu_epilog = process_epilog(

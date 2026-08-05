@@ -32,6 +32,7 @@ from .parseformat import eval_escapes, decode_dict, interval, int_or_interval
 from .parseformat import (
     PathSpec,
     FilesystemPathSpec,
+    FilesystemDirSpec,
     SortBySpec,
     CompressionSpec,
     ChunkerParams,

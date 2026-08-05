@@ -3,7 +3,7 @@ import os
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import RTError
-from ..helpers import PathSpec
+from ..helpers import PathSpec, FilesystemDirSpec
 from ..helpers import umount
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
@@ -185,7 +185,7 @@ class MountMixIn:
         subparser = ArgumentParser(parents=[common_parser], description=self.do_umount.__doc__, epilog=umount_epilog)
         subparsers.add_subcommand("umount", subparser, help="unmount a repository")
         subparser.add_argument(
-            "mountpoint", metavar="MOUNTPOINT", type=str, help="mountpoint of the filesystem to unmount"
+            "mountpoint", metavar="MOUNTPOINT", type=FilesystemDirSpec, help="mountpoint of the filesystem to unmount"
         )
 
     def build_parser_borgfs(self, parser):
@@ -199,7 +199,9 @@ class MountMixIn:
     def _define_borg_mount(self, parser):
         from ._common import define_exclusion_group, define_archive_filters_group
 
-        parser.add_argument("mountpoint", metavar="MOUNTPOINT", type=str, help="where to mount the filesystem")
+        parser.add_argument(
+            "mountpoint", metavar="MOUNTPOINT", type=FilesystemDirSpec, help="where to mount the filesystem"
+        )
         parser.add_argument(
             "-f", "--foreground", dest="foreground", action="store_true", help="stay in foreground, do not daemonize"
         )

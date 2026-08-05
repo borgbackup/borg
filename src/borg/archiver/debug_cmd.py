@@ -4,6 +4,7 @@ import textwrap
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import msgpack
+from ..helpers import FilesystemPathSpec
 from ..helpers import sysinfo
 from ..helpers import bin_to_hex, hex_to_bin, prepare_dump_dict
 from ..helpers import dash_open
@@ -365,7 +366,7 @@ class DebugMixIn:
         )
         debug_parsers.add_subcommand("dump-archive", subparser, help="dump decoded archive metadata (debug)")
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
+        subparser.add_argument("path", metavar="PATH", type=FilesystemPathSpec, help="file to dump data into")
 
         debug_dump_manifest_epilog = process_epilog(
             """
@@ -378,7 +379,7 @@ class DebugMixIn:
             epilog=debug_dump_manifest_epilog,
         )
         debug_parsers.add_subcommand("dump-manifest", subparser, help="dump decoded repository metadata (debug)")
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
+        subparser.add_argument("path", metavar="PATH", type=FilesystemPathSpec, help="file to dump data into")
 
         debug_dump_repo_objs_epilog = process_epilog(
             """
@@ -420,7 +421,7 @@ class DebugMixIn:
         )
         debug_parsers.add_subcommand("id-hash", subparser, help="compute id-hash for some file content (debug)")
         subparser.add_argument(
-            "path", metavar="PATH", type=str, help="content for which the id-hash shall get computed"
+            "path", metavar="PATH", type=FilesystemPathSpec, help="content for which the id-hash shall get computed"
         )
 
         # parse_obj
@@ -435,13 +436,22 @@ class DebugMixIn:
         debug_parsers.add_subcommand("parse-obj", subparser, help="parse borg object file into meta dict and data")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
-            "object_path", metavar="OBJECT_PATH", type=str, help="path of the object file to parse data from"
+            "object_path",
+            metavar="OBJECT_PATH",
+            type=FilesystemPathSpec,
+            help="path of the object file to parse data from",
         )
         subparser.add_argument(
-            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to write uncompressed data into"
+            "binary_path",
+            metavar="BINARY_PATH",
+            type=FilesystemPathSpec,
+            help="path of the file to write uncompressed data into",
         )
         subparser.add_argument(
-            "json_path", metavar="JSON_PATH", type=str, help="path of the json file to write metadata into"
+            "json_path",
+            metavar="JSON_PATH",
+            type=FilesystemPathSpec,
+            help="path of the json file to write metadata into",
         )
 
         # format_obj
@@ -456,10 +466,16 @@ class DebugMixIn:
         debug_parsers.add_subcommand("format-obj", subparser, help="format file and metadata into a Borg object file")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
-            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to convert into an object file"
+            "binary_path",
+            metavar="BINARY_PATH",
+            type=FilesystemPathSpec,
+            help="path of the file to convert into an object file",
         )
         subparser.add_argument(
-            "json_path", metavar="JSON_PATH", type=str, help="path of the json file to read metadata from"
+            "json_path",
+            metavar="JSON_PATH",
+            type=FilesystemPathSpec,
+            help="path of the json file to read metadata from",
         )
         subparser.add_argument(
             "-C",
@@ -474,7 +490,7 @@ class DebugMixIn:
         subparser.add_argument(
             "object_path",
             metavar="OBJECT_PATH",
-            type=str,
+            type=FilesystemPathSpec,
             help="path of the object file to write compressed encrypted data into",
         )
 
@@ -488,7 +504,7 @@ class DebugMixIn:
         )
         debug_parsers.add_subcommand("get-obj", subparser, help="get object from repository (debug)")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to write object data into")
+        subparser.add_argument("path", metavar="PATH", type=FilesystemPathSpec, help="file to write object data into")
 
         debug_put_obj_epilog = process_epilog(
             """
@@ -500,7 +516,9 @@ class DebugMixIn:
         )
         debug_parsers.add_subcommand("put-obj", subparser, help="put object to repository (debug)")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to put into the repo")
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to read and create object from")
+        subparser.add_argument(
+            "path", metavar="PATH", type=FilesystemPathSpec, help="file to read and create object from"
+        )
 
         debug_delete_obj_epilog = process_epilog(
             """
@@ -528,5 +546,5 @@ class DebugMixIn:
         debug_parsers.add_subcommand(
             "convert-profile", subparser, help="convert Borg profile to Python profile (debug)"
         )
-        subparser.add_argument("input", metavar="INPUT", type=str, help="Borg profile")
-        subparser.add_argument("output", metavar="OUTPUT", type=str, help="Output file")
+        subparser.add_argument("input", metavar="INPUT", type=FilesystemPathSpec, help="Borg profile")
+        subparser.add_argument("output", metavar="OUTPUT", type=FilesystemPathSpec, help="Output file")

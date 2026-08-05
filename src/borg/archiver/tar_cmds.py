@@ -13,6 +13,7 @@ from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CompressionSpec
+from ..helpers import FilesystemPathSpec
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
@@ -407,7 +408,9 @@ class TarMixIn:
             help="select tar format: BORG, PAX or GNU",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
-        subparser.add_argument("tarfile", metavar="FILE", help='output tar file. "-" to write to stdout instead.')
+        subparser.add_argument(
+            "tarfile", metavar="FILE", type=FilesystemPathSpec, help='output tar file. "-" to write to stdout instead.'
+        )
         subparser.add_argument(
             "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to extract; patterns are supported"
         )
@@ -536,4 +539,9 @@ class TarMixIn:
         )
 
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
-        subparser.add_argument("tarfile", metavar="TARFILE", help='input tar file. "-" to read from stdin instead.')
+        subparser.add_argument(
+            "tarfile",
+            metavar="TARFILE",
+            type=FilesystemPathSpec,
+            help='input tar file. "-" to read from stdin instead.',
+        )

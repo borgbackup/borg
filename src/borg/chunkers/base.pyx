@@ -116,14 +116,22 @@ cdef class ChunkerBase:
         """Fill the chunker's buffer with more data."""
         cdef ssize_t n
 
-        # Move remaining data to the beginning of the buffer
-        with nogil:
-            memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
-        self.position -= self.last
-        self.last = 0
-        n = self.buf_size - self.position - self.remaining
+        if self.eof:
+            return 1
 
-        if self.eof or n == 0:
+        n = self.buf_size - self.position - self.remaining
+        if n < <ssize_t>self.reader_block_size and self.last > 0:
+            # The free tail of the buffer is too small for a full read block:
+            # compact the buffer by dropping the already-yielded data before
+            # self.last. Compacting lazily (instead of on every fill) avoids
+            # memmoving roughly one byte per byte read.
+            with nogil:
+                memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
+            self.position -= self.last
+            self.last = 0
+            n = self.buf_size - self.position - self.remaining
+
+        if n == 0:
             return 1
 
         if n > 0:

@@ -201,6 +201,10 @@ New features:
     directly into the chunker's scan buffer, replacing several per-byte copy
     chains; fastcdc ~+40%, buzhash64 ~+20%, buzhash ~+15%,
     rabin-aes/toeplitz-aes ~+16%, goldilocks-aes ~+9%
+  - lazy buffer compaction: compact the scan buffer only when the free tail
+    gets too small for a full read block (instead of memmoving on every
+    refill), removing ~80% of the compaction copy traffic; cut points stay
+    bit-identical (all CDC chunkers)
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042

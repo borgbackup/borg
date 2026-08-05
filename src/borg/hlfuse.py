@@ -31,7 +31,7 @@ from .helpers import msgpack
 from .storelocking import LockRefresher
 from .helpers.lrucache import LRUCache
 from .item import Item
-from .platform import uid2user, gid2group, acl_text_to_xattr
+from .platform import uid2user, gid2group, acl_text_to_xattr, acl_is_extended
 from .platformflags import is_darwin, is_linux
 from .repository import Repository
 
@@ -593,7 +593,7 @@ class borgfs(hlfuse.Operations, FuseBackend):
         item = self.get_inode(node.ino)
         result = [k.decode("utf-8", "surrogateescape") for k in item.get("xattrs", {}).keys()]
         # expose the archived POSIX ACLs, so e.g. getfacl or tools copying from the mount can read them.
-        result.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if attr in item)
+        result.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if acl_is_extended(item.get(attr)))
         debug_log(f"listxattr -> {result}")
         return result
 
@@ -606,7 +606,7 @@ class borgfs(hlfuse.Operations, FuseBackend):
         name_str = name if isinstance(name, str) else name.decode("utf-8", "surrogateescape")
         if name_str in ACL_XATTRS:
             acl = item.get(ACL_XATTRS[name_str])
-            if acl is None:
+            if not acl_is_extended(acl):
                 debug_log("getxattr -> ENOATTR")
                 raise hlfuse.FuseOSError(ENOATTR)
             try:

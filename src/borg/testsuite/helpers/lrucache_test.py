@@ -35,6 +35,33 @@ class TestLRUCache:
         c.clear()
         assert c.items() == set()
 
+    def test_assign_to_existing_key(self):
+        # assigning to a key that is present replaces the value and counts as a use,
+        # so the entry becomes the most recently used one.
+        c = LRUCache(2)
+        c["a"] = 1
+        c["b"] = 2
+        c["a"] = 3  # replaces, and refreshes "a"
+        assert len(c) == 2
+        assert c["a"] == 3
+        c["c"] = 4  # evicts the least recently used entry, which is "b" now
+        assert set(c.keys()) == {"a", "c"}
+
+    def test_dispose_on_replacement(self):
+        disposed = []
+        c = LRUCache(2, dispose=disposed.append)
+        c["a"] = "first"
+        c["a"] = "second"  # the replaced value leaves the cache, so it is disposed
+        assert disposed == ["first"]
+        assert c["a"] == "second"
+        value = "same object"
+        c["b"] = value
+        c["b"] = value  # assigning the identical object does not dispose it
+        assert disposed == ["first"]
+        c.replace("b", "replacement")  # replace() never disposes, see there
+        assert disposed == ["first"]
+        assert c["b"] == "replacement"
+
     def test_dispose(self):
         c = LRUCache(2, dispose=lambda f: f.close())
         f1 = TemporaryFile()

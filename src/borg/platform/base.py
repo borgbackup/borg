@@ -95,6 +95,32 @@ def acl_text_to_xattr(acl, numeric_ids=False):
     raise NotImplementedError
 
 
+def acl_is_extended(acl):
+    """
+    Does *acl* (an ACL in the borg item text representation) define anything beyond the
+    traditional permission bits?
+
+    A trivial ACL only has the 3 base entries (owner, owning group, other) and thus is fully
+    equivalent to the mode bits - the kernel does not keep an ACL xattr for such an ACL.
+    borg used to archive a trivial acl_access for directories that only had a default ACL
+    (and an empty acl_default for files/dirs without one), so such ACLs may be present in
+    older archives and must not be offered as ACL xattrs by the FUSE mount.
+    """
+    if not acl:
+        return False
+    for entry in acl.split(b"\n"):
+        if not entry:
+            continue
+        fields = entry.split(b":")
+        if len(fields) < 3:  # unexpected, let the ACL converter deal with it
+            return True
+        if fields[1]:  # a named user/group entry
+            return True
+        if fields[0] not in (b"user", b"group", b"other"):  # e.g. a mask entry
+            return True
+    return False
+
+
 try:
     from os import lchflags  # type: ignore[attr-defined]
 

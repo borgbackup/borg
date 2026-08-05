@@ -189,16 +189,28 @@ def test_fuse_acls(archivers, request):
     dir_path = os.path.join(archiver.input_path, "dir1")
     os.mkdir(dir_path)
     platform.acl_set(dir_path, {"acl_access": access_acl, "acl_default": default_acl})
+    dir2_path = os.path.join(archiver.input_path, "dir2")
+    os.mkdir(dir2_path)
+    platform.acl_set(dir2_path, {"acl_default": default_acl})  # only a default ACL, no access ACL
     cmd(archiver, "create", "archive", "input")
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     with fuse_mount(archiver, mountpoint, "-a", "archive"):
         mounted_file = os.path.join(mountpoint, "archive", "input", "file1")
         mounted_dir = os.path.join(mountpoint, "archive", "input", "dir1")
+        mounted_dir2 = os.path.join(mountpoint, "archive", "input", "dir2")
         # the ACL xattrs must be listed:
         assert "system.posix_acl_access" in os.listxattr(mounted_file)
         assert "system.posix_acl_default" not in os.listxattr(mounted_file)
         assert "system.posix_acl_access" in os.listxattr(mounted_dir)
         assert "system.posix_acl_default" in os.listxattr(mounted_dir)
+        # a directory that only has a default ACL must not offer an access ACL xattr
+        # (its access ACL is just the mode bits, the source fs does not have that xattr either):
+        assert "system.posix_acl_access" not in os.listxattr(dir2_path)
+        assert "system.posix_acl_access" not in os.listxattr(mounted_dir2)
+        assert "system.posix_acl_default" in os.listxattr(mounted_dir2)
+        with pytest.raises(OSError) as exc_info:
+            os.getxattr(mounted_dir2, "system.posix_acl_access")
+        assert exc_info.value.errno in (errno.ENODATA, errno.ENOTSUP)
         # the binary xattr values must be identical to what the kernel provides for the source fs objects:
         try:
             mounted_file_acl = os.getxattr(mounted_file, "system.posix_acl_access")
@@ -212,6 +224,9 @@ def test_fuse_acls(archivers, request):
         assert mounted_file_acl == os.getxattr(file_path, "system.posix_acl_access")
         for name in ("system.posix_acl_access", "system.posix_acl_default"):
             assert os.getxattr(mounted_dir, name) == os.getxattr(dir_path, name)
+        assert os.getxattr(mounted_dir2, "system.posix_acl_default") == os.getxattr(
+            dir2_path, "system.posix_acl_default"
+        )
         # borg's own ACL code (going through libacl, like getfacl or tools copying
         # from the mount would) must see the same ACLs through the mount:
         item_src, item_mnt = {}, {}
@@ -222,6 +237,12 @@ def test_fuse_acls(archivers, request):
         platform.acl_get(dir_path, item_src, os.stat(dir_path))
         platform.acl_get(mounted_dir, item_mnt, os.stat(mounted_dir))
         assert item_src["acl_access"] == item_mnt["acl_access"]
+        assert item_src["acl_default"] == item_mnt["acl_default"]
+        item_src, item_mnt = {}, {}
+        platform.acl_get(dir2_path, item_src, os.stat(dir2_path))
+        platform.acl_get(mounted_dir2, item_mnt, os.stat(mounted_dir2))
+        assert "acl_access" not in item_src
+        assert "acl_access" not in item_mnt
         assert item_src["acl_default"] == item_mnt["acl_default"]
     # also check with --numeric-ids:
     with fuse_mount(archiver, mountpoint, "-a", "archive", "--numeric-ids"):

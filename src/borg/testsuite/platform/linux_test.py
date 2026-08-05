@@ -83,6 +83,41 @@ def test_default_acl():
 
 
 @skipif_acls_not_working
+def test_default_acl_only():
+    # a directory can have a default ACL while its access ACL is just the traditional permission
+    # bits. such an access ACL must not be archived - it has no xattr on the source fs either.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        set_acl(tmpdir, default=DEFAULT_ACL)
+        item = get_acl(tmpdir)
+        assert "acl_access" not in item
+        assert item["acl_default"] == DEFAULT_ACL
+
+
+@skipif_acls_not_working
+def test_access_acl_only_no_empty_default():
+    # a directory without a default ACL must not get an empty acl_default archived.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        set_acl(tmpdir, access=ACCESS_ACL)
+        item = get_acl(tmpdir)
+        assert item["acl_access"] == ACCESS_ACL
+        assert "acl_default" not in item
+
+
+def test_acl_is_extended():
+    from ...platform import acl_is_extended
+
+    assert not acl_is_extended(None)
+    assert not acl_is_extended(b"")
+    # trivial ACLs (only the base entries) are equivalent to the mode bits:
+    assert not acl_is_extended(b"user::rw-\ngroup::r--\nother::r--")
+    assert not acl_is_extended(b"user::rw-\ngroup::r--\nother::r--\n")
+    # anything else is a real ACL:
+    assert acl_is_extended(b"user::rw-\ngroup::r--\nmask::rw-\nother::r--")
+    assert acl_is_extended(b"user::rw-\nuser:root:rw-:0\ngroup::r--\nother::r--")
+    assert acl_is_extended(b"user::rw-\ngroup::r--\ngroup:8888:rw-:8888\nother::r--")
+
+
+@skipif_acls_not_working
 @skipif_no_ubel_user
 def test_non_ascii_acl():
     # Testing non-ASCII ACL processing to see whether our code is robust.

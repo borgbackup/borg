@@ -17,6 +17,7 @@ except ImportError:
     SYNC_FILE_RANGE_LOADED = False
 
 from libc cimport errno
+from posix.types cimport mode_t
 
 
 
@@ -48,10 +49,12 @@ cdef extern from "sys/acl.h":
     int acl_set_file(const char *path, int type, acl_t acl)
     int acl_set_fd(int fd, acl_t acl)
     acl_t acl_from_text(const char *buf)
+    int acl_equiv_mode(acl_t acl, mode_t *mode_p)
 
 cdef extern from "acl/libacl.h":
     int acl_extended_file_nofollow(const char *path)
     int acl_extended_fd(int fd)
+    int acl_entries(acl_t acl)
     char *acl_to_any_text(acl_t acl, const char *prefix, char separator, int options)
     int TEXT_NUMERIC_IDS
 
@@ -298,10 +301,16 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
         if access_acl == NULL:
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-        access_text = acl_to_any_text(access_acl, NULL, '\n', TEXT_NUMERIC_IDS)
-        if access_text == NULL:
-            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-        item['acl_access'] = converter(access_text)
+        # a directory having only a default ACL also counts as "extended" (see above), but its
+        # access ACL then just mirrors the traditional permission bits and thus carries no extra
+        # information. the kernel does not keep a system.posix_acl_access xattr in that case
+        # either, so do not archive such an access ACL. acl_equiv_mode returns 0 if the ACL is
+        # equivalent to the mode bits, 1 if it is not and -1 on error (then we rather store it).
+        if acl_equiv_mode(access_acl, NULL) != 0:
+            access_text = acl_to_any_text(access_acl, NULL, '\n', TEXT_NUMERIC_IDS)
+            if access_text == NULL:
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+            item['acl_access'] = converter(access_text)
     finally:
         acl_free(access_text)
         acl_free(access_acl)
@@ -311,10 +320,13 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
             if default_acl == NULL:
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-            default_text = acl_to_any_text(default_acl, NULL, '\n', TEXT_NUMERIC_IDS)
-            if default_text == NULL:
-                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-            item['acl_default'] = converter(default_text)
+            # a directory without a default ACL gives an empty ACL here - nothing to archive
+            # (same as above: the kernel has no system.posix_acl_default xattr for it).
+            if acl_entries(default_acl) > 0:
+                default_text = acl_to_any_text(default_acl, NULL, '\n', TEXT_NUMERIC_IDS)
+                if default_text == NULL:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+                item['acl_default'] = converter(default_text)
         finally:
             acl_free(default_text)
             acl_free(default_acl)

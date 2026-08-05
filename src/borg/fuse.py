@@ -74,7 +74,7 @@ from .helpers import msgpack
 from .storelocking import LockRefresher
 from .helpers.lrucache import LRUCache
 from .item import Item
-from .platform import uid2user, gid2group, acl_text_to_xattr
+from .platform import uid2user, gid2group, acl_text_to_xattr, acl_is_extended
 from .platformflags import is_darwin, is_linux
 from .repository import Repository
 
@@ -683,7 +683,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         item = self.get_item(inode)
         names = list(item.get("xattrs", {}).keys())
         # expose the archived POSIX ACLs, so e.g. getfacl or tools copying from the mount can read them.
-        names.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if attr in item)
+        names.extend(xattr_name for xattr_name, attr in ACL_XATTRS.items() if acl_is_extended(item.get(attr)))
         return names
 
     @async_wrapper
@@ -691,7 +691,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         item = self.get_item(inode)
         if name in ACL_XATTRS:
             acl = item.get(ACL_XATTRS[name])
-            if acl is None:
+            if not acl_is_extended(acl):
                 raise llfuse.FUSEError(ENOATTR)
             try:
                 return acl_text_to_xattr(acl, numeric_ids=self.numeric_ids)

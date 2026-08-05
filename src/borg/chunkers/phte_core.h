@@ -15,6 +15,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <openssl/evp.h>
@@ -25,6 +26,7 @@ typedef struct {
     uint8_t rk[11][16];  /* AES-128 round keys, for the hardware paths */
     EVP_CIPHER_CTX *evp; /* portable path */
     int use_hw;
+    int use_hw512; /* VAES/AVX-512 variant of the hardware path (x86-64) */
 } PHTE_BASE;
 
 /* --- endianness-explicit helpers (byte loops, so cut points do not depend
@@ -130,8 +132,32 @@ phte_aes1_ni(const uint8_t rk[11][16], __m128i b)
     return _mm_aesenclast_si128(b, _mm_loadu_si128((const __m128i *)rk[10]));
 }
 
+/* VAES/AVX-512 variant of the hardware path (4 AES blocks per instruction).
+ * __builtin_cpu_supports("vaes") needs GCC >= 11 / clang >= 14; older
+ * compilers simply keep the 128-bit AES-NI path. */
+#if (defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 11) || (defined(__clang__) && __clang_major__ >= 14)
+#define PHTE_HAVE_HW512 1
+#define PHTE_KIND_HW512 "vaes"
+
+static int phte_hw512_available(void)
+{
+    /* BORG_PHTE_NO_VAES caps the AES chunkers at the 128-bit AES-NI path
+     * (for benchmarking the paths against each other); it is read at
+     * context creation, ""/"0" mean off. */
+    const char *e;
+    if (!__builtin_cpu_supports("avx512f") || !__builtin_cpu_supports("vaes"))
+        return 0;
+    e = getenv("BORG_PHTE_NO_VAES");
+    return e == NULL || e[0] == 0 || strcmp(e, "0") == 0;
+}
+#endif
+
 #else
 #define PHTE_HAVE_HW 0
+#endif
+
+#ifndef PHTE_HAVE_HW512
+#define PHTE_HAVE_HW512 0
 #endif
 
 /* --- context base management ------------------------------------------- */
@@ -146,6 +172,11 @@ static int phte_base_init(PHTE_BASE *b, const uint8_t aes_key[16], int force_sw)
 #else
     (void)force_sw;
     b->use_hw = 0;
+#endif
+#if PHTE_HAVE_HW512
+    b->use_hw512 = b->use_hw && phte_hw512_available();
+#else
+    b->use_hw512 = 0;
 #endif
     b->evp = EVP_CIPHER_CTX_new();
     if (b->evp == NULL)
@@ -169,6 +200,10 @@ static void phte_base_free(PHTE_BASE *b)
 
 static const char *phte_base_kind(const PHTE_BASE *b)
 {
+#if PHTE_HAVE_HW512
+    if (b->use_hw512)
+        return PHTE_KIND_HW512;
+#endif
 #if PHTE_HAVE_HW
     if (b->use_hw)
         return PHTE_KIND_HW;

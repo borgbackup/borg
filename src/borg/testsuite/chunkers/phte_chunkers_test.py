@@ -61,7 +61,7 @@ def test_kernels_identical(chunker_spec):
         del os.environ[env_var]
     assert sizes_default == sizes_evp
     # whatever kernel was selected by default, it must be a known one
-    assert default.kernel in ("aes-arm64", "aes-ni", "evp")
+    assert default.kernel in ("aes-arm64", "vaes", "aes-ni", "evp")
 
 
 def test_chunksize_distribution(chunker_spec):

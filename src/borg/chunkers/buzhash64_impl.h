@@ -27,7 +27,7 @@ size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
                  const uint8_t *p_rem, const uint8_t *p_add,
                  size_t n, uint64_t *sum, uint64_t mask, int force_scalar);
 
-/* Name of the kernel bz64_scan would use: "neon", "avx2", "blocked" or "scalar". */
+/* Name of the kernel bz64_scan would use: "neon", "avx512", "avx2", "blocked" or "scalar". */
 const char *bz64_kernel_name(int force_scalar);
 
 #endif

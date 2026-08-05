@@ -43,7 +43,7 @@ GL_CTX *gl_new(const uint64_t *tables, uint64_t k1, uint64_t k2, const uint8_t a
 
 void gl_free(GL_CTX *ctx);
 
-/* Which path this context uses: "aes-arm64", "aes-ni" or "evp". */
+/* Which path this context uses: "aes-arm64", "vaes", "aes-ni" or "evp". */
 const char *gl_kind(const GL_CTX *ctx);
 
 /* Full (non-rolling) polynomial hash of the 64 bytes at q (Horner): the

@@ -19,9 +19,11 @@
  *  - a portable path batching digests through OpenSSL EVP AES-128-ECB,
  *  - a hardware path using AES instructions directly (arm64 crypto extension,
  *    x86-64 AES-NI), which interleaves the serial rolling-hash chain with
- *    pipelined AES so the AES work is (mostly) hidden behind it.
+ *    pipelined AES so the AES work is (mostly) hidden behind it,
+ *  - a VAES/AVX-512 variant of the x86-64 hardware path (runtime-detected)
+ *    encrypting 4 AES blocks per instruction.
  *
- * Both paths produce bit-identical cut points.
+ * All paths produce bit-identical cut points.
  */
 
 #define PH_CAT2(a, b) a##b
@@ -105,11 +107,12 @@ static int64_t PH_FN(scan_evp)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *
 
 /* --- hardware paths ----------------------------------------------------
  *
- * Both hardware paths process groups of 8 positions: the two rolling lanes
- * advance 4 stride-2 steps each (two independent dependency chains), then the
- * 8 digests are encrypted with interleaved AES instructions, which execute on
- * different ports than the rolling work and thus overlap with the next
- * group's.
+ * The 128-bit hardware paths process groups of 8 positions (the VAES/AVX-512
+ * path below uses the same structure with groups of 32): the two rolling
+ * lanes advance 4 stride-2 steps each (two independent dependency chains),
+ * then the 8 digests are encrypted with interleaved AES instructions, which
+ * execute on different ports than the rolling work and thus overlap with the
+ * next group's.
  *
  * Loop invariant: entering a group at position i, db = digest at i and
  * da = digest at i+1 (both already computed); the group emits digests for
@@ -334,10 +337,130 @@ PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t
 
 #endif /* PHTE_HAVE_HW */
 
+#if PHTE_HAVE_HW512
+
+/* VAES/AVX-512 variant of the x86-64 hardware path: the same two rolling
+ * lanes, but groups of 32 positions whose digests are encrypted as 8 zmm
+ * vectors of 4 AES blocks each - 4x fewer AES instructions than the 128-bit
+ * path, the round keys stay register-resident (32 zmm registers instead of
+ * 16 xmm, so no per-round key reloads), and the 8 independent chains hide
+ * the vaesenc latency (2 chains would be latency-bound). vpexpandq places a
+ * vector's 4 digests into its block-low qwords in one instruction, and a
+ * masked vptestnmq tests the 4 ciphertext-low qwords against the mask
+ * without extracting. Every digest is exact and every position is tested,
+ * so cut points stay bit-identical to the other paths. */
+__attribute__((target("aes,sse2,vaes,avx512f"))) static int64_t
+PH_FN(scan_hw512)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
+{
+    __m512i k[11];
+    __m512i M = _mm512_set1_epi64((long long)mask);
+    uint64_t d = *digest, da, db;
+    const uint8_t *qo = p - 64;
+    size_t i = 0;
+    int lanes_live = 0;
+
+    /* broadcast each 128-bit round key to all four block lanes */
+    for (int j = 0; j < 11; j++)
+        k[j] = _mm512_broadcast_i32x4(_mm_loadu_si128((const __m128i *)c->base.rk[j]));
+
+    if (n >= 34) {
+        db = PH_ROLL(c, d, qo[0], p[0]);               /* d_0 */
+        da = PH_ROLL2(c, d, qo[0], qo[1], p[0], p[1]); /* d_1 */
+        lanes_live = 1;
+    }
+
+    while (lanes_live && i + 34 <= n) {
+        uint64_t dg[32];
+        __m512i b0, b1, b2, b3, b4, b5, b6, b7;
+        __mmask8 h0, h1, h2, h3, h4, h5, h6, h7;
+
+        dg[0] = db;
+        dg[1] = da;
+        for (int j = 2; j < 32; j += 2) {
+            db = PH_ROLL2(c, db, qo[i + j - 1], qo[i + j], p[i + j - 1], p[i + j]);
+            dg[j] = db;
+            da = PH_ROLL2(c, da, qo[i + j], qo[i + j + 1], p[i + j], p[i + j + 1]);
+            dg[j + 1] = da;
+        }
+        /* prepare the next group's invariant (digests at i+32, i+33) */
+        db = PH_ROLL2(c, db, qo[i + 31], qo[i + 32], p[i + 31], p[i + 32]);
+        da = PH_ROLL2(c, da, qo[i + 32], qo[i + 33], p[i + 32], p[i + 33]);
+
+        /* qword lanes 0,2,4,6 take 4 digests, lanes 1,3,5,7 stay zero
+         * (= AES input block bytes 8..15, as in the other paths) */
+        b0 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg), k[0]);
+        b1 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 4), k[0]);
+        b2 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 8), k[0]);
+        b3 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 12), k[0]);
+        b4 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 16), k[0]);
+        b5 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 20), k[0]);
+        b6 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 24), k[0]);
+        b7 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 28), k[0]);
+        for (int r = 1; r < 10; r++) {
+            b0 = _mm512_aesenc_epi128(b0, k[r]);
+            b1 = _mm512_aesenc_epi128(b1, k[r]);
+            b2 = _mm512_aesenc_epi128(b2, k[r]);
+            b3 = _mm512_aesenc_epi128(b3, k[r]);
+            b4 = _mm512_aesenc_epi128(b4, k[r]);
+            b5 = _mm512_aesenc_epi128(b5, k[r]);
+            b6 = _mm512_aesenc_epi128(b6, k[r]);
+            b7 = _mm512_aesenc_epi128(b7, k[r]);
+        }
+        h0 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b0, k[10]), M);
+        h1 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b1, k[10]), M);
+        h2 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b2, k[10]), M);
+        h3 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b3, k[10]), M);
+        h4 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b4, k[10]), M);
+        h5 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b5, k[10]), M);
+        h6 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b6, k[10]), M);
+        h7 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b7, k[10]), M);
+
+        if (h0 | h1 | h2 | h3 | h4 | h5 | h6 | h7) {
+            /* block j of vector g is qword lane 2j and position i + 4g + j */
+            const uint8_t hs[8] = {h0, h1, h2, h3, h4, h5, h6, h7};
+            for (int j = 0; j < 32; j++) {
+                if ((hs[j >> 2] >> ((j & 3) * 2)) & 1) {
+                    *digest = dg[j];
+                    return (int64_t)(i + j);
+                }
+            }
+        }
+        i += 32;
+    }
+    /* tail: single positions, exactly as in the 128-bit path */
+    if (lanes_live && i < n) {
+        __m128i b = phte_aes1_ni(c->base.rk, _mm_set_epi64x(0, (long long)db));
+        if (((uint64_t)_mm_cvtsi128_si64(b) & mask) == 0) {
+            *digest = db;
+            return (int64_t)i;
+        }
+        d = db;
+        i++;
+    }
+    while (i < n) {
+        __m128i b;
+        d = PH_ROLL(c, d, qo[i], p[i]);
+        b = phte_aes1_ni(c->base.rk, _mm_set_epi64x(0, (long long)d));
+        if (((uint64_t)_mm_cvtsi128_si64(b) & mask) == 0) {
+            *digest = d;
+            return (int64_t)i;
+        }
+        i++;
+    }
+    *digest = d;
+    return -1;
+}
+
+#endif /* PHTE_HAVE_HW512 */
+
 /* --- dispatch (exported) ------------------------------------------------ */
 
 int64_t PH_FN(scan)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
 {
+#if PHTE_HAVE_HW512
+    if (c->base.use_hw512)
+        return PH_FN(scan_hw512)(c, p, n, digest, mask);
+#endif
 #if PHTE_HAVE_HW
     if (c->base.use_hw)
         return PH_FN(scan_hw)(c, p, n, digest, mask);

@@ -155,7 +155,7 @@ cdef class ChunkerBuzHash64(ChunkerBase):
 
     @property
     def kernel(self):
-        """Which scan kernel this chunker uses: 'neon', 'avx2', 'blocked' or 'scalar'."""
+        """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blocked' or 'scalar'."""
         return (<bytes>bz64_kernel_name(self.force_scalar)).decode("ascii")
 
     cdef object process(self):

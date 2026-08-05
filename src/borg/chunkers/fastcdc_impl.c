@@ -21,9 +21,11 @@
  * which an exact sequential recheck of the block resolves. The per-lane
  * masks (mask << 7 .. mask << 0) are constants of the scan.
  *
- * All kernels (sequential, blocked scalar, NEON, AVX2) return bit-identical
- * cut positions and fp values; the chunker's golden tests depend on this. */
+ * All kernels (sequential, blocked scalar, NEON, AVX2, AVX-512) return
+ * bit-identical cut positions and fp values; the chunker's golden tests
+ * depend on this. */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "fastcdc_impl.h"
@@ -214,8 +216,62 @@ fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, 
     return -1;
 }
 
+/* --- AVX-512 (x86-64, runtime detected) --------------------------------- */
+
+#define FC_KIND_512 "avx512"
+
+/* The same 8-lane candidate test as the AVX2 kernel, in one 512-bit vector:
+ * vptestnmq fuses the AND and the ==0 test per lane into a mask register,
+ * so the whole test is broadcast + load + add + testn + branch. Only the
+ * test narrows; the scalar prefix work (fc_block_prefix) is shared. */
+__attribute__((target("avx512f"))) static int64_t
+fc_scan_simd512(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
+{
+    uint64_t fp = *fp_io;
+    uint64_t s[8];
+    /* _mm512_set_epi64 takes arguments high lane first: lane j = mask << (7-j) */
+    __m512i M = _mm512_set_epi64((long long)mask, (long long)(mask << 1),
+                                 (long long)(mask << 2), (long long)(mask << 3),
+                                 (long long)(mask << 4), (long long)(mask << 5),
+                                 (long long)(mask << 6), (long long)(mask << 7));
+    size_t i = 0;
+
+    for (; i + 8 <= n; i += 8) {
+        fc_block_prefix(gear, p + i, s);
+        uint64_t c = fp << 8;
+        __m512i H = _mm512_add_epi64(_mm512_set1_epi64((long long)c),
+                                     _mm512_loadu_si512((const void *)s));
+        if (_mm512_testn_epi64_mask(H, M)) {
+            int64_t r = fc_scan_seq(gear, p + i, 8, &fp, mask); /* exact recheck */
+            if (r >= 0) {
+                *fp_io = fp;
+                return (int64_t)i + r;
+            }
+        } else {
+            fp = c + s[7];
+        }
+    }
+    if (i < n) {
+        int64_t r = fc_scan_seq(gear, p + i, n - i, &fp, mask);
+        if (r >= 0) {
+            *fp_io = fp;
+            return (int64_t)i + r;
+        }
+    }
+    *fp_io = fp;
+    return -1;
+}
+
 static int fc_simd_available(void)
 {
+    /* BORG_FASTCDC_NO_AVX512 caps dispatch at AVX2 (for benchmarking the
+     * kernels against each other); like the detection itself it is read
+     * once per process, so it must be set before the first chunker use. */
+    if (__builtin_cpu_supports("avx512f")) {
+        const char *e = getenv("BORG_FASTCDC_NO_AVX512");
+        if (e == NULL || e[0] == 0 || strcmp(e, "0") == 0)
+            return 2;
+    }
     return __builtin_cpu_supports("avx2");
 }
 
@@ -236,7 +292,8 @@ static int fc_simd_available(void)
 
 /* --- dispatch ----------------------------------------------------------- */
 
-/* resolved once; a racy double-init writes the same value, so it is benign */
+/* resolved once (0 = blocked, 1 = FC_KIND, 2 = FC_KIND_512 where defined);
+ * a racy double-init writes the same value, so it is benign */
 static int fc_use_simd = -1;
 
 int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int force_scalar)
@@ -245,6 +302,10 @@ int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, 
         return fc_scan_seq(gear, p, n, fp, mask);
     if (fc_use_simd < 0)
         fc_use_simd = fc_simd_available();
+#ifdef FC_KIND_512
+    if (fc_use_simd == 2)
+        return fc_scan_simd512(gear, p, n, fp, mask);
+#endif
     if (fc_use_simd)
         return fc_scan_simd(gear, p, n, fp, mask);
     return fc_scan_blocked(gear, p, n, fp, mask);
@@ -256,5 +317,9 @@ const char *fc_kernel_name(int force_scalar)
         return "scalar";
     if (fc_use_simd < 0)
         fc_use_simd = fc_simd_available();
+#ifdef FC_KIND_512
+    if (fc_use_simd == 2)
+        return FC_KIND_512;
+#endif
     return fc_use_simd ? FC_KIND : "blocked";
 }

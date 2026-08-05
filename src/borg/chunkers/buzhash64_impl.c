@@ -22,14 +22,15 @@
  * also removes one rotate per byte from the sequential path.
  *
  * Kernel dispatch mirrors fastcdc_impl.c: NEON on aarch64 (baseline there),
- * AVX2 on x86-64 (runtime-detected), blocked scalar elsewhere, sequential
- * when forced. Measured on Apple M-series (64 MiB, window 4095, 21-bit
+ * AVX-512 or AVX2 on x86-64 (runtime-detected), blocked scalar elsewhere,
+ * sequential when forced. Measured on Apple M-series (64 MiB, window 4095, 21-bit
  * mask): sequential 1150, blocked scalar 2340, NEON 2260 MB/s - NEON and
  * blocked are a tie here (throughput and energy, within noise), because the
  * XOR/AND/compare test also runs well on the scalar ALUs; the symmetric
  * dispatch is kept for consistency across the SIMD chunker kernels.
  * All kernels return bit-identical results. */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "buzhash64_impl.h"
@@ -209,8 +210,56 @@ bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
     return j;
 }
 
+/* --- AVX-512 (x86-64, runtime detected) ---------------------------------- */
+
+#define BZ_KIND_512 "avx512"
+
+/* The same 8-lane test as the AVX2 kernel in one 512-bit vector: vptestnmq
+ * fuses the AND and the ==0 test per lane into a mask register. Only the
+ * test narrows; the scalar prefix work (bz64_block_prefix) is shared. */
+__attribute__((target("avx512f"))) static size_t
+bz64_scan_simd512(const uint64_t *T, const uint64_t *Trot,
+                  const uint8_t *pr, const uint8_t *pa,
+                  size_t n, uint64_t *sum_io, uint64_t mask)
+{
+    uint64_t sum = *sum_io;
+    uint64_t s[8];
+    size_t j = 0;
+    /* _mm512_set_epi64 takes arguments high lane first: lane k = ROTL(mask, 7-k) */
+    __m512i M = _mm512_set_epi64((long long)mask, (long long)BZ_ROTL(mask, 1),
+                                 (long long)BZ_ROTL(mask, 2), (long long)BZ_ROTL(mask, 3),
+                                 (long long)BZ_ROTL(mask, 4), (long long)BZ_ROTL(mask, 5),
+                                 (long long)BZ_ROTL(mask, 6), (long long)BZ_ROTL(mask, 7));
+
+    while (j + 8 <= n && (sum & mask) != 0) {
+        bz64_block_prefix(T, Trot, pr + j, pa + j, s);
+        uint64_t c = BZ_ROTL(sum, 8);
+        __m512i H = _mm512_xor_si512(_mm512_set1_epi64((long long)c),
+                                     _mm512_loadu_si512((const void *)s));
+        if (_mm512_testn_epi64_mask(H, M)) {
+            size_t r = bz64_scan_seq(T, Trot, pr + j, pa + j, 8, &sum, mask); /* exact re-scan */
+            *sum_io = sum;
+            return j + r;
+        }
+        sum = c ^ s[7];
+        j += 8;
+    }
+    if (j < n)
+        j += bz64_scan_seq(T, Trot, pr + j, pa + j, n - j, &sum, mask);
+    *sum_io = sum;
+    return j;
+}
+
 static int bz64_simd_available(void)
 {
+    /* BORG_BUZHASH64_NO_AVX512 caps dispatch at AVX2 (for benchmarking the
+     * kernels against each other); like the detection itself it is read
+     * once per process, so it must be set before the first chunker use. */
+    if (__builtin_cpu_supports("avx512f")) {
+        const char *e = getenv("BORG_BUZHASH64_NO_AVX512");
+        if (e == NULL || e[0] == 0 || strcmp(e, "0") == 0)
+            return 2;
+    }
     return __builtin_cpu_supports("avx2");
 }
 
@@ -233,7 +282,8 @@ static int bz64_simd_available(void)
 
 /* --- dispatch ----------------------------------------------------------- */
 
-/* resolved once; a racy double-init writes the same value, so it is benign */
+/* resolved once (0 = blocked, 1 = BZ_KIND, 2 = BZ_KIND_512 where defined);
+ * a racy double-init writes the same value, so it is benign */
 static int bz64_use_simd = -1;
 
 size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
@@ -244,6 +294,10 @@ size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
         return bz64_scan_seq(table, table_rot, p_rem, p_add, n, sum, mask);
     if (bz64_use_simd < 0)
         bz64_use_simd = bz64_simd_available();
+#ifdef BZ_KIND_512
+    if (bz64_use_simd == 2)
+        return bz64_scan_simd512(table, table_rot, p_rem, p_add, n, sum, mask);
+#endif
     if (bz64_use_simd)
         return bz64_scan_simd(table, table_rot, p_rem, p_add, n, sum, mask);
     return bz64_scan_blocked(table, table_rot, p_rem, p_add, n, sum, mask);
@@ -255,5 +309,9 @@ const char *bz64_kernel_name(int force_scalar)
         return "scalar";
     if (bz64_use_simd < 0)
         bz64_use_simd = bz64_simd_available();
+#ifdef BZ_KIND_512
+    if (bz64_use_simd == 2)
+        return BZ_KIND_512;
+#endif
     return bz64_use_simd ? BZ_KIND : "blocked";
 }

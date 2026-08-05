@@ -40,7 +40,7 @@ RA_CTX *ra_new(const uint64_t *tables, const uint8_t aes_key[16], int force_sw);
 
 void ra_free(RA_CTX *ctx);
 
-/* Which path this context uses: "aes-arm64", "aes-ni" or "evp". */
+/* Which path this context uses: "aes-arm64", "vaes", "aes-ni" or "evp". */
 const char *ra_kind(const RA_CTX *ctx);
 
 /* Full (non-rolling) Rabin digest of the 64 bytes at q: the window warm-up at

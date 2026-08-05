@@ -1,3 +1,5 @@
+import sys
+import threading
 from tempfile import TemporaryFile
 
 import pytest
@@ -81,3 +83,50 @@ class TestLRUCache:
         c.clear()
         assert c.items() == set()
         assert f3.closed
+
+    def test_pop(self):
+        disposed = []
+        c = LRUCache(2, dispose=disposed.append)
+        c["a"] = 1
+        assert c.pop("a") == 1  # pop hands the value to the caller, so it is not disposed
+        assert disposed == []
+        assert "a" not in c
+        assert c.pop("a", "default") == "default"
+        with pytest.raises(KeyError):
+            c.pop("a")
+
+    def test_threaded_access(self):
+        # several threads sharing one cache must not corrupt it or raise: they hit the same
+        # keys, so they race on inserting, refreshing, evicting and removing the same entries.
+        # e.g. popping via MutableMapping (get, then delete) raises KeyError here when
+        # another thread removes the key in between.
+        c: LRUCache = LRUCache(8)
+        keys = list(range(16))  # more keys than capacity, so entries keep getting evicted
+        errors: list[Exception] = []
+        start = threading.Barrier(8)
+
+        def worker(n):
+            start.wait()
+            try:
+                for _round in range(2000):
+                    for key in keys:
+                        c[key] = n
+                        c.get(key)
+                        c.pop(key, None)
+            except Exception as e:
+                errors.append(e)
+
+        # the default switch interval (5 ms) is longer than these loops, so threads would
+        # hardly ever switch inside one cache operation and the races would not show up.
+        previous_interval = sys.getswitchinterval()
+        sys.setswitchinterval(1e-6)
+        try:
+            threads = [threading.Thread(target=worker, args=(n,)) for n in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        finally:
+            sys.setswitchinterval(previous_interval)
+        assert errors == []
+        assert len(c) <= 8

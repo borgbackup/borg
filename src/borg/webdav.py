@@ -13,15 +13,14 @@ optional dependencies.
 
 import html
 import mimetypes
-import os
 import re
 import stat
 import tarfile
 import threading
-import unicodedata
 from datetime import datetime, timezone
 from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import NamedTuple
 from urllib.parse import parse_qs, quote, unquote_to_bytes
 from xml.etree import ElementTree as ET  # nosec B405 # only used to *build* response XML, never to parse input
 from xml.parsers import expat
@@ -29,177 +28,26 @@ from xml.parsers import expat
 from . import __version__
 from .archive import Archive
 from .constants import *  # NOQA
-from .helpers import bin_to_hex, remove_surrogates, HardLinkManager
-from .helpers.lrucache import LRUCache
+from .helpers import remove_surrogates, HardLinkManager
 from .logger import create_logger
+from .vfs import ArchiveVFS, ChunkMissing, DEFAULT_DIR_MODE
 
 logger = create_logger(__name__)
 
-DEFAULT_DIR_MODE = 0o40755
 
+class Resource(NamedTuple):
+    """What this server needs to know about one file system object it serves.
 
-class Node:
-    """A node in an archive's directory tree: a directory (children is a dict) or a leaf."""
-
-    __slots__ = ("mode", "mtime", "size", "chunks", "target", "children", "nfc_names")
-
-    def __init__(self, mode, mtime=0, size=0, chunks=None, target=None, children=None):
-        self.mode = mode
-        self.mtime = mtime  # ns
-        self.size = size
-        self.chunks = chunks
-        self.target = target  # symlink target
-        self.children = children  # {name(str): Node} for directories, None otherwise
-        self.nfc_names = None  # lazily built by lookup_child(), see there
-
-    @property
-    def is_dir(self):
-        return self.children is not None
-
-
-def nfc(name):
-    """NFC-normalize *name*; names with surrogates (non-UTF-8 bytes) pass through unchanged."""
-    return unicodedata.normalize("NFC", name)
-
-
-def lookup_child(node, name):
-    """Return (child_name, child_node) for *name* in directory *node*. Raises KeyError.
-
-    An exact match always wins. If there is none, we retry comparing Unicode NFC forms:
-    file systems disagree about normalization (macOS decomposes, so its WebDAV client asks
-    for "gru<combining diaeresis>..." where the archive stores "grü..."), and an exact-only
-    lookup would answer 404 for a file the client just saw in our listing.
-
-    The NFC index is built lazily (only for directories that actually get such a request)
-    and skips names that are ambiguous, i.e. where several different names share one NFC
-    form - those keep requiring an exact match, so we never silently serve the wrong file.
-    """
-    try:
-        return name, node.children[name]
-    except KeyError:
-        pass
-    if node.nfc_names is None:
-        index = {}
-        for child_name in node.children:
-            key = nfc(child_name)
-            index[key] = None if key in index else child_name  # None marks an ambiguous key
-        node.nfc_names = index
-    child_name = node.nfc_names.get(nfc(name))
-    if child_name is None:
-        raise KeyError(name)
-    return child_name, node.children[child_name]
-
-
-class ArchiveVFS:
-    """Read-only view of the archives selected by the archive filter args.
-
-    The top level maps (deduplicated) archive names to lazily built directory trees.
-    All repository access happens under repo_lock, because borgstore connections are
-    not thread-safe.
+    The tree itself lives in the (shared) archive VFS - this is just the flat view
+    of one node of it that building a listing, a PROPFIND response or a download
+    needs, so we do not look up the same item metadata over and over.
     """
 
-    def __init__(self, manifest, args, repo_lock):
-        self.manifest = manifest
-        self.repo_lock = repo_lock
-        archives = manifest.archives.list_considering(args)
-        # deduplicate archive names (archives of a series all share the same name)
-        name_counter = {}
-        for archive in archives:
-            name_counter[archive.name] = name_counter.get(archive.name, 0) + 1
-        self.archives = {}  # display name -> ArchiveInfo
-        for archive in archives:
-            name = archive.name
-            if name_counter[name] > 1:
-                name += f"-{bin_to_hex(archive.id):.8}"
-            self.archives[name] = archive
-        self._trees = {}  # display name -> (root Node, DownloadPipeline)
-        self.nfc_archives = None  # lazily built by lookup_archive(), see there
-        timestamps = [archive.ts for archive in archives]
-        self.root_mtime = int(max(timestamps).timestamp() * 1e9) if timestamps else 0
-
-    def get_root(self, name):
-        """Return (root Node, pipeline) for archive *name*, building the tree on first access."""
-        try:
-            return self._trees[name]
-        except KeyError:
-            pass
-        archive_info = self.archives[name]  # may raise KeyError -> 404
-        with self.repo_lock:
-            if name not in self._trees:  # re-check under lock
-                self._trees[name] = self._build_tree(archive_info)
-        return self._trees[name]
-
-    def _build_tree(self, archive_info):
-        logger.debug("webdav: building tree for archive %s ...", remove_surrogates(archive_info.name))
-        archive = Archive(self.manifest, archive_info.id)
-        archive_mtime = int(archive_info.ts.timestamp() * 1e9)
-        root = Node(DEFAULT_DIR_MODE, mtime=archive_mtime, children={})
-        for item in archive.iter_items():
-            segments = [s for s in item.path.split("/") if s]
-            if not segments:
-                continue
-            node = root
-            for segment in segments[:-1]:
-                child = node.children.get(segment)
-                if child is None or not child.is_dir:
-                    # intermediate directory not (yet) seen as an item: synthesize it
-                    child = Node(DEFAULT_DIR_MODE, mtime=archive_mtime, children={})
-                    node.children[segment] = child
-                node = child
-            name = segments[-1]
-            if stat.S_ISDIR(item.mode):
-                existing = node.children.get(name)
-                if existing is not None and existing.is_dir:
-                    # was synthesized before the dir item was seen: update metadata in place
-                    existing.mode = item.mode
-                    existing.mtime = item.mtime
-                else:
-                    node.children[name] = Node(item.mode, mtime=item.mtime, children={})
-            else:
-                node.children[name] = Node(
-                    item.mode,
-                    mtime=item.mtime,
-                    size=item.get_size(),
-                    chunks=item.get("chunks"),
-                    target=item.get("target"),
-                )
-        return root, archive.pipeline
-
-    def resolve(self, segments):
-        """Resolve path segments (first one is the archive name) to (Node, pipeline, canonical).
-
-        *canonical* are the segments as they are actually stored in the archive: a client may
-        address a path in a different Unicode normalization than the archive uses (see
-        lookup_child()), and the stored spelling is what path-based operations (e.g. the tar
-        download, which matches item paths) have to use.
-
-        Raises KeyError if not found.
-        """
-        archive_name = self.lookup_archive(segments[0])
-        root, pipeline = self.get_root(archive_name)
-        node = root
-        canonical = [archive_name]
-        for segment in segments[1:]:
-            if not node.is_dir:
-                raise KeyError(segment)
-            name, node = lookup_child(node, segment)
-            canonical.append(name)
-        return node, pipeline, canonical
-
-    def lookup_archive(self, name):
-        """Return the stored archive name matching *name*. Raises KeyError if there is none."""
-        if name in self.archives:
-            return name
-        if self.nfc_archives is None:
-            index = {}
-            for archive_name in self.archives:
-                key = nfc(archive_name)
-                index[key] = None if key in index else archive_name
-            self.nfc_archives = index
-        archive_name = self.nfc_archives.get(nfc(name))
-        if archive_name is None:
-            raise KeyError(name)
-        return archive_name
+    is_dir: bool
+    mode: int
+    mtime: int  # ns
+    size: int
+    target: str | None  # symlink target
 
 
 def strip_crlf(value):
@@ -240,9 +88,9 @@ def guess_content_type(name):
     return mimetypes.guess_type(remove_surrogates(name), strict=False)[0] or "application/octet-stream"
 
 
-def make_etag(node):
+def make_etag(res):
     # archive contents are immutable, so mtime+size identify the content well enough.
-    return f'"{node.mtime:x}-{node.size:x}"'
+    return f'"{res.mtime:x}-{res.size:x}"'
 
 
 def parse_byte_range(header, size):
@@ -357,33 +205,33 @@ def parse_propfind(body):
     return "allprop", None  # allprop, maybe with an include element
 
 
-def make_prop_element(tag, name, node):
-    """Build the XML element for live property *tag* of resource *node*.
+def make_prop_element(tag, name, res):
+    """Build the XML element for live property *tag* of resource *res*.
 
     Returns None if the property is not defined for this resource.
     """
     elem = ET.Element(tag)
     if tag == "{DAV:}resourcetype":
-        if node.is_dir:
+        if res.is_dir:
             ET.SubElement(elem, "{DAV:}collection")
     elif tag == "{DAV:}displayname":
         elem.text = remove_surrogates(name)
     elif tag == "{DAV:}getlastmodified":
-        elem.text = http_date(node.mtime)
+        elem.text = http_date(res.mtime)
     elif tag == "{DAV:}creationdate":
-        elem.text = iso8601(node.mtime)
+        elem.text = iso8601(res.mtime)
     elif tag == "{DAV:}getcontentlength":
-        if node.is_dir:
+        if res.is_dir:
             return None
-        elem.text = str(node.size)
+        elem.text = str(res.size)
     elif tag == "{DAV:}getcontenttype":
-        if node.is_dir:
+        if res.is_dir:
             return None
         elem.text = guess_content_type(name)
     elif tag == "{DAV:}getetag":
-        if node.is_dir:
+        if res.is_dir:
             return None
-        elem.text = make_etag(node)
+        elem.text = make_etag(res)
     elif tag in ("{DAV:}supportedlock", "{DAV:}lockdiscovery"):
         pass  # empty elements: locking is not supported
     else:
@@ -394,22 +242,22 @@ def make_prop_element(tag, name, node):
 def render_multistatus(resources, mode, requested):
     """Render a PROPFIND result as a multistatus XML document (bytes).
 
-    *resources* is a list of (href, displayname, node) tuples, *mode* / *requested*
+    *resources* is a list of (href, displayname, Resource) tuples, *mode* / *requested*
     are the parse_propfind() results.
     """
     multistatus = ET.Element("{DAV:}multistatus")
-    for href, name, node in resources:
+    for href, name, res in resources:
         response = ET.SubElement(multistatus, "{DAV:}response")
         ET.SubElement(response, "{DAV:}href").text = href
         found = ET.Element("{DAV:}prop")
         missing = ET.Element("{DAV:}prop")
         if mode == "propname":
             for tag in DAV_PROPS:
-                if make_prop_element(tag, name, node) is not None:
+                if make_prop_element(tag, name, res) is not None:
                     ET.SubElement(found, tag)
         else:
             for tag in DAV_PROPS if mode == "allprop" else requested:
-                elem = make_prop_element(tag, name, node)
+                elem = make_prop_element(tag, name, res)
                 if elem is not None:
                     found.append(elem)
                 else:
@@ -549,9 +397,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
     sys_version = ""  # do not tell clients about the python version we use
 
     # set on the handler class by make_server():
-    vfs = None
-    repo_lock = None
-    data_cache = None  # LRUCache: chunk id -> decrypted chunk data, shared across requests
+    vfs = None  # the shared archive VFS, see vfs.py
 
     def version_string(self):
         # the base class would append sys_version, giving a trailing space if it is empty.
@@ -652,11 +498,12 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         try:
             # use the canonical (as stored in the archive) segments from here on, so that a
             # request in a different Unicode normalization still names the stored items.
-            node, pipeline, segments = self.vfs.resolve(segments)
+            segments, node = self.vfs.resolve(segments)
         except KeyError:
             self.send_error(404)
             return
-        if node.is_dir:
+        res = self._resource(node)
+        if res.is_dir:
             if not dir_syntax:
                 self._redirect_to_dir(segments)
                 return
@@ -664,14 +511,21 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 self._send_tar(segments, head)
                 return
             self._send_dir_listing(segments, node, head)
-        elif stat.S_ISREG(node.mode):
-            self._send_file(segments[-1], node, pipeline, head)
-        elif stat.S_ISLNK(node.mode):
+        elif stat.S_ISREG(res.mode):
+            self._send_file(segments[-1], node, res, head)
+        elif stat.S_ISLNK(res.mode):
             self.send_error(
-                403, explain=f"symbolic link (target: {remove_surrogates(node.target or '?')}), not downloadable"
+                403, explain=f"symbolic link (target: {remove_surrogates(res.target or '?')}), not downloadable"
             )
         else:
             self.send_error(403, explain="special file, not downloadable")
+
+    def _resource(self, node):
+        """Return the Resource describing *node*."""
+        item = self.vfs.get_item(node.ino)
+        return Resource(
+            is_dir=node.is_dir, mode=item.mode, mtime=item.mtime, size=item.get_size(), target=item.get("target")
+        )
 
     def _handle_propfind(self):
         body = self._read_body()
@@ -704,29 +558,32 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         self.wfile.write(result)
 
     def _propfind_resources(self, segments, depth):
-        """Return the [(href, displayname, node), ...] a PROPFIND on *segments* refers to."""
+        """Return the [(href, displayname, Resource), ...] a PROPFIND on *segments* refers to."""
         resources = []
         if not segments:  # server root: the list of archives
-            resources.append(("/", "/", Node(DEFAULT_DIR_MODE, mtime=self.vfs.root_mtime, children={})))
+            resources.append(("/", "/", Resource(True, DEFAULT_DIR_MODE, self.vfs.root_mtime, 0, None)))
             if depth == "1":
                 for name in sorted(self.vfs.archives):
                     archive_info = self.vfs.archives[name]
-                    node = Node(DEFAULT_DIR_MODE, mtime=int(archive_info.ts.timestamp() * 1e9), children={})
-                    resources.append(("/" + encode_path(name) + "/", name, node))
+                    mtime_ns = int(archive_info.ts.timestamp() * 1e9)
+                    res = Resource(True, DEFAULT_DIR_MODE, mtime_ns, 0, None)
+                    resources.append(("/" + encode_path(name) + "/", name, res))
             return resources
-        node, _, segments = self.vfs.resolve(segments)  # may raise KeyError
-        if not (node.is_dir or stat.S_ISREG(node.mode)):
+        segments, node = self.vfs.resolve(segments)  # may raise KeyError
+        res = self._resource(node)
+        if not (res.is_dir or stat.S_ISREG(res.mode)):
             raise KeyError(segments[-1])  # symlinks and special files are not exposed via WebDAV
         base = "/" + "/".join(encode_path(s) for s in segments)
-        if not node.is_dir:
-            return [(base, segments[-1], node)]
-        resources.append((base + "/", segments[-1], node))
+        if not res.is_dir:
+            return [(base, segments[-1], res)]
+        resources.append((base + "/", segments[-1], res))
         if depth == "1":
-            for name, child in sorted(node.children.items()):
-                if child.is_dir:
-                    resources.append((f"{base}/{encode_path(name)}/", name, child))
-                elif stat.S_ISREG(child.mode):
-                    resources.append((f"{base}/{encode_path(name)}", name, child))
+            for name, child in sorted(self.vfs.children(node), key=lambda kv: kv[0]):
+                child_res = self._resource(child)
+                if child_res.is_dir:
+                    resources.append((f"{base}/{encode_path(name)}/", name, child_res))
+                elif stat.S_ISREG(child_res.mode):
+                    resources.append((f"{base}/{encode_path(name)}", name, child_res))
                 # symlinks and special files are not exposed via WebDAV
         return resources
 
@@ -771,7 +628,8 @@ class WebDAVHandler(BaseHTTPRequestHandler):
             f' (preserves metadata)">{DOWNLOAD_ICON_SVG}</a>'
         )
         rows = [make_row("../", "..")]
-        children = sorted(node.children.items(), key=lambda kv: (not kv[1].is_dir, kv[0]))
+        children = [(name, self._resource(child)) for name, child in self.vfs.children(node)]
+        children.sort(key=lambda kv: (not kv[1].is_dir, kv[0]))  # directories first
         for name, child in children:
             display_name = remove_surrogates(name)
             if child.is_dir:
@@ -787,8 +645,8 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 rows.append(make_row(None, display_name, mtime_ns=child.mtime))
         self._send_page(render_page(title, rows, heading=heading), head)
 
-    def _send_file(self, name, node, pipeline, head):
-        etag = make_etag(node)
+    def _send_file(self, name, node, res, head):
+        etag = make_etag(res)
         if_none_match = self.headers.get("If-None-Match")
         if if_none_match:
             client_tags = [t.strip() for t in if_none_match.split(",")]
@@ -802,78 +660,54 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         if range_header:
             if_range = self.headers.get("If-Range")
             if if_range is None or if_range.strip() == etag:
-                byte_range = parse_byte_range(range_header, node.size)
+                byte_range = parse_byte_range(range_header, res.size)
         if byte_range == "unsatisfiable":
             self.send_response(416)
-            self.send_header("Content-Range", f"bytes */{node.size}")
+            self.send_header("Content-Range", f"bytes */{res.size}")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
         if byte_range:
             start, end = byte_range
             self.send_response(206)
-            self.send_header("Content-Range", f"bytes {start}-{end}/{node.size}")
+            self.send_header("Content-Range", f"bytes {start}-{end}/{res.size}")
         else:
-            start, end = 0, node.size - 1
+            start, end = 0, res.size - 1
             self.send_response(200)
         self.send_header("Content-Type", guess_content_type(name))
-        self.send_header("Content-Length", str(end - start + 1 if node.size else 0))
-        self.send_header("Last-Modified", http_date(node.mtime))
+        self.send_header("Content-Length", str(end - start + 1 if res.size else 0))
+        self.send_header("Last-Modified", http_date(res.mtime))
         self.send_header("ETag", etag)
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("X-Content-Type-Options", "nosniff")
         content_disposition = self._content_disposition(name)  # CR/LF-sanitized, see there
         self.send_header("Content-Disposition", content_disposition)
         self.end_headers()
-        if head or node.size == 0:
+        if head or res.size == 0:
             return  # no body to send (and Content-Length is 0 for an empty file)
-        if not node.chunks:
+        chunks = self.vfs.get_item(node.ino).get("chunks")
+        if not chunks:
             # anomaly: a non-empty file with no chunks list (e.g. corrupted metadata). We
             # already sent Content-Length > 0, so abort the connection instead of leaving
             # the client waiting forever for body bytes that will never arrive.
             logger.error(
-                "webdav: file %s has size %d but no chunks, aborting the connection.",
-                remove_surrogates(name),
-                node.size,
+                "webdav: file %s has size %d but no chunks, aborting the connection.", remove_surrogates(name), res.size
             )
             self.close_connection = True
             return
-        # select only the chunks overlapping the requested range, so nothing else
-        # gets fetched and decrypted (the chunk sizes are known in advance).
-        selected, first_offset, pos = [], 0, 0
-        for entry in node.chunks:
-            if pos + entry.size <= start:
-                pos += entry.size
-                continue
-            if pos > end:
-                break
-            if not selected:
-                first_offset = start - pos
-            selected.append(entry)
-            pos += entry.size
-        remaining = end - start + 1
-        for entry in selected:
-            if remaining <= 0:
-                break
-            # serialize repository and data cache access, but write to the client outside
-            # the lock, so one slow client cannot block other requests for the whole download.
-            with self.repo_lock:
-                data = self._get_chunk(pipeline, entry)
-            if data is None:
-                # chunk missing in repository - never serve silently corrupted data:
-                # abort the connection, the client sees a short read (Content-Length mismatch).
-                logger.error(
-                    "webdav: chunk missing while serving %s, aborting the connection.", remove_surrogates(name)
-                )
-                self.close_connection = True
-                return
-            if first_offset:
-                data = data[first_offset:]
-                first_offset = 0
-            if len(data) > remaining:
-                data = data[:remaining]
-            self.wfile.write(data)
-            remaining -= len(data)
+        # the reader fetches only the chunks overlapping the requested range (the chunk
+        # sizes are known in advance), each one under the repository lock - but we write
+        # to the client outside of it, so one slow client cannot block other requests.
+        # pos_key: a mounted file system reads a big file with many sequential range
+        # requests - remember where in the chunk list they got us.
+        try:
+            for data in self.vfs.reader.iter_data(chunks, start, end - start + 1, pos_key=node.ino):
+                self.wfile.write(data)
+        except ChunkMissing:
+            # chunk missing in repository - never serve silently corrupted data:
+            # abort the connection, the client sees a short read (Content-Length mismatch).
+            logger.error("webdav: chunk missing while serving %s, aborting the connection.", remove_surrogates(name))
+            self.close_connection = True
 
     def _send_chunked(self, data):
         """Write one HTTP/1.1 chunked-transfer-encoding block; *data* must be non-empty."""
@@ -895,8 +729,8 @@ class WebDAVHandler(BaseHTTPRequestHandler):
 
         The tar size is not known in advance (PAX header sizes vary), so we stream it
         with chunked transfer encoding. Repository access (item iteration and chunk
-        fetching) is serialized under repo_lock, but each chunk is written to the client
-        outside the lock - so a slow client cannot block other requests, and the
+        fetching) is serialized under the VFS lock, but each chunk is written to the
+        client outside the lock - so a slow client cannot block other requests, and the
         LockRefresher can keep the repository lock alive during a long download.
         """
         # lazy import: pulling in the archiver package at module import time would be
@@ -927,16 +761,15 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         if head:
             return
 
-        with self.repo_lock:
+        with self.vfs.lock:
             archive = Archive(self.vfs.manifest, self.vfs.archives[archive_name].id)
-            pipeline = archive.pipeline
             item_iter = archive.iter_items(want)
 
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> (stripped) path of the first link
         complete = False
         try:
             while True:
-                with self.repo_lock:
+                with self.vfs.lock:
                     try:
                         item = next(item_iter)
                     except StopIteration:
@@ -948,7 +781,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                     continue  # unsupported item type, skipped (with a warning)
                 tarinfo.pax_headers = item_to_paxheaders("PAX", item)
                 self._send_chunked(tarinfo.tobuf(tarfile.PAX_FORMAT, tarfile.ENCODING, "surrogateescape"))
-                if needs_content and not self._send_tar_content(item, tarinfo.size, pipeline):
+                if needs_content and not self._send_tar_content(item, tarinfo.size):
                     return  # a chunk was missing: leave the chunked stream unterminated (see finally)
             # end-of-archive marker (two zero blocks), then terminate the chunked stream.
             self._send_chunked(b"\0" * (tarfile.BLOCKSIZE * 2))
@@ -960,7 +793,7 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 # tar is truncated (never present a corrupt archive as if it were complete).
                 self.close_connection = True
 
-    def _send_tar_content(self, item, size, pipeline):
+    def _send_tar_content(self, item, size):
         """Stream *item*'s file content into the tar, padded to a 512-byte block boundary.
 
         Returns False (after logging) if the content cannot be produced in full (a chunk
@@ -977,47 +810,20 @@ class WebDAVHandler(BaseHTTPRequestHandler):
                 size,
             )
             return False
-        for entry in chunks:
-            # fetch under the lock, write to the client outside it (see _send_tar).
-            with self.repo_lock:
-                data = next(pipeline.fetch_many([entry], ro_type=ROBJ_FILE_STREAM, replacement_chunk=False))
-            if data is None:
-                logger.error(
-                    "webdav: chunk missing while streaming tar member %s, aborting the connection.",
-                    remove_surrogates(item.path),
-                )
-                return False
-            self._send_chunked(data)
+        try:
+            # fetches under the lock, writes to the client outside it (see _send_tar).
+            for data in self.vfs.reader.iter_data(chunks, 0, size):
+                self._send_chunked(data)
+        except ChunkMissing:
+            logger.error(
+                "webdav: chunk missing while streaming tar member %s, aborting the connection.",
+                remove_surrogates(item.path),
+            )
+            return False
         padding = (tarfile.BLOCKSIZE - size % tarfile.BLOCKSIZE) % tarfile.BLOCKSIZE
         if padding:
             self._send_chunked(b"\0" * padding)
         return True
-
-    def _get_chunk(self, pipeline, entry):
-        """Return the decrypted data of chunk *entry*, using the shared data cache.
-
-        Returns None if the chunk is missing in the repository. Must be called while
-        holding repo_lock (it guards both the repository and the data cache, and the
-        data cache's LRUCache is not thread-safe). The cache is keyed by chunk id
-        (a content hash), so it is valid across archives and requests. Reads of a big
-        file over a mounted file system tend to come as many small sequential range
-        requests hitting the same chunk - the cache avoids re-fetching and re-decrypting
-        it every time.
-
-        This complements, but does not duplicate, the repository's own pack cache:
-        fetch_many() -> Repository.get_many() caches whole packs (raw, still encrypted
-        and compressed on-disk bytes), whereas we cache the *decrypted+decompressed*
-        chunk data, i.e. the output of the per-chunk RepoObj.parse() that runs on every
-        fetch even on a pack cache hit. So the two layers save different work (repo I/O
-        vs. per-chunk decrypt+decompress).
-        """
-        try:
-            return self.data_cache[entry.id]
-        except KeyError:
-            data = next(pipeline.fetch_many([entry], ro_type=ROBJ_FILE_STREAM, replacement_chunk=False))
-            if data is not None:
-                self.data_cache[entry.id] = data
-            return data
 
     @staticmethod
     def _content_disposition(name):
@@ -1035,13 +841,6 @@ class WebDAVHandler(BaseHTTPRequestHandler):
         return strip_crlf(result)  # no-op by construction, but makes the CR/LF safety explicit
 
 
-def data_cache_capacity():
-    # number of decrypted chunks to keep cached; same knob as borg mount uses.
-    # default: number of CPUs (a small, non-zero value), see also borg mount --help.
-    capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
-    return max(1, capacity)
-
-
 def make_server(manifest, args, bind="127.0.0.1", port=8000):
     """Create a ThreadingHTTPServer serving the archives selected by *args*.
 
@@ -1049,14 +848,11 @@ def make_server(manifest, args, bind="127.0.0.1", port=8000):
     server threads is serialized with it (use it for e.g. LockRefresher, too).
     """
     repo_lock = threading.RLock()
-    vfs = ArchiveVFS(manifest, args, repo_lock)
-    capacity = data_cache_capacity()
-    logger.debug("webdav: data cache capacity: %d chunks", capacity)
-    data_cache = LRUCache(capacity=capacity)
+    vfs = ArchiveVFS(manifest, args, lock=repo_lock)
+    vfs.create_filesystem()
 
-    handler_class = type("WebDAVHandler", (WebDAVHandler,), dict(vfs=vfs, repo_lock=repo_lock, data_cache=data_cache))
+    handler_class = type("WebDAVHandler", (WebDAVHandler,), dict(vfs=vfs))
     server = ThreadingHTTPServer((bind, port), handler_class)
     server.daemon_threads = True
     server.repo_lock = repo_lock
-    server.data_cache = data_cache
     return server

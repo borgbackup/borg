@@ -137,7 +137,10 @@ cdef _get_acl(p, type, item, attribute, flags, fd=None):
     if text == NULL:
         acl_free(acl)
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
-    item[attribute] = text
+    if text[0] != 0:
+        # an empty ACL (e.g. a directory that has no default ACL) means: there is none.
+        # do not archive it - it would only be restored as a no-op.
+        item[attribute] = text
     acl_free(text)
     acl_free(acl)
 
@@ -154,21 +157,35 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
     if isinstance(path, str):
         path = os.fsencode(path)
+    is_dir = stat.S_ISDIR(st.st_mode)
     ret = acl_extended_link_np(path)
     if ret < 0:
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-    if ret == 0:
+    # note: acl_extended_link_np only looks at the access (resp. NFSv4) ACL, so a directory
+    # that only has a default ACL is not "extended" for it - we must not stop looking then.
+    extended = ret == 1
+    if not extended and not is_dir:
         # there is no ACL defining permissions other than those defined by the traditional file permission bits.
         return
-    ret = lpathconf(path, _PC_ACL_NFS4)
-    if ret < 0:
-        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-    nfs4_acl = ret == 1
+    if extended:
+        ret = lpathconf(path, _PC_ACL_NFS4)
+        if ret < 0:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+        nfs4_acl = ret == 1
+    else:
+        # a directory with no extended access ACL: only POSIX.1e filesystems have default ACLs.
+        # if this filesystem does not do them (or we can not tell), there is nothing to archive.
+        nfs4_acl = False
+        if lpathconf(path, _PC_ACL_EXTENDED) != 1:
+            return
     if nfs4_acl:
+        # NFSv4 ACLs have no separate default ACL, inheritance is expressed by entry flags.
         _get_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', flags, fd=fd)
     else:
-        _get_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', flags, fd=fd)
-        if stat.S_ISDIR(st.st_mode):
+        if extended:
+            _get_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', flags, fd=fd)
+        if is_dir:
+            # only directories can have a default ACL.
             _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
 
 

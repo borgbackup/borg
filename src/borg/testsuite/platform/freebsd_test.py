@@ -93,4 +93,26 @@ def test_default_acl():
         assert get_acl(tmpdir)["acl_default"] == DEFAULT_ACL
 
 
+@skipif_acls_not_working
+def test_default_acl_only():
+    # a directory can have a default ACL while its access ACL is just the traditional permission
+    # bits. acl_extended_link_np() only considers the access ACL, so borg must not rely on it
+    # alone for directories - otherwise the default ACL would not be archived at all.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        set_acl(tmpdir, default=DEFAULT_ACL)
+        item = get_acl(tmpdir)
+        assert "acl_access" not in item
+        assert item["acl_default"] == DEFAULT_ACL
+
+
+@skipif_acls_not_working
+def test_access_acl_only_no_empty_default():
+    # a directory without a default ACL must not get an empty acl_default archived.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        set_acl(tmpdir, access=ACCESS_ACL)
+        item = get_acl(tmpdir)
+        assert item["acl_access"] == ACCESS_ACL
+        assert "acl_default" not in item
+
+
 # nfs4 acls testing not implemented.

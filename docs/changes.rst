@@ -104,7 +104,7 @@ Compatibility notes:
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
-  - removed --save-space option (does not change behaviour)
+  - removed --save-space option (does not change behavior)
 - removed --bypass-lock option
 - removed --remote-path option (use the BORG_REMOTE_PATH environment variable)
 - removed --rsh option (use the BORG_RSH environment variable)
@@ -169,65 +169,73 @@ New features:
 
 - faster:
 
-  - use multi-threaded zstd compression for big chunks, #9961
-  - use multi-threaded blake3 hashing for big chunks, #9958
-  - extract: avoid refetching/reparsing repeated chunks, #1678
-  - fetch_many: serve all-zero chunks without repository access; also cache
-    recently parsed chunks, #1678
-  - do not verify the chunk id on every read from an encrypted repo (the AEAD
-    authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
+  - create:
+
+    - use multi-threaded zstd compression for big chunks, #9961
+    - use multi-threaded blake3 hashing for big chunks, #9958
+    - overlap pack hash/store and build of the next pack, #9988.
+      BORG_PACK_ASYNC=no disables the store-thread (debugging aid).
+    - chunkers, crypto: release the GIL in pure-C hot paths
+  - extract / mount:
+
+    - avoid refetching/reparsing repeated chunks, #1678
+    - do not verify the chunk id on every read from an encrypted repo (the
+      AEAD authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
+    - serve all-zero chunks without repository access; also cache
+      recently parsed chunks, #1678
 - Chunkers:
 
-  - fastcdc is the new default chunker, for file content data as well as for the
-    item metadata stream, #9957. Compared to the previous default "buzhash", it is
-    faster and its Gear table is derived from secret key material (instead of only
-    XORing a 32bit seed into the table), so chunk cut points are much harder to
-    predict without the key (better resistance against fingerprinting attacks).
-  - rabin-aes: new chunker with cryptographically sound resistance against
-    chunk-size fingerprinting (UHF-then-PRF: secret Rabin polynomial + AES-128,
-    following eprint 2025/558); uses AES hw acceleration or OpenSSL, ~700 MB/s
-  - goldilocks-aes: new chunker, like rabin-aes but with the reference universal
-    hash of eprint 2025/558 (Goldilocks prime-field polynomial hash); about half
-    the rabin-aes speed, mainly a comparison baseline
-  - toeplitz-aes: new chunker, like rabin-aes but with a tabulated LFSR/Toeplitz
-    hash as the universal hash (secret 2 KiB table, fixed public polynomial);
-    optimal 2^-64 collision bound, fastest of the three AES chunkers
-  - fastcdc: SIMD-accelerated scan kernel (NEON on aarch64, AVX2 on x86-64,
-    blocked scalar elsewhere), ~1.4x faster on Apple Silicon; cut points stay
-    bit-identical (1-byte granularity, same golden chunk points)
-  - buzhash64: SIMD scan kernel (same technique and dispatch), ~1.5x faster
-    on Apple Silicon; cut points stay bit-identical
-  - zero-copy fill: the file reader writes data (and zeros for sparse holes)
-    directly into the chunker's scan buffer, replacing several per-byte copy
-    chains; fastcdc ~+40%, buzhash64 ~+20%, buzhash ~+15%,
-    rabin-aes/toeplitz-aes ~+16%, goldilocks-aes ~+9%
-  - lazy buffer compaction: compact the scan buffer only when the free tail
-    gets too small for a full read block (instead of memmoving on every
-    refill), removing ~80% of the compaction copy traffic; cut points stay
-    bit-identical (all CDC chunkers)
+  - fastcdc is the new and faster default chunker, #9957
+  - fastcdc / buzhash64: SIMD-accelerated scan kernel, #10034:
+
+    - NEON on aarch64 (e.g. Apple Silicon)
+    - AVX2 on x86-64 (Intel / AMD)
+    - blocked scalar elsewhere
+  - toeplitz-aes, rabin-aes, goldilocks-aes: fingerprinting-resistant chunkers
+    (UHF-then-PRF), with direct AES hw acceleration or via OpenSSL, #9987
+  - zero-copy fill and lazy buffer compaction optimizations
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
 - analyze: report deduplicated size of a set of archives, #5741
+- repo-compress: was temporarily gone, re-added now with pack support, #9663
+- version: add --json output, #10004
+- completion: generate fish completions, remove hand-written ones, #9989
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
 
 Fixes:
 
 - re-add XXH64 to read borg 1.x integrity data, #9935
+- list: add {blake3} format key, #9984
 - support date: archive patterns for --from-borg1, #9949
 - fix calculate_relative_offset year offset for Feb 29, #9967
 - bind pack object header into AEAD authentication
 - fix false repo relocation warning on macOS due to NFC/NFD path differences, #2913
 - release chunk data memoryviews (fixes PyPy memory leak), #1755, #9978
+- fix DownloadPipeline.fetch_many() crashing on a missing chunk, #10024
+- lrucache: make it thread-safe
+- crypto: start a new session after encrypting 2TiB with one aes256-ocb session key, #6501
 
 Other changes:
 
-- crypto: start a new session after encrypting 2TiB with one aes256-ocb session key, #6501
-- chunkers: refactor the shared machinery (buffering, min/max clamping, normalized
-  chunking, iterator protocol) into a common ChunkerBase class instead of keeping a
-  copy per chunker; fastcdc also shares the window-less scan loop with the AES
-  chunkers via a _scan() hook. Cut points stay bit-identical for all chunkers.
+- support Python 3.15
+- borgstore: require 0.6.x, with blake3 support
+- shtab: require >=1.9.3
+- list: validate --format keys, #9984
+- crypto: raise IntegrityError for truncated AEAD/AE envelopes
+- chunkers: refactor the shared machinery into a common ChunkerBase class
+- PackReader.read(): return a memoryview of the in-memory pack instead of copying
+- mount/webdav: unify the 3 archive-as-filesystem implementations, #10020.
+  Behavior changes that fell out of the unification:
+
+  - webdav reads now go through DownloadPipeline.fetch_many(), so the all-zero
+    chunk shortcut and the parsed-chunk cache (#1678) apply to webdav as well.
+  - the mounts get webdav's Unicode NFC lookup fallback (macOS decomposes names).
+  - directories report st_nlink >= 2 (hlfuse behavior) in both mounts.
+  - a chunk that is read to its end is no longer put into the data cache, so a
+    full download does not evict the chunks that partial (range) reads need - this was
+    the FUSE behavior, now webdav shares it.
 - removed some global options (they were difficult to use and spammed the help output):
 
   - --remote-path -> BORG_REMOTE_PATH
@@ -239,11 +247,16 @@ Other changes:
 - docs:
 
   - update README
+  - README: show the contributor chart in the "Helping" section
   - new borg2 demo screencast (see www.borgbackup.org), #6303
   - fix/refactor return codes documentation, #9905
   - fix chunks index / memory usage internals documentation, #9937
   - update help for some commands, #9948
   - fix grammar/typos, #9972
+  - add chunker guide (user-level and cryptographic)
+  - FAME.md: update contributor statistics, #10022
+  - crypto: misc. improvements to code and docs, #6501, ...
+  - GitHub issue #10000: "We Are Borg" joke collection
 
 
 Version 2.0.0b22 (2026-07-22)
@@ -1162,7 +1175,7 @@ New features:
 
 Bug fixes:
 
-- fix Ctrl-C / SIGINT behaviour for pyinstaller-made binaries, #8155
+- fix Ctrl-C / SIGINT behavior for pyinstaller-made binaries, #8155
 - delete: fix error handling with Ctrl-C
 - rcompress: fix error handling with Ctrl-C
 - delete: fix error handling when no archive is specified, #8256
@@ -1192,7 +1205,7 @@ New features:
 - BORG_EXIT_CODES=modern: optional more specific return codes (for errors and warnings).
 
   The default value of this new environment variable is "legacy", which should result in
-  a behaviour similar to borg 1.2 and older (only using rc 0, 1 and 2).
+  a behavior similar to borg 1.2 and older (only using rc 0, 1 and 2).
   "modern" exit codes are much more specific (see the internals/frontends docs).
 - implement "borg version" (shows client and server version), #7829
 
@@ -1441,7 +1454,7 @@ Other changes:
 
 - use local time / local timezone to output timestamps, #7283
 - update development.lock.txt, including a setuptools security fix, #7227
-- remove --save-space option (does not change behaviour)
+- remove --save-space option (does not change behavior)
 - remove part files from final archive
 - remove --consider-part-files, related stats code, update docs
 - transfer: drop part files

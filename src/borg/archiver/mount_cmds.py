@@ -36,27 +36,17 @@ class MountMixIn:
         from ..fuse_impl import has_mfusepy
 
         if has_mfusepy:
-            # Use mfusepy implementation
-            from ..hlfuse import borgfs
-
-            operations = borgfs(manifest, args, repository)
-            logger.info("Mounting filesystem")
-            try:
-                operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
-            except RuntimeError:
-                # Relevant error message already printed to stderr by FUSE
-                raise RTError("FUSE mount failed")
+            from ..hlfuse import borgfs as fuse_operations  # high-level FUSE API
         else:
-            # Use llfuse/pyfuse3 implementation
-            from ..fuse import FuseOperations
+            from ..fuse import FuseOperations as fuse_operations  # low-level FUSE API
 
-            operations = FuseOperations(manifest, args, repository)
-            logger.info("Mounting filesystem")
-            try:
-                operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
-            except RuntimeError:
-                # Relevant error message already printed to stderr by FUSE
-                raise RTError("FUSE mount failed")
+        operations = fuse_operations(manifest, args, repository)
+        logger.info("Mounting filesystem")
+        try:
+            operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
+        except RuntimeError:
+            # Relevant error message already printed to stderr by FUSE
+            raise RTError("FUSE mount failed")
 
     def do_umount(self, args):
         """Unmounts the FUSE filesystem."""

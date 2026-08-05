@@ -250,16 +250,22 @@ bz64_scan_simd512(const uint64_t *T, const uint64_t *Trot,
     return j;
 }
 
+static int bz64_env_set(const char *name)
+{
+    const char *e = getenv(name);
+    return e != NULL && e[0] != 0 && strcmp(e, "0") != 0;
+}
+
 static int bz64_simd_available(void)
 {
-    /* BORG_BUZHASH64_NO_AVX512 caps dispatch at AVX2 (for benchmarking the
-     * kernels against each other); like the detection itself it is read
-     * once per process, so it must be set before the first chunker use. */
-    if (__builtin_cpu_supports("avx512f")) {
-        const char *e = getenv("BORG_BUZHASH64_NO_AVX512");
-        if (e == NULL || e[0] == 0 || strcmp(e, "0") == 0)
-            return 2;
-    }
+    /* BORG_BUZHASH64_NO_AVX512 caps dispatch at AVX2, BORG_BUZHASH64_NO_AVX2
+     * at the blocked scalar kernel (for benchmarking the kernels against
+     * each other); like the detection itself they are read once per process,
+     * so they must be set before the first chunker use. */
+    if (bz64_env_set("BORG_BUZHASH64_NO_AVX2"))
+        return 0;
+    if (__builtin_cpu_supports("avx512f") && !bz64_env_set("BORG_BUZHASH64_NO_AVX512"))
+        return 2;
     return __builtin_cpu_supports("avx2");
 }
 

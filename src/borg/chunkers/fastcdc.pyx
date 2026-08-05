@@ -36,8 +36,8 @@ cdef extern from "fastcdc_impl.h":
 # aarch64, AVX-512 or AVX2 on x86-64, blocked scalar elsewhere) that are bit-identical to
 # the plain sequential Gear loop: every byte position is tested, cuts and hash state are
 # exactly the same, only faster. BORG_FASTCDC_FORCE_SCALAR=1 forces the sequential loop
-# (for tests); BORG_FASTCDC_NO_AVX512=1 caps dispatch at AVX2 (for benchmarking, must be
-# set before the first chunker use).
+# (for tests); BORG_FASTCDC_NO_AVX512=1 caps dispatch at AVX2 and BORG_FASTCDC_NO_AVX2=1
+# at the blocked scalar kernel (for benchmarking, must be set before the first chunker use).
 
 
 @cython.boundscheck(False)

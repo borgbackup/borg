@@ -220,6 +220,10 @@ Fixes:
 Other changes:
 
 - crypto: start a new session after encrypting 2TiB with one aes256-ocb session key, #6501
+- chunkers: refactor the shared machinery (buffering, min/max clamping, normalized
+  chunking, iterator protocol) into a common ChunkerBase class instead of keeping a
+  copy per chunker; fastcdc also shares the window-less scan loop with the AES
+  chunkers via a _scan() hook. Cut points stay bit-identical for all chunkers.
 - removed some global options (they were difficult to use and spammed the help output):
 
   - --remote-path -> BORG_REMOTE_PATH

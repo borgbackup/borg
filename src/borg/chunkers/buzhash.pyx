@@ -3,14 +3,11 @@
 
 
 import cython
-import time
-from cpython.bytes cimport PyBytes_AsString
+
 from libc.stdint cimport uint8_t, uint32_t
 from libc.stdlib cimport malloc, free
-from libc.string cimport memcpy, memmove, memset
 
-from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
-from .reader import FileReader, Chunk
+from .base cimport ChunkerBase
 
 # Cyclic polynomial / buzhash
 #
@@ -119,7 +116,7 @@ cdef uint32_t _buzhash_update(uint32_t sum, unsigned char remove, unsigned char 
     return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], lenmod) ^ h[add]
 
 
-cdef class Chunker:
+cdef class Chunker(ChunkerBase):
     """
     Content-Defined Chunker, variable chunk sizes.
 
@@ -130,90 +127,35 @@ cdef class Chunker:
     window contents. If the last n bits of the rolling hash are 0, a chunk is cut.
     Additionally it obeys some more criteria, like a minimum and maximum chunk size.
     It also uses a per-repo random seed to avoid some chunk length fingerprinting attacks.
+
+    Buffering and iteration live in ChunkerBase; the window-based scan loop needs its
+    own process() (the shared one is for window-less hashes). This chunker must stay
+    bit-compatible with borg 1.x, see the golden tests.
     """
-    cdef uint32_t chunk_mask
     cdef uint32_t* table
-    cdef uint8_t* data
-    cdef object _fd  # Python object for file descriptor
-    cdef int fh
-    cdef int done, eof
-    cdef size_t min_size, buf_size, window_size, remaining, position, last
-    cdef long long bytes_read, bytes_yielded  # off_t in C, using long long for compatibility
-    cdef readonly float chunking_time
-    cdef object file_reader  # FileReader instance
-    cdef size_t reader_block_size
-    cdef bint sparse
+    cdef size_t window_size
 
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
         self.table = NULL
-        self.data = NULL
-        min_size = 1 << chunk_min_exp
-        max_size = 1 << chunk_max_exp
-        assert max_size <= len(zeros)
-        # see chunker_process, first while loop condition, first term must be able to get True:
-        assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
-
+        # see process, first while loop condition, first term must be able to get True:
+        assert hash_window_size + (1 << chunk_min_exp) + 1 <= (1 << chunk_max_exp), "too small max_size"
         self.window_size = hash_window_size
-        self.chunk_mask = (1 << hash_mask_bits) - 1
-        self.min_size = min_size
         self.table = buzhash_init_table(seed & 0xffffffff)
-        self.buf_size = max_size
-        self.data = <uint8_t*>malloc(self.buf_size)
-        if self.data == NULL:
-            raise MemoryError("Failed to allocate chunker buffer")
-        self.fh = -1
-        self.done = 0
-        self.eof = 0
-        self.remaining = 0
-        self.position = 0
-        self.last = 0
-        self.bytes_read = 0
-        self.bytes_yielded = 0
-        self._fd = None
-        self.chunking_time = 0.0
-        self.reader_block_size = 1024 * 1024
-        self.sparse = sparse
+        # buzhash is single-mask (no normalized chunking): nc_level 0 makes
+        # mask_s == mask_l == chunk_mask, and the (low-bit) uint64 chunk_mask
+        # has the same value as the previous uint32 one, keeping cut points
+        # bit-identical.
+        self._setup_common("buzhash", chunk_min_exp, chunk_max_exp, hash_mask_bits, 0, 0, False, sparse)
 
     def __dealloc__(self):
         """Free the chunker's resources."""
         if self.table != NULL:
             free(self.table)
             self.table = NULL
-        if self.data != NULL:
-            free(self.data)
-            self.data = NULL
 
-    cdef int fill(self) except 0:
-        """Fill the chunker's buffer with more data."""
-        cdef ssize_t n
-
-        # Move remaining data to the beginning of the buffer
-        with nogil:
-            memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
-        self.position -= self.last
-        self.last = 0
-        n = self.buf_size - self.position - self.remaining
-
-        if self.eof or n == 0:
-            return 1
-
-        if n > 0:
-            # zero-copy path: the reader writes file data (and zeros for holes)
-            # directly into the scan buffer - one memcpy per byte instead of
-            # slice/join/copy chains through intermediate bytes objects.
-            n = self.file_reader.readinto(
-                <uint8_t[:n]>(self.data + self.position + self.remaining), n)
-        if n > 0:
-            self.remaining += n
-            self.bytes_read += n
-        else:
-            self.eof = 1
-
-        return 1
-
-    cdef object process(self) except *:
+    cdef object process(self):
         """Process the chunker's buffer and return the next chunk."""
-        cdef uint32_t sum, chunk_mask = self.chunk_mask
+        cdef uint32_t sum, chunk_mask = <uint32_t>self.chunk_mask
         cdef size_t n, old_last, min_size = self.min_size, window_size = self.window_size
         cdef uint8_t* p
         cdef uint8_t* stop_at
@@ -276,45 +218,6 @@ cdef class Chunker:
 
         # Return a memory view of the chunk
         return memoryview((self.data + old_last)[:n])
-
-    def chunkify(self, fd, fh=-1, fmap=None):
-        """
-        Cut a file into chunks.
-
-        :param fd: Python file object
-        :param fh: OS-level file handle (if available),
-                   defaults to -1 which means not to use OS-level fd.
-        :param fmap: a file map, same format as generated by sparsemap
-        """
-        self._fd = fd
-        self.fh = fh
-        self.file_reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size, sparse=self.sparse, fmap=fmap)
-        self.done = 0
-        self.remaining = 0
-        self.bytes_read = 0
-        self.bytes_yielded = 0
-        self.position = 0
-        self.last = 0
-        self.eof = 0
-        return self
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        started_chunking = time.monotonic()
-        data = self.process()
-        got = len(data)
-        # we do not have SEEK_DATA/SEEK_HOLE support in chunker_process C code,
-        # but we can just check if data was all-zero (and either came from a hole
-        # or from stored zeros - we can not detect that here).
-        if zeros.startswith(data):
-            data = None
-            allocation = CH_ALLOC
-        else:
-            allocation = CH_DATA
-        self.chunking_time += time.monotonic() - started_chunking
-        return Chunk(data, size=got, allocation=allocation)
 
 
 def buzhash(data, unsigned long seed):

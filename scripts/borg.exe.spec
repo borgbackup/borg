@@ -14,12 +14,16 @@ if is_win32:
 else:
     hiddenimports = ['borg.platform.posix', 'borghash', 'rich._unicode_data.unicode17-0-0']
 
-# The chunkers cimport their shared base classes (ChunkerBase, and ChunkerPHTE
-# for the *-aes chunkers), so they import those modules at C level when
-# initializing - PyInstaller can not see this by static analysis of the Python
-# sources.
+# Anything a compiled chunker module pulls in has to be listed here: the
+# chunkers are Cython extensions, so PyInstaller's static analysis of the
+# Python sources cannot see their imports at all. That covers both the base
+# classes they cimport (ChunkerBase, and ChunkerPHTE for the *-aes chunkers),
+# which are imported at C level during module init, and plain Python modules
+# imported from a .pyx, such as kernel_env - it is imported ONLY from .pyx
+# files, so nothing else would drag it in.
 hiddenimports.append('borg.chunkers.base')
 hiddenimports.append('borg.chunkers.phte_chunker')
+hiddenimports.append('borg.chunkers.kernel_env')
 
 block_cipher = None
 

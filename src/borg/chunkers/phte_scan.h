@@ -344,16 +344,25 @@ PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t
  * vectors of 4 AES blocks each - 4x fewer AES instructions than the 128-bit
  * path, the round keys stay register-resident (32 zmm registers instead of
  * 16 xmm, so no per-round key reloads), and the 8 independent chains hide
- * the vaesenc latency (2 chains would be latency-bound). vpexpandq places a
- * vector's 4 digests into its block-low qwords in one instruction, and a
- * masked vptestnmq tests the 4 ciphertext-low qwords against the mask
- * without extracting. Every digest is exact and every position is tested,
- * so cut points stay bit-identical to the other paths. */
+ * the vaesenc latency (2 chains would be latency-bound), and a masked
+ * vptestnmq tests the 4 ciphertext-low qwords against the mask without
+ * extracting. Every digest is exact and every position is tested, so cut
+ * points stay bit-identical to the other paths.
+ *
+ * The digests are stored pre-spread: an AES input block wants the digest in
+ * the low qword and zero in the high one, so dgs[] keeps a digest in every
+ * even slot and a zero in every odd one. The zeros are written once at entry
+ * and never touched again, which makes each vector's input a plain aligned
+ * 512-bit load. Packing the digests and spreading them with vpexpandq (eight
+ * of those per group) instead costs the same stores and measurably more
+ * time - about 9% of the whole toeplitz-aes scan, 6% of rabin-aes. */
 __attribute__((target("aes,sse2,vaes,avx512f"))) static int64_t
 PH_FN(scan_hw512)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
 {
     __m512i k[11];
     __m512i M = _mm512_set1_epi64((long long)mask);
+    /* digest at dgs[2j], zero at dgs[2j+1] (= AES input block bytes 8..15) */
+    uint64_t dgs[64] __attribute__((aligned(64)));
     uint64_t d = *digest, da, db;
     const uint8_t *qo = p - 64;
     size_t i = 0;
@@ -362,6 +371,8 @@ PH_FN(scan_hw512)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint6
     /* broadcast each 128-bit round key to all four block lanes */
     for (int j = 0; j < 11; j++)
         k[j] = _mm512_broadcast_i32x4(_mm_loadu_si128((const __m128i *)c->base.rk[j]));
+    for (int j = 1; j < 64; j += 2)
+        dgs[j] = 0;
 
     if (n >= 34) {
         db = PH_ROLL(c, d, qo[0], p[0]);               /* d_0 */
@@ -370,32 +381,31 @@ PH_FN(scan_hw512)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint6
     }
 
     while (lanes_live && i + 34 <= n) {
-        uint64_t dg[32];
         __m512i b0, b1, b2, b3, b4, b5, b6, b7;
         __mmask8 h0, h1, h2, h3, h4, h5, h6, h7;
 
-        dg[0] = db;
-        dg[1] = da;
+        dgs[0] = db;
+        dgs[2] = da;
         for (int j = 2; j < 32; j += 2) {
             db = PH_ROLL2(c, db, qo[i + j - 1], qo[i + j], p[i + j - 1], p[i + j]);
-            dg[j] = db;
+            dgs[2 * j] = db;
             da = PH_ROLL2(c, da, qo[i + j], qo[i + j + 1], p[i + j], p[i + j + 1]);
-            dg[j + 1] = da;
+            dgs[2 * j + 2] = da;
         }
         /* prepare the next group's invariant (digests at i+32, i+33) */
         db = PH_ROLL2(c, db, qo[i + 31], qo[i + 32], p[i + 31], p[i + 32]);
         da = PH_ROLL2(c, da, qo[i + 32], qo[i + 33], p[i + 32], p[i + 33]);
 
-        /* qword lanes 0,2,4,6 take 4 digests, lanes 1,3,5,7 stay zero
-         * (= AES input block bytes 8..15, as in the other paths) */
-        b0 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg), k[0]);
-        b1 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 4), k[0]);
-        b2 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 8), k[0]);
-        b3 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 12), k[0]);
-        b4 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 16), k[0]);
-        b5 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 20), k[0]);
-        b6 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 24), k[0]);
-        b7 = _mm512_xor_si512(_mm512_maskz_expandloadu_epi64(0x55, dg + 28), k[0]);
+        /* each vector's 4 blocks are already laid out in dgs (digest in the
+         * low qword of every block, zero in the high one) */
+        b0 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 0)), k[0]);
+        b1 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 8)), k[0]);
+        b2 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 16)), k[0]);
+        b3 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 24)), k[0]);
+        b4 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 32)), k[0]);
+        b5 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 40)), k[0]);
+        b6 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 48)), k[0]);
+        b7 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 56)), k[0]);
         for (int r = 1; r < 10; r++) {
             b0 = _mm512_aesenc_epi128(b0, k[r]);
             b1 = _mm512_aesenc_epi128(b1, k[r]);
@@ -420,7 +430,7 @@ PH_FN(scan_hw512)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint6
             const uint8_t hs[8] = {h0, h1, h2, h3, h4, h5, h6, h7};
             for (int j = 0; j < 32; j++) {
                 if ((hs[j >> 2] >> ((j & 3) * 2)) & 1) {
-                    *digest = dg[j];
+                    *digest = dgs[2 * j];
                     return (int64_t)(i + j);
                 }
             }

@@ -385,10 +385,6 @@ class BenchmarkMixIn:
 
         if "compression" in selected:
             section_header("compression", "Compression")
-            if not args.json:
-                sample = compressible_buffer(comp_sizes[-1][1])
-                ratio = len(sample) / len(CompressionSpec("zstd,3").compressor.compress({}, sample)[1])
-                print(f"(test data is compressible, {ratio:.1f}x at zstd,3)")
             # grouped by buffer size rather than by codec, so the codecs can be
             # compared against each other at a glance; chunk-sized first, as
             # that is what borg actually compresses
@@ -403,7 +399,7 @@ class BenchmarkMixIn:
                     "zstd,10",
                     "zstd,16",
                     "zstd,22",
-                    "zlib,0",
+                    "zlib,1",
                     "zlib,6",
                     "zlib,9",
                     "lzma,0",

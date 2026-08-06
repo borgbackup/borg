@@ -181,7 +181,8 @@ class BenchmarkMixIn:
             hash_sizes = comp_sizes = one_size = [SMALL]
             hash_total = comp_total = SMALL[1]
         else:
-            hash_sizes = [SMALL, CHUNK, PACK]
+            # blake3: a borg pack, then a borg chunk - both above its MT threshold
+            hash_sizes = [PACK, CHUNK]
             comp_sizes = [SMALL, CHUNK]
             one_size = [CHUNK]  # for algorithms where the buffer size does not change behaviour
             hash_total = GIB
@@ -334,11 +335,11 @@ class BenchmarkMixIn:
 
             section_header("hashes", "Cryptographic hashes / MACs")
             # only blake3 uses multiple threads, and only above a size threshold,
-            # so it is the one worth measuring at several buffer sizes.
+            # so it is the one worth measuring at more than one buffer size.
             hashes_tests = [
+                ("blake3", hash_sizes, blake3_hash),
                 ("hmac-sha256", one_size, lambda d: hmac_sha256(key_256, d)),
                 ("blake2b-256", one_size, lambda d: blake2b_256(key_256, d)),
-                ("blake3", hash_sizes, blake3_hash),
             ]
             for spec, sizes, func in hashes_tests:
                 for label, nbytes in sizes:

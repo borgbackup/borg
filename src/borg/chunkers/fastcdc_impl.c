@@ -342,22 +342,12 @@ fc_scan_simd512(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_i
     return -1;
 }
 
-static int fc_env_set(const char *name)
-{
-    const char *e = getenv(name);
-    return e != NULL && e[0] != 0 && strcmp(e, "0") != 0;
-}
-
 static int fc_simd_available(void)
 {
-    /* BORG_FASTCDC_NO_AVX512 caps dispatch at AVX2, BORG_FASTCDC_NO_AVX2 at
-     * the blockwise scalar kernel (for benchmarking the kernels against each
-     * other); like the detection itself they are read once per process, so
-     * they must be set before the first chunker use. */
-    if (fc_env_set("BORG_FASTCDC_NO_AVX2"))
-        return 0;
-    if (__builtin_cpu_supports("avx512f") && !fc_env_set("BORG_FASTCDC_NO_AVX512"))
+#ifdef FC_KIND_512
+    if (__builtin_cpu_supports("avx512f"))
         return 2;
+#endif
     return __builtin_cpu_supports("avx2");
 }
 
@@ -376,36 +366,107 @@ static int fc_simd_available(void)
 
 #endif
 
-/* --- dispatch ----------------------------------------------------------- */
+/* --- kernel selection --------------------------------------------------- */
 
-/* resolved once (0 = blockwise, 1 = FC_KIND, 2 = FC_KIND_512 where defined);
- * a racy double-init writes the same value, so it is benign */
-static int fc_use_simd = -1;
-
-int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int force_scalar)
+const char *fc_kernel_names(void)
 {
-    if (force_scalar)
-        return fc_scan_seq(gear, p, n, fp, mask);
-    if (fc_use_simd < 0)
-        fc_use_simd = fc_simd_available();
-#ifdef FC_KIND_512
-    if (fc_use_simd == 2)
-        return fc_scan_simd512(gear, p, n, fp, mask);
+#if defined(__aarch64__)
+    return "auto, neon, blockwise, scalar";
+#elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    return "auto, avx512, avx2, blockwise, scalar";
+#else
+    return "auto, blockwise, scalar";
 #endif
-    if (fc_use_simd)
-        return fc_scan_simd(gear, p, n, fp, mask);
-    return fc_scan_blockwise(gear, p, n, fp, mask);
 }
 
-const char *fc_kernel_name(int force_scalar)
+int fc_kernel_select(const char *name, int *out_id)
 {
-    if (force_scalar)
-        return "scalar";
-    if (fc_use_simd < 0)
-        fc_use_simd = fc_simd_available();
+    if (strcmp(name, "auto") == 0) {
+        *out_id = FC_K_AUTO;
+        return FC_KSEL_OK;
+    }
+    if (strcmp(name, "scalar") == 0) {
+        *out_id = FC_K_SCALAR;
+        return FC_KSEL_OK;
+    }
+    if (strcmp(name, "blockwise") == 0) {
+        *out_id = FC_K_BLOCKWISE;
+        return FC_KSEL_OK;
+    }
+#if defined(__aarch64__)
+    if (strcmp(name, "neon") == 0) {
+        *out_id = FC_K_VECTOR; /* baseline on aarch64, always runnable */
+        return FC_KSEL_OK;
+    }
+#elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    if (strcmp(name, "avx2") == 0) {
+        if (!__builtin_cpu_supports("avx2"))
+            return FC_KSEL_NOCPU;
+        *out_id = FC_K_VECTOR;
+        return FC_KSEL_OK;
+    }
+    if (strcmp(name, "avx512") == 0) {
+#ifndef FC_KIND_512
+        return FC_KSEL_NOTBUILT; /* compiler too old for the target attribute */
+#else
+        if (!__builtin_cpu_supports("avx512f"))
+            return FC_KSEL_NOCPU;
+        *out_id = FC_K_VECTOR512;
+        return FC_KSEL_OK;
+#endif
+    }
+#endif
+    return FC_KSEL_UNKNOWN;
+}
+
+/* --- dispatch ----------------------------------------------------------- */
+
+/* the kernel FC_K_AUTO resolves to, worked out once; a racy double-init
+ * writes the same value, so it is benign */
+static int fc_auto = -1;
+
+static int fc_auto_kernel(void)
+{
+    int a;
+    if (fc_auto < 0) {
+        a = fc_simd_available();
+        fc_auto = (a == 2) ? FC_K_VECTOR512 : (a ? FC_K_VECTOR : FC_K_BLOCKWISE);
+    }
+    return fc_auto;
+}
+
+int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel)
+{
+    if (kernel == FC_K_AUTO)
+        kernel = fc_auto_kernel();
+    switch (kernel) {
+    case FC_K_SCALAR:
+        return fc_scan_seq(gear, p, n, fp, mask);
+    case FC_K_BLOCKWISE:
+        return fc_scan_blockwise(gear, p, n, fp, mask);
 #ifdef FC_KIND_512
-    if (fc_use_simd == 2)
+    case FC_K_VECTOR512:
+        return fc_scan_simd512(gear, p, n, fp, mask);
+#endif
+    default:
+        return fc_scan_simd(gear, p, n, fp, mask);
+    }
+}
+
+const char *fc_kernel_name(int kernel)
+{
+    if (kernel == FC_K_AUTO)
+        kernel = fc_auto_kernel();
+    switch (kernel) {
+    case FC_K_SCALAR:
+        return "scalar";
+    case FC_K_BLOCKWISE:
+        return "blockwise";
+#ifdef FC_KIND_512
+    case FC_K_VECTOR512:
         return FC_KIND_512;
 #endif
-    return fc_use_simd ? FC_KIND : "blockwise";
+    default:
+        return FC_KIND;
+    }
 }

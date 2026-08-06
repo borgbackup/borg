@@ -57,7 +57,11 @@ cdef extern from "rabin_aes_impl.h":
     ctypedef struct RA_CTX:
         pass
     int RA_TABLES
-    RA_CTX *ra_new(const uint64_t *tables, const uint8_t *aes_key, int force_sw)
+    RA_CTX *ra_new(const uint64_t *tables, const uint8_t *aes_key, int kernel)
+    int phte_kernel_select(const char *name, int *out_id)
+    const char *phte_kernel_names()
+    int PHTE_K_AUTO
+    int PHTE_K_EVP
     void ra_free(RA_CTX *ctx)
     const char *ra_kind(const RA_CTX *ctx)
     uint64_t ra_digest64(const RA_CTX *ctx, const uint8_t *q)
@@ -175,6 +179,27 @@ def _derive(bytes key):
     return aes_key, p, tables
 
 
+from .kernel_env import kernel_error, requested_kernel
+
+
+cdef int _select_kernel() except -1:
+    """Resolve BORG_AES_CHUNKER_KERNEL to a scan path id, raising if it cannot be honoured.
+
+    One selector for all three AES chunkers: they share phte_scan.h, so the
+    available paths never differ between them.
+    """
+    cdef int kid = PHTE_K_AUTO
+    cdef int rc
+    want = requested_kernel("BORG_AES_CHUNKER_KERNEL")
+    if want is None:
+        return PHTE_K_AUTO
+    rc = phte_kernel_select(want.encode("ascii"), &kid)
+    if rc != 0:
+        raise kernel_error("BORG_AES_CHUNKER_KERNEL", want, rc,
+                           (<bytes>phte_kernel_names()).decode("ascii"))
+    return kid
+
+
 cdef class ChunkerRabinAES(ChunkerPHTE):
     """
     Content-Defined Chunker, variable chunk sizes, UHF-then-PRF cut decision.
@@ -198,8 +223,8 @@ cdef class ChunkerRabinAES(ChunkerPHTE):
             for i in range(256):
                 c_tables[t * 256 + i] = tables[t][i]
 
-        force_sw = os.environ.get("BORG_RABIN_AES_FORCE_EVP", "") not in ("", "0")
-        self.ctx = ra_new(c_tables, aes_key, 1 if force_sw else 0)
+        kernel = _select_kernel()
+        self.ctx = ra_new(c_tables, aes_key, kernel)
         if self.ctx == NULL:
             raise MemoryError("Failed to set up rabin-aes kernel")
         self.kernel_str = (<bytes>ra_kind(self.ctx)).decode("ascii")

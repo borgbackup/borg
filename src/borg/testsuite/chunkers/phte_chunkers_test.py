@@ -23,13 +23,16 @@ from ...helpers import hex_to_bin
 # from os.urandom(32)
 key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
 
-# (chunker class, algo name, default params constant, env var forcing the portable kernel)
+# all three share one scan-path selector, see phte_kernel.h
+KERNEL_ENV = "BORG_AES_CHUNKER_KERNEL"
+
+# (chunker class, algo name, default params constant)
 CHUNKERS = [
-    (ChunkerRabinAES, CH_RABIN_AES, RABIN_AES_PARAMS, "BORG_RABIN_AES_FORCE_EVP"),
-    (ChunkerGoldilocksAES, CH_GOLDILOCKS_AES, GOLDILOCKS_AES_PARAMS, "BORG_GOLDILOCKS_AES_FORCE_EVP"),
-    (ChunkerToeplitzAES, CH_TOEPLITZ_AES, TOEPLITZ_AES_PARAMS, "BORG_TOEPLITZ_AES_FORCE_EVP"),
+    (ChunkerRabinAES, CH_RABIN_AES, RABIN_AES_PARAMS),
+    (ChunkerGoldilocksAES, CH_GOLDILOCKS_AES, GOLDILOCKS_AES_PARAMS),
+    (ChunkerToeplitzAES, CH_TOEPLITZ_AES, TOEPLITZ_AES_PARAMS),
 ]
-IDS = [algo for _, algo, _, _ in CHUNKERS]
+IDS = [algo for _, algo, _ in CHUNKERS]
 
 
 def H(data):
@@ -44,7 +47,7 @@ def chunker_spec(request):
 def test_kernels_identical(chunker_spec):
     # the OpenSSL EVP batch path and the AES hardware instruction path (if available
     # on this platform) must produce identical cut points.
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
     data = os.urandom(4 * 1024 * 1024)
 
     def sizes(chunker):
@@ -52,20 +55,20 @@ def test_kernels_identical(chunker_spec):
 
     default = cls(key0, 10, 16, 14, 2)
     sizes_default = sizes(default)
-    os.environ[env_var] = "1"
+    os.environ[KERNEL_ENV] = "evp"
     try:
         forced = cls(key0, 10, 16, 14, 2)
         assert forced.kernel == "evp"
         sizes_evp = sizes(forced)
     finally:
-        del os.environ[env_var]
+        del os.environ[KERNEL_ENV]
     assert sizes_default == sizes_evp
     # whatever kernel was selected by default, it must be a known one
     assert default.kernel in ("aes-arm64", "vaes", "aes-ni", "evp")
 
 
 def test_chunksize_distribution(chunker_spec):
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
     data = os.urandom(1048576)
     min_exp, max_exp, mask, nc_level = 10, 16, 14, 2  # chunk size target 16 KiB, clip at 1 KiB and 64 KiB
     chunker = cls(key0, min_exp, max_exp, mask, nc_level)
@@ -95,7 +98,7 @@ def test_chunksize_distribution(chunker_spec):
 def test_shift_resilience(chunker_spec):
     # content-defined cuts must survive a prefix insertion (this also validates that the
     # rolling digest update and the per-chunk window warm-up agree with each other).
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
     data = os.urandom(4 * 1024 * 1024)
 
     def chunk_hashes(data):
@@ -110,7 +113,7 @@ def test_shift_resilience(chunker_spec):
 
 def test_get_chunker(chunker_spec):
     # without a key, get_chunker uses an all-zero key; chunking must still work and be deterministic
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
     data = os.urandom(2 * 1024 * 1024)
     a = cf_expand(get_chunker(*params, key=None).chunkify(BytesIO(data)))
     b = cf_expand(get_chunker(algo, 19, 23, 21, 2, key=None).chunkify(BytesIO(data)))
@@ -123,7 +126,7 @@ def test_params_parsing(chunker_spec):
 
     from ...helpers import ChunkerParams
 
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
 
     # <algo>, chunk_min, chunk_max, chunk_mask, nc_level (no window field)
     assert ChunkerParams(f"{algo},19,23,21,2") == (algo, 19, 23, 21, 2)
@@ -149,7 +152,7 @@ def test_params_parsing(chunker_spec):
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
 def test_fuzz(chunker_spec, worker):
     # Fuzz with random and uniform data of misc. sizes and misc keys.
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
 
     # decompose <ALGO>_PARAMS = (algo, min_exp, max_exp, mask_bits, nc_level)
     params_algo, min_exp, max_exp, mask_bits, nc_level = params

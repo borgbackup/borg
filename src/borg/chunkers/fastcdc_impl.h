@@ -11,16 +11,42 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* Scan kernel ids, a tier ladder. Which names map onto them depends on the
+ * build: "neon" exists only on aarch64, "avx2"/"avx512" only on x86-64. */
+#define FC_K_AUTO 0      /* best kernel this CPU can run */
+#define FC_K_SCALAR 1    /* sequential reference loop */
+#define FC_K_BLOCKWISE 2 /* portable 8-lane C */
+#define FC_K_VECTOR 3    /* the platform's vector kernel: neon or avx2 */
+#define FC_K_VECTOR512 4 /* avx512 */
+
+/* Results of fc_kernel_select(). */
+#define FC_KSEL_OK 0
+#define FC_KSEL_UNKNOWN 1  /* not a kernel name on this platform */
+#define FC_KSEL_NOTBUILT 2 /* known, but not compiled into this binary */
+#define FC_KSEL_NOCPU 3    /* known and built, but this CPU cannot run it */
+
+/* Resolve a kernel name for this build. On FC_KSEL_OK the id is stored in
+ * *out_id, otherwise *out_id is left alone. The three failures are kept apart
+ * because they need different fixes: a typo, too old a compiler, or the wrong
+ * CPU. */
+int fc_kernel_select(const char *name, int *out_id);
+
+/* Comma-separated list of the kernel names this build accepts, for error
+ * messages. Names a CPU cannot run are still listed. */
+const char *fc_kernel_names(void);
+
 /* Scan up to n positions: for i = 0..n-1 advance fp = (fp << 1) + gear[p[i]]
  * and test (fp & mask) == 0.
  * Returns the first i that matched (fp is left at position i), or -1 if none
  * matched (fp is left at position n-1).
- * gear: the keyed 256-entry table. force_scalar != 0 selects the sequential
- * reference loop (for tests); otherwise the best kernel for this CPU is used.
+ * gear: the keyed 256-entry table. kernel is one of FC_K_*; FC_K_AUTO picks
+ * the best one this CPU can run. Callers are expected to have validated any
+ * explicit choice with fc_kernel_select() - an unrunnable one falls back to
+ * FC_K_AUTO rather than crashing.
  * All kernels return bit-identical results. */
-int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int force_scalar);
+int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel);
 
-/* Name of the kernel fc_scan would use: "neon", "avx512", "avx2", "blockwise" or "scalar". */
-const char *fc_kernel_name(int force_scalar);
+/* Name of the kernel <kernel> selects; for FC_K_AUTO, the auto-selected one. */
+const char *fc_kernel_name(int kernel);
 
 #endif

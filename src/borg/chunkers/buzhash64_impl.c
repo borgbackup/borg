@@ -298,22 +298,12 @@ bz64_scan_simd512(const uint64_t *T, const uint64_t *Trot,
     return j;
 }
 
-static int bz64_env_set(const char *name)
-{
-    const char *e = getenv(name);
-    return e != NULL && e[0] != 0 && strcmp(e, "0") != 0;
-}
-
 static int bz64_simd_available(void)
 {
-    /* BORG_BUZHASH64_NO_AVX512 caps dispatch at AVX2, BORG_BUZHASH64_NO_AVX2
-     * at the blockwise scalar kernel (for benchmarking the kernels against
-     * each other); like the detection itself they are read once per process,
-     * so they must be set before the first chunker use. */
-    if (bz64_env_set("BORG_BUZHASH64_NO_AVX2"))
-        return 0;
-    if (__builtin_cpu_supports("avx512f") && !bz64_env_set("BORG_BUZHASH64_NO_AVX512"))
+#ifdef BZ_KIND_512
+    if (__builtin_cpu_supports("avx512f"))
         return 2;
+#endif
     return __builtin_cpu_supports("avx2");
 }
 
@@ -334,38 +324,102 @@ static int bz64_simd_available(void)
 
 #endif
 
+/* --- kernel selection --------------------------------------------------- */
+
+const char *bz64_kernel_names(void)
+{
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    return "auto, avx512, avx2, blockwise, scalar";
+#else
+    return "auto, blockwise, scalar";
+#endif
+}
+
+int bz64_kernel_select(const char *name, int *out_id)
+{
+    if (strcmp(name, "auto") == 0) {
+        *out_id = BZ_K_AUTO;
+        return BZ_KSEL_OK;
+    }
+    if (strcmp(name, "scalar") == 0) {
+        *out_id = BZ_K_SCALAR;
+        return BZ_KSEL_OK;
+    }
+    if (strcmp(name, "blockwise") == 0) {
+        *out_id = BZ_K_BLOCKWISE;
+        return BZ_KSEL_OK;
+    }
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    if (strcmp(name, "avx2") == 0) {
+        if (!__builtin_cpu_supports("avx2"))
+            return BZ_KSEL_NOCPU;
+        *out_id = BZ_K_VECTOR;
+        return BZ_KSEL_OK;
+    }
+    if (strcmp(name, "avx512") == 0) {
+#ifndef BZ_KIND_512
+        return BZ_KSEL_NOTBUILT; /* compiler too old for the target attribute */
+#else
+        if (!__builtin_cpu_supports("avx512f"))
+            return BZ_KSEL_NOCPU;
+        *out_id = BZ_K_VECTOR512;
+        return BZ_KSEL_OK;
+#endif
+    }
+#endif
+    return BZ_KSEL_UNKNOWN;
+}
+
 /* --- dispatch ----------------------------------------------------------- */
 
-/* resolved once (0 = blockwise, 1 = BZ_KIND, 2 = BZ_KIND_512 where defined);
- * a racy double-init writes the same value, so it is benign */
-static int bz64_use_simd = -1;
+/* the kernel BZ_K_AUTO resolves to, worked out once; a racy double-init
+ * writes the same value, so it is benign */
+static int bz64_auto = -1;
+
+static int bz64_auto_kernel(void)
+{
+    int a;
+    if (bz64_auto < 0) {
+        a = bz64_simd_available();
+        bz64_auto = (a == 2) ? BZ_K_VECTOR512 : (a ? BZ_K_VECTOR : BZ_K_BLOCKWISE);
+    }
+    return bz64_auto;
+}
 
 size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
                  const uint8_t *p_rem, const uint8_t *p_add,
-                 size_t n, uint64_t *sum, uint64_t mask, int force_scalar)
+                 size_t n, uint64_t *sum, uint64_t mask, int kernel)
 {
-    if (force_scalar)
+    if (kernel == BZ_K_AUTO)
+        kernel = bz64_auto_kernel();
+    switch (kernel) {
+    case BZ_K_SCALAR:
         return bz64_scan_seq(table, table_rot, p_rem, p_add, n, sum, mask);
-    if (bz64_use_simd < 0)
-        bz64_use_simd = bz64_simd_available();
+    case BZ_K_BLOCKWISE:
+        return bz64_scan_blockwise(table, table_rot, p_rem, p_add, n, sum, mask);
 #ifdef BZ_KIND_512
-    if (bz64_use_simd == 2)
+    case BZ_K_VECTOR512:
         return bz64_scan_simd512(table, table_rot, p_rem, p_add, n, sum, mask);
 #endif
-    if (bz64_use_simd)
+    default:
         return bz64_scan_simd(table, table_rot, p_rem, p_add, n, sum, mask);
-    return bz64_scan_blockwise(table, table_rot, p_rem, p_add, n, sum, mask);
+    }
 }
 
-const char *bz64_kernel_name(int force_scalar)
+const char *bz64_kernel_name(int kernel)
 {
-    if (force_scalar)
+    if (kernel == BZ_K_AUTO)
+        kernel = bz64_auto_kernel();
+    switch (kernel) {
+    case BZ_K_SCALAR:
         return "scalar";
-    if (bz64_use_simd < 0)
-        bz64_use_simd = bz64_simd_available();
+    case BZ_K_BLOCKWISE:
+        return "blockwise";
 #ifdef BZ_KIND_512
-    if (bz64_use_simd == 2)
+    case BZ_K_VECTOR512:
         return BZ_KIND_512;
 #endif
-    return bz64_use_simd ? BZ_KIND : "blockwise";
+    default:
+        return BZ_KIND;
+    }
 }

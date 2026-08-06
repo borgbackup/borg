@@ -66,7 +66,7 @@ uint64_t ra_digest64(const RA_CTX *c, const uint8_t *q)
 #define PH_DIGEST64 ra_digest64
 #include "phte_scan.h"
 
-RA_CTX *ra_new(const uint64_t tables[RA_TABLES * 256], const uint8_t aes_key[16], int force_sw)
+RA_CTX *ra_new(const uint64_t tables[RA_TABLES * 256], const uint8_t aes_key[16], int kernel)
 {
     RA_CTX *c = calloc(1, sizeof(RA_CTX));
     if (c == NULL)
@@ -76,7 +76,7 @@ RA_CTX *ra_new(const uint64_t tables[RA_TABLES * 256], const uint8_t aes_key[16]
     memcpy(c->w1_tbl, tables + 2 * 256, sizeof(c->w1_tbl));
     memcpy(c->out8_tbl, tables + 3 * 256, sizeof(c->out8_tbl));
     memcpy(c->out16_tbl, tables + 4 * 256, sizeof(c->out16_tbl));
-    if (!phte_base_init(&c->base, aes_key, force_sw)) {
+    if (!phte_base_init(&c->base, aes_key, kernel)) {
         free(c);
         return NULL;
     }

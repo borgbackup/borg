@@ -153,13 +153,13 @@ def test_buzhash64_kernels_identical():
 
     default = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
     sizes_default = sizes(default)
-    os.environ["BORG_BUZHASH64_FORCE_SCALAR"] = "1"
+    os.environ["BORG_BUZHASH64_KERNEL"] = "scalar"
     try:
         forced = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
         assert forced.kernel == "scalar"
         sizes_scalar = sizes(forced)
     finally:
-        del os.environ["BORG_BUZHASH64_FORCE_SCALAR"]
+        del os.environ["BORG_BUZHASH64_KERNEL"]
     assert sizes_default == sizes_scalar
     # whatever kernel was selected by default, it must be a known one
     assert default.kernel in ("avx512", "avx2", "blockwise", "scalar")

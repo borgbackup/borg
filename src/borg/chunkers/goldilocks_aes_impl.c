@@ -135,7 +135,7 @@ uint64_t gl_digest64(const GL_CTX *c, const uint8_t *q)
 #include "phte_scan.h"
 
 GL_CTX *gl_new(const uint64_t tables[GL_TABLES * 256], uint64_t k1, uint64_t k2,
-               const uint8_t aes_key[16], int force_sw)
+               const uint8_t aes_key[16], int kernel)
 {
     GL_CTX *c = calloc(1, sizeof(GL_CTX));
     if (c == NULL)
@@ -145,7 +145,7 @@ GL_CTX *gl_new(const uint64_t tables[GL_TABLES * 256], uint64_t k1, uint64_t k2,
     memcpy(c->in1_tbl, tables + 2 * 256, sizeof(c->in1_tbl));
     c->k1 = k1;
     c->k2 = k2;
-    if (!phte_base_init(&c->base, aes_key, force_sw)) {
+    if (!phte_base_init(&c->base, aes_key, kernel)) {
         free(c);
         return NULL;
     }

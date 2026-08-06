@@ -13,6 +13,8 @@
 #ifndef BORG_PHTE_CORE_H
 #define BORG_PHTE_CORE_H
 
+#include "phte_kernel.h"
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -141,14 +143,7 @@ phte_aes1_ni(const uint8_t rk[11][16], __m128i b)
 
 static int phte_hw512_available(void)
 {
-    /* BORG_PHTE_NO_VAES caps the AES chunkers at the 128-bit AES-NI path
-     * (for benchmarking the paths against each other); it is read at
-     * context creation, ""/"0" mean off. */
-    const char *e;
-    if (!__builtin_cpu_supports("avx512f") || !__builtin_cpu_supports("vaes"))
-        return 0;
-    e = getenv("BORG_PHTE_NO_VAES");
-    return e == NULL || e[0] == 0 || strcmp(e, "0") == 0;
+    return __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("vaes");
 }
 #endif
 
@@ -160,24 +155,76 @@ static int phte_hw512_available(void)
 #define PHTE_HAVE_HW512 0
 #endif
 
+/* --- kernel selection ---------------------------------------------------
+ *
+ * Shared by all three AES chunkers: the scan path lives in phte_scan.h and
+ * only the rolling hash differs between them, so there is no machine on which
+ * one of them has a hardware path and another does not. Hence one selector
+ * (BORG_AES_CHUNKER_KERNEL) rather than one per chunker. */
+
+const char *phte_kernel_names(void)
+{
+#if defined(__aarch64__)
+    return "auto, aes-arm64, evp";
+#elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    return "auto, vaes, aes-ni, evp";
+#else
+    return "auto, evp";
+#endif
+}
+
+int phte_kernel_select(const char *name, int *out_id)
+{
+    if (strcmp(name, "auto") == 0) {
+        *out_id = PHTE_K_AUTO;
+        return PHTE_KSEL_OK;
+    }
+    if (strcmp(name, "evp") == 0) {
+        *out_id = PHTE_K_EVP;
+        return PHTE_KSEL_OK;
+    }
+#if PHTE_HAVE_HW
+    if (strcmp(name, PHTE_KIND_HW) == 0) {
+        if (!phte_hw_available())
+            return PHTE_KSEL_NOCPU;
+        *out_id = PHTE_K_HW;
+        return PHTE_KSEL_OK;
+    }
+#endif
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    if (strcmp(name, "vaes") == 0) {
+#if !PHTE_HAVE_HW512
+        return PHTE_KSEL_NOTBUILT; /* compiler too old for the VAES intrinsics */
+#else
+        if (!phte_hw512_available())
+            return PHTE_KSEL_NOCPU;
+        *out_id = PHTE_K_HW512;
+        return PHTE_KSEL_OK;
+#endif
+    }
+#endif
+    return PHTE_KSEL_UNKNOWN;
+}
+
 /* --- context base management ------------------------------------------- */
 
 /* Expand the AES key, select the scan path and set up the OpenSSL context.
+ * kernel is one of PHTE_K_*; PHTE_K_AUTO picks the best path this CPU can run.
  * Returns 0 on failure (caller frees its context). */
-static int phte_base_init(PHTE_BASE *b, const uint8_t aes_key[16], int force_sw)
+static int phte_base_init(PHTE_BASE *b, const uint8_t aes_key[16], int kernel)
 {
     phte_aes128_expand(aes_key, b->rk);
 #if PHTE_HAVE_HW
-    b->use_hw = !force_sw && phte_hw_available();
+    b->use_hw = (kernel == PHTE_K_AUTO || kernel == PHTE_K_HW || kernel == PHTE_K_HW512) && phte_hw_available();
 #else
-    (void)force_sw;
     b->use_hw = 0;
 #endif
 #if PHTE_HAVE_HW512
-    b->use_hw512 = b->use_hw && phte_hw512_available();
+    b->use_hw512 = b->use_hw && kernel != PHTE_K_HW && phte_hw512_available();
 #else
     b->use_hw512 = 0;
 #endif
+    (void)kernel;
     b->evp = EVP_CIPHER_CTX_new();
     if (b->evp == NULL)
         return 0;

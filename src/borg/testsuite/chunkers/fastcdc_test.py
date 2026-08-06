@@ -189,13 +189,42 @@ def test_fastcdc_kernels_identical():
 
     default = ChunkerFastCDC(key0, 10, 16, 14, 2)
     sizes_default = sizes(default)
-    os.environ["BORG_FASTCDC_FORCE_SCALAR"] = "1"
+    os.environ["BORG_FASTCDC_KERNEL"] = "scalar"
     try:
         forced = ChunkerFastCDC(key0, 10, 16, 14, 2)
         assert forced.kernel == "scalar"
         sizes_scalar = sizes(forced)
     finally:
-        del os.environ["BORG_FASTCDC_FORCE_SCALAR"]
+        del os.environ["BORG_FASTCDC_KERNEL"]
     assert sizes_default == sizes_scalar
     # whatever kernel was selected by default, it must be a known one
     assert default.kernel in ("neon", "avx512", "avx2", "blockwise", "scalar")
+
+
+@pytest.mark.parametrize("envvar", ["BORG_FASTCDC_KERNEL", "BORG_BUZHASH64_KERNEL", "BORG_AES_CHUNKER_KERNEL"])
+def test_kernel_env_rejects_unusable(envvar, monkeypatch):
+    # A kernel that cannot run here must fail loudly instead of silently
+    # falling back - a silent fallback would turn a benchmark, or a CI job that
+    # means to pin one kernel, into a measurement of a different one.
+    from ...chunkers import ChunkerBuzHash64, ChunkerToeplitzAES
+
+    make = {
+        "BORG_FASTCDC_KERNEL": lambda k: ChunkerFastCDC(k, 10, 16, 14, 2),
+        "BORG_BUZHASH64_KERNEL": lambda k: ChunkerBuzHash64(k, 10, 16, 14, 4095, 2),
+        "BORG_AES_CHUNKER_KERNEL": lambda k: ChunkerToeplitzAES(k, 10, 16, 14, 2),
+    }[envvar]
+    key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
+
+    monkeypatch.setenv(envvar, "no-such-kernel")
+    with pytest.raises(ValueError, match="no-such-kernel"):
+        make(key0)
+
+    # "auto" and an unset var both mean "pick the best one", and always work
+    monkeypatch.setenv(envvar, "auto")
+    auto = make(key0).kernel
+    monkeypatch.delenv(envvar)
+    assert make(key0).kernel == auto
+
+    # asking for whatever auto-selection picked must yield exactly that
+    monkeypatch.setenv(envvar, auto)
+    assert make(key0).kernel == auto

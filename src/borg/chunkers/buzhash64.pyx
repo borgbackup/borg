@@ -17,8 +17,13 @@ from .base cimport ChunkerBase
 cdef extern from "buzhash64_impl.h":
     size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
                      const uint8_t *p_rem, const uint8_t *p_add,
-                     size_t n, uint64_t *sum, uint64_t mask, int force_scalar) nogil
-    const char *bz64_kernel_name(int force_scalar)
+                     size_t n, uint64_t *sum, uint64_t mask, int kernel) nogil
+    const char *bz64_kernel_name(int kernel)
+    int bz64_kernel_select(const char *name, int *out_id)
+    const char *bz64_kernel_names()
+    int BZ_K_AUTO
+
+from .kernel_env import kernel_error, requested_kernel
 
 # Cyclic polynomial / buzhash
 #
@@ -101,6 +106,20 @@ cdef uint64_t _buzhash64_update(uint64_t sum, unsigned char remove, unsigned cha
     return BARREL_SHIFT64(sum, 1) ^ BARREL_SHIFT64(h[remove], lenmod) ^ h[add]
 
 
+cdef int _select_kernel() except -1:
+    """Resolve BORG_BUZHASH64_KERNEL to a kernel id, raising if it cannot be honoured."""
+    cdef int kid = BZ_K_AUTO
+    cdef int rc
+    want = requested_kernel("BORG_BUZHASH64_KERNEL")
+    if want is None:
+        return BZ_K_AUTO
+    rc = bz64_kernel_select(want.encode("ascii"), &kid)
+    if rc != 0:
+        raise kernel_error("BORG_BUZHASH64_KERNEL", want, rc,
+                           (<bytes>bz64_kernel_names()).decode("ascii"))
+    return kid
+
+
 cdef class ChunkerBuzHash64(ChunkerBase):
     """
     Content-Defined Chunker, variable chunk sizes.
@@ -118,7 +137,7 @@ cdef class ChunkerBuzHash64(ChunkerBase):
     """
     cdef uint64_t* table
     cdef uint64_t* table_rot
-    cdef int force_scalar
+    cdef int kernel_id
     cdef size_t window_size
 
     def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, int nc_level=0, size_t normal_size=0, bint sparse=False):
@@ -139,7 +158,7 @@ cdef class ChunkerBuzHash64(ChunkerBase):
         lenmod = <uint64_t>hash_window_size & 0x3f
         for i_rot in range(256):
             self.table_rot[i_rot] = BARREL_SHIFT64(self.table[i_rot], lenmod)
-        self.force_scalar = 1 if os.environ.get("BORG_BUZHASH64_FORCE_SCALAR", "") not in ("", "0") else 0
+        self.kernel_id = _select_kernel()
         # buzhash64 output is uniform, so contiguous low-bit masks are used (high_masks=False)
         self._setup_common("buzhash64", chunk_min_exp, chunk_max_exp, hash_mask_bits,
                            nc_level, normal_size, False, sparse)
@@ -155,8 +174,12 @@ cdef class ChunkerBuzHash64(ChunkerBase):
 
     @property
     def kernel(self):
-        """Which scan kernel this chunker uses: 'avx512', 'avx2', 'blockwise' or 'scalar'."""
-        return (<bytes>bz64_kernel_name(self.force_scalar)).decode("ascii")
+        """Which scan kernel this chunker uses: 'avx512', 'avx2', 'blockwise' or 'scalar'.
+
+        With BORG_BUZHASH64_KERNEL set to anything but "auto", this is always the
+        requested kernel - creating the chunker fails otherwise.
+        """
+        return (<bytes>bz64_kernel_name(self.kernel_id)).decode("ascii")
 
     cdef object process(self):
         """Process the chunker's buffer and return the next chunk."""
@@ -169,7 +192,7 @@ cdef class ChunkerBuzHash64(ChunkerBase):
         cdef uint8_t* stop_at
         cdef uint8_t* nc_stop
         cdef size_t did_bytes, span
-        cdef int force_scalar = self.force_scalar
+        cdef int kernel_id = self.kernel_id
 
         if self.done:
             if self.bytes_read == self.bytes_yielded:
@@ -229,7 +252,7 @@ cdef class ChunkerBuzHash64(ChunkerBase):
             span = stop_at - p
             with nogil:
                 did_bytes = bz64_scan(self.table, self.table_rot, p, p + window_size,
-                                      span, &sum, mask, force_scalar)
+                                      span, &sum, mask, kernel_id)
             self.position += did_bytes
             self.remaining -= did_bytes
 

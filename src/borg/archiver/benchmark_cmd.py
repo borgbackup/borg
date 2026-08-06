@@ -308,7 +308,14 @@ class BenchmarkMixIn:
 
         if "hashing" in selected:
             from ..crypto.low_level import hmac_sha256, blake2b_256
+            from ..crypto.key import get_blake3_mt_threshold
             import blake3
+
+            def blake3_hash(d):
+                # mirror what borg does per chunk (see AESKeyBase.id_hash): below the
+                # threshold multi-threading costs more than it gains, so it is not used
+                max_threads = blake3.blake3.AUTO if len(d) >= get_blake3_mt_threshold() else 1
+                return blake3.blake3(d, key=key_256, max_threads=max_threads).digest()
 
             section_header("hashes", "Cryptographic hashes / MACs")
             # only blake3 uses multiple threads, and only above a size threshold,
@@ -316,12 +323,7 @@ class BenchmarkMixIn:
             hashes_tests = [
                 ("hmac-sha256", one_size, lambda d: hmac_sha256(key_256, d)),
                 ("blake2b-256", one_size, lambda d: blake2b_256(key_256, d)),
-                ("blake3", hash_sizes, lambda d: blake3.blake3(d, key=key_256).digest()),
-                (
-                    "blake3-mt",
-                    hash_sizes,
-                    lambda d: blake3.blake3(d, key=key_256, max_threads=blake3.blake3.AUTO).digest(),
-                ),
+                ("blake3", hash_sizes, blake3_hash),
             ]
             for spec, sizes, func in hashes_tests:
                 for label, nbytes in sizes:

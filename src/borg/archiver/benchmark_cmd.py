@@ -353,7 +353,19 @@ class BenchmarkMixIn:
 
             section_header("encryption", "Encryption")
             size = chunk_data_size * number_default
+            # AEAD modes first (what borg uses by default), then the legacy
+            # encrypt-then-MAC ones
             tests = [
+                (
+                    "aes-256-ocb",
+                    lambda: AES256_OCB(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b"X"),
+                ),
+                (
+                    "chacha20-poly1305",
+                    lambda: CHACHA20_POLY1305(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(
+                        random_10M, header=b"X"
+                    ),
+                ),
                 (
                     "aes-256-ctr-hmac-sha256",
                     lambda: AES256_CTR_HMAC_SHA256(key_256, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
@@ -363,16 +375,6 @@ class BenchmarkMixIn:
                 (
                     "aes-256-ctr-blake2b",
                     lambda: AES256_CTR_BLAKE2b(key_256 * 4, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
-                        random_10M, header=b"X"
-                    ),
-                ),
-                (
-                    "aes-256-ocb",
-                    lambda: AES256_OCB(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b"X"),
-                ),
-                (
-                    "chacha20-poly1305",
-                    lambda: CHACHA20_POLY1305(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(
                         random_10M, header=b"X"
                     ),
                 ),

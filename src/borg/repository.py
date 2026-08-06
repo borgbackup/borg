@@ -955,9 +955,12 @@ class Repository:
         The index is hashed first and the packs only if it is intact. The packs could be hashed even
         with a corrupt index, but a corrupt index already means the user has to repair it, and that
         rebuild re-reads every pack anyway - so a read-only check just stops and reports it instead of
-        continuing. The index is never rebuilt here in any case: reading every pack to do so would be
-        far too slow and expensive for a routine (e.g. cron) check. Salvaging good objects out of
-        corrupt packs and dropping those packs is left to repair, refs #8572.
+        continuing. A read-only check never rebuilds the index: reading every pack to do so would be
+        far too slow and expensive for a routine (e.g. cron) check.
+
+        With repair=True and a corrupt index, the index is rebuilt from the object headers of the packs
+        whose sha256 still matches, then persisted. Salvaging objects out of corrupt packs is not
+        implemented yet, refs #8572.
         """
 
         def verify(namespace, name):
@@ -994,6 +997,7 @@ class Repository:
         t_last_checkpoint = t_start
         index_files = index_errors = 0
         pack_files = pack_errors = 0
+        index_repaired = False
         # index and packs get separate progress indicators, each running from 0% to 100%.
         # the index is checked first and in full, on partial checks too: it is small, and index errors
         # stop the pack check below.
@@ -1047,17 +1051,49 @@ class Repository:
                 logger.info("Finished checking packs.")
                 tracker.clear()
             pack_pi.finish()
+        elif repair:
+            # rebuild the corrupt index from the packs' object headers. only packs whose sha256 still
+            # matches are used: an entry taken from a corrupted header could point the index at a wrong
+            # or absent object and break dedup on the next create (refs #8476). chunks that exist only in
+            # the skipped packs drop out of the index (refs #8572, #10026, salvaging them needs the key).
+            logger.warning("Repository index is corrupted; rebuilding it from the packs.")
+            pack_infos = store_list("packs")
+            good_pack_ids = []
+            pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
+            for info in pack_infos:
+                self._lock_refresh()
+                pack_pi.show(increase=1)
+                pack_files += 1
+                if verify("packs", info.name):
+                    good_pack_ids.append(hex_to_bin(info.name))
+                else:
+                    pack_errors += 1
+            if pack_infos:
+                pack_pi.show(current=len(pack_infos))  # finish at 100%
+            pack_pi.finish()
+            from .cache import build_chunkindex_from_repo
+
+            # write_immediately stores the rebuilt index and deletes the corrupt fragments.
+            build_chunkindex_from_repo(self, slow_rebuild=True, write_immediately=True, only_packs=good_pack_ids)
+            index_repaired = True
         else:
-            # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
         objs_errors = index_errors + pack_errors
         logger.info(
             f"Checked {index_files} index files ({index_errors} errors) and {pack_files} packs ({pack_errors} errors)."
         )
+        if index_repaired:
+            logger.info("Repository index was corrupted and has been rebuilt from the intact packs.")
         if objs_errors == 0:
             logger.info(f"Finished {mode} repository check, no problems found.")
         elif repair:
-            logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
+            if pack_errors:
+                logger.error(
+                    f"Finished {mode} repository check, {pack_errors} corrupt pack(s) could not be "
+                    "repaired (pack repair is not implemented yet)."
+                )
+            else:
+                logger.info(f"Finished {mode} repository check, repaired.")
         else:
             logger.error(f"Finished {mode} repository check, errors found.")
         return objs_errors == 0 or repair

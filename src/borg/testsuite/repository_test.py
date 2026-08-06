@@ -1053,6 +1053,56 @@ def test_check_detects_index_corruption(tmp_path):
         assert repository.check(repair=False) is False  # mismatch between content hash and name detected
 
 
+def test_check_repair_rebuilds_corrupt_index(tmp_path):
+    # check(repair=True) rebuilds a corrupt index from the packs' object headers.
+    location = os.fspath(tmp_path / "repo")
+    ids = [H(x) for x in range(10)]
+    with Repository(location, exclusive=True, create=True) as repository:
+        for i, cid in enumerate(ids):
+            repository.put(cid, fchunk(bytes([i]) * 20, chunk_id=cid))
+        repository.flush()  # seal the pack(s) and let close() persist the index
+    with reopen(repository) as repository:
+        index_names = [f"index/{info.name}" for info in repository.store_list("index")]
+        assert index_names  # close() persisted at least one index fragment
+        for name in index_names:  # rot every fragment so its content no longer matches its sha256 name
+            data = bytearray(repository.store_load(name))
+            data[0] ^= 0xFF
+            repository.store_store(name, bytes(data))
+        assert repository.check(repair=False) is False  # read-only check reports the corrupt index
+    with reopen(repository) as repository:
+        assert repository.check(repair=True) is True  # repair rebuilds the index from the packs
+    with reopen(repository) as repository:
+        assert repository.check(repair=False) is True  # the rebuilt index passes a read-only check
+        for i, cid in enumerate(ids):
+            assert pdchunk(repository.get(cid)) == bytes([i]) * 20  # every chunk is indexed and resolves
+
+
+def test_check_repair_excludes_corrupt_pack_from_rebuilt_index(tmp_path):
+    # The rebuild must not trust a corrupt pack's headers (they could poison the index and break dedup,
+    # refs #8476), so a pack that fails its sha256 is left out of the rebuilt index; its chunk is dropped.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository.put(H(1), fchunk(b"GOOD-CHUNK", chunk_id=H(1)))
+        repository.flush()  # seal a pack holding H(1)
+        repository.put(H(2), fchunk(b"LOST-CHUNK", chunk_id=H(2)))
+        repository.flush()  # seal a separate pack holding H(2)
+    with reopen(repository) as repository:
+        bad_pack_name = "packs/" + bin_to_hex(repository.chunks[H(2)].pack_id)
+        data = bytearray(repository.store_load(bad_pack_name))
+        data[-1] ^= 0xFF  # rot the pack holding H(2): its content no longer matches its sha256 name
+        repository.store_store(bad_pack_name, bytes(data))
+        for info in repository.store_list("index"):  # rot the index so repair takes the rebuild path
+            name = f"index/{info.name}"
+            idata = bytearray(repository.store_load(name))
+            idata[0] ^= 0xFF
+            repository.store_store(name, bytes(idata))
+    with reopen(repository) as repository:
+        assert repository.check(repair=True) is True
+    with reopen(repository) as repository:
+        assert H(2) not in repository.chunks  # corrupt pack's chunk left out of the rebuilt index
+        assert pdchunk(repository.get(H(1))) == b"GOOD-CHUNK"  # intact pack's chunk recovered and resolves
+
+
 def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):
     # check warns about an invalid chunk index but does not fail, since the index is not part of
     # the repository's object integrity.

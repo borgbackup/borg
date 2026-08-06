@@ -153,6 +153,10 @@ class BenchmarkMixIn:
         """Benchmark CPU-bound operations."""
         from timeit import timeit
 
+        def throughput(size, dt):
+            """Rate as MB/s, always - so numbers stay comparable between rows."""
+            return f"{size / dt / 1e6:>8.1f} MB/s"
+
         result = {} if args.json else None
 
         is_test = "_BORG_BENCHMARK_CPU_TEST" in os.environ
@@ -173,7 +177,7 @@ class BenchmarkMixIn:
             print("Chunkers =======================================================")
         else:
             result["chunkers"] = []
-        size = 1000000000
+        size = data_size * number_default
 
         def chunkit(ch):
             with io.BytesIO(random_10M) as data_file:
@@ -224,7 +228,7 @@ class BenchmarkMixIn:
                 algo, _, algo_params = spec.partition(",")
                 result["chunkers"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
             else:
-                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
+                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s  {throughput(size, dt)}")
 
         from ..crypto.low_level import hmac_sha256, blake2b_256
         import blake3
@@ -233,7 +237,7 @@ class BenchmarkMixIn:
             print("Cryptographic hashes / MACs ====================================")
         else:
             result["hashes"] = []
-        size = 1000000000
+        size = data_size * number_default
         hashes_tests = [
             ("hmac-sha256", lambda: hmac_sha256(key_256, random_10M)),
             ("blake2b-256", lambda: blake2b_256(key_256, random_10M)),
@@ -245,7 +249,7 @@ class BenchmarkMixIn:
             if args.json:
                 result["hashes"].append({"algo": spec, "size": size, "time": dt})
             else:
-                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
+                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s  {throughput(size, dt)}")
 
         from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
         from ..crypto.low_level import AES256_OCB, CHACHA20_POLY1305
@@ -254,7 +258,7 @@ class BenchmarkMixIn:
             print("Encryption =====================================================")
         else:
             result["encryption"] = []
-        size = 1000000000
+        size = data_size * number_default
 
         tests = [
             (
@@ -285,7 +289,7 @@ class BenchmarkMixIn:
             if args.json:
                 result["encryption"].append({"algo": spec, "size": size, "time": dt})
             else:
-                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
+                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s  {throughput(size, dt)}")
 
         if not args.json:
             print("Compression ====================================================")
@@ -307,13 +311,13 @@ class BenchmarkMixIn:
             "lzma,9",
         ]:
             compressor = CompressionSpec(spec).compressor
-            size = 100000000
+            size = data_size * number_compression
             dt = timeit(lambda: compressor.compress({}, random_10M), number=number_compression)
             if args.json:
                 algo, _, algo_params = spec.partition(",")
                 result["compression"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
             else:
-                print(f"{spec:<12} {format_file_size(size):<10} {dt:.3f}s")
+                print(f"{spec:<12} {format_file_size(size):<10} {dt:.3f}s  {throughput(size, dt)}")
 
         if not args.json:
             print("msgpack ========================================================")
@@ -321,13 +325,15 @@ class BenchmarkMixIn:
             result["msgpack"] = []
         item = Item(path="foo/bar/baz", mode=660, mtime=1234567)
         items = [item.as_dict()] * 1000
-        size = "100k Items"
+        count = 1000 * number_default
+        size = "%dk Items" % (count // 1000)
         spec = "msgpack"
         dt = timeit(lambda: msgpack.packb(items), number=number_default)
         if args.json:
-            result["msgpack"].append({"algo": spec, "count": 100000, "time": dt})
+            result["msgpack"].append({"algo": spec, "count": count, "time": dt})
         else:
-            print(f"{spec:<12} {size:<10} {dt:.3f}s")
+            # this one packs items, not bytes, so it gets a rate in its own unit
+            print(f"{spec:<12} {size:<10} {dt:.3f}s  {count / dt / 1000:>8.1f} kItems/s")
 
         if args.json:
             json_print(result)

@@ -1929,10 +1929,10 @@ class ArchiveChecker:
                 rebuild_manifest = True
         if rebuild_manifest:
             self.manifest = self.rebuild_manifest()
-        # On Ctrl-C, skip the remaining scans.
+        # On Ctrl-C, skip any scan not yet started; a scan already running stops at its own boundary.
+        if find_lost_archives and not sig_int:
+            self.rebuild_archives_directory()
         if not sig_int:
-            if find_lost_archives:
-                self.rebuild_archives_directory()
             self.rebuild_archives(
                 match=match,
                 first=first,

@@ -110,14 +110,12 @@ def test_check_soft_interrupt(archivers, request, monkeypatch):
     with Repository(archiver.repository_path, exclusive=True) as repository:
         orig_get = repository.get
         get_calls = 0
-        interrupted_after = None
 
         def get_then_interrupt(*args, **kwargs):
-            nonlocal get_calls, interrupted_after
+            nonlocal get_calls
             get_calls += 1
             if get_calls == 3:  # trip mid-loop, after 3 chunks
                 sig_int._sig_int_triggered = True
-                interrupted_after = get_calls
             return orig_get(*args, **kwargs)
 
         monkeypatch.setattr(repository, "get", get_then_interrupt)
@@ -126,7 +124,8 @@ def test_check_soft_interrupt(archivers, request, monkeypatch):
                 ArchiveChecker().check(repository, verify_data=True, sort_by="ts", format="{archive} {time} {id}")
         finally:
             sig_int._sig_int_triggered = False
-        assert interrupted_after == 3  # the loop stopped after verifying 3 chunks
+        # verify_data breaks at the chunk it interrupted on, and the skipped scans issue no more get()s.
+        assert get_calls == 3
 
     # nothing changed, so a normal check passes.
     cmd(archiver, "check", exit_code=0)
@@ -163,6 +162,49 @@ def test_check_repair_soft_interrupt(archivers, request, monkeypatch):
     # a second --repair finishes the job; a plain check then finds no problems.
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
+
+
+def test_check_interrupt_skips_archive_check(archivers, request, monkeypatch):
+    """A Ctrl-C during the repository check makes a full `borg check` skip the archive check. do_check
+    raises at the sig_int guard, which sits before the archive_checker.check() call, so the raise itself
+    is the skip. Exercises the do_check path (the other soft-interrupt tests call check() directly)."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:  # a class-level monkeypatch cannot reach the borg.exe subprocess
+        pytest.skip("in-process store patch does not apply to the binary")
+    check_cmd_setup(archiver)  # produces many packs
+
+    from borgstore.store import Store
+
+    orig_hash = Store.hash
+    pack_checks = []
+
+    def hash_then_interrupt(self, key):
+        result = orig_hash(self, key)
+        if key.startswith("packs/"):  # count pack checks, not the index files hashed first
+            pack_checks.append(key)
+            if len(pack_checks) == 1:  # one Ctrl-C after the first pack is checked
+                sig_int._sig_int_triggered = True
+        return result
+
+    # spy on the archive check: "Got Ctrl-C" is also raised inside ArchiveChecker.check(), so matching the
+    # message alone would not prove the skip. Recording that check() never runs is the load-bearing assertion.
+    orig_check = ArchiveChecker.check
+    archive_check_ran = False
+
+    def spy_check(self, *args, **kwargs):
+        nonlocal archive_check_ran
+        archive_check_ran = True
+        return orig_check(self, *args, **kwargs)
+
+    monkeypatch.setattr(Store, "hash", hash_then_interrupt)
+    monkeypatch.setattr(ArchiveChecker, "check", spy_check)
+    try:
+        # exec_cmd calls Archiver.run() directly; only main() maps Error to an exit code, so it propagates.
+        with pytest.raises(Error, match="Got Ctrl-C"):
+            cmd(archiver, "check", "-v")
+    finally:
+        sig_int._sig_int_triggered = False
+    assert archive_check_ran is False  # do_check raised at the sig_int guard, before archive_checker.check()
 
 
 def test_date_matching(archivers, request):

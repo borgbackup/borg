@@ -1058,16 +1058,15 @@ class Repository:
         logger.info(
             f"Checked {index_files} index files ({index_errors} errors) and {pack_files} packs ({pack_errors} errors)."
         )
+        # On Ctrl-C the check stopped early, so the summary only covers the packs seen so far.
+        done, so_far = ("Interrupted", " so far") if sig_int else ("Finished", "")
         if objs_errors == 0:
-            if sig_int:
-                logger.info(f"Interrupted {mode} repository check, no problems found so far.")
-            else:
-                logger.info(f"Finished {mode} repository check, no problems found.")
+            logger.info(f"{done} {mode} repository check, no problems found{so_far}.")
         elif repair:
-            logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
+            logger.error(f"{done} {mode} repository check, errors found{so_far} (repository repair not implemented).")
         else:
-            logger.error(f"Finished {mode} repository check, errors found.")
-        # True means the checked objects were clean; on Ctrl-C that covers only the packs seen so far.
+            logger.error(f"{done} {mode} repository check, errors found{so_far}.")
+        # True means the checked objects were clean; --repair returns True so the caller proceeds to fix them.
         return objs_errors == 0 or repair
 
     def list(self, limit=None, marker=None):

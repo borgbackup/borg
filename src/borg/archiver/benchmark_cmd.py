@@ -389,25 +389,28 @@ class BenchmarkMixIn:
                 sample = compressible_buffer(comp_sizes[-1][1])
                 ratio = len(sample) / len(CompressionSpec("zstd,3").compressor.compress({}, sample)[1])
                 print(f"(test data is compressible, {ratio:.1f}x at zstd,3)")
-            for spec in [
-                "lz4",
-                "zstd,1",
-                "zstd,3",
-                "zstd,5",
-                "zstd,10",
-                "zstd,16",
-                "zstd,22",
-                "zlib,0",
-                "zlib,6",
-                "zlib,9",
-                "lzma,0",
-                "lzma,6",
-                "lzma,9",
-            ]:
-                compressor = CompressionSpec(spec).compressor
-                for label, nbytes in comp_sizes:
-                    data = compressible_buffer(nbytes)
-                    number = max(3, comp_total // nbytes)  # a few reps even for the fast codecs
+            # grouped by buffer size rather than by codec, so the codecs can be
+            # compared against each other at a glance; chunk-sized first, as
+            # that is what borg actually compresses
+            for label, nbytes in reversed(comp_sizes):
+                data = compressible_buffer(nbytes)
+                number = max(3, comp_total // nbytes)  # a few reps even for the fast codecs
+                for spec in [
+                    "lz4",
+                    "zstd,1",
+                    "zstd,3",
+                    "zstd,5",
+                    "zstd,10",
+                    "zstd,16",
+                    "zstd,22",
+                    "zlib,0",
+                    "zlib,6",
+                    "zlib,9",
+                    "lzma,0",
+                    "lzma,6",
+                    "lzma,9",
+                ]:
+                    compressor = CompressionSpec(spec).compressor
                     dt = timeit(lambda: compressor.compress({}, data), number=number)
                     algo, _, algo_params = spec.partition(",")
                     report(

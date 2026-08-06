@@ -44,27 +44,36 @@ def chunker_spec(request):
     return request.param
 
 
-def test_kernels_identical(chunker_spec):
-    # the OpenSSL EVP batch path and the AES hardware instruction path (if available
-    # on this platform) must produce identical cut points.
+ALL_AES_KERNELS = ("auto", "vaes", "aes-ni", "aes-arm64", "evp")
+
+
+def test_kernels_identical(chunker_spec, monkeypatch):
+    # Every scan path this platform accepts - OpenSSL EVP, the 128-bit AES
+    # instructions, VAES - must produce identical cut points. Paths this
+    # build/CPU cannot run raise and are skipped.
     cls, algo, params = chunker_spec
     data = os.urandom(4 * 1024 * 1024)
 
     def sizes(chunker):
         return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
 
-    default = cls(key0, 10, 16, 14, 2)
-    sizes_default = sizes(default)
-    os.environ[KERNEL_ENV] = "evp"
-    try:
-        forced = cls(key0, 10, 16, 14, 2)
-        assert forced.kernel == "evp"
-        sizes_evp = sizes(forced)
-    finally:
-        del os.environ[KERNEL_ENV]
-    assert sizes_default == sizes_evp
-    # whatever kernel was selected by default, it must be a known one
-    assert default.kernel in ("aes-arm64", "vaes", "aes-ni", "evp")
+    monkeypatch.delenv(KERNEL_ENV, raising=False)
+    reference = sizes(cls(key0, 10, 16, 14, 2))
+
+    tested = []
+    for name in ALL_AES_KERNELS:
+        monkeypatch.setenv(KERNEL_ENV, name)
+        try:
+            chunker = cls(key0, 10, 16, 14, 2)
+        except ValueError:
+            continue  # not available on this build/CPU
+        if name != "auto":
+            assert chunker.kernel == name
+        assert sizes(chunker) == reference, f"path {name} disagrees with the default one"
+        tested.append(name)
+
+    # the portable OpenSSL path exists everywhere
+    assert "evp" in tested
 
 
 def test_chunksize_distribution(chunker_spec):

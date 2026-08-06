@@ -178,27 +178,37 @@ def test_fuzz_fastcdc(worker):
             assert b"".join(parts) == data
 
 
-def test_fastcdc_kernels_identical():
-    # the SIMD scan kernel (neon/avx512/avx2/blockwise, auto-selected) and the
-    # plain sequential Gear loop must produce identical cut points.
+ALL_FASTCDC_KERNELS = ("auto", "neon", "avx512", "avx2", "blockwise", "scalar")
+
+
+def test_fastcdc_kernels_identical(monkeypatch):
+    # Every scan kernel this platform accepts must produce identical cut points.
+    # Kernels this build/CPU cannot run raise and are skipped, so the same test
+    # covers whatever tier the machine happens to have - including kernels that
+    # exist but are not auto-selected, which nothing else would exercise.
     data = os.urandom(4 * 1024 * 1024)
     key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
 
     def sizes(chunker):
         return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
 
-    default = ChunkerFastCDC(key0, 10, 16, 14, 2)
-    sizes_default = sizes(default)
-    os.environ["BORG_FASTCDC_KERNEL"] = "scalar"
-    try:
-        forced = ChunkerFastCDC(key0, 10, 16, 14, 2)
-        assert forced.kernel == "scalar"
-        sizes_scalar = sizes(forced)
-    finally:
-        del os.environ["BORG_FASTCDC_KERNEL"]
-    assert sizes_default == sizes_scalar
-    # whatever kernel was selected by default, it must be a known one
-    assert default.kernel in ("neon", "avx512", "avx2", "blockwise", "scalar")
+    monkeypatch.delenv("BORG_FASTCDC_KERNEL", raising=False)
+    reference = sizes(ChunkerFastCDC(key0, 10, 16, 14, 2))
+
+    tested = []
+    for name in ALL_FASTCDC_KERNELS:
+        monkeypatch.setenv("BORG_FASTCDC_KERNEL", name)
+        try:
+            chunker = ChunkerFastCDC(key0, 10, 16, 14, 2)
+        except ValueError:
+            continue  # not available on this build/CPU
+        if name != "auto":
+            assert chunker.kernel == name
+        assert sizes(chunker) == reference, f"kernel {name} disagrees with the default one"
+        tested.append(name)
+
+    # the portable kernels exist everywhere; if they were skipped, the loop is broken
+    assert "blockwise" in tested and "scalar" in tested
 
 
 @pytest.mark.parametrize("envvar", ["BORG_FASTCDC_KERNEL", "BORG_BUZHASH64_KERNEL", "BORG_AES_CHUNKER_KERNEL"])

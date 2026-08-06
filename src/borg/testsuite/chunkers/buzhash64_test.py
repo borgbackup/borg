@@ -142,24 +142,32 @@ def test_fuzz_bh64(worker):
             assert reconstructed == data
 
 
-def test_buzhash64_kernels_identical():
-    # the SIMD scan kernel (avx512/avx2/blockwise, auto-selected) and the plain sequential
-    # loop must produce identical cut points.
+ALL_BUZHASH64_KERNELS = ("auto", "neon", "avx512", "avx2", "blockwise", "scalar")
+
+
+def test_buzhash64_kernels_identical(monkeypatch):
+    # Every scan kernel this platform accepts must produce identical cut points;
+    # see the fastcdc counterpart. On aarch64 this is what keeps the NEON kernel
+    # verified - it is selectable but never auto-selected.
     data = os.urandom(4 * 1024 * 1024)
     key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
 
     def sizes(chunker):
         return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
 
-    default = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
-    sizes_default = sizes(default)
-    os.environ["BORG_BUZHASH64_KERNEL"] = "scalar"
-    try:
-        forced = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
-        assert forced.kernel == "scalar"
-        sizes_scalar = sizes(forced)
-    finally:
-        del os.environ["BORG_BUZHASH64_KERNEL"]
-    assert sizes_default == sizes_scalar
-    # whatever kernel was selected by default, it must be a known one
-    assert default.kernel in ("avx512", "avx2", "blockwise", "scalar")
+    monkeypatch.delenv("BORG_BUZHASH64_KERNEL", raising=False)
+    reference = sizes(ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2))
+
+    tested = []
+    for name in ALL_BUZHASH64_KERNELS:
+        monkeypatch.setenv("BORG_BUZHASH64_KERNEL", name)
+        try:
+            chunker = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
+        except ValueError:
+            continue  # not available on this build/CPU
+        if name != "auto":
+            assert chunker.kernel == name
+        assert sizes(chunker) == reference, f"kernel {name} disagrees with the default one"
+        tested.append(name)
+
+    assert "blockwise" in tested and "scalar" in tested

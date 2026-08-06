@@ -27,7 +27,7 @@
 #define BZ_K_AUTO 0      /* best kernel this CPU can run */
 #define BZ_K_SCALAR 1    /* sequential reference loop */
 #define BZ_K_BLOCKWISE 2 /* portable 8-lane C */
-#define BZ_K_VECTOR 3    /* avx2 (there is no aarch64 vector kernel) */
+#define BZ_K_VECTOR 3    /* neon / avx2 (neon is not auto-selected) */
 #define BZ_K_VECTOR512 4 /* avx512 */
 
 /* Results of bz64_kernel_select(). */
@@ -46,9 +46,9 @@ size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
                  const uint8_t *p_rem, const uint8_t *p_add,
                  size_t n, uint64_t *sum, uint64_t mask, int kernel);
 
-/* Name of the kernel <kernel> selects: "avx512", "avx2", "blockwise" or
- * "scalar" (there is no vector kernel on aarch64, see buzhash64_impl.c).
- * For BZ_K_AUTO, the auto-selected one. */
+/* Name of the kernel <kernel> selects: "neon", "avx512", "avx2", "blockwise"
+ * or "scalar"; for BZ_K_AUTO, the auto-selected one. Note "neon" is never
+ * auto-selected, see buzhash64_impl.c. */
 const char *bz64_kernel_name(int kernel);
 
 #endif

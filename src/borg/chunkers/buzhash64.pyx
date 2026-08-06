@@ -174,7 +174,10 @@ cdef class ChunkerBuzHash64(ChunkerBase):
 
     @property
     def kernel(self):
-        """Which scan kernel this chunker uses: 'avx512', 'avx2', 'blockwise' or 'scalar'.
+        """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blockwise' or 'scalar'.
+
+        'neon' exists on aarch64 but is never auto-selected (it loses to
+        'blockwise' there); BORG_BUZHASH64_KERNEL=neon selects it.
 
         With BORG_BUZHASH64_KERNEL set to anything but "auto", this is always the
         requested kernel - creating the chunker fails otherwise.

@@ -71,6 +71,11 @@ MIN_PACK_SIZE = DEFAULT_PACK_MAX_SIZE // 50  # 1 MB
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module
 
+# Clock skew is the difference between the clocks of the machines writing to a repository (seconds).
+# A check result timestamp up to this far in the future still counts as recent; further ahead than
+# this, the pack is re-verified.
+MAX_CLOCK_SKEW = 7200  # [s]
+
 # How many segment files Borg puts into a single directory by default.
 DEFAULT_SEGMENTS_PER_DIR = 1000
 

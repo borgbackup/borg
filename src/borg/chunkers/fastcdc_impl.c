@@ -21,7 +21,7 @@
  * which an exact sequential recheck of the block resolves. The per-lane
  * masks (mask << 7 .. mask << 0) are constants of the scan.
  *
- * All kernels (sequential, blocked scalar, NEON, AVX2, AVX-512) return
+ * All kernels (sequential, blockwise scalar, NEON, AVX2, AVX-512) return
  * bit-identical cut positions and fp values; the chunker's golden tests
  * depend on this. */
 
@@ -76,9 +76,9 @@ static inline void fc_block_prefix(const uint64_t *gear, const uint8_t *p, uint6
     s[7] = s8;
 }
 
-/* --- blocked scalar (portable C, no intrinsics) ------------------------- */
+/* --- blockwise scalar (portable C, no intrinsics) ------------------------- */
 
-static int64_t fc_scan_blocked(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
+static int64_t fc_scan_blockwise(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {
     uint64_t fp = *fp_io;
     uint64_t M[8];
@@ -215,7 +215,7 @@ static inline void fc_block_gear(const uint64_t *gear, const uint8_t *p, uint64_
  * forwarding and stalls, twice per block. Loading block i+1 while block i is
  * tested puts a full loop body between the stores and the load, so the stores
  * have retired by then and the stall disappears. Before this, the stalls made
- * the AVX2 kernel slower than the blocked scalar one. */
+ * the AVX2 kernel slower than the blockwise scalar one. */
 __attribute__((target("avx2"))) static int64_t
 fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {
@@ -351,7 +351,7 @@ static int fc_env_set(const char *name)
 static int fc_simd_available(void)
 {
     /* BORG_FASTCDC_NO_AVX512 caps dispatch at AVX2, BORG_FASTCDC_NO_AVX2 at
-     * the blocked scalar kernel (for benchmarking the kernels against each
+     * the blockwise scalar kernel (for benchmarking the kernels against each
      * other); like the detection itself they are read once per process, so
      * they must be set before the first chunker use. */
     if (fc_env_set("BORG_FASTCDC_NO_AVX2"))
@@ -362,11 +362,11 @@ static int fc_simd_available(void)
 }
 
 #else
-#define FC_KIND "blocked"
+#define FC_KIND "blockwise"
 
 static int64_t fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {
-    return fc_scan_blocked(gear, p, n, fp_io, mask);
+    return fc_scan_blockwise(gear, p, n, fp_io, mask);
 }
 
 static int fc_simd_available(void)
@@ -378,7 +378,7 @@ static int fc_simd_available(void)
 
 /* --- dispatch ----------------------------------------------------------- */
 
-/* resolved once (0 = blocked, 1 = FC_KIND, 2 = FC_KIND_512 where defined);
+/* resolved once (0 = blockwise, 1 = FC_KIND, 2 = FC_KIND_512 where defined);
  * a racy double-init writes the same value, so it is benign */
 static int fc_use_simd = -1;
 
@@ -394,7 +394,7 @@ int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, 
 #endif
     if (fc_use_simd)
         return fc_scan_simd(gear, p, n, fp, mask);
-    return fc_scan_blocked(gear, p, n, fp, mask);
+    return fc_scan_blockwise(gear, p, n, fp, mask);
 }
 
 const char *fc_kernel_name(int force_scalar)
@@ -407,5 +407,5 @@ const char *fc_kernel_name(int force_scalar)
     if (fc_use_simd == 2)
         return FC_KIND_512;
 #endif
-    return fc_use_simd ? FC_KIND : "blocked";
+    return fc_use_simd ? FC_KIND : "blockwise";
 }

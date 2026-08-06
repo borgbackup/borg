@@ -33,11 +33,11 @@ cdef extern from "fastcdc_impl.h":
 # class only provides the keyed Gear table and the _scan() hook calling the C kernel.
 #
 # The inner scan runs in a C kernel (fastcdc_impl.c) with SIMD implementations (NEON on
-# aarch64, AVX-512 or AVX2 on x86-64, blocked scalar elsewhere) that are bit-identical to
+# aarch64, AVX-512 or AVX2 on x86-64, blockwise scalar elsewhere) that are bit-identical to
 # the plain sequential Gear loop: every byte position is tested, cuts and hash state are
 # exactly the same, only faster. BORG_FASTCDC_FORCE_SCALAR=1 forces the sequential loop
 # (for tests); BORG_FASTCDC_NO_AVX512=1 caps dispatch at AVX2 and BORG_FASTCDC_NO_AVX2=1
-# at the blocked scalar kernel (for benchmarking, must be set before the first chunker use).
+# at the blockwise scalar kernel (for benchmarking, must be set before the first chunker use).
 
 
 @cython.boundscheck(False)
@@ -87,7 +87,7 @@ cdef class ChunkerFastCDC(ChunkerBase):
 
     @property
     def kernel(self):
-        """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blocked' or 'scalar'."""
+        """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blockwise' or 'scalar'."""
         return (<bytes>fc_kernel_name(self.force_scalar)).decode("ascii")
 
     cdef int64_t _scan(self, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) noexcept:

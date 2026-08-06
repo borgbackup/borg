@@ -188,9 +188,10 @@ New features:
   - fastcdc is the new and faster default chunker, #9957
   - fastcdc / buzhash64: SIMD-accelerated scan kernel, #10034, #10043:
 
-    - NEON on aarch64 (e.g. Apple Silicon)
     - AVX-512 / AVX2 on x86-64 (Intel / AMD)
-    - blocked scalar elsewhere
+    - fastcdc also NEON on aarch64 (e.g. Apple Silicon); buzhash64 is faster
+      blockwise there, so it has no vector kernel on aarch64
+    - blockwise scalar elsewhere
   - toeplitz-aes, rabin-aes, goldilocks-aes: fingerprinting-resistant chunkers
     (UHF-then-PRF), with direct AES hw acceleration or via OpenSSL, #9987
   - toeplitz-aes, rabin-aes, goldilocks-aes: VAES/AVX-512 scan path on x86-64

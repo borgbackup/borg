@@ -20,7 +20,7 @@
  * All kernels return bit-identical results. */
 int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int force_scalar);
 
-/* Name of the kernel fc_scan would use: "neon", "avx512", "avx2", "blocked" or "scalar". */
+/* Name of the kernel fc_scan would use: "neon", "avx512", "avx2", "blockwise" or "scalar". */
 const char *fc_kernel_name(int force_scalar);
 
 #endif

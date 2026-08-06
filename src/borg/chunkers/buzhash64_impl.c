@@ -21,7 +21,7 @@
  * Trot[b] = ROTL(T[b], window_size % 64) is precomputed by the caller, which
  * also removes one rotate per byte from the sequential path.
  *
- * Kernel dispatch: AVX-512 or AVX2 on x86-64 (runtime-detected), blocked
+ * Kernel dispatch: AVX-512 or AVX2 on x86-64 (runtime-detected), blockwise
  * scalar everywhere else including aarch64 (which has no vector kernel, see
  * the note where it would go), sequential when forced.
  * All kernels return bit-identical results. */
@@ -82,9 +82,9 @@ static inline void bz64_block_prefix(const uint64_t *T, const uint64_t *Trot,
     s[7] = s8;
 }
 
-/* --- blocked scalar (the default kernel) --------------------------------- */
+/* --- blockwise scalar (the default kernel) --------------------------------- */
 
-static size_t bz64_scan_blocked(const uint64_t *T, const uint64_t *Trot,
+static size_t bz64_scan_blockwise(const uint64_t *T, const uint64_t *Trot,
                                 const uint8_t *pr, const uint8_t *pa,
                                 size_t n, uint64_t *sum_io, uint64_t mask)
 {
@@ -117,8 +117,8 @@ static size_t bz64_scan_blocked(const uint64_t *T, const uint64_t *Trot,
 /* --- aarch64: no vector kernel ------------------------------------------
  *
  * There was a NEON kernel here doing the 8-lane test in vector registers.
- * It is gone because it lost to the blocked scalar kernel: measured on an
- * Apple M3 Pro (48 MiB, window 4095), blocked 2590 MB/s vs NEON 2360 MB/s,
+ * It is gone because it lost to the blockwise scalar kernel: measured on an
+ * Apple M3 Pro (48 MiB, window 4095), blockwise 2590 MB/s vs NEON 2360 MB/s,
  * the same ~9% gap at every mask size from 17 to 23 bits.
  *
  * The reason is that nothing here needs a vector register in the first
@@ -132,7 +132,7 @@ static size_t bz64_scan_blocked(const uint64_t *T, const uint64_t *Trot,
  * with per-lane shifted masks - enough extra per-lane work to pay for the
  * trip - and there it wins by 2x.
  *
- * So aarch64 falls through to the blocked scalar kernel below. */
+ * So aarch64 falls through to the blockwise scalar kernel below. */
 
 /* --- AVX2 (x86-64, runtime detected) ------------------------------------ */
 
@@ -307,7 +307,7 @@ static int bz64_env_set(const char *name)
 static int bz64_simd_available(void)
 {
     /* BORG_BUZHASH64_NO_AVX512 caps dispatch at AVX2, BORG_BUZHASH64_NO_AVX2
-     * at the blocked scalar kernel (for benchmarking the kernels against
+     * at the blockwise scalar kernel (for benchmarking the kernels against
      * each other); like the detection itself they are read once per process,
      * so they must be set before the first chunker use. */
     if (bz64_env_set("BORG_BUZHASH64_NO_AVX2"))
@@ -318,13 +318,13 @@ static int bz64_simd_available(void)
 }
 
 #else
-#define BZ_KIND "blocked"
+#define BZ_KIND "blockwise"
 
 static size_t bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
                              const uint8_t *pr, const uint8_t *pa,
                              size_t n, uint64_t *sum_io, uint64_t mask)
 {
-    return bz64_scan_blocked(T, Trot, pr, pa, n, sum_io, mask);
+    return bz64_scan_blockwise(T, Trot, pr, pa, n, sum_io, mask);
 }
 
 static int bz64_simd_available(void)
@@ -336,7 +336,7 @@ static int bz64_simd_available(void)
 
 /* --- dispatch ----------------------------------------------------------- */
 
-/* resolved once (0 = blocked, 1 = BZ_KIND, 2 = BZ_KIND_512 where defined);
+/* resolved once (0 = blockwise, 1 = BZ_KIND, 2 = BZ_KIND_512 where defined);
  * a racy double-init writes the same value, so it is benign */
 static int bz64_use_simd = -1;
 
@@ -354,7 +354,7 @@ size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
 #endif
     if (bz64_use_simd)
         return bz64_scan_simd(table, table_rot, p_rem, p_add, n, sum, mask);
-    return bz64_scan_blocked(table, table_rot, p_rem, p_add, n, sum, mask);
+    return bz64_scan_blockwise(table, table_rot, p_rem, p_add, n, sum, mask);
 }
 
 const char *bz64_kernel_name(int force_scalar)
@@ -367,5 +367,5 @@ const char *bz64_kernel_name(int force_scalar)
     if (bz64_use_simd == 2)
         return BZ_KIND_512;
 #endif
-    return bz64_use_simd ? BZ_KIND : "blocked";
+    return bz64_use_simd ? BZ_KIND : "blockwise";
 }

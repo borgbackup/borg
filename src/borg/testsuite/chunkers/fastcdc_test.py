@@ -179,7 +179,7 @@ def test_fuzz_fastcdc(worker):
 
 
 def test_fastcdc_kernels_identical():
-    # the SIMD scan kernel (neon/avx512/avx2/blocked, auto-selected) and the
+    # the SIMD scan kernel (neon/avx512/avx2/blockwise, auto-selected) and the
     # plain sequential Gear loop must produce identical cut points.
     data = os.urandom(4 * 1024 * 1024)
     key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
@@ -198,4 +198,4 @@ def test_fastcdc_kernels_identical():
         del os.environ["BORG_FASTCDC_FORCE_SCALAR"]
     assert sizes_default == sizes_scalar
     # whatever kernel was selected by default, it must be a known one
-    assert default.kernel in ("neon", "avx512", "avx2", "blocked", "scalar")
+    assert default.kernel in ("neon", "avx512", "avx2", "blockwise", "scalar")

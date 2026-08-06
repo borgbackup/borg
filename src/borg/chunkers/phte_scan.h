@@ -181,18 +181,28 @@ static int64_t PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *d
         b6 = veorq_u8(vaeseq_u8(b6, k[9]), k[10]);
         b7 = veorq_u8(vaeseq_u8(b7, k[9]), k[10]);
 
+        /* Test all 8 ciphertexts without leaving the vector domain: uzp1
+         * packs the low halves (the cut-decision uint64) of two blocks into
+         * one vector, then and/cmeq-zero/or-reduce. Moving the 8 values to
+         * general registers instead - one fmov each, plus 8 scalar and/cmp
+         * pairs - costs noticeably more on the common no-hit path, where
+         * nothing but the single "any lane hit" bit is ever needed. */
         {
-            uint64_t c0 = vgetq_lane_u64(vreinterpretq_u64_u8(b0), 0);
-            uint64_t c1 = vgetq_lane_u64(vreinterpretq_u64_u8(b1), 0);
-            uint64_t c2 = vgetq_lane_u64(vreinterpretq_u64_u8(b2), 0);
-            uint64_t c3 = vgetq_lane_u64(vreinterpretq_u64_u8(b3), 0);
-            uint64_t c4 = vgetq_lane_u64(vreinterpretq_u64_u8(b4), 0);
-            uint64_t c5 = vgetq_lane_u64(vreinterpretq_u64_u8(b5), 0);
-            uint64_t c6 = vgetq_lane_u64(vreinterpretq_u64_u8(b6), 0);
-            uint64_t c7 = vgetq_lane_u64(vreinterpretq_u64_u8(b7), 0);
-            if ((((c0 & mask) == 0) | ((c1 & mask) == 0) | ((c2 & mask) == 0) | ((c3 & mask) == 0) |
-                 ((c4 & mask) == 0) | ((c5 & mask) == 0) | ((c6 & mask) == 0) | ((c7 & mask) == 0))) {
-                uint64_t cs[8] = {c0, c1, c2, c3, c4, c5, c6, c7};
+            const uint64x2_t maskv = vdupq_n_u64(mask);
+            uint64x2_t h01 = vuzp1q_u64(vreinterpretq_u64_u8(b0), vreinterpretq_u64_u8(b1));
+            uint64x2_t h23 = vuzp1q_u64(vreinterpretq_u64_u8(b2), vreinterpretq_u64_u8(b3));
+            uint64x2_t h45 = vuzp1q_u64(vreinterpretq_u64_u8(b4), vreinterpretq_u64_u8(b5));
+            uint64x2_t h67 = vuzp1q_u64(vreinterpretq_u64_u8(b6), vreinterpretq_u64_u8(b7));
+            uint64x2_t any = vorrq_u64(vorrq_u64(vceqzq_u64(vandq_u64(h01, maskv)),
+                                                vceqzq_u64(vandq_u64(h23, maskv))),
+                                       vorrq_u64(vceqzq_u64(vandq_u64(h45, maskv)),
+                                                vceqzq_u64(vandq_u64(h67, maskv))));
+            if (vmaxvq_u32(vreinterpretq_u32_u64(any))) {
+                uint64_t cs[8];
+                vst1q_u64(cs + 0, h01);
+                vst1q_u64(cs + 2, h23);
+                vst1q_u64(cs + 4, h45);
+                vst1q_u64(cs + 6, h67);
                 for (int j = 0; j < 8; j++) {
                     if ((cs[j] & mask) == 0) {
                         *digest = dg[j];

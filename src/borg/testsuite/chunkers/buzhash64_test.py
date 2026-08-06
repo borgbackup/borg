@@ -142,7 +142,7 @@ def test_fuzz_bh64(worker):
             assert reconstructed == data
 
 
-ALL_BUZHASH64_KERNELS = ("auto", "neon", "avx512", "avx2", "blockwise", "scalar")
+ALL_BUZHASH64_KERNELS = ("neon", "avx512", "avx2", "blockwise", "scalar")
 
 
 def test_buzhash64_kernels_identical(monkeypatch):
@@ -165,8 +165,7 @@ def test_buzhash64_kernels_identical(monkeypatch):
             chunker = ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
         except ValueError:
             continue  # not available on this build/CPU
-        if name != "auto":
-            assert chunker.kernel == name
+        assert chunker.kernel == name
         assert sizes(chunker) == reference, f"kernel {name} disagrees with the default one"
         tested.append(name)
 

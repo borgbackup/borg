@@ -11,13 +11,20 @@
 #include <stdint.h>
 #include <stddef.h>
 
-/* Scan kernel ids, a tier ladder. Which names map onto them depends on the
- * build: "neon" exists only on aarch64, "avx2"/"avx512" only on x86-64. */
-#define FC_K_AUTO 0      /* best kernel this CPU can run */
-#define FC_K_SCALAR 1    /* sequential reference loop */
-#define FC_K_BLOCKWISE 2 /* portable 8-lane C */
-#define FC_K_VECTOR 3    /* the platform's vector kernel: neon or avx2 */
-#define FC_K_VECTOR512 4 /* avx512 */
+/* Scan kernel ids. Which names map onto them depends on the build: "neon"
+ * exists only on aarch64, "avx2"/"avx512" only on x86-64.
+ *
+ * There is no automatic selection: the caller says which kernel to run, and
+ * that is what runs. FC_K_SCALAR, the plain sequential loop, is id 0 and the
+ * default everywhere - it is the simplest implementation and the one the
+ * others are checked against. Which of the rest is fastest turned out not to
+ * be predictable from the instruction set (on an Apple M3 the NEON kernel
+ * beats the sequential loop 2.1x; with gcc on a Zen 4 the sequential loop
+ * beats AVX-512 by 1.7x), so choosing one is left to whoever measured. */
+#define FC_K_SCALAR 0    /* sequential reference loop */
+#define FC_K_BLOCKWISE 1 /* portable 8-lane C */
+#define FC_K_VECTOR 2    /* the platform's vector kernel: neon or avx2 */
+#define FC_K_VECTOR512 3 /* avx512 */
 
 /* Results of fc_kernel_select(). */
 #define FC_KSEL_OK 0
@@ -39,14 +46,13 @@ const char *fc_kernel_names(void);
  * and test (fp & mask) == 0.
  * Returns the first i that matched (fp is left at position i), or -1 if none
  * matched (fp is left at position n-1).
- * gear: the keyed 256-entry table. kernel is one of FC_K_*; FC_K_AUTO picks
- * the best one this CPU can run. Callers are expected to have validated any
- * explicit choice with fc_kernel_select() - an unrunnable one falls back to
- * FC_K_AUTO rather than crashing.
+ * gear: the keyed 256-entry table. kernel is one of FC_K_*; callers are
+ * expected to have validated it with fc_kernel_select(), an unrunnable one
+ * falls back to the vector kernel rather than crashing.
  * All kernels return bit-identical results. */
 int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel);
 
-/* Name of the kernel <kernel> selects; for FC_K_AUTO, the auto-selected one. */
+/* Name of the kernel <kernel> selects. */
 const char *fc_kernel_name(int kernel);
 
 #endif

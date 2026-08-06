@@ -21,14 +21,14 @@
  * ROTL(table[b], window_size % 64) (precomputed by the caller).
  * p_rem points at the byte leaving the window, p_add at the byte entering
  * (p_add = p_rem + window_size); both must have n readable bytes.
- * kernel is one of BZ_K_*; BZ_K_AUTO picks the best one this CPU can run.
+ * kernel is one of BZ_K_*.
  * All kernels return bit-identical results. */
-/* Scan kernel ids, a tier ladder; see fastcdc_impl.h for the rationale. */
-#define BZ_K_AUTO 0      /* best kernel this CPU can run */
-#define BZ_K_SCALAR 1    /* sequential reference loop */
-#define BZ_K_BLOCKWISE 2 /* portable 8-lane C */
-#define BZ_K_VECTOR 3    /* neon / avx2 (neon is not auto-selected) */
-#define BZ_K_VECTOR512 4 /* avx512 */
+/* Scan kernel ids; see fastcdc_impl.h for the rationale. There is no
+ * automatic selection - the caller says which kernel to run. */
+#define BZ_K_SCALAR 0    /* sequential reference loop */
+#define BZ_K_BLOCKWISE 1 /* portable 8-lane C */
+#define BZ_K_VECTOR 2    /* neon / avx2 (neon is not auto-selected) */
+#define BZ_K_VECTOR512 3 /* avx512 */
 
 /* Results of bz64_kernel_select(). */
 #define BZ_KSEL_OK 0
@@ -46,9 +46,8 @@ size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
                  const uint8_t *p_rem, const uint8_t *p_add,
                  size_t n, uint64_t *sum, uint64_t mask, int kernel);
 
-/* Name of the kernel <kernel> selects: "neon", "avx512", "avx2", "blockwise"
- * or "scalar"; for BZ_K_AUTO, the auto-selected one. Note "neon" is never
- * auto-selected, see buzhash64_impl.c. */
+/* Name of the kernel <kernel> selects: "neon", "avx512", "avx2",
+ * "blockwise" or "scalar". */
 const char *bz64_kernel_name(int kernel);
 
 #endif

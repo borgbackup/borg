@@ -40,7 +40,7 @@ typedef struct TP_CTX TP_CTX;
 /* Create a kernel context.
  * tables: TP_TABLES * 256 uint64 entries, see above.
  * aes_key: 16 bytes (AES-128).
- * kernel: one of PHTE_K_*; PHTE_K_AUTO picks the best path this CPU can run.
+ * kernel: one of PHTE_K_*.
  * Returns NULL on allocation/OpenSSL failure. */
 TP_CTX *tp_new(const uint64_t *tables, const uint8_t aes_key[16], int kernel);
 

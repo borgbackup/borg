@@ -178,7 +178,7 @@ def test_fuzz_fastcdc(worker):
             assert b"".join(parts) == data
 
 
-ALL_FASTCDC_KERNELS = ("auto", "neon", "avx512", "avx2", "blockwise", "scalar")
+ALL_FASTCDC_KERNELS = ("neon", "avx512", "avx2", "blockwise", "scalar")
 
 
 def test_fastcdc_kernels_identical(monkeypatch):
@@ -202,8 +202,7 @@ def test_fastcdc_kernels_identical(monkeypatch):
             chunker = ChunkerFastCDC(key0, 10, 16, 14, 2)
         except ValueError:
             continue  # not available on this build/CPU
-        if name != "auto":
-            assert chunker.kernel == name
+        assert chunker.kernel == name
         assert sizes(chunker) == reference, f"kernel {name} disagrees with the default one"
         tested.append(name)
 
@@ -218,10 +217,10 @@ def test_kernel_env_rejects_unusable(envvar, monkeypatch):
     # means to pin one kernel, into a measurement of a different one.
     from ...chunkers import ChunkerBuzHash64, ChunkerToeplitzAES
 
-    make = {
-        "BORG_FASTCDC_KERNEL": lambda k: ChunkerFastCDC(k, 10, 16, 14, 2),
-        "BORG_BUZHASH64_KERNEL": lambda k: ChunkerBuzHash64(k, 10, 16, 14, 4095, 2),
-        "BORG_AES_CHUNKER_KERNEL": lambda k: ChunkerToeplitzAES(k, 10, 16, 14, 2),
+    make, default = {
+        "BORG_FASTCDC_KERNEL": (lambda k: ChunkerFastCDC(k, 10, 16, 14, 2), "scalar"),
+        "BORG_BUZHASH64_KERNEL": (lambda k: ChunkerBuzHash64(k, 10, 16, 14, 4095, 2), "scalar"),
+        "BORG_AES_CHUNKER_KERNEL": (lambda k: ChunkerToeplitzAES(k, 10, 16, 14, 2), "evp"),
     }[envvar]
     key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
 
@@ -229,12 +228,15 @@ def test_kernel_env_rejects_unusable(envvar, monkeypatch):
     with pytest.raises(ValueError, match="no-such-kernel"):
         make(key0)
 
-    # "auto" and an unset var both mean "pick the best one", and always work
+    # there is no automatic selection, so "auto" is not a kernel name either
     monkeypatch.setenv(envvar, "auto")
-    auto = make(key0).kernel
-    monkeypatch.delenv(envvar)
-    assert make(key0).kernel == auto
+    with pytest.raises(ValueError, match="auto"):
+        make(key0)
 
-    # asking for whatever auto-selection picked must yield exactly that
-    monkeypatch.setenv(envvar, auto)
-    assert make(key0).kernel == auto
+    # unset means the simplest implementation, on every platform
+    monkeypatch.delenv(envvar)
+    assert make(key0).kernel == default
+
+    # and asking for it explicitly gives the same thing
+    monkeypatch.setenv(envvar, default)
+    assert make(key0).kernel == default

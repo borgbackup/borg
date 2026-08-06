@@ -53,7 +53,6 @@ cdef extern from "toeplitz_aes_impl.h":
     TP_CTX *tp_new(const uint64_t *tables, const uint8_t *aes_key, int kernel)
     int phte_kernel_select(const char *name, int *out_id)
     const char *phte_kernel_names()
-    int PHTE_K_AUTO
     int PHTE_K_EVP
     void tp_free(TP_CTX *ctx)
     const char *tp_kind(const TP_CTX *ctx)
@@ -120,11 +119,11 @@ cdef int _select_kernel() except -1:
     One selector for all three AES chunkers: they share phte_scan.h, so the
     available paths never differ between them.
     """
-    cdef int kid = PHTE_K_AUTO
+    cdef int kid = PHTE_K_EVP
     cdef int rc
     want = requested_kernel("BORG_AES_CHUNKER_KERNEL")
     if want is None:
-        return PHTE_K_AUTO
+        return PHTE_K_EVP
     rc = phte_kernel_select(want.encode("ascii"), &kid)
     if rc != 0:
         raise kernel_error("BORG_AES_CHUNKER_KERNEL", want, rc,

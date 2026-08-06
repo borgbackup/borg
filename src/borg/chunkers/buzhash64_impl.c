@@ -114,12 +114,13 @@ static size_t bz64_scan_blockwise(const uint64_t *T, const uint64_t *Trot,
     return j;
 }
 
-/* --- NEON (aarch64, selectable but not the default) ---------------------
+/* --- NEON (aarch64) ------------------------------------------------------
  *
- * This kernel is NOT auto-selected: on an Apple M3 Pro it loses to the
- * blockwise scalar one (2590 vs 2360 MB/s, the same ~9% gap at every mask
- * size from 17 to 23 bits), so bz64_simd_available() returns 0 here and
- * BZ_K_AUTO resolves to blockwise. BORG_BUZHASH64_KERNEL=neon selects it.
+ * Nothing selects this by default (the default is the sequential kernel
+ * everywhere); BORG_BUZHASH64_KERNEL=neon selects it. On an Apple M3 Pro it
+ * loses to the blockwise kernel - 2590 vs 2360 MB/s, the same ~9% gap at
+ * every mask size from 17 to 23 bits - so it is not the one to reach for
+ * there.
  *
  * Why it loses there: the 16 table lookups per block have to happen in
  * general registers (NEON has no gather), so the vector form only ADDS the
@@ -136,8 +137,7 @@ static size_t bz64_scan_blockwise(const uint64_t *T, const uint64_t *Trot,
  * comparatively healthy NEON, which is exactly where this should get
  * competitive - on this machine's much narrower E-cores the 9% gap already
  * collapses into measurement noise. If you have such hardware, compare
- * BORG_BUZHASH64_KERNEL=neon against =blockwise and please report; flipping
- * the default is then a one-line change here. */
+ * BORG_BUZHASH64_KERNEL=neon against =blockwise and please report. */
 
 #if defined(__aarch64__)
 #define BZ_KIND "neon"
@@ -179,10 +179,6 @@ static size_t bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
     return j;
 }
 
-static int bz64_simd_available(void)
-{
-    return 0; /* see above: selectable by name, but never auto-selected */
-}
 
 /* --- AVX2 (x86-64, runtime detected) ------------------------------------ */
 
@@ -348,14 +344,6 @@ bz64_scan_simd512(const uint64_t *T, const uint64_t *Trot,
     return j;
 }
 
-static int bz64_simd_available(void)
-{
-#ifdef BZ_KIND_512
-    if (__builtin_cpu_supports("avx512f"))
-        return 2;
-#endif
-    return __builtin_cpu_supports("avx2");
-}
 
 #else
 #define BZ_KIND "blockwise"
@@ -367,10 +355,6 @@ static size_t bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
     return bz64_scan_blockwise(T, Trot, pr, pa, n, sum_io, mask);
 }
 
-static int bz64_simd_available(void)
-{
-    return 0;
-}
 
 #endif
 
@@ -379,20 +363,16 @@ static int bz64_simd_available(void)
 const char *bz64_kernel_names(void)
 {
 #if defined(__aarch64__)
-    return "auto, neon, blockwise, scalar";
+    return "neon,blockwise,scalar";
 #elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
-    return "auto, avx512, avx2, blockwise, scalar";
+    return "avx512,avx2,blockwise,scalar";
 #else
-    return "auto, blockwise, scalar";
+    return "blockwise,scalar";
 #endif
 }
 
 int bz64_kernel_select(const char *name, int *out_id)
 {
-    if (strcmp(name, "auto") == 0) {
-        *out_id = BZ_K_AUTO;
-        return BZ_KSEL_OK;
-    }
     if (strcmp(name, "scalar") == 0) {
         *out_id = BZ_K_SCALAR;
         return BZ_KSEL_OK;
@@ -429,26 +409,10 @@ int bz64_kernel_select(const char *name, int *out_id)
 
 /* --- dispatch ----------------------------------------------------------- */
 
-/* the kernel BZ_K_AUTO resolves to, worked out once; a racy double-init
- * writes the same value, so it is benign */
-static int bz64_auto = -1;
-
-static int bz64_auto_kernel(void)
-{
-    int a;
-    if (bz64_auto < 0) {
-        a = bz64_simd_available();
-        bz64_auto = (a == 2) ? BZ_K_VECTOR512 : (a ? BZ_K_VECTOR : BZ_K_BLOCKWISE);
-    }
-    return bz64_auto;
-}
-
 size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
                  const uint8_t *p_rem, const uint8_t *p_add,
                  size_t n, uint64_t *sum, uint64_t mask, int kernel)
 {
-    if (kernel == BZ_K_AUTO)
-        kernel = bz64_auto_kernel();
     switch (kernel) {
     case BZ_K_SCALAR:
         return bz64_scan_seq(table, table_rot, p_rem, p_add, n, sum, mask);
@@ -465,8 +429,6 @@ size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
 
 const char *bz64_kernel_name(int kernel)
 {
-    if (kernel == BZ_K_AUTO)
-        kernel = bz64_auto_kernel();
     switch (kernel) {
     case BZ_K_SCALAR:
         return "scalar";

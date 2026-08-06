@@ -172,10 +172,6 @@ static int64_t fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, ui
     return -1;
 }
 
-static int fc_simd_available(void)
-{
-    return 1;
-}
 
 /* --- AVX2 (x86-64, runtime detected) ------------------------------------ */
 
@@ -342,14 +338,6 @@ fc_scan_simd512(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_i
     return -1;
 }
 
-static int fc_simd_available(void)
-{
-#ifdef FC_KIND_512
-    if (__builtin_cpu_supports("avx512f"))
-        return 2;
-#endif
-    return __builtin_cpu_supports("avx2");
-}
 
 #else
 #define FC_KIND "blockwise"
@@ -359,10 +347,6 @@ static int64_t fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, ui
     return fc_scan_blockwise(gear, p, n, fp_io, mask);
 }
 
-static int fc_simd_available(void)
-{
-    return 0;
-}
 
 #endif
 
@@ -371,20 +355,16 @@ static int fc_simd_available(void)
 const char *fc_kernel_names(void)
 {
 #if defined(__aarch64__)
-    return "auto, neon, blockwise, scalar";
+    return "neon,blockwise,scalar";
 #elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
-    return "auto, avx512, avx2, blockwise, scalar";
+    return "avx512,avx2,blockwise,scalar";
 #else
-    return "auto, blockwise, scalar";
+    return "blockwise,scalar";
 #endif
 }
 
 int fc_kernel_select(const char *name, int *out_id)
 {
-    if (strcmp(name, "auto") == 0) {
-        *out_id = FC_K_AUTO;
-        return FC_KSEL_OK;
-    }
     if (strcmp(name, "scalar") == 0) {
         *out_id = FC_K_SCALAR;
         return FC_KSEL_OK;
@@ -421,24 +401,8 @@ int fc_kernel_select(const char *name, int *out_id)
 
 /* --- dispatch ----------------------------------------------------------- */
 
-/* the kernel FC_K_AUTO resolves to, worked out once; a racy double-init
- * writes the same value, so it is benign */
-static int fc_auto = -1;
-
-static int fc_auto_kernel(void)
-{
-    int a;
-    if (fc_auto < 0) {
-        a = fc_simd_available();
-        fc_auto = (a == 2) ? FC_K_VECTOR512 : (a ? FC_K_VECTOR : FC_K_BLOCKWISE);
-    }
-    return fc_auto;
-}
-
 int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel)
 {
-    if (kernel == FC_K_AUTO)
-        kernel = fc_auto_kernel();
     switch (kernel) {
     case FC_K_SCALAR:
         return fc_scan_seq(gear, p, n, fp, mask);
@@ -455,8 +419,6 @@ int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, 
 
 const char *fc_kernel_name(int kernel)
 {
-    if (kernel == FC_K_AUTO)
-        kernel = fc_auto_kernel();
     switch (kernel) {
     case FC_K_SCALAR:
         return "scalar";

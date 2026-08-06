@@ -9,13 +9,17 @@
 #ifndef BORG_PHTE_KERNEL_H
 #define BORG_PHTE_KERNEL_H
 
-/* Scan path ids, a tier ladder. Which names map onto them depends on the
- * build: "vaes" only on x86-64, and the 128-bit hardware path is spelled
- * "aes-ni" on x86-64 and "aes-arm64" on aarch64. */
-#define PHTE_K_AUTO 0  /* best path this CPU can run */
-#define PHTE_K_EVP 1   /* portable OpenSSL EVP batch path */
-#define PHTE_K_HW 2    /* 128-bit AES instructions: aes-ni / aes-arm64 */
-#define PHTE_K_HW512 3 /* VAES/AVX-512, 4 AES blocks per instruction */
+/* Scan path ids. Which names map onto them depends on the build: "vaes" only
+ * on x86-64, and the 128-bit hardware path is spelled "aes-ni" on x86-64 and
+ * "aes-arm64" on aarch64.
+ *
+ * There is no automatic selection: the caller says which path to run.
+ * PHTE_K_EVP, the portable OpenSSL batch path, is id 0 and the default - it
+ * is the simplest implementation and the one the others are checked
+ * against. */
+#define PHTE_K_EVP 0   /* portable OpenSSL EVP batch path */
+#define PHTE_K_HW 1    /* 128-bit AES instructions: aes-ni / aes-arm64 */
+#define PHTE_K_HW512 2 /* VAES/AVX-512, 4 AES blocks per instruction */
 
 /* Results of phte_kernel_select(). */
 #define PHTE_KSEL_OK 0

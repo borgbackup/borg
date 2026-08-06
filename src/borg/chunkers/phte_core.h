@@ -165,20 +165,16 @@ static int phte_hw512_available(void)
 const char *phte_kernel_names(void)
 {
 #if defined(__aarch64__)
-    return "auto, aes-arm64, evp";
+    return "aes-arm64,evp";
 #elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
-    return "auto, vaes, aes-ni, evp";
+    return "vaes,aes-ni,evp";
 #else
-    return "auto, evp";
+    return "evp";
 #endif
 }
 
 int phte_kernel_select(const char *name, int *out_id)
 {
-    if (strcmp(name, "auto") == 0) {
-        *out_id = PHTE_K_AUTO;
-        return PHTE_KSEL_OK;
-    }
     if (strcmp(name, "evp") == 0) {
         *out_id = PHTE_K_EVP;
         return PHTE_KSEL_OK;
@@ -209,18 +205,18 @@ int phte_kernel_select(const char *name, int *out_id)
 /* --- context base management ------------------------------------------- */
 
 /* Expand the AES key, select the scan path and set up the OpenSSL context.
- * kernel is one of PHTE_K_*; PHTE_K_AUTO picks the best path this CPU can run.
+ * kernel is one of PHTE_K_*.
  * Returns 0 on failure (caller frees its context). */
 static int phte_base_init(PHTE_BASE *b, const uint8_t aes_key[16], int kernel)
 {
     phte_aes128_expand(aes_key, b->rk);
 #if PHTE_HAVE_HW
-    b->use_hw = (kernel == PHTE_K_AUTO || kernel == PHTE_K_HW || kernel == PHTE_K_HW512) && phte_hw_available();
+    b->use_hw = (kernel == PHTE_K_HW || kernel == PHTE_K_HW512) && phte_hw_available();
 #else
     b->use_hw = 0;
 #endif
 #if PHTE_HAVE_HW512
-    b->use_hw512 = b->use_hw && kernel != PHTE_K_HW && phte_hw512_available();
+    b->use_hw512 = b->use_hw && kernel == PHTE_K_HW512 && phte_hw512_available();
 #else
     b->use_hw512 = 0;
 #endif

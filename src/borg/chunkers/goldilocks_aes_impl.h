@@ -39,7 +39,7 @@ typedef struct GL_CTX GL_CTX;
  * k1: the secret evaluation point K (canonical, 0 <= K < p).
  * k2: K^2 mod p.
  * aes_key: 16 bytes (AES-128).
- * kernel: one of PHTE_K_*; PHTE_K_AUTO picks the best path this CPU can run.
+ * kernel: one of PHTE_K_*.
  * Returns NULL on allocation/OpenSSL failure. */
 GL_CTX *gl_new(const uint64_t *tables, uint64_t k1, uint64_t k2, const uint8_t aes_key[16], int kernel);
 

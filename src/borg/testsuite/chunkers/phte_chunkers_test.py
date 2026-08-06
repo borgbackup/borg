@@ -44,7 +44,7 @@ def chunker_spec(request):
     return request.param
 
 
-ALL_AES_KERNELS = ("auto", "vaes", "aes-ni", "aes-arm64", "evp")
+ALL_AES_KERNELS = ("vaes", "aes-ni", "aes-arm64", "evp")
 
 
 def test_kernels_identical(chunker_spec, monkeypatch):
@@ -67,8 +67,7 @@ def test_kernels_identical(chunker_spec, monkeypatch):
             chunker = cls(key0, 10, 16, 14, 2)
         except ValueError:
             continue  # not available on this build/CPU
-        if name != "auto":
-            assert chunker.kernel == name
+        assert chunker.kernel == name
         assert sizes(chunker) == reference, f"path {name} disagrees with the default one"
         tested.append(name)
 

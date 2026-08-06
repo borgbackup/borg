@@ -31,9 +31,11 @@ struct GL_CTX {
 
 /* --- Goldilocks field arithmetic ---------------------------------------
  *
- * All values are kept canonical (< p) at every step: the state is fed to
- * AES verbatim, so a non-canonical representation of the same field element
- * would change cut decisions. */
+ * Every digest the scan produces is canonical (< p): it is fed to AES
+ * verbatim, so a non-canonical representation of the same field element
+ * would change cut decisions. The rolls reach that via gl_add, which always
+ * canonicalizes; only the multiply inside them is allowed to hand on a
+ * merely reduced (< 2^64) representative, see gl_mul_lazy. */
 
 /* The reductions are data-dependent and unpredictable (~27% branch-miss rate
  * measured), so they must not become branches. Writing them as if() or as a
@@ -67,6 +69,30 @@ static inline uint64_t gl_mul(uint64_t a, uint64_t b)
     return __builtin_sub_overflow(r, GL_P, &u) ? r : u;
 }
 
+/* gl_mul without the final canonicalization: the result is congruent to a*b
+ * mod p but only bounded by 2^64, not by p.
+ *
+ * That is enough for the rolls, because both feed it straight into a gl_add
+ * whose other operand is canonical, and that gl_add canonicalizes anyway.
+ * The bound still holds with a non-canonical first operand: for a < 2^64 and
+ * b < p, a carry leaves a + b - 2^64 <= p - 2, so adding eps cannot carry a
+ * second time, and the one conditional subtraction of p then lands below p
+ * (r - p < 2^32). So the digest handed to AES stays canonical - which it must
+ * be, since it is fed to AES verbatim - while the multiply chain that limits
+ * this kernel loses its trailing compare and select. */
+static inline uint64_t gl_mul_lazy(uint64_t a, uint64_t b)
+{
+    __uint128_t t = (__uint128_t)a * b;
+    uint64_t lo = (uint64_t)t, hi = (uint64_t)(t >> 64);
+    uint64_t hi_hi = hi >> 32, hi_lo = hi & GL_EPS;
+    uint64_t t0, r;
+    unsigned char borrow = __builtin_sub_overflow(lo, hi_hi, &t0);
+    t0 -= ((uint64_t)0 - (uint64_t)borrow) & GL_EPS; /* -2^64 = -eps (mod p) */
+    unsigned char carry = __builtin_add_overflow(t0, hi_lo * GL_EPS, &r);
+    r += ((uint64_t)0 - (uint64_t)carry) & GL_EPS; /* cannot re-carry */
+    return r;
+}
+
 /* Advance the state by one byte. The state is the window's polynomial hash
  * s = sum b_j * K^(63-j) (oldest byte at K^63, newest at K^0), so
  *   s' = s*K - byte_out*K^64 + byte_in.
@@ -75,7 +101,7 @@ static inline uint64_t gl_mul(uint64_t a, uint64_t b)
 static inline uint64_t gl_roll(const GL_CTX *c, uint64_t s, uint8_t byte_out, uint8_t byte_in)
 {
     uint64_t delta = gl_add(c->nout64_tbl[byte_out], byte_in);
-    return gl_add(gl_mul(s, c->k1), delta);
+    return gl_add(gl_mul_lazy(s, c->k1), delta);
 }
 
 /* Advance the state by TWO bytes in one step (exact composition of two
@@ -89,7 +115,7 @@ static inline uint64_t gl_roll2(const GL_CTX *c, uint64_t s,
 {
     uint64_t delta = gl_add(gl_add(c->nout65_tbl[o0], c->nout64_tbl[o1]),
                             gl_add(c->in1_tbl[i0], i1));
-    return gl_add(gl_mul(s, c->k2), delta);
+    return gl_add(gl_mul_lazy(s, c->k2), delta);
 }
 
 uint64_t gl_digest64(const GL_CTX *c, const uint8_t *q)

@@ -7,6 +7,7 @@ import time
 
 from ..constants import *  # NOQA
 from ..helpers import format_file_size, CompressionSpec
+from ..helpers import sizeof_fmt_iec
 from ..helpers import FilesystemDirSpec
 from ..helpers import json_print
 from ..helpers import msgpack
@@ -161,17 +162,21 @@ class BenchmarkMixIn:
         if not selected:
             selected = set(sections)
 
+        KIB, MIB, GIB = 1024, 1024 * 1024, 1024 * 1024 * 1024
+
         is_test = "_BORG_BENCHMARK_CPU_TEST" in os.environ
         # Use minimal data and one iteration in test mode to keep CI fast.
-        number_default = 1 if is_test else 100
-        chunk_data_size = 100 * 1000 if is_test else 10 * 1000 * 1000
+        chunk_data_size = 128 * KIB if is_test else 8 * MIB
+        number_default = 1 if is_test else GIB // chunk_data_size
 
         # Buffer sizes matter where an algorithm switches to multiple threads:
         # blake3 and zstd do so above a threshold, so a size below it, one the
         # size of a typical borg chunk and one the size of a borg pack behave
-        # quite differently. Each row processes about as many bytes in total,
-        # so the throughput column stays comparable across sizes.
-        SMALL, CHUNK, PACK = ("100kiB", 100 * 1024), ("2MiB", 2 * 1024 * 1024), ("50MiB", 50 * 1024 * 1024)
+        # quite differently. Every row processes the same total either way, so
+        # the throughput column stays comparable across sizes.
+        # powers of two, so every row processes exactly 1 GiB (or 10 MiB for the
+        # compressors) rather than an awkward fraction of it
+        SMALL, CHUNK, PACK = ("128kiB", 128 * KIB), ("2MiB", 2 * MIB), ("64MiB", 64 * MIB)
         if is_test:
             hash_sizes = comp_sizes = one_size = [SMALL]
             hash_total = comp_total = SMALL[1]
@@ -179,10 +184,10 @@ class BenchmarkMixIn:
             hash_sizes = [SMALL, CHUNK, PACK]
             comp_sizes = [SMALL, CHUNK]
             one_size = [CHUNK]  # for algorithms where the buffer size does not change behaviour
-            hash_total = 1000 * 1000 * 1000
+            hash_total = GIB
             # compressible data means the codecs actually work, so the slow ones
             # (lzma, high zstd levels) need fewer bytes to stay bearable
-            comp_total = 10 * 1000 * 1000
+            comp_total = 10 * MIB
 
         buffers = {}
 
@@ -225,6 +230,16 @@ class BenchmarkMixIn:
                 compressible[nbytes] = bytes(out[:nbytes])
             return compressible[nbytes]
 
+        def data_size_str(size):
+            """The benchmark's own data volumes, always in IEC units.
+
+            These are fixed constants of the benchmark rather than user data, so
+            they do not follow BORG_UNITS - that would make two people's output
+            incomparable and would render binary sizes as awkward decimals
+            (1 GiB as "1.07 GB").
+            """
+            return sizeof_fmt_iec(size, suffix="B", sep=" ", precision=2)
+
         def throughput(size, dt):
             """Rate as MB/s, always - so numbers stay comparable between rows."""
             return f"{size / dt / 1e6:>8.1f} MB/s"
@@ -233,7 +248,7 @@ class BenchmarkMixIn:
             if args.json:
                 result[section].append({"size": size, "time": dt, **extra})
             else:
-                print(f"{spec:<{width}} {format_file_size(size):<10} {dt:.3f}s  {throughput(size, dt)}")
+                print(f"{spec:<{width}} {data_size_str(size):<11} {dt:.3f}s  {throughput(size, dt)}")
 
         def section_header(section, title):
             if args.json:

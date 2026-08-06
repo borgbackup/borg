@@ -21,13 +21,9 @@
  * Trot[b] = ROTL(T[b], window_size % 64) is precomputed by the caller, which
  * also removes one rotate per byte from the sequential path.
  *
- * Kernel dispatch mirrors fastcdc_impl.c: NEON on aarch64 (baseline there),
- * AVX-512 or AVX2 on x86-64 (runtime-detected), blocked scalar elsewhere,
- * sequential when forced. Measured on Apple M-series (64 MiB, window 4095, 21-bit
- * mask): sequential 1150, blocked scalar 2340, NEON 2260 MB/s - NEON and
- * blocked are a tie here (throughput and energy, within noise), because the
- * XOR/AND/compare test also runs well on the scalar ALUs; the symmetric
- * dispatch is kept for consistency across the SIMD chunker kernels.
+ * Kernel dispatch: AVX-512 or AVX2 on x86-64 (runtime-detected), blocked
+ * scalar everywhere else including aarch64 (which has no vector kernel, see
+ * the note where it would go), sequential when forced.
  * All kernels return bit-identical results. */
 
 #include <stdlib.h>
@@ -118,56 +114,29 @@ static size_t bz64_scan_blocked(const uint64_t *T, const uint64_t *Trot,
     return j;
 }
 
-/* --- NEON (aarch64 baseline, always available) -------------------------- */
-
-#if defined(__aarch64__)
-#define BZ_KIND "neon"
-
-#include <arm_neon.h>
-
-static size_t bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
-                             const uint8_t *pr, const uint8_t *pa,
-                             size_t n, uint64_t *sum_io, uint64_t mask)
-{
-    uint64_t sum = *sum_io;
-    uint64_t s[8];
-    size_t j = 0;
-    uint64x2_t M12 = {BZ_ROTL(mask, 7), BZ_ROTL(mask, 6)};
-    uint64x2_t M34 = {BZ_ROTL(mask, 5), BZ_ROTL(mask, 4)};
-    uint64x2_t M56 = {BZ_ROTL(mask, 3), BZ_ROTL(mask, 2)};
-    uint64x2_t M78 = {BZ_ROTL(mask, 1), mask};
-
-    while (j + 8 <= n && (sum & mask) != 0) {
-        bz64_block_prefix(T, Trot, pr + j, pa + j, s);
-        uint64_t c = BZ_ROTL(sum, 8);
-        uint64x2_t Cv = vdupq_n_u64(c);
-        uint64x2_t z12 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[0], s[1]}), M12));
-        uint64x2_t z34 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[2], s[3]}), M34));
-        uint64x2_t z56 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[4], s[5]}), M56));
-        uint64x2_t z78 = vceqzq_u64(vandq_u64(veorq_u64(Cv, (uint64x2_t){s[6], s[7]}), M78));
-        uint64x2_t any = vorrq_u64(vorrq_u64(z12, z34), vorrq_u64(z56, z78));
-        if (vmaxvq_u32(vreinterpretq_u32_u64(any))) {
-            size_t r = bz64_scan_seq(T, Trot, pr + j, pa + j, 8, &sum, mask); /* exact re-scan */
-            *sum_io = sum;
-            return j + r;
-        }
-        sum = c ^ s[7];
-        j += 8;
-    }
-    if (j < n)
-        j += bz64_scan_seq(T, Trot, pr + j, pa + j, n - j, &sum, mask);
-    *sum_io = sum;
-    return j;
-}
-
-static int bz64_simd_available(void)
-{
-    return 1;
-}
+/* --- aarch64: no vector kernel ------------------------------------------
+ *
+ * There was a NEON kernel here doing the 8-lane test in vector registers.
+ * It is gone because it lost to the blocked scalar kernel: measured on an
+ * Apple M3 Pro (48 MiB, window 4095), blocked 2590 MB/s vs NEON 2360 MB/s,
+ * the same ~9% gap at every mask size from 17 to 23 bits.
+ *
+ * The reason is that nothing here needs a vector register in the first
+ * place. clang keeps the block's eight prefix XORs in general registers and
+ * the scalar test is xor/and/compare per lane, which the wide scalar ALUs
+ * retire at more than one lane per cycle; the vector form has to move those
+ * eight values across to the SIMD side and then reduce the 8-lane result
+ * back to one condition flag (umaxv, ~4 cycles) before the loop branch can
+ * resolve. The move-and-reduce round trip costs more than the parallel test
+ * saves. fastcdc keeps its NEON kernel because its test is add/and/compare
+ * with per-lane shifted masks - enough extra per-lane work to pay for the
+ * trip - and there it wins by 2x.
+ *
+ * So aarch64 falls through to the blocked scalar kernel below. */
 
 /* --- AVX2 (x86-64, runtime detected) ------------------------------------ */
 
-#elif (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
 #define BZ_KIND "avx2"
 
 #include <immintrin.h>

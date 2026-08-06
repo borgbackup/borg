@@ -102,9 +102,9 @@ def test_check_soft_interrupt(archivers, request, monkeypatch):
             sig_int._sig_int_triggered = False
         assert len(PackTracker.load(repository.store)) == 1  # the pack checked before the break persisted
 
-    # a partial check resumes the saved cycle.
+    # a partial check resumes from the saved record (the one pack checked before the interrupt).
     output = cmd(archiver, "check", "-v", "--repository-only", "--max-duration=600", exit_code=0)
-    assert "Continuing check cycle" in output
+    assert "1 pack check results on record" in output
 
     # archive check: interrupt verify_data after 3 chunks.
     with Repository(archiver.repository_path, exclusive=True) as repository:
@@ -205,6 +205,38 @@ def test_check_interrupt_skips_archive_check(archivers, request, monkeypatch):
     finally:
         sig_int._sig_int_triggered = False
     assert archive_check_ran is False  # do_check raised at the sig_int guard, before archive_checker.check()
+
+
+def test_check_max_age(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+
+    # --repair and --archives-only do not allow --max-age; 0d is a valid value (resolves to no reuse).
+    # --max-duration needs --repository-only, but not --max-age: a partial check advances on its own.
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "check", "--repair", "--max-age=1d", exit_code=CommandError().exit_code)
+        cmd(archiver, "check", "--repair", "--max-age=0d", exit_code=CommandError().exit_code)
+        cmd(archiver, "check", "--archives-only", "--max-age=1d", exit_code=CommandError().exit_code)
+        cmd(archiver, "check", "--max-duration=3600", exit_code=CommandError().exit_code)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "check", "--repair", "--max-age=1d")
+        with pytest.raises(CommandError):
+            cmd(archiver, "check", "--repair", "--max-age=0d")
+        with pytest.raises(CommandError):
+            cmd(archiver, "check", "--archives-only", "--max-age=1d")
+        with pytest.raises(CommandError):
+            cmd(archiver, "check", "--max-duration=3600")
+
+    # a partial check runs without --max-age.
+    cmd(archiver, "check", "--repository-only", "--max-duration=3600", exit_code=0)
+
+    # a check records its results, a later one with --max-age reuses them.
+    output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)
+    assert "Starting full repository check" in output
+    output = cmd(archiver, "check", "-v", "--repository-only", "--max-age=4w", exit_code=0)
+    assert "reusing those younger than --max-age" in output
+    assert "no problems found" in output
 
 
 def test_date_matching(archivers, request):

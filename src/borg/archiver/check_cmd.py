@@ -148,7 +148,8 @@ class CheckMixIn:
         interrupted. A partial check verifies the least-recently-checked packs first,
         so repeated runs cover the whole repository. Add ``--max-age`` to also skip
         packs whose result is still younger than the given age: once every pack has a
-        recent result, further runs re-check each pack about once per ``--max-age``.
+        recent result, further runs re-check each pack at most once per ``--max-age``,
+        and no faster than the per-run budget allows.
         Assuming a complete check would take 7 hours, running a daily check with
         ``--max-duration=3600 --max-age=1w`` (1 hour) results in one full repository
         verification per week. Partial repository checks run neither archive checks

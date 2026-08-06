@@ -871,6 +871,10 @@ class Repository:
             logger.info("Starting from beginning.")
         elif max_age:
             logger.info(f"{len(tracker)} pack check results on record, reusing those younger than --max-age.")
+        elif partial:
+            logger.info(
+                f"{len(tracker)} pack check results on record, verifying the least-recently-checked packs first."
+            )
         else:
             logger.info(f"{len(tracker)} pack check results on record, verifying every pack.")
         t_start = time.monotonic()

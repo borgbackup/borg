@@ -180,7 +180,9 @@ class BenchmarkMixIn:
             comp_sizes = [SMALL, CHUNK]
             one_size = [CHUNK]  # for algorithms where the buffer size does not change behaviour
             hash_total = 1000 * 1000 * 1000
-            comp_total = 50 * 1000 * 1000
+            # compressible data means the codecs actually work, so the slow ones
+            # (lzma, high zstd levels) need fewer bytes to stay bearable
+            comp_total = 10 * 1000 * 1000
 
         buffers = {}
 
@@ -189,6 +191,39 @@ class BenchmarkMixIn:
             if nbytes not in buffers:
                 buffers[nbytes] = os.urandom(nbytes)
             return buffers[nbytes]
+
+        compressible = {}
+
+        def compressible_buffer(nbytes):
+            """Deterministic, text-like, compressible data of the given size.
+
+            Random bytes are the worst possible input for a compression benchmark:
+            nothing compresses, so every codec takes its incompressible fast path,
+            the levels barely differ, and zstd's multi-threading looks like a large
+            loss when on real data it is a 1.7 .. 3x win. This is a word soup built
+            from a fixed seed - identical on every machine and every run, so numbers
+            stay comparable - which compresses about 4x at zstd,3.
+
+            The xorshift is written out rather than using random.Random so that the
+            bytes do not depend on the Python version's PRNG internals.
+            """
+            if nbytes not in compressible:
+                words = (
+                    b"backup archive chunk repository compress encrypt index cache manifest "
+                    b"the and of a to in is it for with data borg file path size key id hash "
+                    b"item repo object segment directory user group mtime mode owner content"
+                ).split()
+                out = bytearray()
+                state = 0x2545F4914F6CDD1D
+                mask = 0xFFFFFFFFFFFFFFFF
+                while len(out) < nbytes:
+                    state ^= (state << 13) & mask
+                    state ^= state >> 7
+                    state ^= (state << 17) & mask
+                    out += words[state % len(words)]
+                    out += b"\n" if state & 0xF == 0 else b" "
+                compressible[nbytes] = bytes(out[:nbytes])
+            return compressible[nbytes]
 
         def throughput(size, dt):
             """Rate as MB/s, always - so numbers stay comparable between rows."""
@@ -331,6 +366,10 @@ class BenchmarkMixIn:
 
         if "compression" in selected:
             section_header("compression", "Compression")
+            if not args.json:
+                sample = compressible_buffer(comp_sizes[-1][1])
+                ratio = len(sample) / len(CompressionSpec("zstd,3").compressor.compress({}, sample)[1])
+                print(f"(test data is compressible, {ratio:.1f}x at zstd,3)")
             for spec in [
                 "lz4",
                 "zstd,1",
@@ -348,8 +387,8 @@ class BenchmarkMixIn:
             ]:
                 compressor = CompressionSpec(spec).compressor
                 for label, nbytes in comp_sizes:
-                    data = buffer(nbytes)
-                    number = max(1, comp_total // nbytes)
+                    data = compressible_buffer(nbytes)
+                    number = max(3, comp_total // nbytes)  # a few reps even for the fast codecs
                     dt = timeit(lambda: compressor.compress({}, data), number=number)
                     algo, _, algo_params = spec.partition(",")
                     report(

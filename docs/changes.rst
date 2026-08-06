@@ -204,6 +204,7 @@ New features:
 - benchmark cpu: measure hashes and compressors at several buffer sizes, and
   add --chunking / --hashing / --encryption / --compression / --msgpack to run
   only a subset, #10050
+- benchmark cpu: compress deterministic compressible data instead of random noise
 - completion: generate fish completions, remove hand-written ones, #9989
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041

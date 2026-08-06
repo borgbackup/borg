@@ -121,24 +121,35 @@ static int64_t fc_scan_blocked(const uint64_t *gear, const uint8_t *p, size_t n,
 
 #include <arm_neon.h>
 
+/* Per lane, "(x & M) == 0" is replaced by "x <= ~M", turning the and plus
+ * compare-against-zero into one unsigned compare against a limit computed
+ * once per scan.
+ *
+ * (x & M) == 0 means x's set bits are a subset of ~M's, which implies
+ * x <= ~M for any M - so this never loses a cut, whatever the mask looks
+ * like. For the contiguous high-bit masks the chunker actually uses (mask
+ * has its one-bits at the top and shifting left only drops bits off the top,
+ * so ~M is 2^(64-k)-1) the two are exactly equivalent, and this stays the
+ * same superset test as the masked form: the block's exact sequential
+ * recheck resolves candidates either way. */
 static int64_t fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {
     uint64_t fp = *fp_io;
     uint64_t s[8];
-    uint64x2_t M12 = {mask << 7, mask << 6};
-    uint64x2_t M34 = {mask << 5, mask << 4};
-    uint64x2_t M56 = {mask << 3, mask << 2};
-    uint64x2_t M78 = {mask << 1, mask};
+    uint64x2_t L12 = {~(mask << 7), ~(mask << 6)};
+    uint64x2_t L34 = {~(mask << 5), ~(mask << 4)};
+    uint64x2_t L56 = {~(mask << 3), ~(mask << 2)};
+    uint64x2_t L78 = {~(mask << 1), ~mask};
     size_t i = 0;
 
     for (; i + 8 <= n; i += 8) {
         fc_block_prefix(gear, p + i, s);
         uint64_t c = fp << 8;
         uint64x2_t C = vdupq_n_u64(c);
-        uint64x2_t z12 = vceqzq_u64(vandq_u64(vaddq_u64(C, (uint64x2_t){s[0], s[1]}), M12));
-        uint64x2_t z34 = vceqzq_u64(vandq_u64(vaddq_u64(C, (uint64x2_t){s[2], s[3]}), M34));
-        uint64x2_t z56 = vceqzq_u64(vandq_u64(vaddq_u64(C, (uint64x2_t){s[4], s[5]}), M56));
-        uint64x2_t z78 = vceqzq_u64(vandq_u64(vaddq_u64(C, (uint64x2_t){s[6], s[7]}), M78));
+        uint64x2_t z12 = vcgeq_u64(L12, vaddq_u64(C, (uint64x2_t){s[0], s[1]}));
+        uint64x2_t z34 = vcgeq_u64(L34, vaddq_u64(C, (uint64x2_t){s[2], s[3]}));
+        uint64x2_t z56 = vcgeq_u64(L56, vaddq_u64(C, (uint64x2_t){s[4], s[5]}));
+        uint64x2_t z78 = vcgeq_u64(L78, vaddq_u64(C, (uint64x2_t){s[6], s[7]}));
         uint64x2_t any = vorrq_u64(vorrq_u64(z12, z34), vorrq_u64(z56, z78));
         if (vmaxvq_u32(vreinterpretq_u32_u64(any))) {
             int64_t r = fc_scan_seq(gear, p + i, 8, &fp, mask); /* exact recheck */

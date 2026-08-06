@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from ...archive import ChunkBuffer
+from ...archive import ChunkBuffer, ArchiveChecker
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, IntegrityError
 from ...manifest import Manifest
@@ -16,6 +16,7 @@ from . import (
     cmd,
     src_file,
     create_src_archive,
+    create_regular_file,
     open_archive,
     generate_archiver_tests,
     read_chunk,
@@ -178,9 +179,20 @@ def test_missing_file_chunk(archivers, request):
             pytest.fail("should not happen")  # convert 'fail'
 
     output = cmd(archiver, "check", exit_code=1)
-    assert "Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    # archive1 and archive2 share src_file, so the missing chunk is grouped once, with both archives
+    # listed on its single reference line (the id also appears once in the streamed "Missing chunk
+    # detected" line emitted while the archives are analyzed).
+    killed_hex = bin_to_hex(killed_chunk.id)
+    chunk_header_lines = [ln for ln in output.splitlines() if ln.startswith("- Chunk ") and killed_hex in ln]
+    assert len(chunk_header_lines) == 1
+    ref_lines = [line for line in output.splitlines() if src_file in line]
+    assert len(ref_lines) == 1
+    assert "archive1" in ref_lines[0] and "archive2" in ref_lines[0]
     output = cmd(archiver, "check", "--repair", exit_code=0)
-    assert "Missing file chunk detected" in output  # repair is not changing anything, just reporting.
+    # repair is not changing anything, just reporting.
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(killed_chunk.id) in output
 
     # check does not modify the chunks list.
     for archive_name in ("archive1", "archive2"):
@@ -200,7 +212,63 @@ def test_missing_file_chunk(archivers, request):
 
     # check should not complain anymore about missing chunks:
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "Missing file chunk detected" not in output
+    assert "The following chunks are missing in the repository:" not in output
+
+
+def test_missing_file_chunk_report_truncated(archiver):
+    # local-only: this patches ArchiveChecker.MAX_MISSING_CHUNKS in-process, which has no effect
+    # when borg runs as a separate process (binary_archiver), so it must not be parametrized.
+    check_cmd_setup(archiver)
+
+    # remove several distinct file chunks, so more missing chunks exist than the (patched) report limit.
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    killed_ids = []
+    with repository:
+        for item in archive.iter_items():
+            if "chunks" not in item or not item.chunks:
+                continue
+            chunk_id = item.chunks[-1].id
+            if chunk_id not in killed_ids:
+                repository.delete(chunk_id)
+                killed_ids.append(chunk_id)
+            if len(killed_ids) >= 3:
+                break
+    assert len(killed_ids) >= 2  # need several distinct missing chunks to exercise truncation
+
+    # cap the report to a single chunk, so the remaining missing chunks are truncated.
+    with patch.object(ArchiveChecker, "MAX_MISSING_CHUNKS", 1):
+        output = cmd(archiver, "check", exit_code=1)
+    assert "The following chunks are missing in the repository:" in output
+    assert output.count("- Chunk ") == 1  # only one chunk is detailed
+    assert "only the first 1 missing chunks are listed" in output  # the rest are noted as truncated
+
+
+def test_missing_file_chunk_refs_truncated(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # many distinct files with identical content dedup to the same chunk, so a single missing chunk
+    # ends up referenced by more files than MAX_REFS_PER_CHUNK, which exercises the per-chunk cap
+    # without patching (so it works in binary mode too, where borg runs as a separate process).
+    cap = ArchiveChecker.MAX_REFS_PER_CHUNK
+    for i in range(cap + 1):
+        create_regular_file(archiver.input_path, f"samefile{i}", contents=b"same content for dedup")
+    cmd(archiver, "create", "archive1", "input")
+
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    killed_id = None
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith("samefile0"):
+                killed_id = item.chunks[0].id
+                repository.delete(killed_id)
+                break
+    assert killed_id is not None
+
+    output = cmd(archiver, "check", exit_code=1)
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(killed_id) in output
+    assert f"only the first {cap} files are listed" in output  # the remaining referencing files are truncated
 
 
 def test_missing_archive_item_chunk(archivers, request):
@@ -483,11 +551,14 @@ def test_verify_data(archivers, request, init_args):
     # repair will find the defect chunk and remove it
     output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(chunk.id) in output
+    assert src_file in output
 
     # run with --verify-data again, it will notice the missing chunk.
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(chunk.id) in output
 
 
 def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):
@@ -571,12 +642,15 @@ def test_corrupted_file_chunk(archivers, request, init_args):
     # repair: the defect chunk will be removed.
     output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert bin_to_hex(chunk.id) in output
+    assert src_file in output
 
     # run normal check again
     cmd(archiver, "check", "--repository-only", exit_code=0)
     output = cmd(archiver, "check", "--archives-only", exit_code=1)
-    assert f"{src_file}: Missing file chunk detected" in output
+    assert "The following chunks are missing in the repository:" in output
+    assert src_file in output
 
 
 @pytest.mark.skip(

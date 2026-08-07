@@ -269,6 +269,9 @@ def set_flags(path, bsd_flags, fd=None):
 import errno as errno_mod
 import fcntl as fcntl_mod
 
+# pypy's fcntl module does not expose F_FULLFSYNC (value 51 in macOS headers)
+F_FULLFSYNC = getattr(fcntl_mod, "F_FULLFSYNC", 51)
+
 
 def fdatasync(fd):
     """macOS fdatasync using F_FULLFSYNC for true data durability.
@@ -278,7 +281,7 @@ def fdatasync(fd):
     Falls back to os.fsync() if F_FULLFSYNC is not supported (e.g. network fs).
     """
     try:
-        fcntl_mod.fcntl(fd, fcntl_mod.F_FULLFSYNC)
+        fcntl_mod.fcntl(fd, F_FULLFSYNC)
     except OSError:
         # F_FULLFSYNC not supported (e.g. network filesystem), fall back
         os.fsync(fd)

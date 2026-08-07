@@ -68,7 +68,7 @@ def test_fdatasync_uses_f_fullfsync(monkeypatch):
         tmp.flush()
         darwin.fdatasync(tmp.fileno())
 
-    assert any(cmd == fcntl_mod.F_FULLFSYNC for _, cmd in calls), "fdatasync should call fcntl with F_FULLFSYNC"
+    assert any(cmd == darwin.F_FULLFSYNC for _, cmd in calls), "fdatasync should call fcntl with F_FULLFSYNC"
 
 
 def test_fdatasync_falls_back_to_fsync(monkeypatch):
@@ -79,7 +79,7 @@ def test_fdatasync_falls_back_to_fsync(monkeypatch):
     fsync_calls = []
 
     def mock_fcntl(fd, cmd, *args):
-        if cmd == fcntl_mod.F_FULLFSYNC:
+        if cmd == darwin.F_FULLFSYNC:
             raise OSError("F_FULLFSYNC not supported")
         return 0
 

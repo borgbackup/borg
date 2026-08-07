@@ -41,6 +41,8 @@ import hashlib
 import hmac
 from math import ceil
 
+from ..platformflags import is_pypy
+
 from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AsString
@@ -679,6 +681,12 @@ cdef class CHACHA20_POLY1305(_AEAD_BASE):
 
 
 def hmac_sha256(key, data):
+    if is_pypy:
+        # pypy's hmac/_hashlib only accepts bytes (no memoryview, no bytearray)
+        if not isinstance(key, bytes):
+            key = bytes(key)
+        if not isinstance(data, bytes):
+            data = bytes(data)
     return hmac.digest(key, data, 'sha256')
 
 

@@ -19,3 +19,6 @@ is_haiku = sys.platform.startswith("haiku")
 
 # MSYS2 (on Windows)
 is_msystem = is_win32 and "MSYSTEM" in os.environ
+
+# Python implementation
+is_pypy = sys.implementation.name == "pypy"

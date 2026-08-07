@@ -164,18 +164,23 @@ class BenchmarkMixIn:
 
         KIB, MIB, GIB = 1024, 1024 * 1024, 1024 * 1024 * 1024
 
+        # width of the spec column, wide enough for the longest row of any section, so
+        # that all sections line up with each other
+        WIDTH = 26
+
         is_test = "_BORG_BENCHMARK_CPU_TEST" in os.environ
         # Use minimal data and one iteration in test mode to keep CI fast.
         chunk_data_size = 128 * KIB if is_test else 8 * MIB
         number_default = 1 if is_test else GIB // chunk_data_size
 
         # Buffer sizes matter where an algorithm switches to multiple threads:
-        # blake3 and zstd do so above a threshold, so a size below it, one the
-        # size of a typical borg chunk and one the size of a borg pack behave
-        # quite differently. Every row processes the same total either way, so
-        # the throughput column stays comparable across sizes.
-        # powers of two, so every row processes exactly 1 GiB (or 10 MiB for the
-        # compressors) rather than an awkward fraction of it
+        # blake3 and zstd do so above a threshold, so a buffer below it and one
+        # above it behave quite differently. The hashes are measured at pack and
+        # chunk size (both above blake3's threshold), the compressors at chunk
+        # size and below zstd's threshold. Within a section every row processes
+        # the same total, so the throughput column stays comparable across sizes.
+        # All powers of two, so that total is exactly 1 GiB (or 10 MiB for the
+        # compressors) rather than an awkward fraction of it.
         SMALL, CHUNK, PACK = ("128kiB", 128 * KIB), ("2MiB", 2 * MIB), ("64MiB", 64 * MIB)
         if is_test:
             hash_sizes = comp_sizes = one_size = [SMALL]
@@ -245,11 +250,11 @@ class BenchmarkMixIn:
             """Rate as MB/s, always - so numbers stay comparable between rows."""
             return f"{size / dt / 1e6:>8.1f} MB/s"
 
-        def report(section, spec, size, dt, width, **extra):
+        def report(section, spec, size, dt, **extra):
             if args.json:
                 result[section].append({"size": size, "time": dt, **extra})
             else:
-                print(f"{spec:<{width}} {data_size_str(size):<11} {dt:.3f}s  {throughput(size, dt)}")
+                print(f"{spec:<{WIDTH}} {data_size_str(size):<11} {dt:.3f}s  {throughput(size, dt)}")
 
         def section_header(section, title):
             if args.json:
@@ -320,7 +325,7 @@ class BenchmarkMixIn:
             ]:
                 dt = timeit(func, setup, number=number_default, globals=vars)
                 algo, _, algo_params = spec.partition(",")
-                report("chunkers", spec, size, dt, 26, algo=algo, algo_params=algo_params)
+                report("chunkers", spec, size, dt, algo=algo, algo_params=algo_params)
 
         if "hashing" in selected:
             from ..crypto.low_level import hmac_sha256, blake2b_256
@@ -346,7 +351,7 @@ class BenchmarkMixIn:
                     data = buffer(nbytes)
                     number = max(1, hash_total // nbytes)
                     dt = timeit(lambda: func(data), number=number)
-                    report("hashes", f"{spec} ({label})", nbytes * number, dt, 26, algo=spec, buffer_size=nbytes)
+                    report("hashes", f"{spec} ({label})", nbytes * number, dt, algo=spec, buffer_size=nbytes)
 
         if "encryption" in selected:
             from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
@@ -382,7 +387,7 @@ class BenchmarkMixIn:
             ]
             for spec, func in tests:
                 dt = timeit(func, number=number_default)
-                report("encryption", spec, size, dt, 26, algo=spec)
+                report("encryption", spec, size, dt, algo=spec)
 
         if "compression" in selected:
             section_header("compression", "Compression")
@@ -415,7 +420,6 @@ class BenchmarkMixIn:
                         f"{spec} ({label})",
                         nbytes * number,
                         dt,
-                        20,
                         algo=algo,
                         algo_params=algo_params,
                         buffer_size=nbytes,
@@ -433,7 +437,7 @@ class BenchmarkMixIn:
             else:
                 # this one packs items, not bytes, so it gets a rate in its own unit
                 size = "%dk Items" % (count // 1000)
-                print(f"{spec:<20} {size:<10} {dt:.3f}s  {count / dt / 1000:>8.1f} kItems/s")
+                print(f"{spec:<{WIDTH}} {size:<11} {dt:.3f}s  {count / dt / 1000:>8.1f} kItems/s")
 
         if args.json:
             json_print(result)
@@ -517,10 +521,17 @@ class BenchmarkMixIn:
         --encryption, --compression, --msgpack to run only those.
 
         Some algorithms use multiple threads only above a size threshold, so the
-        hashes and compressors are measured at several buffer sizes: 100kiB (below
-        the threshold), 2MiB (a typical borg chunk) and, for hashes, 50MiB (a borg
-        pack). Every row processes roughly the same total number of bytes, so the
-        throughput column is comparable between them.
+        hashes and the compressors are measured at more than one buffer size: the
+        hashes at 64MiB (a borg pack) and 2MiB (a typical borg chunk), both above
+        blake3's threshold, the compressors at 2MiB and 128kiB, which is below
+        zstd's. Within a section every row processes the same total number of
+        bytes - 1 GiB, or 10 MiB for the compressors - so the throughput column is
+        comparable between rows.
+
+        The compressors work on synthetic text-like data that compresses about 4x
+        at zstd,3. Random data would be the worst possible input: no codec can
+        compress it, so all of them would take their incompressible fast path and
+        the levels would barely differ.
         """
         )
         subparser = ArgumentParser(

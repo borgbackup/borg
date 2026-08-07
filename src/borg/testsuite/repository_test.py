@@ -156,6 +156,67 @@ def test_chunk_index_persisted_on_close(tmp_path):
             assert pdchunk(repository.get(H(x))) == b"DATA"
 
 
+def test_exception_unwind_drops_buffered_chunks(tmp_path):
+    # An exception inside "with repository:" unwinds with chunks still buffered in the
+    # PackWriter (put() buffers until a pack fills or flush() is called).  __exit__ must
+    # drop the buffered chunks so that close() neither replaces the original exception
+    # with its "call flush() before close()" assertion nor persists F_PENDING index
+    # entries for chunks that were never stored.
+    location = os.fspath(tmp_path / "repo")
+    with pytest.raises(ValueError, match="original error"):
+        with Repository(location, exclusive=True, create=True) as repository:
+            repository.put(H(0), fchunk(b"DATA"))
+            assert repository._pack_writer._pieces  # small chunk: still buffered, no pack written
+            raise ValueError("original error")
+    with Repository(location, exclusive=True) as repository:
+        # the buffered chunk died with the aborted operation: not in the index, not readable
+        assert H(0) not in repository.chunks
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(H(0))
+
+
+def test_exception_unwind_does_not_rebuild_dropped_chunk_index(tmp_path, monkeypatch):
+    # Unwinding must not rebuild a chunk index that was dropped while chunks are still
+    # buffered.  That combination is what check --repair leaves behind: it puts chunks
+    # without a Cache and its finish() calls delete_chunkindex_from_repo(), which ends in
+    # invalidate_chunk_index().  Reaching for .chunks there would rebuild the index from the
+    # repo -- repo I/O on the error path, which can fail and mask the original exception.
+    from .. import cache as cache_mod
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository.put(H(0), fchunk(b"DATA"))
+        repository.flush()
+
+    rebuilds = []
+
+    def must_not_rebuild(repository, *args, **kwargs):
+        rebuilds.append(1)
+        raise OSError("rebuilt the chunk index while unwinding")
+
+    with pytest.raises(ValueError, match="original error"):
+        with Repository(location, exclusive=True) as repository:
+            repository.put(H(1), fchunk(b"MORE"))
+            assert repository._pack_writer._pieces  # still buffered, no pack written
+            repository.invalidate_chunk_index()  # what check --repair's finish() leaves behind
+            assert not repository.is_chunk_index_loaded
+            monkeypatch.setattr(cache_mod, "build_chunkindex_from_repo", must_not_rebuild)
+            raise ValueError("original error")
+    assert rebuilds == []
+
+
+def test_close_with_unflushed_chunks_asserts(tmp_path):
+    # On a clean (non-exception) path, closing with buffered chunks is a caller bug:
+    # the assertion in close() still catches a forgotten flush().
+    location = os.fspath(tmp_path / "repo")
+    with pytest.raises(AssertionError, match="unflushed"):
+        with Repository(location, exclusive=True, create=True) as repository:
+            repository.put(H(0), fchunk(b"DATA"))
+    # clean up the deliberately broken close: drop the buffered chunk, then close for real
+    repository._pack_writer._drop_buffered()
+    repository.close()
+
+
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         meta, data = b"meta", b"data"

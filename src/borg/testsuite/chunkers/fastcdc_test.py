@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from . import cf, cf_expand
+from . import cf, cf_expand, chunker_with_kernel
 from ...chunkers import ChunkerFastCDC, get_chunker
 from ...chunkers.fastcdc import fastcdc_get_gear_table
 from ...constants import *  # NOQA
@@ -142,10 +142,17 @@ def test_fastcdc_params_parsing():
         ChunkerParams("fastcdc,20,20,20,2")
 
 
+ALL_FASTCDC_KERNELS = ("neon", "avx512", "avx2", "blockwise", "scalar")
+
+
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("kernel", ALL_FASTCDC_KERNELS)
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
-def test_fuzz_fastcdc(worker):
+def test_fuzz_fastcdc(worker, kernel, monkeypatch):
     # Fuzz fastcdc with random and uniform data of misc. sizes and misc keys.
+    # Every kernel gets fuzzed: the sizes here are not multiples of a block, so
+    # this is what covers the vector kernels' tails and their sub-block inputs,
+    # which the fixed-size buffer in test_fastcdc_kernels_identical never reaches.
     def rnd_key():
         return os.urandom(32)
 
@@ -157,7 +164,12 @@ def test_fuzz_fastcdc(worker):
     sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
 
     for key in keys:
-        chunker = ChunkerFastCDC(key, min_exp, max_exp, mask_bits, nc_level)
+        chunker = chunker_with_kernel(
+            monkeypatch,
+            "BORG_FASTCDC_KERNEL",
+            kernel,
+            lambda: ChunkerFastCDC(key, min_exp, max_exp, mask_bits, nc_level),
+        )
         for size in sizes:
             # Random data
             data = os.urandom(size)
@@ -178,16 +190,13 @@ def test_fuzz_fastcdc(worker):
             assert b"".join(parts) == data
 
 
-ALL_FASTCDC_KERNELS = ("neon", "avx512", "avx2", "blockwise", "scalar")
-
-
-def test_fastcdc_kernels_identical(monkeypatch):
+@pytest.mark.parametrize("kernel", ALL_FASTCDC_KERNELS)
+def test_fastcdc_kernels_identical(kernel, monkeypatch):
     # Every scan kernel this platform accepts must produce identical cut points.
-    # Kernels this build/CPU cannot run raise and are skipped, so the same test
-    # covers whatever tier the machine happens to have - including kernels that
-    # exist but are not auto-selected, which nothing else would exercise.
+    # Kernels this build/CPU cannot run are skipped, so the same test covers
+    # whatever tier the machine happens to have - including kernels that exist
+    # but are not auto-selected, which nothing else would exercise.
     data = os.urandom(4 * 1024 * 1024)
-    key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
 
     def sizes(chunker):
         return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
@@ -195,19 +204,19 @@ def test_fastcdc_kernels_identical(monkeypatch):
     monkeypatch.delenv("BORG_FASTCDC_KERNEL", raising=False)
     reference = sizes(ChunkerFastCDC(key0, 10, 16, 14, 2))
 
-    tested = []
-    for name in ALL_FASTCDC_KERNELS:
-        monkeypatch.setenv("BORG_FASTCDC_KERNEL", name)
-        try:
-            chunker = ChunkerFastCDC(key0, 10, 16, 14, 2)
-        except ValueError:
-            continue  # not available on this build/CPU
-        assert chunker.kernel == name
-        assert sizes(chunker) == reference, f"kernel {name} disagrees with the default one"
-        tested.append(name)
+    chunker = chunker_with_kernel(
+        monkeypatch, "BORG_FASTCDC_KERNEL", kernel, lambda: ChunkerFastCDC(key0, 10, 16, 14, 2)
+    )
+    assert sizes(chunker) == reference, f"kernel {kernel} disagrees with the default one"
 
-    # the portable kernels exist everywhere; if they were skipped, the loop is broken
-    assert "blockwise" in tested and "scalar" in tested
+
+@pytest.mark.parametrize("kernel", ["blockwise", "scalar"])
+def test_fastcdc_portable_kernel_available(kernel, monkeypatch):
+    # scalar and blockwise are portable C and exist in every build on every CPU.
+    # If one of them cannot be selected, kernel selection is broken rather than
+    # the platform being limited - so this must not skip the way the test above does.
+    monkeypatch.setenv("BORG_FASTCDC_KERNEL", kernel)
+    assert ChunkerFastCDC(key0, 10, 16, 14, 2).kernel == kernel
 
 
 @pytest.mark.parametrize("envvar", ["BORG_FASTCDC_KERNEL", "BORG_BUZHASH64_KERNEL", "BORG_AES_CHUNKER_KERNEL"])

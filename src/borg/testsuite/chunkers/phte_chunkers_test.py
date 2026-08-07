@@ -14,7 +14,7 @@ import random
 
 import pytest
 
-from . import cf, cf_expand
+from . import cf, cf_expand, chunker_with_kernel
 from ...chunkers import ChunkerRabinAES, ChunkerGoldilocksAES, ChunkerToeplitzAES, get_chunker
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin
@@ -47,10 +47,11 @@ def chunker_spec(request):
 ALL_AES_KERNELS = ("vaes", "aes-ni", "aes-arm64", "evp")
 
 
-def test_kernels_identical(chunker_spec, monkeypatch):
+@pytest.mark.parametrize("kernel", ALL_AES_KERNELS)
+def test_kernels_identical(chunker_spec, kernel, monkeypatch):
     # Every scan path this platform accepts - OpenSSL EVP, the 128-bit AES
     # instructions, VAES - must produce identical cut points. Paths this
-    # build/CPU cannot run raise and are skipped.
+    # build/CPU cannot run are skipped.
     cls, algo, params = chunker_spec
     data = os.urandom(4 * 1024 * 1024)
 
@@ -60,19 +61,17 @@ def test_kernels_identical(chunker_spec, monkeypatch):
     monkeypatch.delenv(KERNEL_ENV, raising=False)
     reference = sizes(cls(key0, 10, 16, 14, 2))
 
-    tested = []
-    for name in ALL_AES_KERNELS:
-        monkeypatch.setenv(KERNEL_ENV, name)
-        try:
-            chunker = cls(key0, 10, 16, 14, 2)
-        except ValueError:
-            continue  # not available on this build/CPU
-        assert chunker.kernel == name
-        assert sizes(chunker) == reference, f"path {name} disagrees with the default one"
-        tested.append(name)
+    chunker = chunker_with_kernel(monkeypatch, KERNEL_ENV, kernel, lambda: cls(key0, 10, 16, 14, 2))
+    assert sizes(chunker) == reference, f"path {kernel} disagrees with the default one"
 
-    # the portable OpenSSL path exists everywhere
-    assert "evp" in tested
+
+def test_evp_kernel_available(chunker_spec, monkeypatch):
+    # EVP is the portable OpenSSL path: it exists in every build on every CPU, so
+    # unlike the test above this must not skip - if it cannot be selected, path
+    # selection is broken rather than the platform being limited.
+    cls, algo, params = chunker_spec
+    monkeypatch.setenv(KERNEL_ENV, "evp")
+    assert cls(key0, 10, 16, 14, 2).kernel == "evp"
 
 
 def test_chunksize_distribution(chunker_spec):
@@ -157,9 +156,12 @@ def test_params_parsing(chunker_spec):
 
 
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("kernel", ALL_AES_KERNELS)
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
-def test_fuzz(chunker_spec, worker):
-    # Fuzz with random and uniform data of misc. sizes and misc keys.
+def test_fuzz(chunker_spec, worker, kernel, monkeypatch):
+    # Fuzz with random and uniform data of misc. sizes and misc keys, on every
+    # scan path: these odd sizes are what exercise the hardware paths' tails and
+    # their groups-of-8 handling, which test_kernels_identical does not reach.
     cls, algo, params = chunker_spec
 
     # decompose <ALGO>_PARAMS = (algo, min_exp, max_exp, mask_bits, nc_level)
@@ -170,7 +172,9 @@ def test_fuzz(chunker_spec, worker):
     sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
 
     for key in keys:
-        chunker = cls(key, min_exp, max_exp, mask_bits, nc_level)
+        chunker = chunker_with_kernel(
+            monkeypatch, KERNEL_ENV, kernel, lambda: cls(key, min_exp, max_exp, mask_bits, nc_level)
+        )
         for size in sizes:
             # Random data
             data = os.urandom(size)

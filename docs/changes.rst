@@ -167,23 +167,22 @@ Version 2.0.0b23 (not released yet)
 
 New features:
 
-- faster:
+- faster create:
 
-  - create:
+  - use multi-threaded zstd compression for big chunks, #9961
+  - use multi-threaded blake3 hashing for big chunks, #9958
+  - overlap pack hash/store and build of the next pack, #9988.
+    BORG_PACK_ASYNC=no disables the store-thread (debugging aid).
+  - chunkers, crypto: release the GIL in pure-C hot paths
+  - give each thread its own LZ4 scratch buffer, #10032
+- faster extract / mount:
 
-    - use multi-threaded zstd compression for big chunks, #9961
-    - use multi-threaded blake3 hashing for big chunks, #9958
-    - overlap pack hash/store and build of the next pack, #9988.
-      BORG_PACK_ASYNC=no disables the store-thread (debugging aid).
-    - chunkers, crypto: release the GIL in pure-C hot paths
-  - extract / mount:
-
-    - avoid refetching/reparsing repeated chunks, #1678
-    - do not verify the chunk id on every read from an encrypted repo (the
-      AEAD authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
-    - serve all-zero chunks without repository access; also cache
-      recently parsed chunks, #1678
-- Chunkers:
+  - avoid refetching/reparsing repeated chunks, #1678
+  - do not verify the chunk id on every read from an encrypted repo (the
+    AEAD authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
+  - serve all-zero chunks without repository access; also cache
+    recently parsed chunks, #1678
+- more, faster, and more secure chunkers:
 
   - fastcdc is the new and faster default chunker, #9957
   - fastcdc / buzhash64: SIMD-accelerated scan kernel, #10034, #10043:
@@ -195,26 +194,35 @@ New features:
       which one is fastest depends on the CPU *and* the compiler, so nothing
       is chosen automatically
   - toeplitz-aes, rabin-aes, goldilocks-aes: fingerprinting-resistant chunkers
-    (UHF-then-PRF), with direct AES hw acceleration or via OpenSSL, #9987
-  - toeplitz-aes, rabin-aes, goldilocks-aes: VAES/AVX-512 scan path on x86-64
-    (4 AES blocks per instruction), #10043
+    (UHF-then-PRF), with direct AES hw acceleration (AES-NI or VAES/AVX-512) or
+    via OpenSSL, #9987, #10043
   - zero-copy fill and lazy buffer compaction optimizations
+  - log the chunker and its scan kernel at debug level
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
 - analyze: report deduplicated size of a set of archives, #5741
 - repo-compress: was temporarily gone, re-added now with pack support, #9663
 - version: add --json output, #10004
-- benchmark cpu: add a throughput column (MB/s), #10049
-- benchmark cpu: measure hashes and compressors at several buffer sizes, and
-  add --chunking / --hashing / --encrypting / --compressing / --msgpacking to
-  run only a subset, #10050
-- benchmark cpu: compress deterministic compressible data instead of random noise
-- benchmark cpu: measure blake3 the way borg uses it (multi-threaded only above
-  BORG_BLAKE3_MT_THRESHOLD)
-- completion: generate fish completions, remove hand-written ones, #9989
+- benchmark cpu:
+
+  - add a throughput column (MB/s), #10049
+  - measure hashes and compressors at several buffer sizes
+  - compress deterministic compressible data instead of random noise
+  - measure algorithms the way borg uses them (e.g. multithreading on/off
+    depending on data size)
+  - use --chunking / --hashing / --encrypting / --compressing / --msgpacking
+    to run only a subset of the benchmarks, #10050
+- completion: generate fish and tcsh completions, #9989, #9503
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
+- check:
+
+  - keep pack check results, add --max-age to reuse them, #9696, #9925
+  - report missing chunks grouped as chunk -> files -> archives, #9218, #9965
+  - calendar-aware --max-age, symmetric clock-skew window
+  - check: stream one line per missing chunk id, run report on abort, lower report caps, #9218
+
 
 Fixes:
 

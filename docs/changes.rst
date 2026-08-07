@@ -202,8 +202,8 @@ New features:
 - version: add --json output, #10004
 - benchmark cpu: add a throughput column (MB/s), #10049
 - benchmark cpu: measure hashes and compressors at several buffer sizes, and
-  add --chunking / --hashing / --encryption / --compression / --msgpack to run
-  only a subset, #10050
+  add --chunking / --hashing / --encrypting / --compressing / --msgpacking to
+  run only a subset, #10050
 - benchmark cpu: compress deterministic compressible data instead of random noise
 - benchmark cpu: measure blake3 the way borg uses it (multi-threaded only above
   BORG_BLAKE3_MT_THRESHOLD)

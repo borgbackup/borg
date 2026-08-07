@@ -63,9 +63,9 @@ def test_benchmark_cpu(archiver, monkeypatch):
     [
         ("--chunking", "Chunkers"),
         ("--hashing", "Cryptographic hashes / MACs"),
-        ("--encryption", "Encryption"),
-        ("--compression", "Compression"),
-        ("--msgpack", "msgpack"),
+        ("--encrypting", "Encryption"),
+        ("--compressing", "Compression"),
+        ("--msgpacking", "msgpack"),
     ],
 )
 def test_benchmark_cpu_section_selection(archiver, monkeypatch, flag, header):

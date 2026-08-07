@@ -157,7 +157,7 @@ class BenchmarkMixIn:
         result = {} if args.json else None
 
         # no section selected means: run them all
-        sections = ("chunking", "hashing", "encryption", "compression", "msgpack")
+        sections = ("chunking", "hashing", "encrypting", "compressing", "msgpacking")
         selected = {name for name in sections if getattr(args, name)}
         if not selected:
             selected = set(sections)
@@ -353,7 +353,7 @@ class BenchmarkMixIn:
                     dt = timeit(lambda: func(data), number=number)
                     report("hashes", f"{spec} ({label})", nbytes * number, dt, algo=spec, buffer_size=nbytes)
 
-        if "encryption" in selected:
+        if "encrypting" in selected:
             from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
             from ..crypto.low_level import AES256_OCB, CHACHA20_POLY1305
 
@@ -389,7 +389,7 @@ class BenchmarkMixIn:
                 dt = timeit(func, number=number_default)
                 report("encryption", spec, size, dt, algo=spec)
 
-        if "compression" in selected:
+        if "compressing" in selected:
             section_header("compression", "Compression")
             # grouped by buffer size rather than by codec, so the codecs can be
             # compared against each other at a glance; chunk-sized first, as
@@ -425,7 +425,7 @@ class BenchmarkMixIn:
                         buffer_size=nbytes,
                     )
 
-        if "msgpack" in selected:
+        if "msgpacking" in selected:
             section_header("msgpack", "msgpack")
             item = Item(path="foo/bar/baz", mode=660, mtime=1234567)
             items = [item.as_dict()] * 1000
@@ -518,7 +518,7 @@ class BenchmarkMixIn:
         - enough free memory so there will be no slow down due to paging activity
 
         By default all benchmarks run. Give one or more of --chunking, --hashing,
-        --encryption, --compression, --msgpack to run only those.
+        --encrypting, --compressing, --msgpacking to run only those.
 
         Some algorithms use multiple threads only above a size threshold, so the
         hashes and the compressors are measured at more than one buffer size: the
@@ -541,6 +541,6 @@ class BenchmarkMixIn:
         subparser.add_argument("--json", action="store_true", help="format output as JSON")
         subparser.add_argument("--chunking", action="store_true", help="benchmark the chunkers")
         subparser.add_argument("--hashing", action="store_true", help="benchmark the hashes / MACs")
-        subparser.add_argument("--encryption", action="store_true", help="benchmark the encryption modes")
-        subparser.add_argument("--compression", action="store_true", help="benchmark the compressors")
-        subparser.add_argument("--msgpack", action="store_true", help="benchmark msgpack item packing")
+        subparser.add_argument("--encrypting", action="store_true", help="benchmark the encryption modes")
+        subparser.add_argument("--compressing", action="store_true", help="benchmark the compressors")
+        subparser.add_argument("--msgpacking", action="store_true", help="benchmark msgpack item packing")

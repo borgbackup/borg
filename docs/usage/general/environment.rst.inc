@@ -182,6 +182,32 @@ General:
         +0.05% archive size for 1MiB chunks, +0.64% for 8MiB ones, more at higher levels), and
         it uses more cpu time in total to reduce the wallclock time. Set it to 1 if you would
         rather have the smaller archive, or if borg has to share the cpu with other work.
+    BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
+        Select the scan kernel the ``fastcdc`` / ``buzhash64`` chunker uses (default:
+        ``scalar``, the plain sequential loop). Accepted values are ``avx512``, ``avx2``,
+        ``neon``, ``blockwise`` and ``scalar``.
+        All kernels chunk identically - same cut points, same chunk ids - and differ only in
+        speed, so this is safe to change at any time, also for an existing repository.
+        Which kernel is fastest is not predictable from the instruction set: it depends on the
+        cpu and on the compiler that built borg, and the sequential loop wins on some machines.
+        Nothing is selected automatically, so measure on your own hardware with
+        ``borg benchmark cpu --chunking`` before setting these.
+        ``avx512`` and ``avx2`` exist only on x86-64, ``neon`` only on aarch64, and only if the
+        compiler that built borg supported them; ``scalar`` and ``blockwise`` are portable C
+        and always available.
+        Requesting a kernel that this build or this cpu cannot run is an error rather than a
+        silent fallback, so a benchmark can not accidentally measure a different kernel.
+        ``borg create --debug`` logs the chunker and the kernel it was created with.
+    BORG_AES_CHUNKER_KERNEL
+        Select the scan kernel used by the AES based chunkers - one variable for all three of
+        ``toeplitz-aes``, ``rabin-aes`` and ``goldilocks-aes`` (default: ``evp``, the portable
+        OpenSSL path). Accepted values are ``vaes``, ``aes-ni``, ``aes-arm64`` and ``evp``.
+        As with the chunker kernels above, all of them chunk identically and differ only in
+        speed, nothing is selected automatically, and a kernel that can not run here is an
+        error rather than a silent fallback.
+        ``vaes`` and ``aes-ni`` exist only on x86-64, ``aes-arm64`` only on aarch64.
+        ``vaes`` additionally needs a compiler that knows it (gcc >= 11 / clang >= 14), so a
+        cpu supporting VAES is not by itself enough to have that kernel available.
     BORG_SHOW_SYSINFO
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.

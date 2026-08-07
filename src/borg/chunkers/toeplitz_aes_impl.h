@@ -24,6 +24,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "phte_kernel.h"
+
 typedef struct TP_CTX TP_CTX;
 
 /* Number of 256-entry rolling tables passed to tp_new, in this order:
@@ -38,13 +40,13 @@ typedef struct TP_CTX TP_CTX;
 /* Create a kernel context.
  * tables: TP_TABLES * 256 uint64 entries, see above.
  * aes_key: 16 bytes (AES-128).
- * force_sw: nonzero forces the portable OpenSSL path (for tests/benchmarks).
+ * kernel: one of PHTE_K_*.
  * Returns NULL on allocation/OpenSSL failure. */
-TP_CTX *tp_new(const uint64_t *tables, const uint8_t aes_key[16], int force_sw);
+TP_CTX *tp_new(const uint64_t *tables, const uint8_t aes_key[16], int kernel);
 
 void tp_free(TP_CTX *ctx);
 
-/* Which path this context uses: "aes-arm64", "aes-ni" or "evp". */
+/* Which path this context uses: "aes-arm64", "vaes", "aes-ni" or "evp". */
 const char *tp_kind(const TP_CTX *ctx);
 
 /* Full (non-rolling) digest of the 64 bytes at q: the window warm-up at the

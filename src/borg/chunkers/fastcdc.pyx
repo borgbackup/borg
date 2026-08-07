@@ -13,8 +13,13 @@ from ..crypto.low_level import CSPRNG
 from .base cimport ChunkerBase
 
 cdef extern from "fastcdc_impl.h":
-    int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int force_scalar) nogil
-    const char *fc_kernel_name(int force_scalar)
+    int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel) nogil
+    const char *fc_kernel_name(int kernel)
+    int fc_kernel_select(const char *name, int *out_id)
+    const char *fc_kernel_names()
+    int FC_K_SCALAR
+
+from .kernel_env import kernel_error, requested_kernel
 
 # FastCDC content-defined chunker (Xia et al., USENIX ATC 2016).
 #
@@ -33,9 +38,10 @@ cdef extern from "fastcdc_impl.h":
 # class only provides the keyed Gear table and the _scan() hook calling the C kernel.
 #
 # The inner scan runs in a C kernel (fastcdc_impl.c) with SIMD implementations (NEON on
-# aarch64, AVX2 on x86-64, blocked scalar elsewhere) that are bit-identical to the plain
-# sequential Gear loop: every byte position is tested, cuts and hash state are exactly the
-# same, only faster. BORG_FASTCDC_FORCE_SCALAR=1 forces the sequential loop (for tests).
+# aarch64, AVX-512 or AVX2 on x86-64, blockwise scalar elsewhere) that are bit-identical to
+# the plain sequential Gear loop: every byte position is tested, cuts and hash state are
+# exactly the same, only faster. The sequential loop is what runs by default; the others
+# are selected via BORG_FASTCDC_KERNEL, see kernel_env.py and the .kernel property.
 
 
 @cython.boundscheck(False)
@@ -58,6 +64,24 @@ cdef uint64_t* fastcdc_init_gear(bytes key) except NULL:
     return gear
 
 
+cdef int _select_kernel() except -1:
+    """Resolve BORG_FASTCDC_KERNEL to a kernel id, raising if it cannot be honoured.
+
+    Unset means the simplest implementation, not the fastest one: nothing here
+    guesses which kernel a given CPU and compiler make fastest.
+    """
+    cdef int kid = FC_K_SCALAR
+    cdef int rc
+    want = requested_kernel("BORG_FASTCDC_KERNEL")
+    if want is None:
+        return FC_K_SCALAR
+    rc = fc_kernel_select(want.encode("ascii"), &kid)
+    if rc != 0:
+        raise kernel_error("BORG_FASTCDC_KERNEL", want, rc,
+                           (<bytes>fc_kernel_names()).decode("ascii"))
+    return kid
+
+
 cdef class ChunkerFastCDC(ChunkerBase):
     """
     FastCDC content-defined chunker, variable chunk sizes, keyed Gear hash.
@@ -65,11 +89,11 @@ cdef class ChunkerFastCDC(ChunkerBase):
     Unlike the buzhash chunkers, Gear is window-less, so there is no hash_window_size parameter.
     """
     cdef uint64_t* gear
-    cdef int force_scalar
+    cdef int kernel_id
 
     def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int nc_level=0, size_t normal_size=0, bint sparse=False):
         self.gear = NULL
-        self.force_scalar = 1 if os.environ.get("BORG_FASTCDC_FORCE_SCALAR", "") not in ("", "0") else 0
+        self.kernel_id = _select_kernel()
         self.gear = fastcdc_init_gear(key)
         # Gear accumulates information in its high bits, so the cut-decision
         # masks must use the high bits of the hash (high_masks=True). The Gear
@@ -85,13 +109,17 @@ cdef class ChunkerFastCDC(ChunkerBase):
 
     @property
     def kernel(self):
-        """Which scan kernel this chunker uses: 'neon', 'avx2', 'blocked' or 'scalar'."""
-        return (<bytes>fc_kernel_name(self.force_scalar)).decode("ascii")
+        """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blockwise' or 'scalar'.
+
+        'scalar' unless BORG_FASTCDC_KERNEL names another one, in which case
+        this is always that one - creating the chunker fails otherwise.
+        """
+        return (<bytes>fc_kernel_name(self.kernel_id)).decode("ascii")
 
     cdef int64_t _scan(self, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) noexcept:
         cdef int64_t r
         with nogil:
-            r = fc_scan(self.gear, p, n, digest, mask, self.force_scalar)
+            r = fc_scan(self.gear, p, n, digest, mask, self.kernel_id)
         return r
 
 

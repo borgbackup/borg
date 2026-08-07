@@ -19,6 +19,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "phte_kernel.h"
+
 typedef struct RA_CTX RA_CTX;
 
 /* Number of 256-entry rolling tables passed to ra_new, in this order:
@@ -34,13 +36,13 @@ typedef struct RA_CTX RA_CTX;
 /* Create a kernel context.
  * tables: RA_TABLES * 256 uint64 entries, see above.
  * aes_key: 16 bytes (AES-128).
- * force_sw: nonzero forces the portable OpenSSL path (for tests/benchmarks).
+ * kernel: one of PHTE_K_*.
  * Returns NULL on allocation/OpenSSL failure. */
-RA_CTX *ra_new(const uint64_t *tables, const uint8_t aes_key[16], int force_sw);
+RA_CTX *ra_new(const uint64_t *tables, const uint8_t aes_key[16], int kernel);
 
 void ra_free(RA_CTX *ctx);
 
-/* Which path this context uses: "aes-arm64", "aes-ni" or "evp". */
+/* Which path this context uses: "aes-arm64", "vaes", "aes-ni" or "evp". */
 const char *ra_kind(const RA_CTX *ctx);
 
 /* Full (non-rolling) Rabin digest of the 64 bytes at q: the window warm-up at

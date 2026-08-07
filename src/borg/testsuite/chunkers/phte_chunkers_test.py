@@ -14,7 +14,7 @@ import random
 
 import pytest
 
-from . import cf, cf_expand
+from . import cf, cf_expand, chunker_with_kernel
 from ...chunkers import ChunkerRabinAES, ChunkerGoldilocksAES, ChunkerToeplitzAES, get_chunker
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin
@@ -23,13 +23,16 @@ from ...helpers import hex_to_bin
 # from os.urandom(32)
 key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
 
-# (chunker class, algo name, default params constant, env var forcing the portable kernel)
+# all three share one scan-path selector, see phte_kernel.h
+KERNEL_ENV = "BORG_AES_CHUNKER_KERNEL"
+
+# (chunker class, algo name, default params constant)
 CHUNKERS = [
-    (ChunkerRabinAES, CH_RABIN_AES, RABIN_AES_PARAMS, "BORG_RABIN_AES_FORCE_EVP"),
-    (ChunkerGoldilocksAES, CH_GOLDILOCKS_AES, GOLDILOCKS_AES_PARAMS, "BORG_GOLDILOCKS_AES_FORCE_EVP"),
-    (ChunkerToeplitzAES, CH_TOEPLITZ_AES, TOEPLITZ_AES_PARAMS, "BORG_TOEPLITZ_AES_FORCE_EVP"),
+    (ChunkerRabinAES, CH_RABIN_AES, RABIN_AES_PARAMS),
+    (ChunkerGoldilocksAES, CH_GOLDILOCKS_AES, GOLDILOCKS_AES_PARAMS),
+    (ChunkerToeplitzAES, CH_TOEPLITZ_AES, TOEPLITZ_AES_PARAMS),
 ]
-IDS = [algo for _, algo, _, _ in CHUNKERS]
+IDS = [algo for _, algo, _ in CHUNKERS]
 
 
 def H(data):
@@ -41,31 +44,38 @@ def chunker_spec(request):
     return request.param
 
 
-def test_kernels_identical(chunker_spec):
-    # the OpenSSL EVP batch path and the AES hardware instruction path (if available
-    # on this platform) must produce identical cut points.
-    cls, algo, params, env_var = chunker_spec
+ALL_AES_KERNELS = ("vaes", "aes-ni", "aes-arm64", "evp")
+
+
+@pytest.mark.parametrize("kernel", ALL_AES_KERNELS)
+def test_kernels_identical(chunker_spec, kernel, monkeypatch):
+    # Every scan path this platform accepts - OpenSSL EVP, the 128-bit AES
+    # instructions, VAES - must produce identical cut points. Paths this
+    # build/CPU cannot run are skipped.
+    cls, algo, params = chunker_spec
     data = os.urandom(4 * 1024 * 1024)
 
     def sizes(chunker):
         return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
 
-    default = cls(key0, 10, 16, 14, 2)
-    sizes_default = sizes(default)
-    os.environ[env_var] = "1"
-    try:
-        forced = cls(key0, 10, 16, 14, 2)
-        assert forced.kernel == "evp"
-        sizes_evp = sizes(forced)
-    finally:
-        del os.environ[env_var]
-    assert sizes_default == sizes_evp
-    # whatever kernel was selected by default, it must be a known one
-    assert default.kernel in ("aes-arm64", "aes-ni", "evp")
+    monkeypatch.delenv(KERNEL_ENV, raising=False)
+    reference = sizes(cls(key0, 10, 16, 14, 2))
+
+    chunker = chunker_with_kernel(monkeypatch, KERNEL_ENV, kernel, lambda: cls(key0, 10, 16, 14, 2))
+    assert sizes(chunker) == reference, f"path {kernel} disagrees with the default one"
+
+
+def test_evp_kernel_available(chunker_spec, monkeypatch):
+    # EVP is the portable OpenSSL path: it exists in every build on every CPU, so
+    # unlike the test above this must not skip - if it cannot be selected, path
+    # selection is broken rather than the platform being limited.
+    cls, algo, params = chunker_spec
+    monkeypatch.setenv(KERNEL_ENV, "evp")
+    assert cls(key0, 10, 16, 14, 2).kernel == "evp"
 
 
 def test_chunksize_distribution(chunker_spec):
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
     data = os.urandom(1048576)
     min_exp, max_exp, mask, nc_level = 10, 16, 14, 2  # chunk size target 16 KiB, clip at 1 KiB and 64 KiB
     chunker = cls(key0, min_exp, max_exp, mask, nc_level)
@@ -95,7 +105,7 @@ def test_chunksize_distribution(chunker_spec):
 def test_shift_resilience(chunker_spec):
     # content-defined cuts must survive a prefix insertion (this also validates that the
     # rolling digest update and the per-chunk window warm-up agree with each other).
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
     data = os.urandom(4 * 1024 * 1024)
 
     def chunk_hashes(data):
@@ -110,7 +120,7 @@ def test_shift_resilience(chunker_spec):
 
 def test_get_chunker(chunker_spec):
     # without a key, get_chunker uses an all-zero key; chunking must still work and be deterministic
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
     data = os.urandom(2 * 1024 * 1024)
     a = cf_expand(get_chunker(*params, key=None).chunkify(BytesIO(data)))
     b = cf_expand(get_chunker(algo, 19, 23, 21, 2, key=None).chunkify(BytesIO(data)))
@@ -123,7 +133,7 @@ def test_params_parsing(chunker_spec):
 
     from ...helpers import ChunkerParams
 
-    cls, algo, params, env_var = chunker_spec
+    cls, algo, params = chunker_spec
 
     # <algo>, chunk_min, chunk_max, chunk_mask, nc_level (no window field)
     assert ChunkerParams(f"{algo},19,23,21,2") == (algo, 19, 23, 21, 2)
@@ -146,10 +156,13 @@ def test_params_parsing(chunker_spec):
 
 
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("kernel", ALL_AES_KERNELS)
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
-def test_fuzz(chunker_spec, worker):
-    # Fuzz with random and uniform data of misc. sizes and misc keys.
-    cls, algo, params, env_var = chunker_spec
+def test_fuzz(chunker_spec, worker, kernel, monkeypatch):
+    # Fuzz with random and uniform data of misc. sizes and misc keys, on every
+    # scan path: these odd sizes are what exercise the hardware paths' tails and
+    # their groups-of-8 handling, which test_kernels_identical does not reach.
+    cls, algo, params = chunker_spec
 
     # decompose <ALGO>_PARAMS = (algo, min_exp, max_exp, mask_bits, nc_level)
     params_algo, min_exp, max_exp, mask_bits, nc_level = params
@@ -159,7 +172,9 @@ def test_fuzz(chunker_spec, worker):
     sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
 
     for key in keys:
-        chunker = cls(key, min_exp, max_exp, mask_bits, nc_level)
+        chunker = chunker_with_kernel(
+            monkeypatch, KERNEL_ENV, kernel, lambda: cls(key, min_exp, max_exp, mask_bits, nc_level)
+        )
         for size in sizes:
             # Random data
             data = os.urandom(size)

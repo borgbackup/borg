@@ -45,7 +45,11 @@ cdef extern from "goldilocks_aes_impl.h":
     ctypedef struct GL_CTX:
         pass
     int GL_TABLES
-    GL_CTX *gl_new(const uint64_t *tables, uint64_t k1, uint64_t k2, const uint8_t *aes_key, int force_sw)
+    GL_CTX *gl_new(const uint64_t *tables, uint64_t k1, uint64_t k2, const uint8_t *aes_key, int kernel)
+    int phte_kernel_select(const char *name, int *out_id)
+    const char *phte_kernel_names()
+    int PHTE_K_EVP
+    int PHTE_K_HW
     void gl_free(GL_CTX *ctx)
     const char *gl_kind(const GL_CTX *ctx)
     uint64_t gl_digest64(const GL_CTX *ctx, const uint8_t *q)
@@ -105,6 +109,27 @@ def _derive(bytes key):
     return aes_key, k, tables
 
 
+from .kernel_env import kernel_error, requested_kernel
+
+
+cdef int _select_kernel() except -1:
+    """Resolve BORG_AES_CHUNKER_KERNEL to a scan path id, raising if it cannot be honoured.
+
+    One selector for all three AES chunkers: they share phte_scan.h, so the
+    available paths never differ between them.
+    """
+    cdef int kid = PHTE_K_EVP
+    cdef int rc
+    want = requested_kernel("BORG_AES_CHUNKER_KERNEL")
+    if want is None:
+        return PHTE_K_EVP
+    rc = phte_kernel_select(want.encode("ascii"), &kid)
+    if rc != 0:
+        raise kernel_error("BORG_AES_CHUNKER_KERNEL", want, rc,
+                           (<bytes>phte_kernel_names()).decode("ascii"))
+    return kid
+
+
 cdef class ChunkerGoldilocksAES(ChunkerPHTE):
     """
     Content-Defined Chunker, variable chunk sizes, UHF-then-PRF cut decision.
@@ -128,8 +153,8 @@ cdef class ChunkerGoldilocksAES(ChunkerPHTE):
             for i in range(256):
                 c_tables[t * 256 + i] = tables[t][i]
 
-        force_sw = os.environ.get("BORG_GOLDILOCKS_AES_FORCE_EVP", "") not in ("", "0")
-        self.ctx = gl_new(c_tables, k, (k * k) % _GL_P, aes_key, 1 if force_sw else 0)
+        kernel = _select_kernel()
+        self.ctx = gl_new(c_tables, k, (k * k) % _GL_P, aes_key, kernel)
         if self.ctx == NULL:
             raise MemoryError("Failed to set up goldilocks-aes kernel")
         self.kernel_str = (<bytes>gl_kind(self.ctx)).decode("ascii")
@@ -176,7 +201,7 @@ def goldilocks_aes_digest64(k, bytes window):
         for i in range(256):
             c_tables[t * 256 + i] = tables[t][i]
     memset(aes_key, 0, 16)
-    ctx = gl_new(c_tables, k, (k * k) % _GL_P, aes_key, 1)
+    ctx = gl_new(c_tables, k, (k * k) % _GL_P, aes_key, PHTE_K_EVP)
     if ctx == NULL:
         raise MemoryError("Failed to set up goldilocks-aes kernel")
     d = gl_digest64(ctx, <const uint8_t*>PyBytes_AsString(window))
@@ -189,7 +214,9 @@ def goldilocks_aes_scan_all(k, bytes aes_key, bytes data, mask, bint force_sw=Fa
 
     Returns the list of positions i where the cut condition matches, i.e.
     (AES(state of window data[i-63..i]) & mask) == 0 - independent of any
-    chunk min/max framing. force_sw selects the portable EVP path.
+    chunk min/max framing. force_sw selects the portable EVP path, otherwise
+    the AES hardware path is used (which falls back to EVP where the CPU has
+    no AES instructions).
     """
     cdef uint64_t c_tables[3 * 256]
     cdef GL_CTX *ctx
@@ -205,7 +232,7 @@ def goldilocks_aes_scan_all(k, bytes aes_key, bytes data, mask, bint force_sw=Fa
     for t in range(len(tables)):
         for i in range(256):
             c_tables[t * 256 + i] = tables[t][i]
-    ctx = gl_new(c_tables, k, (k * k) % _GL_P, <const uint8_t*>PyBytes_AsString(aes_key), 1 if force_sw else 0)
+    ctx = gl_new(c_tables, k, (k * k) % _GL_P, <const uint8_t*>PyBytes_AsString(aes_key), PHTE_K_EVP if force_sw else PHTE_K_HW)
     if ctx == NULL:
         raise MemoryError("Failed to set up goldilocks-aes kernel")
     try:

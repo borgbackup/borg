@@ -205,6 +205,13 @@ New features:
 - analyze: report deduplicated size of a set of archives, #5741
 - repo-compress: was temporarily gone, re-added now with pack support, #9663
 - version: add --json output, #10004
+- benchmark cpu: add a throughput column (MB/s), #10049
+- benchmark cpu: measure hashes and compressors at several buffer sizes, and
+  add --chunking / --hashing / --encrypting / --compressing / --msgpacking to
+  run only a subset, #10050
+- benchmark cpu: compress deterministic compressible data instead of random noise
+- benchmark cpu: measure blake3 the way borg uses it (multi-threaded only above
+  BORG_BLAKE3_MT_THRESHOLD)
 - completion: generate fish completions, remove hand-written ones, #9989
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041

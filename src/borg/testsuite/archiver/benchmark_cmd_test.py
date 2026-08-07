@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from ...constants import *  # NOQA
 from . import cmd, RK_ENCRYPTION
 
@@ -54,6 +56,27 @@ def test_benchmark_cpu(archiver, monkeypatch):
     assert "Encryption" in output
     assert "Compression" in output
     assert "msgpack" in output
+
+
+@pytest.mark.parametrize(
+    "flag, header",
+    [
+        ("--chunking", "Chunkers"),
+        ("--hashing", "Cryptographic hashes / MACs"),
+        ("--encrypting", "Encryption"),
+        ("--compressing", "Compression"),
+        ("--msgpacking", "msgpack"),
+    ],
+)
+def test_benchmark_cpu_section_selection(archiver, monkeypatch, flag, header):
+    # a flag runs that section and only that one
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    all_headers = ["Chunkers", "Cryptographic hashes / MACs", "Encryption", "Compression", "msgpack"]
+    output = cmd(archiver, "benchmark", "cpu", flag)
+    assert header in output
+    for other in all_headers:
+        if other != header:
+            assert other not in output
 
 
 def test_benchmark_cpu_json(archiver, monkeypatch):

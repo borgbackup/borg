@@ -6,11 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from ...archive import ChunkBuffer, ArchiveChecker
+from ...archive import ArchiveChecker, ChunkBuffer
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack, CommandError, IntegrityError
-from ...manifest import Manifest
-from ...repository import Repository
+from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
+from ...manifest import Archives, Manifest
+from ...repository import PackTracker, Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
     cmd,
@@ -73,6 +73,138 @@ def test_check_usage(archivers, request):
     output = cmd(archiver, "check", "-v", "--archives-only", "--last=1", exit_code=0)
     assert "archive1" not in output
     assert "archive2" in output
+
+
+def test_check_soft_interrupt(archivers, request, monkeypatch):
+    """A mid-run Ctrl-C stops both check phases at a safe boundary (#7893): the repository check persists
+    its checked packs for a later partial check to resume, and the archive check runs finish() and then
+    raises. The check is read-only, so a normal check still passes afterwards."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)  # produces many packs
+
+    # repository check: interrupt after the first pack.
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        orig_hash = repository.store.hash
+        pack_checks = []
+
+        def hash_then_interrupt(key):
+            result = orig_hash(key)
+            if key.startswith("packs/"):  # count pack checks, not the index files hashed first
+                pack_checks.append(key)
+                if len(pack_checks) == 1:  # one Ctrl-C after the first pack is checked
+                    sig_int._sig_int_triggered = True
+            return result
+
+        monkeypatch.setattr(repository.store, "hash", hash_then_interrupt)
+        try:
+            repository.check()
+        finally:
+            sig_int._sig_int_triggered = False
+        assert len(PackTracker.load(repository.store)) == 1  # the pack checked before the break persisted
+
+    # a partial check resumes from the saved record (the one pack checked before the interrupt).
+    output = cmd(archiver, "check", "-v", "--repository-only", "--max-duration=600", exit_code=0)
+    assert "1 pack check results on record" in output
+
+    # archive check: interrupt verify_data after 3 chunks.
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        orig_get = repository.get
+        get_calls = 0
+
+        def get_then_interrupt(*args, **kwargs):
+            nonlocal get_calls
+            get_calls += 1
+            if get_calls == 3:  # trip mid-loop, after 3 chunks
+                sig_int._sig_int_triggered = True
+            return orig_get(*args, **kwargs)
+
+        monkeypatch.setattr(repository, "get", get_then_interrupt)
+        try:
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                ArchiveChecker().check(repository, verify_data=True, sort_by="ts", format="{archive} {time} {id}")
+        finally:
+            sig_int._sig_int_triggered = False
+        # verify_data breaks at the chunk it interrupted on, and the skipped scans issue no more get()s.
+        assert get_calls == 3
+
+    # nothing changed, so a normal check passes.
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_check_repair_soft_interrupt(archivers, request, monkeypatch):
+    """A Ctrl-C after the first archive of a --repair archive check stops at the archive boundary, runs
+    finish() (dropping the chunk index, writing the manifest), then raises. No archive is lost, and a
+    second --repair finishes the job so a following check reports the repository consistent."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)  # two archives
+
+    orig_create = Archives.create
+
+    def create_then_interrupt(self, *args, **kwargs):
+        orig_create(self, *args, **kwargs)
+        sig_int._sig_int_triggered = True  # one Ctrl-C after the first archive was rebuilt
+
+    monkeypatch.setattr(Archives, "create", create_then_interrupt)
+    try:
+        with Repository(archiver.repository_path, exclusive=True) as repository:
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                ArchiveChecker().check(repository, repair=True, sort_by="ts", format="{archive} {time} {id}")
+    finally:
+        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+    # restore the real method; monkeypatch.undo() would also drop the autouse env (BORG_TESTONLY_WEAKEN_KDF).
+    monkeypatch.setattr(Archives, "create", orig_create)
+
+    # both archives survive the interrupt between archives.
+    output = cmd(archiver, "repo-list", exit_code=0)
+    assert "archive1" in output
+    assert "archive2" in output
+
+    # a second --repair finishes the job; a plain check then finds no problems.
+    cmd(archiver, "check", "--repair", exit_code=0)
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_check_interrupt_skips_archive_check(archivers, request, monkeypatch):
+    """A Ctrl-C during the repository check makes a full `borg check` skip the archive check. do_check
+    raises at the sig_int guard, which sits before the archive_checker.check() call, so the raise itself
+    is the skip. Exercises the do_check path (the other soft-interrupt tests call check() directly)."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:  # a class-level monkeypatch cannot reach the borg.exe subprocess
+        pytest.skip("in-process store patch does not apply to the binary")
+    check_cmd_setup(archiver)  # produces many packs
+
+    from borgstore.store import Store
+
+    orig_hash = Store.hash
+    pack_checks = []
+
+    def hash_then_interrupt(self, key):
+        result = orig_hash(self, key)
+        if key.startswith("packs/"):  # count pack checks, not the index files hashed first
+            pack_checks.append(key)
+            if len(pack_checks) == 1:  # one Ctrl-C after the first pack is checked
+                sig_int._sig_int_triggered = True
+        return result
+
+    # spy on the archive check: "Got Ctrl-C" is also raised inside ArchiveChecker.check(), so matching the
+    # message alone would not prove the skip. Recording that check() never runs is the load-bearing assertion.
+    orig_check = ArchiveChecker.check
+    archive_check_ran = False
+
+    def spy_check(self, *args, **kwargs):
+        nonlocal archive_check_ran
+        archive_check_ran = True
+        return orig_check(self, *args, **kwargs)
+
+    monkeypatch.setattr(Store, "hash", hash_then_interrupt)
+    monkeypatch.setattr(ArchiveChecker, "check", spy_check)
+    try:
+        # exec_cmd calls Archiver.run() directly; only main() maps Error to an exit code, so it propagates.
+        with pytest.raises(Error, match="Got Ctrl-C"):
+            cmd(archiver, "check", "-v")
+    finally:
+        sig_int._sig_int_triggered = False
+    assert archive_check_ran is False  # do_check raised at the sig_int guard, before archive_checker.check()
 
 
 def test_check_max_age(archivers, request):

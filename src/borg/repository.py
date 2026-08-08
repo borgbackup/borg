@@ -1057,6 +1057,9 @@ class Repository:
                 pack_infos.sort(key=recorded_ts)
             pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
             for info in pack_infos:
+                if sig_int:  # on Ctrl-C, stop; tracker.prune() below persists the records past the loop
+                    logger.info(f"Interrupted repository check, {pack_files} packs checked so far.")
+                    break
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
@@ -1110,12 +1113,15 @@ class Repository:
                 logger.error(f"Corrupt pack: {bin_to_hex(pack_id)}")
         # fail if this run found errors, or any pack is recorded corrupt.
         problems = objs_errors != 0 or bool(corrupt_ids)
+        # On Ctrl-C the check stopped early, so the summary only covers the packs seen so far.
+        done, so_far = ("Interrupted", " so far") if sig_int else ("Finished", "")
         if not problems:
-            logger.info(f"Finished {mode} repository check, no problems found.")
+            logger.info(f"{done} {mode} repository check, no problems found{so_far}.")
         elif repair:
-            logger.error(f"Finished {mode} repository check, errors found (repository repair not implemented).")
+            logger.error(f"{done} {mode} repository check, errors found{so_far} (repository repair not implemented).")
         else:
-            logger.error(f"Finished {mode} repository check, errors found.")
+            logger.error(f"{done} {mode} repository check, errors found{so_far}.")
+        # True means the checked objects were clean; --repair returns True so the caller proceeds to fix them.
         return not problems or repair
 
     def list(self, limit=None, marker=None):

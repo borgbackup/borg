@@ -146,12 +146,11 @@ cdef class CompressorBase:
 
     def compress(self, meta, data):
         """
-        Compress *data* (bytes) and return compression metadata and compressed bytes.
+        Compress *data* (bytes or memoryview) and return compression metadata and compressed data.
         """
-        if not isinstance(data, bytes):
-            data = bytes(data)  # code below does not work with memoryview
         if self.legacy_mode:
-            return None, bytes((self.ID, self.level)) + data
+            # the ID/level prefix concatenation needs bytes (bytes() is a no-op for bytes input)
+            return None, bytes((self.ID, self.level)) + bytes(data)
         else:
             meta["ctype"] = self.ID
             meta["clevel"] = self.level
@@ -276,12 +275,15 @@ class LZ4(DecidingCompressor):
 
         *lz4_data* is the LZ4 result if *compressor* is LZ4 as well, otherwise it is None.
         """
-        if not isinstance(idata, bytes):
-            idata = bytes(idata)  # code below does not work with memoryview
-        cdef int isize = len(idata)
+        cdef const unsigned char[::1] iview = idata
+        cdef int isize = iview.shape[0]
         cdef int osize
-        cdef char *source = idata
+        cdef const char *source
         cdef char *dest
+        if isize == 0:
+            # empty input cannot shrink (and an empty view has no address to take below)
+            return NONE_COMPRESSOR, (meta, None)
+        source = <const char *> &iview[0]
         osize = LZ4_compressBound(isize)
         buf = get_buffer().get(osize)
         dest = <char *> buf
@@ -630,8 +632,11 @@ class ObfuscateSize(CompressorBase):
         addtl_size = self._obfuscate(compr_size) if meta["type"] == ROBJ_FILE_STREAM else 0
         addtl_size = max(0, addtl_size)  # we can only make it longer, not shorter!
         addtl_size = min(MAX_DATA_SIZE - 1024 - compr_size, addtl_size)  # stay away from MAX_DATA_SIZE
-        trailer = bytes(addtl_size)
-        obfuscated_data = compressed_data + trailer
+        if addtl_size:
+            # join, not +: compressed_data may be a memoryview (CNONE passes the input through)
+            obfuscated_data = b"".join([compressed_data, bytes(addtl_size)])
+        else:
+            obfuscated_data = compressed_data
         meta["csize"] = len(obfuscated_data)  # csize is the overall output size of this "obfuscation compressor"
         meta["olevel"] = self.level  # remember the obfuscation level, useful for repo-compress
         return meta, obfuscated_data  # for borg2 it is enough that we have the payload size in meta["psize"]

@@ -1057,9 +1057,8 @@ class Repository:
                 pack_infos.sort(key=recorded_ts)
             pack_pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Checking packs %3.0f%%", msgid="check.packs")
             for info in pack_infos:
-                if sig_int:  # on Ctrl-C, persist checked packs, then stop
-                    logger.info(f"Interrupted repository check, {len(tracker)} packs checked so far.")
-                    tracker.save()
+                if sig_int:  # on Ctrl-C, stop; tracker.prune() below persists the records past the loop
+                    logger.info(f"Interrupted repository check, {pack_files} packs checked so far.")
                     break
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
@@ -1122,6 +1121,7 @@ class Repository:
             logger.error(f"{done} {mode} repository check, errors found{so_far} (repository repair not implemented).")
         else:
             logger.error(f"{done} {mode} repository check, errors found{so_far}.")
+        # True means the checked objects were clean; --repair returns True so the caller proceeds to fix them.
         return not problems or repair
 
     def list(self, limit=None, marker=None):

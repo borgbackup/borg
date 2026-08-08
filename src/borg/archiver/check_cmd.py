@@ -192,9 +192,9 @@ class CheckMixIn:
         next safe boundary, leaving the repository and its chunk index in a consistent state.
         The repository check stops after the current pack; ``--verify-data`` and
         ``--find-lost-archives`` stop after the current chunk; a ``--repair`` archive check
-        stops between whole archives. A partial repository check (``--max-duration``) saves its
-        progress so a later partial check resumes where it stopped; a full check restarts from
-        the beginning. With ``--repair``, an interrupted archive check may leave some archives
+        stops between whole archives. Results recorded before the interrupt are kept, so a later
+        check does not re-verify those packs until they are due again. With ``--repair``, an
+        interrupted archive check may leave some archives
         already repaired and others not yet processed, so run ``borg check --repair`` again to
         finish.
 

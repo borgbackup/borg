@@ -434,6 +434,9 @@ jobs:
 
       - name: Start VM for ${{ matrix.display_name }}
         id: cross_os
+        # a normal boot takes < 1 minute; sometimes the VM never becomes
+        # ssh-reachable and the action retries forever - fail early then.
+        timeout-minutes: 15
         uses: cross-platform-actions/action@v1.3.0
         with:
           operating_system: ${{ matrix.os }}

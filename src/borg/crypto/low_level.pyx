@@ -514,10 +514,11 @@ cdef class _AEAD_BASE:
         cdef int rc
 
         try:
-            odata = <unsigned char *>PyMem_Malloc(hlen + self.mac_len +
-                                                  ilen + self.cipher_blk_len)
-            if not odata:
-                raise MemoryError
+            # Our AEAD ciphers (OCB, chacha20-poly1305) are padding-free: the ciphertext is
+            # exactly as long as the plaintext. Thus the result can be allocated up front
+            # and the cipher writes directly into it - no scratch buffer, no copy.
+            ret = PyBytes_FromStringAndSize(NULL, hlen + self.mac_len + ilen)
+            odata = <unsigned char *>PyBytes_AsString(ret)
 
             idata = ro_buffer(data)
             idata_acquired = True
@@ -545,16 +546,19 @@ cdef class _AEAD_BASE:
             if not rc:
                 raise CryptoError('EVP_EncryptUpdate failed')
             offset += olen
+            # Final can emit a buffered partial block (OCB does). Our AEAD modes are
+            # padding-free, so it never writes more than the space left in the
+            # exact-size result buffer.
             if not EVP_EncryptFinal_ex(self.ctx, odata+offset, &olen):
                 raise CryptoError('EVP_EncryptFinal_ex failed')
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_GET_TAG, self.mac_len, odata + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl GET TAG failed')
+            if offset != hlen + self.mac_len + ilen:
+                raise CryptoError('unexpected ciphertext length')
             self.blocks = block_count
-            return odata[:offset]
+            return ret
         finally:
-            if odata:
-                PyMem_Free(odata)
             if hdata_acquired:
                 PyBuffer_Release(&hdata)
             if idata_acquired:
@@ -591,9 +595,11 @@ cdef class _AEAD_BASE:
         cdef int rc
 
         try:
-            odata = <unsigned char *>PyMem_Malloc(ilen + self.cipher_blk_len)
-            if not odata:
-                raise MemoryError
+            # Our AEAD ciphers (OCB, chacha20-poly1305) are padding-free: the plaintext is
+            # exactly as long as the ciphertext. Thus the result can be allocated up front
+            # and the cipher writes directly into it - no scratch buffer, no copy.
+            ret = PyBytes_FromStringAndSize(NULL, ilen - hlen - self.mac_len)
+            odata = <unsigned char *>PyBytes_AsString(ret)
 
             idata = ro_buffer(envelope)
             idata_acquired = True
@@ -619,15 +625,18 @@ cdef class _AEAD_BASE:
             offset += olen
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
+            # Final can emit a buffered partial block (OCB does). Our AEAD modes are
+            # padding-free, so it never writes more than the space left in the
+            # exact-size result buffer.
             if not EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen):
                 # a failure here means corrupted or tampered tag (mac) or data.
                 raise IntegrityError('Authentication / EVP_DecryptFinal_ex failed')
             offset += olen
+            if offset != ilen - hlen - self.mac_len:
+                raise CryptoError('unexpected plaintext length')
             self.blocks = self.block_count(offset)
-            return odata[:offset]
+            return ret
         finally:
-            if odata:
-                PyMem_Free(odata)
             if idata_acquired:
                 PyBuffer_Release(&idata)
             if aadata_acquired:

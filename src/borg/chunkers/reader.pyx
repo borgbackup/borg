@@ -4,6 +4,7 @@
 
 import os
 import errno
+import stat
 import time
 from collections import namedtuple
 
@@ -227,7 +228,7 @@ class FileReader:
     Most complexity in here comes from the desired size when a user calls FileReader.read does
     not need to match the Chunk sizes we got from the FileFMAPReader.
     """
-    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None):
+    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None, st=None):
         assert read_size > 0
         self.reader = FileFMAPReader(fd=fd, fh=fh, read_size=read_size, sparse=sparse, fmap=fmap)
         self.buffer = []  # list of Chunk objects
@@ -241,7 +242,22 @@ class FileReader:
         # consider - the file is read start to end. readinto() then reads directly
         # from the file into the caller's buffer (see there), instead of going
         # through the block reader.
-        self.direct = not sparse and fmap is None
+        # Only known regular files take the direct path: reading FIFOs / devices via
+        # --read-special must keep using the proven block reader path - e.g. NetBSD 10
+        # was seen blocking forever in the direct path's big readv() on a FIFO, where
+        # the block reader's 1 MiB os.read() calls work fine.
+        self.direct = False
+        if not sparse and fmap is None:
+            if st is None:
+                # caller did not have a stat result at hand - determine the file type here.
+                try:
+                    if fh >= 0:
+                        st = os.fstat(fh)
+                    elif fd is not None:
+                        st = os.fstat(fd.fileno())
+                except (AttributeError, OSError):
+                    pass  # no OS-level fd (e.g. BytesIO, wrapper objects) - stay on the block reader path
+            self.direct = st is not None and stat.S_ISREG(st.st_mode)
         self.direct_offset = 0  # bytes read so far via the direct path (for fadvise)
 
     def _fill_buffer(self):
@@ -399,9 +415,9 @@ class FileReader:
         Read up to 'size' bytes from the file directly into 'target' (a writable
         buffer, e.g. a memoryview over the caller's scan buffer).
 
-        Fast path (no sparse processing, no fmap given): the file data is read
-        by the OS directly into 'target' - zero copies in user space and one
-        syscall per request instead of one per block.
+        Fast path (known regular file, no sparse processing, no fmap given):
+        the file data is read by the OS directly into 'target' - zero copies
+        in user space and one syscall per request instead of one per block.
 
         Otherwise, unlike read(), this does not allocate or combine intermediate
         byte objects: each byte is copied exactly once, from the buffered file

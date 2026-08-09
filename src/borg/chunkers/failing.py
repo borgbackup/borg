@@ -27,13 +27,17 @@ class ChunkerFailing:
         self.count = 0
         self.chunking_time = 0.0  # not updated, just provided so that caller does not crash
 
-    def chunkify(self, fd: BinaryIO | None = None, fh: int = -1) -> Iterator:
+    def chunkify(
+        self, fd: BinaryIO | None = None, fh: int = -1, fmap: list | None = None, st: os.stat_result | None = None
+    ) -> Iterator:
         """
         Cut a file into chunks.
 
         :param fd: Python file object
         :param fh: OS-level file handle (if available),
                    defaults to -1 which means not to use OS-level fd.
+        :param fmap: ignored
+        :param st: ignored
         """
         use_fh = fh >= 0
         wanted = self.block_size

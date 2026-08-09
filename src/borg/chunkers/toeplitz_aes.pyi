@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 from typing import BinaryIO
 
@@ -21,4 +22,6 @@ class ChunkerToeplitzAES:
         normal_size: int = 0,
         sparse: bool = False,
     ) -> None: ...
-    def chunkify(self, fd: BinaryIO = None, fh: int = -1, fmap: list[fmap_entry] = None) -> Iterator: ...
+    def chunkify(
+        self, fd: BinaryIO = None, fh: int = -1, fmap: list[fmap_entry] = None, st: os.stat_result = None
+    ) -> Iterator: ...

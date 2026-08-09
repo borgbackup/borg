@@ -434,11 +434,17 @@ jobs:
 
       - name: Start VM for ${{ matrix.display_name }}
         id: cross_os
+        # a normal boot takes < 1 minute; sometimes the VM never becomes
+        # ssh-reachable and the action retries forever - fail early then.
+        timeout-minutes: 15
         uses: cross-platform-actions/action@v1.3.0
         with:
           operating_system: ${{ matrix.os }}
           version: ${{ matrix.version }}
           shell: bash
+          # the default VM size (2 cpus) leaves half of the runner's 4 vcpus idle
+          cpu_count: 4
+          memory: 8G
 
       - name: Test on ${{ matrix.display_name }}
         shell: cpa.sh {0}
@@ -446,6 +452,10 @@ jobs:
           DO_BINARIES: ${{ matrix.do_binaries }}
         run: |
           set -euxo pipefail
+
+          # a hung test must fail instead of stalling the suite until the
+          # job timeout (tox passes all env vars through to pytest).
+          export PYTEST_TIMEOUT=300
 
           case "${{ matrix.os }}" in
             freebsd)

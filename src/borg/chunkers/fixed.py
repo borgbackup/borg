@@ -4,7 +4,8 @@ from typing import BinaryIO
 
 import time
 
-from .reader import FileReader
+from .reader import FileReader, Chunk
+from ..constants import CH_DATA, CH_ALLOC, zeros
 
 
 class ChunkerFixed:
@@ -26,6 +27,11 @@ class ChunkerFixed:
 
     Note: the last block of a data or hole range may be less than the block size,
           this is supported and not considered to be an error.
+
+    Chunks are yielded as memoryviews over per-chunk buffers that the file data is
+    read into directly - each byte is copied exactly once, from the reader's block
+    buffer into the chunk (all-zero chunks are yielded as allocation CH_ALLOC with
+    data None). Call release_chunk_data() after consuming a chunk.
     """
 
     def __init__(self, block_size: int, header_size: int = 0, sparse: bool = False) -> None:
@@ -48,24 +54,25 @@ class ChunkerFixed:
         # Initialize the reader with the file descriptors
         self.reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size, sparse=self.sparse, fmap=fmap)
 
-        # Handle header if present
-        if self.header_size > 0:
-            # Read the header block using read
-            started_chunking = time.monotonic()
-            header_chunk = self.reader.read(self.header_size)
-            self.chunking_time += time.monotonic() - started_chunking
-
-            if header_chunk.meta["size"] > 0:
-                # Yield the header chunk
-                yield header_chunk
-
-        # Process the rest of the file using read
+        # Read the header block first, if there is one; after it, read block_size sized blocks.
+        wanted = self.header_size if self.header_size > 0 else self.block_size
         while True:
             started_chunking = time.monotonic()
-            chunk = self.reader.read(self.block_size)
+            # The file data is read directly into a fresh per-chunk buffer (zero-filled
+            # for ranges stemming from holes), so each byte is copied only once, instead
+            # of being assembled in an intermediate buffer and copied out of it again.
+            buf = bytearray(wanted)
+            got = self.reader.readinto(buf, wanted)
             self.chunking_time += time.monotonic() - started_chunking
-            size = chunk.meta["size"]
-            if size == 0:
+            if got == 0:
                 break  # EOF
-            assert size <= self.block_size
-            yield chunk
+            assert got <= wanted
+            data = memoryview(buf)[:got]
+            if zeros.startswith(data):
+                # All-zero chunk: either read as zeros from the file or stemming from
+                # a hole in a sparse file - we can not distinguish that here.
+                data.release()
+                yield Chunk(None, size=got, allocation=CH_ALLOC)
+            else:
+                yield Chunk(data, size=got, allocation=CH_DATA)
+            wanted = self.block_size

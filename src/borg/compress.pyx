@@ -23,6 +23,8 @@ import sys
 import threading
 import zlib
 
+from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AsString
+
 try:
     import lzma
 except ImportError:
@@ -306,6 +308,21 @@ class LZ4(DecidingCompressor):
         cdef int rsize
         cdef char *source = idata
         cdef char *dest
+        size = None if meta is None else meta.get("size")
+        if size is not None and 0 <= size <= 2 ** 31 - 1:
+            # borg2 stores the exact plaintext size in the (authenticated) object metadata:
+            # decompress directly into the result bytes object - no scratch buffer, no copy,
+            # no output size guessing. rsize != size means corrupt (or misdescribed) data,
+            # this also covers everything check_fix_size would assert.
+            ret = PyBytes_FromStringAndSize(NULL, size)
+            dest = PyBytes_AsString(ret)
+            osize = size
+            with nogil:
+                rsize = LZ4_decompress_safe(source, dest, isize, osize)
+            if rsize != osize:
+                raise DecompressionError('lz4 decompress failed')
+            return meta, ret
+        # no size known up front (borg 1.x repos in legacy mode): guess and retry.
         # a bit more than 8MB is enough for the usual data sizes yielded by the chunker.
         # allocate more if isize * 3 is already bigger, to avoid having to resize often.
         osize = max(int(1.1 * 2**23), isize * 3)

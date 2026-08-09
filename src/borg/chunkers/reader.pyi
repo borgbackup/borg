@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 from typing import Any, BinaryIO, NamedTuple
 
@@ -36,6 +37,7 @@ class FileReader:
         read_size: int = 0,
         sparse: bool = False,
         fmap: list[fmap_entry] = None,
+        st: os.stat_result = None,
     ) -> None: ...
     def _fill_buffer(self) -> bool: ...
     def _readinto_direct(self, tv: memoryview, size: int) -> int: ...

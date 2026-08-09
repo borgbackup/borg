@@ -1593,7 +1593,13 @@ class FilesystemObjectProcessors:
                         # stored. An unwrapped repository OSError is critical and aborts create before
                         # archive.save() runs (see the BackupOSError docstring).
                         self.process_file_chunks(
-                            item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd))
+                            item,
+                            cache,
+                            self.stats,
+                            self.show_progress,
+                            # passing st saves FileReader a stat call; regular files take the
+                            # direct read path, special files (--read-special) the buffered one.
+                            backup_io_iter(self.chunker.chunkify(None, fd, st=st)),
                         )
                         self.stats.chunking_time = self.chunker.chunking_time
                         end_reading = time.time_ns()

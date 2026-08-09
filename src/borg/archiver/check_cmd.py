@@ -194,9 +194,8 @@ class CheckMixIn:
         ``--find-lost-archives`` stop after the current chunk; a ``--repair`` archive check
         stops between whole archives. Results recorded before the interrupt are kept, so a later
         check does not re-verify those packs until they are due again. With ``--repair``, an
-        interrupted archive check may leave some archives
-        already repaired and others not yet processed, so run ``borg check --repair`` again to
-        finish.
+        interrupted archive check may leave some archives already repaired and others not yet
+        processed, so run ``borg check --repair`` again to finish.
 
         During a ``--repair`` run, the archive check first rebuilds the chunk index from the
         packs, and, if the key must be recovered, scans chunks for it. These phases do not yet

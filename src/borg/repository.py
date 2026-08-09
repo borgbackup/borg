@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import sys
 import threading
 import time
@@ -33,6 +34,9 @@ from .repoobj import RepoObj, OBJ_MAGIC
 from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
+
+# an object name is its sha256 as 64 lowercase hex digits.
+_valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
 
 
 def repo_lister(repository, *, limit=None):
@@ -1046,6 +1050,16 @@ class Repository:
         if index_errors == 0:
             # packs are the bulk of the work and the part --max-duration spreads over several checks.
             pack_infos = store_list("packs")
+            # drop objects whose name is not a valid pack name and count them as errors; the code
+            # below decodes each name via hex_to_bin, which only accepts valid names.
+            valid_pack_infos = []
+            for info in pack_infos:
+                if _valid_object_name(info.name):
+                    valid_pack_infos.append(info)
+                else:
+                    logger.error(f"Store object packs/{info.name} has an invalid name.")
+                    pack_errors += 1
+            pack_infos = valid_pack_infos
             if partial:
                 # a partial check stops after max_duration; verify the least-recently-checked packs
                 # first so repeated runs cover every pack. sort by recorded check time, unrecorded

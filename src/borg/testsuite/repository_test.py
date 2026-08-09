@@ -1056,6 +1056,21 @@ def test_check_detects_index_corruption(tmp_path):
         assert repository.check(repair=False) is False  # mismatch between content hash and name detected
 
 
+def test_check_reports_invalid_pack_name(tmp_path, caplog):
+    # an object in packs/ whose name is not 64 hex digits is reported as an error, and the other
+    # packs are still checked.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        intact_id, _ = _store_intact_pack(repository)
+        repository.store_store("packs/not-a-hex-name", b"stray junk")
+
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert repository.check(repair=False) is False
+
+        assert "packs/not-a-hex-name has an invalid name" in caplog.text
+        after = PackTracker.load(repository.store)
+        assert after.table[intact_id].result == 1  # the valid pack was checked
+
+
 def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):
     # check warns about an invalid chunk index but does not fail, since the index is not part of
     # the repository's object integrity.

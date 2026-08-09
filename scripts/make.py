@@ -70,6 +70,10 @@ class BuildUsage:
                 doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n\n")
                 if command == "help":
                     for topic in Archiver.helptext:
+                        if topic == "environment":
+                            # not on the misc. help docs page - it is included by the
+                            # "General" docs chapter instead, see below.
+                            continue
                         params = {"topic": topic, "underline": "~" * len("borg help " + topic)}
                         doc.write(".. _borg_{topic}:\n\n".format(**params))
                         doc.write("borg help {topic}\n{underline}\n\n".format(**params))
@@ -92,6 +96,16 @@ class BuildUsage:
                     self.write_options(parser, doc)
                     doc.write("\n\nDescription\n~~~~~~~~~~~\n")
                     doc.write(epilog)
+
+            if command == "help":
+                # the "environment" help topic is the single source for the
+                # "Environment Variables" section of the "General" docs chapter.
+                # note: the comment must come after the heading - if it came first, it would break
+                # the association of the ``.. _env_vars:`` label (in the including file) with the heading.
+                with open("docs/usage/general/environment.rst.inc", "w") as doc:
+                    doc.write("Environment Variables\n~~~~~~~~~~~~~~~~~~~~~\n\n")
+                    doc.write(".. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!\n")
+                    doc.write(Archiver.helptext["environment"])
 
         if "create" in choices:
             common_options = [group for group in choices["create"]._action_groups if group.title == "Common options"][0]

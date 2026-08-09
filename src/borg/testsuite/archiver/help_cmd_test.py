@@ -1,5 +1,6 @@
 import pytest
 
+from ...archiver._common import rst_plain_text_references
 from ...constants import *  # NOQA
 from ...helpers.nanorst import RstToTextLazy, rst_to_terminal
 from . import Archiver, cmd, exec_cmd
@@ -40,6 +41,8 @@ def test_usage(archiver):
 def test_help(archiver):
     assert "Borg" in cmd(archiver, "help")
     assert "patterns" in cmd(archiver, "help", "patterns")
+    assert "BORG_PASSPHRASE" in cmd(archiver, "help", "environment")
+    assert "BORG_PASSPHRASE" in cmd(archiver, "help", "env")  # alias
     assert "creates a new, empty repository" in cmd(archiver, "help", "repo-create")
     assert "positional arguments" not in cmd(archiver, "help", "repo-create", "--epilog-only")
     assert "creates a new, empty repository" not in cmd(archiver, "help", "repo-create", "--usage-only")
@@ -54,7 +57,7 @@ def test_help_formatting(command, parser):
 @pytest.mark.parametrize("topic", list(Archiver.helptext.keys()))
 def test_help_formatting_helptexts(topic):
     helptext = Archiver.helptext[topic]
-    assert str(rst_to_terminal(helptext))
+    assert str(rst_to_terminal(helptext, rst_plain_text_references))
 
 
 def test_main_help_epilog(archiver):
@@ -64,6 +67,7 @@ def test_main_help_epilog(archiver):
     assert "match-archives" in help_output
     assert "placeholders" in help_output
     assert "compression" in help_output
+    assert "environment" in help_output
 
 
 @pytest.mark.parametrize("command", list(get_all_parsers().keys()))

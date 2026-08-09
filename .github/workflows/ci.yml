@@ -439,6 +439,9 @@ jobs:
           operating_system: ${{ matrix.os }}
           version: ${{ matrix.version }}
           shell: bash
+          # the default VM size (2 cpus) leaves half of the runner's 4 vcpus idle
+          cpu_count: 4
+          memory: 8G
 
       - name: Test on ${{ matrix.display_name }}
         shell: cpa.sh {0}

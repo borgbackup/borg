@@ -453,6 +453,10 @@ jobs:
         run: |
           set -euxo pipefail
 
+          # a hung test must fail instead of stalling the suite until the
+          # job timeout (tox passes all env vars through to pytest).
+          export PYTEST_TIMEOUT=300
+
           case "${{ matrix.os }}" in
             freebsd)
               export IGNORE_OSVERSION=yes

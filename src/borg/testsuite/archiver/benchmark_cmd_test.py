@@ -44,7 +44,9 @@ def test_benchmark_crud_json_lines(archiver, monkeypatch):
         assert isinstance(entry["time"], float)
         assert entry["time"] > 0
         assert isinstance(entry["io"], int)
-        assert entry["io"] > 0
+        # io is int(bytes/second); with this test's 1-byte samples it is 0
+        # whenever the operation takes >= 1s (seen on a loaded OpenBSD CI VM).
+        assert entry["io"] >= 0
 
 
 def test_benchmark_cpu(archiver, monkeypatch):

@@ -42,3 +42,16 @@ def test_code_block_end_of_string():
     # check that there is no unexpected exception if a code block
     # is not followed by blank lines, but the string just ends.
     assert rst_to_text("This is a code block::\n\n    borg --help") == "This is a code block:\n\n    borg --help"
+
+
+def test_code_block_indented_context():
+    # a code block inside a definition list: the following text is indented, but less than
+    # the code block's contents, so it ends the code block and gets markup-processed again.
+    rst = "term\n    Foo::\n\n        code\n\n    Continued ``text``.\n"
+    assert rst_to_text(rst) == "term\n    Foo:\n\n        code\n\n    Continued text.\n"
+
+
+def test_code_block_less_indented_than_four():
+    # code blocks indented by less than 4 spaces are recognized, too
+    rst = "Foo::\n\n  code\n\nBar ``baz``.\n"
+    assert rst_to_text(rst) == "Foo:\n\n  code\n\nBar baz.\n"

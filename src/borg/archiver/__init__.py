@@ -260,6 +260,7 @@ class Archiver(
           match-archives      selection patterns for matching archives
           placeholders        placeholders in repository URLs, archive names, etc.
           compression         options and specifications for data compression
+          environment         environment variables used by borg (short: env)
         """
         )
         parser = ArgumentParser(

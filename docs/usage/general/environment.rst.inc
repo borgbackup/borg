@@ -1,6 +1,8 @@
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~
 
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 Borg uses some environment variables for automation:
 
 General:
@@ -61,7 +63,8 @@ General:
         You can set the default value for the ``--lock-wait`` option with this, so
         you do not need to give it as a command line option.
     BORG_LOGGING_CONF
-        When set, use the given filename as INI_-style logging configuration.
+        When set, use the given filename as INI-style logging configuration (see
+        https://docs.python.org/3/library/logging.config.html#configuration-file-format).
         A basic example conf can be found at ``docs/misc/logging.conf``.
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
@@ -294,60 +297,31 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     answer or ask you interactively, depending on whether retries are allowed (they by default are
     allowed). So please test your scripts interactively before making them a non-interactive script.
 
-.. _XDG env var: https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html
-
 Directories and files:
+    Borg 2 uses the platformdirs library (https://pypi.org/project/platformdirs/) to determine
+    default directory locations. This means that default paths are **platform-specific**:
 
-    .. note::
+    - Linux: XDG Base Directory Specification paths are used (e.g. ``~/.config/borg``,
+      ``~/.cache/borg``, ``~/.local/share/borg``). ``XDG_*`` environment variables are
+      honoured (see https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html).
+    - macOS: native macOS directories are used by default (e.g. ``~/Library/Application Support/borg``,
+      ``~/Library/Caches/borg``). ``XDG_*`` environment variables are honoured if set.
+    - Windows: Windows AppData directories are used (e.g. ``C:\Users\<user>\AppData\Roaming\borg``,
+      ``C:\Users\<user>\AppData\Local\borg``). ``XDG_*`` environment variables are **not** honoured.
 
-        Borg 2 uses the `platformdirs <https://pypi.org/project/platformdirs/>`_ library to determine
-        default directory locations. This means that default paths are **platform-specific**:
+    On all platforms, you can override each directory individually using the specific environment
+    variables described below. You can also set ``BORG_BASE_DIR`` to force borg to use
+    ``BORG_BASE_DIR/.config/borg``, ``BORG_BASE_DIR/.cache/borg``, etc., regardless of the platform.
 
-        - **Linux**: Uses XDG Base Directory Specification paths (e.g., ``~/.config/borg``,
-          ``~/.cache/borg``, ``~/.local/share/borg``). `XDG env var`_ variables are honoured.
-        - **macOS**: Uses native macOS directories by default (e.g., ``~/Library/Application Support/borg``,
-          ``~/Library/Caches/borg``). `XDG env var`_ variables are honoured if set.
-        - **Windows**: Uses Windows AppData directories (e.g., ``C:\Users\<user>\AppData\Roaming\borg``,
-          ``C:\Users\<user>\AppData\Local\borg``). `XDG env var`_ variables are **not** honoured.
+    Default directory locations by platform (when no ``BORG_*`` environment variables are set)::
 
-        On all platforms, you can override each directory individually using the specific environment
-        variables described below. You can also set ``BORG_BASE_DIR`` to force borg to use
-        ``BORG_BASE_DIR/.config/borg``, ``BORG_BASE_DIR/.cache/borg``, etc., regardless of the platform.
-
-    Default directory locations by platform (when no ``BORG_*`` environment variables are set):
-
-    .. list-table::
-       :header-rows: 1
-       :widths: 15 25 30 30
-
-       * - Directory
-         - Linux
-         - macOS
-         - Windows
-       * - Config
-         - ``~/.config/borg``
-         - ``~/Library/Application Support/borg``
-         - ``%APPDATA%\borg``
-       * - Cache
-         - ``~/.cache/borg``
-         - ``~/Library/Caches/borg``
-         - ``%LOCALAPPDATA%\borg\Cache``
-       * - Data
-         - ``~/.local/share/borg``
-         - ``~/Library/Application Support/borg``
-         - ``%LOCALAPPDATA%\borg``
-       * - Runtime
-         - ``/run/user/<uid>/borg``
-         - ``~/Library/Caches/TemporaryItems/borg``
-         - ``%TEMP%\borg``
-       * - Keys
-         - ``<config_dir>/keys``
-         - ``<config_dir>/keys``
-         - ``<config_dir>\keys``
-       * - Security
-         - ``<data_dir>/security``
-         - ``<data_dir>/security``
-         - ``<data_dir>\security``
+        Directory  Linux                 macOS                                 Windows
+        Config     ~/.config/borg        ~/Library/Application Support/borg    %APPDATA%\borg
+        Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\borg\Cache
+        Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\borg
+        Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %TEMP%\borg
+        Keys       <config_dir>/keys     <config_dir>/keys                     <config_dir>\keys
+        Security   <data_dir>/security   <data_dir>/security                   <data_dir>\security
 
     BORG_BASE_DIR
         Defaults to ``$HOME`` or ``~$USER`` or ``~`` (in that order).
@@ -357,26 +331,26 @@ Directories and files:
     BORG_CACHE_DIR
         Defaults to the platform-specific cache directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.cache/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_CACHE_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_CACHE_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains the local cache and might need a lot
         of space for dealing with big repositories. Make sure you're aware of the associated
         security aspects of the cache location: :ref:`cache_security`
     BORG_CONFIG_DIR
         Defaults to the platform-specific config directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.config/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_CONFIG_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_CONFIG_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains all borg configuration directories, see the FAQ
         for a security advisory about the data in this directory: :ref:`home_config_borg`
     BORG_DATA_DIR
         Defaults to the platform-specific data directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.local/share/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_DATA_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_DATA_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains all borg data directories, see the FAQ
         for a security advisory about the data in this directory: :ref:`home_data_borg`
     BORG_RUNTIME_DIR
         Defaults to the platform-specific runtime directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.cache/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_RUNTIME_DIR`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_RUNTIME_DIR`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains borg runtime files, like e.g. the socket file.
     BORG_SECURITY_DIR
         Defaults to ``$BORG_DATA_DIR/security``.
@@ -397,7 +371,8 @@ Directories and files:
         - you need to point to the correct key file matching the repository the command will operate on.
     TMPDIR
         This is where temporary files are stored (might need a lot of temporary space for some
-        operations), see tempfile_ for details.
+        operations), see https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir
+        for details.
 
 Building:
     BORG_OPENSSL_NAME
@@ -411,38 +386,30 @@ Building:
         Adds given prefix directory to the default locations. If a 'include/lz4.h' is found Borg
         will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
 
+Automatic option environment variables:
+    Borg uses jsonargparse (https://jsonargparse.readthedocs.io/) with ``default_env=True``,
+    which means that every command-line option can also be set via an environment variable.
+
+    The environment variable name is derived from the program name (``borg``),
+    the subcommand (if any), and the option name, all converted to uppercase
+    with dashes replaced by underscores.
+
+    For **top-level options** (not specific to a subcommand), the pattern is::
+
+        BORG_<OPTION>
+
+    For example, ``--lock-wait`` can be set via ``BORG_LOCK_WAIT``.
+
+    For **subcommand options**, the subcommand and option are separated by a
+    double underscore::
+
+        BORG_<SUBCOMMAND>__<OPTION>
+
+    For example, ``borg create --comment`` can be set via ``BORG_CREATE__COMMENT``.
+
 Please note:
 
 - Be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data's security/safety.
 - Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
   mode 600, root:root).
 
-.. _INI: https://docs.python.org/3/library/logging.config.html#configuration-file-format
-
-.. _tempfile: https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir
-
-
-Automatically generated Environment Variables (jsonargparse)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Borg uses jsonargparse_ with ``default_env=True``, which means that every
-command-line option can also be set via an environment variable.
-
-The environment variable name is derived from the program name (``borg``),
-the subcommand (if any), and the option name, all converted to uppercase
-with dashes replaced by underscores.
-
-For **top-level options** (not specific to a subcommand), the pattern is::
-
-    BORG_<OPTION>
-
-For example, ``--lock-wait`` can be set via ``BORG_LOCK_WAIT``.
-
-For **subcommand options**, the subcommand and option are separated by a
-double underscore::
-
-    BORG_<SUBCOMMAND>__<OPTION>
-
-For example, ``borg create --comment`` can be set via ``BORG_CREATE__COMMENT``.
-
-.. _jsonargparse: https://jsonargparse.readthedocs.io/

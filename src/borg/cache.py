@@ -30,7 +30,7 @@ from .helpers import chunkit
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
-from .helpers import ProgressIndicatorMessage
+from .helpers import ProgressIndicatorMessage, ProgressIndicatorPercent
 from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
@@ -938,15 +938,23 @@ def build_chunkindex_from_repo(
     # headers and skipping the (much larger) encrypted payloads. Don't call Repository.list() here:
     # it iterates this same index we are building, so it would recurse. The headers also give each
     # object's real (chunk_id, offset, size), so every object in a pack is indexed individually.
-    for info in repository.store_list("packs"):
+    pack_infos = repository.store_list("packs")
+    pi = ProgressIndicatorPercent(
+        total=len(pack_infos), msg="Rebuilding chunk index %3.0f%%", msgid="cache.build_chunkindex_from_repo"
+    )
+    for info in pack_infos:
         # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
         repository._lock_refresh()
+        pi.show(increase=1)
         pack_id = hex_to_bin(info.name)
         for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_id).iter_headers():
             num_chunks += 1
             chunks[chunk_id] = ChunkIndexEntry(
                 flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
             )
+    if pack_infos:
+        pi.show(current=len(pack_infos))  # finish at 100%
+    pi.finish()
     duration = perf_counter() - t0 or 0.001
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
     # Protocol overhead is neglected in this calculation.

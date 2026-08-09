@@ -15,6 +15,9 @@ from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 # because the FS also needs to support this.
 has_seek_hole = hasattr(os, 'SEEK_DATA') and hasattr(os, 'SEEK_HOLE')
 
+# os.readv is POSIX; on platforms without it (win32) we fall back to os.read + copy.
+has_readv = hasattr(os, 'readv')
+
 _Chunk = namedtuple('_Chunk', 'meta data')
 _Chunk.__doc__ = """\
     Chunk namedtuple
@@ -234,6 +237,12 @@ class FileReader:
         self.fd = fd
         self.fh = fh
         self.fmap = fmap
+        # Without sparse processing and without a given fmap there are no ranges to
+        # consider - the file is read start to end. readinto() then reads directly
+        # from the file into the caller's buffer (see there), instead of going
+        # through the block reader.
+        self.direct = not sparse and fmap is None
+        self.direct_offset = 0  # bytes read so far via the direct path (for fadvise)
 
     def _fill_buffer(self):
         """
@@ -358,22 +367,59 @@ class FileReader:
             # Otherwise, all chunks were CH_ALLOC
             return Chunk(None, size=bytes_read, allocation=CH_ALLOC)
 
+    def _readinto_direct(self, tv, size):
+        """Read up to 'size' bytes from the file directly into 'tv' (a writable memoryview)."""
+        pos = 0
+        while pos < size:
+            if self.fh >= 0:
+                if has_readv:
+                    got = os.readv(self.fh, [tv[pos:size]])
+                else:
+                    data = os.read(self.fh, size - pos)
+                    got = len(data)
+                    tv[pos:pos + got] = data
+                if got > 0:
+                    safe_fadvise(self.fh, self.direct_offset, got, "DONTNEED")
+            else:
+                try:
+                    got = self.fd.readinto(tv[pos:size])
+                except AttributeError:
+                    # file-like object without readinto: fall back to read + copy
+                    data = self.fd.read(size - pos)
+                    got = len(data)
+                    tv[pos:pos + got] = data
+            if not got:
+                break  # EOF
+            pos += got
+            self.direct_offset += got
+        return pos
+
     def readinto(self, target, size):
         """
         Read up to 'size' bytes from the file directly into 'target' (a writable
         buffer, e.g. a memoryview over the caller's scan buffer).
 
-        Unlike read(), this does not allocate or combine intermediate byte
-        objects: each byte is copied exactly once, from the buffered file block
-        into 'target'. Ranges stemming from holes / all-zero blocks are written
-        as zero bytes ('target' may contain stale data). The caller detects
-        all-zero chunks itself at chunk granularity, so no allocation type is
-        returned.
+        Fast path (no sparse processing, no fmap given): the file data is read
+        by the OS directly into 'target' - zero copies in user space and one
+        syscall per request instead of one per block.
+
+        Otherwise, unlike read(), this does not allocate or combine intermediate
+        byte objects: each byte is copied exactly once, from the buffered file
+        block into 'target'. Ranges stemming from holes / all-zero blocks are
+        written as zero bytes ('target' may contain stale data). The caller
+        detects all-zero chunks itself at chunk granularity, so no allocation
+        type is returned.
 
         :param target: writable buffer, len(target) >= size
         :param size: number of bytes to read
         :return: number of bytes written to target (0 at EOF).
         """
+        if self.direct and self.blockify_gen is None:
+            # blockify_gen check: if read() was used on this reader before, keep
+            # using the buffered path, for consistent file position and buffer state.
+            with memoryview(target) as tv:
+                return self._readinto_direct(tv, size)
+
         # Initialize if not already done
         if self.blockify_gen is None:
             self.buffer = []

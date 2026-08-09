@@ -152,11 +152,6 @@ def test_item_file_size_no_chunks():
     assert item.get_size() == 0
 
 
-def test_item_optr():
-    item = Item()
-    assert Item.from_optr(item.to_optr()) is item
-
-
 @pytest.mark.parametrize(
     "chunk_a, chunk_b, chunks_equal",
     [

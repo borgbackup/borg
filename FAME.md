@@ -1,11 +1,11 @@
 # Contributors
 
-372 people have contributed to Borg, with 10,607 commits in total.
+372 people have contributed to Borg, with 10,733 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-08-03 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-08-10 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,30 +21,30 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,044 | 76,773 | 461 |
-| Marian Beermann | 1,140 | 8,400 | 157 |
-| Jonas Borgström | 560 | 1,028 | 38 |
+| Thomas Waldmann | 7,148 | 82,508 | 490 |
+| Marian Beermann | 1,140 | 8,158 | 156 |
+| Jonas Borgström | 560 | 986 | 38 |
 | Antoine Beaupré | 285 | 441 | 33 |
-| Mrityunjay Raj | 198 | 7,917 | 102 |
+| Mrityunjay Raj | 217 | 8,493 | 102 |
 | Andrey Bienkowski | 72 | 210 | 16 |
 | Ted Lawson | 71 | 4,606 | 39 |
-| Thalian | 63 | 594 | 32 |
+| Thalian | 63 | 584 | 31 |
 | Martin Hostettler | 46 | 2,559 | 9 |
-| Milkey Mouse | 42 | 248 | 14 |
+| Milkey Mouse | 42 | 245 | 13 |
 | Dan Christensen | 40 | 5 | 2 |
-| dependabot[bot] | 37 | 46 | 7 |
+| dependabot[bot] | 39 | 46 | 7 |
 | Rayyan Ansari | 34 | 91 | 12 |
 | Abdel-Rahman | 30 | 3 | 3 |
 | Manuel Riel | 28 | 94 | 6 |
 | Nehalenniæ Oudin | 26 | 48 | 11 |
 | anarcat | 24 | 34 | 4 |
-| Hugo Wallenburg | 23 | 1,189 | 13 |
+| Hugo Wallenburg | 23 | 1,183 | 12 |
 | Michael Hanselmann | 22 | 71 | 3 |
-| SanskritFritz | 17 | 258 | 1 |
 | Björn Ketelaars | 17 | 33 | 6 |
+| SanskritFritz | 17 | 0 | 0 |
 | Lee Bousfield | 14 | 160 | 9 |
-| Alan Jenkins | 14 | 38 | 2 |
-| Daniel Rudolf | 13 | 230 | 14 |
+| Alan Jenkins | 14 | 35 | 2 |
+| Daniel Rudolf | 13 | 220 | 14 |
 | Robin Schneider | 13 | 19 | 8 |
 | Elmar Hoffmann | 12 | 90 | 6 |
 | Jürg Rast | 12 | 73 | 11 |
@@ -71,7 +71,7 @@ show up there, so the number understates early contributions.  Generated files
 | Felix Schwarz | 6 | 4 | 2 |
 | Alexander-N | 6 | 0 | 0 |
 | Paul D | 5 | 185 | 46 |
-| Simon Frei | 5 | 174 | 3 |
+| Simon Frei | 5 | 132 | 3 |
 | Dominik Stadler | 5 | 77 | 1 |
 | elandorr | 5 | 40 | 3 |
 | remyabel | 5 | 25 | 3 |
@@ -86,7 +86,6 @@ show up there, so the number understates early contributions.  Generated files
 | Franco Ayala | 4 | 39 | 6 |
 | Suryansh Pal | 4 | 36 | 9 |
 | 8bit | 4 | 30 | 5 |
-| oxiedi | 4 | 26 | 1 |
 | Steve Groesz | 4 | 22 | 1 |
 | Ryan Polley | 4 | 12 | 4 |
 | Artem Sheremet | 4 | 10 | 1 |
@@ -94,6 +93,7 @@ show up there, so the number understates early contributions.  Generated files
 | Josh Holland | 4 | 3 | 2 |
 | Narendra Vardi | 4 | 3 | 1 |
 | Alexander Pyhalov | 4 | 0 | 0 |
+| oxiedi | 4 | 0 | 0 |
 | Stephan Herbers | 3 | 49 | 2 |
 | Charmi Kadi | 3 | 46 | 2 |
 | Martin Richtarsky | 3 | 34 | 4 |
@@ -103,7 +103,7 @@ show up there, so the number understates early contributions.  Generated files
 | Michael Gajda | 3 | 23 | 2 |
 | eoli3n | 3 | 22 | 1 |
 | Will | 3 | 21 | 4 |
-| Andrea Gelmini | 3 | 18 | 13 |
+| Andrea Gelmini | 3 | 17 | 12 |
 | Oleg Drokin | 3 | 16 | 1 |
 | kmq | 3 | 15 | 1 |
 | jungle-boogie | 3 | 13 | 1 |
@@ -125,12 +125,13 @@ show up there, so the number understates early contributions.  Generated files
 | jhemmje | 3 | 0 | 0 |
 | Thomas Portmann | 2 | 206 | 5 |
 | Ken Kundert | 2 | 149 | 4 |
+| ThomasWaldmann | 2 | 145 | 1 |
 | trxvorr | 2 | 103 | 7 |
 | Syed Ali Ghazi Ejaz | 2 | 90 | 4 |
 | David Rambo | 2 | 87 | 3 |
-| Soumik Dutta | 2 | 85 | 3 |
-| Eric Wolf | 2 | 51 | 4 |
+| Soumik Dutta | 2 | 80 | 3 |
 | Divyansh Agrawal | 2 | 43 | 4 |
+| Eric Wolf | 2 | 38 | 3 |
 | Ioannis Cherouvim | 2 | 32 | 2 |
 | zDEFz | 2 | 27 | 1 |
 | Lapinot | 2 | 24 | 4 |
@@ -200,7 +201,6 @@ show up there, so the number understates early contributions.  Generated files
 | Mike Mason | 1 | 38 | 3 |
 | borkd | 1 | 37 | 1 |
 | James Vasile | 1 | 36 | 1 |
-| lexa-a | 1 | 31 | 1 |
 | Uriel | 1 | 30 | 1 |
 | vancheese | 1 | 28 | 8 |
 | Nic Donaldson | 1 | 26 | 1 |
@@ -208,7 +208,6 @@ show up there, so the number understates early contributions.  Generated files
 | Mike | 1 | 23 | 1 |
 | Sitaram Chamarty | 1 | 23 | 1 |
 | Jonathan Zacsh | 1 | 21 | 1 |
-| edvatar | 1 | 16 | 2 |
 | Félix Sipma | 1 | 13 | 1 |
 | remyabel2 | 1 | 13 | 1 |
 | Antonio Larrosa | 1 | 12 | 1 |
@@ -222,7 +221,7 @@ show up there, so the number understates early contributions.  Generated files
 | Jubjub | 1 | 6 | 1 |
 | Mher Kazandjian | 1 | 6 | 1 |
 | TawfeeqShaik | 1 | 6 | 1 |
-| ThomasWaldmann | 1 | 6 | 1 |
+| edvatar | 1 | 6 | 2 |
 | Florent Hemmi | 1 | 5 | 1 |
 | Leo Antunes | 1 | 5 | 1 |
 | dataprolet | 1 | 5 | 1 |
@@ -381,6 +380,7 @@ show up there, so the number understates early contributions.  Generated files
 | jeroen tiebout | 1 | 0 | 0 |
 | kannes | 1 | 0 | 0 |
 | klemens | 1 | 0 | 0 |
+| lexa-a | 1 | 0 | 0 |
 | lumbric | 1 | 0 | 0 |
 | mirobertod | 1 | 0 | 0 |
 | nain-F49FF806 | 1 | 0 | 0 |

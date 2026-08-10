@@ -556,6 +556,34 @@ def test_extra_chunks(archivers, request):
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
+def test_repair_finish_flushes_pack_writer(archivers, request):
+    """finish() stores chunks re-added during --repair before it drops the index (#10055).
+
+    close() asserts an empty pack writer buffer, so a chunk left buffered by finish() would
+    trip it.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects in-process repository internals")
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        checker = ArchiveChecker()
+        checker.repair = True
+        checker.repository = repository
+        checker.key = checker.make_key(repository)
+        checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
+
+        # a chunk re-added during repair, buffered in the pack writer:
+        key = b"01234567890123456789012345678901"
+        repository.put(key, fchunk(b"repaired", chunk_id=key))
+        assert repository._pack_writer._pieces
+
+        checker.finish()
+        assert not repository._pack_writer._pieces  # finish() stored it
+
+
 @pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none"]])
 def test_verify_data(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)

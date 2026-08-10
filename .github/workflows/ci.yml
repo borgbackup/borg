@@ -411,7 +411,7 @@ jobs:
             artifact_prefix: borg-freebsd-15-x86_64-gh
 
           - os: netbsd
-            version: '10.1'
+            version: '11.0'
             display_name: NetBSD
             do_binaries: false
 
@@ -434,10 +434,10 @@ jobs:
 
       - name: Start VM for ${{ matrix.display_name }}
         id: cross_os
-        # a normal boot takes < 1 minute; sometimes the VM never becomes
-        # ssh-reachable and the action retries forever - fail early then.
+        # a normal boot takes < 1 minute; since 1.4.0 the action bounds
+        # waiting for boot itself, this is just an additional safety net.
         timeout-minutes: 15
-        uses: cross-platform-actions/action@v1.3.0
+        uses: cross-platform-actions/action@v1.4.0
         with:
           operating_system: ${{ matrix.os }}
           version: ${{ matrix.version }}
@@ -512,7 +512,7 @@ jobs:
             netbsd)
               arch="$(uname -m)"
               sudo -E mkdir -p /usr/pkg/etc/pkgin
-              echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+              echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/11.0/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
               sudo -E pkgin update
               sudo -E pkgin -y upgrade
               sudo -E pkgin -y install lz4 git

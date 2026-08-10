@@ -518,11 +518,12 @@ jobs:
               sudo -E pkgin -y install lz4 git
               sudo -E pkgin -y install rust
               sudo -E pkgin -y install pkg-config
-              sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
-              sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
-              sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
-              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
-              sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
+              # rust already depends on python313, so use that
+              sudo -E pkgin -y install py313-pip py313-virtualenv py313-tox
+              sudo -E ln -sf /usr/pkg/bin/python3.13 /usr/pkg/bin/python3
+              sudo -E ln -sf /usr/pkg/bin/pip3.13 /usr/pkg/bin/pip3
+              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.13 /usr/pkg/bin/virtualenv3
+              sudo -E ln -sf /usr/pkg/bin/tox-3.13 /usr/pkg/bin/tox3
 
               # Ensure base system admin tools are on PATH for the non-root shell
               export PATH="/sbin:/usr/sbin:$PATH"
@@ -545,7 +546,7 @@ jobs:
               touch ${TMPDIR}/testfile
               lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
 
-              tox3 -e py311-none
+              tox3 -e py313-none
               ;;
 
             openbsd)

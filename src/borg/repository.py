@@ -986,6 +986,11 @@ class Repository:
         it. The record clears at the check that finds the pack intact again or gone (removed by
         compact, or salvaged and dropped by repair; refs #8572); prune() does this from packs/.
 
+        It also reports missing packs (refs #9898): pack ids the chunk index references but that are
+        absent from packs/. The chunk index is loaded and its referenced pack ids are compared with the
+        packs present in the store. A corrupt or invalid index is rebuilt from the packs on next use, so
+        its references are not checked here.
+
         max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
         max_age, accepting a future timestamp up to MAX_CLOCK_SKEW (clock skew). Results are recorded
         regardless of max_age.
@@ -1027,15 +1032,17 @@ class Repository:
         t_last_checkpoint = t_start
         index_files = index_errors = 0
         pack_files = pack_errors = pack_skipped = 0
+        missing_pack_ids = []  # packs referenced by the index but absent from packs/ (refs #9898)
         # index and packs get separate progress indicators, each running from 0% to 100%.
         # the index is checked first and in full, on partial checks too: it is small, and index errors
         # stop the pack check below.
         index_infos = store_list("index")
         # an invalid chunk index means an interrupted fragment deletion; it will be rebuilt on next
         # use, so warn rather than verify the leftover fragments.
-        from .cache import chunkindex_is_invalid
+        from .cache import chunkindex_is_invalid, build_chunkindex_from_repo
 
-        if chunkindex_is_invalid(self):
+        index_invalid = chunkindex_is_invalid(self)
+        if index_invalid:
             logger.warning("chunk index is invalid (interrupted operation); it will be rebuilt on next use.")
         index_pi = ProgressIndicatorPercent(total=len(index_infos), msg="Checking index %3.0f%%", msgid="check.index")
         for info in index_infos:
@@ -1104,19 +1111,40 @@ class Repository:
                 if pack_infos:
                     pack_pi.show(current=len(pack_infos))  # finish at 100%
                 logger.info("Finished checking packs.")
-            tracker.prune({hex_to_bin(info.name) for info in pack_infos})
+            present_pack_ids = {hex_to_bin(info.name) for info in pack_infos}
+            tracker.prune(present_pack_ids)
             pack_pi.finish()
+            # report packs the index references but that are absent from packs/ (refs #9898). an
+            # invalid index is rebuilt from the packs on next use, so its references are not checked.
+            if not index_invalid:
+                chunks = build_chunkindex_from_repo(self)
+                try:
+                    referenced_pack_ids = {
+                        entry.pack_id
+                        for _, entry in chunks.iteritems()
+                        if not (entry.flags & ChunkIndex.F_PENDING)  # pending: pack_id not resolved yet
+                    }
+                finally:
+                    chunks.clear()
+                missing_pack_ids = sorted(referenced_pack_ids - present_pack_ids)
         else:
             # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
-        objs_errors = index_errors + pack_errors
+        objs_errors = index_errors + pack_errors + len(missing_pack_ids)
         summary = (
             f"Checked {index_files} index files ({index_errors} errors) "
             f"and {pack_files} packs ({pack_errors} errors)."
         )
+        if missing_pack_ids:
+            summary += f" {len(missing_pack_ids)} pack(s) referenced by the index are missing."
         if pack_skipped:
             summary += f" Reused {pack_skipped} recent pack check result(s)."
         logger.info(summary)
+        if missing_pack_ids:
+            # one id per line (the list can be long).
+            logger.error(f"Found {len(missing_pack_ids)} missing pack(s) referenced by the index:")
+            for pack_id in missing_pack_ids:
+                logger.error(f"Missing pack: {bin_to_hex(pack_id)}")
         # corrupt_ids() is every pack recorded corrupt, including from earlier runs. with a corrupt
         # index the packs were not scanned, so report nothing.
         corrupt_ids = tracker.corrupt_ids() if index_errors == 0 else []

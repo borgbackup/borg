@@ -1024,6 +1024,15 @@ def test_flush_store_failure_drops_pending_entries(tmp_path):
         assert H(1) not in repository._chunks
 
 
+def _serialized_chunkindex(chunks=None):
+    # Serialize a ChunkIndex to bytes, as stored under index/<sha256(content)>. check() parses index
+    # fragments, so a fragment must be a real ChunkIndex serialization.
+    chunks = chunks if chunks is not None else ChunkIndex()
+    with io.BytesIO() as f:
+        chunks.write(f)
+        return f.getvalue()
+
+
 def test_check_detects_corruption_in_later_object(tmp_path):
     # Corruption anywhere in a multi-object pack must be caught, not just in the first object: the pack
     # is named by sha256(content), so flipping any byte makes its stored hash differ from its name.
@@ -1044,7 +1053,7 @@ def test_check_detects_corruption_in_later_object(tmp_path):
 
 def test_check_detects_index_corruption(tmp_path):
     # index/ objects are named by sha256(content) like packs, so check verifies them the same way.
-    content = b"pretend this is a serialized chunk index"
+    content = _serialized_chunkindex()
     index_name = "index/" + bin_to_hex(sha256(content).digest())
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(index_name, content)
@@ -1092,6 +1101,43 @@ def test_check_intact_multi_object_pack_passes(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
         assert repository.check(repair=False) is True
+
+
+def test_check_detects_missing_pack_referenced_by_index(tmp_path, caplog):
+    # check must report a pack the chunk index references but that is absent from packs/ (refs #9898).
+    # put+flush+close persists the index; then delete the pack, keeping its index entry.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()  # flush before close persists the index
+    with Repository(location, exclusive=True) as repository:
+        assert repository.check(repair=False) is True  # index and pack both present
+        pack_id = repository.chunks[H(0)].pack_id
+        repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
+        with caplog.at_level(logging.ERROR):
+            assert repository.check(repair=False) is False
+        assert f"Missing pack: {bin_to_hex(pack_id)}" in caplog.text
+
+
+def test_check_missing_pack_detection_skipped_when_index_invalid(tmp_path, caplog):
+    # an invalid index is rebuilt from the packs on next use, so check does not report missing packs
+    # from it (refs #9898); it only warns about the invalid index.
+    from ..cache import write_chunkindex_invalid
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()
+    with Repository(location, exclusive=True) as repository:
+        pack_id = repository.chunks[H(0)].pack_id
+        repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone
+        write_chunkindex_invalid(repository)  # mark the index invalid
+        with caplog.at_level(logging.WARNING):
+            assert repository.check(repair=False) is True
+        assert "Missing pack" not in caplog.text
+        assert "chunk index is invalid" in caplog.text
 
 
 def test_check_checked_packs_roundtrip(tmp_path):
@@ -1574,7 +1620,7 @@ def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):
     monkeypatch.setattr("borg.repository.ProgressIndicatorPercent", FakePI)
     pack = fchunk(b"A", chunk_id=H(1))
     pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
-    index_content = b"serialized chunk index"
+    index_content = _serialized_chunkindex()
     index_name = "index/" + bin_to_hex(sha256(index_content).digest())
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)

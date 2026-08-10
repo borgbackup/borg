@@ -3,8 +3,8 @@ import os
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
-from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
-from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter
+from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error, IntegrityError
+from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.time import archive_ts_now, calculate_relative_offset
 
@@ -80,6 +80,8 @@ class CheckMixIn:
         if not args.archives_only:
             if not repository.check(repair=args.repair, max_duration=args.max_duration, max_age=max_age):
                 set_ec(EXIT_WARNING)
+            if sig_int:  # repository check interrupted; skip the archive check
+                raise Error("Got Ctrl-C / SIGINT.")
         if not args.repo_only and not archive_checker.check(
             repository,
             verify_data=args.verify_data,
@@ -185,6 +187,20 @@ class CheckMixIn:
         You can influence how the archive part of the ``Analyzing archive ...`` output is
         formatted by giving a custom format using ``--format`` (see the ``borg repo-list``
         description for more details about the format string).
+
+        If the ``borg check`` process receives a SIGINT signal (Ctrl-C), it stops at the
+        next safe boundary, leaving the repository and its chunk index in a consistent state.
+        The repository check stops after the current pack; ``--verify-data`` and
+        ``--find-lost-archives`` stop after the current chunk; a ``--repair`` archive check
+        stops between whole archives. Results recorded before the interrupt are kept, so a later
+        check does not re-verify those packs until they are due again. With ``--repair``, an
+        interrupted archive check may leave some archives already repaired and others not yet
+        processed, so run ``borg check --repair`` again to finish.
+
+        During a ``--repair`` run, the archive check first rebuilds the chunk index from the
+        packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
+        respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
+        effect until they finish.
 
         About repair mode
         +++++++++++++++++

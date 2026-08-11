@@ -1,3 +1,8 @@
+import datetime
+import hashlib
+import json
+import os
+import random
 import time
 from pathlib import Path
 
@@ -5,10 +10,22 @@ import pytest
 
 from borgstore.store import ObjectNotFound, Store
 
+from ..platform import get_process_id, process_alive
 from ..storelocking import Lock, NotLocked, LockTimeout
 
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2
+
+
+@pytest.fixture()
+def free_pid():
+    """Return a free PID not used by any process (naturally this is racy)."""
+    host, pid, tid = get_process_id()
+    while True:
+        # PIDs are often restricted to a small range. On Linux the range >32k is by default not used.
+        pid = random.randint(33000, 65000)
+        if not process_alive(host, pid, tid):
+            return pid
 
 
 @pytest.fixture()
@@ -18,6 +35,23 @@ def lockstore(tmp_path):
     with store:
         yield store
     store.destroy()
+
+
+def write_raw_lock(store, id, *, exclusive, dt, mtime=None):
+    """
+    Write a lock object like Lock._create_lock does, but with an arbitrary content timestamp <dt>
+    (simulating a writer whose clock is skewed against ours). The object's store-side mtime is
+    "now" (a real store write), unless <mtime> is given (then the file's mtime is set to it).
+    """
+    timestamp = dt.isoformat(timespec="milliseconds")
+    lock = dict(exclusive=exclusive, hostid=id[0], processid=id[1], threadid=id[2], time=timestamp)
+    value = json.dumps(lock).encode("utf-8")
+    key = hashlib.sha256(value).hexdigest()
+    store.store(f"locks/{key}", value)
+    if mtime is not None:
+        path = store.backend.base_path / "locks" / key  # posixfs, locks/ nesting levels [0]
+        os.utime(path, (mtime, mtime))
+    return key
 
 
 class TestLock:
@@ -90,14 +124,20 @@ class TestLock:
         lock_keys_b00 = set(lock._get_locks())
         time.sleep(2.1)
         # now the lock is stale. we never consider the lock we hold ourselves stale,
-        # but another client (== another Lock instance) does:
+        # but another client (== another Lock instance) does. a client without a lock object
+        # of its own can not confirm staleness in the store's clock domain yet (see #9870),
+        # so a plain listing defers the kill:
         other_lock = Lock(lockstore, exclusive=True, id=ID2, stale=2)
-        lock_keys_b21 = set(other_lock._get_locks())  # now the lock should be stale & gone.
+        lock_keys_b21 = set(other_lock._get_locks())
         assert lock_keys_a00 == lock_keys_a05  # was too young, no refresh done
         assert len(lock_keys_a00) == 1
         assert lock_keys_a00 != lock_keys_b00  # refresh done, new lock has different key
         assert len(lock_keys_b00) == 1
-        assert len(lock_keys_b21) == 0  # stale lock was ignored
+        assert lock_keys_b21 == lock_keys_b00  # stale, but kill deferred (no store time reference yet)
+        # acquire() creates other_lock's own lock object first, then confirms the staleness
+        # in the store's clock domain and kills the stale lock:
+        other_lock.acquire()
+        other_lock.release()
         assert len(list(lock.store.list("locks"))) == 0  # stale lock was removed from store
 
     def test_release_stale_lock(self, lockstore):
@@ -173,6 +213,88 @@ class TestLock:
         assert foreign_key not in lock._get_locks()  # skipped, no exception
         lock.acquire()  # the vanished exclusive lock must not block us
         lock.release()
+
+    def test_skewed_writer_healthy_lock_not_killed(self, lockstore):
+        # a lock whose content timestamp looks stale (its writer's clock runs >stale behind ours),
+        # but whose store-side mtime shows it was written just now: it must NOT be killed - killing
+        # a healthy lock enables compact to delete chunks a running backup references, see #9870.
+        dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
+        foreign_key = write_raw_lock(lockstore, ID1, exclusive=False, dt=dt)  # store mtime: now
+        # a shared lock can coexist with it - and must warn about the skew:
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.acquire()
+        assert lock.skew_warned
+        assert foreign_key in lock._get_locks()  # healthy foreign lock survived
+        lock.release()
+        # an exclusive lock must NOT be obtainable by killing the healthy shared lock:
+        with pytest.raises(LockTimeout):
+            Lock(lockstore, exclusive=True, id=ID2).acquire()
+        assert f"locks/{foreign_key}" in [f"locks/{k}" for k in Lock(lockstore, id=ID2)._get_locks()]
+
+    def test_stale_lock_killed_when_both_clock_domains_agree(self, lockstore):
+        # a lock that is stale in both clock domains (old content timestamp AND old store-side
+        # mtime) is really stale and must be killed during acquire().
+        dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
+        foreign_key = write_raw_lock(lockstore, ID1, exclusive=True, dt=dt, mtime=dt.timestamp())
+        lock = Lock(lockstore, exclusive=True, id=ID2)
+        lock.acquire()  # must succeed: the stale exclusive lock gets confirmed stale and killed
+        assert not lock.skew_warned
+        locks = lock._get_locks()
+        assert foreign_key not in locks
+        assert lock.my_lock_key in locks
+        lock.release()
+
+    def test_skew_warning_below_stale_threshold(self, lockstore):
+        # a live lock whose writer's clock runs 10 minutes ahead of ours: far from the stale
+        # threshold, but still worth a warning (e.g. concurrent manifest writes could produce
+        # a spurious RepositoryReplay later), see #9870.
+        dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=10)
+        write_raw_lock(lockstore, ID1, exclusive=False, dt=dt)  # store mtime: now
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.acquire()
+        assert lock.skew_warned
+        lock.release()
+
+    def test_no_skew_warning_for_small_offsets(self, lockstore):
+        # small clock differences (well below MAX_MUTUAL_CLOCK_SKEW) must not warn.
+        dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=60)
+        write_raw_lock(lockstore, ID1, exclusive=False, dt=dt)  # store mtime: now
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.acquire()
+        assert not lock.skew_warned
+        lock.release()
+
+    def test_dead_process_lock_killed_despite_fresh_store_mtime(self, lockstore, free_pid):
+        # knowing locally that the lock-owning process (on THIS machine) is dead must not be
+        # vetoable by store-side timestamps: a store serving bogus, always-fresh mtimes could
+        # otherwise keep an abandoned lock alive forever and block us, see #9870.
+        host, _, tid = get_process_id()
+        dead_id = (host, free_pid, tid)
+        dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
+        dead_key = write_raw_lock(lockstore, dead_id, exclusive=True, dt=dt)  # store mtime: now (fresh)
+        lock = Lock(lockstore, exclusive=True, id=ID2)
+        # killed on a plain listing already - no store time reference of our own needed:
+        assert dead_key not in lock._get_locks()
+        lock.acquire()  # the exclusive lock must be obtainable
+        lock.release()
+
+    def test_stale_kill_legacy_behavior_without_mtime(self, lockstore, monkeypatch):
+        # if the backend can not provide store-side mtimes (e.g. rclone, mtime == 0), staleness
+        # is judged by the content timestamp alone, like before #9870 - even on a plain listing.
+        dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
+        foreign_key = write_raw_lock(lockstore, ID1, exclusive=True, dt=dt)
+
+        orig_list = lockstore.list
+
+        def list_no_mtime(name, *args, **kwargs):
+            for info in orig_list(name, *args, **kwargs):
+                yield info._replace(mtime=0)
+
+        monkeypatch.setattr(lockstore, "list", list_no_mtime)
+        lock = Lock(lockstore, exclusive=True, id=ID2)
+        locks = lock._get_locks()  # legacy: killed right away, no store-domain cross-check possible
+        assert foreign_key not in locks
+        assert len(list(orig_list("locks"))) == 0
 
     def test_migrate_lock(self, lockstore):
         old_id, new_id = ID1, ID2

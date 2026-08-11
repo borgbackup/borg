@@ -8,6 +8,7 @@ import time
 from borgstore.store import ObjectNotFound
 
 from . import platform
+from .constants import MAX_MUTUAL_CLOCK_SKEW
 from .helpers import Error, ErrorWithTraceback
 from .logger import create_logger
 
@@ -80,6 +81,13 @@ class Lock:
         self.refresh_td = datetime.timedelta(seconds=stale // 2)  # don't refresh it if younger
         self.last_refresh_dt = None
         self.my_lock_key = None  # store key of the lock we currently hold, None if we hold none
+        # store-side mtime [s] of our current lock object (stamped by the store's clock, harvested
+        # from lock listings) and time.monotonic() at its creation - together they let us compute
+        # the current time in the store's clock domain, see _store_now().
+        self.my_lock_mtime = None
+        self.my_lock_monotonic = None
+        self.last_seen_locks = {}  # all locks seen by the most recent listing (for skew diagnostics)
+        self.skew_warned = False  # emit the clock-skew warning only once per Lock instance
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
         logger.debug(f"LOCK-INIT: initializing. store: {store}, stale: {stale}s, refresh: {stale // 2}s.")
@@ -109,6 +117,11 @@ class Lock:
             # we parse the timestamp string to get *precisely* the datetime in the lock:
             self.last_refresh_dt = datetime.datetime.fromisoformat(timestamp)
             self.my_lock_key = key
+            # the store-side mtime of the new lock object is not known yet - it is harvested
+            # from the next locks listing. anchor the monotonic clock at creation time so the
+            # harvested mtime can be extrapolated to "now" later, see _store_now().
+            self.my_lock_mtime = None
+            self.my_lock_monotonic = time.monotonic()
         return key
 
     def _delete_lock(self, key, *, ignore_not_found=False, update_last_refresh=False):
@@ -122,9 +135,58 @@ class Lock:
             if update_last_refresh:
                 self.last_refresh_dt = None
                 self.my_lock_key = None
+                self.my_lock_mtime = None
+                self.my_lock_monotonic = None
 
     def _is_our_lock(self, lock):
         return self.id == (lock["hostid"], lock["processid"], lock["threadid"])
+
+    def _store_now(self):
+        """Return the current time in the store's clock domain [UNIX timestamp], or None if unknown."""
+        if self.my_lock_mtime is None or self.my_lock_monotonic is None:
+            return None
+        # note: on most platforms time.monotonic() does not advance while the machine is suspended,
+        # so after a suspend this underestimates store "now". that errs towards NOT considering
+        # other locks stale (the safe direction) and self-heals at our next lock creation/refresh.
+        return self.my_lock_mtime + (time.monotonic() - self.my_lock_monotonic)
+
+    def _mutual_skew(self, lock):
+        """
+        Return the clock skew [s] between us and the writer of <lock> (positive: their clock runs
+        ahead of ours), or None if it can not be determined.
+
+        Each lock object carries two timestamps of the same write instant: its content timestamp
+        (stamped by the writer's clock) and its store-side mtime (stamped by the store's clock).
+        Their difference is that writer's clock offset relative to the store; comparing two
+        writers' offsets yields their mutual skew, with the store's absolute clock error cancelled
+        out (the store's clock is only used as a common reference and may itself be wrong).
+        """
+        if not lock.get("mtime") or self.my_lock_mtime is None or self.last_refresh_dt is None:
+            return None
+        offset_self = self.last_refresh_dt.timestamp() - self.my_lock_mtime
+        offset_other = lock["dt"].timestamp() - lock["mtime"]
+        return offset_other - offset_self
+
+    def _warn_clock_skew(self, lock, skew=None):
+        if self.skew_warned:
+            return
+        self.skew_warned = True
+        skew = skew if skew is not None else self._mutual_skew(lock)
+        skew_info = f" of ~{abs(skew):.0f}s" if skew is not None else ""
+        logger.warning(
+            f"Clock skew{skew_info} detected between this machine and the borg client on "
+            f"{lock['hostid']!r} (also using this repository). "
+            f"The clocks of machines sharing a repository should be synchronized (e.g. via NTP)."
+        )
+
+    def _check_clock_skew(self):
+        """Warn (once) if another current lock writer's clock is skewed against ours."""
+        for lock in self.last_seen_locks.values():
+            if lock["key"] == self.my_lock_key:
+                continue
+            skew = self._mutual_skew(lock)
+            if skew is not None and abs(skew) > MAX_MUTUAL_CLOCK_SKEW:
+                self._warn_clock_skew(lock, skew)
 
     def _is_stale_lock(self, lock):
         if lock["key"] == self.my_lock_key:
@@ -133,12 +195,39 @@ class Lock:
             # how old it is. it can get old e.g. if the machine is suspended while doing a
             # backup or if there is a long stretch of work without repository access, see #9883.
             return False
+        if not platform.process_alive(lock["hostid"], lock["processid"], lock["threadid"]):
+            # the lock owner is a process on THIS machine and it is dead - local knowledge,
+            # independent of any clock and of the store. checked first (and never vetoed by
+            # store timestamps below), so a store serving bogus, always-fresh mtimes can not
+            # keep an abandoned lock alive forever and block us.
+            logger.debug(f"LOCK-STALE: we KNOW that the lock-owning process is dead. lock: {lock}.")
+            return True
         now = datetime.datetime.now(datetime.UTC)
         if now > lock["dt"] + self.stale_td:
+            # the lock looks stale, judging by its content timestamp (writer's clock) vs. our
+            # local clock. but that comparison breaks down if the writer's clock is skewed
+            # against ours, and we must never kill a healthy lock (data loss hazard, #9870).
+            # thus, cross-check in the store's clock domain: the lock object's store-side mtime
+            # vs. store "now". store timestamps are advisory only: they can veto a kill here,
+            # but they can never cause a kill on their own (the store might be hostile).
+            if lock["mtime"]:
+                store_now = self._store_now()
+                if store_now is None:
+                    # we do not have a store-written object of our own yet, so we can not compute
+                    # store "now". defer: the caller may create our lock first and list again -
+                    # then we get here again with store_now available. never kill unconfirmed.
+                    lock["maybe_stale"] = True
+                    logger.debug(f"LOCK-STALE: lock looks stale, deferring until store time is known. lock: {lock}.")
+                    return False
+                if store_now <= lock["mtime"] + self.stale_td.total_seconds():
+                    # the store saw this lock object being written recently: it is NOT stale,
+                    # its writer's clock is just skewed against ours. never kill it!
+                    self._warn_clock_skew(lock)
+                    logger.debug(f"LOCK-STALE: lock only looks stale due to clock skew. lock: {lock}.")
+                    return False
+            # either both clock domains agree that the lock is stale, or the backend can not
+            # provide store-side mtimes (mtime == 0) and the content timestamp has to suffice.
             logger.debug(f"LOCK-STALE: lock is too old, it was not refreshed. lock: {lock}.")
-            return True
-        if not platform.process_alive(lock["hostid"], lock["processid"], lock["threadid"]):
-            logger.debug(f"LOCK-STALE: we KNOW that the lock-owning process is dead. lock: {lock}.")
             return True
         return False
 
@@ -159,14 +248,23 @@ class Lock:
             lock = json.loads(content.decode("utf-8"))
             lock["key"] = key
             lock["dt"] = datetime.datetime.fromisoformat(lock["time"])
-            if self._is_stale_lock(lock):
+            lock["mtime"] = info.mtime  # store-side mtime [s], 0 if the backend can not provide it
+            locks[key] = lock
+        if self.my_lock_key in locks:
+            # harvest the store-side mtime of our own lock object from this listing (this pairs
+            # with the monotonic anchor set at its creation, see _create_lock / _store_now).
+            mtime = locks[self.my_lock_key]["mtime"]
+            if mtime:
+                self.my_lock_mtime = mtime
+        for key in list(locks):
+            if self._is_stale_lock(locks[key]):
                 # ignore it and delete it (even if it is not from us).
                 # note: this is never the lock we currently hold (see _is_stale_lock), so this
                 # must not touch last_refresh_dt / my_lock_key - a stale lock matching our id
                 # can only be a leftover of a dead process (pid reuse), not our own lock.
                 self._delete_lock(key, ignore_not_found=True)
-            else:
-                locks[key] = lock
+                del locks[key]
+        self.last_seen_locks = locks
         return locks
 
     def _find_locks(self, *, only_exclusive=False, only_mine=False):
@@ -188,8 +286,11 @@ class Lock:
         started = time.monotonic()
         while time.monotonic() - started < self.timeout:
             exclusive_locks = self._find_locks(only_exclusive=True)
-            if len(exclusive_locks) == 0:
-                # looks like there are no exclusive locks, create our lock.
+            if all(lock.get("maybe_stale") for lock in exclusive_locks):
+                # there are no exclusive locks (or only ones that look stale, but whose staleness
+                # could not be confirmed in the store's clock domain yet, see _is_stale_lock -
+                # creating our lock below gives the next listing a store time reference, so they
+                # get either confirmed (and deleted) or vetoed there). create our lock.
                 key = self._create_lock(exclusive=self.is_exclusive, update_last_refresh=True)
                 # obviously we have a race condition here: other client(s) might have created exclusive
                 # lock(s) at the same time in parallel. thus we have to check again.
@@ -204,6 +305,7 @@ class Lock:
                             locks = self._find_locks(only_exclusive=False)
                             if len(locks) == 1 and locks[0]["key"] == key:
                                 logger.debug("LOCK-ACQUIRE: success! no non-exclusive locks are left!")
+                                self._check_clock_skew()
                                 return self
                             time.sleep(self.other_locks_go_away_delay)
                         logger.debug("LOCK-ACQUIRE: timeout while waiting for non-exclusive locks to go away.")
@@ -218,6 +320,7 @@ class Lock:
                     if len(exclusive_locks) == 0:
                         logger.debug("LOCK-ACQUIRE: success! no exclusive locks detected.")
                         # We don't care for other non-exclusive locks.
+                        self._check_clock_skew()
                         return self
                     else:
                         logger.debug("LOCK-ACQUIRE: exclusive locks detected, deleting our shared lock.")

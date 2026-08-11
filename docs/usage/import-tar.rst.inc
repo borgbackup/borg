@@ -96,8 +96,12 @@ based on its file extension and pipe the file through an appropriate filter:
 - .tar.gz or .tgz: gzip -d
 - .tar.bz2 or .tbz: bzip2 -d
 - .tar.xz or .txz: xz -d
-- .tar.zstd or .tar.zst: zstd -d
+- .tar.zstd, .tar.zst or .tzst: zstd (in-process)
 - .tar.lz4: lz4 -d
+
+For zstd, Borg decompresses in-process using libzstd instead of piping through
+an external program. The other formats are piped through the respective
+external filter program.
 
 Alternatively, a --tar-filter program may be explicitly specified. It should
 read compressed data from stdin and output an uncompressed tar stream on

@@ -416,9 +416,11 @@ jobs:
             do_binaries: false
 
           - os: openbsd
-            version: '7.8'
+            version: '7.9'
             display_name: OpenBSD
             do_binaries: false
+            # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
+            memory: 12G
 
           - os: omnios
             version: 'r151056'
@@ -432,6 +434,17 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # .pip-cache lives inside the workspace, which cross-platform-actions
+      # rsyncs into the VM and back, so wheels built from sdists in one run
+      # (most of the VM setup time) are reused by the next one.
+      - name: Cache pip-built wheels
+        uses: actions/cache@v6
+        with:
+          path: .pip-cache
+          key: ${{ matrix.os }}-${{ matrix.version }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.version }}-pip-
+
       - name: Start VM for ${{ matrix.display_name }}
         id: cross_os
         # a normal boot takes < 1 minute; since 1.4.0 the action bounds
@@ -444,7 +457,7 @@ jobs:
           shell: bash
           # the default VM size (2 cpus) leaves half of the runner's 4 vcpus idle
           cpu_count: 4
-          memory: 8G
+          memory: ${{ matrix.memory || '8G' }}
 
       - name: Test on ${{ matrix.display_name }}
         shell: cpa.sh {0}
@@ -456,6 +469,9 @@ jobs:
           # a hung test must fail instead of stalling the suite until the
           # job timeout (tox passes all env vars through to pytest).
           export PYTEST_TIMEOUT=300
+
+          # see the "Cache pip-built wheels" step
+          export PIP_CACHE_DIR="$PWD/.pip-cache"
 
           case "${{ matrix.os }}" in
             freebsd)
@@ -540,13 +556,21 @@ jobs:
               ;;
 
             openbsd)
-              sudo -E pkg_add lz4 git
-              sudo -E pkg_add rust
-              sudo -E pkg_add openssl%3.5
-              sudo -E pkg_add py3-pip py3-virtualenv py3-tox
+              # Put the temp tree (pip/cc build temps, pytest tmp dirs and the
+              # borg test repos in them) on a memory-backed filesystem instead
+              # of the slow FFS disk. Sized generously (the pytest tmp tree is
+              # only cleaned up after the run); the VM gets 12G RAM for this.
+              sudo mkdir -p /mfs
+              # -O2: FFS2 format - mfs defaults to FFS1, whose 32 bit
+              # timestamps silently wrap (breaks test_extract_y2261).
+              sudo mount_mfs -O2 -s 6g swap /mfs
+              sudo chmod 1777 /mfs
+              export TMPDIR=/mfs
+
+              sudo -E pkg_add lz4 git rust openssl%3.5 py3-pip py3-virtualenv py3-tox
 
               export BORG_OPENSSL_NAME=eopenssl35
-              tox -e py312-none
+              tox -e py313-none
               ;;
 
             omnios)

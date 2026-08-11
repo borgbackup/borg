@@ -110,6 +110,9 @@ jobs:
       PY_COLORS: 1
       MSYS2_ARG_CONV_EXCL: "*"
       MSYS2_ENV_CONV_EXCL: "*"
+      # see the "Cache pip-built wheels" step. MSYS2_ENV_CONV_EXCL above keeps
+      # this a Windows path when it enters the msys2 shell.
+      PIP_CACHE_DIR: ${{ github.workspace }}\.pip-cache
 
     defaults:
       run:
@@ -119,6 +122,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      # Same as the "Cache pip-built wheels" step in ci.yml (MSYS2's mingw
+      # Python cannot use PyPI's win_amd64 wheels). Own key, because the
+      # unlocked requirements may resolve to different versions; falls back
+      # to (and gets picked up by) the ci.yml cache via the shared prefix.
+      - name: Cache pip-built wheels
+        uses: actions/cache@v6
+        with:
+          path: .pip-cache
+          key: windows-msys2-pip-canary-${{ hashFiles('pyproject.toml', 'requirements.d/pyinstaller.txt') }}
+          restore-keys: |
+            windows-msys2-pip-
 
       - uses: msys2/setup-msys2@v2
         with:

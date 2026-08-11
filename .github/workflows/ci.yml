@@ -671,6 +671,9 @@ jobs:
       PY_COLORS: 1
       MSYS2_ARG_CONV_EXCL: "*"
       MSYS2_ENV_CONV_EXCL: "*"
+      # see the "Cache pip-built wheels" step. MSYS2_ENV_CONV_EXCL above keeps
+      # this a Windows path when it enters the msys2 shell.
+      PIP_CACHE_DIR: ${{ github.workspace }}\.pip-cache
 
     defaults:
       run:
@@ -680,6 +683,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      # MSYS2's mingw Python cannot use PyPI's win_amd64 wheels, so pip builds
+      # all compiled deps from source - incl. building maturin via cargo, just
+      # to build the blake3 wheel. Persist the wheels pip builds.
+      - name: Cache pip-built wheels
+        uses: actions/cache@v6
+        with:
+          path: .pip-cache
+          key: windows-msys2-pip-${{ hashFiles('pyproject.toml', 'requirements.d/pyinstaller.txt') }}
+          restore-keys: |
+            windows-msys2-pip-
 
       - uses: msys2/setup-msys2@v2
         with:

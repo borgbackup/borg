@@ -30,7 +30,7 @@ classifiers = [
 license = "BSD-3-Clause"
 license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
-  "borghash ~= 0.1.0",
+  "borghash ~= 0.2.0",
   "borgstore[rest,blake3] ~= 0.6.0",
   "msgpack >=1.0.3, <=1.2.1",
   "packaging",

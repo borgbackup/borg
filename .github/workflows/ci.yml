@@ -419,6 +419,8 @@ jobs:
             version: '7.8'
             display_name: OpenBSD
             do_binaries: false
+            # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
+            memory: 12G
 
           - os: omnios
             version: 'r151056'
@@ -444,7 +446,7 @@ jobs:
           shell: bash
           # the default VM size (2 cpus) leaves half of the runner's 4 vcpus idle
           cpu_count: 4
-          memory: 8G
+          memory: ${{ matrix.memory || '8G' }}
 
       - name: Test on ${{ matrix.display_name }}
         shell: cpa.sh {0}
@@ -540,10 +542,18 @@ jobs:
               ;;
 
             openbsd)
-              sudo -E pkg_add lz4 git
-              sudo -E pkg_add rust
-              sudo -E pkg_add openssl%3.5
-              sudo -E pkg_add py3-pip py3-virtualenv py3-tox
+              # Put the temp tree (pip/cc build temps, pytest tmp dirs and the
+              # borg test repos in them) on a memory-backed filesystem instead
+              # of the slow FFS disk. Sized generously (the pytest tmp tree is
+              # only cleaned up after the run); the VM gets 12G RAM for this.
+              sudo mkdir -p /mfs
+              # -O2: FFS2 format - mfs defaults to FFS1, whose 32 bit
+              # timestamps silently wrap (breaks test_extract_y2261).
+              sudo mount_mfs -O2 -s 6g swap /mfs
+              sudo chmod 1777 /mfs
+              export TMPDIR=/mfs
+
+              sudo -E pkg_add lz4 git rust openssl%3.5 py3-pip py3-virtualenv py3-tox
 
               export BORG_OPENSSL_NAME=eopenssl35
               tox -e py312-none

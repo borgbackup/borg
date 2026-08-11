@@ -416,7 +416,7 @@ jobs:
             do_binaries: false
 
           - os: openbsd
-            version: '7.8'
+            version: '7.9'
             display_name: OpenBSD
             do_binaries: false
             # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
@@ -556,7 +556,7 @@ jobs:
               sudo -E pkg_add lz4 git rust openssl%3.5 py3-pip py3-virtualenv py3-tox
 
               export BORG_OPENSSL_NAME=eopenssl35
-              tox -e py312-none
+              tox -e py313-none
               ;;
 
             omnios)

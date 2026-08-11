@@ -95,8 +95,12 @@ before writing it to FILE:
 - .tar.gz or .tgz: gzip
 - .tar.bz2 or .tbz: bzip2
 - .tar.xz or .txz: xz
-- .tar.zstd or .tar.zst: zstd
+- .tar.zstd, .tar.zst or .tzst: zstd (in-process, level 3)
 - .tar.lz4: lz4
+
+For zstd, Borg compresses in-process using libzstd instead of piping through an
+external program (set BORG_ZSTD_MT_WORKERS to use multiple compression threads).
+The other formats are piped through the respective external filter program.
 
 Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered

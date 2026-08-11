@@ -26,6 +26,9 @@ def have_gnutar():
 
 requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason="GNU tar must be installed for this test.")
 requires_gzip = pytest.mark.skipif(not shutil.which("gzip"), reason="gzip must be installed for this test.")
+requires_zstd = pytest.mark.skipif(not shutil.which("zstd"), reason="zstd must be installed for this test.")
+
+ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 
 
 @requires_gnutar
@@ -154,6 +157,72 @@ def test_import_tar_gz(archivers, request, tar_format="GNU"):
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tgz", f"--tar-format={tar_format}")
     cmd(archiver, "import-tar", "dst", "simple.tgz")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+    assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
+
+
+@pytest.mark.parametrize("suffix", ["tar.zst", "tar.zstd", "tzst"])
+def test_export_import_tar_zst(archivers, request, suffix):
+    # zstd tarballs are (de)compressed in-process, no external zstd binary is needed.
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
+    os.unlink("input/flagfile")
+    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", f"simple.{suffix}")
+    with open(f"simple.{suffix}", "rb") as fd:
+        assert fd.read(4) == ZSTD_MAGIC
+    cmd(archiver, "import-tar", "dst", f"simple.{suffix}")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+    assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
+
+
+def test_export_import_tar_zst_mt(archivers, request, monkeypatch):
+    # exercise the multi-threaded compression path (nb_workers) of the in-process zstd filter.
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_ZSTD_MT_WORKERS", "2")
+    monkeypatch.setattr("borg.compress._zstd_mt_workers", None)  # drop the cache
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
+    os.unlink("input/flagfile")
+    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "simple.tar.zst")
+    cmd(archiver, "import-tar", "dst", "simple.tar.zst")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+    assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
+
+
+@requires_gnutar
+@requires_zstd
+def test_export_tar_zst_interop(archivers, request):
+    # in-process zstd output must be readable by the standard zstd tool.
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    os.unlink("input/flagfile")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    cmd(archiver, "export-tar", "test", "simple.tar.zst", "--tar-format=GNU")
+    subprocess.check_call(["zstd", "-d", "simple.tar.zst", "-o", "simple.tar"])
+    with changedir("output"):
+        subprocess.check_call(["tar", "xpf", "../simple.tar", "--warning=no-timestamp"])
+    assert_dirs_equal("input", "output/input", ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
+
+
+@requires_zstd
+def test_tar_filter_zstd_external(archivers, request):
+    # an explicit --tar-filter always runs the external filter program, also for zstd.
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
+    os.unlink("input/flagfile")
+    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "simple.tar.zst", "--tar-filter=zstd")
+    with open("simple.tar.zst", "rb") as fd:
+        assert fd.read(4) == ZSTD_MAGIC
+    cmd(archiver, "import-tar", "dst", "simple.tar.zst", "--tar-filter=zstd -d")
     with changedir(archiver.output_path):
         cmd(archiver, "extract", "dst")
     assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)

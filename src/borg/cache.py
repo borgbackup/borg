@@ -662,16 +662,45 @@ def write_chunkindex_to_repo(
     new_hashes = set()  # content hashes of the fragments that make up the index we are writing now
     fragments_written = 0
 
-    # sort the selected keys, so that an identical set of entries always produces identical
-    # fragments (identical content hashes), no matter in which order the entries were inserted
-    # into the hash table. this makes writing/repacking idempotent and convergent across clients:
-    # a fragment that already exists in the repo is not stored again (see _store_chunkindex_fragment)
-    # and no differently-partitioned duplicates of the same entries can pile up.
-    keys = sorted(key for key, _ in chunks.iteritems(only_new=incremental))
-    total = len(keys)
-    if keys:
-        # partition the selected entries into batches of at most max_entries entries:
-        batches = chunkit(keys, max_entries)
+    total = chunks.new_count if incremental else len(chunks)
+    if total > max_entries:
+        # to keep memory usage low, we don't build one huge, sorted list of all selected keys
+        # (~90 bytes per key!), see #9886: as the keys are uniformly distributed hash digests, we can
+        # partition them into 2 ** prefix_bits similarly sized, disjoint sets by their leading key bits
+        # and select / sort / write one partition's keys at a time. selecting a partition is a cheap,
+        # C-level filtering scan of the in-memory hash table, see borghash.HashTable.items.
+        # aim a bit below max_entries: without that headroom, a total of exactly
+        # 2 ** prefix_bits * max_entries would put the expected partition size right AT max_entries,
+        # so about half the partitions would overshoot it by a little.
+        target_entries = max_entries - max_entries // 20  # 5% headroom
+        partitions = -(-total // target_entries)  # == ceil(total / target_entries)
+        prefix_bits = (partitions - 1).bit_length()  # smallest prefix_bits with 2 ** prefix_bits >= partitions
+    else:
+        prefix_bits = 0  # all selected keys are one partition (and no filtering scans are needed)
+
+    def gen_batches():
+        # sort the selected keys per partition, so that an identical set of entries always produces
+        # identical fragments (identical content hashes), no matter in which order the entries were
+        # inserted into the hash table: partition membership and prefix_bits (chosen by entry count)
+        # only depend on the selected entries. this makes writing/repacking idempotent and convergent
+        # across clients: a fragment that already exists in the repo is not stored again (see
+        # _store_chunkindex_fragment) and no differently-partitioned duplicates of the same entries
+        # can pile up. as the prefix compares the keys' leading bits, ascending prefixes yield the
+        # same globally sorted key sequence a single all-keys sort would have produced.
+        for prefix in range(2**prefix_bits):
+            keys = sorted(
+                key for key, _ in chunks.iteritems(only_new=incremental, prefix_bits=prefix_bits, prefix=prefix)
+            )
+            # Usually a no-op splitwise: with hash digests as keys, prefix_bits was chosen so that a
+            # partition comes out well below max_entries (>100 sigma of margin), so this yields the
+            # partition as a single batch. It is what makes the "no fragment has more than
+            # max_entries entries" invariant a hard guarantee rather than an assumption about the
+            # key distribution - keys that are not uniformly distributed (e.g. in tests) can put
+            # everything into one partition.
+            yield from chunkit(keys, max_entries)
+
+    if total:
+        batches = gen_batches()
     elif force_write:
         # write a single empty fragment (e.g. at repo creation or after delete_chunkindex_from_repo()):
         batches = [[]]

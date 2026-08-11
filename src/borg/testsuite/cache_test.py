@@ -1,3 +1,4 @@
+import hashlib
 import os
 import time
 from datetime import UTC, datetime
@@ -376,6 +377,63 @@ def test_write_chunkindex_deterministic_fragments(tmp_path, monkeypatch):
                 [_ci_key(i) for i in range(500, 1000)],
                 [_ci_key(i) for i in range(1000, 1200)],
             ]
+    assert hashes[0] == hashes[1]  # identical fragment sets from differently-ordered inputs
+
+
+def _u_key(i):
+    """A pseudo-random (uniformly distributed) 32-byte chunk id for entry number i."""
+    return hashlib.sha256(i.to_bytes(4, "big")).digest()
+
+
+def test_write_chunkindex_partitioned_write(tmp_path, monkeypatch):
+    """A big write with uniformly distributed keys is partitioned by leading key bits.
+
+    When more than MAX entries are selected, the write path processes the keys one key-prefix
+    partition at a time instead of building one huge all-keys list (#9886). The resulting
+    fragments must still be bounded by MAX and together hold every entry exactly once; as the
+    partitions compare the keys' leading bits, the fragments are contiguous ranges of the
+    globally sorted key space.
+    """
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 100)
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MIN", 50)
+
+    keys = [_u_key(i) for i in range(1000)]
+    for incremental in (False, True):
+        repository_location = os.fspath(tmp_path / f"repository{incremental}")
+        with Repository(repository_location, exclusive=True, create=True) as repository:
+            delete_chunkindex_from_repo(repository)  # start from a known-empty fragment set
+            write_chunkindex_to_repo(
+                repository, _make_chunkindex(keys), incremental=incremental, force_write=not incremental
+            )
+            fragment_keys = [
+                sorted(read_chunkindex_from_repo(repository, name)) for name, _ in list_chunkindex_fragments(repository)
+            ]
+            # 1000 uniformly distributed entries with MAX=100 must have been really partitioned:
+            assert len(fragment_keys) >= 10
+            assert all(len(fk) <= 100 for fk in fragment_keys)
+            # ordering the fragments by their first key must yield the globally sorted key sequence,
+            # so the fragments are disjoint, complete and contiguous:
+            fragment_keys.sort(key=lambda fk: fk[0])
+            assert [k for fk in fragment_keys for k in fk] == sorted(keys)
+            # the index rebuilt from the fragments is complete:
+            chunks = build_chunkindex_from_repo(repository)
+            assert len(chunks) == 1000
+            assert set(chunks) == set(keys)
+
+
+def test_write_chunkindex_partitioned_deterministic(tmp_path, monkeypatch):
+    """Partitioned writes are convergent, too: identical entries -> identical fragments."""
+    monkeypatch.setattr(cache_mod, "CHUNKINDEX_FRAGMENT_ENTRIES_MAX", 100)
+
+    keys = [_u_key(i) for i in range(1000)]
+    shuffled = keys[311:] + keys[:311]  # same set, different insertion order
+    hashes = []
+    for key_list in (keys, shuffled):
+        repository_location = os.fspath(tmp_path / f"repository{len(hashes)}")
+        with Repository(repository_location, exclusive=True, create=True) as repository:
+            delete_chunkindex_from_repo(repository)
+            write_chunkindex_to_repo(repository, _make_chunkindex(key_list), incremental=False, force_write=True)
+            hashes.append({name for name, _ in list_chunkindex_fragments(repository)})
     assert hashes[0] == hashes[1]  # identical fragment sets from differently-ordered inputs
 
 

@@ -95,6 +95,18 @@ General:
         ``BORG_PROGRESS_FPS=0.1`` limits it to one update every 10 seconds.
         Lower values are useful when the output goes into a logfile rather than
         to an interactive terminal.
+    BORG_SPINNER
+        Controls the spinner borg animates on a terminal while doing work of unknown
+        duration:
+
+        - unset (default): animate, using Unicode frames if the terminal can display them
+        - ``ascii``: animate, but only use ASCII frames (``|/-\``)
+        - ``off``: do not animate, only output the messages next to the spinner
+
+        The spinner is animated only on an interactive terminal anyway (and never
+        with ``--log-json``), and its colour follows the usual ``NO_COLOR`` and
+        ``COLORTERM`` conventions. See also ``BORG_PROGRESS_FPS``: it also gives
+        the spinner its frame rate.
     BORG_DEBUG_PROFILE
         When set to a filename, write an execution profile in Borg format into that file
         (see :ref:`debugging`). If the filename ends with ``.pyprof``, a Python-compatible

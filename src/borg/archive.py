@@ -2429,6 +2429,9 @@ class ArchiveChecker:
 
     def finish(self):
         if self.repair:
+            # store packs still buffered from chunks re-added during repair, so their index entries
+            # are set before the index is dropped below and no chunk is left buffered at close().
+            self.repository.flush()
             # we may have deleted chunks. delete_chunkindex_from_repo() removes the on-disk index and
             # drops the stale in-memory index, so the next repository access rebuilds it from the repo.
             logger.info("Deleting chunk indexes in repository - next repository access will cause a rebuild.")

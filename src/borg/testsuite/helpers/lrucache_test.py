@@ -1,5 +1,6 @@
 import sys
 import threading
+import time
 from tempfile import TemporaryFile
 
 import pytest
@@ -105,14 +106,21 @@ class TestLRUCache:
         errors: list[Exception] = []
         start = threading.Barrier(8)
 
+        # time-bounded instead of a fixed round count: with the tiny switch interval and
+        # coverage tracing, a fixed count takes wildly different time across platforms
+        # (it ran into the test timeout on a slow NetBSD CI VM).
+        deadline = time.monotonic() + 2.0
+
         def worker(n):
             start.wait()
             try:
-                for _round in range(2000):
+                while True:
                     for key in keys:
                         c[key] = n
                         c.get(key)
                         c.pop(key, None)
+                    if time.monotonic() >= deadline:
+                        break
             except Exception as e:
                 errors.append(e)
 

@@ -177,11 +177,10 @@ New features:
   - give each thread its own LZ4 scratch buffer, #10032
 - faster extract / mount:
 
-  - avoid refetching/reparsing repeated chunks, #1678
+  - avoid refetching/reparsing repeated chunks: serve all-zero chunks without
+    repository access, cache recently parsed chunks, #1678
   - do not verify the chunk id on every read from an encrypted repo (the
     AEAD authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
-  - serve all-zero chunks without repository access; also cache
-    recently parsed chunks, #1678
 - more, faster, and more secure chunkers:
 
   - fastcdc is the new and faster default chunker, #9957
@@ -189,22 +188,29 @@ New features:
 
     - AVX-512 / AVX2 on x86-64 (Intel / AMD), NEON on aarch64, plus a portable
       blockwise one; all bit-identical to the sequential loop
-    - the sequential loop is what runs unless BORG_FASTCDC_KERNEL /
-      BORG_BUZHASH64_KERNEL / BORG_AES_CHUNKER_KERNEL selects another kernel:
+    - the sequential loop is what runs unless one of BORG_FASTCDC_KERNEL /
+      BORG_BUZHASH64_KERNEL / BORG_AES_CHUNKER_KERNEL selects another kernel;
       which one is fastest depends on the CPU *and* the compiler, so nothing
       is chosen automatically
   - toeplitz-aes, rabin-aes, goldilocks-aes: fingerprinting-resistant chunkers
-    (UHF-then-PRF), with direct AES hw acceleration (AES-NI or VAES/AVX-512) or
-    via OpenSSL, #9987, #10043
+    (UHF-then-PRF), with direct AES hardware acceleration (AES-NI or
+    VAES/AVX-512) or via OpenSSL, #9987, #10043
   - zero-copy fill and lazy buffer compaction optimizations
   - log the chunker and its scan kernel at debug level
 - compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.
   They trade compression ratio for speed. Compatible with existing repositories.
+- check:
+
+  - keep pack check results, add --max-age to reuse them, #9696, #9925
+  - report missing chunks grouped as chunk -> files -> archives, #9218, #9965
+  - calendar-aware --max-age, symmetric clock-skew window
+  - stream one line per missing chunk id, run report on abort, lower report caps, #9218
+- help environment: new help topic about environment variables, #10061
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
 - analyze: report deduplicated size of a set of archives, #5741
-- repo-compress: was temporarily gone, re-added now with pack support, #9663
+- repo-compress: was temporarily gone, now re-added with pack support, #9663
 - version: add --json output, #10004
 - benchmark cpu:
 
@@ -218,13 +224,6 @@ New features:
 - completion: generate fish and tcsh completions, #9989, #9503
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
-- check:
-
-  - keep pack check results, add --max-age to reuse them, #9696, #9925
-  - report missing chunks grouped as chunk -> files -> archives, #9218, #9965
-  - calendar-aware --max-age, symmetric clock-skew window
-  - check: stream one line per missing chunk id, run report on abort, lower report caps, #9218
-
 
 Fixes:
 
@@ -237,7 +236,13 @@ Fixes:
 - release chunk data memoryviews (fixes PyPy memory leak), #1755, #9978
 - fix DownloadPipeline.fetch_many() crashing on a missing chunk, #10024
 - lrucache: make it thread-safe
-- crypto: start a new session after encrypting 2TiB with one aes256-ocb session key, #6501
+- crypto: start a new session after encrypting 2 TiB with one aes256-ocb session key, #6501
+- check:
+
+  - flush pack writer in ArchiveChecker.finish() before dropping the index
+  - handle Ctrl-C at safe boundaries, #7893, #9966
+  - report invalid pack names instead of crashing
+  - honest per-run interrupt count, drop redundant save, fix stale SIGINT docs
 
 Other changes:
 
@@ -248,6 +253,14 @@ Other changes:
 - crypto: raise IntegrityError for truncated AEAD/AE envelopes
 - chunkers: refactor the shared machinery into a common ChunkerBase class
 - PackReader.read(): return a memoryview of the in-memory pack instead of copying
+- remove avoidable per-chunk memory copies on the hot data path, #10059, #10060
+
+  - compress: lz4 decompresses directly into the result bytes object
+  - compress: do not copy chunk data to bytes, use the buffer protocol
+  - chunkers: read file data directly into the caller's buffer (if possible)
+  - crypto: AEAD encrypt/decrypt directly into the result bytes object
+- write_chunkindex_to_repo: reduce memory needs, #9886
+- export-tar/import-tar: zstd (de)compression is in-process now, #10067
 - mount/webdav: unify the 3 archive-as-filesystem implementations, #10020.
   Behavior changes that fell out of the unification:
 
@@ -279,6 +292,19 @@ Other changes:
   - FAME.md: update contributor statistics, #10022
   - crypto: misc. improvements to code and docs, #6501, ...
   - GitHub issue #10000: "We Are Borg" joke collection
+- CI / tests:
+
+  - give the test VMs 4 CPUs / 8 GiB RAM
+  - cache pip-built wheels (Windows, BSDs, OmniOS, Haiku)
+  - upgrade cross-platform-actions to 1.4.0
+  - upgrade to NetBSD 11.0
+  - upgrade to OpenBSD 7.9
+  - OpenBSD: put TMPDIR on an mfs
+  - fix VM job hangs, use all runner CPUs
+  - fail hung tests after 5 minutes on the test VMs
+  - time out the "Start VM" step after 15 minutes
+  - time-bound LRUCache.test_threaded_access
+  - benchmark crud json-lines: I/O throughput may round to 0
 
 
 Version 2.0.0b22 (2026-07-22)

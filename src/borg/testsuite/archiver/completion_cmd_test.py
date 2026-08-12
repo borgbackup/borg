@@ -66,7 +66,7 @@ def _run_zsh_completion_fn(completion_script, setup_code):
     sourced from a completion context. So we only take the preamble (shtab wraps it into
     markers) and stub compadd, which is how the helpers report their candidates.
     """
-    preamble = completion_script.split("# Custom Preamble\n", 1)[1].split("\n# End Custom Preamble", 1)[0]
+    preamble = completion_script.split("# Custom Preamble", 1)[1].split("# End Custom Preamble", 1)[0]
     code = (
         preamble + "\n"
         'compadd() { local a; for a in "$@"; do [[ $a == -* ]] && continue; print -r -- $a; done }\n' + setup_code
@@ -262,37 +262,42 @@ SORTBY_BEHAVIOR = [
 ]
 
 
+def completion_lines(archivers, request, shell):
+    """The generated completion script as a list of lines (on Windows it has CRLF line endings)."""
+    return cmd(request.getfixturevalue(archivers), "completion", shell).splitlines()
+
+
 @pytest.mark.parametrize("command,fn", SORTBY_WIRING)
 def test_bash_sortby_wiring(archivers, request, command, fn):
-    output = cmd(request.getfixturevalue(archivers), "completion", "bash")
-    assert f"_shtab_borg_{command.replace('-', '_')}___sort_by_COMPGEN={fn}\n" in output
-    assert f"\n{fn}() {{\n" in output
+    lines = completion_lines(archivers, request, "bash")
+    assert f"_shtab_borg_{command.replace('-', '_')}___sort_by_COMPGEN={fn}" in lines
+    assert f"{fn}() {{" in lines
 
 
 @pytest.mark.parametrize("command,fn", SORTBY_WIRING)
 def test_zsh_sortby_wiring(archivers, request, command, fn):
-    output = cmd(request.getfixturevalue(archivers), "completion", "zsh")
-    block = output.split(f"\n_shtab_borg_{command.replace('-', '_')}_options=(\n", 1)[1].split("\n)\n", 1)[0]
-    assert f':sort_by:{fn}"' in block
-    assert f"\n{fn}() {{\n" in output
+    lines = completion_lines(archivers, request, "zsh")
+    block = lines[lines.index(f"_shtab_borg_{command.replace('-', '_')}_options=(") :]
+    block = block[: block.index(")")]
+    assert any(f':sort_by:{fn}"' in line for line in block)
+    assert f"{fn}() {{" in lines
 
 
 @pytest.mark.parametrize("command,fn", SORTBY_WIRING)
 def test_fish_sortby_wiring(archivers, request, command, fn):
-    output = cmd(request.getfixturevalue(archivers), "completion", "fish")
+    lines = completion_lines(archivers, request, "fish")
     assert any(
-        f"_shtab_borg_using {command}'" in line and " -l sort-by " in line and f'"({fn})"' in line
-        for line in output.splitlines()
+        f"_shtab_borg_using {command}'" in line and " -l sort-by " in line and f'"({fn})"' in line for line in lines
     )
-    assert f"\nfunction {fn}\n" in output
+    assert f"function {fn}" in lines
 
 
 def test_tcsh_sortby_single_rule(archivers, request):
     """tcsh matches by option name only, so all --sort-by options share one helper."""
-    output = cmd(request.getfixturevalue(archivers), "completion", "tcsh")
-    assert output.count("'n/--sort-by/") == 1
-    assert f"'n/--sort-by/`{TCSH_SORTBY_FN}`/'" in output
-    alias = next(line for line in output.splitlines() if line.startswith(f"alias {TCSH_SORTBY_FN} "))
+    lines = completion_lines(archivers, request, "tcsh")
+    assert sum(line.count("'n/--sort-by/") for line in lines) == 1
+    assert any(f"'n/--sort-by/`{TCSH_SORTBY_FN}`/'" in line for line in lines)
+    alias = next(line for line in lines if line.startswith(f"alias {TCSH_SORTBY_FN} "))
     for key in ("timestamp", "atime", "size_added"):  # the union of all the sort keys
         assert f" {key}" in alias
 
@@ -300,7 +305,7 @@ def test_tcsh_sortby_single_rule(archivers, request):
 @pytest.mark.parametrize("shell", ["bash", "zsh", "fish", "tcsh"])
 def test_completion_helpers_are_defined(archivers, request, shell):
     """Every _borg_* helper the generated script refers to must also be defined by it."""
-    output = cmd(request.getfixturevalue(archivers), "completion", shell)
+    output = "\n".join(completion_lines(archivers, request, shell))
     defined = set(re.findall(r"^(?:function |alias )?(_borg_\w+)\s*(?:\(\)|\(|\s|$)", output, re.M))
     referenced = set(re.findall(r"_borg_complete_\w+|_borg_help_topics", output))
     assert referenced <= defined, f"undefined: {sorted(referenced - defined)}"

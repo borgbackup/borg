@@ -227,8 +227,10 @@ class CompressionSpec:
                     level = 3  # default compression level in zstd
                 elif count == 2:
                     level = int(values[1])
-                    if not 1 <= level <= 22:
-                        raise ArgumentTypeError("level must be >= 1 and <= 22")
+                    # negative levels are zstd's "fast" levels, -128 is what the clevel byte
+                    # can still store (it is interpreted as an int8_t for zstd).
+                    if not -128 <= level <= 22:
+                        raise ArgumentTypeError("level must be >= -128 and <= 22")
                 else:
                     raise ArgumentTypeError("too many arguments")
                 self.level = level

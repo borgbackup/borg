@@ -232,7 +232,8 @@ def test_default_compression_level(c_type, c_name):
 
 
 @pytest.mark.parametrize(
-    "c_type, c_name, c_levels", [(ZLIB, "zlib", [0, 9]), (LZMA, "lzma", [0, 9]), (ZSTD, "zstd", [1, 22])]
+    "c_type, c_name, c_levels",
+    [(ZLIB, "zlib", [0, 9]), (LZMA, "lzma", [0, 9]), (ZSTD, "zstd", [-128, -22, -4, -1, 1, 22])],
 )
 def test_specified_compression_level(c_type, c_name, c_levels):
     for level in c_levels:
@@ -241,10 +242,51 @@ def test_specified_compression_level(c_type, c_name, c_levels):
         assert cs.level == level
 
 
-@pytest.mark.parametrize("invalid_spec", ["", "lzma,9,invalid", "invalid"])
+@pytest.mark.parametrize("invalid_spec", ["", "lzma,9,invalid", "invalid", "zstd,-129", "zstd,23"])
 def test_invalid_compression_level(invalid_spec):
     with pytest.raises(ArgumentTypeError):
         CompressionSpec(invalid_spec)
+
+
+@pytest.mark.parametrize("level, clevel", [(22, 22), (3, 3), (1, 1), (-1, 255), (-4, 252), (-22, 234), (-128, 128)])
+def test_zstd_level_encoding(level, clevel):
+    """The clevel byte is an int8_t for zstd, and levels 1..22 keep the byte they always had."""
+    assert ZSTD.encode_level(level) == clevel
+    assert ZSTD.decode_level(clevel) == level
+    # the autodetection has to hand back the decoded (possibly negative) level
+    assert Compressor.detect(bytes((ZSTD.ID, clevel))) == (ZSTD, level)
+
+
+@pytest.mark.parametrize("level", [-128, -22, -4, -1, 1, 3, 22])
+def test_zstd_level_roundtrip(level):
+    data = bytes(bytearray(range(256))) * 400
+    compressor = CompressionSpec(f"zstd,{level}").compressor
+    meta, compressed = compressor.compress({}, data)
+    assert meta["clevel"] == ZSTD.encode_level(level)
+    # decompress via the autodetecting Compressor, i.e. the way a repo object is read back
+    meta, decompressed = Compressor("zstd").decompress(dict(meta), compressed)
+    assert decompressed == data
+
+
+@pytest.mark.parametrize("level", [-128, -4, -1, 3])
+def test_zstd_level_roundtrip_legacy_mode(level):
+    data = bytes(bytearray(range(256))) * 400
+    compressor = ZSTD(level=level, legacy_mode=True)
+    # legacy mode returns meta None, but compress() still needs a dict to put "size" into
+    meta, compressed = compressor.compress({}, data)
+    assert compressed[:2] == bytes((ZSTD.ID, ZSTD.encode_level(level)))
+    meta, decompressed = Compressor("zstd", legacy_mode=True).decompress(None, compressed)
+    assert decompressed == data
+
+
+def test_other_compressors_keep_their_level_byte():
+    """Only zstd reinterprets the byte - everything else must store exactly what it did before."""
+    for cls in (CNONE, LZ4, ZLIB, LZMA):
+        assert cls.encode_level(255) == 255
+        assert cls.decode_level(255) == 255
+        for level in (0, 6, 9):
+            assert cls.encode_level(level) == level
+            assert cls.decode_level(level) == level
 
 
 @pytest.mark.parametrize(

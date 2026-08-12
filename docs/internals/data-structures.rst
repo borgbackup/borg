@@ -115,7 +115,8 @@ Repo object metadata
 Metadata is a MessagePack-encoded (and encrypted/authenticated) dict with:
 
 - ctype (compression type 0..255)
-- clevel (compression level 0..255)
+- clevel (compression level, one byte, interpreted depending on ctype - see
+  :ref:`data-compression`)
 - csize (overall compressed (and maybe obfuscated) data size)
 - psize (only when obfuscated: payload size without the obfuscation trailer)
 - size (uncompressed size of the data)
@@ -1011,19 +1012,25 @@ Compression
 -----------
 
 Borg supports the following compression methods, each identified by a ctype value
-in the range between 0 and 255 (and augmented by a clevel 0..255 value for the
+in the range between 0 and 255 (and augmented by a one-byte clevel value for the
 compression level):
 
 - none (no compression, pass through data 1:1), identified by 0x00
 - lz4 (low compression, but super fast), identified by 0x01
-- zstd (level 1-22 offering a wide range: level 1 is lower compression and high
-  speed, level 22 is higher compression and lower speed) - identified by 0x03
+- zstd (level -128..22 offering a wide range: level 22 is higher compression and lower
+  speed, level 1 is lower compression and high speed, and the negative "fast" levels
+  trade still more compression for still more speed) - identified by 0x03
 - zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
   level 1 is low, level 9 is high compression), identified by 0x05
 - lzma (level 0-9, level 0 is low, level 9 is high compression), identified
   by 0x02.
 
-The type byte is followed by a byte indicating the compression level.
+The type byte is followed by a byte indicating the compression level. How that byte is
+interpreted depends on the compression type: for zstd it is an ``int8_t``, so that the
+negative levels fit (level -1 is stored as 255, -128 as 128). For all other types it is
+an unsigned byte, with 255 meaning "no level applies" (as for none and lz4). Levels 1..22
+occupy the same byte values either way, so zstd data written by older borg versions keeps
+its meaning.
 
 Speed:  none > lz4 > zlib > lzma, lz4 > zstd
 Compression: lzma > zlib > lz4 > none, zstd > lz4

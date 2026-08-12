@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 
@@ -76,6 +77,47 @@ def test_repo_compress(archiver):
     check_compression(ctype, clevel, olevel)
 
     # data must survive all those recompressions unharmed
+    cmd(archiver, "check")
+
+
+def test_repo_compress_zstd_negative_level(archiver):
+    """zstd's negative ("fast") levels survive a repo-compress round trip.
+
+    The second run is the interesting part: it only reports everything as already-ok if the
+    level the compressor is configured with and the clevel byte stored in the repo are the
+    same representation. If they diverge, borg parses and recompresses every object again on
+    every run (see get_csettings).
+    """
+    create_regular_file(archiver.input_path, "file1", size=1024 * 10)
+    create_regular_file(archiver.input_path, "file2", contents=os.urandom(1024 * 10))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input", "-C", "lz4")
+
+    for level in (-1, -4):  # -1 is the level whose byte (255) is also the "no level" sentinel
+        cmd(archiver, "repo-compress", "-C", f"zstd,{level}")
+        repository = Repository(archiver.repository_path, exclusive=True)
+        with repository:
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            for id, _ in repo_lister(repository, limit=LIST_SCAN_LIMIT):
+                chunk = repository.get(id, read_data=True)
+                meta, data = manifest.repo_objs.parse(id, chunk, ro_type=ROBJ_DONTCARE)
+                assert meta["ctype"] in (ZSTD.ID, LZ4.ID, CNONE.ID)
+                if meta["ctype"] == ZSTD.ID:
+                    assert meta["clevel"] == ZSTD.encode_level(level)
+
+        # Running it again must recognise the objects as already having the desired
+        # compression. Checking for "0 recompressed" alone would not catch anything: objects
+        # whose settings are misread get recompressed to the identical result and are then
+        # counted as "kept as-is", so the telling number is how many were recognised as ok.
+        output = cmd(archiver, "repo-compress", "-C", f"zstd,{level}", "--stats")
+        stats = re.search(
+            r"Objects: (\d+) total, (\d+) recompressed, (\d+) already had the desired compression", output
+        )
+        assert stats, output
+        total, recompressed, already_ok = (int(g) for g in stats.groups())
+        assert recompressed == 0
+        assert already_ok > 0, f"no object was recognised as already compressed with zstd,{level}"
+
     cmd(archiver, "check")
 
 

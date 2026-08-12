@@ -9,6 +9,7 @@ from hashlib import sha256
 import pytest
 from borghash import HashTableNT
 
+from ..cache import write_chunkindex_invalid
 from ..constants import MAX_CLOCK_SKEW
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
@@ -1024,12 +1025,11 @@ def test_flush_store_failure_drops_pending_entries(tmp_path):
         assert H(1) not in repository._chunks
 
 
-def _serialized_chunkindex(chunks=None):
-    # Serialize a ChunkIndex to bytes, as stored under index/<sha256(content)>. check() parses index
-    # fragments, so a fragment must be a real ChunkIndex serialization.
-    chunks = chunks if chunks is not None else ChunkIndex()
+def _serialized_chunkindex():
+    # Serialize an empty ChunkIndex to bytes, as stored under index/<sha256(content)>. check() parses
+    # index fragments, so a fragment must be a real ChunkIndex serialization.
     with io.BytesIO() as f:
-        chunks.write(f)
+        ChunkIndex().write(f)
         return f.getvalue()
 
 
@@ -1083,9 +1083,6 @@ def test_check_reports_invalid_pack_name(tmp_path, caplog):
 def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):
     # check warns about an invalid chunk index but does not fail, since the index is not part of
     # the repository's object integrity.
-    import logging
-    from ..cache import write_chunkindex_invalid
-
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         write_chunkindex_invalid(repository)
         with caplog.at_level(logging.WARNING):
@@ -1123,8 +1120,6 @@ def test_check_detects_missing_pack_referenced_by_index(tmp_path, caplog):
 def test_check_missing_pack_detection_skipped_when_index_invalid(tmp_path, caplog):
     # an invalid index is rebuilt from the packs on next use, so check does not report missing packs
     # from it (refs #9898); it only warns about the invalid index.
-    from ..cache import write_chunkindex_invalid
-
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         for x in range(3):

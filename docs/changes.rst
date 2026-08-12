@@ -222,6 +222,7 @@ New features:
   - use --chunking / --hashing / --encrypting / --compressing / --msgpacking
     to run only a subset of the benchmarks, #10050
 - completion: generate fish and tcsh completions, #9989, #9503
+- list: --sort-by=field[,field,...], #9009
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
 

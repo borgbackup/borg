@@ -29,6 +29,8 @@ borg list
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--depth N``                         | only list files up to the specified directory depth                                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--sort-by SPEC``                    | sort output by comma-separated fields (e.g. '>size,path'), see Sorting below                                                                                                          |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                        |
     |                                                                                                                                                                                                                                                                                       |
     | :ref:`common_options`                                                                                                                                                                                                                                                                 |
@@ -61,10 +63,11 @@ borg list
 
 
     options
-        --short     only print file/directory names, nothing else
+        --short            only print file/directory names, nothing else
         --format FORMAT    specify format for file listing (default: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
-        --json-lines    Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
-        --depth N    only list files up to the specified directory depth
+        --json-lines       Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
+        --depth N          only list files up to the specified directory depth
+        --sort-by SPEC     sort output by comma-separated fields (e.g. '>size,path'), see Sorting below
 
 
     :ref:`common_options`
@@ -157,3 +160,32 @@ Keys available only when listing files in an archive:
 - archiveid: internal ID of the archive
 - archivename: name of the archive
 - extra: prepends {target} with " -> " for soft links and " link to " for hard links
+
+
+Sorting
++++++++
+Use ``--sort-by SPEC`` where SPEC is a comma-separated list of fields.
+Sorts are applied stably from last to first in the given list, thus the first
+field is the primary sort criterion. Prepend ">" for descending, "<" (or no
+prefix) for ascending order, e.g. ``--sort-by='>size,path'`` (quote it, ">" is
+a shell redirection).
+
+Supported fields, sorting by the same value that ``--format`` would print:
+
+- path: the item path
+- type, mode: the file type character resp. the full file mode string
+- user, group: the owner/group name, or the numeric id if the name is not known
+- uid, gid: the numeric owner/group id
+- size: the file size (0 for hardlink slaves, same as {size})
+- mtime, ctime, atime: the timestamps (atime/ctime fall back to mtime if not stored)
+
+There is no ``birthtime`` field, as there is no {birthtime} format key either.
+
+The sort fields are independent of ``--format``, you may sort by a field you do
+not print.
+
+Note: ``--sort-by`` needs to read all (matching) items into memory before it can
+print anything, so listing a huge archive this way needs a lot of memory and
+delays the first output line. Without ``--sort-by``, items are streamed and their
+order is undefined. If memory usage is a problem, consider
+``borg list --format ... | sort`` instead.

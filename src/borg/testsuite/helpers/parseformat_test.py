@@ -679,6 +679,57 @@ def test_file_size_sign(size, fmt):
 
 
 @pytest.mark.parametrize(
+    "size, fmt",
+    [
+        (0, "0 B"),  # bytes and kB are formatted like with fine=False
+        (999, "999 B"),
+        (1234, "1.23 kB"),
+        (10**6, "1.00 MB"),  # MB: 2 decimals, like with fine=False
+        (1234567, "1.23 MB"),
+        (10**9, "1.000 GB"),  # GB: 3 decimals
+        (1234567890, "1.235 GB"),
+        (999995000, "1.000 GB"),  # rounded up to the next unit, like with fine=False
+        (999994999999, "999.995 GB"),  # almost 1 TB, but still shown as GB
+        (999999000000, "0.999999 TB"),  # unit like with fine=False ("1.00 TB"), but exact value
+        (10**12, "1.000000 TB"),  # TB: 6 decimals
+        (5000001000000, "5.000001 TB"),  # 1 MB more is visible now, that is the point of #3559
+        (10**15, "1.000000000 PB"),  # PB: 9 decimals
+        (5 * 10**15 + 10**6, "5.000000001 PB"),
+        (10**18, "1.000000000 EB"),  # decimals are capped at 9
+        (-(10**12), "-1.000000 TB"),
+    ],
+)
+def test_file_size_fine(size, fmt):
+    """fine=True shows big sizes with more decimals, so that changes of ~1MB stay visible"""
+    assert format_file_size(size, fine=True) == fmt
+
+
+@pytest.mark.parametrize(
+    "size, fmt",
+    [
+        (2**20, "1.00 MiB"),
+        (2**30, "1.000 GiB"),
+        (2**40, "1.000000 TiB"),
+        (2**40 + 2**20, "1.000001 TiB"),
+        (2**50 + 2**20, "1.000000001 PiB"),
+    ],
+)
+def test_file_size_fine_iec(monkeypatch, size, fmt):
+    monkeypatch.setenv("BORG_UNITS", "iec")
+    assert format_file_size(size, fine=True) == fmt
+
+
+def test_file_size_fine_raw(monkeypatch):
+    """BORG_UNITS=raw is exact anyway, so fine does not change anything"""
+    monkeypatch.setenv("BORG_UNITS", "raw")
+    assert format_file_size(10**12, fine=True) == "1000000000000 B"
+
+
+def test_file_size_fine_sign():
+    assert format_file_size(10**12, sign=True, fine=True) == "+1.000000 TB"
+
+
+@pytest.mark.parametrize(
     "string, value", [("1", 1), ("20", 20), ("5K", 5000), ("1.75M", 1750000), ("1e+9", 1e9), ("-1T", -1e12)]
 )
 def test_parse_file_size(string, value):

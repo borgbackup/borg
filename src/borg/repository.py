@@ -987,9 +987,12 @@ class Repository:
         compact, or salvaged and dropped by repair; refs #8572); prune() does this from packs/.
 
         It also reports missing packs (refs #9898): pack ids the chunk index references but that are
-        absent from packs/. The chunk index is loaded and its referenced pack ids are compared with the
-        packs present in the store. A corrupt or invalid index is rebuilt from the packs on next use, so
-        its references are not checked here.
+        absent from packs/. The index is read from its fragments only and its referenced pack ids are
+        compared with the packs present in the store. This cross-check is skipped, and the check still
+        passes, when the index cannot be read from its fragments (an invalid index is regenerated from
+        the packs on next use, so it can never reference a missing pack; a pack that is truly gone then
+        surfaces as missing chunks in the archives check). It is also skipped on a partial run
+        (max_duration), which covers packs incrementally; the cross-check runs on the full check instead.
 
         max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
         max_age, accepting a future timestamp up to MAX_CLOCK_SKEW (clock skew). Results are recorded
@@ -1114,31 +1117,37 @@ class Repository:
             present_pack_ids = {hex_to_bin(info.name) for info in pack_infos}
             tracker.prune(present_pack_ids)
             pack_pi.finish()
-            # cross-check the chunk index against packs/ (refs #9898). skip it when the index is
-            # invalid (loading it rebuilds from packs, which writes, and a check must not write) or
-            # after Ctrl-C (sig_int), where building the whole index would negate the interrupt.
-            if not index_invalid and not sig_int:
-                chunks = build_chunkindex_from_repo(self)
-                try:
-                    referenced_pack_ids = {
-                        entry.pack_id
-                        for _, entry in chunks.iteritems()
-                        # F_PENDING means the chunk's pack location is unresolved, so pack_id is a
-                        # placeholder, not a real pack. Fragments should not hold pending entries;
-                        # skip them defensively.
-                        if not (entry.flags & ChunkIndex.F_PENDING)
-                    }
-                finally:
-                    chunks.clear()
-                # index entries pointing to a pack absent from packs/: data loss.
-                missing_pack_ids = sorted(referenced_pack_ids - present_pack_ids)
-                # packs no index entry references: leftovers of an interrupted operation, not an error.
-                orphan_pack_ids = sorted(present_pack_ids - referenced_pack_ids)
-                if orphan_pack_ids:
-                    logger.info(
-                        f"{len(orphan_pack_ids)} pack(s) in packs/ are not referenced by the index "
-                        f"(leftovers from an interrupted operation)."
+            # cross-check the chunk index against packs/ to find referenced-but-absent packs (refs #9898).
+            # read the index from its fragments only; if that fails, skip the cross-check (rebuilding from
+            # packs is too slow here, and a check must not write). also skip after Ctrl-C (sig_int) and on
+            # a partial run (--max-duration), which the full check's cross-check covers.
+            if not index_invalid and not sig_int and not partial:
+                chunks = build_chunkindex_from_repo(self, fragments_only=True)
+                if chunks is None:
+                    logger.warning(
+                        "Cannot cross-check packs against the chunk index: the index could not be loaded "
+                        "from its fragments; skipping missing-pack detection."
                     )
+                else:
+                    try:
+                        referenced_pack_ids = {
+                            entry.pack_id
+                            for _, entry in chunks.iteritems()
+                            # F_PENDING marks a chunk whose pack location is unresolved, so its pack_id
+                            # is a placeholder rather than a real pack; skip such entries.
+                            if not (entry.flags & ChunkIndex.F_PENDING)
+                        }
+                    finally:
+                        chunks.clear()
+                    # index entries pointing to a pack absent from packs/: data loss.
+                    missing_pack_ids = sorted(referenced_pack_ids - present_pack_ids)
+                    # packs no index entry references: leftovers of an interrupted operation, not an error.
+                    orphan_pack_ids = sorted(present_pack_ids - referenced_pack_ids)
+                    if orphan_pack_ids:
+                        logger.info(
+                            f"{len(orphan_pack_ids)} pack(s) in packs/ are not referenced by the index "
+                            f"(leftovers from an interrupted operation)."
+                        )
         else:
             # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")

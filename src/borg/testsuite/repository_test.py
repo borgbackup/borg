@@ -1152,6 +1152,42 @@ def test_check_reports_orphan_pack_not_referenced_by_index(tmp_path, caplog):
         assert "not referenced by the index" in caplog.text
 
 
+def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, caplog):
+    # an index/ fragment whose name matches its content hash but whose content does not deserialize
+    # into a ChunkIndex makes the fragment set unreadable; check skips the cross-check (and still
+    # passes) instead of crashing or rebuilding from the packs (refs #9898).
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()
+    with Repository(location, exclusive=True) as repository:
+        pack_id = repository.chunks[H(0)].pack_id
+        repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
+        content = b"not a serialized chunk index"
+        repository.store_store("index/" + bin_to_hex(sha256(content).digest()), content)
+        with caplog.at_level(logging.WARNING):
+            assert repository.check(repair=False) is True
+        assert "Missing pack" not in caplog.text
+        assert "Cannot cross-check packs against the chunk index" in caplog.text
+
+
+def test_check_partial_skips_missing_pack_cross_check(tmp_path, caplog):
+    # a partial check (max_duration) does not cross-check the index against packs/; missing-pack
+    # detection runs on the full check instead (refs #9898).
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()
+    with Repository(location, exclusive=True) as repository:
+        pack_id = repository.chunks[H(0)].pack_id
+        repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
+        with caplog.at_level(logging.ERROR):
+            assert repository.check(repair=False, max_duration=3600) is True
+        assert "Missing pack" not in caplog.text
+
+
 def test_check_checked_packs_roundtrip(tmp_path):
     # the set survives a store/load round-trip; a rotted blob loads as empty.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:

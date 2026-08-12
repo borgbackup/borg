@@ -30,13 +30,16 @@ from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
-from .repoobj import RepoObj, OBJ_MAGIC
+from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
 from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
 
 # an object name is its sha256 as 64 lowercase hex digits.
 _valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
+
+# how much of a pack PackReader reads at once when searching for the next object header.
+RESYNC_WINDOW_SIZE = 1024 * 1024
 
 
 def repo_lister(repository, *, limit=None):
@@ -362,24 +365,73 @@ class PackReader:
         return self.store.load(self.key, offset=offset, size=size)
 
     def size(self):
-        """Return the pack size in bytes; for a store-backed pack this is one metadata lookup."""
+        """Return the pack size in bytes (a store metadata lookup, unless the pack is in memory)."""
         if self.pack_contents is not None:
             return len(self.pack_contents)
         return self.store.info(self.key).size
 
-    def iter_headers(self):
+    @staticmethod
+    def _parse_header(hdr_data, offset, pack_size):
+        """Return the ObjHeader in hdr_data if it is a valid header at offset, None otherwise.
+
+        Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack.
+        """
+        hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+        if hdr.magic != OBJ_MAGIC or hdr.version not in SUPPORTED_OBJ_VERSIONS:
+            return None
+        if offset + RepoObj.obj_header.size + hdr.meta_size + hdr.data_size > pack_size:
+            return None
+        return hdr
+
+    def _find_header(self, offset, pack_size, validate):
+        """Scan forward from offset for the next object validate accepts, return its offset or None.
+
+        A pack has no framing besides the object headers, so this searches for OBJ_MAGIC. That byte
+        sequence also occurs inside payloads, so a candidate is accepted only when its header parses
+        and validate confirms it.
+        """
+        hdr_size = RepoObj.obj_header.size
+        while offset + hdr_size <= pack_size:
+            # a window at a time, so the scan costs one store request per RESYNC_WINDOW_SIZE bytes.
+            buf = bytes(self.read(offset, min(RESYNC_WINDOW_SIZE, pack_size - offset)))
+            if len(buf) < hdr_size:
+                break
+            pos = 0
+            while True:
+                pos = buf.find(OBJ_MAGIC, pos)
+                if pos < 0 or pos + hdr_size > len(buf):
+                    break  # not in this window, or a header overlapping its end: the next window has it
+                hdr = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
+                if hdr is not None:
+                    obj_size = hdr_size + hdr.meta_size + hdr.data_size
+                    # an object is at most MAX_DATA_SIZE bytes (Repository.put), so a larger candidate is a
+                    # false match on OBJ_MAGIC in a payload.
+                    if obj_size <= MAX_DATA_SIZE:
+                        size = obj_size if validate.needs_data else hdr_size + hdr.meta_size
+                        end = pos + size
+                        # the window holds these bytes, unless the candidate crosses its end.
+                        obj = buf[pos:end] if end <= len(buf) else self.read(offset + pos, size)
+                        if validate(hdr.chunk_id, obj):
+                            return offset + pos
+                pos += 1
+            # step by the window less one header, so a magic straddling the boundary is still found.
+            offset += max(len(buf) - (hdr_size - 1), 1)
+        return None
+
+    def iter_headers(self, validate=None):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
-        Only the headers are read, not the payloads, so locating every object costs one short
-        range read per object (or just a slice, when the pack is already in memory), plus one
-        store metadata lookup for the pack size.
+        The walk reads a header per object: one short range read each (or a slice, for a pack in
+        memory), plus one store metadata lookup for the pack size.
 
-        Each full header must have OBJ_MAGIC and describe an object that fits into the pack,
-        otherwise the pack is corrupt and IntegrityError is raised. Ending the walk instead
-        would be worse than raising: the chunks index rebuilt from these headers would just be
-        missing the rest of the pack, and borg check --repair would then "fix" the archives by
-        dropping chunks that are there.
-        A trailing partial header is the clean end of the pack, not corruption.
+        A header must have OBJ_MAGIC, a supported version and describe an object that fits into
+        the pack, otherwise the pack is corrupt and IntegrityError is raised. A read shorter than
+        a header ends the walk: that is the end of the pack.
+
+        validate(chunk_id, obj): returns whether obj is a repo object with id chunk_id, where obj is
+        its header and metadata, plus its data when validate.needs_data is set. When validate is
+        given, a corrupt header makes the walk resync: it scans for the next object validate accepts
+        (see _find_header), continues there, and logs the skipped bytes.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
@@ -389,17 +441,26 @@ class PackReader:
             hdr_data = self.read(offset, hdr_size)
             if len(hdr_data) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
-            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
-            if hdr.magic != OBJ_MAGIC:
-                raise IntegrityError(
-                    f'pack {pack_hex}: no object header at offset {offset} (pack corruption), run "borg check"'
+            hdr = self._parse_header(hdr_data, offset, pack_size)
+            if hdr is None:
+                if validate is None:
+                    raise IntegrityError(
+                        f'pack {pack_hex}: invalid object header at offset {offset} (pack corruption), run "borg check"'
+                    )
+                next_offset = self._find_header(offset + 1, pack_size, validate)
+                if next_offset is None:
+                    logger.warning(
+                        f"pack {pack_hex}: invalid object header at offset {offset} and none after it, "
+                        f"skipping the remaining {pack_size - offset} bytes."
+                    )
+                    break
+                logger.warning(
+                    f"pack {pack_hex}: invalid object header at offset {offset}, "
+                    f"skipping {next_offset - offset} bytes to the next one."
                 )
+                offset = next_offset
+                continue
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
-            if offset + obj_size > pack_size:
-                raise IntegrityError(
-                    f"pack {pack_hex}: object extends past end of file at offset {offset} "
-                    f'(pack corruption), run "borg check"'
-                )
             yield hdr.chunk_id, offset, obj_size
             offset += obj_size
 

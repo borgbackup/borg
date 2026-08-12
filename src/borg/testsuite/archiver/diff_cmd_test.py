@@ -330,6 +330,17 @@ def test_sort_by_invalid_field_is_rejected(archivers, request):
     cmd(archiver, "diff", "a1", "a2", "--sort-by=not_a_field", exit_code=EXIT_ERROR)
 
 
+def test_sort_by_twice_is_rejected(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    create_regular_file(archiver.input_path, "file", size=1)
+    cmd(archiver, "create", "a1", "input")
+    cmd(archiver, "create", "a2", "input")
+
+    cmd(archiver, "diff", "a1", "a2", "--sort-by=path", "--sort-by=size", exit_code=EXIT_ERROR)
+
+
 def test_sort_by_size_added_then_path(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

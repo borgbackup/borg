@@ -293,6 +293,7 @@ class DiffMixIn:
             "--sort-by",
             dest="sort_by",
             type=diff_sort_spec,
+            action=Highlander,
             help="Sort output by comma-separated fields (e.g., '>size_added,path').",
         )
         subparser.add_argument(

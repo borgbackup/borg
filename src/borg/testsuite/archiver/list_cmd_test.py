@@ -4,6 +4,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers import CommandError
+from .. import granularity_sleep
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, requires_hardlinks
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -299,3 +300,118 @@ def test_fingerprint(archivers, request):
 
     # Even unmodified files should have different fingerprints because conditions_hash changed
     assert fingerprints1["input/file2"] != fingerprints5["input/file2"]
+
+
+def test_list_sort_by_path(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "c_file", size=1)
+    create_regular_file(archiver.input_path, "a_file", size=1)
+    create_regular_file(archiver.input_path, "b_file", size=1)
+    cmd(archiver, "create", "test", "input")
+
+    expected = ["input", "input/a_file", "input/b_file", "input/c_file"]
+    assert cmd(archiver, "list", "test", "--short", "--sort-by=path").splitlines() == expected
+    assert cmd(archiver, "list", "test", "--short", "--sort-by=>path").splitlines() == list(reversed(expected))
+
+
+def test_list_sort_by_size_then_path(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "a_file", size=30)
+    create_regular_file(archiver.input_path, "b_file", size=10)
+    create_regular_file(archiver.input_path, "c_file", size=20)
+    cmd(archiver, "create", "test", "input")
+
+    output = cmd(archiver, "list", "test", "--sort-by=>size,path", "--format={size} {path}{NL}")
+    assert output.splitlines() == ["30 input/a_file", "20 input/c_file", "10 input/b_file", "0 input"]
+
+
+def test_list_sort_by_type(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "dir/file", size=1)
+    cmd(archiver, "create", "test", "input")
+
+    output = cmd(archiver, "list", "test", "--sort-by=type,path", "--format={type} {path}{NL}")
+    # regular files ("-") sort before directories ("d")
+    assert output.splitlines() == ["- input/dir/file", "d input", "d input/dir"]
+
+
+def test_list_sort_by_is_stable(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "a_file", size=10)
+    create_regular_file(archiver.input_path, "b_file", size=10)
+    cmd(archiver, "create", "test", "input")
+
+    # equal sizes, so the last sort field decides the order of these 2 items
+    output = cmd(archiver, "list", "test", "--short", "--sort-by=size,>path")
+    assert output.splitlines() == ["input", "input/b_file", "input/a_file"]
+
+
+@pytest.mark.parametrize("sort_spec", ["not_a_field", "path,not_a_field", "", ",", ">", "birthtime"])
+def test_list_sort_by_invalid_spec_is_rejected(archivers, request, sort_spec):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", size=1)
+    cmd(archiver, "create", "test", "input")
+
+    cmd(archiver, "list", "test", f"--sort-by={sort_spec}", exit_code=EXIT_ERROR)
+
+
+def test_list_sort_by_twice_is_rejected(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", size=1)
+    cmd(archiver, "create", "test", "input")
+
+    cmd(archiver, "list", "test", "--sort-by=path", "--sort-by=size", exit_code=EXIT_ERROR)
+
+
+@pytest.mark.parametrize(
+    "sort_key", ["path", "type", "mode", "user", "uid", "group", "gid", "size", "mtime", "ctime", "atime"]
+)
+def test_list_sort_by_all_keys_with_directions(archivers, request, sort_key):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "a_file", size=11)
+    create_regular_file(archiver.input_path, "b_file", size=22)
+    granularity_sleep()  # the files created below shall have newer timestamps
+    create_regular_file(archiver.input_path, "c_file", size=33)
+    create_regular_file(archiver.input_path, "dir/d_file", size=44)
+    cmd(archiver, "create", "test", "input")
+
+    expected_paths = {"input", "input/a_file", "input/b_file", "input/c_file", "input/dir", "input/dir/d_file"}
+    # We do not check the order here, this is mostly for coverage of all the sort keys.
+    for direction in ("<", ">"):
+        output = cmd(archiver, "list", "test", "--short", f"--sort-by={direction}{sort_key},path")
+        assert set(output.splitlines()) == expected_paths
+
+
+def test_list_sort_by_json_lines(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "a_file", size=1)
+    create_regular_file(archiver.input_path, "b_file", size=1)
+    cmd(archiver, "create", "test", "input")
+
+    output = cmd(archiver, "list", "test", "--json-lines", "--sort-by=>path")
+    paths = [json.loads(line)["path"] for line in output.splitlines()]
+    assert paths == ["input/b_file", "input/a_file", "input"]
+
+
+def test_list_sort_by_with_depth_and_pattern(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "b_file", size=1)
+    create_regular_file(archiver.input_path, "a_file", size=1)
+    create_regular_file(archiver.input_path, "dir/c_file", size=1)
+    cmd(archiver, "create", "test", "input")
+
+    # filtering happens before sorting
+    output = cmd(archiver, "list", "test", "--short", "--depth=1", "--sort-by=path")
+    assert output.splitlines() == ["input", "input/a_file", "input/b_file", "input/dir"]
+
+    output = cmd(archiver, "list", "test", "--short", "--sort-by=>path", "--pattern=+ re:_file$", "--pattern=- re:^.*$")
+    assert output.splitlines() == ["input/dir/c_file", "input/b_file", "input/a_file"]

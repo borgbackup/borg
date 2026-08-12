@@ -3,7 +3,7 @@ import os
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import RTError
-from ..helpers import PathSpec
+from ..helpers import PathSpec, FilesystemDirSpec
 from ..helpers import umount
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
@@ -36,27 +36,17 @@ class MountMixIn:
         from ..fuse_impl import has_mfusepy
 
         if has_mfusepy:
-            # Use mfusepy implementation
-            from ..hlfuse import borgfs
-
-            operations = borgfs(manifest, args, repository)
-            logger.info("Mounting filesystem")
-            try:
-                operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
-            except RuntimeError:
-                # Relevant error message already printed to stderr by FUSE
-                raise RTError("FUSE mount failed")
+            from ..hlfuse import borgfs as fuse_operations  # high-level FUSE API
         else:
-            # Use llfuse/pyfuse3 implementation
-            from ..fuse import FuseOperations
+            from ..fuse import FuseOperations as fuse_operations  # low-level FUSE API
 
-            operations = FuseOperations(manifest, args, repository)
-            logger.info("Mounting filesystem")
-            try:
-                operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
-            except RuntimeError:
-                # Relevant error message already printed to stderr by FUSE
-                raise RTError("FUSE mount failed")
+        operations = fuse_operations(manifest, args, repository)
+        logger.info("Mounting filesystem")
+        try:
+            operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
+        except RuntimeError:
+            # Relevant error message already printed to stderr by FUSE
+            raise RTError("FUSE mount failed")
 
     def do_umount(self, args):
         """Unmounts the FUSE filesystem."""
@@ -185,7 +175,7 @@ class MountMixIn:
         subparser = ArgumentParser(parents=[common_parser], description=self.do_umount.__doc__, epilog=umount_epilog)
         subparsers.add_subcommand("umount", subparser, help="unmount a repository")
         subparser.add_argument(
-            "mountpoint", metavar="MOUNTPOINT", type=str, help="mountpoint of the filesystem to unmount"
+            "mountpoint", metavar="MOUNTPOINT", type=FilesystemDirSpec, help="mountpoint of the filesystem to unmount"
         )
 
     def build_parser_borgfs(self, parser):
@@ -199,7 +189,9 @@ class MountMixIn:
     def _define_borg_mount(self, parser):
         from ._common import define_exclusion_group, define_archive_filters_group
 
-        parser.add_argument("mountpoint", metavar="MOUNTPOINT", type=str, help="where to mount the filesystem")
+        parser.add_argument(
+            "mountpoint", metavar="MOUNTPOINT", type=FilesystemDirSpec, help="where to mount the filesystem"
+        )
         parser.add_argument(
             "-f", "--foreground", dest="foreground", action="store_true", help="stay in foreground, do not daemonize"
         )

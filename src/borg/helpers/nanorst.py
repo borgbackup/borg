@@ -19,9 +19,9 @@ class TextPecker:
         else:
             return self.str[self.i + n - 1 : self.i - 1]
 
-    def peekline(self):
+    def peekline(self, offset=0):
         out = ""
-        i = self.i
+        i = self.i + offset
         while i < len(self.str) and self.str[i] != "\n":
             out += self.str[i]
             i += 1
@@ -60,6 +60,7 @@ def rst_to_text(text, state_hook=None, references=None):
     references = references or {}
     state = "text"
     inline_mode = "replace"
+    code_indent = None  # indentation of the current code block's contents
     text = TextPecker(text)
     out = io.StringIO()
 
@@ -111,6 +112,7 @@ def rst_to_text(text, state_hook=None, references=None):
                     text.read(2)
                     state_hook(state, "code-block", out)
                     state = "code-block"
+                    code_indent = None
                     out.write(":\n")
                     continue
             if text.peek(-2) in ("\n\n", "") and char == next == ".":
@@ -144,16 +146,25 @@ def rst_to_text(text, state_hook=None, references=None):
             state = "text"
             text.read(1)
             continue
-        if state == "code-block" and char == next == "\n" and text.peek(5)[1:] != "    ":
-            # Foo::
-            #
-            #     *stuff* *code* *ignore .. all markup*
-            #
-            #     More arcane stuff
-            #
-            # Regular text...
-            state_hook(state, "text", out)
-            state = "text"
+        if state == "code-block":
+            if code_indent is None and char == "\n":
+                line = text.peekline()
+                if line.strip():
+                    code_indent = len(line) - len(line.lstrip())
+            if char == next == "\n":
+                # a blank line ends the code block if the following line is less
+                # indented than the code block's contents:
+                # Foo::
+                #
+                #     *stuff* *code* *ignore .. all markup*
+                #
+                #     More arcane stuff
+                #
+                # Regular text...
+                following = text.peekline(1)
+                if following.strip() and len(following) - len(following.lstrip()) < (code_indent or 1):
+                    state_hook(state, "text", out)
+                    state = "text"
         out.write(char)
 
     if state == "code-block":

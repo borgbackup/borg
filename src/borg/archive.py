@@ -32,7 +32,7 @@ from .helpers import BackupSymlinkParentError, BackupPathTraversalError
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
-from .helpers import Error, IntegrityError, set_ec
+from .helpers import Error, IntegrityError, set_ec, sig_int
 from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
 from .helpers import parse_timestamp, archive_ts_now, CompressionSpec
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
@@ -41,7 +41,7 @@ from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_jso
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
-from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi
+from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
 from .helpers import os_open, flags_normal, flags_dir
 from .helpers import os_stat
 from .helpers import msgpack
@@ -109,7 +109,7 @@ class Statistics:
     def __init__(self, output_json=False):
         self.output_json = output_json
         self.osize = self.usize = self.nfiles = 0
-        self.last_progress = 0  # timestamp when last progress was shown
+        self.last_progress = float("-inf")  # monotonic timestamp when progress was last shown, -inf: never
         self.files_stats = defaultdict(int)
         self.chunking_time = 0.0
         self.hashing_time = 0.0
@@ -195,9 +195,9 @@ Files changed while reading: {files_changed_while_reading}
     def usize_fmt(self):
         return format_file_size(self.usize)
 
-    def show_progress(self, item=None, final=False, stream=None, dt=None):
+    def show_progress(self, item=None, final=False, stream=None):
         now = time.monotonic()
-        if dt is None or now - self.last_progress > dt:
+        if final or now - self.last_progress > get_progress_dt():
             stream = stream or sys.stderr
             self.last_progress = now
             if self.output_json:
@@ -399,7 +399,7 @@ class DownloadPipeline:
                 except KeyError:
                     _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
                     self.parsed_cache[(id, ro_type)] = data
-            assert size is None or len(data) == size
+            assert data is None or size is None or len(data) == size
             yield data
 
 
@@ -713,7 +713,7 @@ Duration: {0.duration}
         if show_progress and self.show_progress:
             if stats is None:
                 stats = self.stats
-            stats.show_progress(item=item, dt=0.2)
+            stats.show_progress(item=item)
         self.items_buffer.add(item)
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
@@ -1329,7 +1329,7 @@ class ChunksProcessor:
             chunk_entry = chunk_processor(chunk)
             item.chunks.append(chunk_entry)
             if show_progress:
-                stats.show_progress(item=item, dt=0.2)
+                stats.show_progress(item=item)
 
 
 def maybe_exclude_by_attr(item):
@@ -1593,7 +1593,13 @@ class FilesystemObjectProcessors:
                         # stored. An unwrapped repository OSError is critical and aborts create before
                         # archive.save() runs (see the BackupOSError docstring).
                         self.process_file_chunks(
-                            item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(None, fd))
+                            item,
+                            cache,
+                            self.stats,
+                            self.show_progress,
+                            # passing st saves FileReader a stat call; regular files take the
+                            # direct read path, special files (--read-special) the buffered one.
+                            backup_io_iter(self.chunker.chunkify(None, fd, st=st)),
                         )
                         self.stats.chunking_time = self.chunker.chunking_time
                         end_reading = time.time_ns()
@@ -1849,6 +1855,11 @@ class RobustUnpacker:
 
 
 class ArchiveChecker:
+    # Bound how many missing file chunks rebuild_archives buffers for its end-of-run report,
+    # so checking a badly damaged repo with very many missing chunks can not exhaust memory.
+    MAX_MISSING_CHUNKS = 1000  # max. distinct missing chunk ids kept for the grouped report
+    MAX_REFS_PER_CHUNK = 10  # max. referencing files kept per missing chunk
+
     def __init__(self):
         self.error_found = False
         self.key = None
@@ -1898,6 +1909,14 @@ class ArchiveChecker:
         if self.key is None:
             self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
+        if repair:
+            # --repair re-anchors content: it re-packs the item metadata stream it reads into new chunks
+            # with freshly computed ids (see add_callback in rebuild_archives) and it recreates archives
+            # directory entries from archive metadata content. Just like re-chunking, that would turn a
+            # chunk whose content does not match its id into valid data under a new id, and the violation
+            # could not be noticed afterwards. So everything read here is read at the "repair" place, which
+            # re-certifies chunkid == id_hash(content) by default, see BORG_ASSERT_ID.
+            self.repo_objs.set_assert_id_place("repair")
         if verify_data:
             self.verify_data()
         rebuild_manifest = False
@@ -1916,12 +1935,28 @@ class ArchiveChecker:
                 rebuild_manifest = True
         if rebuild_manifest:
             self.manifest = self.rebuild_manifest()
-        if find_lost_archives:
+        # On Ctrl-C, skip any scan not yet started; a scan already running stops at its own boundary.
+        if find_lost_archives and not sig_int:
             self.rebuild_archives_directory()
-        self.rebuild_archives(
-            match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
-        )
+        if not sig_int:
+            self.rebuild_archives(
+                match=match,
+                first=first,
+                last=last,
+                sort_by=sort_by,
+                older=older,
+                oldest=oldest,
+                newer=newer,
+                newest=newest,
+            )
+        # finish() writes the manifest and a consistent chunk index; run it on Ctrl-C too (#9850).
         self.finish()
+        if sig_int:
+            if self.error_found:
+                logger.error("Archive consistency check interrupted, problems found so far.")
+            else:
+                logger.info("Archive consistency check interrupted, no problems found so far.")
+            raise Error("Got Ctrl-C / SIGINT.")
         if self.error_found:
             logger.error("Archive consistency check complete, problems found.")
         else:
@@ -1969,12 +2004,16 @@ class ArchiveChecker:
         logger.info("Starting cryptographic data integrity verification...")
         chunks_count = len(self.chunks)
         errors = 0
+        verified = 0  # chunks actually verified
         defect_chunks = []
         pi = ProgressIndicatorPercent(
             total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
         for chunk_id, _ in self.chunks.iteritems():
+            if sig_int:
+                break
             pi.show()
+            verified += 1
             try:
                 encrypted_data = self.repository.get(chunk_id)
             except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
@@ -1985,8 +2024,12 @@ class ArchiveChecker:
                     defect_chunks.append(chunk_id)
             else:
                 try:
-                    # we must decompress, so it'll call assert_id() in there:
-                    self.repo_objs.parse(chunk_id, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
+                    # we must decompress, so it'll call assert_id() in there.
+                    # this is the audit that re-certifies the id/content invariant, so it reads at its own
+                    # place, which always verifies and can not be switched off, see BORG_ASSERT_ID.
+                    self.repo_objs.parse(
+                        chunk_id, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE, assert_id_place="verify_data"
+                    )
                 except IntegrityErrorBase as integrity_error:
                     self.error_found = True
                     errors += 1
@@ -2004,8 +2047,14 @@ class ArchiveChecker:
                     # from the underlying media.
                     try:
                         encrypted_data = self.repository.get(defect_chunk)
-                        # we must decompress, so it'll call assert_id() in there:
-                        self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
+                        # we must decompress, so it'll call assert_id() in there (see above):
+                        self.repo_objs.parse(
+                            defect_chunk,
+                            encrypted_data,
+                            decompress=True,
+                            ro_type=ROBJ_DONTCARE,
+                            assert_id_place="verify_data",
+                        )
                     except IntegrityErrorBase:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
                         # keeping the other chunks. update_index=False: finish() rebuilds the index from
@@ -2020,11 +2069,20 @@ class ArchiveChecker:
                 for defect_chunk in defect_chunks:
                     logger.debug("chunk %s is defect.", bin_to_hex(defect_chunk))
         log = logger.error if errors else logger.info
-        log(
-            "Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.",
-            chunks_count,
-            errors,
-        )
+        if sig_int:
+            log(
+                "Interrupted cryptographic data integrity verification, "
+                "verified %d of %d chunks with %d integrity errors.",
+                verified,
+                chunks_count,
+                errors,
+            )
+        else:
+            log(
+                "Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.",
+                verified,
+                errors,
+            )
 
     def rebuild_manifest(self):
         """Rebuild the manifest object."""
@@ -2060,6 +2118,8 @@ class ArchiveChecker:
             msgid="check.rebuild_archives_directory",
         )
         for chunk_id, _ in self.chunks.iteritems():
+            if sig_int:
+                break
             pi.show()
             cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
             try:
@@ -2105,12 +2165,42 @@ class ArchiveChecker:
                         logger.warning(f"Would create archives directory entry for {name} {archive_id_hex}.")
 
         pi.finish()
-        logger.info("Rebuilding missing archives directory entries completed.")
+        if sig_int:
+            logger.info("Rebuilding missing archives directory entries interrupted.")
+        else:
+            logger.info("Rebuilding missing archives directory entries completed.")
 
     def rebuild_archives(
         self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None
     ):
         """Analyze and rebuild archives, expecting some damage and trying to make stuff consistent again."""
+
+        # Missing file chunks, collected during the per-archive checks and reported grouped as
+        # chunk -> files -> archives after all archives were analyzed. Bounded by
+        # MAX_MISSING_CHUNKS / MAX_REFS_PER_CHUNK.
+        missing_chunks = {}  # chunk_id -> (size, {path: {archive_name}})
+        missing_chunks_truncated = False  # True once the MAX_MISSING_CHUNKS cap was hit
+        missing_refs_truncated = set()  # chunk_ids whose MAX_REFS_PER_CHUNK cap was hit
+        missing_refs_total = 0  # total missing chunk references seen (every file x chunk occurrence, uncapped)
+
+        def record_missing_chunk(archive_name, path, chunk_id, size):
+            nonlocal missing_chunks_truncated, missing_refs_total
+            missing_refs_total += 1
+            entry = missing_chunks.get(chunk_id)
+            if entry is None:
+                if len(missing_chunks) >= self.MAX_MISSING_CHUNKS:
+                    missing_chunks_truncated = True
+                    return
+                entry = missing_chunks[chunk_id] = (size, {})
+                # one line per chunk id (not per file), so an interrupted check still logs what it found.
+                logger.error(f"Missing chunk detected: {bin_to_hex(chunk_id)}, {format_file_size(size)}.")
+            size, refs = entry
+            if path in refs:
+                refs[path].add(archive_name)
+            elif len(refs) < self.MAX_REFS_PER_CHUNK:
+                refs[path] = {archive_name}
+            else:
+                missing_refs_truncated.add(chunk_id)
 
         def add_callback(chunk):
             id_ = self.key.id_hash(chunk)
@@ -2128,16 +2218,17 @@ class ArchiveChecker:
                     self.chunks.update_pack_info(pack_results)
 
         def verify_file_chunks(archive_name, item):
-            """Verifies that all file chunks are present. Missing file chunks will be logged."""
+            """Verify that all of a file's chunks are present, collecting any missing ones for the report."""
             offset = 0
             for chunk in item.chunks:
                 chunk_id, size = chunk
                 if chunk_id not in self.chunks:
-                    logger.error(
+                    logger.debug(
                         "{}: {}: Missing file chunk detected (Byte {}-{}, Chunk {}).".format(
                             archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
                         )
                     )
+                    record_missing_chunk(archive_name, item.path, chunk_id, size)
                     self.error_found = True
                 offset += size
             if "size" in item:
@@ -2150,6 +2241,24 @@ class ArchiveChecker:
                             archive_name, item.path, item_size, item_chunks_size
                         )
                     )
+
+        def report_missing_chunks():
+            """Report the collected missing chunks, grouped as chunk -> files -> archives."""
+            if not missing_chunks:
+                return
+            logger.error("The following chunks are missing in the repository:")
+            for chunk_id, (size, refs) in missing_chunks.items():
+                logger.error(f"- Chunk {bin_to_hex(chunk_id)}, {format_file_size(size)}")
+                for path in sorted(refs):
+                    archive_names = ", ".join(sorted(refs[path]))
+                    logger.error(f"    - {path}: {archive_names}")
+                if chunk_id in missing_refs_truncated:
+                    logger.error(f"    - ... (only the first {self.MAX_REFS_PER_CHUNK} files are listed)")
+            if missing_chunks_truncated:
+                logger.error(
+                    f"... (only the first {self.MAX_MISSING_CHUNKS} missing chunks are listed; "
+                    f"{missing_refs_total} missing chunk references total)"
+                )
 
         def robust_iterator(archive):
             """Iterates through all archive items
@@ -2252,65 +2361,77 @@ class ArchiveChecker:
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Checking archives %3.1f%%", step=0.1, msgid="check.rebuild_archives"
         )
-        for i, info in enumerate(archive_infos):
-            pi.show(i)
-            archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
-            try:
-                formatted = formatter.format_item(info, jsonline=False)
-            except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityErrorBase):
-                # keys like {comment} need the archive metadata, which is damaged or missing here.
-                # use the values from the archive directory entry, they are always available.
-                formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
-            logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
-            if archive_id not in self.chunks:
-                logger.error(f"Archive metadata block {archive_id_hex} is missing!")
-                self.error_found = True
+        # report the missing chunks collected so far even if the loop is interrupted (Ctrl-C) or aborts
+        # with an exception (e.g. the "Unknown archive metadata version" raise below), so a check of a
+        # badly damaged repo does not throw away everything it already found.
+        try:
+            for i, info in enumerate(archive_infos):
+                if sig_int:
+                    # Break only between archives, as --repair rewrites each archive as a whole.
+                    break
+                pi.show(i)
+                archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
+                try:
+                    formatted = formatter.format_item(info, jsonline=False)
+                except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityErrorBase):
+                    # keys like {comment} need the archive metadata, which is damaged or missing here.
+                    # use the values from the archive directory entry, they are always available.
+                    formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
+                logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
+                if archive_id not in self.chunks:
+                    logger.error(f"Archive metadata block {archive_id_hex} is missing!")
+                    self.error_found = True
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    continue
+                cdata = self.repository.get(archive_id)
+                try:
+                    _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
+                except IntegrityErrorBase as integrity_error:
+                    logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
+                    self.error_found = True
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    continue
+                archive = self.key.unpack_archive(data)
+                archive = ArchiveItem(internal_dict=archive)
+                if archive.version != 2:
+                    raise Exception("Unknown archive metadata version")
+                items_buffer = ChunkBuffer(self.key)
+                items_buffer.write_chunk = add_callback
+                for item in robust_iterator(archive):
+                    if "chunks" in item:
+                        verify_file_chunks(info.name, item)
+                    items_buffer.add(item)
+                items_buffer.flush(flush=True)
                 if self.repair:
-                    logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                    self.manifest.archives.delete_by_id(archive_id)
-                else:
-                    logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                continue
-            cdata = self.repository.get(archive_id)
-            try:
-                _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
-            except IntegrityErrorBase as integrity_error:
-                logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
-                self.error_found = True
-                if self.repair:
-                    logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                    self.manifest.archives.delete_by_id(archive_id)
-                else:
-                    logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                continue
-            archive = self.key.unpack_archive(data)
-            archive = ArchiveItem(internal_dict=archive)
-            if archive.version != 2:
-                raise Exception("Unknown archive metadata version")
-            items_buffer = ChunkBuffer(self.key)
-            items_buffer.write_chunk = add_callback
-            for item in robust_iterator(archive):
-                if "chunks" in item:
-                    verify_file_chunks(info.name, item)
-                items_buffer.add(item)
-            items_buffer.flush(flush=True)
-            if self.repair:
-                archive.item_ptrs = archive_put_items(
-                    items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
-                )
-                data = self.key.pack_metadata(archive.as_dict())
-                new_archive_id = self.key.id_hash(data)
-                logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
-                logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
-                cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
-                add_reference(new_archive_id, len(data), cdata)
-                self.manifest.archives.create(info.name, new_archive_id, info.ts)
-                if archive_id != new_archive_id:
-                    self.manifest.archives.delete_by_id(archive_id)
-        pi.finish()
+                    archive.item_ptrs = archive_put_items(
+                        items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
+                    )
+                    data = self.key.pack_metadata(archive.as_dict())
+                    new_archive_id = self.key.id_hash(data)
+                    logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
+                    logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
+                    cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
+                    add_reference(new_archive_id, len(data), cdata)
+                    self.manifest.archives.create(info.name, new_archive_id, info.ts)
+                    if archive_id != new_archive_id:
+                        self.manifest.archives.delete_by_id(archive_id)
+        finally:
+            pi.finish()
+            report_missing_chunks()
 
     def finish(self):
         if self.repair:
+            # store packs still buffered from chunks re-added during repair, so their index entries
+            # are set before the index is dropped below and no chunk is left buffered at close().
+            self.repository.flush()
             # we may have deleted chunks. delete_chunkindex_from_repo() removes the on-disk index and
             # drops the stale in-memory index, so the next repository access rebuilds it from the repo.
             logger.info("Deleting chunk indexes in repository - next repository access will cause a rebuild.")
@@ -2358,6 +2479,11 @@ class ArchiveRecreater:
         self.rechunkify = chunker_params is not None
         if self.rechunkify:
             logger.debug("Rechunking archives to %s", chunker_params)
+            # Re-chunking computes new ids from the plaintext we read, so a chunk whose content does not match
+            # its id would just silently become a valid chunk under a new id and the violation could not be
+            # noticed any more. Thus we read at the "rechunk" place, which re-certifies the id/content
+            # invariant by default, like borg transfer does, see BORG_ASSERT_ID.
+            self.repo_objs.set_assert_id_place("rechunk")
         self.chunker_params = chunker_params or CHUNKER_PARAMS
         self.compression = compression or CompressionSpec("none")
         self.seen_chunks = set()

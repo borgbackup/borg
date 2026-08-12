@@ -358,6 +358,30 @@ def ChunkerParams(s):
                 "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
             )
         return CH_FASTCDC, chunk_min, chunk_max, chunk_mask, nc_level
+    if algo in (CH_RABIN_AES, CH_GOLDILOCKS_AES, CH_TOEPLITZ_AES):
+        # <algo>, chunk_min, chunk_max, chunk_mask, nc_level
+        # both UHF-then-PRF chunkers have a fixed 64-byte window, so there is no window_size field.
+        # nc_level is required; use nc_level 0 to disable normalized chunking.
+        if count != 5:
+            raise ArgumentTypeError(f"{algo} chunker params must be: {algo},chunk_min,chunk_max,chunk_mask,nc_level")
+        chunk_min, chunk_max, chunk_mask = (int(p) for p in params[1:4])
+        nc_level = int(params[4])
+        if not (chunk_min <= chunk_mask <= chunk_max):
+            raise ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+        if chunk_min < 6:
+            # the rolling window needs 64 bytes of in-chunk history at the first possible
+            # cut position, so the min. chunk size must be at least the 64-byte window size
+            # (this also matches the general lower bound, see comment in 'fixed' algo check).
+            raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
+        if chunk_max > 23:
+            raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        if chunk_min >= chunk_max:
+            raise ArgumentTypeError("required: chunk_min < chunk_max")
+        if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
+            raise ArgumentTypeError(
+                "required: 0 <= nc_level and 1 <= chunk_mask - nc_level and chunk_mask + nc_level <= 48"
+            )
+        return algo, chunk_min, chunk_max, chunk_mask, nc_level
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 numeric params, buzhash);
     # the isdigit check keeps misspelled/incomplete algo specs out of the compat branch.
     if (algo == CH_BUZHASH and count == 5) or (
@@ -483,12 +507,21 @@ replace_placeholders = PlaceholderReplacer()
 
 
 def PathSpec(text):
+    """A path inside an archive."""
     if not text:
         raise ArgumentTypeError("Empty strings are not accepted as paths.")
     return text
 
 
 def FilesystemPathSpec(text):
+    """A path (file or directory) in the local filesystem."""
+    if not text:
+        raise ArgumentTypeError("Empty strings are not accepted as paths.")
+    return slashify(text)
+
+
+def FilesystemDirSpec(text):
+    """A directory in the local filesystem."""
     if not text:
         raise ArgumentTypeError("Empty strings are not accepted as paths.")
     return slashify(text)

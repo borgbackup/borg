@@ -69,7 +69,7 @@ jobs:
         sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
+      uses: github/codeql-action/init@v4.37.6
       with:
         languages: ${{ matrix.language }}
         # If you wish to specify custom queries, you can do so here or in a config file.
@@ -83,4 +83,4 @@ jobs:
         pip3 install -r requirements.d/development.txt
         pip3 install -ve .
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4
+      uses: github/codeql-action/analyze@v4.37.6

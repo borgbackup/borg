@@ -202,6 +202,30 @@ def open_archive(repo_path, name):
     return archive, repository
 
 
+def read_chunk(archive, repository, chunk_id, *, ro_type=ROBJ_FILE_STREAM):
+    _, data = archive.repo_objs.parse(
+        chunk_id, repository.get(chunk_id), ro_type=ro_type, assert_id_place="verify_data"
+    )
+    return data
+
+
+def write_wrong_content_chunk(archive, repository, chunk_id, *, ro_type=ROBJ_FILE_STREAM, wrong_data=None):
+    """Replace the chunk <chunk_id> by one with different content, violating id == id_hash(content).
+
+    This simulates an evil or compromised borg client that had the repo key: the chunk id goes into the AEAD
+    AAD, so such a chunk decrypts and authenticates just fine, only the id check detects it (see issue #9994).
+    If wrong_data is not given, the chunk content is bit-flipped, keeping its length (file content chunks
+    have their size recorded in the item's chunks list).
+    """
+    repo_objs = archive.repo_objs
+    if wrong_data is None:
+        data = read_chunk(archive, repository, chunk_id, ro_type=ro_type)
+        wrong_data = bytes([data[0] ^ 0xFF]) + data[1:]
+    repository.delete(chunk_id)  # put() would not replace an id the repo already has
+    repository.put(chunk_id, repo_objs.format(chunk_id, {}, wrong_data, ro_type=ro_type))
+    repository.flush()
+
+
 def open_repository(archiver):
     if archiver.get_kind() == "remote":
         return Repository(Location(archiver.repository_location), exclusive=True)

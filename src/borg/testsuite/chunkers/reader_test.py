@@ -344,3 +344,69 @@ def test_filefmapreader_build_fmap():
     assert fmap[0][0] == 0  # start
     assert fmap[0][1] == 2**62  # size
     assert fmap[0][2] is True  # is_data
+
+
+def test_filereader_readinto_direct(tmpdir):
+    """readinto uses the direct read path for a known regular file (st given)."""
+    fn = str(tmpdir / "regular_file")
+    file_content = b"data1234" * 100
+    with open(fn, "wb") as fd:
+        fd.write(file_content)
+
+    fh = os.open(fn, os.O_RDONLY)
+    try:
+        st = os.fstat(fh)
+        reader = FileReader(fd=None, fh=fh, read_size=1024, sparse=False, fmap=None, st=st)
+        assert reader.direct  # regular file, no sparse, no fmap -> direct read path
+        target = bytearray(len(file_content) + 42)
+        got = reader.readinto(target, len(file_content) + 42)
+        assert got == len(file_content)
+        assert target[:got] == file_content
+        assert reader.readinto(target, 42) == 0  # EOF
+    finally:
+        os.close(fh)
+
+
+def test_filereader_direct_without_st(tmpdir):
+    """Without a given stat result, FileReader stats the file itself: regular file -> direct."""
+    fn = str(tmpdir / "regular_file")
+    file_content = b"data1234"
+    with open(fn, "wb") as fd:
+        fd.write(file_content)
+
+    # OS-level file handle, no st given
+    fh = os.open(fn, os.O_RDONLY)
+    try:
+        reader = FileReader(fd=None, fh=fh, read_size=1024, sparse=False, fmap=None)
+        assert reader.direct  # fstat(fh) says regular file
+    finally:
+        os.close(fh)
+
+    # Python file object, no st given
+    with open(fn, "rb") as fd:
+        reader = FileReader(fd=fd, fh=-1, read_size=1024, sparse=False, fmap=None)
+        assert reader.direct  # fstat(fd.fileno()) says regular file
+        target = bytearray(8)
+        assert reader.readinto(target, 8) == 8
+        assert bytes(target) == file_content
+
+
+def test_filereader_no_direct_without_os_fd():
+    """A file-like object without an OS-level fd must use the buffered block reader path."""
+    file_content = b"data1234"
+    reader = FileReader(fd=BytesIO(file_content), fh=-1, read_size=1024, sparse=False, fmap=None)
+    assert not reader.direct  # no OS-level fd, unknown file type -> buffered path
+    target = bytearray(8)
+    assert reader.readinto(target, 8) == 8
+    assert bytes(target) == file_content
+
+
+def test_filereader_no_direct_for_fifo(tmpdir):
+    """A FIFO's stat result must not enable the direct read path (hung on NetBSD)."""
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("no FIFOs on this platform")
+    fifo_fn = str(tmpdir / "fifo")
+    os.mkfifo(fifo_fn)
+    st = os.stat(fifo_fn)
+    reader = FileReader(fd=BytesIO(b""), fh=-1, read_size=1024, sparse=False, fmap=None, st=st)
+    assert not reader.direct

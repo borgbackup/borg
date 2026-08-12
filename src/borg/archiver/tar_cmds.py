@@ -1,11 +1,20 @@
 import base64
+import contextlib
 import logging
 import os
 import stat
+import sys
 import tarfile
 
+if sys.version_info >= (3, 14):
+    from compression import zstd
+else:
+    from backports import zstd
+
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
+from ..compress import get_zstd_mt_workers
 from ..constants import *  # NOQA
+from ..helpers import Error
 from ..helpers import HardLinkManager, IncludePatternNeverMatchedWarning
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import dash_open
@@ -13,6 +22,7 @@ from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CompressionSpec
+from ..helpers import FilesystemPathSpec
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
@@ -146,6 +156,14 @@ def item_to_paxheaders(format, item):
     return ph
 
 
+# Sentinel returned by get_tar_filter for zstd suffixes: (de)compress in-process
+# via the zstd module instead of piping through an external filter program.
+IN_PROCESS_ZSTD = "zstd (in-process)"
+
+# Default zstd compression level, same as the zstd command line tool's default.
+ZSTD_TAR_LEVEL = 3
+
+
 def get_tar_filter(fname, decompress):
     # Note that filter is None if fname is '-'.
     if fname.endswith((".tar.gz", ".tgz")):
@@ -156,12 +174,37 @@ def get_tar_filter(fname, decompress):
         filter = "xz -d" if decompress else "xz"
     elif fname.endswith((".tar.lz4",)):
         filter = "lz4 -d" if decompress else "lz4"
-    elif fname.endswith((".tar.zstd", ".tar.zst")):
-        filter = "zstd -d" if decompress else "zstd"
+    elif fname.endswith((".tar.zstd", ".tar.zst", ".tzst")):
+        filter = IN_PROCESS_ZSTD
     else:
         filter = None
     logger.debug("Automatically determined tar filter: %s", filter)
     return filter
+
+
+@contextlib.contextmanager
+def create_zstd_filter(stream, stream_close, decompress):
+    """In-process zstd (de)compression wrapper around *stream*, same contract as create_filter_process."""
+    if decompress:
+        zstream = zstd.ZstdFile(stream, "rb")
+    else:
+        workers = get_zstd_mt_workers()
+        if workers > 1:
+            params = zstd.CompressionParameter
+            options = {params.compression_level: ZSTD_TAR_LEVEL, params.nb_workers: workers}
+            zstream = zstd.ZstdFile(stream, "wb", options=options)
+        else:
+            zstream = zstd.ZstdFile(stream, "wb", level=ZSTD_TAR_LEVEL)
+    try:
+        yield zstream
+    except zstd.ZstdError as e:
+        raise Error(f"in-process zstd filter failed: {e}") from None
+    finally:
+        # for compression, closing also finishes the zstd frame.
+        # ZstdFile does not close a fileobj it was given, so close stream separately.
+        zstream.close()
+        if stream_close:
+            stream.close()
 
 
 class TarMixIn:
@@ -188,13 +231,25 @@ class TarMixIn:
         # none of these drawbacks. The only issue of using an external filter is
         # that it has to be installed -- hardly a problem, considering that
         # the decompressor must be installed as well to make use of the exported tarball!
+        #
+        # zstd is the exception: borg requires the zstd module anyway (Python >= 3.14
+        # stdlib, backports.zstd otherwise), libzstd multithreading (see the
+        # BORG_ZSTD_MT_WORKERS env var) runs outside the GIL, and there is no
+        # significantly more optimized external tool - so zstd tarballs are
+        # (de)compressed in-process and need no external program.
 
         filter = get_tar_filter(args.tarfile, decompress=False) if args.tar_filter == "auto" else args.tar_filter
 
         tarstream = dash_open(args.tarfile, "wb")
         tarstream_close = args.tarfile != "-"
 
-        with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=False) as _stream:
+        if filter is IN_PROCESS_ZSTD:
+            filter_context = create_zstd_filter(tarstream, stream_close=tarstream_close, decompress=False)
+        else:
+            filter_context = create_filter_process(
+                filter, stream=tarstream, stream_close=tarstream_close, inbound=False
+            )
+        with filter_context as _stream:
             self._export_tar(args, archive, _stream)
 
     def _export_tar(self, args, archive, tarstream):
@@ -267,7 +322,11 @@ class TarMixIn:
         tarstream = dash_open(args.tarfile, "rb")
         tarstream_close = args.tarfile != "-"
 
-        with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=True) as _stream:
+        if filter is IN_PROCESS_ZSTD:
+            filter_context = create_zstd_filter(tarstream, stream_close=tarstream_close, decompress=True)
+        else:
+            filter_context = create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=True)
+        with filter_context as _stream:
             self._import_tar(args, repository, manifest, manifest.key, cache, _stream)
 
     def _import_tar(self, args, repository, manifest, key, cache, tarstream):
@@ -350,8 +409,12 @@ class TarMixIn:
         - .tar.gz or .tgz: gzip
         - .tar.bz2 or .tbz: bzip2
         - .tar.xz or .txz: xz
-        - .tar.zstd or .tar.zst: zstd
+        - .tar.zstd, .tar.zst or .tzst: zstd (in-process, level 3)
         - .tar.lz4: lz4
+
+        For zstd, Borg compresses in-process using libzstd instead of piping through an
+        external program (set BORG_ZSTD_MT_WORKERS to use multiple compression threads).
+        The other formats are piped through the respective external filter program.
 
         Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
         read the uncompressed tar stream from stdin and write a compressed/filtered
@@ -407,7 +470,9 @@ class TarMixIn:
             help="select tar format: BORG, PAX or GNU",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
-        subparser.add_argument("tarfile", metavar="FILE", help='output tar file. "-" to write to stdout instead.')
+        subparser.add_argument(
+            "tarfile", metavar="FILE", type=FilesystemPathSpec, help='output tar file. "-" to write to stdout instead.'
+        )
         subparser.add_argument(
             "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to extract; patterns are supported"
         )
@@ -425,8 +490,12 @@ class TarMixIn:
         - .tar.gz or .tgz: gzip -d
         - .tar.bz2 or .tbz: bzip2 -d
         - .tar.xz or .txz: xz -d
-        - .tar.zstd or .tar.zst: zstd -d
+        - .tar.zstd, .tar.zst or .tzst: zstd (in-process)
         - .tar.lz4: lz4 -d
+
+        For zstd, Borg decompresses in-process using libzstd instead of piping through
+        an external program. The other formats are piped through the respective
+        external filter program.
 
         Alternatively, a --tar-filter program may be explicitly specified. It should
         read compressed data from stdin and output an uncompressed tar stream on
@@ -522,7 +591,7 @@ class TarMixIn:
             action=Highlander,
             metavar="PARAMS",
             help="specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
+            "HASH_MASK_BITS, NC_LEVEL). default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
         )
         archive_group.add_argument(
             "-C",
@@ -536,4 +605,9 @@ class TarMixIn:
         )
 
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
-        subparser.add_argument("tarfile", metavar="TARFILE", help='input tar file. "-" to read from stdin instead.')
+        subparser.add_argument(
+            "tarfile",
+            metavar="TARFILE",
+            type=FilesystemPathSpec,
+            help='input tar file. "-" to read from stdin instead.',
+        )

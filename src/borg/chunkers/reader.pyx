@@ -4,6 +4,7 @@
 
 import os
 import errno
+import stat
 import time
 from collections import namedtuple
 
@@ -14,6 +15,9 @@ from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 # this does not imply that it will actually work on the filesystem,
 # because the FS also needs to support this.
 has_seek_hole = hasattr(os, 'SEEK_DATA') and hasattr(os, 'SEEK_HOLE')
+
+# os.readv is POSIX; on platforms without it (win32) we fall back to os.read + copy.
+has_readv = hasattr(os, 'readv')
 
 _Chunk = namedtuple('_Chunk', 'meta data')
 _Chunk.__doc__ = """\
@@ -224,7 +228,7 @@ class FileReader:
     Most complexity in here comes from the desired size when a user calls FileReader.read does
     not need to match the Chunk sizes we got from the FileFMAPReader.
     """
-    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None):
+    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None, st=None):
         assert read_size > 0
         self.reader = FileFMAPReader(fd=fd, fh=fh, read_size=read_size, sparse=sparse, fmap=fmap)
         self.buffer = []  # list of Chunk objects
@@ -234,6 +238,27 @@ class FileReader:
         self.fd = fd
         self.fh = fh
         self.fmap = fmap
+        # Without sparse processing and without a given fmap there are no ranges to
+        # consider - the file is read start to end. readinto() then reads directly
+        # from the file into the caller's buffer (see there), instead of going
+        # through the block reader.
+        # Only known regular files take the direct path: reading FIFOs / devices via
+        # --read-special must keep using the proven block reader path - e.g. NetBSD 10
+        # was seen blocking forever in the direct path's big readv() on a FIFO, where
+        # the block reader's 1 MiB os.read() calls work fine.
+        self.direct = False
+        if not sparse and fmap is None:
+            if st is None:
+                # caller did not have a stat result at hand - determine the file type here.
+                try:
+                    if fh >= 0:
+                        st = os.fstat(fh)
+                    elif fd is not None:
+                        st = os.fstat(fd.fileno())
+                except (AttributeError, OSError):
+                    pass  # no OS-level fd (e.g. BytesIO, wrapper objects) - stay on the block reader path
+            self.direct = st is not None and stat.S_ISREG(st.st_mode)
+        self.direct_offset = 0  # bytes read so far via the direct path (for fadvise)
 
     def _fill_buffer(self):
         """
@@ -358,4 +383,110 @@ class FileReader:
             # Otherwise, all chunks were CH_ALLOC
             return Chunk(None, size=bytes_read, allocation=CH_ALLOC)
 
+    def _readinto_direct(self, tv, size):
+        """Read up to 'size' bytes from the file directly into 'tv' (a writable memoryview)."""
+        pos = 0
+        while pos < size:
+            if self.fh >= 0:
+                if has_readv:
+                    got = os.readv(self.fh, [tv[pos:size]])
+                else:
+                    data = os.read(self.fh, size - pos)
+                    got = len(data)
+                    tv[pos:pos + got] = data
+                if got > 0:
+                    safe_fadvise(self.fh, self.direct_offset, got, "DONTNEED")
+            else:
+                try:
+                    got = self.fd.readinto(tv[pos:size])
+                except AttributeError:
+                    # file-like object without readinto: fall back to read + copy
+                    data = self.fd.read(size - pos)
+                    got = len(data)
+                    tv[pos:pos + got] = data
+            if not got:
+                break  # EOF
+            pos += got
+            self.direct_offset += got
+        return pos
+
+    def readinto(self, target, size):
+        """
+        Read up to 'size' bytes from the file directly into 'target' (a writable
+        buffer, e.g. a memoryview over the caller's scan buffer).
+
+        Fast path (known regular file, no sparse processing, no fmap given):
+        the file data is read by the OS directly into 'target' - zero copies
+        in user space and one syscall per request instead of one per block.
+
+        Otherwise, unlike read(), this does not allocate or combine intermediate
+        byte objects: each byte is copied exactly once, from the buffered file
+        block into 'target'. Ranges stemming from holes / all-zero blocks are
+        written as zero bytes ('target' may contain stale data). The caller
+        detects all-zero chunks itself at chunk granularity, so no allocation
+        type is returned.
+
+        :param target: writable buffer, len(target) >= size
+        :param size: number of bytes to read
+        :return: number of bytes written to target (0 at EOF).
+        """
+        if self.direct and self.blockify_gen is None:
+            # blockify_gen check: if read() was used on this reader before, keep
+            # using the buffered path, for consistent file position and buffer state.
+            with memoryview(target) as tv:
+                return self._readinto_direct(tv, size)
+
+        # Initialize if not already done
+        if self.blockify_gen is None:
+            self.buffer = []
+            self.offset = 0
+            self.remaining_bytes = 0
+            self.blockify_gen = self.reader.blockify()
+
+        # If we don't have enough data in the buffer, try to fill it
+        while self.remaining_bytes < size:
+            if not self._fill_buffer():
+                # No more data available, return what we have
+                break
+
+        if not self.buffer:
+            return 0
+
+        with memoryview(target) as tv:
+            bytes_to_read = min(size, self.remaining_bytes)
+            bytes_read = 0
+            while bytes_read < bytes_to_read and self.buffer:
+                chunk = self.buffer[0]
+                chunk_size = chunk.meta["size"]
+                allocation = chunk.meta["allocation"]
+                data = chunk.data
+
+                if allocation not in (CH_DATA, CH_HOLE, CH_ALLOC):
+                    raise ValueError(f"Invalid allocation type: {allocation}")
+
+                # Calculate how much we can read from this chunk
+                available = chunk_size - self.offset
+                to_read = min(available, bytes_to_read - bytes_read)
+
+                if allocation == CH_DATA:
+                    assert data is not None
+                    # one memcpy: block -> target (the source slice is a view, not a copy)
+                    with memoryview(data) as dv:
+                        tv[bytes_read:bytes_read + to_read] = dv[self.offset:self.offset + to_read]
+                else:
+                    # holes / all-zero blocks: write zeros (target may contain stale data)
+                    tv[bytes_read:bytes_read + to_read] = zeros[:to_read]
+
+                bytes_read += to_read
+
+                # Update offset or remove chunk if fully consumed
+                if to_read < available:
+                    self.offset += to_read
+                else:
+                    self.offset = 0
+                    self.buffer.pop(0)
+
+                self.remaining_bytes -= to_read
+
+        return bytes_read
 

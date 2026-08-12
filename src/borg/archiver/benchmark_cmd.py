@@ -7,6 +7,8 @@ import time
 
 from ..constants import *  # NOQA
 from ..helpers import format_file_size, CompressionSpec
+from ..helpers import sizeof_fmt_iec
+from ..helpers import FilesystemDirSpec
 from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
@@ -154,158 +156,288 @@ class BenchmarkMixIn:
 
         result = {} if args.json else None
 
-        is_test = "_BORG_BENCHMARK_CPU_TEST" in os.environ
-        # Use minimal iterations and data size in test mode to keep CI fast.
-        number_default = 1 if is_test else 100
-        number_compression = 1 if is_test else 10
-        data_size = 100 * 1000 if is_test else 10 * 1000 * 1000
+        # no section selected means: run them all
+        sections = ("chunking", "hashing", "encrypting", "compressing", "msgpacking")
+        selected = {name for name in sections if getattr(args, name)}
+        if not selected:
+            selected = set(sections)
 
-        random_10M = os.urandom(data_size)
+        KIB, MIB, GIB = 1024, 1024 * 1024, 1024 * 1024 * 1024
+
+        # width of the spec column, wide enough for the longest row of any section, so
+        # that all sections line up with each other
+        WIDTH = 26
+
+        is_test = "_BORG_BENCHMARK_CPU_TEST" in os.environ
+        # Use minimal data and one iteration in test mode to keep CI fast.
+        chunk_data_size = 128 * KIB if is_test else 8 * MIB
+        number_default = 1 if is_test else GIB // chunk_data_size
+
+        # Buffer sizes matter where an algorithm switches to multiple threads:
+        # blake3 and zstd do so above a threshold, so a buffer below it and one
+        # above it behave quite differently. The hashes are measured at pack and
+        # chunk size (both above blake3's threshold), the compressors at chunk
+        # size and below zstd's threshold. Within a section every row processes
+        # the same total, so the throughput column stays comparable across sizes.
+        # All powers of two, so that total is exactly 1 GiB (or 10 MiB for the
+        # compressors) rather than an awkward fraction of it.
+        SMALL, CHUNK, PACK = ("128kiB", 128 * KIB), ("2MiB", 2 * MIB), ("64MiB", 64 * MIB)
+        if is_test:
+            hash_sizes = comp_sizes = one_size = [SMALL]
+            hash_total = comp_total = SMALL[1]
+        else:
+            # blake3: a borg pack, then a borg chunk - both above its MT threshold
+            hash_sizes = [PACK, CHUNK]
+            comp_sizes = [SMALL, CHUNK]
+            one_size = [CHUNK]  # for algorithms where the buffer size does not change behaviour
+            hash_total = GIB
+            # compressible data means the codecs actually work, so the slow ones
+            # (lzma, high zstd levels) need fewer bytes to stay bearable
+            comp_total = 10 * MIB
+
+        buffers = {}
+
+        def buffer(nbytes):
+            """Random data of the given size, made once and reused."""
+            if nbytes not in buffers:
+                buffers[nbytes] = os.urandom(nbytes)
+            return buffers[nbytes]
+
+        compressible = {}
+
+        def compressible_buffer(nbytes):
+            """Deterministic, text-like, compressible data of the given size.
+
+            Random bytes are the worst possible input for a compression benchmark:
+            nothing compresses, so every codec takes its incompressible fast path,
+            the levels barely differ, and zstd's multi-threading looks like a large
+            loss when on real data it is a 1.7 .. 3x win. This is a word soup built
+            from a fixed seed - identical on every machine and every run, so numbers
+            stay comparable - which compresses about 4x at zstd,3.
+
+            The xorshift is written out rather than using random.Random so that the
+            bytes do not depend on the Python version's PRNG internals.
+            """
+            if nbytes not in compressible:
+                words = (
+                    b"backup archive chunk repository compress encrypt index cache manifest "
+                    b"the and of a to in is it for with data borg file path size key id hash "
+                    b"item repo object segment directory user group mtime mode owner content"
+                ).split()
+                out = bytearray()
+                state = 0x2545F4914F6CDD1D
+                mask = 0xFFFFFFFFFFFFFFFF
+                while len(out) < nbytes:
+                    state ^= (state << 13) & mask
+                    state ^= state >> 7
+                    state ^= (state << 17) & mask
+                    out += words[state % len(words)]
+                    out += b"\n" if state & 0xF == 0 else b" "
+                compressible[nbytes] = bytes(out[:nbytes])
+            return compressible[nbytes]
+
+        def data_size_str(size):
+            """The benchmark's own data volumes, always in IEC units.
+
+            These are fixed constants of the benchmark rather than user data, so
+            they do not follow BORG_UNITS - that would make two people's output
+            incomparable and would render binary sizes as awkward decimals
+            (1 GiB as "1.07 GB").
+            """
+            return sizeof_fmt_iec(size, suffix="B", sep=" ", precision=2)
+
+        def throughput(size, dt):
+            """Rate as MB/s, always - so numbers stay comparable between rows."""
+            return f"{size / dt / 1e6:>8.1f} MB/s"
+
+        def report(section, spec, size, dt, **extra):
+            if args.json:
+                result[section].append({"size": size, "time": dt, **extra})
+            else:
+                print(f"{spec:<{WIDTH}} {data_size_str(size):<11} {dt:.3f}s  {throughput(size, dt)}")
+
+        def section_header(section, title):
+            if args.json:
+                result[section] = []
+            else:
+                print(f"{title} ".ljust(64, "="))
+
+        random_10M = buffer(chunk_data_size)
         key_256 = os.urandom(32)
         key_128 = os.urandom(16)
         key_96 = os.urandom(12)
 
-        import io
-        from ..chunkers import get_chunker, release_chunk_data  # noqa
+        if "chunking" in selected:
+            import io
+            from ..chunkers import get_chunker, release_chunk_data  # noqa
 
-        if not args.json:
-            print("Chunkers =======================================================")
-        else:
-            result["chunkers"] = []
-        size = 1000000000
+            section_header("chunkers", "Chunkers")
+            size = chunk_data_size * number_default
 
-        def chunkit(ch):
-            with io.BytesIO(random_10M) as data_file:
-                for chunk in ch.chunkify(fd=data_file):
-                    release_chunk_data(chunk.data)
+            def chunkit(ch):
+                with io.BytesIO(random_10M) as data_file:
+                    for chunk in ch.chunkify(fd=data_file):
+                        release_chunk_data(chunk.data)
 
-        for spec, setup, func, vars in [
-            (
-                "buzhash,19,23,21,4095",
-                "ch = get_chunker('buzhash', 19, 23, 21, 4095, sparse=False)",
-                "chunkit(ch)",
-                locals(),
-            ),
-            # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
-            (
-                "buzhash64,19,23,21,4095,2",
-                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, 2, sparse=False)",
-                "chunkit(ch)",
-                locals(),
-            ),
-            # fastcdc (window-less keyed gear hash); gear table creation is slow, keep it in setup
-            ("fastcdc,19,23,21,2", "ch = get_chunker('fastcdc', 19, 23, 21, 2, sparse=False)", "chunkit(ch)", locals()),
-            ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
-        ]:
-            dt = timeit(func, setup, number=number_default, globals=vars)
-            if args.json:
+            for spec, setup, func, vars in [
+                ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
+                # fastcdc (window-less keyed gear hash); gear table creation is slow, keep it in setup
+                (
+                    "fastcdc,19,23,21,2",
+                    "ch = get_chunker('fastcdc', 19, 23, 21, 2, sparse=False)",
+                    "chunkit(ch)",
+                    locals(),
+                ),
+                # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
+                (
+                    "buzhash64,19,23,21,4095,2",
+                    "ch = get_chunker('buzhash64', 19, 23, 21, 4095, 2, sparse=False)",
+                    "chunkit(ch)",
+                    locals(),
+                ),
+                (
+                    "buzhash,19,23,21,4095",
+                    "ch = get_chunker('buzhash', 19, 23, 21, 4095, sparse=False)",
+                    "chunkit(ch)",
+                    locals(),
+                ),
+                # toeplitz-aes (UHF-then-PRF, tabulated Toeplitz hash); table creation in setup
+                (
+                    "toeplitz-aes,19,23,21,2",
+                    "ch = get_chunker('toeplitz-aes', 19, 23, 21, 2, sparse=False)",
+                    "chunkit(ch)",
+                    locals(),
+                ),
+                # rabin-aes (UHF-then-PRF); polynomial sampling / table creation is slow, keep it in setup
+                (
+                    "rabin-aes,19,23,21,2",
+                    "ch = get_chunker('rabin-aes', 19, 23, 21, 2, sparse=False)",
+                    "chunkit(ch)",
+                    locals(),
+                ),
+                # goldilocks-aes (UHF-then-PRF, prime-field comparison chunker); table creation in setup
+                (
+                    "goldilocks-aes,19,23,21,2",
+                    "ch = get_chunker('goldilocks-aes', 19, 23, 21, 2, sparse=False)",
+                    "chunkit(ch)",
+                    locals(),
+                ),
+            ]:
+                dt = timeit(func, setup, number=number_default, globals=vars)
                 algo, _, algo_params = spec.partition(",")
-                result["chunkers"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
-            else:
-                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
+                report("chunkers", spec, size, dt, algo=algo, algo_params=algo_params)
 
-        from ..crypto.low_level import hmac_sha256, blake2b_256
-        import blake3
+        if "hashing" in selected:
+            from ..crypto.low_level import hmac_sha256, blake2b_256
+            from ..crypto.key import get_blake3_mt_threshold
+            import blake3
 
-        if not args.json:
-            print("Cryptographic hashes / MACs ====================================")
-        else:
-            result["hashes"] = []
-        size = 1000000000
-        hashes_tests = [
-            ("hmac-sha256", lambda: hmac_sha256(key_256, random_10M)),
-            ("blake2b-256", lambda: blake2b_256(key_256, random_10M)),
-            ("blake3", lambda: blake3.blake3(random_10M, key=key_256).digest()),
-            ("blake3-mt", lambda: blake3.blake3(random_10M, key=key_256, max_threads=blake3.blake3.AUTO).digest()),
-        ]
-        for spec, func in hashes_tests:
-            dt = timeit(func, number=number_default)
-            if args.json:
-                result["hashes"].append({"algo": spec, "size": size, "time": dt})
-            else:
-                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
+            def blake3_hash(d):
+                # mirror what borg does per chunk (see AESKeyBase.id_hash): below the
+                # threshold multi-threading costs more than it gains, so it is not used
+                max_threads = blake3.blake3.AUTO if len(d) >= get_blake3_mt_threshold() else 1
+                return blake3.blake3(d, key=key_256, max_threads=max_threads).digest()
 
-        from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
-        from ..crypto.low_level import AES256_OCB, CHACHA20_POLY1305
+            section_header("hashes", "Cryptographic hashes / MACs")
+            # only blake3 uses multiple threads, and only above a size threshold,
+            # so it is the one worth measuring at more than one buffer size.
+            hashes_tests = [
+                ("blake3", hash_sizes, blake3_hash),
+                ("hmac-sha256", one_size, lambda d: hmac_sha256(key_256, d)),
+                ("blake2b-256", one_size, lambda d: blake2b_256(key_256, d)),
+            ]
+            for spec, sizes, func in hashes_tests:
+                for label, nbytes in sizes:
+                    data = buffer(nbytes)
+                    number = max(1, hash_total // nbytes)
+                    dt = timeit(lambda: func(data), number=number)
+                    report("hashes", f"{spec} ({label})", nbytes * number, dt, algo=spec, buffer_size=nbytes)
 
-        if not args.json:
-            print("Encryption =====================================================")
-        else:
-            result["encryption"] = []
-        size = 1000000000
+        if "encrypting" in selected:
+            from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
+            from ..crypto.low_level import AES256_OCB, CHACHA20_POLY1305
 
-        tests = [
-            (
-                "aes-256-ctr-hmac-sha256",
-                lambda: AES256_CTR_HMAC_SHA256(key_256, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
-                    random_10M, header=b"X"
+            section_header("encryption", "Encryption")
+            size = chunk_data_size * number_default
+            # AEAD modes first (what borg uses by default), then the legacy
+            # encrypt-then-MAC ones
+            tests = [
+                (
+                    "aes-256-ocb",
+                    lambda: AES256_OCB(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b"X"),
                 ),
-            ),
-            (
-                "aes-256-ctr-blake2b",
-                lambda: AES256_CTR_BLAKE2b(key_256 * 4, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
-                    random_10M, header=b"X"
+                (
+                    "chacha20-poly1305",
+                    lambda: CHACHA20_POLY1305(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(
+                        random_10M, header=b"X"
+                    ),
                 ),
-            ),
-            (
-                "aes-256-ocb",
-                lambda: AES256_OCB(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(random_10M, header=b"X"),
-            ),
-            (
-                "chacha20-poly1305",
-                lambda: CHACHA20_POLY1305(key_256, iv=key_96, header_len=1, aad_offset=1).encrypt(
-                    random_10M, header=b"X"
+                (
+                    "aes-256-ctr-hmac-sha256",
+                    lambda: AES256_CTR_HMAC_SHA256(key_256, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
+                        random_10M, header=b"X"
+                    ),
                 ),
-            ),
-        ]
-        for spec, func in tests:
-            dt = timeit(func, number=number_default)
-            if args.json:
-                result["encryption"].append({"algo": spec, "size": size, "time": dt})
-            else:
-                print(f"{spec:<26} {format_file_size(size):<10} {dt:.3f}s")
+                (
+                    "aes-256-ctr-blake2b",
+                    lambda: AES256_CTR_BLAKE2b(key_256 * 4, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
+                        random_10M, header=b"X"
+                    ),
+                ),
+            ]
+            for spec, func in tests:
+                dt = timeit(func, number=number_default)
+                report("encryption", spec, size, dt, algo=spec)
 
-        if not args.json:
-            print("Compression ====================================================")
-        else:
-            result["compression"] = []
-        for spec in [
-            "lz4",
-            "zstd,1",
-            "zstd,3",
-            "zstd,5",
-            "zstd,10",
-            "zstd,16",
-            "zstd,22",
-            "zlib,0",
-            "zlib,6",
-            "zlib,9",
-            "lzma,0",
-            "lzma,6",
-            "lzma,9",
-        ]:
-            compressor = CompressionSpec(spec).compressor
-            size = 100000000
-            dt = timeit(lambda: compressor.compress({}, random_10M), number=number_compression)
-            if args.json:
-                algo, _, algo_params = spec.partition(",")
-                result["compression"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
-            else:
-                print(f"{spec:<12} {format_file_size(size):<10} {dt:.3f}s")
+        if "compressing" in selected:
+            section_header("compression", "Compression")
+            # grouped by buffer size rather than by codec, so the codecs can be
+            # compared against each other at a glance; chunk-sized first, as
+            # that is what borg actually compresses
+            for label, nbytes in reversed(comp_sizes):
+                data = compressible_buffer(nbytes)
+                number = max(3, comp_total // nbytes)  # a few reps even for the fast codecs
+                for spec in [
+                    "lz4",
+                    "zstd,1",
+                    "zstd,3",
+                    "zstd,5",
+                    "zstd,10",
+                    "zstd,16",
+                    "zstd,22",
+                    "zlib,1",
+                    "zlib,6",
+                    "zlib,9",
+                    "lzma,0",
+                    "lzma,6",
+                    "lzma,9",
+                ]:
+                    compressor = CompressionSpec(spec).compressor
+                    dt = timeit(lambda: compressor.compress({}, data), number=number)
+                    algo, _, algo_params = spec.partition(",")
+                    report(
+                        "compression",
+                        f"{spec} ({label})",
+                        nbytes * number,
+                        dt,
+                        algo=algo,
+                        algo_params=algo_params,
+                        buffer_size=nbytes,
+                    )
 
-        if not args.json:
-            print("msgpack ========================================================")
-        else:
-            result["msgpack"] = []
-        item = Item(path="foo/bar/baz", mode=660, mtime=1234567)
-        items = [item.as_dict()] * 1000
-        size = "100k Items"
-        spec = "msgpack"
-        dt = timeit(lambda: msgpack.packb(items), number=number_default)
-        if args.json:
-            result["msgpack"].append({"algo": spec, "count": 100000, "time": dt})
-        else:
-            print(f"{spec:<12} {size:<10} {dt:.3f}s")
+        if "msgpacking" in selected:
+            section_header("msgpack", "msgpack")
+            item = Item(path="foo/bar/baz", mode=660, mtime=1234567)
+            items = [item.as_dict()] * 1000
+            count = 1000 * number_default
+            spec = "msgpack"
+            dt = timeit(lambda: msgpack.packb(items), number=number_default)
+            if args.json:
+                result["msgpack"].append({"algo": spec, "count": count, "time": dt})
+            else:
+                # this one packs items, not bytes, so it gets a rate in its own unit
+                size = "%dk Items" % (count // 1000)
+                print(f"{spec:<{WIDTH}} {size:<11} {dt:.3f}s  {count / dt / 1000:>8.1f} kItems/s")
 
         if args.json:
             json_print(result)
@@ -370,7 +502,9 @@ class BenchmarkMixIn:
             "crud", subparser, help="benchmarks Borg CRUD (create, extract, update, delete)."
         )
 
-        subparser.add_argument("path", metavar="PATH", help="path where to create benchmark input data")
+        subparser.add_argument(
+            "path", metavar="PATH", type=FilesystemDirSpec, help="path where to create benchmark input data"
+        )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")
 
         bench_cpu_epilog = process_epilog(
@@ -382,6 +516,22 @@ class BenchmarkMixIn:
 
         - an otherwise as idle as possible machine
         - enough free memory so there will be no slow down due to paging activity
+
+        By default all benchmarks run. Give one or more of --chunking, --hashing,
+        --encrypting, --compressing, --msgpacking to run only those.
+
+        Some algorithms use multiple threads only above a size threshold, so the
+        hashes and the compressors are measured at more than one buffer size: the
+        hashes at 64MiB (a borg pack) and 2MiB (a typical borg chunk), both above
+        blake3's threshold, the compressors at 2MiB and 128kiB, which is below
+        zstd's. Within a section every row processes the same total number of
+        bytes - 1 GiB, or 10 MiB for the compressors - so the throughput column is
+        comparable between rows.
+
+        The compressors work on synthetic text-like data that compresses about 4x
+        at zstd,3. Random data would be the worst possible input: no codec can
+        compress it, so all of them would take their incompressible fast path and
+        the levels would barely differ.
         """
         )
         subparser = ArgumentParser(
@@ -389,3 +539,8 @@ class BenchmarkMixIn:
         )
         benchmark_parsers.add_subcommand("cpu", subparser, help="benchmarks Borg CPU-bound operations.")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")
+        subparser.add_argument("--chunking", action="store_true", help="benchmark the chunkers")
+        subparser.add_argument("--hashing", action="store_true", help="benchmark the hashes / MACs")
+        subparser.add_argument("--encrypting", action="store_true", help="benchmark the encryption modes")
+        subparser.add_argument("--compressing", action="store_true", help="benchmark the compressors")
+        subparser.add_argument("--msgpacking", action="store_true", help="benchmark msgpack item packing")

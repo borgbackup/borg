@@ -71,6 +71,11 @@ MIN_PACK_SIZE = DEFAULT_PACK_MAX_SIZE // 50  # 1 MB
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module
 
+# Clock skew is the difference between the clocks of the machines writing to a repository (seconds).
+# A check result timestamp up to this far in the future still counts as recent; further ahead than
+# this, the pack is re-verified.
+MAX_CLOCK_SKEW = 7200  # [s]
+
 # How many segment files Borg puts into a single directory by default.
 DEFAULT_SEGMENTS_PER_DIR = 1000
 
@@ -133,27 +138,36 @@ MAX_SEGMENT_DIR_INDEX = 2**32 - 1
 CH_BUZHASH = "buzhash"
 CH_BUZHASH64 = "buzhash64"
 CH_FASTCDC = "fastcdc"
+CH_RABIN_AES = "rabin-aes"
+CH_GOLDILOCKS_AES = "goldilocks-aes"
+CH_TOEPLITZ_AES = "toeplitz-aes"
 CH_FIXED = "fixed"
 CH_FAIL = "fail"
 
-# buzhash chunker params
+# chunker params
 CHUNK_MIN_EXP = 19  # 2**19 == 512 KiB
 CHUNK_MAX_EXP = 23  # 2**23 == 8 MiB
-HASH_WINDOW_SIZE = 0xFFF  # 4095 B
+HASH_WINDOW_SIZE = 0xFFF  # 4095 B (buzhash / buzhash64 only, fastcdc is window-less)
 HASH_MASK_BITS = 21  # results in ~2 MiB chunks statistically
 
-# buzhash64-only: normalized chunking level (0 disables it). buzhash (32bit) does not support this
-# and must stay bit-compatible to borg 1.x, so it has no nc_level param.
+# not supported by buzhash (32bit): it must stay bit-compatible to borg 1.x, so it has no nc_level param.
 NC_LEVEL = 2  # FastCDC-style normalized chunking: tightens chunk-size distribution (much lower variance)
 
 # defaults, use --chunker-params to override
-CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
-CHUNKER64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, NC_LEVEL)
 # fastcdc uses a window-less Gear hash, so it has no window_size parameter.
 FASTCDC_PARAMS = (CH_FASTCDC, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
+BUZHASH_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
+BUZHASH64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, NC_LEVEL)
+# rabin-aes has a fixed 64-byte window, so it has no window_size parameter either.
+RABIN_AES_PARAMS = (CH_RABIN_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
+# goldilocks-aes: same param shape as rabin-aes (fixed 64-byte window).
+GOLDILOCKS_AES_PARAMS = (CH_GOLDILOCKS_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
+# toeplitz-aes: same param shape as rabin-aes (fixed 64-byte window).
+TOEPLITZ_AES_PARAMS = (CH_TOEPLITZ_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
+CHUNKER_PARAMS = FASTCDC_PARAMS  # the default chunker for file content data
 
 # chunker params for the items metadata stream, finer granularity
-ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)
+ITEMS_CHUNKER_PARAMS = (CH_FASTCDC, 15, 19, 17, NC_LEVEL)
 
 # normal on-disk data, allocated (but not written, all zeros), not allocated hole (all zeros)
 CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2

@@ -135,6 +135,8 @@ jobs:
       id-token: write
       attestations: write
     strategy:
+      # entries with "allow-failure": true (e.g. prerelease pythons) do not fail
+      # the matrix, see continue-on-error below.
       fail-fast: true
       # noinspection YAMLSchemaValidation
       matrix: >-
@@ -145,7 +147,8 @@ jobs:
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3", "store_cache": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
+              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }' || '{
             "include": [
@@ -155,7 +158,8 @@ jobs:
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
               {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
               {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
-              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"}
+              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"},
+              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }'
         ) }}
@@ -163,6 +167,10 @@ jobs:
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
+    # Python 3.15 is not released yet, so do not fail the whole matrix if it (or a
+    # dependency not having wheels / not compiling for it yet) breaks.
+    # Remove the "allow-failure" matrix entries once 3.15 is final.
+    continue-on-error: ${{ matrix.allow-failure || false }}
     # macOS machines can be slow, if overloaded.
     timeout-minutes: 360
 
@@ -403,14 +411,16 @@ jobs:
             artifact_prefix: borg-freebsd-15-x86_64-gh
 
           - os: netbsd
-            version: '10.1'
+            version: '11.0'
             display_name: NetBSD
             do_binaries: false
 
           - os: openbsd
-            version: '7.8'
+            version: '7.9'
             display_name: OpenBSD
             do_binaries: false
+            # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
+            memory: 12G
 
           - os: omnios
             version: 'r151056'
@@ -424,13 +434,30 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # .pip-cache lives inside the workspace, which cross-platform-actions
+      # rsyncs into the VM and back, so wheels built from sdists in one run
+      # (most of the VM setup time) are reused by the next one.
+      - name: Cache pip-built wheels
+        uses: actions/cache@v6
+        with:
+          path: .pip-cache
+          key: ${{ matrix.os }}-${{ matrix.version }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.version }}-pip-
+
       - name: Start VM for ${{ matrix.display_name }}
         id: cross_os
-        uses: cross-platform-actions/action@v1.3.0
+        # a normal boot takes < 1 minute; since 1.4.0 the action bounds
+        # waiting for boot itself, this is just an additional safety net.
+        timeout-minutes: 15
+        uses: cross-platform-actions/action@v1.4.0
         with:
           operating_system: ${{ matrix.os }}
           version: ${{ matrix.version }}
           shell: bash
+          # the default VM size (2 cpus) leaves half of the runner's 4 vcpus idle
+          cpu_count: 4
+          memory: ${{ matrix.memory || '8G' }}
 
       - name: Test on ${{ matrix.display_name }}
         shell: cpa.sh {0}
@@ -438,6 +465,13 @@ jobs:
           DO_BINARIES: ${{ matrix.do_binaries }}
         run: |
           set -euxo pipefail
+
+          # a hung test must fail instead of stalling the suite until the
+          # job timeout (tox passes all env vars through to pytest).
+          export PYTEST_TIMEOUT=300
+
+          # see the "Cache pip-built wheels" step
+          export PIP_CACHE_DIR="$PWD/.pip-cache"
 
           case "${{ matrix.os }}" in
             freebsd)
@@ -494,50 +528,49 @@ jobs:
             netbsd)
               arch="$(uname -m)"
               sudo -E mkdir -p /usr/pkg/etc/pkgin
-              echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+              echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/11.0/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
               sudo -E pkgin update
               sudo -E pkgin -y upgrade
               sudo -E pkgin -y install lz4 git
               sudo -E pkgin -y install rust
               sudo -E pkgin -y install pkg-config
-              sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
-              sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
-              sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
-              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
-              sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
+              # rust already depends on python313, so use that
+              sudo -E pkgin -y install py313-pip py313-virtualenv py313-tox
+              sudo -E ln -sf /usr/pkg/bin/python3.13 /usr/pkg/bin/python3
+              sudo -E ln -sf /usr/pkg/bin/pip3.13 /usr/pkg/bin/pip3
+              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.13 /usr/pkg/bin/virtualenv3
+              sudo -E ln -sf /usr/pkg/bin/tox-3.13 /usr/pkg/bin/tox3
 
               # Ensure base system admin tools are on PATH for the non-root shell
               export PATH="/sbin:/usr/sbin:$PATH"
 
-              echo "--- Preparing an extattr-enabled filesystem ---"
-              # On many NetBSD setups /tmp is tmpfs without extended attributes.
-              # Create a FFS image with extended attributes enabled and use it for TMPDIR.
-              VNDDEV="vnd0"
-              IMGFILE="/tmp/fs.img"
-              sudo -E dd if=/dev/zero of=${IMGFILE} bs=1m count=1024
-              sudo -E vndconfig -c "${VNDDEV}" "${IMGFILE}"
-              sudo -E newfs -O 2ea /dev/r${VNDDEV}a
-              MNT="/mnt/eafs"
-              sudo -E mkdir -p ${MNT}
-              sudo -E mount -t ffs -o extattr /dev/${VNDDEV}a $MNT
-              export TMPDIR="${MNT}/tmp"
+              # On the netbsd 11 VM, / is a fs with extended attributes.
+              export TMPDIR="/tmp_eafs"
               sudo -E mkdir -p ${TMPDIR}
               sudo -E chmod 1777 ${TMPDIR}
 
               touch ${TMPDIR}/testfile
               lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
 
-              tox3 -e py311-none
+              tox3 -e py313-none
               ;;
 
             openbsd)
-              sudo -E pkg_add lz4 git
-              sudo -E pkg_add rust
-              sudo -E pkg_add openssl%3.5
-              sudo -E pkg_add py3-pip py3-virtualenv py3-tox
+              # Put the temp tree (pip/cc build temps, pytest tmp dirs and the
+              # borg test repos in them) on a memory-backed filesystem instead
+              # of the slow FFS disk. Sized generously (the pytest tmp tree is
+              # only cleaned up after the run); the VM gets 12G RAM for this.
+              sudo mkdir -p /mfs
+              # -O2: FFS2 format - mfs defaults to FFS1, whose 32 bit
+              # timestamps silently wrap (breaks test_extract_y2261).
+              sudo mount_mfs -O2 -s 6g swap /mfs
+              sudo chmod 1777 /mfs
+              export TMPDIR=/mfs
+
+              sudo -E pkg_add lz4 git rust openssl%3.5 py3-pip py3-virtualenv py3-tox
 
               export BORG_OPENSSL_NAME=eopenssl35
-              tox -e py312-none
+              tox -e py313-none
               ;;
 
             omnios)
@@ -638,6 +671,9 @@ jobs:
       PY_COLORS: 1
       MSYS2_ARG_CONV_EXCL: "*"
       MSYS2_ENV_CONV_EXCL: "*"
+      # see the "Cache pip-built wheels" step. MSYS2_ENV_CONV_EXCL above keeps
+      # this a Windows path when it enters the msys2 shell.
+      PIP_CACHE_DIR: ${{ github.workspace }}\.pip-cache
 
     defaults:
       run:
@@ -647,6 +683,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      # MSYS2's mingw Python cannot use PyPI's win_amd64 wheels, so pip builds
+      # all compiled deps from source - incl. building maturin via cargo, just
+      # to build the blake3 wheel. Persist the wheels pip builds.
+      - name: Cache pip-built wheels
+        uses: actions/cache@v6
+        with:
+          path: .pip-cache
+          key: windows-msys2-pip-${{ hashFiles('pyproject.toml', 'requirements.d/pyinstaller.txt') }}
+          restore-keys: |
+            windows-msys2-pip-
 
       - uses: msys2/setup-msys2@v2
         with:

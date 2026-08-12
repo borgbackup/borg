@@ -1,17 +1,25 @@
 # cython: language_level=3
 
+import os
+
 import cython
-import time
 
 from cpython.bytes cimport PyBytes_AsString
-from libc.stdint cimport uint8_t, uint64_t
+from libc.stdint cimport uint8_t, uint64_t, int64_t
 from libc.stdlib cimport malloc, free
-from libc.string cimport memcpy, memmove, memset
 
 from ..crypto.low_level import CSPRNG
 
-from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
-from .reader import FileReader, Chunk
+from .base cimport ChunkerBase
+
+cdef extern from "fastcdc_impl.h":
+    int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel) nogil
+    const char *fc_kernel_name(int kernel)
+    int fc_kernel_select(const char *name, int *out_id)
+    const char *fc_kernel_names()
+    int FC_K_SCALAR
+
+from .kernel_env import kernel_error, requested_kernel
 
 # FastCDC content-defined chunker (Xia et al., USENIX ATC 2016).
 #
@@ -26,6 +34,14 @@ from .reader import FileReader, Chunk
 #
 # It implements the same FastCDC techniques the buzhash64 chunker uses: sub-minimum cut-point
 # skipping, normalized chunking (strict/loose mask around a "normal" size), and min/max clamping.
+# All of that - buffering, the scan loop, sparse/hole handling - lives in ChunkerBase; this
+# class only provides the keyed Gear table and the _scan() hook calling the C kernel.
+#
+# The inner scan runs in a C kernel (fastcdc_impl.c) with SIMD implementations (NEON on
+# aarch64, AVX-512 or AVX2 on x86-64, blockwise scalar elsewhere) that are bit-identical to
+# the plain sequential Gear loop: every byte position is tested, cuts and hash state are
+# exactly the same, only faster. The sequential loop is what runs by default; the others
+# are selected via BORG_FASTCDC_KERNEL, see kernel_env.py and the .kernel property.
 
 
 @cython.boundscheck(False)
@@ -48,229 +64,63 @@ cdef uint64_t* fastcdc_init_gear(bytes key) except NULL:
     return gear
 
 
-cdef inline uint64_t _high_mask(int bits):
-    """A mask with <bits> one-bits in the most significant positions (Gear's strong bits)."""
-    if bits <= 0:
-        return 0
-    if bits >= 64:
-        return <uint64_t>0xFFFFFFFFFFFFFFFF
-    return ((<uint64_t>1 << bits) - 1) << (64 - bits)
+cdef int _select_kernel() except -1:
+    """Resolve BORG_FASTCDC_KERNEL to a kernel id, raising if it cannot be honoured.
+
+    Unset means the simplest implementation, not the fastest one: nothing here
+    guesses which kernel a given CPU and compiler make fastest.
+    """
+    cdef int kid = FC_K_SCALAR
+    cdef int rc
+    want = requested_kernel("BORG_FASTCDC_KERNEL")
+    if want is None:
+        return FC_K_SCALAR
+    rc = fc_kernel_select(want.encode("ascii"), &kid)
+    if rc != 0:
+        raise kernel_error("BORG_FASTCDC_KERNEL", want, rc,
+                           (<bytes>fc_kernel_names()).decode("ascii"))
+    return kid
 
 
-cdef class ChunkerFastCDC:
+cdef class ChunkerFastCDC(ChunkerBase):
     """
     FastCDC content-defined chunker, variable chunk sizes, keyed Gear hash.
 
     Unlike the buzhash chunkers, Gear is window-less, so there is no hash_window_size parameter.
     """
-    cdef uint64_t chunk_mask
-    cdef uint64_t mask_s, mask_l  # normalized chunking: strict / loose masks
-    cdef size_t normal_size       # chunk length at which we switch mask_s -> mask_l
-    cdef int nc_level             # normalized chunking level (0 = disabled)
     cdef uint64_t* gear
-    cdef uint8_t* data
-    cdef object _fd
-    cdef int fh
-    cdef int done, eof
-    cdef size_t min_size, buf_size, remaining, position, last
-    cdef long long bytes_read, bytes_yielded
-    cdef readonly float chunking_time
-    cdef object file_reader
-    cdef size_t reader_block_size
-    cdef bint sparse
+    cdef int kernel_id
 
     def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int nc_level=0, size_t normal_size=0, bint sparse=False):
         self.gear = NULL
-        self.data = NULL
-        min_size = 1 << chunk_min_exp
-        max_size = 1 << chunk_max_exp
-        assert max_size <= len(zeros)
-        assert min_size + 1 <= max_size, "too small max_size"
-
-        self.chunk_mask = _high_mask(hash_mask_bits)
-        self.min_size = min_size
-        # Normalized chunking, identical structure to the buzhash64 chunker (see there), but with
-        # the mask one-bits placed in the high bits of the Gear hash.
-        assert nc_level >= 0
-        assert hash_mask_bits - nc_level >= 1, "nc_level too large for hash_mask_bits"
-        assert hash_mask_bits + nc_level <= 48, "nc_level too large for hash_mask_bits"
-        self.nc_level = nc_level
-        if nc_level:
-            self.mask_s = _high_mask(hash_mask_bits + nc_level)
-            self.mask_l = _high_mask(hash_mask_bits - nc_level)
-            self.normal_size = normal_size if normal_size else ((1ULL << hash_mask_bits) - (1ULL << (hash_mask_bits - nc_level)))
-        else:
-            self.mask_s = self.chunk_mask
-            self.mask_l = self.chunk_mask
-            self.normal_size = 0
+        self.kernel_id = _select_kernel()
         self.gear = fastcdc_init_gear(key)
-        self.buf_size = max_size
-        self.data = <uint8_t*>malloc(self.buf_size)
-        if self.data == NULL:
-            raise MemoryError("Failed to allocate chunker buffer")
-        self.fh = -1
-        self.done = 0
-        self.eof = 0
-        self.remaining = 0
-        self.position = 0
-        self.last = 0
-        self.bytes_read = 0
-        self.bytes_yielded = 0
-        self._fd = None
-        self.chunking_time = 0.0
-        self.reader_block_size = 1024 * 1024
-        self.sparse = sparse
+        # Gear accumulates information in its high bits, so the cut-decision
+        # masks must use the high bits of the hash (high_masks=True). The Gear
+        # hash restarts from 0 at each chunk (window-less), so the default
+        # _restart() is correct.
+        self._setup_common("fastcdc", chunk_min_exp, chunk_max_exp, hash_mask_bits,
+                           nc_level, normal_size, True, sparse)
 
     def __dealloc__(self):
         if self.gear != NULL:
             free(self.gear)
             self.gear = NULL
-        if self.data != NULL:
-            free(self.data)
-            self.data = NULL
 
-    cdef int fill(self) except 0:
-        """Fill the chunker's buffer with more data."""
-        cdef ssize_t n
-        cdef object chunk
+    @property
+    def kernel(self):
+        """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blockwise' or 'scalar'.
 
-        memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
-        self.position -= self.last
-        self.last = 0
-        n = self.buf_size - self.position - self.remaining
+        'scalar' unless BORG_FASTCDC_KERNEL names another one, in which case
+        this is always that one - creating the chunker fails otherwise.
+        """
+        return (<bytes>fc_kernel_name(self.kernel_id)).decode("ascii")
 
-        if self.eof or n == 0:
-            return 1
-
-        chunk = self.file_reader.read(n)
-        n = chunk.meta["size"]
-
-        if n > 0:
-            if chunk.meta["allocation"] == CH_DATA:
-                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(chunk.data), n)
-            else:
-                memset(self.data + self.position + self.remaining, 0, n)
-            self.remaining += n
-            self.bytes_read += n
-        else:
-            self.eof = 1
-        return 1
-
-    cdef object process(self) except *:
-        """Process the chunker's buffer and return the next chunk."""
-        cdef uint64_t fp = 0, mask, mask_s = self.mask_s, mask_l = self.mask_l
-        cdef int nc_level = self.nc_level
-        cdef size_t n, old_last, min_size = self.min_size
-        cdef size_t normal_size = self.normal_size, normal_pos, chunk_len, did
-        cdef uint8_t* p
-        cdef uint8_t* stop
-        cdef uint8_t* cut
-        cdef uint64_t* gear = self.gear
-
-        if self.done:
-            if self.bytes_read == self.bytes_yielded:
-                raise StopIteration
-            else:
-                raise Exception("chunkifier byte count mismatch")
-
-        # ensure at least min_size + 1 bytes are buffered, or we are at eof
-        while self.remaining < min_size + 1 and not self.eof:
-            self.fill()
-
-        # at eof with only a remainder (< min_size + 1): emit it as the final chunk
-        if self.eof and self.remaining < min_size + 1:
-            self.done = 1
-            if self.remaining:
-                old_last = self.last
-                self.position += self.remaining
-                self.last = self.position
-                n = self.last - old_last
-                self.remaining = 0
-                self.bytes_yielded += n
-                return memoryview((self.data + old_last)[:n])
-            else:
-                if self.bytes_read == self.bytes_yielded:
-                    raise StopIteration
-                else:
-                    raise Exception("chunkifier byte count mismatch")
-
-        # skip the sub-minimum region (no cut allowed below min_size), then gear-scan
-        self.position += min_size
-        self.remaining -= min_size
-        fp = 0
-
-        while True:
-            chunk_len = self.position - self.last
-            mask = mask_s if (nc_level and chunk_len < normal_size) else mask_l
-
-            if self.remaining == 0:
-                if self.eof:
-                    break  # cut at end of data
-                self.fill()
-                if self.remaining == 0:
-                    break  # buffer full -> chunk reached max_size -> forced cut
-                continue
-
-            p = self.data + self.position
-            stop = p + self.remaining
-            if nc_level and chunk_len < normal_size:
-                # do not scan past the strict->loose transition; re-evaluate the mask there
-                normal_pos = self.last + normal_size
-                if (self.data + normal_pos) < stop:
-                    stop = self.data + normal_pos
-
-            cut = NULL
-            while p < stop:
-                fp = (fp << 1) + gear[p[0]]
-                if (fp & mask) == 0:
-                    cut = p
-                    break
-                p += 1
-
-            if cut != NULL:
-                p = cut + 1  # cut right after the byte that triggered the boundary
-                did = p - (self.data + self.position)
-                self.position += did
-                self.remaining -= did
-                break
-            else:
-                did = p - (self.data + self.position)
-                self.position += did
-                self.remaining -= did
-
-        old_last = self.last
-        self.last = self.position
-        n = self.last - old_last
-        self.bytes_yielded += n
-        return memoryview((self.data + old_last)[:n])
-
-    def chunkify(self, fd, fh=-1, fmap=None):
-        self._fd = fd
-        self.fh = fh
-        self.file_reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size, sparse=self.sparse, fmap=fmap)
-        self.done = 0
-        self.remaining = 0
-        self.bytes_read = 0
-        self.bytes_yielded = 0
-        self.position = 0
-        self.last = 0
-        self.eof = 0
-        return self
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        started_chunking = time.monotonic()
-        data = self.process()
-        got = len(data)
-        if zeros.startswith(data):
-            data = None
-            allocation = CH_ALLOC
-        else:
-            allocation = CH_DATA
-        self.chunking_time += time.monotonic() - started_chunking
-        return Chunk(data, size=got, allocation=allocation)
+    cdef int64_t _scan(self, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) noexcept:
+        cdef int64_t r
+        with nogil:
+            r = fc_scan(self.gear, p, n, digest, mask, self.kernel_id)
+        return r
 
 
 def fastcdc_get_gear_table(bytes key):

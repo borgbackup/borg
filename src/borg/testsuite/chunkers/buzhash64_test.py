@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from . import cf, cf_expand
+from . import cf, cf_expand, chunker_with_kernel
 from ...chunkers import ChunkerBuzHash64
 from ...chunkers.buzhash64 import buzhash64_get_table
 from ...constants import *  # NOQA
@@ -103,22 +103,33 @@ def test_buzhash64_table():
         assert bit_count == 128  # 50% of 256 = 128
 
 
+ALL_BUZHASH64_KERNELS = ("neon", "avx512", "avx2", "blockwise", "scalar")
+
+
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("kernel", ALL_BUZHASH64_KERNELS)
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
-def test_fuzz_bh64(worker):
+def test_fuzz_bh64(worker, kernel, monkeypatch):
     # Fuzz buzhash64 with random and uniform data of misc. sizes and misc keys.
+    # Every kernel gets fuzzed - see the fastcdc counterpart for why the odd
+    # sizes here matter more to the vector kernels than the identity test does.
     def rnd_key():
         return os.urandom(32)
 
-    # decompose CHUNKER64_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size, nc_level)
-    algo, min_exp, max_exp, mask_bits, win_size, nc_level = CHUNKER64_PARAMS
+    # decompose BUZHASH64_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size, nc_level)
+    algo, min_exp, max_exp, mask_bits, win_size, nc_level = BUZHASH64_PARAMS
     assert algo == CH_BUZHASH64  # default chunker must be buzhash64 here
 
     keys = [b"\0" * 32] + [rnd_key() for _ in range(10)]
     sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
 
     for key in keys:
-        chunker = ChunkerBuzHash64(key, min_exp, max_exp, mask_bits, win_size, nc_level)
+        chunker = chunker_with_kernel(
+            monkeypatch,
+            "BORG_BUZHASH64_KERNEL",
+            kernel,
+            lambda: ChunkerBuzHash64(key, min_exp, max_exp, mask_bits, win_size, nc_level),
+        )
         for size in sizes:
             # Random data
             data = os.urandom(size)
@@ -140,3 +151,31 @@ def test_fuzz_bh64(worker):
                 parts = cf_expand(chunker.chunkify(bio))
             reconstructed = b"".join(parts)
             assert reconstructed == data
+
+
+@pytest.mark.parametrize("kernel", ALL_BUZHASH64_KERNELS)
+def test_buzhash64_kernels_identical(kernel, monkeypatch):
+    # Every scan kernel this platform accepts must produce identical cut points;
+    # see the fastcdc counterpart. On aarch64 this is what keeps the NEON kernel
+    # verified - it is selectable but never auto-selected.
+    data = os.urandom(4 * 1024 * 1024)
+    key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
+
+    def sizes(chunker):
+        return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
+
+    monkeypatch.delenv("BORG_BUZHASH64_KERNEL", raising=False)
+    reference = sizes(ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2))
+
+    chunker = chunker_with_kernel(
+        monkeypatch, "BORG_BUZHASH64_KERNEL", kernel, lambda: ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2)
+    )
+    assert sizes(chunker) == reference, f"kernel {kernel} disagrees with the default one"
+
+
+@pytest.mark.parametrize("kernel", ["blockwise", "scalar"])
+def test_buzhash64_portable_kernel_available(kernel, monkeypatch):
+    # portable C, so these two must be selectable everywhere - see the fastcdc counterpart.
+    key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
+    monkeypatch.setenv("BORG_BUZHASH64_KERNEL", kernel)
+    assert ChunkerBuzHash64(key0, 10, 16, 14, 4095, 2).kernel == kernel

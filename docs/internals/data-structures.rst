@@ -36,9 +36,13 @@ config/
 
 cache/
   checked-packs
-    repository check progress (partial checks, full checks' checkpointing),
-    the set of packs checked so far this cycle (pack id -> timestamp, result),
-    as a hashtable with an appended integrity hash
+    repository check results (pack id -> timestamp, result), as a hashtable with an
+    appended integrity hash. Records are kept across checks: ``check --max-age``
+    skips packs whose intact record is younger than the given age, and partial checks
+    (``--max-duration``) verify the least-recently-checked packs first so repeated
+    runs cover the whole repository. Records of corrupt packs are kept for repair and
+    always re-verified. Records of packs no longer listed in packs/ are pruned when a
+    check finishes.
 
 There is a list of pointers to archive objects in this directory:
 
@@ -399,15 +403,26 @@ A chunk is stored as an object as well, of course.
 Chunks
 ~~~~~~
 
-Borg has these chunkers:
+Borg has these chunkers (the default is "fastcdc"):
 
 - "fixed": a simple, low cpu overhead, fixed blocksize chunker, optionally
   supporting a header block of different size.
-- "buzhash": variable, content-defined blocksize, uses a rolling hash
-  computed by the Buzhash_ algorithm.
-- "buzhash64": similar to "buzhash", but improved 64bit implementation
 - "fastcdc": variable, content-defined blocksize, uses the window-less, keyed
   Gear rolling hash (FastCDC_); faster than buzhash, same deduplication.
+- "buzhash64": similar to "buzhash", but improved 64bit implementation
+- "buzhash": variable, content-defined blocksize, uses a rolling hash
+  computed by the Buzhash_ algorithm.
+- "toeplitz-aes": like "rabin-aes", but the universal hash is a tabulated
+  LFSR/Toeplitz hash (secret 2 KiB table, fixed public polynomial); same
+  speed as "rabin-aes" with the best collision bound of the three.
+- "rabin-aes": variable, content-defined blocksize; a rolling Rabin fingerprint
+  (secret polynomial) post-processed with AES-128, so the cut decision only
+  depends on the AES output ("UHF-then-PRF" construction). Strongest available
+  protection against chunk-size fingerprinting attacks.
+- "goldilocks-aes": like "rabin-aes", but the universal hash is a polynomial
+  hash over the Goldilocks prime field (the reference construction of the
+  underlying paper); about half the rabin-aes speed, mainly a comparison
+  baseline.
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -432,6 +447,42 @@ The fixed chunker also supports processing sparse files (reading only the ranges
 with data and seeking over the empty hole ranges).
 
 ``borg create --sparse --chunker-params fixed,BLOCK_SIZE[,HEADER_SIZE]``
+
+"fastcdc" chunker
++++++++++++++++++
+
+FastCDC_ content-defined chunker using the Gear rolling hash. Unlike buzhash it
+is window-less (each byte's influence simply decays out of the hash), so its
+update is cheaper and it chunks noticeably faster, while producing the same
+deduplication and (with normalized chunking) the same chunk-size distribution.
+
+Like "buzhash64", the Gear table is cryptographically derived from secret key
+material, so chunk cut points are unpredictable without the key.
+
+``borg create --chunker-params fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+can be used to tune the chunker parameters, the default is:
+
+- CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
+- CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
+- HASH_MASK_BITS = 21 (target chunk size ~= 2^21 B = 2 MiB)
+- NC_LEVEL = 2 (normalized chunking level, 0 disables it)
+
+There is no window size (Gear is window-less). Normalized chunking varies the
+cut-point mask around the target size, which tightens the chunk-size
+distribution and reduces clamping at the min./max. chunk size.
+
+This is the default chunker (``fastcdc,19,23,21,2``), also used for the item
+metadata stream (with a finer granularity, ``fastcdc,15,19,17,2``).
+
+"buzhash64" chunker
++++++++++++++++++++
+
+Similar to "buzhash", but using 64bit wide hash values.
+
+The buzhash table is cryptographically derived from secret key material.
+
+These changes should improve resistance against attacks and also solve
+some of the issues of the original (32bit / XORed table) implementation.
 
 "buzhash" chunker
 +++++++++++++++++
@@ -466,7 +517,7 @@ which narrows down where cuts may be made, greatly reducing the amount of data
 that is actually hashed for content-defined chunking.
 
 ``borg create --chunker-params buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE``
-can be used to tune the chunker parameters, the default is:
+can be used to tune the chunker parameters, the usual values are:
 
 - CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
 - CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
@@ -478,31 +529,66 @@ for the repository, and stored encrypted in the keyfile. This is to prevent
 chunk size based fingerprinting attacks on your encrypted repo contents (to
 guess what files you have based on a specific set of chunk sizes).
 
-"buzhash64" chunker
+"toeplitz-aes" chunker
+++++++++++++++++++++++
+
+Like "rabin-aes", but the universal hash is a tabulated LFSR-based Toeplitz
+hash (Krawczyk, CRYPTO '94): the digest of the 64-byte window is
+sum_j x^(63-j) * T[b_j] over GF(2)[x] mod P, where T is a secret random
+table of 256 64-bit values (2 KiB of key material) and P is a *fixed public*
+irreducible polynomial of degree 64. The AES-128 PRF layer is the same as
+for "rabin-aes". Two distinct windows collide with probability exactly
+2^-64 over the choice of T - the best possible bound for a 64-bit digest,
+and unconditional (no secret polynomial sampling). The rolling update
+contains no secret-dependent memory access. Speed is on par with
+"rabin-aes". See :doc:`chunker` for a comparison of all chunkers.
+
+``borg create --chunker-params toeplitz-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+
+The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
+level (0 disables it); 2 is a good default. E.g.: ``toeplitz-aes,19,23,21,2``.
+
+"rabin-aes" chunker
 +++++++++++++++++++
 
-Similar to "buzhash", but using 64bit wide hash values.
+A "UHF-then-PRF" content-defined chunker, following the provably secure
+construction of `Breaking and Fixing Content-Defined Chunking
+<https://eprint.iacr.org/2025/558>`_ (Truong et al., 2025): a rolling Rabin
+fingerprint over GF(2)[x]/P(x) - with P a secret, random, irreducible
+polynomial of degree 64 - compresses the last 64 bytes into a digest
+(a universal hash), and AES-128 with a secret key is applied to that digest.
+The cut decision only looks at the AES output, so observed chunk boundaries
+are pseudo-random and do not provide usable equations about the chunking
+secrets, unlike chunkers that cut directly on (keyed) rolling hash bits.
+Both secrets are derived from the repository key material.
 
-The buzhash table is cryptographically derived from secret key material.
+This is the recommended chunker when resistance against chunk-size
+fingerprinting attacks matters most. It is slower than "fastcdc" (one AES
+block encryption per scanned byte), but still fast in absolute terms: the
+implementation batches the AES work through OpenSSL or uses AES hardware
+instructions (arm64 crypto extensions / x86-64 AES-NI) where available.
 
-These changes should improve resistance against attacks and also solve
-some of the issues of the original (32bit / XORed table) implementation.
+``borg create --chunker-params rabin-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
 
-"fastcdc" chunker
-+++++++++++++++++
+The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
+level (0 disables it); 2 is a good default. E.g.: ``rabin-aes,19,23,21,2``.
 
-FastCDC_ content-defined chunker using the Gear rolling hash. Unlike buzhash it
-is window-less (each byte's influence simply decays out of the hash), so its
-update is cheaper and it chunks noticeably faster, while producing the same
-deduplication and (with normalized chunking) the same chunk-size distribution.
+"goldilocks-aes" chunker
+++++++++++++++++++++++++
 
-Like "buzhash64", the Gear table is cryptographically derived from secret key
-material, so chunk cut points are unpredictable without the key.
+Like "rabin-aes", but the universal hash is the reference construction of the
+same paper: a polynomial hash over the Goldilocks prime field GF(p) with
+p = 2^64 - 2^32 + 1, evaluated at a secret random point K over the same
+64-byte window. The AES-128 PRF layer and the security properties are the
+same as for "rabin-aes" (the two-window collision bound is even slightly
+better). It is about half as fast as "rabin-aes" - prime-field multiplies
+instead of table lookups in the rolling hash - and is provided mainly as a
+well-understood comparison baseline.
 
-``borg create --chunker-params fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
+``borg create --chunker-params goldilocks-aes,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL``
 
-There is no window size (Gear is window-less). NC_LEVEL is the normalized
-chunking level (0 disables it); 2 is a good default. E.g.: ``fastcdc,19,23,21,2``.
+The window size is fixed at 64 bytes. NC_LEVEL is the normalized chunking
+level (0 disables it); 2 is a good default. E.g.: ``goldilocks-aes,19,23,21,2``.
 
 .. _cache:
 

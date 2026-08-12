@@ -20,7 +20,10 @@ import os
 import random
 from struct import Struct
 import sys
+import threading
 import zlib
+
+from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AsString
 
 try:
     import lzma
@@ -86,7 +89,30 @@ cdef extern from "lz4.h":
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_compressBound(int inputSize) nogil
 
-buffer = Buffer(bytearray, size=0)
+_thread_local = threading.local()
+
+
+def get_buffer():
+    """Return the scratch buffer of the calling thread, creating it on first use.
+
+    The LZ4 code below uses a scratch buffer to avoid allocating a new output buffer for
+    every single chunk. Chunks are (de)compressed concurrently by multiple threads, so
+    that buffer must not be shared: two threads getting the same bytearray would write
+    into it at the same time, silently corrupting each other's output.
+
+    Thread-locals are the right granularity here (rather than per compressor instance):
+    compressor instances are shared between threads (e.g. LZ4_COMPRESSOR, used by Auto),
+    while a buffer that belongs to a thread is by definition only used by that thread.
+
+    A thread's buffer stays allocated until the thread ends, and it only ever grows, so
+    a pool of N worker threads may hold N buffers. That is the same behaviour as before,
+    just no longer limited to the one buffer of the main thread.
+    """
+    try:
+        return _thread_local.buffer
+    except AttributeError:
+        buffer = _thread_local.buffer = Buffer(bytearray, size=0)
+        return buffer
 
 cdef class CompressorBase:
     """
@@ -122,12 +148,11 @@ cdef class CompressorBase:
 
     def compress(self, meta, data):
         """
-        Compress *data* (bytes) and return compression metadata and compressed bytes.
+        Compress *data* (bytes or memoryview) and return compression metadata and compressed data.
         """
-        if not isinstance(data, bytes):
-            data = bytes(data)  # code below does not work with memoryview
         if self.legacy_mode:
-            return None, bytes((self.ID, self.level)) + data
+            # the ID/level prefix concatenation needs bytes (bytes() is a no-op for bytes input)
+            return None, bytes((self.ID, self.level)) + bytes(data)
         else:
             meta["ctype"] = self.ID
             meta["clevel"] = self.level
@@ -252,14 +277,17 @@ class LZ4(DecidingCompressor):
 
         *lz4_data* is the LZ4 result if *compressor* is LZ4 as well, otherwise it is None.
         """
-        if not isinstance(idata, bytes):
-            idata = bytes(idata)  # code below does not work with memoryview
-        cdef int isize = len(idata)
+        cdef const unsigned char[::1] iview = idata
+        cdef int isize = iview.shape[0]
         cdef int osize
-        cdef char *source = idata
+        cdef const char *source
         cdef char *dest
+        if isize == 0:
+            # empty input cannot shrink (and an empty view has no address to take below)
+            return NONE_COMPRESSOR, (meta, None)
+        source = <const char *> &iview[0]
         osize = LZ4_compressBound(isize)
-        buf = buffer.get(osize)
+        buf = get_buffer().get(osize)
         dest = <char *> buf
         with nogil:
             osize = LZ4_compress_default(source, dest, isize, osize)
@@ -280,9 +308,25 @@ class LZ4(DecidingCompressor):
         cdef int rsize
         cdef char *source = idata
         cdef char *dest
+        size = None if meta is None else meta.get("size")
+        if size is not None and 0 <= size <= 2 ** 31 - 1:
+            # borg2 stores the exact plaintext size in the (authenticated) object metadata:
+            # decompress directly into the result bytes object - no scratch buffer, no copy,
+            # no output size guessing. rsize != size means corrupt (or misdescribed) data,
+            # this also covers everything check_fix_size would assert.
+            ret = PyBytes_FromStringAndSize(NULL, size)
+            dest = PyBytes_AsString(ret)
+            osize = size
+            with nogil:
+                rsize = LZ4_decompress_safe(source, dest, isize, osize)
+            if rsize != osize:
+                raise DecompressionError('lz4 decompress failed')
+            return meta, ret
+        # no size known up front (borg 1.x repos in legacy mode): guess and retry.
         # a bit more than 8MB is enough for the usual data sizes yielded by the chunker.
         # allocate more if isize * 3 is already bigger, to avoid having to resize often.
         osize = max(int(1.1 * 2**23), isize * 3)
+        buffer = get_buffer()
         while True:
             try:
                 buf = buffer.get(osize)
@@ -605,8 +649,11 @@ class ObfuscateSize(CompressorBase):
         addtl_size = self._obfuscate(compr_size) if meta["type"] == ROBJ_FILE_STREAM else 0
         addtl_size = max(0, addtl_size)  # we can only make it longer, not shorter!
         addtl_size = min(MAX_DATA_SIZE - 1024 - compr_size, addtl_size)  # stay away from MAX_DATA_SIZE
-        trailer = bytes(addtl_size)
-        obfuscated_data = compressed_data + trailer
+        if addtl_size:
+            # join, not +: compressed_data may be a memoryview (CNONE passes the input through)
+            obfuscated_data = b"".join([compressed_data, bytes(addtl_size)])
+        else:
+            obfuscated_data = compressed_data
         meta["csize"] = len(obfuscated_data)  # csize is the overall output size of this "obfuscation compressor"
         meta["olevel"] = self.level  # remember the obfuscation level, useful for repo-compress
         return meta, obfuscated_data  # for borg2 it is enough that we have the payload size in meta["psize"]

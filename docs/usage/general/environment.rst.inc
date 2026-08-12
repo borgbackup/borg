@@ -1,6 +1,8 @@
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~
 
+.. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+
 Borg uses some environment variables for automation:
 
 General:
@@ -61,7 +63,8 @@ General:
         You can set the default value for the ``--lock-wait`` option with this, so
         you do not need to give it as a command line option.
     BORG_LOGGING_CONF
-        When set, use the given filename as INI_-style logging configuration.
+        When set, use the given filename as INI-style logging configuration (see
+        https://docs.python.org/3/library/logging.config.html#configuration-file-format).
         A basic example conf can be found at ``docs/misc/logging.conf``.
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
@@ -86,6 +89,24 @@ General:
 
         ``BORG_UNITS=iec`` is the replacement for the removed ``BORG_IEC`` environment
         variable (and for the ``--iec`` command line option removed before that).
+    BORG_PROGRESS_FPS
+        How often the ``--progress`` output is updated at most, in updates per
+        second (default: 5). Fractional values are allowed, e.g.
+        ``BORG_PROGRESS_FPS=0.1`` limits it to one update every 10 seconds.
+        Lower values are useful when the output goes into a logfile rather than
+        to an interactive terminal.
+    BORG_SPINNER
+        Controls the spinner borg animates on a terminal while doing work of unknown
+        duration:
+
+        - unset (default): animate, using Unicode frames if the terminal can display them
+        - ``ascii``: animate, but only use ASCII frames (``|/-\``)
+        - ``off``: do not animate, only output the messages next to the spinner
+
+        The spinner is animated only on an interactive terminal anyway (and never
+        with ``--log-json``), and its colour follows the usual ``NO_COLOR`` and
+        ``COLORTERM`` conventions. See also ``BORG_PROGRESS_FPS``: it also gives
+        the spinner its frame rate.
     BORG_DEBUG_PROFILE
         When set to a filename, write an execution profile in Borg format into that file
         (see :ref:`debugging`). If the filename ends with ``.pyprof``, a Python-compatible
@@ -101,6 +122,59 @@ General:
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
+    BORG_ASSERT_ID
+        Comma-separated list of the places where borg shall verify that a chunk's content matches
+        its chunk id (``chunkid == id_hash(content)``) after decrypting and decompressing it.
+        Verifying costs a full hash pass over everything that is read at such a place.
+
+        Default (variable not set)::
+
+            BORG_ASSERT_ID=repair,transfer,rechunk
+
+        These are the place names that can be listed:
+
+        read
+            Every read that decompresses a chunk: ``borg extract``, ``borg mount``,
+            ``borg export-tar``, ``borg diff``, ... This is by far the most data borg reads, so
+            this place is **not** in the default, see the explanation below.
+        repair
+            ``borg check --repair``. It rebuilds archives from the item metadata stream it reads,
+            re-packing it into new chunks with freshly computed ids, and it recreates manifest and
+            archives directory entries from what it reads.
+        transfer
+            ``borg transfer``, for everything it reads from the source repository. Transferring
+            re-anchors the content in another repository, which is a trust boundary.
+        rechunk
+            ``borg recreate --chunker-params ...``, i.e. re-chunking reads. Re-chunking computes
+            new chunk ids from the content it reads, so a violation would not be noticeable any
+            more afterwards. (Re-chunking in ``borg transfer`` is covered by ``transfer``.)
+
+        An unknown place name is an error. An empty value (``BORG_ASSERT_ID=``) verifies at none of
+        these places, but still where borg always verifies (see below).
+
+        Why ``read`` is not in the default: for encrypted repositories (all the AEAD ciphersuites),
+        the chunk id is part of the AEAD additional authenticated data, so a successful decryption
+        already proves that a holder of the repository key deliberately stored exactly this
+        ciphertext for exactly this chunk id. A malicious or buggy **repository** can therefore not
+        swap, splice or substitute objects, whether the id is verified on read or not. What the id
+        check adds is the detection of chunks whose content does not match their id, which only a
+        malicious or compromised **borg client that had your borg key** could have written (e.g. to
+        poison future deduplication). If that is in your threat model - e.g. because some machines
+        writing into the repository are not fully trusted - add ``read`` to the list::
+
+            BORG_ASSERT_ID=read,repair,transfer,rechunk
+
+        Otherwise, running ``borg check --verify-data`` periodically is recommended: it is the
+        audit that re-certifies the invariant for all chunks in the background, instead of on
+        every read.
+
+        Independent of this variable, borg always verifies the chunk id:
+
+        - in ``borg check --verify-data``. That audit is what makes not verifying elsewhere
+          defensible, so it is not configurable (there is no ``verify_data`` place name).
+        - for ``authenticated`` and ``none`` mode repositories: there is no AEAD there, so the id
+          check *is* the read path's integrity check and switching it off would remove it
+          completely. Same for reading borg 1.x repositories (``borg transfer``).
     BORG_BLAKE3_MT_THRESHOLD
         When set to a numeric value, chunks of at least that many KiB get their id computed by
         multi-threaded BLAKE3, smaller ones single-threaded (default: 256, i.e. 256KiB).
@@ -123,6 +197,32 @@ General:
         +0.05% archive size for 1MiB chunks, +0.64% for 8MiB ones, more at higher levels), and
         it uses more cpu time in total to reduce the wallclock time. Set it to 1 if you would
         rather have the smaller archive, or if borg has to share the cpu with other work.
+    BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
+        Select the scan kernel the ``fastcdc`` / ``buzhash64`` chunker uses (default:
+        ``scalar``, the plain sequential loop). Accepted values are ``avx512``, ``avx2``,
+        ``neon``, ``blockwise`` and ``scalar``.
+        All kernels chunk identically - same cut points, same chunk ids - and differ only in
+        speed, so this is safe to change at any time, also for an existing repository.
+        Which kernel is fastest is not predictable from the instruction set: it depends on the
+        cpu and on the compiler that built borg, and the sequential loop wins on some machines.
+        Nothing is selected automatically, so measure on your own hardware with
+        ``borg benchmark cpu --chunking`` before setting these.
+        ``avx512`` and ``avx2`` exist only on x86-64, ``neon`` only on aarch64, and only if the
+        compiler that built borg supported them; ``scalar`` and ``blockwise`` are portable C
+        and always available.
+        Requesting a kernel that this build or this cpu cannot run is an error rather than a
+        silent fallback, so a benchmark can not accidentally measure a different kernel.
+        ``borg create --debug`` logs the chunker and the kernel it was created with.
+    BORG_AES_CHUNKER_KERNEL
+        Select the scan kernel used by the AES based chunkers - one variable for all three of
+        ``toeplitz-aes``, ``rabin-aes`` and ``goldilocks-aes`` (default: ``evp``, the portable
+        OpenSSL path). Accepted values are ``vaes``, ``aes-ni``, ``aes-arm64`` and ``evp``.
+        As with the chunker kernels above, all of them chunk identically and differ only in
+        speed, nothing is selected automatically, and a kernel that can not run here is an
+        error rather than a silent fallback.
+        ``vaes`` and ``aes-ni`` exist only on x86-64, ``aes-arm64`` only on aarch64.
+        ``vaes`` additionally needs a compiler that knows it (gcc >= 11 / clang >= 14), so a
+        cpu supporting VAES is not by itself enough to have that kernel available.
     BORG_SHOW_SYSINFO
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.
@@ -209,60 +309,31 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     answer or ask you interactively, depending on whether retries are allowed (they by default are
     allowed). So please test your scripts interactively before making them a non-interactive script.
 
-.. _XDG env var: https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html
-
 Directories and files:
+    Borg 2 uses the platformdirs library (https://pypi.org/project/platformdirs/) to determine
+    default directory locations. This means that default paths are **platform-specific**:
 
-    .. note::
+    - Linux: XDG Base Directory Specification paths are used (e.g. ``~/.config/borg``,
+      ``~/.cache/borg``, ``~/.local/share/borg``). ``XDG_*`` environment variables are
+      honoured (see https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html).
+    - macOS: native macOS directories are used by default (e.g. ``~/Library/Application Support/borg``,
+      ``~/Library/Caches/borg``). ``XDG_*`` environment variables are honoured if set.
+    - Windows: Windows AppData directories are used (e.g. ``C:\Users\<user>\AppData\Roaming\borg``,
+      ``C:\Users\<user>\AppData\Local\borg``). ``XDG_*`` environment variables are **not** honoured.
 
-        Borg 2 uses the `platformdirs <https://pypi.org/project/platformdirs/>`_ library to determine
-        default directory locations. This means that default paths are **platform-specific**:
+    On all platforms, you can override each directory individually using the specific environment
+    variables described below. You can also set ``BORG_BASE_DIR`` to force borg to use
+    ``BORG_BASE_DIR/.config/borg``, ``BORG_BASE_DIR/.cache/borg``, etc., regardless of the platform.
 
-        - **Linux**: Uses XDG Base Directory Specification paths (e.g., ``~/.config/borg``,
-          ``~/.cache/borg``, ``~/.local/share/borg``). `XDG env var`_ variables are honoured.
-        - **macOS**: Uses native macOS directories by default (e.g., ``~/Library/Application Support/borg``,
-          ``~/Library/Caches/borg``). `XDG env var`_ variables are honoured if set.
-        - **Windows**: Uses Windows AppData directories (e.g., ``C:\Users\<user>\AppData\Roaming\borg``,
-          ``C:\Users\<user>\AppData\Local\borg``). `XDG env var`_ variables are **not** honoured.
+    Default directory locations by platform (when no ``BORG_*`` environment variables are set)::
 
-        On all platforms, you can override each directory individually using the specific environment
-        variables described below. You can also set ``BORG_BASE_DIR`` to force borg to use
-        ``BORG_BASE_DIR/.config/borg``, ``BORG_BASE_DIR/.cache/borg``, etc., regardless of the platform.
-
-    Default directory locations by platform (when no ``BORG_*`` environment variables are set):
-
-    .. list-table::
-       :header-rows: 1
-       :widths: 15 25 30 30
-
-       * - Directory
-         - Linux
-         - macOS
-         - Windows
-       * - Config
-         - ``~/.config/borg``
-         - ``~/Library/Application Support/borg``
-         - ``%APPDATA%\borg``
-       * - Cache
-         - ``~/.cache/borg``
-         - ``~/Library/Caches/borg``
-         - ``%LOCALAPPDATA%\borg\Cache``
-       * - Data
-         - ``~/.local/share/borg``
-         - ``~/Library/Application Support/borg``
-         - ``%LOCALAPPDATA%\borg``
-       * - Runtime
-         - ``/run/user/<uid>/borg``
-         - ``~/Library/Caches/TemporaryItems/borg``
-         - ``%TEMP%\borg``
-       * - Keys
-         - ``<config_dir>/keys``
-         - ``<config_dir>/keys``
-         - ``<config_dir>\keys``
-       * - Security
-         - ``<data_dir>/security``
-         - ``<data_dir>/security``
-         - ``<data_dir>\security``
+        Directory  Linux                 macOS                                 Windows
+        Config     ~/.config/borg        ~/Library/Application Support/borg    %APPDATA%\borg
+        Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\borg\Cache
+        Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\borg
+        Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %TEMP%\borg
+        Keys       <config_dir>/keys     <config_dir>/keys                     <config_dir>\keys
+        Security   <data_dir>/security   <data_dir>/security                   <data_dir>\security
 
     BORG_BASE_DIR
         Defaults to ``$HOME`` or ``~$USER`` or ``~`` (in that order).
@@ -272,26 +343,26 @@ Directories and files:
     BORG_CACHE_DIR
         Defaults to the platform-specific cache directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.cache/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_CACHE_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_CACHE_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains the local cache and might need a lot
         of space for dealing with big repositories. Make sure you're aware of the associated
         security aspects of the cache location: :ref:`cache_security`
     BORG_CONFIG_DIR
         Defaults to the platform-specific config directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.config/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_CONFIG_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_CONFIG_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains all borg configuration directories, see the FAQ
         for a security advisory about the data in this directory: :ref:`home_config_borg`
     BORG_DATA_DIR
         Defaults to the platform-specific data directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.local/share/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_DATA_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_DATA_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains all borg data directories, see the FAQ
         for a security advisory about the data in this directory: :ref:`home_data_borg`
     BORG_RUNTIME_DIR
         Defaults to the platform-specific runtime directory (see table above).
         If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.cache/borg``.
-        On Linux and macOS, `XDG env var`_ ``XDG_RUNTIME_DIR`` is also honoured if ``BORG_BASE_DIR`` is not set.
+        On Linux and macOS, ``XDG_RUNTIME_DIR`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains borg runtime files, like e.g. the socket file.
     BORG_SECURITY_DIR
         Defaults to ``$BORG_DATA_DIR/security``.
@@ -312,7 +383,8 @@ Directories and files:
         - you need to point to the correct key file matching the repository the command will operate on.
     TMPDIR
         This is where temporary files are stored (might need a lot of temporary space for some
-        operations), see tempfile_ for details.
+        operations), see https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir
+        for details.
 
 Building:
     BORG_OPENSSL_NAME
@@ -326,38 +398,30 @@ Building:
         Adds given prefix directory to the default locations. If a 'include/lz4.h' is found Borg
         will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
 
+Automatic option environment variables:
+    Borg uses jsonargparse (https://jsonargparse.readthedocs.io/) with ``default_env=True``,
+    which means that every command-line option can also be set via an environment variable.
+
+    The environment variable name is derived from the program name (``borg``),
+    the subcommand (if any), and the option name, all converted to uppercase
+    with dashes replaced by underscores.
+
+    For **top-level options** (not specific to a subcommand), the pattern is::
+
+        BORG_<OPTION>
+
+    For example, ``--lock-wait`` can be set via ``BORG_LOCK_WAIT``.
+
+    For **subcommand options**, the subcommand and option are separated by a
+    double underscore::
+
+        BORG_<SUBCOMMAND>__<OPTION>
+
+    For example, ``borg create --comment`` can be set via ``BORG_CREATE__COMMENT``.
+
 Please note:
 
 - Be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data's security/safety.
 - Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
   mode 600, root:root).
 
-.. _INI: https://docs.python.org/3/library/logging.config.html#configuration-file-format
-
-.. _tempfile: https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir
-
-
-Automatically generated Environment Variables (jsonargparse)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Borg uses jsonargparse_ with ``default_env=True``, which means that every
-command-line option can also be set via an environment variable.
-
-The environment variable name is derived from the program name (``borg``),
-the subcommand (if any), and the option name, all converted to uppercase
-with dashes replaced by underscores.
-
-For **top-level options** (not specific to a subcommand), the pattern is::
-
-    BORG_<OPTION>
-
-For example, ``--lock-wait`` can be set via ``BORG_LOCK_WAIT``.
-
-For **subcommand options**, the subcommand and option are separated by a
-double underscore::
-
-    BORG_<SUBCOMMAND>__<OPTION>
-
-For example, ``borg create --comment`` can be set via ``BORG_CREATE__COMMENT``.
-
-.. _jsonargparse: https://jsonargparse.readthedocs.io/

@@ -191,6 +191,14 @@ Notable:
   This strongly associates the id with the written data (== associates the key with
   the value). When later reading the data for some id, authentication will only
   succeed if what we get was really written by us for that id.
+- Because of that, additionally verifying ``id == MAC(id_key, decompressed)`` after
+  decryption is optional for these modes: it is not what protects against a malicious
+  repository (the authentication tag does that), it only detects chunks whose content
+  does not match their id - which only a malicious or compromised borg client that had
+  the borg key could have written. Borg therefore does not verify that on every read by
+  default, see the ``BORG_ASSERT_ID`` environment variable for details and for the places
+  where borg verifies it by default (e.g. ``borg check --verify-data``, which is the
+  recommended periodic audit for this).
 
 
 Legacy modes

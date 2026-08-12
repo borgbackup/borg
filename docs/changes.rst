@@ -104,7 +104,7 @@ Compatibility notes:
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
-  - removed --save-space option (does not change behaviour)
+  - removed --save-space option (does not change behavior)
 - removed --bypass-lock option
 - removed --remote-path option (use the BORG_REMOTE_PATH environment variable)
 - removed --rsh option (use the BORG_RSH environment variable)
@@ -167,31 +167,95 @@ Version 2.0.0b23 (not released yet)
 
 New features:
 
-- faster:
+- faster create:
 
   - use multi-threaded zstd compression for big chunks, #9961
   - use multi-threaded blake3 hashing for big chunks, #9958
-  - extract: avoid refetching/reparsing repeated chunks, #1678
-  - fetch_many: serve all-zero chunks without repository access; also cache
+  - overlap pack hash/store and build of the next pack, #9988.
+    BORG_PACK_ASYNC=no disables the store-thread (debugging aid).
+  - chunkers, crypto: release the GIL in pure-C hot paths
+  - give each thread its own LZ4 scratch buffer, #10032
+- faster extract / mount:
+
+  - avoid refetching/reparsing repeated chunks, #1678
+  - do not verify the chunk id on every read from an encrypted repo (the
+    AEAD authentication covers reads), see BORG_ASSERT_ID, #9994, #7362
+  - serve all-zero chunks without repository access; also cache
     recently parsed chunks, #1678
+- more, faster, and more secure chunkers:
+
+  - fastcdc is the new and faster default chunker, #9957
+  - fastcdc / buzhash64: SIMD-accelerated scan kernel, #10034, #10043:
+
+    - AVX-512 / AVX2 on x86-64 (Intel / AMD), NEON on aarch64, plus a portable
+      blockwise one; all bit-identical to the sequential loop
+    - the sequential loop is what runs unless BORG_FASTCDC_KERNEL /
+      BORG_BUZHASH64_KERNEL / BORG_AES_CHUNKER_KERNEL selects another kernel:
+      which one is fastest depends on the CPU *and* the compiler, so nothing
+      is chosen automatically
+  - toeplitz-aes, rabin-aes, goldilocks-aes: fingerprinting-resistant chunkers
+    (UHF-then-PRF), with direct AES hw acceleration (AES-NI or VAES/AVX-512) or
+    via OpenSSL, #9987, #10043
+  - zero-copy fill and lazy buffer compaction optimizations
+  - log the chunker and its scan kernel at debug level
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
 - analyze: report deduplicated size of a set of archives, #5741
+- repo-compress: was temporarily gone, re-added now with pack support, #9663
+- version: add --json output, #10004
+- benchmark cpu:
+
+  - add a throughput column (MB/s), #10049
+  - measure hashes and compressors at several buffer sizes
+  - compress deterministic compressible data instead of random noise
+  - measure algorithms the way borg uses them (e.g. multithreading on/off
+    depending on data size)
+  - use --chunking / --hashing / --encrypting / --compressing / --msgpacking
+    to run only a subset of the benchmarks, #10050
+- completion: generate fish and tcsh completions, #9989, #9503
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
+- BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
+- check:
+
+  - keep pack check results, add --max-age to reuse them, #9696, #9925
+  - report missing chunks grouped as chunk -> files -> archives, #9218, #9965
+  - calendar-aware --max-age, symmetric clock-skew window
+  - check: stream one line per missing chunk id, run report on abort, lower report caps, #9218
+
 
 Fixes:
 
 - re-add XXH64 to read borg 1.x integrity data, #9935
+- list: add {blake3} format key, #9984
 - support date: archive patterns for --from-borg1, #9949
 - fix calculate_relative_offset year offset for Feb 29, #9967
 - bind pack object header into AEAD authentication
 - fix false repo relocation warning on macOS due to NFC/NFD path differences, #2913
 - release chunk data memoryviews (fixes PyPy memory leak), #1755, #9978
+- fix DownloadPipeline.fetch_many() crashing on a missing chunk, #10024
+- lrucache: make it thread-safe
+- crypto: start a new session after encrypting 2TiB with one aes256-ocb session key, #6501
 
 Other changes:
 
-- crypto: start a new session after encrypting 2TiB with one aes256-ocb session key, #6501
+- support Python 3.15
+- borgstore: require 0.6.x, with blake3 support
+- shtab: require >=1.9.3
+- list: validate --format keys, #9984
+- crypto: raise IntegrityError for truncated AEAD/AE envelopes
+- chunkers: refactor the shared machinery into a common ChunkerBase class
+- PackReader.read(): return a memoryview of the in-memory pack instead of copying
+- mount/webdav: unify the 3 archive-as-filesystem implementations, #10020.
+  Behavior changes that fell out of the unification:
+
+  - webdav reads now go through DownloadPipeline.fetch_many(), so the all-zero
+    chunk shortcut and the parsed-chunk cache (#1678) apply to webdav as well.
+  - the mounts get webdav's Unicode NFC lookup fallback (macOS decomposes names).
+  - directories report st_nlink >= 2 (hlfuse behavior) in both mounts.
+  - a chunk that is read to its end is no longer put into the data cache, so a
+    full download does not evict the chunks that partial (range) reads need - this was
+    the FUSE behavior, now webdav shares it.
 - removed some global options (they were difficult to use and spammed the help output):
 
   - --remote-path -> BORG_REMOTE_PATH
@@ -203,11 +267,16 @@ Other changes:
 - docs:
 
   - update README
+  - README: show the contributor chart in the "Helping" section
   - new borg2 demo screencast (see www.borgbackup.org), #6303
   - fix/refactor return codes documentation, #9905
   - fix chunks index / memory usage internals documentation, #9937
   - update help for some commands, #9948
   - fix grammar/typos, #9972
+  - add chunker guide (user-level and cryptographic)
+  - FAME.md: update contributor statistics, #10022
+  - crypto: misc. improvements to code and docs, #6501, ...
+  - GitHub issue #10000: "We Are Borg" joke collection
 
 
 Version 2.0.0b22 (2026-07-22)
@@ -245,6 +314,7 @@ New features:
 
   - fastcdc: new chunker (keyed Gear hash, normalized chunking, ~1.3x faster), #9824
   - buzhash64: add normalized chunking (better chunk size distribution, less clamping)
+
 - borg keys:
 
   - locate the borg key automatically in the key directory or in the repository, #9743
@@ -1125,7 +1195,7 @@ New features:
 
 Bug fixes:
 
-- fix Ctrl-C / SIGINT behaviour for pyinstaller-made binaries, #8155
+- fix Ctrl-C / SIGINT behavior for pyinstaller-made binaries, #8155
 - delete: fix error handling with Ctrl-C
 - rcompress: fix error handling with Ctrl-C
 - delete: fix error handling when no archive is specified, #8256
@@ -1155,7 +1225,7 @@ New features:
 - BORG_EXIT_CODES=modern: optional more specific return codes (for errors and warnings).
 
   The default value of this new environment variable is "legacy", which should result in
-  a behaviour similar to borg 1.2 and older (only using rc 0, 1 and 2).
+  a behavior similar to borg 1.2 and older (only using rc 0, 1 and 2).
   "modern" exit codes are much more specific (see the internals/frontends docs).
 - implement "borg version" (shows client and server version), #7829
 
@@ -1404,7 +1474,7 @@ Other changes:
 
 - use local time / local timezone to output timestamps, #7283
 - update development.lock.txt, including a setuptools security fix, #7227
-- remove --save-space option (does not change behaviour)
+- remove --save-space option (does not change behavior)
 - remove part files from final archive
 - remove --consider-part-files, related stats code, update docs
 - transfer: drop part files

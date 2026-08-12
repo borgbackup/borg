@@ -48,7 +48,7 @@ SEE ALSO
 `borg-delete(1)`, `borg-prune(1)`, `borg-compact(1)`,
 `borg-recreate(1)`
 
-`borg-compression(1)`, `borg-patterns(1)`, `borg-placeholders(1)`
+`borg-compression(1)`, `borg-patterns(1)`, `borg-placeholders(1)`, `borg-environment(1)`
 
 * Main web site https://www.borgbackup.org/
 * Releases https://github.com/borgbackup/borg/releases

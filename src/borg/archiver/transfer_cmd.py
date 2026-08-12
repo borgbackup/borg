@@ -143,6 +143,13 @@ class TransferMixIn:
                 "You must use the same chunker secret or deduplication will break. " "Use a related repository!"
             )
 
+        # Transferring re-anchors the content in another repository, so this is the trust boundary where the
+        # chunkid == id_hash(content) invariant should be re-certified (the "transfer" place is verifying by
+        # default, see BORG_ASSERT_ID). This covers everything we read from the source repo: file content
+        # chunks, item metadata streams and the reads feeding --chunker-params re-chunking (there, content
+        # ends up in new chunks under freshly computed ids, so a violation could not be noticed later).
+        other_manifest.repo_objs.set_assert_id_place("transfer")
+
         dry_run = args.dry_run
         archive_infos = other_manifest.archives.list_considering(args)
         count = len(archive_infos)
@@ -394,7 +401,7 @@ class TransferMixIn:
             default=None,
             action=Highlander,
             help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. "
+            "HASH_MASK_BITS, NC_LEVEL) or `default` to use the chunker defaults. "
             "default: do not rechunk",
         )
 

@@ -18,9 +18,10 @@ specified when the backup was performed.
 
 Deduplication is performed globally across all data in the repository
 (multiple backups and even multiple hosts), both on data and file
-metadata, using :ref:`chunks` created by the chunker using the
-Buzhash_ algorithm ("buzhash" and "buzhash64" chunker) or a simpler
-fixed block size algorithm ("fixed" chunker).
+metadata, using :ref:`chunks` created by the chunker using a
+content-defined chunking algorithm - the Gear rolling hash of FastCDC_
+("fastcdc" chunker, the default) or Buzhash_ ("buzhash" and "buzhash64"
+chunker) - or a simpler fixed block size algorithm ("fixed" chunker).
 
 To perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks index <index>`, which is a
@@ -43,5 +44,6 @@ hash table of all chunks that already exist.
 
     internals/security
     internals/data-structures
+    internals/chunker
     internals/packs
     internals/frontends

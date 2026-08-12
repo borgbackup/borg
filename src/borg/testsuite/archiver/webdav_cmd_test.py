@@ -11,7 +11,6 @@ import stat
 import tarfile
 import threading
 import time
-import unicodedata
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -22,10 +21,11 @@ from urllib.parse import urlsplit
 import pytest
 
 from ...constants import *  # NOQA
+from ...archive import Archive
 from ...manifest import Manifest
 from ...platform import is_win32
 from ...repository import Repository
-from ...webdav import make_server, lookup_child, Node
+from ...webdav import make_server
 from .. import are_symlinks_supported, are_hardlinks_supported
 from . import RK_ENCRYPTION, cmd, create_regular_file, generate_archiver_tests
 
@@ -467,18 +467,23 @@ def test_webdav_data_cache(archivers, request, monkeypatch):
     with repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         server = make_server(manifest, args, port=0)
-        assert server.data_cache._capacity == 8  # the env var is honored
+        data_cache = server.RequestHandlerClass.vfs.reader.data_cache
+        assert data_cache._capacity == 8  # the env var is honored
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
             url = f"http://127.0.0.1:{server.server_address[1]}/test/input/big"
-            assert len(server.data_cache) == 0
-            status, _, body = get(url)  # first read populates the cache
+            assert len(data_cache) == 0
+            status, _, body = get(url)  # a full download reads each chunk completely ...
             assert status == 200 and body == big
-            assert len(server.data_cache) > 0  # the multi-chunk file cached some chunks
-            # a second (ranged) read hits the cache and must return identical bytes
+            assert len(data_cache) == 0  # ... so it does not fill (pollute) the cache
+            # a range request only reads part of a chunk, so that chunk is worth caching
             status, _, body = get(url, headers={"Range": "bytes=0-99"})
             assert status == 206 and body == big[:100]
+            assert len(data_cache) > 0
+            # the next range request in the same chunk is served from the cache
+            status, _, body = get(url, headers={"Range": "bytes=100-199"})
+            assert status == 206 and body == big[100:200]
         finally:
             server.shutdown()
             server.server_close()
@@ -521,36 +526,6 @@ def test_webdav_unicode_normalization(archivers, request):
         assert exc_info.value.code == 404
 
 
-def test_webdav_lookup_child():
-    # exact matches always win, and names that are ambiguous after normalization are only
-    # reachable by their exact spelling, so we never serve a different file than requested.
-    nfc_name = "grüße.txt"  # composed
-    nfd_name = unicodedata.normalize("NFD", nfc_name)  # decomposed
-    assert nfc_name != nfd_name
-
-    only_nfc = Node(0o40755, children={nfc_name: Node(0o100644)})
-    # the stored (composed) name is found by both spellings
-    assert lookup_child(only_nfc, nfc_name)[0] == nfc_name
-    assert lookup_child(only_nfc, nfd_name)[0] == nfc_name
-
-    only_nfd = Node(0o40755, children={nfd_name: Node(0o100644)})
-    assert lookup_child(only_nfd, nfd_name)[0] == nfd_name
-    assert lookup_child(only_nfd, nfc_name)[0] == nfd_name  # the other way round, too
-
-    # an archive may contain both spellings (they are different names on e.g. Linux):
-    # each one resolves to itself, exactly.
-    both = Node(0o40755, children={nfc_name: Node(0o100644), nfd_name: Node(0o100644)})
-    assert lookup_child(both, nfc_name)[0] == nfc_name
-    assert lookup_child(both, nfd_name)[0] == nfd_name
-
-    # a name with non-UTF-8 bytes (surrogate escapes) must not break normalization
-    weird = b"bad\xff.txt".decode("utf-8", "surrogateescape")
-    assert lookup_child(Node(0o40755, children={weird: Node(0o100644)}), weird)[0] == weird
-
-    with pytest.raises(KeyError):
-        lookup_child(only_nfc, "no-such-file.txt")
-
-
 def test_webdav_file_without_chunks(archivers, request):
     # An anomalous item - size > 0 but no chunks list (e.g. corrupted metadata) - must not
     # leave the client hanging after an advertised Content-Length: the server aborts the
@@ -565,9 +540,12 @@ def test_webdav_file_without_chunks(archivers, request):
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         server = make_server(manifest, args, port=0)
         # corrupt the in-memory tree: pretend file1 is non-empty but has no chunks
-        node, _, _ = server.RequestHandlerClass.vfs.resolve(["test", "input", "file1"])
-        node.size = 5
-        node.chunks = None
+        vfs = server.RequestHandlerClass.vfs
+        _, node = vfs.resolve(["test", "input", "file1"])
+        item = vfs.get_item(node.ino)
+        item.size = 5
+        del item.chunks
+        vfs._set_item(node.ino, item)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
@@ -578,6 +556,41 @@ def test_webdav_file_without_chunks(archivers, request):
             assert response.getheader("Content-Length") == "5"  # a body was promised...
             with pytest.raises(http.client.IncompleteRead):
                 response.read()  # ...but the connection is aborted with no body
+            conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=10)
+
+
+def test_webdav_damaged_file(archivers, request):
+    # A file with a chunk missing in the repository must never be served as if it were
+    # intact: the server aborts the connection, so the client sees a short read.
+    archiver = request.getfixturevalue(archivers)
+    _create_archive(archiver)
+    args = SimpleNamespace(
+        sort_by="ts", match_archives=None, first=None, last=None, older=None, newer=None, oldest=None, newest=None
+    )
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        archive = Archive(manifest, manifest.archives.get("test").id)
+        for item in archive.iter_items():
+            if item.path.endswith("big"):
+                repository.delete(item.chunks[-1].id)  # get rid of a chunk of "big"
+                break
+        else:
+            assert False  # missed the file
+        server = make_server(manifest, args, port=0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1])
+            conn.request("GET", "/test/input/big")
+            response = conn.getresponse()
+            assert response.status == 200
+            with pytest.raises(http.client.IncompleteRead):
+                response.read()  # the connection is aborted where the chunk is missing
             conn.close()
         finally:
             server.shutdown()

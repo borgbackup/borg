@@ -1,6 +1,7 @@
 import errno
 import os
 import sys
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -177,11 +178,11 @@ def test_get_runtime_dir(monkeypatch):
         monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
         uid = str(os.getuid())
         assert get_runtime_dir(create=False) in [
-            os.path.join("/run/user", uid, "borg"),
-            os.path.join("/var/run/user", uid, "borg"),
-            os.path.join(f"/tmp/runtime-{uid}", "borg"),
-            os.path.join(f"/mnt/eafs/tmp/runtime-{uid}", "borg"),  # CI netbsd
-            os.path.join(f"/var/tmp/borg-ci/runtime-{uid}", "borg"),  # CI omnios (TMPDIR)
+            os.path.join("/run/user", uid, "borg"),  # Linux
+            os.path.join("/var/run/user", uid, "borg"),  # FreeBSD/NetBSD
+            os.path.join("/tmp/run/user", uid, "borg"),  # OpenBSD
+            # platformdirs falls back to a TMPDIR-based path if the platform default is not writable
+            os.path.join(tempfile.gettempdir(), f"runtime-{uid}", "borg"),
         ]
         monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
         assert get_runtime_dir(create=False) == os.path.join("/var/tmp/.cache", "borg")

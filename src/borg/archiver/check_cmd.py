@@ -3,9 +3,10 @@ import os
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
-from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
-from ..helpers import yes, ArchiveFormatter
+from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error, IntegrityError
+from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
+from ..helpers.time import archive_ts_now, calculate_relative_offset
 
 from ..logger import create_logger
 
@@ -42,12 +43,25 @@ class CheckMixIn:
             )
         if args.repo_only and args.find_lost_archives:
             raise CommandError("--repository-only contradicts the --find-lost-archives option.")
+        # resolve the marker (e.g. 4w, 12m) to seconds; calendar units (m, y) count from now, as for
+        # --older/--newer. max_age stays 0 when --max-age is not given, which disables reuse.
+        if args.max_age is not None:
+            now = archive_ts_now()
+            max_age = int((now - calculate_relative_offset(args.max_age, now, earlier=True)).total_seconds())
+        else:
+            max_age = 0
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
+        if args.repair and args.max_age is not None:
+            # repair verifies every pack; reusing recorded results during repair needs repository
+            # repair (refs #8572).
+            raise CommandError("--repair does not allow the --max-age option.")
+        if args.archives_only and args.max_age is not None:
+            # --max-age only affects the repository check; --archives-only skips it.
+            raise CommandError("--archives-only does not allow the --max-age option.")
         if args.max_duration and not args.repo_only:
-            # when doing a partial repo check, we can only do a low-level check of the repository files.
-            # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.
-            # also, there is no max_duration support in the archives check code anyway.
+            # --max-duration limits only the repository check; the archives check has no max_duration
+            # support.
             raise CommandError("--repository-only is required for --max-duration support.")
         if not args.repo_only:
             # if we need the key later for the archives check, ask NOW for the passphrase! #1931
@@ -64,8 +78,10 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
-            if not repository.check(repair=args.repair, max_duration=args.max_duration):
+            if not repository.check(repair=args.repair, max_duration=args.max_duration, max_age=max_age):
                 set_ec(EXIT_WARNING)
+            if sig_int:  # repository check interrupted; skip the archive check
+                raise Error("Got Ctrl-C / SIGINT.")
         if not args.repo_only and not archive_checker.check(
             repository,
             verify_data=args.verify_data,
@@ -118,17 +134,29 @@ class CheckMixIn:
         repository checks only, or pass ``--archives-only`` to run the archive checks
         only.
 
-        The ``--max-duration`` option can be used to split a long-running repository
-        check into multiple partial checks. After the given number of seconds, the check
-        is interrupted. The next partial check will continue where the previous one
-        stopped, until the full repository has been checked. Assuming a complete check
-        would take 7 hours, then running a daily check with ``--max-duration=3600``
-        (1 hour) would result in one full repository check per week. Doing a full
-        repository check aborts any previous partial check; the next partial check will
-        restart from the beginning. With partial repository checks you can run neither
-        archive checks, nor enable repair mode. Consequently, if you want to use
-        ``--max-duration`` you must also pass ``--repository-only``, and must not pass
-        ``--archives-only``, nor ``--repair``.
+        The ``--max-age`` option makes the check reuse the results of previous
+        repository checks: packs whose intact result is younger than the given
+        timespan (e.g. ``--max-age=4w`` or ``--max-age=12m``) are skipped, spreading
+        the verification cost over repeated checks. The timespan uses the same markers
+        as ``--older``/``--newer``: ``d``, ``w``, ``H``, ``M``, ``S`` are exact spans,
+        while ``m`` and ``y`` are calendar units counted from now (so ``12m`` equals
+        ``1y``). Check results are recorded in any case; ``--max-age`` only controls
+        their reuse. Packs recorded corrupt are always re-verified. ``--max-age``
+        affects only the repository check and cannot be combined with
+        ``--archives-only`` or ``--repair``.
+
+        The ``--max-duration`` option splits a long-running repository check into
+        several partial checks. After the given number of seconds, the check is
+        interrupted. A partial check verifies the least-recently-checked packs first,
+        so repeated runs cover the whole repository. Add ``--max-age`` to also skip
+        packs whose result is still younger than the given age: once every pack has a
+        recent result, further runs re-check each pack at most once per ``--max-age``,
+        and no faster than the per-run budget allows.
+        Assuming a complete check would take 7 hours, running a daily check with
+        ``--max-duration=3600 --max-age=1w`` (1 hour) results in one full repository
+        verification per week. Partial repository checks run neither archive checks
+        nor repair mode, so ``--max-duration`` requires ``--repository-only`` and
+        cannot be combined with ``--archives-only`` or ``--repair``.
 
         **Warning:** Please note that partial repository checks (i.e., running with
         ``--max-duration``) can only perform non-cryptographic checksum checks on the
@@ -143,6 +171,10 @@ class CheckMixIn:
         guaranteed for encrypted repositories against attackers without access to the keys.
         You cannot use ``--verify-data`` with ``--repository-only``.
 
+        ``--verify-data`` also always verifies that each chunk's content matches its chunk id,
+        which normal reads do not do by default (see ``BORG_ASSERT_ID``). Running it periodically
+        is therefore recommended.
+
         The ``--find-lost-archives`` option will also scan the whole repository, but
         tells Borg to search for lost archive metadata. If Borg encounters any archive
         metadata that does not match an archive directory entry (including
@@ -155,6 +187,20 @@ class CheckMixIn:
         You can influence how the archive part of the ``Analyzing archive ...`` output is
         formatted by giving a custom format using ``--format`` (see the ``borg repo-list``
         description for more details about the format string).
+
+        If the ``borg check`` process receives a SIGINT signal (Ctrl-C), it stops at the
+        next safe boundary, leaving the repository and its chunk index in a consistent state.
+        The repository check stops after the current pack; ``--verify-data`` and
+        ``--find-lost-archives`` stop after the current chunk; a ``--repair`` archive check
+        stops between whole archives. Results recorded before the interrupt are kept, so a later
+        check does not re-verify those packs until they are due again. With ``--repair``, an
+        interrupted archive check may leave some archives already repaired and others not yet
+        processed, so run ``borg check --repair`` again to finish.
+
+        During a ``--repair`` run, the archive check first rebuilds the chunk index from the
+        packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
+        respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
+        effect until they finish.
 
         About repair mode
         +++++++++++++++++
@@ -217,6 +263,15 @@ class CheckMixIn:
         )
         subparser.add_argument(
             "--find-lost-archives", dest="find_lost_archives", action="store_true", help="attempt to find lost archives"
+        )
+        subparser.add_argument(
+            "--max-age",
+            metavar="TIMESPAN",
+            dest="max_age",
+            type=relative_time_marker_validator,
+            default=None,
+            action=Highlander,
+            help="reuse intact-pack check results younger than TIMESPAN, e.g. 4w or 12m",
         )
         subparser.add_argument(
             "--max-duration",

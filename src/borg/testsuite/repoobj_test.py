@@ -1,11 +1,20 @@
 import pytest
 
 from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
-from ..crypto.key import PlaintextKey, CHPOKey
+from ..crypto.key import PlaintextKey, AuthenticatedKey, CHPOKey
 from ..helpers import msgpack
-from ..helpers.errors import IntegrityError
+from ..helpers.errors import Error, IntegrityError
 from ..repository import Repository
-from ..repoobj import OBJ_MAGIC, OBJ_VERSION, OBJ_VERSION_NO_HEADER_AAD, REPOOBJ_HEADER_SIZE, RepoObj
+from ..repoobj import (
+    ASSERT_ID_PLACES,
+    ASSERT_ID_PLACES_MANDATORY,
+    BORG_ASSERT_ID_DEFAULT,
+    OBJ_MAGIC,
+    OBJ_VERSION,
+    OBJ_VERSION_NO_HEADER_AAD,
+    REPOOBJ_HEADER_SIZE,
+    RepoObj,
+)
 from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
 
@@ -18,6 +27,15 @@ def repository(tmpdir):
 @pytest.fixture
 def key(repository):
     return PlaintextKey(repository)
+
+
+@pytest.fixture
+def authenticated_key(repository):
+    # "authenticated" mode: not encrypted, the id check is the only read path authentication.
+    key = AuthenticatedKey(repository)
+    key.init_from_random_data()
+    key.init_ciphers()
+    return key
 
 
 @pytest.fixture
@@ -269,6 +287,111 @@ def test_untampered_roundtrip_with_aead_key(aead_key):
     got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
     assert got_data == data
     assert got_meta["custom"] == "something"
+
+
+def wrong_content_object(repo_objs, id):
+    """Build an object that decrypts fine for <id>, but whose content does not hash to <id>.
+
+    That is what an evil/compromised borg client with the repo key could store (the id goes into the AAD,
+    so the AEAD layer authenticates such an object just fine) - only assert_id() detects it.
+    """
+    return repo_objs.format(id, {}, b"evil content", ro_type=ROBJ_FILE_STREAM)
+
+
+def test_assert_id_places_default(aead_key, monkeypatch):
+    monkeypatch.delenv("BORG_ASSERT_ID", raising=False)
+    repo_objs = RepoObj(aead_key)
+    assert repo_objs.assert_id_places == frozenset(BORG_ASSERT_ID_DEFAULT)
+    assert repo_objs.assert_id_place == "read"
+    id = repo_objs.id_hash(b"foobar" * 10)  # id of some other content
+    cdata = wrong_content_object(repo_objs, id)
+
+    # by default, the id/content invariant is not checked on the "read" place, the AEAD authentication
+    # is enough there.
+    _, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
+    assert got_data == b"evil content"
+
+    # the places that re-anchor content are verifying by default:
+    for place in ("repair", "transfer", "rechunk"):
+        with pytest.raises(IntegrityError):
+            repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
+
+    # ... including via the place a command sets for everything it reads (transfer, re-chunking, repair):
+    repo_objs.set_assert_id_place("transfer")
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
+
+
+@pytest.mark.parametrize(
+    "env_value, verifying",
+    [
+        ("read", {"read"}),
+        ("read,repair,transfer,rechunk", {"read", "repair", "transfer", "rechunk"}),
+        ("transfer, rechunk", {"transfer", "rechunk"}),  # whitespace is stripped
+        ("", set()),  # verify at none of the configurable places
+    ],
+)
+def test_assert_id_places_env_var(aead_key, monkeypatch, env_value, verifying):
+    monkeypatch.setenv("BORG_ASSERT_ID", env_value)
+    repo_objs = RepoObj(aead_key)
+    assert repo_objs.assert_id_places == frozenset(verifying)
+    id = repo_objs.id_hash(b"foobar" * 10)
+    cdata = wrong_content_object(repo_objs, id)
+
+    for place in ASSERT_ID_PLACES:
+        if place in verifying:
+            with pytest.raises(IntegrityError):
+                repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
+        else:
+            repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
+
+
+@pytest.mark.parametrize("env_value", ["", "read", "repair,transfer,rechunk"])
+def test_assert_id_mandatory_places(aead_key, monkeypatch, env_value):
+    # borg check --verify-data is the audit that makes not verifying elsewhere defensible,
+    # so it verifies no matter what the user configured - it is not a configurable place.
+    monkeypatch.setenv("BORG_ASSERT_ID", env_value)
+    repo_objs = RepoObj(aead_key)
+    id = repo_objs.id_hash(b"foobar" * 10)
+    cdata = wrong_content_object(repo_objs, id)
+
+    for place in ASSERT_ID_PLACES_MANDATORY:
+        assert place not in repo_objs.assert_id_places
+        with pytest.raises(IntegrityError):
+            repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
+
+
+def test_assert_id_places_env_var_invalid(aead_key, monkeypatch):
+    monkeypatch.setenv("BORG_ASSERT_ID", "read,typo")
+    with pytest.raises(Error) as exc_info:
+        RepoObj(aead_key)
+    assert "typo" in str(exc_info.value)
+    assert "read" in str(exc_info.value)  # it tells the valid place names
+
+
+def test_assert_id_places_env_var_mandatory_place(aead_key, monkeypatch):
+    # the mandatory places are not accepted in the env var: they can not be switched off, so
+    # offering to switch them "on" would be misleading.
+    monkeypatch.setenv("BORG_ASSERT_ID", "read,verify_data")
+    with pytest.raises(Error) as exc_info:
+        RepoObj(aead_key)
+    assert "verify_data: always verifies, can not be configured" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("key_fixture", ["key", "authenticated_key"])
+def test_assert_id_never_skipped_for_non_aead_key(key_fixture, request, monkeypatch):
+    # PlaintextKey ("none" mode) and AuthenticatedKey ("authenticated" mode): there is no AEAD, so the id
+    # check is the only integrity check reads have and thus must happen no matter what the user configured.
+    key = request.getfixturevalue(key_fixture)
+    monkeypatch.setenv("BORG_ASSERT_ID", "")  # verify nowhere - but this is not switchable off
+    assert key.id_check_is_authentication
+    repo_objs = RepoObj(key)
+    id = repo_objs.id_hash(b"foobar" * 10)
+    cdata = wrong_content_object(repo_objs, id)
+
+    for place in ASSERT_ID_PLACES:
+        with pytest.raises(IntegrityError):
+            repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
 
 
 def test_version1_object_without_header_aad_still_readable(aead_key):

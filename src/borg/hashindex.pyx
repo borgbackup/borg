@@ -59,19 +59,34 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     def __init__(self, capacity=1000, path=None, usable=None):
         if path:
             self.ht = HashTableNT.read(path)
+            self._new_count = None  # unknown, computed lazily (see new_count)
         else:
             if usable is not None:
                 capacity = usable * 2  # load factor 0.5
             self.ht = HashTableNT(key_size=32, value_type=ChunkIndexEntry, value_format=ChunkIndexEntryFormat,
                                   capacity=capacity)
+            self._new_count = 0
 
     def hide_system_flags(self, value):
         user_flags = value.flags & self.M_USER
         return value._replace(flags=user_flags)
 
-    def iteritems(self, *, only_new=False):
-        """Iterates items (optionally only new items); hides system flags."""
-        for key, value in self.ht.items():
+    @property
+    def new_count(self):
+        """Count of new entries (entries that have the F_NEW flag set)."""
+        if self._new_count is None:
+            # loaded from a file: compute once, then maintain incrementally.
+            self._new_count = sum(1 for key, value in self.ht.items() if value.flags & self.F_NEW)
+        return self._new_count
+
+    def iteritems(self, *, only_new=False, prefix_bits=0, prefix=0):
+        """
+        Iterates items (optionally only new items and/or only items of one key-prefix partition);
+        hides system flags.
+
+        See borghash.HashTable.items for the prefix_bits / prefix semantics.
+        """
+        for key, value in self.ht.items(prefix_bits=prefix_bits, prefix=prefix):
             if not only_new or (value.flags & self.F_NEW):
                 yield key, self.hide_system_flags(value)
 
@@ -101,9 +116,11 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         except KeyError:
             prev_flags = self.F_NONE
             is_new = True
+            inserting = True
         else:
             prev_flags = prev.flags
             is_new = bool(prev_flags & self.F_NEW)  # was new? stays new!
+            inserting = False
         system_flags = prev_flags & self.M_SYSTEM
         if is_new:
             system_flags |= self.F_NEW
@@ -111,6 +128,17 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
             system_flags &= ~self.F_NEW
         user_flags = value.flags & self.M_USER
         self.ht[key] = value._replace(flags=system_flags | user_flags)
+        if inserting and self._new_count is not None:
+            self._new_count += 1  # inserted a new entry (overwriting keeps the F_NEW state)
+
+    def __delitem__(self, key):
+        value = self.ht.pop(key)  # raises KeyError if not present, like del would
+        if self._new_count is not None and (value.flags & self.F_NEW):
+            self._new_count -= 1
+
+    def clear(self):
+        self.ht.clear()
+        self._new_count = 0
 
     def update_pack_info(self, pack_results):
         """Set pack_id, obj_offset and obj_size from a list of (chunk_id, pack_id, obj_offset, obj_size)
@@ -133,6 +161,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
             if value.flags & self.F_NEW:
                 flags = value.flags & ~self.F_NEW
                 self.ht[key] = value._replace(flags=flags)
+        self._new_count = 0
 
     @classmethod
     def read(cls, path):

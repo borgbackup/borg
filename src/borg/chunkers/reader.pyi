@@ -1,13 +1,14 @@
+import os
 from collections.abc import Iterator
 from typing import Any, BinaryIO, NamedTuple
 
 has_seek_hole: bool
 
 class _Chunk(NamedTuple):
-    data: bytes | None
+    data: bytes | memoryview | None
     meta: dict[str, Any]
 
-def Chunk(data: bytes | None, **meta) -> type[_Chunk]: ...
+def Chunk(data: bytes | memoryview | None, **meta) -> type[_Chunk]: ...
 def release_chunk_data(data: bytes | memoryview | None) -> None: ...
 
 fmap_entry = tuple[int, int, bool]
@@ -36,6 +37,9 @@ class FileReader:
         read_size: int = 0,
         sparse: bool = False,
         fmap: list[fmap_entry] = None,
+        st: os.stat_result = None,
     ) -> None: ...
     def _fill_buffer(self) -> bool: ...
+    def _readinto_direct(self, tv: memoryview, size: int) -> int: ...
     def read(self, size: int) -> type[_Chunk]: ...
+    def readinto(self, target: bytearray | memoryview, size: int) -> int: ...

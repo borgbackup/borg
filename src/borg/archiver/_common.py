@@ -8,6 +8,7 @@ from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import SortBySpec, location_validator, Location, relative_time_marker_validator
+from ..helpers import FilesystemPathSpec
 from ..helpers import Highlander, octal_int
 from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
@@ -280,6 +281,11 @@ rst_plain_text_references = {
     "key_files": "Internals -> Data structures and file formats -> Key files",
     "borg_key_export": "borg key export --help",
     "internals_hashindex": "Internals -> Data structures and file formats -> HashIndex",
+    "borg_serve": "borg serve --help",
+    "debugging": '"Debugging Facilities"',
+    "cache_security": 'FAQ -> "Do I need to take security precautions regarding the cache?"',
+    "home_config_borg": 'FAQ -> "How important is the borg config directory?"',
+    "home_data_borg": 'FAQ -> "How important is the borg data directory?"',
     "json_output": "Internals -> All about JSON: How to develop frontends",
 }
 
@@ -314,6 +320,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
     add_option(
         "--exclude-from",
         metavar="EXCLUDEFILE",
+        type=FilesystemPathSpec,
         action=ArgparseExcludeFileAction,
         help="read exclude patterns from EXCLUDEFILE, one per line",
     )
@@ -323,6 +330,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
     add_option(
         "--patterns-from",
         metavar="PATTERNFILE",
+        type=FilesystemPathSpec,
         action=ArgparsePatternFileAction,
         help="read include/exclude patterns from PATTERNFILE, one per line",
     )

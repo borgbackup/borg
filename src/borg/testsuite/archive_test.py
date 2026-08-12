@@ -29,6 +29,12 @@ def stats():
     return stats
 
 
+def show_progress_force(stats, **kwargs):
+    # bypass the BORG_PROGRESS_FPS rate limiting, so every call produces output
+    stats.last_progress = float("-inf")
+    stats.show_progress(**kwargs)
+
+
 def test_stats_basic(stats):
     assert stats.osize == 20
     assert stats.usize == 20
@@ -44,20 +50,20 @@ def test_stats_progress_tty(stats, monkeypatch, columns=80):
 
     monkeypatch.setenv("COLUMNS", str(columns))
     out = TTYStringIO()
-    stats.show_progress(stream=out)
+    show_progress_force(stats, stream=out)
     s = "20 B O 20 B U 1 N "
     buf = " " * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
     out = TTYStringIO()
     stats.update(10**3, unique=False)
-    stats.show_progress(item=Item(path="foo"), final=False, stream=out)
+    show_progress_force(stats, item=Item(path="foo"), final=False, stream=out)
     s = "1.02 kB O 20 B U 1 N foo"
     buf = " " * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
     out = TTYStringIO()
-    stats.show_progress(item=Item(path="foo" * 40), final=False, stream=out)
+    show_progress_force(stats, item=Item(path="foo" * 40), final=False, stream=out)
     s = "1.02 kB O 20 B U 1 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo"
     buf = " " * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
@@ -65,22 +71,34 @@ def test_stats_progress_tty(stats, monkeypatch, columns=80):
 
 def test_stats_progress_file(stats, monkeypatch):
     out = StringIO()
-    stats.show_progress(stream=out)
+    show_progress_force(stats, stream=out)
     s = "20 B O 20 B U 1 N "
     assert out.getvalue() == s + "\n"
 
     out = StringIO()
     stats.update(10**3, unique=False)
     path = "foo"
-    stats.show_progress(item=Item(path=path), final=False, stream=out)
+    show_progress_force(stats, item=Item(path=path), final=False, stream=out)
     s = f"1.02 kB O 20 B U 1 N {path}"
     assert out.getvalue() == s + "\n"
 
     out = StringIO()
     path = "foo" * 40
-    stats.show_progress(item=Item(path=path), final=False, stream=out)
+    show_progress_force(stats, item=Item(path=path), final=False, stream=out)
     s = f"1.02 kB O 20 B U 1 N {path}"
     assert out.getvalue() == s + "\n"
+
+
+def test_stats_progress_rate_limited(stats):
+    out = StringIO()
+    stats.show_progress(stream=out)  # the first update is always shown
+    assert out.getvalue() != ""
+    out = StringIO()
+    stats.show_progress(stream=out)  # immediately after: suppressed by the BORG_PROGRESS_FPS rate limit
+    assert out.getvalue() == ""
+    out = StringIO()
+    stats.show_progress(stream=out, final=True)  # the final update is never suppressed
+    assert out.getvalue() != ""
 
 
 def test_stats_format(stats):
@@ -109,7 +127,7 @@ def test_stats_progress_json(stats):
     stats.output_json = True
 
     out = StringIO()
-    stats.show_progress(item=Item(path="foo"), stream=out)
+    show_progress_force(stats, item=Item(path="foo"), stream=out)
     result = json.loads(out.getvalue())
     assert result["type"] == "archive_progress"
     assert isinstance(result["time"], float)
@@ -241,6 +259,21 @@ def test_download_pipeline_parsed_cache():
     # each distinct chunk was parsed only once, the repetitions were served from the cache
     assert len(parsed_ids) == 3
     assert len(set(parsed_ids)) == 3
+
+
+@pytest.mark.parametrize("replacement_chunk", [False, True])
+def test_download_pipeline_missing_chunk(replacement_chunk):
+    # a chunk missing in the repository is either replaced by all-zero data of the
+    # correct size, or reported as None - and never blows up on the size check.
+    key = PlaintextKey(None)
+    repo_objs = RepoObj(key)
+    data = b"foobar" * 100
+    id = repo_objs.id_hash(data)
+    repository = MockFetchRepo({id: None})  # the object is gone
+    pipeline = DownloadPipeline(repository, repo_objs)
+    chunk_list = [ChunkListEntry(id, len(data))]
+    result = list(pipeline.fetch_many(chunk_list, ro_type=ROBJ_FILE_STREAM, replacement_chunk=replacement_chunk))
+    assert result == [zeros[: len(data)] if replacement_chunk else None]
 
 
 def test_download_pipeline_zero_chunks_served_locally():

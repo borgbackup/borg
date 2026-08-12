@@ -83,6 +83,11 @@ def test_repository_permissions_no_delete(archivers, request, monkeypatch):
     # A dry run only reads and reports, so it is allowed even without write/delete access.
     cmd(archiver, "compact", "--dry-run")
 
+    # Try to repo-compress (and change compression from lz4 to zstd), which should fail up front:
+    # it rewrites (and deletes) pack files, which is disallowed by no-delete.
+    with pytest.raises(Repository.PermissionDenied):
+        cmd(archiver, "repo-compress", "-C", "zstd")
+
     # Check without --repair should work.
     cmd(archiver, "check")
 

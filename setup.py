@@ -54,9 +54,19 @@ if not is_win32:
 compress_source = "src/borg/compress.pyx"
 crypto_ll_source = "src/borg/crypto/low_level.pyx"
 crypto_legacy_ll_source = "src/borg/legacy/crypto/low_level.pyx"
+chunker_base_source = "src/borg/chunkers/base.pyx"
 buzhash_source = "src/borg/chunkers/buzhash.pyx"
 buzhash64_source = "src/borg/chunkers/buzhash64.pyx"
+buzhash64_impl_source = "src/borg/chunkers/buzhash64_impl.c"
 fastcdc_source = "src/borg/chunkers/fastcdc.pyx"
+fastcdc_impl_source = "src/borg/chunkers/fastcdc_impl.c"
+rabin_aes_source = "src/borg/chunkers/rabin_aes.pyx"
+rabin_aes_impl_source = "src/borg/chunkers/rabin_aes_impl.c"
+goldilocks_aes_source = "src/borg/chunkers/goldilocks_aes.pyx"
+goldilocks_aes_impl_source = "src/borg/chunkers/goldilocks_aes_impl.c"
+phte_chunker_source = "src/borg/chunkers/phte_chunker.pyx"
+toeplitz_aes_source = "src/borg/chunkers/toeplitz_aes.pyx"
+toeplitz_aes_impl_source = "src/borg/chunkers/toeplitz_aes_impl.c"
 reader_source = "src/borg/chunkers/reader.pyx"
 hashindex_source = "src/borg/hashindex.pyx"
 item_source = "src/borg/item.pyx"
@@ -72,9 +82,14 @@ cython_sources = [
     compress_source,
     crypto_ll_source,
     crypto_legacy_ll_source,
+    chunker_base_source,
     buzhash_source,
     buzhash64_source,
     fastcdc_source,
+    phte_chunker_source,
+    rabin_aes_source,
+    goldilocks_aes_source,
+    toeplitz_aes_source,
     reader_source,
     hashindex_source,
     item_source,
@@ -166,6 +181,27 @@ if not on_rtd:
         dict(sources=[crypto_legacy_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)
     )
 
+    # rabin-aes uses OpenSSL (EVP AES-128-ECB) in its C scan kernel
+    rabin_aes_ext_kwargs = members_appended(
+        dict(sources=[rabin_aes_source, rabin_aes_impl_source], include_dirs=["src/borg/chunkers"]),
+        crypto_ext_lib,
+        dict(extra_compile_args=cflags),
+    )
+
+    # goldilocks-aes likewise (same PRF layer, different rolling hash)
+    goldilocks_aes_ext_kwargs = members_appended(
+        dict(sources=[goldilocks_aes_source, goldilocks_aes_impl_source], include_dirs=["src/borg/chunkers"]),
+        crypto_ext_lib,
+        dict(extra_compile_args=cflags),
+    )
+
+    # toeplitz-aes likewise (same PRF layer, different rolling hash)
+    toeplitz_aes_ext_kwargs = members_appended(
+        dict(sources=[toeplitz_aes_source, toeplitz_aes_impl_source], include_dirs=["src/borg/chunkers"]),
+        crypto_ext_lib,
+        dict(extra_compile_args=cflags),
+    )
+
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
         lib_ext_kwargs(pc, "BORG_LIBLZ4_PREFIX", "lz4", "liblz4", ">= 1.7.0"),
@@ -189,9 +225,24 @@ if not on_rtd:
         Extension("borg.compress", **compress_ext_kwargs),
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
+        Extension("borg.chunkers.base", [chunker_base_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash", [buzhash_source], extra_compile_args=cflags),
-        Extension("borg.chunkers.buzhash64", [buzhash64_source], extra_compile_args=cflags),
-        Extension("borg.chunkers.fastcdc", [fastcdc_source], extra_compile_args=cflags),
+        Extension(
+            "borg.chunkers.buzhash64",
+            [buzhash64_source, buzhash64_impl_source],
+            include_dirs=["src/borg/chunkers"],
+            extra_compile_args=cflags,
+        ),
+        Extension(
+            "borg.chunkers.fastcdc",
+            [fastcdc_source, fastcdc_impl_source],
+            include_dirs=["src/borg/chunkers"],
+            extra_compile_args=cflags,
+        ),
+        Extension("borg.chunkers.phte_chunker", [phte_chunker_source], extra_compile_args=cflags),
+        Extension("borg.chunkers.rabin_aes", **rabin_aes_ext_kwargs),
+        Extension("borg.chunkers.goldilocks_aes", **goldilocks_aes_ext_kwargs),
+        Extension("borg.chunkers.toeplitz_aes", **toeplitz_aes_ext_kwargs),
         Extension("borg.chunkers.reader", [reader_source], extra_compile_args=cflags),
     ]
 

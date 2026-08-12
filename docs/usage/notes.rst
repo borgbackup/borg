@@ -14,12 +14,12 @@ resource usage (RAM and disk space) as the amount of resources needed is
 (also) determined by the total number of chunks in the repository (see
 :ref:`cache-memory-usage` for details).
 
-``--chunker-params=buzhash,10,23,16,4095`` results in a fine-grained deduplication|
+``--chunker-params=fastcdc,10,23,16,2`` results in a fine-grained deduplication|
 and creates a large number of chunks and thus uses a lot of resources to manage
 them. This is good for relatively small data volumes and if the machine has a
 good amount of free RAM and disk space.
 
-``--chunker-params=buzhash,19,23,21,4095`` (default) results in a coarse-grained
+``--chunker-params=fastcdc,19,23,21,2`` (default) results in a coarse-grained
 deduplication and creates a much smaller number of chunks and thus uses less
 resources. This is good for relatively big data volumes and if the machine has
 a relatively low amount of free RAM and disk space.

@@ -719,7 +719,7 @@ def test_extra_chunks(archivers, request):
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):
-    """finish() stores chunks re-added during --repair before it drops the index (#10055).
+    """finish() stores chunks re-added during --repair before it (re)builds the index (#10055).
 
     close() asserts an empty pack writer buffer, so a chunk left buffered by finish() would
     trip it.
@@ -736,6 +736,8 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.repository = repository
         checker.key = checker.make_key(repository)
         checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
+        # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
+        checker.chunks_modified = True
 
         # a chunk re-added during repair, buffered in the pack writer:
         key = b"01234567890123456789012345678901"

@@ -2455,10 +2455,12 @@ class ArchiveChecker:
 
     def finish(self):
         if self.repair:
+            # flush chunks re-added during repair so their packs are on the store and out of the pack
+            # writer buffer (close() requires an empty buffer, #10055) before we (re)build the index.
+            self.repository.flush()
             if self.chunks_modified:
                 # the packs changed, so the index no longer matches them: rebuild it from the packs
-                # and persist it. flush first so the rewritten and newly written packs are on the store.
-                self.repository.flush()
+                # and persist it.
                 logger.info("Rebuilding and writing the repository chunks index.")
                 build_chunkindex_from_repo(self.repository, slow_rebuild=True, write_immediately=True)
             else:

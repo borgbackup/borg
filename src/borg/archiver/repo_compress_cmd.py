@@ -19,14 +19,18 @@ logger = create_logger()
 
 
 def get_csettings(c):
-    """Return the (ctype, clevel, olevel) compression settings a compressor is configured for."""
+    """Return the (ctype, clevel, olevel) compression settings a compressor is configured for.
+
+    clevel is the *stored* level byte, so that it can be compared against the clevel of an
+    existing repo object as-is - see PackRecompressor.transform.
+    """
     if isinstance(c, Auto):
         return get_csettings(c.compressor)
     if isinstance(c, ObfuscateSize):
         ctype, clevel, _ = get_csettings(c.compressor)
         olevel = c.level
         return ctype, clevel, olevel
-    ctype, clevel, olevel = c.ID, c.level, -1
+    ctype, clevel, olevel = c.ID, c.encode_level(c.level), -1
     return ctype, clevel, olevel
 
 
@@ -37,7 +41,11 @@ def format_compression_spec(ctype, clevel, olevel):
             cname = f"{cname}"
             break
     else:
-        cname = f"{ctype}"
+        cname, cls = f"{ctype}", None
+    if cls is not None:
+        # decode before checking for 255 ("level not applicable"): for zstd the byte is an
+        # int8_t, so 255 there is level -1 and has to be shown.
+        clevel = cls.decode_level(clevel)
     clevel = f",{clevel}" if clevel != 255 else ""
     return obfuscation + cname + clevel
 
@@ -228,7 +236,7 @@ class RepoCompressMixIn:
             type=CompressionSpec,
             default=CompressionSpec("lz4"),
             action=Highlander,
-            help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+            help='select compression algorithm, see the output of the "borg help compression" command for details.',
         )
 
         subparser.add_argument("-s", "--stats", dest="stats", action="store_true", help="print statistics")

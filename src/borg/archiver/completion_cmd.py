@@ -972,7 +972,16 @@ class CompletionMixIn:
         help_choices = " ".join(sorted(help_choices))
 
         # Compression spec choices (static list)
-        comp_spec_choices = ["lz4", "zstd,3", "auto,zstd,10", "zlib,6", "lzma,6", "obfuscate,250,lz4", "none"]
+        comp_spec_choices = [
+            "lz4",
+            "zstd,3",
+            "zstd,-4",
+            "auto,zstd,10",
+            "zlib,6",
+            "lzma,6",
+            "obfuscate,250,lz4",
+            "none",
+        ]
         comp_spec_choices_str = " ".join(comp_spec_choices)
 
         # Chunker params choices (static list)

@@ -128,8 +128,24 @@ cdef class CompressorBase:
     def detect(cls, data):
         return data and data[0] == cls.ID
 
+    @classmethod
+    def encode_level(cls, level):
+        """Compression level as the compressor uses it -> the single clevel byte we store.
+
+        Compressors that need a different byte encoding (see ZSTD) override this and
+        decode_level. Doing it per compressor rather than globally keeps the stored byte
+        of every other compressor exactly as it always was.
+        """
+        assert 0 <= level <= 255, f"invalid level: {level}"
+        return level
+
+    @classmethod
+    def decode_level(cls, clevel):
+        """The stored clevel byte -> compression level as the compressor uses it."""
+        return clevel
+
     def __init__(self, level=255, legacy_mode=False, **kwargs):
-        assert 0 <= level <= 255
+        self.encode_level(level)  # rejects levels this compressor cannot store
         self.level = level
         self.legacy_mode = legacy_mode  # True: support prefixed ctype/clevel bytes
 
@@ -152,10 +168,10 @@ cdef class CompressorBase:
         """
         if self.legacy_mode:
             # the ID/level prefix concatenation needs bytes (bytes() is a no-op for bytes input)
-            return None, bytes((self.ID, self.level)) + bytes(data)
+            return None, bytes((self.ID, self.encode_level(self.level))) + bytes(data)
         else:
             meta["ctype"] = self.ID
-            meta["clevel"] = self.level
+            meta["clevel"] = self.encode_level(self.level)
             meta["csize"] = len(data)
             return meta, data
 
@@ -384,9 +400,24 @@ class LZMA(DecidingCompressor):
 class ZSTD(DecidingCompressor):
     """
     zstd compression / decompression (python stdlib (python >= 3.14))
+
+    Levels range from -128 to 22. The negative ones are zstd's "fast" levels (level -N is
+    what the zstd cli calls --fast=N): they trade compression ratio for speed.
     """
     ID = 0x03
     name = 'zstd'
+
+    @classmethod
+    def encode_level(cls, level):
+        # We interpret the clevel byte as an int8_t, which is what makes the negative levels
+        # storable at all. Levels 1..22 encode to the very same byte value as before, so
+        # repos written by older borg versions keep their meaning.
+        assert -128 <= level <= 127, f"invalid level: {level}"
+        return level & 0xFF
+
+    @classmethod
+    def decode_level(cls, clevel):
+        return clevel - 256 if clevel >= 128 else clevel
 
     def __init__(self, level=3, legacy_mode=False, **kwargs):
         super().__init__(level=level, legacy_mode=legacy_mode, **kwargs)
@@ -715,9 +746,9 @@ class Compressor:
     @staticmethod
     def detect(data):
         hdr = bytes(data[:2])  # detect() does not work with memoryview
-        level = hdr[1]  # usually the level, but not for zlib_legacy
+        clevel = hdr[1]  # usually the level byte, but not for zlib_legacy
         for cls in COMPRESSOR_LIST:
             if cls.detect(hdr):
-                return cls, (255 if cls.name == 'zlib_legacy' else level)
+                return cls, (255 if cls.name == 'zlib_legacy' else cls.decode_level(clevel))
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])

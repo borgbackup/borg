@@ -198,6 +198,8 @@ New features:
     via OpenSSL, #9987, #10043
   - zero-copy fill and lazy buffer compaction optimizations
   - log the chunker and its scan kernel at debug level
+- compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.
+  They trade compression ratio for speed. Compatible with existing repositories.
 - webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
   replacement for `borg mount` in some use cases, #9942
 - mount: expose POSIX ACLs on Linux mounts (not enforced), #1042

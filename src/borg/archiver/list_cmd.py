@@ -1,4 +1,5 @@
 import os
+import stat
 import textwrap
 import sys
 
@@ -8,11 +9,38 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ItemFormatter, BaseFormatter, archivename_validator, PathSpec
 from ..helpers.argparsing import ArgumentParser
+from ..helpers.sorting import sort_spec_validator, sorted_by_spec
 from ..manifest import Manifest
 
 from ..logger import create_logger
 
 logger = create_logger()
+
+# item fields "borg list --sort-by" can sort by
+ITEM_SORT_KEYS = ("path", "type", "mode", "user", "uid", "group", "gid", "size", "mtime", "ctime", "atime")
+item_sort_spec = sort_spec_validator(ITEM_SORT_KEYS, name="item_sort_spec")
+
+
+def item_sort_key(field, item):
+    """Compute the sort key of item for field, mirroring what ItemFormatter displays."""
+    if field == "path":
+        return item.path
+    if field in ("type", "mode"):
+        mode = stat.filemode(item.get("mode", 0))
+        return mode[0] if field == "type" else mode
+    if field == "size":
+        return item.get_size()
+    if field in ("uid", "gid"):
+        value = item.get(field)
+        return -1 if value is None else value
+    if field in ("user", "group"):
+        value = item.get(field)
+        # if the name is not known, ItemFormatter displays the numeric id, so sort by that.
+        return str(item.get("uid" if field == "user" else "gid")) if value is None else value
+    if field in ("mtime", "ctime", "atime"):
+        # raw ns timestamps. ItemFormatter falls back to mtime for a missing atime/ctime, mirror that.
+        return item.get(field) or item.get("mtime") or 0
+    raise ValueError(f"Invalid sort field name: {field}")
 
 
 class ListMixIn:
@@ -49,7 +77,8 @@ class ListMixIn:
                         return False
                 return True
 
-            for item in archive.iter_items(item_filter):
+            items = sorted_by_spec(archive.iter_items(item_filter), args.sort_by, item_sort_key)
+            for item in items:
                 sys.stdout.write(formatter.format_item(item, args.json_lines, sort=True))
 
         # Only load the cache if it will be used
@@ -103,6 +132,38 @@ class ListMixIn:
         """
             )
             + ItemFormatter.keys_help()
+            + textwrap.dedent(
+                """
+
+        Sorting
+        +++++++
+        Use ``--sort-by SPEC`` where SPEC is a comma-separated list of fields.
+        Sorts are applied stably from last to first in the given list, thus the first
+        field is the primary sort criterion. Prepend ">" for descending, "<" (or no
+        prefix) for ascending order, e.g. ``--sort-by='>size,path'`` (quote it, ">" is
+        a shell redirection).
+
+        Supported fields, sorting by the same value that ``--format`` would print:
+
+        - path: the item path
+        - type, mode: the file type character resp. the full file mode string
+        - user, group: the owner/group name, or the numeric id if the name is not known
+        - uid, gid: the numeric owner/group id
+        - size: the file size (0 for hardlink slaves, same as {size})
+        - mtime, ctime, atime: the timestamps (atime/ctime fall back to mtime if not stored)
+
+        There is no ``birthtime`` field, as there is no {birthtime} format key either.
+
+        The sort fields are independent of ``--format``, you may sort by a field you do
+        not print.
+
+        Note: ``--sort-by`` needs to read all (matching) items into memory before it can
+        print anything, so listing a huge archive this way needs a lot of memory and
+        delays the first output line. Without ``--sort-by``, items are streamed and their
+        order is undefined. If memory usage is a problem, consider
+        ``borg list --format ... | sort`` instead.
+        """
+            )
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_list.__doc__, epilog=list_epilog)
         subparsers.add_subcommand("list", subparser, help="list archive contents")
@@ -127,6 +188,14 @@ class ListMixIn:
         )
         subparser.add_argument(
             "--depth", metavar="N", dest="depth", type=int, help="only list files up to the specified directory depth"
+        )
+        subparser.add_argument(
+            "--sort-by",
+            metavar="SPEC",
+            dest="sort_by",
+            type=item_sort_spec,
+            action=Highlander,
+            help="sort output by comma-separated fields (e.g. '>size,path'), see Sorting below",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

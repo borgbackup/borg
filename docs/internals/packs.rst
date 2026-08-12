@@ -91,10 +91,30 @@ A reader locates the next blob by advancing::
 
     next_blob_offset = current_blob_offset + REPOOBJ_HEADER_SIZE + meta_size + data_size
 
-The per-blob magic limits the blast radius of corrupted length fields: if
-``meta_size`` or ``data_size`` is damaged, the scanner loses at most one blob.
-Once it finds the next ``OBJ_MAGIC`` sequence it resumes. Other corruption
-(payload bit flips) is caught by AEAD on that blob without losing position.
+``iter_headers()`` checks every header it walks: it must have ``OBJ_MAGIC``, a
+supported version, and sizes that keep the blob inside the pack. A header that
+fails these checks means a corrupt pack, and ``IntegrityError`` is raised.
+
+The per-blob magic limits the blast radius of corrupted length fields. The
+repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``
+rebuilds the chunks index from the packs) scans forward for the next blob and
+resumes there, so the blobs after the damaged part of the pack are still found.
+
+``OBJ_MAGIC`` occurs inside the payloads as well, and in ``none`` and
+``authenticated`` mode the payloads are user content stored as it is, so a
+backed up file can contain something shaped like a blob. The scan therefore
+accepts a candidate only if it parses. For the AEAD keys it reads the header and
+the encrypted metadata, a few hundred bytes: decrypting the metadata
+authenticates it together with the header's magic, version and chunk_id, which
+are its AAD (additional authenticated data: authenticated with the ciphertext,
+but not encrypted). The other keys authenticate by ``chunk_id == id_hash(content)``
+(``KeyBase.id_check_is_authentication``), which needs the blob's data, so for
+those the scan reads the whole blob. The key is needed either way; a repair that
+cannot read the manifest walks without scanning.
+
+``data_size`` is not part of that AAD, so accepting a candidate authenticates
+its chunk id, and its size only as far as the blob fits into the pack. Bit flips
+in the data are caught when the blob is read, on that blob alone.
 
 Blobs follow one another contiguously with no padding::
 

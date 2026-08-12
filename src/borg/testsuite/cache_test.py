@@ -26,7 +26,8 @@ from ..cache import (
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
-from ..helpers import safe_ns
+from ..helpers import bin_to_hex, safe_ns
+from ..helpers import IntegrityError
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import Repository
@@ -503,6 +504,26 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
         index = build_chunkindex_from_repo(repository)
         for cid in all_ids:
             assert cid in index
+
+
+def test_build_chunkindex_repair_resyncs_after_corrupt_header(tmp_path):
+    """A corrupt object header fails the rebuild, but with repair=True the rest of the pack is indexed."""
+    from .repository_test import accept_all, fchunk
+
+    obj1 = bytearray(fchunk(b"first", chunk_id=H(90)))
+    obj2 = fchunk(b"second", chunk_id=H(91))
+    obj1[0] ^= 0xFF  # break the magic of the first object's header
+    pack_id = H(92)
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), bytes(obj1) + obj2)
+        with pytest.raises(IntegrityError):
+            build_chunkindex_from_repo(repository, slow_rebuild=True)
+        # accept_all: accepts every candidate, so this exercises the plumbing only.
+        index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_all)
+        assert H(91) in index  # found by resyncing past the damaged header
+        assert H(90) not in index  # its header is gone, so the object can not be indexed
+        assert index[H(91)].pack_id == pack_id
+        assert index[H(91)].obj_offset == len(obj1)
 
 
 def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):

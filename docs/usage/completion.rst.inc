@@ -48,3 +48,9 @@ Please note that for some dynamic completions (like archive IDs), the shell
 completion script will call borg to query the repository. This will work best
 if that call can be made without prompting for user input, so you may want to
 set BORG_REPO and BORG_PASSPHRASE environment variables.
+
+In tcsh, completions for positional arguments are matched by word position, so
+e.g. an archive name is only completed if no options precede it - one more
+reason to use BORG_REPO there rather than --repo. Also, options are matched by
+name only, so --sort-by offers the union of the sort keys valid for list, diff
+and the commands filtering archives.

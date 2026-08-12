@@ -8,6 +8,7 @@ import tempfile
 import pytest
 
 import borg
+from ...archiver.completion_cmd import TCSH_SORTBY_FN
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
@@ -56,6 +57,28 @@ def _run_bash_completion_fn(completion_script, setup_code):
     finally:
         os.unlink(script_path)
     return result
+
+
+def _run_zsh_completion_fn(completion_script, setup_code):
+    """Run a preamble helper of the completion script in zsh, return subprocess result.
+
+    The generated script can not just be sourced: its tail calls _shtab_borg when it is not
+    sourced from a completion context. So we only take the preamble (shtab wraps it into
+    markers) and stub compadd, which is how the helpers report their candidates.
+    """
+    preamble = completion_script.split("# Custom Preamble\n", 1)[1].split("\n# End Custom Preamble", 1)[0]
+    code = (
+        preamble + "\n"
+        'compadd() { local a; for a in "$@"; do [[ $a == -* ]] && continue; print -r -- $a; done }\n' + setup_code
+    )
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".zsh", delete=False) as f:
+        f.write(code)
+        script_path = f.name
+    try:
+        # -f: do not read the startup files
+        return subprocess.run(["zsh", "-f", script_path], capture_output=True, text=True, timeout=120)
+    finally:
+        os.unlink(script_path)
 
 
 def _fish_quote(text):
@@ -217,27 +240,110 @@ def test_tcsh_completion_syntax(archivers, request):
     assert result.returncode == 0, f"Generated Tcsh completion has errors: {result.stderr.decode()}"
 
 
-# -- borg-specific preamble function behavior (bash) --------------------------
+# -- --sort-by completion (one helper per set of sort keys) -------------------
+
+# (command, name of the shell helper completing its --sort-by)
+SORTBY_WIRING = [
+    ("repo-list", "_borg_complete_sortby"),
+    ("list", "_borg_complete_item_sortby"),
+    ("diff", "_borg_complete_diff_sortby"),
+]
+
+# (helper, already typed value, keys it must offer, keys it must not offer)
+SORTBY_BEHAVIOR = [
+    # archive sort keys, must not re-offer an already selected key
+    ("_borg_complete_sortby", "timestamp,", ["timestamp,archive"], ["timestamp,timestamp"]),
+    # item sort keys, not the archive or item diff ones
+    ("_borg_complete_item_sortby", "", ["path", "size", "atime"], ["timestamp", "archive", "size_added"]),
+    ("_borg_complete_item_sortby", "size,", ["size,path"], ["size,size"]),
+    # item diff sort keys: "size" is a valid key, but does not match the "size_" fragment
+    ("_borg_complete_diff_sortby", "size_", ["size_added", "size_removed", "size_diff"], ["size"]),
+    ("_borg_complete_diff_sortby", "path,", ["path,size_added"], ["path,path", "path,atime"]),
+]
+
+
+@pytest.mark.parametrize("command,fn", SORTBY_WIRING)
+def test_bash_sortby_wiring(archivers, request, command, fn):
+    output = cmd(request.getfixturevalue(archivers), "completion", "bash")
+    assert f"_shtab_borg_{command.replace('-', '_')}___sort_by_COMPGEN={fn}\n" in output
+    assert f"\n{fn}() {{\n" in output
+
+
+@pytest.mark.parametrize("command,fn", SORTBY_WIRING)
+def test_zsh_sortby_wiring(archivers, request, command, fn):
+    output = cmd(request.getfixturevalue(archivers), "completion", "zsh")
+    block = output.split(f"\n_shtab_borg_{command.replace('-', '_')}_options=(\n", 1)[1].split("\n)\n", 1)[0]
+    assert f':sort_by:{fn}"' in block
+    assert f"\n{fn}() {{\n" in output
+
+
+@pytest.mark.parametrize("command,fn", SORTBY_WIRING)
+def test_fish_sortby_wiring(archivers, request, command, fn):
+    output = cmd(request.getfixturevalue(archivers), "completion", "fish")
+    assert any(
+        f"_shtab_borg_using {command}'" in line and " -l sort-by " in line and f'"({fn})"' in line
+        for line in output.splitlines()
+    )
+    assert f"\nfunction {fn}\n" in output
+
+
+def test_tcsh_sortby_single_rule(archivers, request):
+    """tcsh matches by option name only, so all --sort-by options share one helper."""
+    output = cmd(request.getfixturevalue(archivers), "completion", "tcsh")
+    assert output.count("'n/--sort-by/") == 1
+    assert f"'n/--sort-by/`{TCSH_SORTBY_FN}`/'" in output
+    alias = next(line for line in output.splitlines() if line.startswith(f"alias {TCSH_SORTBY_FN} "))
+    for key in ("timestamp", "atime", "size_added"):  # the union of all the sort keys
+        assert f" {key}" in alias
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish", "tcsh"])
+def test_completion_helpers_are_defined(archivers, request, shell):
+    """Every _borg_* helper the generated script refers to must also be defined by it."""
+    output = cmd(request.getfixturevalue(archivers), "completion", shell)
+    defined = set(re.findall(r"^(?:function |alias )?(_borg_\w+)\s*(?:\(\)|\(|\s|$)", output, re.M))
+    referenced = set(re.findall(r"_borg_complete_\w+|_borg_help_topics", output))
+    assert referenced <= defined, f"undefined: {sorted(referenced - defined)}"
 
 
 @needs_bash
-def test_bash_sortby_dedup(archivers, request):
-    """_borg_complete_sortby should not re-offer already-selected sort keys."""
+@pytest.mark.parametrize("fn,typed,expected,not_expected", SORTBY_BEHAVIOR)
+def test_bash_sortby_keysets(archivers, request, fn, typed, expected, not_expected):
     archiver = request.getfixturevalue(archivers)
     script = cmd(archiver, "completion", "bash")
 
-    # Simulate: user typed "borg repo-list --sort-by timestamp,"
-    # The function should offer remaining keys but NOT "timestamp" again.
-    result = _run_bash_completion_fn(
-        script, 'COMP_WORDS=(borg repo-list --sort-by "timestamp,")\n' "COMP_CWORD=3\n" "_borg_complete_sortby\n"
-    )
+    result = _run_bash_completion_fn(script, f'COMP_WORDS=(borg cmd --sort-by "{typed}")\nCOMP_CWORD=3\n{fn}\n')
     assert result.returncode == 0, f"stderr: {result.stderr}"
-    lines = [line for line in result.stdout.strip().splitlines() if line.strip()]
-    # "timestamp" must not appear as a standalone completion candidate
-    bare_keys = [line.rsplit(",", 1)[-1] for line in lines]
-    assert "timestamp" not in bare_keys, f"timestamp was re-offered: {lines}"
-    # Other keys like "archive" should be offered
-    assert any("archive" in line for line in lines), f"expected 'archive' in completions: {lines}"
+    candidates = result.stdout.split()
+    assert set(expected) <= set(candidates), f"missing from {candidates}"
+    assert not set(not_expected) & set(candidates), f"unexpected in {candidates}"
+
+
+@needs_zsh
+@pytest.mark.parametrize("fn,typed,expected,not_expected", SORTBY_BEHAVIOR)
+def test_zsh_sortby_keysets(archivers, request, fn, typed, expected, not_expected):
+    archiver = request.getfixturevalue(archivers)
+    script = cmd(archiver, "completion", "zsh")
+
+    result = _run_zsh_completion_fn(script, f"words=(borg cmd --sort-by '{typed}')\nCURRENT=4\n{fn}\n")
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    candidates = result.stdout.split()
+    assert set(expected) <= set(candidates), f"missing from {candidates}"
+    assert not set(not_expected) & set(candidates), f"unexpected in {candidates}"
+
+
+@needs_fish
+def test_fish_sortby_keysets(archivers, request):
+    """Each command's --sort-by completes its own sort keys."""
+    archiver = request.getfixturevalue(archivers)
+    script = cmd(archiver, "completion", "fish")
+
+    items = _fish_complete_candidates(script, "borg list --sort-by ")
+    assert "atime" in items and "timestamp" not in items and "size_added" not in items
+    diffs = _fish_complete_candidates(script, "borg diff --sort-by size_added,")
+    assert "size_added,path" in diffs and "size_added,size_added" not in diffs
+    archives = _fish_complete_candidates(script, "borg repo-list --sort-by ")
+    assert "timestamp" in archives and "atime" not in archives
 
 
 @needs_bash

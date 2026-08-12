@@ -60,6 +60,8 @@ import re
 import shtab
 
 from ._common import process_epilog
+from .diff_cmd import DIFF_SORT_KEYS, diff_sort_spec
+from .list_cmd import ITEM_SORT_KEYS, item_sort_spec
 from ..constants import *  # NOQA
 from ..helpers import (
     archivename_validator,
@@ -236,52 +238,7 @@ _borg_complete_file_size() {
   compgen -W "${choices}" -- "$1"
 }
 
-# Complete comma-separated sort keys for any option with type=SortBySpec.
-# Keys are validated against Borg's AI_HUMAN_SORT_KEYS.
-_borg_complete_sortby() {
-  local cur="${COMP_WORDS[COMP_CWORD]}"
-
-  # Extract value part for --opt=value forms; otherwise the value is the word itself
-  local val prefix_eq
-  if [[ "$cur" == *=* ]]; then
-    prefix_eq="${cur%%=*}="
-    val="${cur#*=}"
-  else
-    prefix_eq=""
-    val="$cur"
-  fi
-
-  # Split into head (selected keys + trailing comma if any) and fragment (last token being typed)
-  local head frag
-  if [[ "$val" == *,* ]]; then
-    head="${val%,*},"
-    frag="${val##*,}"
-  else
-    head=""
-    frag="$val"
-  fi
-
-  # Build a comma-delimited list for cheap membership testing
-  local headlist
-  if [[ -n "$head" ]]; then
-    headlist=",${head%,},"
-  else
-    headlist=","  # nothing selected yet
-  fi
-
-  # Valid keys (embedded at generation time)
-  local keys=({SORT_KEYS})
-
-  local k
-  for k in "${keys[@]}"; do
-    # skip already-selected keys
-    [[ "$headlist" == *",${k},"* ]] && continue
-    # match prefix of last fragment
-    [[ -n "$frag" && "$k" != "$frag"* ]] && continue
-    printf '%s\n' "${prefix_eq}${head}${k}"
-  done
-}
-
+{SORTBY_FUNCS}
 # Complete comma-separated files cache mode tokens for options with type=FilesCacheMode.
 _borg_complete_filescachemode() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
@@ -527,50 +484,7 @@ _borg_complete_file_size() {
   compadd -V 'file size' -Q -a choices
 }
 
-# Complete comma-separated sort keys for any option with type=SortBySpec.
-_borg_complete_sortby() {
-  local cur
-  cur="${words[$CURRENT]}"
-
-  local val prefix_eq
-  if [[ "$cur" == *"="* ]]; then
-    prefix_eq="${cur%%\=*}="
-    val="${cur#*=}"
-  else
-    prefix_eq=""
-    val="$cur"
-  fi
-
-  local head frag
-  if [[ "$val" == *","* ]]; then
-    head="${val%,*},"
-    frag="${val##*,}"
-  else
-    head=""
-    frag="$val"
-  fi
-
-  local headlist
-  if [[ -n "$head" ]]; then
-    headlist=",${head%,},"
-  else
-    headlist=","  # nothing selected yet
-  fi
-
-  # Valid keys (embedded at generation time)
-  local -a keys=({SORT_KEYS})
-
-  local -a candidates=()
-  local k
-  for k in ${keys[@]}; do
-    [[ "$headlist" == *",${k},"* ]] && continue
-    [[ -n "$frag" && "$k" != "$frag"* ]] && continue
-    candidates+=( "${prefix_eq}${head}${k}" )
-  done
-  compadd -Q -- $candidates
-  return 0
-}
-
+{SORTBY_FUNCS}
 # Complete comma-separated files cache mode tokens for options with type=FilesCacheMode.
 _borg_complete_filescachemode() {
   local cur
@@ -753,17 +667,7 @@ function _borg_csv_emit
     end
 end
 
-# Complete comma-separated sort keys for any option with type=SortBySpec.
-function _borg_complete_sortby
-    _borg_csv_scan
-    for k in {SORT_KEYS}
-        if contains -- $k $_borg_csv_selected
-            continue
-        end
-        _borg_csv_emit $k
-    end
-end
-
+{SORTBY_FUNCS}
 # Complete comma-separated files cache mode tokens for options with type=FilesCacheMode.
 function _borg_complete_filescachemode
     _borg_csv_scan
@@ -799,7 +703,7 @@ TCSH_PREAMBLE_TMPL = r"""
 alias _borg_complete_timestamp 'date +"%Y-%m-%dT%H:%M:%S"'
 
 
-alias _borg_complete_sortby "echo {SORT_KEYS}"
+{SORTBY_FUNCS}
 alias _borg_complete_filescachemode "echo {FCM_KEYS}"
 alias _borg_help_topics "echo {HELP_CHOICES}"
 alias _borg_complete_compression_spec "echo {COMP_SPEC_CHOICES}"
@@ -844,6 +748,149 @@ TCSH_SH_COMPLETE = (
     'borg repo-list "$@" --format "{archive}{NL}" 2>/dev/null </dev/null; '
     "fi"
 )
+
+
+# There is more than one kind of --sort-by (archives, items, item diffs), each with its own set of
+# valid sort keys. The completion code is the same for all of them - only the helper's name and the
+# key list differ - so it is generated from one template per shell, rendered once per key set, see
+# SORTBY_COMPLETERS and _sortby_functions.
+BASH_SORTBY_FN_TMPL = r"""
+# Complete comma-separated sort keys for the options using this set of keys.
+{FN_NAME}() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+
+  # Extract value part for --opt=value forms; otherwise the value is the word itself
+  local val prefix_eq
+  if [[ "$cur" == *=* ]]; then
+    prefix_eq="${cur%%=*}="
+    val="${cur#*=}"
+  else
+    prefix_eq=""
+    val="$cur"
+  fi
+
+  # Split into head (selected keys + trailing comma if any) and fragment (last token being typed)
+  local head frag
+  if [[ "$val" == *,* ]]; then
+    head="${val%,*},"
+    frag="${val##*,}"
+  else
+    head=""
+    frag="$val"
+  fi
+
+  # Build a comma-delimited list for cheap membership testing
+  local headlist
+  if [[ -n "$head" ]]; then
+    headlist=",${head%,},"
+  else
+    headlist=","  # nothing selected yet
+  fi
+
+  # Valid keys (embedded at generation time)
+  local keys=({KEYS})
+
+  local k
+  for k in "${keys[@]}"; do
+    # skip already-selected keys
+    [[ "$headlist" == *",${k},"* ]] && continue
+    # match prefix of last fragment
+    [[ -n "$frag" && "$k" != "$frag"* ]] && continue
+    printf '%s\n' "${prefix_eq}${head}${k}"
+  done
+}
+"""
+
+ZSH_SORTBY_FN_TMPL = r"""
+# Complete comma-separated sort keys for the options using this set of keys.
+{FN_NAME}() {
+  local cur
+  cur="${words[$CURRENT]}"
+
+  local val prefix_eq
+  if [[ "$cur" == *"="* ]]; then
+    prefix_eq="${cur%%\=*}="
+    val="${cur#*=}"
+  else
+    prefix_eq=""
+    val="$cur"
+  fi
+
+  local head frag
+  if [[ "$val" == *","* ]]; then
+    head="${val%,*},"
+    frag="${val##*,}"
+  else
+    head=""
+    frag="$val"
+  fi
+
+  local headlist
+  if [[ -n "$head" ]]; then
+    headlist=",${head%,},"
+  else
+    headlist=","  # nothing selected yet
+  fi
+
+  # Valid keys (embedded at generation time)
+  local -a keys=({KEYS})
+
+  local -a candidates=()
+  local k
+  for k in ${keys[@]}; do
+    [[ "$headlist" == *",${k},"* ]] && continue
+    [[ -n "$frag" && "$k" != "$frag"* ]] && continue
+    candidates+=( "${prefix_eq}${head}${k}" )
+  done
+  compadd -Q -- $candidates
+  return 0
+}
+"""
+
+FISH_SORTBY_FN_TMPL = r"""
+# Complete comma-separated sort keys for the options using this set of keys.
+function {FN_NAME}
+    _borg_csv_scan
+    for k in {KEYS}
+        if contains -- $k $_borg_csv_selected
+            continue
+        end
+        _borg_csv_emit $k
+    end
+end
+"""
+
+TCSH_SORTBY_FN_TMPL = 'alias {FN_NAME} "echo {KEYS}"\n'
+
+SORTBY_FN_TMPLS = {
+    "bash": BASH_SORTBY_FN_TMPL,
+    "zsh": ZSH_SORTBY_FN_TMPL,
+    "fish": FISH_SORTBY_FN_TMPL,
+    "tcsh": TCSH_SORTBY_FN_TMPL,
+}
+
+# tcsh matches completion rules by option name only, in one flat namespace for all subcommands,
+# so it can not tell `borg list --sort-by` from `borg repo-list --sort-by`. Thus, it gets a single
+# helper offering the union of all sort keys, see for_all_shells(tcsh_fn=...).
+TCSH_SORTBY_FN = "_borg_complete_sortby"
+
+# the --sort-by flavours: (argparse type, name of the shell helper completing it, valid sort keys)
+SORTBY_COMPLETERS = [
+    (SortBySpec, "_borg_complete_sortby", AI_HUMAN_SORT_KEYS),  # archives: repo-list, ...
+    (item_sort_spec, "_borg_complete_item_sortby", ITEM_SORT_KEYS),  # items: list
+    (diff_sort_spec, "_borg_complete_diff_sortby", DIFF_SORT_KEYS),  # item diffs: diff
+]
+
+
+def _sortby_functions(shell, completers):
+    """Render the --sort-by completion helpers for shell, one per set of sort keys."""
+    template = SORTBY_FN_TMPLS[shell]
+    if shell == "tcsh":
+        union = sorted({key for _, _, keys in completers for key in keys})
+        completers = [(None, TCSH_SORTBY_FN, union)]
+    return "".join(
+        partial_format(template, {"FN_NAME": fn_name, "KEYS": " ".join(keys)}) for _, fn_name, keys in completers
+    )
 
 
 # in a `p@N@`...`@` rule, one `if (...) <action>` clause, e.g.
@@ -938,13 +985,16 @@ class CompletionMixIn:
         finally:
             self.prog = prog
 
-        def for_all_shells(fn_name):
+        def for_all_shells(fn_name, tcsh_fn=None):
             # same-named completion helper in the bash, zsh, tcsh and fish preambles;
-            # fish needs a command substitution to call it, tcsh backquotes
-            return {"bash": fn_name, "zsh": fn_name, "tcsh": f"`{fn_name}`", "fish": f"({fn_name})"}
+            # fish needs a command substitution to call it, tcsh backquotes.
+            # tcsh matches rules by option name only, over all subcommands, so options needing
+            # different completions per subcommand have to share one tcsh helper.
+            return {"bash": fn_name, "zsh": fn_name, "tcsh": f"`{tcsh_fn or fn_name}`", "fish": f"({fn_name})"}
 
         _attach_completion(parser, archivename_validator, for_all_shells("_borg_complete_archive"))
-        _attach_completion(parser, SortBySpec, for_all_shells("_borg_complete_sortby"))
+        for sortby_type, sortby_fn, _ in SORTBY_COMPLETERS:
+            _attach_completion(parser, sortby_type, for_all_shells(sortby_fn, tcsh_fn=TCSH_SORTBY_FN))
         _attach_completion(parser, FilesCacheMode, for_all_shells("_borg_complete_filescachemode"))
         _attach_completion(parser, CompressionSpec, for_all_shells("_borg_complete_compression_spec"))
         _attach_completion(parser, PathSpec, shtab.DIRECTORY)
@@ -965,7 +1015,6 @@ class CompletionMixIn:
         _attach_help_completion(parser, for_all_shells("_borg_help_topics"))
 
         # Build preambles using partial_format to avoid escaping braces etc.
-        sort_keys = " ".join(AI_HUMAN_SORT_KEYS)
         fcm_keys = " ".join(["ctime", "mtime", "size", "inode", "rechunk", "disabled"])  # keep in sync with parser
 
         # Help completion templates
@@ -1006,7 +1055,6 @@ class CompletionMixIn:
         file_size_choices_str = " ".join(file_size_choices)
 
         mapping = {
-            "SORT_KEYS": sort_keys,
             "FCM_KEYS": fcm_keys,
             "COMP_SPEC_CHOICES": comp_spec_choices_str,
             "CHUNKER_PARAMS_CHOICES": chunker_params_choices_str,
@@ -1014,6 +1062,8 @@ class CompletionMixIn:
             "FILE_SIZE_CHOICES": file_size_choices_str,
             "HELP_CHOICES": help_choices,
             "SH_COMPLETE": TCSH_SH_COMPLETE,
+            # last, so that the rendered helpers are not scanned for the placeholders above
+            "SORTBY_FUNCS": _sortby_functions(args.shell, SORTBY_COMPLETERS) if args.shell in SORTBY_FN_TMPLS else "",
         }
         preamble_templates = {
             "bash": BASH_PREAMBLE_TMPL,
@@ -1043,7 +1093,9 @@ class CompletionMixIn:
 
         In tcsh, completions for positional arguments are matched by word position, so
         e.g. an archive name is only completed if no options precede it - one more
-        reason to use BORG_REPO there rather than --repo.
+        reason to use BORG_REPO there rather than --repo. Also, options are matched by
+        name only, so --sort-by offers the union of the sort keys valid for list, diff
+        and the commands filtering archives.
         """
         )
 

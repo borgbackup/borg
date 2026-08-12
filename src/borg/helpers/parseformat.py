@@ -554,15 +554,18 @@ def get_size_units():
     return "si"
 
 
-def format_file_size(v, precision=2, sign=False):
-    """Format file size into a human friendly format, using the units requested via BORG_UNITS."""
+def format_file_size(v, precision=2, sign=False, fine=False):
+    """Format file size into a human friendly format, using the units requested via BORG_UNITS.
+
+    If fine is given, big sizes get more decimals, so that changes of ~1MB stay visible.
+    """
     units = get_size_units()
     if units == "raw":
-        # exact byte counts, so scripts can easily parse the output
+        # exact byte counts, so scripts can easily parse the output (fine does not apply)
         v = round(v)  # v might be a float, e.g. a throughput value
         return f"{v:{'+' if sign and v > 0 else ''}d} B"
     fn = sizeof_fmt_iec if units == "iec" else sizeof_fmt_decimal
-    return fn(v, suffix="B", sep=" ", precision=precision, sign=sign)
+    return fn(v, suffix="B", sep=" ", precision=precision, sign=sign, fine=fine)
 
 
 class FileSize(int):
@@ -587,39 +590,47 @@ def parse_file_size(s):
     return int(float(s) * factor)
 
 
-def sizeof_fmt(num, suffix="B", units=None, power=None, sep="", precision=2, sign=False):
+def sizeof_fmt(num, suffix="B", units=None, power=None, sep="", precision=2, sign=False, fine=False):
     sign = "+" if sign and num > 0 else ""
     fmt = "{0:{1}.{2}f}{3}{4}{5}"
     prec = 0
-    for unit in units[:-1]:
+    for i, unit in enumerate(units[:-1]):
         if abs(round(num, precision)) < power:
             break
         num /= float(power)
         prec = precision
     else:
+        i = len(units) - 1
         unit = units[-1]
+    if fine:
+        # scale dependent precision, so ~1 M<unit> stays visible at any scale: M: 2 (default),
+        # G: 3, T: 6, P: 9 decimals. capped at 9 - a float can not resolve more anyway and it
+        # bounds the output width. see #3559.
+        prec = max(prec, min((i - 2) * 3, 9))
     return fmt.format(num, sign, prec, sep, unit, suffix)
 
 
-def sizeof_fmt_iec(num, suffix="B", sep="", precision=2, sign=False):
+def sizeof_fmt_iec(num, suffix="B", sep="", precision=2, sign=False, fine=False):
     return sizeof_fmt(
         num,
         suffix=suffix,
         sep=sep,
         precision=precision,
         sign=sign,
+        fine=fine,
         units=["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi", "Yi"],
         power=1024,
     )
 
 
-def sizeof_fmt_decimal(num, suffix="B", sep="", precision=2, sign=False):
+def sizeof_fmt_decimal(num, suffix="B", sep="", precision=2, sign=False, fine=False):
     return sizeof_fmt(
         num,
         suffix=suffix,
         sep=sep,
         precision=precision,
         sign=sign,
+        fine=fine,
         units=["", "k", "M", "G", "T", "P", "E", "Z", "Y"],
         power=1000,
     )

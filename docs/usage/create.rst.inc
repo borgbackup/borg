@@ -263,6 +263,11 @@ The ``--progress`` option shows (from left to right) Original and (uncompressed)
 deduplicated size (O and U respectively), then the Number of files (N) processed so far,
 followed by the currently processed path.
 
+Sizes of GB and above are shown with enough decimal places that even MB-sized progress
+stays visible. On a terminal, this needs a width of at least 110 columns - on narrower
+terminals, the compact format is used, so that the path stays readable. If the output
+does not go to a terminal (e.g. into a logfile), the precise format is always used.
+
 When using ``--stats``, you will get some statistics about how much data was
 added - the "This Archive" deduplicated size there is most interesting as that is
 how much your repository will grow. Please note that the "All archives" stats refer to

@@ -35,6 +35,11 @@ def show_progress_force(stats, **kwargs):
     stats.show_progress(**kwargs)
 
 
+class TTYStringIO(StringIO):
+    def isatty(self):
+        return True
+
+
 def test_stats_basic(stats):
     assert stats.osize == 20
     assert stats.usize == 20
@@ -44,10 +49,6 @@ def test_stats_basic(stats):
 
 
 def test_stats_progress_tty(stats, monkeypatch, columns=80):
-    class TTYStringIO(StringIO):
-        def isatty(self):
-            return True
-
     monkeypatch.setenv("COLUMNS", str(columns))
     out = TTYStringIO()
     show_progress_force(stats, stream=out)
@@ -69,6 +70,23 @@ def test_stats_progress_tty(stats, monkeypatch, columns=80):
     assert out.getvalue() == s + buf + "\r"
 
 
+@pytest.mark.parametrize(
+    "columns, s",
+    [
+        (80, "1.00 TB O 20 B U 1 N foo"),  # narrow terminal: compact format, so the path stays visible
+        (109, "1.00 TB O 20 B U 1 N foo"),  # still too narrow
+        (110, "1.000000 TB O 20 B U 1 N foo"),  # wide terminal: more decimals, see #3559
+    ],
+)
+def test_stats_progress_tty_fine(stats, monkeypatch, columns, s):
+    monkeypatch.setenv("COLUMNS", str(columns))
+    stats.update(10**12, unique=False)
+    out = TTYStringIO()
+    show_progress_force(stats, item=Item(path="foo"), final=False, stream=out)
+    buf = " " * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+
+
 def test_stats_progress_file(stats, monkeypatch):
     out = StringIO()
     show_progress_force(stats, stream=out)
@@ -86,6 +104,13 @@ def test_stats_progress_file(stats, monkeypatch):
     path = "foo" * 40
     show_progress_force(stats, item=Item(path=path), final=False, stream=out)
     s = f"1.02 kB O 20 B U 1 N {path}"
+    assert out.getvalue() == s + "\n"
+
+    out = StringIO()
+    stats.update(10**12, unique=False)
+    path = "foo"
+    show_progress_force(stats, item=Item(path=path), final=False, stream=out)
+    s = f"1.000000 TB O 20 B U 1 N {path}"  # no width limit here, so always more decimals, see #3559
     assert out.getvalue() == s + "\n"
 
 

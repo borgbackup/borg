@@ -8,12 +8,31 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
-from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
+from ..helpers.argparsing import ArgumentParser
+from ..helpers.sorting import sort_spec_validator, sorted_by_spec
 from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger
 
 logger = create_logger()
+
+# item diff fields "borg diff --sort-by" can sort by
+DIFF_SORT_KEYS = (
+    "path",
+    "size_added",
+    "size_removed",
+    "size_diff",
+    "size",
+    "user",
+    "group",
+    "uid",
+    "gid",
+    "ctime",
+    "mtime",
+    "ctime_diff",
+    "mtime_diff",
+)
+diff_sort_spec = sort_spec_validator(DIFF_SORT_KEYS, name="diff_sort_spec")
 
 
 class DiffMixIn:
@@ -93,19 +112,9 @@ class DiffMixIn:
         # Filter out equal items early (keep as generator; listify only if sorting)
         diffs = (diff for diff in diffs_iter if not diff.equal(args.content_only))
 
-        sort_specs = []
-        if args.sort_by:
-            for spec in args.sort_by.split(","):
-                spec = spec.strip()
-                if spec:
-                    sort_specs.append(spec)
-
         def key_for(field: str, d: "ItemDiff"):
-            # strip direction markers if present
-            if field and field[0] in ("<", ">"):
-                field = field[1:]
             # path
-            if field in (None, "", "path"):
+            if field == "path":
                 return remove_surrogates(d.path)
             # compute size_* from changes
             if field in ("size_diff", "size_added", "size_removed"):
@@ -150,15 +159,7 @@ class DiffMixIn:
                 return it.get(field, attr_defaults[field])
             raise ValueError(f"Invalid field name: {field}")
 
-        if sort_specs:
-            diffs = list(diffs)
-            # Apply stable sorts from last to first
-            for spec in reversed(sort_specs):
-                desc = False
-                field = spec
-                if field and field[0] in ("<", ">"):
-                    desc = field[0] == ">"
-                diffs.sort(key=lambda di: key_for(field, di), reverse=desc)
+        diffs = sorted_by_spec(diffs, args.sort_by, key_for)
 
         formatter = DiffFormatter(format, args.content_only)
         for diff in diffs:
@@ -266,33 +267,6 @@ class DiffMixIn:
             )
         )
 
-        def diff_sort_spec_validator(s):
-            if not isinstance(s, str):
-                raise ArgumentTypeError("unsupported sort field (not a string)")
-            allowed = {
-                "path",
-                "size_added",
-                "size_removed",
-                "size_diff",
-                "size",
-                "user",
-                "group",
-                "uid",
-                "gid",
-                "ctime",
-                "mtime",
-                "ctime_diff",
-                "mtime_diff",
-            }
-            parts = [p.strip() for p in s.split(",") if p.strip()]
-            if not parts:
-                raise ArgumentTypeError("unsupported sort field: empty spec")
-            for spec in parts:
-                field = spec[1:] if spec and spec[0] in (">", "<") else spec
-                if field not in allowed:
-                    raise ArgumentTypeError(f"unsupported sort field: {field}")
-            return ",".join(parts)
-
         subparser = ArgumentParser(parents=[common_parser], description=self.do_diff.__doc__, epilog=diff_epilog)
         subparsers.add_subcommand("diff", subparser, help="find differences in archive contents")
         subparser.add_argument(
@@ -318,7 +292,7 @@ class DiffMixIn:
         subparser.add_argument(
             "--sort-by",
             dest="sort_by",
-            type=diff_sort_spec_validator,
+            type=diff_sort_spec,
             help="Sort output by comma-separated fields (e.g., '>size_added,path').",
         )
         subparser.add_argument(

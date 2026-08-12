@@ -2126,6 +2126,32 @@ class RobustUnpacker:
             return next(self._unpacker)
 
 
+def resync_validator(repo_objs):
+    """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
+
+    obj holds an object's header and encrypted metadata, plus its encrypted data when
+    validate.needs_data is set. For most keys, decrypting the metadata authenticates it against the
+    header (magic, version, chunk_id), so the metadata alone decides. Keys that authenticate by
+    chunk_id == id_hash(content) (id_check_is_authentication) need the data; for them
+    validate.needs_data is set and parse() checks that id at the "repair" id place.
+    """
+    needs_data = repo_objs.key.id_check_is_authentication
+
+    def validate(chunk_id, obj):
+        try:
+            if needs_data:
+                repo_objs.parse(chunk_id, obj, ro_type=ROBJ_DONTCARE, assert_id_place="repair")
+            else:
+                repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
+        except Exception:
+            # authentication, id check, msgpack or decompression can each raise on non-object bytes.
+            return False
+        return True
+
+    validate.needs_data = needs_data
+    return validate
+
+
 class ArchiveChecker:
     # Bound how many missing file chunks rebuild_archives buffers for its end-of-run report,
     # so checking a badly damaged repo with very many missing chunks can not exhaust memory.
@@ -2180,7 +2206,18 @@ class ArchiveChecker:
         # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
         # --repair does rebuild from the packs (slow_rebuild=repair), working from the real packs so it
         # can detect and fix archives that reference chunks whose pack has gone missing.
-        self.chunks = build_chunkindex_from_repo(self.repository, slow_rebuild=repair, write_immediately=False)
+        # Under --repair, validate lets the rebuild resync past a corrupt object header (see resync_validator).
+        # It authenticates objects with the key, so make the key first; manifest_only=True makes make_key use
+        # the manifest, not self.chunks, which is still unset here.
+        if self.key is None:
+            try:
+                self.key = self.make_key(repository, manifest_only=True)
+            except IntegrityError as err:
+                logger.warning(f"{err}. Packs with a corrupt object header can not be repaired.")
+        validate = resync_validator(RepoObj(self.key)) if repair and self.key is not None else None
+        self.chunks = build_chunkindex_from_repo(
+            self.repository, slow_rebuild=repair, validate=validate, write_immediately=False
+        )
         if self.key is None:
             self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)

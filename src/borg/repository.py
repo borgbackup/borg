@@ -1037,8 +1037,8 @@ class Repository:
         # the index is checked first and in full, on partial checks too: it is small, and index errors
         # stop the pack check below.
         index_infos = store_list("index")
-        # an invalid chunk index means an interrupted fragment deletion; it will be rebuilt on next
-        # use, so warn rather than verify the leftover fragments.
+        # an interrupted fragment deletion leaves the invalid marker set; the index is rebuilt on next
+        # use, so warn rather than fail.
         from .cache import chunkindex_is_invalid, build_chunkindex_from_repo
 
         index_invalid = chunkindex_is_invalid(self)
@@ -1114,8 +1114,9 @@ class Repository:
             present_pack_ids = {hex_to_bin(info.name) for info in pack_infos}
             tracker.prune(present_pack_ids)
             pack_pi.finish()
-            # report packs the index references but that are absent from packs/ (refs #9898). an
-            # invalid index is rebuilt from the packs on next use, so its references are not checked.
+            # cross-check the chunk index against packs/ (refs #9898). skipped for an invalid index:
+            # its fragment set may be incomplete, and build_chunkindex_from_repo would delete fragments
+            # and rebuild (a write), which a read-only check must not do.
             if not index_invalid:
                 chunks = build_chunkindex_from_repo(self)
                 try:
@@ -1126,7 +1127,15 @@ class Repository:
                     }
                 finally:
                     chunks.clear()
+                # index entries pointing to a pack absent from packs/: data loss.
                 missing_pack_ids = sorted(referenced_pack_ids - present_pack_ids)
+                # packs no index entry references: leftovers of an interrupted operation, not an error.
+                orphan_pack_ids = sorted(present_pack_ids - referenced_pack_ids)
+                if orphan_pack_ids:
+                    logger.info(
+                        f"{len(orphan_pack_ids)} pack(s) in packs/ are not referenced by the index "
+                        f"(leftovers from an interrupted operation)."
+                    )
         else:
             # TODO: --repair will rebuild the index from the packs here instead of stopping (refs #8572).
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
@@ -1142,7 +1151,7 @@ class Repository:
         logger.info(summary)
         if missing_pack_ids:
             # one id per line (the list can be long).
-            logger.error(f"Found {len(missing_pack_ids)} missing pack(s) referenced by the index:")
+            logger.error(f"{len(missing_pack_ids)} pack(s) referenced by the index are missing:")
             for pack_id in missing_pack_ids:
                 logger.error(f"Missing pack: {bin_to_hex(pack_id)}")
         # corrupt_ids() is every pack recorded corrupt, including from earlier runs. with a corrupt

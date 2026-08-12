@@ -1140,6 +1140,23 @@ def test_check_missing_pack_detection_skipped_when_index_invalid(tmp_path, caplo
         assert "chunk index is invalid" in caplog.text
 
 
+def test_check_reports_orphan_pack_not_referenced_by_index(tmp_path, caplog):
+    # a pack that no index entry references is reported at info level and does not fail check (refs #9898).
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()  # flush before close persists the index
+    with Repository(location, exclusive=True) as repository:
+        # a validly-named pack (name == sha256(content)) that no index entry points into.
+        content = b"orphan pack content"
+        orphan_id = sha256(content).digest()
+        repository.store_store("packs/" + bin_to_hex(orphan_id), content)
+        with caplog.at_level(logging.INFO):
+            assert repository.check(repair=False) is True
+        assert "not referenced by the index" in caplog.text
+
+
 def test_check_checked_packs_roundtrip(tmp_path):
     # the set survives a store/load round-trip; a rotted blob loads as empty.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:

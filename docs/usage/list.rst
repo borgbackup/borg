@@ -36,3 +36,12 @@ Examples
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.text
     ...
 
+    # Use --sort-by with a comma-separated list; sorts apply stably from last to first.
+    # Here: primary by size descending, tie-breaker by path ascending.
+    # Note the quoting - ">" would otherwise be a shell redirection.
+    $ borg list archiveA --sort-by='>size,path' --format='{size:8d} {path}{NL}'
+     1416192 code/myproject/file.ext
+     1416192 code/myproject/file.text
+           0 .
+    ...
+

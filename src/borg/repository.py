@@ -361,12 +361,28 @@ class PackReader:
             return memoryview(self.pack_contents)[offset : offset + size]
         return self.store.load(self.key, offset=offset, size=size)
 
+    def size(self):
+        """Return the pack size in bytes; for a store-backed pack this is one metadata lookup."""
+        if self.pack_contents is not None:
+            return len(self.pack_contents)
+        return self.store.info(self.key).size
+
     def iter_headers(self):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
         Only the headers are read, not the payloads, so locating every object costs one short
-        range read per object (or just a slice, when the pack is already in memory).
+        range read per object (or just a slice, when the pack is already in memory), plus one
+        store metadata lookup for the pack size.
+
+        Each full header must have OBJ_MAGIC and describe an object that fits into the pack,
+        otherwise the pack is corrupt and IntegrityError is raised. Ending the walk instead
+        would be worse than raising: the chunks index rebuilt from these headers would just be
+        missing the rest of the pack, and borg check --repair would then "fix" the archives by
+        dropping chunks that are there.
+        A trailing partial header is the clean end of the pack, not corruption.
         """
+        pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
+        pack_size = self.size()
         hdr_size = RepoObj.obj_header.size
         offset = 0
         while True:
@@ -374,7 +390,16 @@ class PackReader:
             if len(hdr_data) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
             hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+            if hdr.magic != OBJ_MAGIC:
+                raise IntegrityError(
+                    f'pack {pack_hex}: no object header at offset {offset} (pack corruption), run "borg check"'
+                )
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
+            if offset + obj_size > pack_size:
+                raise IntegrityError(
+                    f"pack {pack_hex}: object extends past end of file at offset {offset} "
+                    f'(pack corruption), run "borg check"'
+                )
             yield hdr.chunk_id, offset, obj_size
             offset += obj_size
 

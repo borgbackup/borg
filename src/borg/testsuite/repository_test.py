@@ -1635,6 +1635,55 @@ def test_pack_reader_iter_headers_reads_through_store(tmp_path):
         assert list(reader.iter_headers()) == [(H(47), 0, len(obj1)), (H(48), len(obj1), len(obj2))]
 
 
+def test_pack_reader_raises_on_bad_magic():
+    # a header without OBJ_MAGIC means the walk desynced onto payload bytes: corruption, not EOF.
+    obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))
+    obj2 = bytearray(fchunk(b"d2", meta=b"m2", chunk_id=H(2)))
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    reader = PackReader(pack_contents=obj1 + bytes(obj2))
+    with pytest.raises(IntegrityError):
+        list(reader.iter_headers())
+
+
+def test_pack_reader_raises_on_bad_magic_through_store(tmp_path):
+    obj = bytearray(fchunk(b"FIRST", chunk_id=H(47)))
+    obj[0] ^= 0xFF
+    pack_id = H(44)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), bytes(obj))
+        reader = PackReader(repository.store, pack_id)
+        with pytest.raises(IntegrityError):
+            list(reader.iter_headers())
+
+
+def test_pack_reader_raises_on_object_past_end_of_pack():
+    # a valid header whose declared sizes overrun the pack: the object cannot be there.
+    obj = fchunk(b"data", meta=b"meta", chunk_id=H(5))
+    pack = obj[:-1]  # drop a byte, so the header's data_size no longer fits
+    reader = PackReader(pack_contents=pack)
+    with pytest.raises(IntegrityError):
+        list(reader.iter_headers())
+
+
+def test_pack_reader_raises_on_object_past_end_of_pack_through_store(tmp_path):
+    obj = fchunk(b"FIRST", chunk_id=H(49))
+    pack_id = H(45)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), obj[:-1])
+        reader = PackReader(repository.store, pack_id)
+        with pytest.raises(IntegrityError):
+            list(reader.iter_headers())
+
+
+def test_pack_reader_size(tmp_path):
+    obj = fchunk(b"data", meta=b"meta", chunk_id=H(6))
+    assert PackReader(pack_contents=obj).size() == len(obj)
+    pack_id = H(46)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), obj)
+        assert PackReader(repository.store, pack_id).size() == len(obj)
+
+
 def test_pack_reader_in_memory_read_returns_view():
     # read() over an in-memory pack returns a memoryview into pack_contents.
     obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))

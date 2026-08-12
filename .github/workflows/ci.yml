@@ -28,6 +28,13 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Force colored tox and pytest output even without a tty - the GitHub
+  # Actions log viewer renders ANSI colors. tox passes both vars through
+  # to pytest (pass_env = ["*"]).
+  PY_COLORS: "1"       # pytest
+  TOX_COLORED: "yes"   # tox's own output
+
 jobs:
   lint:
 
@@ -470,6 +477,11 @@ jobs:
           # job timeout (tox passes all env vars through to pytest).
           export PYTEST_TIMEOUT=300
 
+          # colored tox/pytest output - the workflow-level env vars do not
+          # reach into the VM, so export them here again.
+          export PY_COLORS=1
+          export TOX_COLORED=yes
+
           # see the "Cache pip-built wheels" step
           export PIP_CACHE_DIR="$PWD/.pip-cache"
 
@@ -668,7 +680,6 @@ jobs:
     needs: [lint]
 
     env:
-      PY_COLORS: 1
       MSYS2_ARG_CONV_EXCL: "*"
       MSYS2_ENV_CONV_EXCL: "*"
       # see the "Cache pip-built wheels" step. MSYS2_ENV_CONV_EXCL above keeps

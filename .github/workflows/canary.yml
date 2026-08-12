@@ -8,6 +8,13 @@ on:
 permissions:
   contents: read
 
+env:
+  # Force colored tox and pytest output even without a tty - the GitHub
+  # Actions log viewer renders ANSI colors. tox passes both vars through
+  # to pytest (pass_env = ["*"]).
+  PY_COLORS: "1"       # pytest
+  TOX_COLORED: "yes"   # tox's own output
+
 jobs:
   canary_tests:
     name: Canary (${{ matrix.os }}, ${{ matrix.python-version }}, ${{ matrix.toxenv }})
@@ -107,7 +114,6 @@ jobs:
     timeout-minutes: 180
 
     env:
-      PY_COLORS: 1
       MSYS2_ARG_CONV_EXCL: "*"
       MSYS2_ENV_CONV_EXCL: "*"
       # see the "Cache pip-built wheels" step. MSYS2_ENV_CONV_EXCL above keeps

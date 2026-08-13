@@ -75,10 +75,21 @@ object's metadata (like e.g.: manifest vs. archive vs. user file content data).
 When loading data from the repo, borg verifies that the type of object it got
 matches the type it wanted. borg 2 does not use TAMs any more.
 
-As both the object's metadata and data are AEAD encrypted and also bound to
+As both the object's metadata and data are authenticated and also bound to
 the object ID (via giving the ID as AAD), there is no way an attacker (without
 access to the borg key) could change the type of the object or move content
-to a different object ID.
+to a different object ID. This holds for the AEAD encryption modes (where the
+AEAD tag authenticates them) as well as for the ``authenticated-*`` modes
+(where a MAC does, see :ref:`tagged_envelope`).
+
+It does **not** hold for the ``none-*`` modes: they have no key, so their objects
+carry an unkeyed checksum rather than a MAC, and an attacker who modifies an
+object can simply recompute it. What still constrains an attacker there is the
+object ID being the (unkeyed) hash of the plaintext: the content of an existing
+object can not be replaced without the ID no longer matching. But the object's
+metadata, the archives list and the manifest are not anchored to anything secret,
+so a ``none-*`` repository provides no tamper protection - only detection of
+accidental corruption.
 
 This effectively 'anchors' each archive to the key, which is controlled by the
 client, thereby anchoring the DAG starting from the archives list entry,
@@ -201,10 +212,50 @@ Notable:
   recommended periodic audit for this).
 
 
+Authenticated modes
+~~~~~~~~~~~~~~~~~~~
+
+Modes: ``--encryption authenticated-(sha256|blake3)``
+
+Supported: borg 2.0+
+
+These modes do not encrypt: everything in the repository is readable by anybody who
+can read the repository. They do authenticate, though - like an AEAD mode minus the
+data encryption:
+
+- Every repository object slot (metadata and data) carries a MAC over the payload, the
+  object header and the slot, see :ref:`tagged_envelope`. Reading verifies it before the
+  payload is used for anything (in particular before decompressing it), so tampering with
+  any of them is detected, whether accidental or malicious.
+- The chunk IDs are MACs over the plaintext, as in the encrypted modes.
+- The MAC key lives in a borg key (repokey or keyfile, ``--key-location``), protected by a
+  passphrase like the keys of the encrypted modes. An attacker without that key can neither
+  forge objects nor chunk IDs.
+
+Different from the AEAD modes, the MAC is deterministic (a MAC needs no nonce): there is no
+session key, no IV and thus no usage limit to observe, and identical input produces identical
+objects.
+
+Unencrypted modes
+~~~~~~~~~~~~~~~~~
+
+Modes: ``--encryption none-(sha256|blake3)``
+
+Supported: borg 2.0+
+
+These modes have no key at all: they neither encrypt nor authenticate. Every repository
+object slot carries an *unkeyed* checksum (see :ref:`tagged_envelope`), which detects
+accidental corruption - bad storage hardware, a truncated write, a read that returned the
+wrong bytes - before the data is used. It is not a protection against an attacker: whoever
+modifies an object can recompute the checksum, and the chunk IDs are unkeyed hashes as well.
+
+You are advised not to use these modes. Use ``authenticated-*`` instead if you do not want
+your data encrypted but do want to detect tampering; it is the same thing plus a key.
+
 Legacy modes
 ~~~~~~~~~~~~
 
-Modes: ``--encryption (repokey|keyfile)[-blake2]``
+Modes: ``--encryption (repokey|keyfile)[-blake2]``, ``--encryption (none|authenticated)``
 
 Supported: borg < 2.0
 
@@ -212,6 +263,11 @@ These were the AES-CTR based modes in previous borg versions, with the chunk ID
 derived via HMAC-SHA256 or (in the ``-blake2`` variants) Blake2b. ``blake2b`` is
 only used by these legacy modes; new repositories use ``sha256`` or ``blake3``
 (see above).
+
+The borg 1.x ``none`` and ``authenticated`` modes belong here, too: their repository
+objects have no tag at all, so nothing about an object is verified except the chunk ID
+over the plaintext - not even the object's metadata. They were replaced by the modes
+described above, which cover metadata and object header as well.
 
 borg 2.0 does not support creating new repos using these modes,
 but ``borg transfer`` can still read such existing repos.

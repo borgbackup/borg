@@ -254,7 +254,15 @@ class KeyType:
     CHPO = 0x20
     BLAKE3AESOCB = 0x30
     BLAKE3CHPO = 0x40
-    BLAKE3AUTHENTICATED = 0x50
+    # 0x50 was a borg2 beta format ("authenticated" with blake3 ids and a no-op envelope). It was
+    # dropped before the 2.0 release, see #9104 - the byte stays reserved so it is not reused.
+    DROPPED_BLAKE3AUTHENTICATED = 0x50
+    # the "authenticated-*" and "none-*" modes: not encrypted, but every repo object slot carries
+    # a tag (a MAC resp. an unkeyed checksum), see MACKeyBase.
+    SHA256AUTHENTICATED = 0x60
+    BLAKE3AUTHENTICATED = 0x70
+    SHA256NONE = 0x80
+    BLAKE3NONE = 0x90
 
 
 CACHE_TAG_NAME = "CACHEDIR.TAG"

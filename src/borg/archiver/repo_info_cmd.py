@@ -26,12 +26,12 @@ class RepoInfoMixIn:
             # the two dimensions: cipher / AE algorithm (ENC_NAME) and id hash function (IDHASH_NAME).
             storage = getattr(key, "storage", None)
             mode = {KeyBlobStorage.KEYFILE: "keyfile", KeyBlobStorage.REPO: "repokey"}.get(storage)
-            suite = "%s, %s" % (key.ENC_NAME, key.IDHASH_NAME)
-            if key.ENC_NAME in ("none", "authenticated"):
-                # the "none" and "authenticated" encryptions do not encrypt data; "authenticated"
-                # (unlike "none"/plaintext) still has a key stored as a keyfile or repokey, so show
-                # that location when there is one.
-                encryption += "No (%s, %s)" % (mode, suite) if mode else "No"
+            # the "none-*" and "authenticated-*" modes name their id hash in ENC_NAME already.
+            suite = key.ENC_NAME if key.IDHASH_IN_ENC_NAME else "%s, %s" % (key.ENC_NAME, key.IDHASH_NAME)
+            if not key.encrypts:
+                # these modes do not encrypt data; the "authenticated-*" ones (unlike "none-*")
+                # still have a key stored as a keyfile or repokey, so show that location if there is one.
+                encryption += "No (%s, %s)" % (mode, suite) if mode else "No (%s)" % suite
             else:
                 encryption += "Yes (%s, %s)" % (mode, suite) if mode else "Yes (%s)" % suite
             if storage == KeyBlobStorage.KEYFILE:

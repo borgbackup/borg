@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ..crypto.key import PlaintextKey
+from ..legacy.crypto.key import PlaintextKey
 from ..helpers.errors import CommandError, Error
 from ..legacy.archives import LegacyArchives
 from ..legacy.repository import LegacyRepository

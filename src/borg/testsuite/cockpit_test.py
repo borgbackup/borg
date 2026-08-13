@@ -24,7 +24,7 @@ def test_cockpit_app_create_archive(tmp_path):
     for i in range(5000):
         (input_path / f"test{i}.txt").write_text(f"content {i}")
 
-    subprocess.run(["borg", "-r", str(repo_path), "repo-create", "--encryption", "none"], check=True)
+    subprocess.run(["borg", "-r", str(repo_path), "repo-create", "--encryption", "none-sha256"], check=True)
 
     async def run():
         app = BorgCockpitApp()

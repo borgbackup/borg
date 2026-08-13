@@ -1,10 +1,11 @@
 import hmac
 import os
-from hashlib import pbkdf2_hmac
+from hashlib import pbkdf2_hmac, sha256
 
 from ...constants import *  # NOQA
 from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, hmac_sha256, blake2b_256
-from ...crypto.key import ID_HMAC_SHA_256, AESKeyBase, FlexiKey, AuthenticatedKeyBase, UnsupportedKeyFormatError
+from ...crypto.key import ID_HMAC_SHA_256, KeyBase, AESKeyBase, FlexiKey, UnsupportedKeyFormatError
+from ...crypto.key import AUTHENTICATED_NO_KEY
 from ...helpers import get_limited_unpacker, msgpack
 from ...item import EncryptedKey
 from .low_level import AES
@@ -87,6 +88,102 @@ class ID_BLAKE2b_256:
         self.id_key = random_blake2b_256_key()
 
 
+# borg 1.x unencrypted modes ("none" and "authenticated"). Their repo object envelope is just the
+# type byte followed by the payload: nothing is authenticated by it, the only integrity check a read
+# has is the chunk id hash over the plaintext. borg 2 replaced them with the tagged envelope modes
+# (see MACKeyBase in borg.crypto.key), so these classes are read-only: they exist to read borg 1.x
+# repos, e.g. for "borg transfer --from-borg1". borg 2 never creates them (they are not in
+# AVAILABLE_KEY_TYPES) and refuses to use them for borg 2 repos (see key_factory).
+
+
+class PlaintextKey(KeyBase):
+    TYPE = KeyType.PLAINTEXT
+    TYPES_ACCEPTABLE = {TYPE}
+    ENC_NAME = "none"  # borg 1.x name of this mode; read-only (borg 1.x)
+    IDHASH_NAME = "sha256"
+
+    chunk_seed = 0
+    crypt_key = b""  # makes .derive_key() work, nothing secret here
+    id_key = b""  # makes .derive_key() work, nothing secret here
+
+    logically_encrypted = False
+    encrypts = False
+    has_secret_key = False  # unkeyed sha256 chunk ids, no key material at all
+
+    @classmethod
+    def create(cls, repository, args, **kw):
+        raise NotImplementedError("borg 2 does not create borg 1.x repositories.")
+
+    @classmethod
+    def detect(cls, repository, manifest_data, *, other=False):
+        return cls(repository)
+
+    def id_hash(self, data):
+        return sha256(data).digest()
+
+    def encrypt(self, id, data, aad=b""):
+        return b"".join([self.TYPE_STR, data])
+
+    def decrypt(self, id, data, aad=b""):
+        self.assert_type(data[0], id)
+        return memoryview(data)[1:]
+
+
+class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
+    # default storage; an individual key's actual storage is tracked per-instance in self.storage.
+    STORAGE = KeyBlobStorage.REPO
+    # an authenticated-mode key has real key material (id/auth key) and a key blob, just no data
+    # encryption. The blob may live as a keyfile or inside the repository, like the encrypted modes.
+    LOCATION_CONFIGURABLE = True
+
+    # It's only authenticated, not encrypted.
+    logically_encrypted = False
+    encrypts = False
+
+    def _load(self, key_data, passphrase):
+        if AUTHENTICATED_NO_KEY:
+            # fake _load if we have no key or passphrase
+            NOPE = bytes(32)  # 256 bit all-zero
+            self.repository_id = NOPE
+            self.enc_key = NOPE
+            self.enc_hmac_key = NOPE
+            self.id_key = NOPE
+            self.chunk_seed = 0
+            return True
+        return super()._load(key_data, passphrase)
+
+    def load(self, target, passphrase):
+        success = super().load(target, passphrase)
+        self.logically_encrypted = False
+        return success
+
+    def load_any(self, passphrase):
+        success = super().load_any(passphrase)
+        self.logically_encrypted = False
+        return success
+
+    def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
+        super().save(target, passphrase, algorithm, create=create, label=label, replace=replace)
+        self.logically_encrypted = False
+
+    def init_ciphers(self, manifest_data=None):
+        if manifest_data is not None:
+            self.assert_type(manifest_data[0])
+
+    def encrypt(self, id, data, aad=b""):
+        return b"".join([self.TYPE_STR, data])
+
+    def decrypt(self, id, data, aad=b""):
+        self.assert_type(data[0], id)
+        return memoryview(data)[1:]
+
+
+class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):  # type: ignore[misc]
+    TYPE = KeyType.AUTHENTICATED
+    TYPES_ACCEPTABLE = {TYPE}
+    ENC_NAME = "authenticated"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in; read-only (borg 1.x)
+
+
 class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):  # type: ignore[misc]
     TYPE = KeyType.BLAKE2AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
@@ -117,4 +214,4 @@ class Blake2AESCTRKey(Pbkdf2FileMixin, ID_BLAKE2b_256, AESKeyBase, FlexiKey):  #
     CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-LEGACY_KEY_TYPES = (AESCTRKey, Blake2AESCTRKey, Blake2AuthenticatedKey)
+LEGACY_KEY_TYPES = (AESCTRKey, Blake2AESCTRKey, PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey)

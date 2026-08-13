@@ -136,7 +136,7 @@ def test_archived_paths(archivers, request):
     # no leading slash in borg archives:
     archived_path = posix_path.lstrip("/")
     create_regular_file(archiver.input_path, "test")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "test", "input", posix_path)
     # "input" directory is recursed into, "input/test" is discovered and joined by borg's recursion.
     # posix_path was directly given as a cli argument and should end up as archive_path in the borg archive.
@@ -202,7 +202,7 @@ def test_create_duplicate_root(archivers, request):
     hl_b = os.path.join(path_b, "hardlink")
     create_regular_file(archiver.input_path, hl_a, contents=b"123456")
     os.link(hl_a, hl_b)
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "test", "input", "input")  # give input twice!
     # test if created archive has 'input' contents twice:
     archive_list = cmd(archiver, "list", "test", "--json-lines")
@@ -218,7 +218,7 @@ def test_create_unreadable_parent(archiver):
     os.mkdir(root_dir)
     os.chmod(parent_dir, 0o111)  # --x--x--x == parent dir traversable, but not readable
     try:
-        cmd(archiver, "repo-create", "--encryption=none")
+        cmd(archiver, "repo-create", "--encryption=none-sha256")
         # issue #7746: we *can* read root_dir and we *can* traverse parent_dir, so this should work:
         cmd(archiver, "create", "test", root_dir)
     finally:

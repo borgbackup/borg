@@ -54,12 +54,14 @@ The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
 ``REPOOBJ_HEADER_SIZE = len(OBJ_MAGIC) + 1 + 32 + 4 + 4 = 49``
 
 Format version ``0x02`` (``OBJ_VERSION_HEADER_AAD``) binds the header's first 41 bytes (``OBJ_MAGIC``
-+ version + ``chunk_id`` -- ``REPOOBJ_HEADER_AAD_SIZE``) into the AEAD authentication of
++ version + ``chunk_id`` -- ``REPOOBJ_HEADER_AAD_SIZE``) into the authentication of
 ``encrypted_meta`` and ``encrypted_data`` as additional authenticated data (AAD: data that is
-authenticated together with the ciphertext, but not itself encrypted). This applies to the AEAD
-encryption modes (AES-256-OCB, ChaCha20-Poly1305). ``meta_size`` and ``data_size`` are excluded from
-the AAD; tampering with either still fails authentication, because it changes the length of the
-ciphertext slice being decrypted. A forged ``chunk_id``, version, or magic byte therefore fails AEAD
+authenticated together with the ciphertext, but not itself encrypted). This applies to all borg 2
+modes: the AEAD encryption modes (AES-256-OCB, ChaCha20-Poly1305) authenticate it with their AEAD
+tag, the ``authenticated-*`` modes with their MAC and the ``none-*`` modes with their (unkeyed)
+checksum, see :ref:`tagged_envelope`. ``meta_size`` and ``data_size`` are excluded from
+the AAD; tampering with either still fails the check, because it changes the length of the
+slice being read. A forged ``chunk_id``, version, or magic byte therefore fails
 authentication in ``RepoObj.parse()``/``parse_meta()``.
 
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
@@ -82,7 +84,7 @@ decrypting, so it does not check header AAD authentication.
 
     The fixed 49-byte blob header. ``meta_size`` and ``data_size`` drive
     traversal; integrity comes from the content-addressed pack name and the
-    per-blob AEAD, which authenticates magic/version/chunk_id as additional
+    per-blob tag, which authenticates magic/version/chunk_id as additional
     authenticated data.
 
 A reader locates the next blob by advancing::

@@ -9,7 +9,7 @@ from ...crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ...crypto.low_level import hmac_sha256
 from ...legacy.crypto.low_level import AES
 from hashlib import sha256
-from ...crypto.key import CHPOKey, AESOCBKey, KeyBase, PlaintextKey
+from ...crypto.key import CHPOKey, AESOCBKey, KeyBase, ChecksumKey
 from ...legacy.crypto.key import AESCTRKey as LegacyAESCTRKey
 from ...helpers import msgpack, bin_to_hex
 
@@ -320,11 +320,11 @@ class TestDeriveKey(BaseTestCase):
             self.id_key = id_key
 
     def test_derive_key_with_plaintext_key(self):
-        """Test derive_key with PlaintextKey (empty crypt_key)"""
-        key = PlaintextKey(None)
+        """Test derive_key with ChecksumKey (empty crypt_key)"""
+        key = ChecksumKey(None)
         salt, domain, size = b"salt", b"domain", 16
 
-        # PlaintextKey has an empty crypt_key, so the derived key should be based on salt and domain only
+        # ChecksumKey has an empty crypt_key, so the derived key should be based on salt and domain only
         derived_key = key.derive_key(salt=salt, domain=domain, size=size)
         expected = sha256(b"" + salt + domain).digest()[:size]
         self.assert_equal(derived_key, expected)

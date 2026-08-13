@@ -5,7 +5,7 @@ import textwrap
 from hashlib import sha256
 from math import ceil
 from pathlib import Path
-from typing import Literal, ClassVar, Optional
+from typing import Any, Literal, ClassVar, Optional
 from collections.abc import Callable
 
 from ..logger import create_logger
@@ -27,7 +27,7 @@ from ..helpers import workarounds
 from ..item import Key, EncryptedKey
 from ..manifest import Manifest
 from ..platform import SaveFile
-from ..repoobj import RepoObj
+from ..repoobj import RepoObj, RepoObj1
 
 
 from .low_level import bytes_to_int, num_cipher_blocks, hmac_sha256
@@ -170,18 +170,27 @@ KEY_LOCATIONS = {"keyfile": KeyBlobStorage.KEYFILE, "repokey": KeyBlobStorage.RE
 
 
 def key_creator(repository, args, *, other_key=None):
-    # the crypto suite is selected by two orthogonal dimensions: the cipher / AE algorithm
-    # (--encryption) and the id hash function (--id-hash). id-hash is always significant, so e.g.
-    # "--encryption none --id-hash blake3" finds no match and is rejected (none only supports sha256).
+    # For the encrypted modes, the crypto suite is selected by two orthogonal dimensions: the
+    # cipher / AE algorithm ("--encryption") and the id hash function ("--id-hash", defaulting to
+    # sha256). For the modes that do not encrypt, the hash is not a tuning knob but *is* the
+    # mechanism (it authenticates resp. checksums the data), so it is part of the mode name:
+    # "none-sha256", "none-blake3", "authenticated-sha256", "authenticated-blake3". Giving
+    # "--id-hash" in addition to one of those names is only accepted if both agree.
     enc = args.encryption
-    id_hash = getattr(args, "id_hash", "sha256")
+    id_hash = getattr(args, "id_hash", None)  # None: not given, see the --id-hash argparse default
     for key in AVAILABLE_KEY_TYPES:
-        if key.ENC_NAME == enc and key.IDHASH_NAME == id_hash:
+        if key.ENC_NAME != enc:
+            continue
+        if key.IDHASH_IN_ENC_NAME:
+            if id_hash is not None and id_hash != key.IDHASH_NAME:
+                raise Error(
+                    f'The "{enc}" encryption mode always uses the "{key.IDHASH_NAME}" id-hash, '
+                    f'thus --id-hash "{id_hash}" can not be used with it.'
+                )
             return key.create(repository, args, other_key=other_key)
-    raise Error(
-        f'Unsupported --encryption "{enc}" / --id-hash "{id_hash}" combination '
-        f'(the "none" encryption only supports the "sha256" id-hash).'
-    )
+        if key.IDHASH_NAME == (id_hash or "sha256"):
+            return key.create(repository, args, other_key=other_key)
+    raise Error(f'Unsupported --encryption "{enc}" / --id-hash "{id_hash}" combination.')
 
 
 def encryption_argument_names():
@@ -217,7 +226,14 @@ def identify_key(manifest_data):
 def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
     manifest_data = ro_cls.extract_crypted_data(manifest_chunk)
     assert manifest_data, "manifest data must not be zero bytes long"
-    return identify_key(manifest_data).detect(repository, manifest_data, other=other)
+    key_cls = identify_key(manifest_data)
+    if key_cls in LEGACY_KEY_TYPES and ro_cls is not RepoObj1:
+        # A borg 2 repository using a borg 1.x key type: that can only be a repository created by
+        # a borg 2 beta in the old "none" or "authenticated" mode, which have been replaced by the
+        # tagged envelope modes (see MACKeyBase). The legacy key classes only exist to read borg
+        # 1.x repositories (ro_cls is RepoObj1 then), e.g. for "borg transfer --from-borg1".
+        raise UnsupportedPayloadError(manifest_data[0])
+    return key_cls.detect(repository, manifest_data, other=other)
 
 
 def uses_same_chunker_secret(other_key, key):
@@ -230,12 +246,13 @@ def uses_same_chunker_secret(other_key, key):
 def uses_same_id_hash(other_key, key):
     """other_key -> key upgrade: is the id hash the same?"""
     # avoid breaking the deduplication by changing the id hash
-    old_sha256_ids = (PlaintextKey,)
-    new_sha256_ids = (PlaintextKey,)
-    old_hmac_sha256_ids = (AESCTRKey, AuthenticatedKey)
+    old_sha256_ids = (LegacyPlaintextKey,)  # unkeyed sha256 over the plaintext
+    new_sha256_ids = (ChecksumKey,)
+    old_hmac_sha256_ids = (AESCTRKey, LegacyAuthenticatedKey)
     new_hmac_sha256_ids = (AESOCBKey, CHPOKey, AuthenticatedKey)
     # note: we do not support blake2b for new repos, see #8867
     new_blake3_ids = (Blake3AESOCBKey, Blake3CHPOKey, Blake3AuthenticatedKey)
+    new_unkeyed_blake3_ids = (Blake3ChecksumKey,)  # unkeyed blake3 over the plaintext
     same_ids = (
         isinstance(other_key, old_hmac_sha256_ids + new_hmac_sha256_ids)
         and isinstance(key, new_hmac_sha256_ids)
@@ -243,6 +260,8 @@ def uses_same_id_hash(other_key, key):
         and isinstance(key, new_blake3_ids)
         or isinstance(other_key, old_sha256_ids + new_sha256_ids)
         and isinstance(key, new_sha256_ids)
+        or isinstance(other_key, new_unkeyed_blake3_ids)
+        and isinstance(key, new_unkeyed_blake3_ids)
     )
     return same_ids
 
@@ -260,10 +279,20 @@ class KeyBase:
     # None means "not creatable this way" (e.g. legacy read-only classes).
     ENC_NAME: ClassVar[str] = None  # override in creatable subclasses
     IDHASH_NAME: ClassVar[str] = None  # override in creatable subclasses (or via id-hash mix-in)
+    # Is the id hash part of the ENC_NAME (e.g. "none-blake3") instead of being selectable via
+    # "--id-hash"? True for the modes that do not encrypt: there, the hash is not a tuning knob,
+    # it is what protects the data, so it belongs to the mode. See key_creator.
+    IDHASH_IN_ENC_NAME: ClassVar[bool] = False
 
     # Storage type (no key blob storage / keyfile / repo). This is only a default seed for the
     # per-instance self.storage; keyfile vs repokey is a property of an individual key, not the class.
     STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE
+
+    # per-instance key location, set in __init__ (see also FlexiKey, which shares these with us
+    # in the classes inheriting from both): declared here so that a subclass in another module
+    # does not have to infer their types across the module import cycle.
+    storage: str  # where this key is/will be stored, one of the KeyBlobStorage values
+    target: Any  # key location: keyfile path or repository object
 
     # Whether a key of this class may be stored as a keyfile or as a repokey (configurable at
     # repo creation via --key-location and changeable later via "borg key change-location").
@@ -286,6 +315,18 @@ class KeyBase:
     # False (the AEAD key classes): every read is authenticated by the AEAD tag, with the chunk id in the AAD,
     # independently of assert_id() - see AEADKeyBase.assert_id for what assert_id adds on top of that.
     id_check_is_authentication: ClassVar[bool] = True
+
+    # Does this mode encrypt the data at all? False for the modes that only tag it ("none-*",
+    # "authenticated-*" and their borg 1.x predecessors). Different from logically_encrypted,
+    # which is a per-instance property (an encrypted repo with an empty passphrase is not
+    # "logically" encrypted, but it does encrypt).
+    encrypts: ClassVar[bool] = True
+
+    # Does this key class have secret key material?
+    # False for the "none-*" modes: their chunk ids and their envelope checksums are unkeyed, thus
+    # they work without any key - and the authenticated_no_key workaround (which fakes the key
+    # material of a key it can not unlock) must not switch off checks that need no key at all.
+    has_secret_key: ClassVar[bool] = True
 
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then
@@ -367,38 +408,6 @@ class KeyBase:
         return unpacked
 
 
-class PlaintextKey(KeyBase):
-    TYPE = KeyType.PLAINTEXT
-    TYPES_ACCEPTABLE = {TYPE}
-    ENC_NAME = "none"
-    IDHASH_NAME = "sha256"  # plain sha256(data), no key; blake3 is not supported for "none"
-
-    chunk_seed = 0
-    crypt_key = b""  # makes .derive_key() work, nothing secret here
-    id_key = b""  # makes .derive_key() work, nothing secret here
-
-    logically_encrypted = False
-
-    @classmethod
-    def create(cls, repository, args, **kw):
-        logger.info('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile" to enable encryption.')
-        return cls(repository)
-
-    @classmethod
-    def detect(cls, repository, manifest_data, *, other=False):
-        return cls(repository)
-
-    def id_hash(self, data):
-        return sha256(data).digest()
-
-    def encrypt(self, id, data, aad=b""):
-        return b"".join([self.TYPE_STR, data])
-
-    def decrypt(self, id, data, aad=b""):
-        self.assert_type(data[0], id)
-        return memoryview(data)[1:]
-
-
 class ID_HMAC_SHA_256:
     """
     Key mix-in class for using HMAC-SHA-256 for the id key.
@@ -476,6 +485,15 @@ class AESKeyBase(KeyBase):
 class FlexiKey:
     FILE_ID = KEYFILE_ID
     STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE  # override in subclass
+
+    # this is a mix-in for KeyBase subclasses: it only uses these, KeyBase defines them.
+    # they are declared here (same types as there) so that a subclass in another module does not
+    # have to infer their types across the module import cycle.
+    chunk_seed: int
+    crypt_key: bytes
+    id_key: bytes
+    storage: str
+    target: Any
 
     # multiple-borg-keys state (a repository may have multiple borg keys, one per passphrase):
     _encrypted_key_label = None  # label read from the EncryptedKey envelope on decrypt
@@ -640,7 +658,9 @@ class FlexiKey:
             # choose initial storage (keyfile or repokey) from --key-location (default: repokey).
             key.storage = KEY_LOCATIONS.get(getattr(args, "key_location", None), cls.STORAGE)
         if other_key is not None:
-            if isinstance(other_key, PlaintextKey):
+            if not other_key.has_secret_key:
+                # the "none-*" modes (and borg 1.x "none") have no key material to copy - and they
+                # need none: their chunk ids are unkeyed, so they all dedup identically anyway.
                 raise Error("Copying key material from an unencrypted repository is not possible.")
             if isinstance(key, AESKeyBase):
                 # user must use an AEADKeyBase subclass (AEAD modes with session keys)
@@ -988,10 +1008,176 @@ class FlexiKey:
         return victim
 
 
-class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
+# ------------ not encrypted, but tagged: the "authenticated-*" and "none-*" modes ------------
+
+
+class MACKeyBase(KeyBase):
+    """
+    Base class of the modes that do not encrypt, but tag every repo object slot.
+
+    Envelope layout: TYPE(1) + reserved(1) + tag(32) + payload
+
+    The payload (the compressed chunk data resp. the packed metadata) is stored as-is, so anyone
+    can read it. The tag is computed over the envelope header, the AAD and the payload, so a read
+    detects any modification of them. RepoObj puts the object header (magic, format version, chunk
+    id), the meta/data slot tag and the chunk id into the AAD, thus the tag also binds a payload to
+    the specific object and slot it was written for: swapping the meta and data slot, moving a slot
+    to another object or changing the object header all fail verification.
+
+    The tag is deterministic - there is no nonce, no session and no other state to keep (a MAC does
+    not need any). Two repositories with the same key material therefore store byte-identical
+    objects for identical input, which allows deduplicating them on the filesystem level.
+
+    Subclasses supply the tag algorithm (mac()) and, if they are keyed, the tag key (tag_key).
+    """
+
+    encrypts = False  # these modes only tag the data, they do not encrypt it
+    IDHASH_IN_ENC_NAME = True  # the hash is what protects the data here, see key_creator
+
+    # TYPE + reserved + tag. reserved is currently always zero; it is authenticated by the tag,
+    # so it can carry a format flag later without changing the envelope size.
+    TAG_SIZE = 32
+    HEADER_SIZE = 2
+    PAYLOAD_OVERHEAD = HEADER_SIZE + TAG_SIZE
+
+    def mac(self, prefix: bytes, payload) -> bytes:
+        """Compute the authentication tag over prefix + payload, returning TAG_SIZE bytes."""
+        raise NotImplementedError
+
+    @property
+    def tag_key(self) -> bytes:
+        """The key the tag is computed with (unkeyed modes do not have one)."""
+        raise NotImplementedError
+
+    def init_ciphers(self, manifest_data=None):
+        # there is no cipher and no session state here (the tag is deterministic), we only check
+        # the type byte of the manifest object.
+        if manifest_data is not None:
+            self.assert_type(manifest_data[0])
+
+    def _tag_prefix(self, header: bytes, aad: bytes, id: bytes) -> bytes:
+        # everything the tag covers except the payload. The AAD is length-prefixed, so the
+        # boundary between it and the payload is unambiguous (the AAD has a fixed length today,
+        # but the tag must not depend on that staying true).
+        aad_full = aad + id
+        assert len(aad_full) <= 0xFFFF, "aad too long to be length-prefixed"
+        return b"".join([header, len(aad_full).to_bytes(2, "big"), aad_full])
+
+    def encrypt(self, id, data, aad=b""):
+        header = self.TYPE_STR + b"\0"  # TYPE + reserved
+        tag = self.mac(self._tag_prefix(header, aad, id), data)
+        return b"".join([header, tag, data])
+
+    def decrypt(self, id, data, aad=b""):
+        if len(data) < self.PAYLOAD_OVERHEAD:
+            raise IntegrityError(f"Chunk {bin_to_hex(id)}: truncated envelope")
+        self.assert_type(data[0], id)
+        obj = memoryview(data)
+        payload = obj[self.PAYLOAD_OVERHEAD :]
+        if self.has_secret_key and AUTHENTICATED_NO_KEY:
+            # we do not have the key material, so we can not verify the tag, see the
+            # BORG_WORKAROUNDS docs. Unkeyed modes verify even then - they need no key.
+            return payload
+        header = bytes(obj[: self.HEADER_SIZE])
+        tag = bytes(obj[self.HEADER_SIZE : self.PAYLOAD_OVERHEAD])
+        computed_tag = self.mac(self._tag_prefix(header, aad, id), payload)
+        if not hmac.compare_digest(computed_tag, tag):
+            raise IntegrityError(f"Chunk {bin_to_hex(id)}: envelope tag verification failed")
+        return payload
+
+
+class ChecksumKeyBase(MACKeyBase):
+    """
+    Base class of the "none-*" modes: no encryption, no key, no authentication.
+
+    The tag is an **unkeyed** hash, i.e. a checksum: it detects accidental corruption of the
+    payload, the metadata or the object header (including a read that returned the wrong bytes),
+    but it is no protection against malicious tampering - whoever changes the object can just
+    recompute the checksum. Detecting that requires a secret, see the "authenticated-*" modes.
+
+    Because there is no key, the chunk id is an unkeyed hash of the plaintext, too. Thus, all
+    repositories of this mode dedup identically and store byte-identical objects for identical
+    input, no key sharing needed.
+    """
+
+    STORAGE = KeyBlobStorage.NO_STORAGE
+    LOCATION_CONFIGURABLE = False
+
+    chunk_seed = 0
+    crypt_key = b""  # makes .derive_key() work, nothing secret here
+    id_key = b""  # makes .derive_key() work, nothing secret here
+
+    logically_encrypted = False
+    has_secret_key = False
+
+    # The checksum can be recomputed by anybody, so it is not an authentication and thus can not
+    # take over the read path authentication the id hash does. Different from the keyed classes
+    # below, verifying the chunk id must therefore never be skipped, see RepoObj.parse.
+    id_check_is_authentication = True
+
+    @classmethod
+    def create(cls, repository, args, **kw):
+        logger.info(
+            "Encryption NOT enabled.\n"
+            'Use "--encryption=repokey-aes-ocb" (or another encrypted mode) to enable encryption.'
+        )
+        return cls(repository)
+
+    @classmethod
+    def detect(cls, repository, manifest_data, *, other=False):
+        return cls(repository)
+
+
+class ChecksumKey(ChecksumKeyBase):
+    TYPE = KeyType.SHA256NONE
+    TYPES_ACCEPTABLE = {TYPE}
+    ENC_NAME = "none-sha256"
+    IDHASH_NAME = "sha256"
+
+    def id_hash(self, data):
+        return sha256(data).digest()
+
+    def mac(self, prefix, payload):
+        h = sha256(prefix)
+        h.update(payload)
+        return h.digest()
+
+
+class Blake3ChecksumKey(ChecksumKeyBase):
+    TYPE = KeyType.BLAKE3NONE
+    TYPES_ACCEPTABLE = {TYPE}
+    ENC_NAME = "none-blake3"
+    IDHASH_NAME = "blake3"
+
+    def id_hash(self, data):
+        # see ID_BLAKE3_256.id_hash about max_threads
+        max_threads = blake3.AUTO if len(data) >= get_blake3_mt_threshold() else 1
+        return blake3(data, max_threads=max_threads).digest(length=32)
+
+    def mac(self, prefix, payload):
+        max_threads = blake3.AUTO if len(payload) >= get_blake3_mt_threshold() else 1
+        h = blake3(prefix, max_threads=max_threads)
+        h.update(payload)
+        return h.digest(length=32)
+
+
+class AuthenticatedKeyBase(MACKeyBase, FlexiKey):
+    """
+    Base class of the "authenticated-*" modes: no encryption, but real authentication.
+
+    These modes have key material (in a borg key, like the encrypted modes have), so their tag is
+    a MAC: only somebody who has the borg key can compute it. Thus, a read detects tampering with
+    the payload, the metadata and the object header, no matter whether it was accidental or
+    malicious. The chunk ids are keyed hashes for the same reason.
+
+    The MAC key is derived from crypt_key (not from id_key: chunk ids are public, and related
+    repositories share the id key - see FlexiKey.create - which must not give them the ability to
+    forge each other's objects; "repo-create --other-repo --copy-crypt-key" opts into sharing it).
+    """
+
     # default storage; an individual key's actual storage is tracked per-instance in self.storage.
     STORAGE = KeyBlobStorage.REPO
-    # an authenticated-mode key has real key material (id/auth key) and a key blob, just no data
+    # an authenticated-mode key has real key material (id/MAC key) and a key blob, just no data
     # encryption. The blob may live as a keyfile or inside the repository, like the encrypted modes
     # (configurable via --key-location, changeable later via "borg key change-location").
     LOCATION_CONFIGURABLE = True
@@ -999,14 +1185,33 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
     # It's only authenticated, not encrypted.
     logically_encrypted = False
 
+    # every read is authenticated by the envelope tag (which covers the chunk id via the AAD),
+    # independently of assert_id() - the same reasoning as for the AEAD keys, see
+    # AEADKeyBase.assert_id about what verifying the chunk id adds on top of that.
+    id_check_is_authentication = False
+
+    # domain for deriving the envelope MAC key from crypt_key, see tag_key. It is per MAC
+    # algorithm, so the classes below do not use the same key for different algorithms.
+    MAC_KEY_DOMAIN: ClassVar[bytes] = None  # override in subclass
+
+    _tag_key: bytes | None = None  # cache for the tag_key property
+
+    @property
+    def tag_key(self):
+        # derived lazily (and cached): a key instance may also be built by copying the key
+        # material onto a fresh instance, see "borg key change-location".
+        if self._tag_key is None:
+            self._tag_key = self.derive_key(salt=b"", domain=self.MAC_KEY_DOMAIN, size=32)
+        return self._tag_key
+
     def _load(self, key_data, passphrase):
         if AUTHENTICATED_NO_KEY:
-            # fake _load if we have no key or passphrase
-            NOPE = bytes(32)  # 256 bit all-zero
-            self.repository_id = NOPE
-            self.enc_key = NOPE
-            self.enc_hmac_key = NOPE
-            self.id_key = NOPE
+            # fake _load if we have no key or passphrase. The key material is all-zero and thus
+            # worthless, but these modes do not encrypt, so reading still works - decrypt() skips
+            # the tag verification and RepoObj.parse skips the chunk id check.
+            self.repository_id = bytes(32)
+            self.crypt_key = bytes(64)
+            self.id_key = bytes(32)
             self.chunk_seed = 0
             return True
         return super()._load(key_data, passphrase)
@@ -1025,30 +1230,44 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         super().save(target, passphrase, algorithm, create=create, label=label, replace=replace)
         self.logically_encrypted = False
 
-    def init_ciphers(self, manifest_data=None):
-        if manifest_data is not None:
-            self.assert_type(manifest_data[0])
+    def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
+        assert len(crypt_key) == 32 + 32
+        assert len(id_key) == 32
+        assert isinstance(chunk_seed, int)
+        self.crypt_key = crypt_key
+        self.id_key = id_key
+        self.chunk_seed = chunk_seed
+        self._tag_key = None  # invalidate: it is derived from crypt_key
 
-    def encrypt(self, id, data, aad=b""):
-        return b"".join([self.TYPE_STR, data])
-
-    def decrypt(self, id, data, aad=b""):
-        self.assert_type(data[0], id)
-        return memoryview(data)[1:]
-
-
-# legacy imports placed after FlexiKey/AESKeyBase/KeyBase/AuthenticatedKeyBase so those names are already
-# in the partial module when legacy/crypto/key.py imports them back during circular load
-from ..legacy.crypto.key import AESCTRKey, Blake2AESCTRKey  # noqa: F401
-from ..legacy.crypto.key import Blake2AuthenticatedKey  # noqa: F401
-from ..legacy.crypto.key import LEGACY_KEY_TYPES  # noqa: E402
-from ..legacy.crypto.key import ID_BLAKE2b_256  # noqa: F401
+    def init_from_random_data(self):
+        data = os.urandom(100)
+        chunk_seed = bytes_to_int(data[96:100])
+        # Convert to signed int32
+        if chunk_seed & 0x80000000:
+            chunk_seed = chunk_seed - 0xFFFFFFFF - 1
+        self.init_from_given_data(crypt_key=data[0:64], id_key=data[64:96], chunk_seed=chunk_seed)
 
 
 class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
-    TYPE = KeyType.AUTHENTICATED
+    TYPE = KeyType.SHA256AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    ENC_NAME = "authenticated"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
+    ENC_NAME = "authenticated-sha256"  # IDHASH_NAME = "sha256" via ID_HMAC_SHA_256 mix-in
+    MAC_KEY_DOMAIN = b"borg-repoobj-mac-hmac-sha256"
+
+    def mac(self, prefix, payload):
+        h = hmac.new(self.tag_key, prefix, sha256)
+        h.update(payload)
+        return h.digest()
+
+
+# legacy imports placed after FlexiKey/AESKeyBase/KeyBase so those names are already
+# in the partial module when legacy/crypto/key.py imports them back during circular load
+from ..legacy.crypto.key import AESCTRKey, Blake2AESCTRKey  # noqa: F401
+from ..legacy.crypto.key import Blake2AuthenticatedKey  # noqa: F401
+from ..legacy.crypto.key import AuthenticatedKey as LegacyAuthenticatedKey  # noqa: E402
+from ..legacy.crypto.key import PlaintextKey as LegacyPlaintextKey  # noqa: E402
+from ..legacy.crypto.key import LEGACY_KEY_TYPES  # noqa: E402
+from ..legacy.crypto.key import ID_BLAKE2b_256  # noqa: F401
 
 
 # ------------ new crypto ------------
@@ -1073,7 +1292,15 @@ class ID_BLAKE3_256:
 class Blake3AuthenticatedKey(ID_BLAKE3_256, AuthenticatedKeyBase):
     TYPE = KeyType.BLAKE3AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
-    ENC_NAME = "authenticated"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
+    ENC_NAME = "authenticated-blake3"  # IDHASH_NAME = "blake3" via ID_BLAKE3_256 mix-in
+    MAC_KEY_DOMAIN = b"borg-repoobj-mac-blake3"
+
+    def mac(self, prefix, payload):
+        # see ID_BLAKE3_256.id_hash about max_threads
+        max_threads = blake3.AUTO if len(payload) >= get_blake3_mt_threshold() else 1
+        h = blake3(prefix, key=self.tag_key, max_threads=max_threads)
+        h.update(payload)
+        return h.digest(length=32)
 
 
 class AEADKeyBase(KeyBase):
@@ -1277,14 +1504,15 @@ class Blake3CHPOKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
 
 
 AVAILABLE_KEY_TYPES = (
-    # these are available encryption modes for new repositories
-    # not encrypted modes
-    PlaintextKey,
-    AuthenticatedKey,
-    # new crypto
-    Blake3AuthenticatedKey,
+    # these are available encryption modes for new repositories, ordered by descending security
+    # encrypted modes (the id hash is selected via --id-hash)
     AESOCBKey,
     CHPOKey,
     Blake3AESOCBKey,
     Blake3CHPOKey,
+    # not encrypted modes (the id hash is part of the mode name, see key_creator)
+    AuthenticatedKey,
+    Blake3AuthenticatedKey,
+    ChecksumKey,
+    Blake3ChecksumKey,
 )

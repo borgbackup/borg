@@ -10,7 +10,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def test_return_codes(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "archive", "input")
     with changedir("output"):
         cmd(archiver, "extract", "archive")

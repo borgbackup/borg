@@ -51,7 +51,7 @@ def test_disk_full(test_pass, cmd_fixture, monkeypatch):
     input = os.path.join(DF_MOUNT, "input")
     shutil.rmtree(repo, ignore_errors=True)
     shutil.rmtree(input, ignore_errors=True)
-    rc, out = cmd_fixture(f"--repo={repo}", "repo-create", "--encryption=none")
+    rc, out = cmd_fixture(f"--repo={repo}", "repo-create", "--encryption=none-sha256")
     if rc != EXIT_SUCCESS:
         print("repo-create", rc, out)
     assert rc == EXIT_SUCCESS

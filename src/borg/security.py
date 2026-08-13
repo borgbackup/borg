@@ -150,7 +150,6 @@ class SecurityManager:
                 fd.write(repository_location)
 
     def assert_no_manifest_replay(self, manifest, key):
-        from .crypto.key import PlaintextKey
 
         try:
             with self.manifest_ts_file.open() as fd:
@@ -165,7 +164,9 @@ class SecurityManager:
         logger.debug("security: determined newest manifest timestamp as %s", timestamp)
         # If repository is older than the cache or security dir something fishy is going on
         if timestamp and timestamp > manifest.timestamp:
-            if isinstance(key, PlaintextKey):
+            if not key.has_secret_key:
+                # unkeyed modes ("none-*", and borg 1.x "none"): the repository id is not derived
+                # from any secret, so two repositories can legitimately have the same id.
                 raise RepositoryIDNotUnique()
             else:
                 raise RepositoryReplay()

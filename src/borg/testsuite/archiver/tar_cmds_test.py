@@ -110,7 +110,7 @@ def test_import_tar(archivers, request, tar_format="PAX"):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tar", f"--tar-format={tar_format}")
     cmd(archiver, "import-tar", "dst", "simple.tar")
@@ -129,7 +129,7 @@ def test_import_unusual_tar(archivers, request):
     # ./foo//bar
     # ./
     tar_archive = os.path.join(os.path.dirname(__file__), "unusual_paths.tar")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "import-tar", "dst", tar_archive)
     files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
     assert set(files) == {"foobar", "bar", "foo2", "foo/bar", "."}
@@ -143,7 +143,7 @@ def test_import_tar_with_dotdot(archivers, request):
     # Contains this file:
     # ../../../../etc/shadow
     tar_archive = os.path.join(os.path.dirname(__file__), "dotdot_path.tar")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     with pytest.raises(ValueError, match="unexpected '..' element in path '../../../../etc/shadow'"):
         cmd(archiver, "import-tar", "dst", tar_archive, exit_code=2)
 
@@ -153,7 +153,7 @@ def test_import_tar_gz(archivers, request, tar_format="GNU"):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tgz", f"--tar-format={tar_format}")
     cmd(archiver, "import-tar", "dst", "simple.tgz")
@@ -168,7 +168,7 @@ def test_export_import_tar_zst(archivers, request, suffix):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", f"simple.{suffix}")
     with open(f"simple.{suffix}", "rb") as fd:
@@ -186,7 +186,7 @@ def test_export_import_tar_zst_mt(archivers, request, monkeypatch):
     monkeypatch.setattr("borg.compress._zstd_mt_workers", None)  # drop the cache
     create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tar.zst")
     cmd(archiver, "import-tar", "dst", "simple.tar.zst")
@@ -217,7 +217,7 @@ def test_tar_filter_zstd_external(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tar.zst", "--tar-filter=zstd")
     with open("simple.tar.zst", "rb") as fd:
@@ -247,7 +247,7 @@ def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
             # Clean up for assert_dirs_equal.
             os.unlink("the_rest.tar")
 
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "import-tar", "--ignore-zeros", "dst", "input/concatenated.tar")
     # Clean up for assert_dirs_equal.
     os.unlink("input/concatenated.tar")
@@ -272,7 +272,7 @@ def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
             with open("the_rest.tar", "rb") as the_rest:
                 concatenated.write(the_rest.read())
             os.unlink("the_rest.tar")
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "import-tar", "dst", "input/concatenated.tar")
 
     with changedir(archiver.output_path):
@@ -300,7 +300,7 @@ def test_import_tar_with_dotslash_paths(archivers, request):
         assert "./dir/file" in tar_content
 
     # Import the tar file into a Borg repository
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "import-tar", "dotslash", "input/dotslash.tar")
 
     # List the archive contents and verify no paths start with './'
@@ -314,7 +314,7 @@ def test_roundtrip_pax_borg(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     os.remove("input/flagfile")  # this would be automagically excluded due to NODUMP
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tar", "--tar-format=BORG")
     cmd(archiver, "import-tar", "dst", "simple.tar")
@@ -331,7 +331,7 @@ def test_roundtrip_pax_xattrs(archivers, request):
     original_path = os.path.join(archiver.input_path, "file")
     xa_key, xa_value = b"user.xattrtest", b"not valid utf-8: \xff"
     xattr.setxattr(original_path.encode(), xa_key, xa_value)
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "xattrs.tar", "--tar-format=PAX")
     cmd(archiver, "import-tar", "dst", "xattrs.tar")
@@ -393,7 +393,7 @@ def test_acl_roundtrip(archivers, request):
         pytest.skip("ACLs not supported or not working correctly")
 
     # 2. Create a Borg archive
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     cmd(archiver, "create", "original", "input")
 
     # 3. export-tar this archive to a tar file

@@ -167,6 +167,31 @@ Version 2.0.0b23 (not released yet)
 
 New features:
 
+- crypto: protect metadata and object header in the modes that do not encrypt, #9104.
+
+  The "none" and "authenticated" modes had a no-op repo object envelope: only the chunk
+  id over the plaintext was checked, so a repo object's metadata (which selects the
+  decompressor!) and its object header were not verified at all. They now use a tagged
+  envelope: every object slot carries a 32 byte tag over the payload, the object header,
+  the chunk id and the meta/data slot, verified before the payload is used.
+
+  - "authenticated-sha256" / "authenticated-blake3": the tag is a MAC (HMAC-SHA256 resp.
+    keyed BLAKE3, key derived from crypt_key), thus these modes now detect tampering with
+    metadata and object header, not just with the chunk content.
+  - "none-sha256" / "none-blake3": the tag is an unkeyed checksum, which detects accidental
+    corruption. It is no authentication - these modes have no key and make no such claim.
+  - The tag is deterministic (no nonce/session), so repositories with the same key material
+    store byte-identical objects for identical input.
+  - The unencrypted modes are named "<mode>-<hash>" now, because the hash *is* what protects
+    the data there: "none-sha256", "none-blake3", "authenticated-sha256",
+    "authenticated-blake3". Bare "--encryption none" / "--encryption authenticated" are
+    rejected, and "--id-hash" only applies to the encrypted modes now.
+  - "none-blake3" is new: the unencrypted mode was limited to sha256 before.
+
+  Breaking: borg 2 beta repositories using the old "none" or "authenticated" formats are not
+  supported any more - create a new repository, or transfer the archives with borg 2.0.0b23
+  or older first. Reading borg 1.x "none"/"authenticated" repositories for
+  "borg transfer --from-borg1" is not affected.
 - faster create:
 
   - use multi-threaded zstd compression for big chunks, #9961

@@ -7,7 +7,7 @@ import pytest
 from ...constants import *  # NOQA
 from ...constants import KeyBlobStorage
 from ...crypto.key import AESOCBKey, CHPOKey, Passphrase, is_keyfile, keyfile_parse
-from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
+from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile, UnencryptedRepo
 from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
@@ -79,26 +79,26 @@ def test_change_location_to_b3repokey(archivers, request):
 def test_change_location_authenticated_to_keyfile(archivers, request):
     # authenticated mode does not encrypt, but it still has a key whose location is configurable.
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=authenticated")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     log = cmd(archiver, "repo-info")
-    assert "(repokey, authenticated, sha256)" in log
+    assert "(repokey, authenticated-sha256)" in log
     cmd(archiver, "key", "change-location", "keyfile")
     [key_filename] = os.listdir(archiver.keys_path)
     assert key_filename  # key blob now lives as a keyfile
     log = cmd(archiver, "repo-info")
-    assert "(keyfile, authenticated, sha256)" in log
+    assert "(keyfile, authenticated-sha256)" in log
 
 
 def test_change_location_authenticated_to_repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=authenticated", KF_LOCATION)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256", KF_LOCATION)
     assert os.listdir(archiver.keys_path)  # key blob created as a keyfile
     log = cmd(archiver, "repo-info")
-    assert "(keyfile, authenticated, sha256)" in log
+    assert "(keyfile, authenticated-sha256)" in log
     cmd(archiver, "key", "change-location", "repokey")
     assert os.listdir(archiver.keys_path) == []  # keyfile removed after moving into the repo
     log = cmd(archiver, "repo-info")
-    assert "(repokey, authenticated, sha256)" in log
+    assert "(repokey, authenticated-sha256)" in log
 
 
 def test_keyfile_name_is_content_sha256(archivers, request):
@@ -136,6 +136,24 @@ def test_borg_key_file_env_keeps_explicit_path(archivers, request, monkeypatch):
     cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     assert os.path.isfile(explicit_key_path)
     assert os.listdir(archiver.keys_path) == []
+
+
+@pytest.mark.parametrize("mode", ["none-sha256", "none-blake3"])
+def test_key_management_unavailable_for_keyless_repo(archivers, request, mode):
+    # the "none-*" modes have no key at all, so there is nothing to export/import.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", f"--encryption={mode}")
+    export_file = archiver.output_path + "/exported"
+    if archiver.FORK_DEFAULT:
+        # a forked/binary run returns the exit code, not the exception (BORG_EXIT_CODES defaults
+        # to "modern", so that is the specific mcode of UnencryptedRepo, not the generic EXIT_ERROR).
+        cmd(archiver, "key", "export", export_file, exit_code=UnencryptedRepo.exit_mcode)
+        cmd(archiver, "key", "import", export_file, exit_code=UnencryptedRepo.exit_mcode)
+    else:
+        with pytest.raises(UnencryptedRepo):
+            cmd(archiver, "key", "export", export_file)
+        with pytest.raises(UnencryptedRepo):
+            cmd(archiver, "key", "import", export_file)
 
 
 def test_key_export_keyfile(archivers, request):

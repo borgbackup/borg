@@ -7,7 +7,7 @@ from .helpers import msgpack, workarounds
 from .helpers.errors import Error, IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR
 
-# Workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
+# Workaround for lost passphrase or key in the "authenticated-*" modes
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 # The places where parse() verifies chunkid == id_hash(content) only if the user asks for it.
@@ -23,8 +23,9 @@ ASSERT_ID_PLACES = (
 # not verifying elsewhere defensible, so it must not be switchable.
 ASSERT_ID_PLACES_MANDATORY = ("verify_data",)  # borg check --verify-data
 # Default value of the BORG_ASSERT_ID env var: verify everywhere except on the (hot) general read
-# path - there, the AEAD authentication already covers what a repository could do to us, see
-# AEADKeyBase.assert_id.
+# path - there, the envelope authentication of the keyed modes already covers what a repository
+# could do to us, see AEADKeyBase.assert_id. (For the modes whose id check *is* the read path
+# authentication, this setting does not apply, see below.)
 BORG_ASSERT_ID_DEFAULT = ("repair", "transfer", "rechunk")
 # Reads through a RepoObj are attributed to this place unless a command sets another one.
 ASSERT_ID_PLACE_DEFAULT = "read"
@@ -34,8 +35,9 @@ def get_assert_id_places():
     """Determine the configurable places that shall verify the chunk id, see the BORG_ASSERT_ID docs.
 
     Note: this only decides for keys that authenticate reads independently of the id hash (the AEAD
-    ciphersuites, see KeyBase.id_check_is_authentication) - for all other keys, the id check is the
-    read path authentication itself and thus always happens, no matter what is configured here.
+    ciphersuites and the "authenticated-*" modes, see KeyBase.id_check_is_authentication) - for all
+    other keys, the id check is the read path authentication itself and thus always happens, no
+    matter what is configured here.
     The same is true for ASSERT_ID_PLACES_MANDATORY.
     """
     value = os.environ.get("BORG_ASSERT_ID")
@@ -252,19 +254,23 @@ class RepoObj:
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)
             meta, data = compressor.decompress(dict(meta_compressed), data_compressed[:psize])
-            # For keys where the id check is the read-path authentication ("authenticated" and "none" mode),
-            # it always has to happen - skipping it would remove all integrity checking from reads.
-            # For the AEAD keys, the ciphertext is already authenticated for this specific chunk id (the id is
-            # in the AAD), so the id check only adds detection of chunks whose plaintext does not match their id
-            # - which only an evil/broken borg client that had the repo key could have written. Whether that
-            # extra full-plaintext hash pass is worth it depends on the place we read at, see BORG_ASSERT_ID.
+            # For keys where the id check is the read-path authentication (the "none-*" modes, whose
+            # envelope checksum is unkeyed and thus no authentication), it always has to happen -
+            # skipping it would remove all integrity checking from reads.
+            # For the keys that authenticate the envelope (the AEAD and the "authenticated-*" modes), the
+            # payload is already authenticated for this specific chunk id (the id is in the AAD), so the id
+            # check only adds detection of chunks whose plaintext does not match their id - which only an
+            # evil/broken borg client that had the repo key could have written. Whether that extra
+            # full-plaintext hash pass is worth it depends on the place we read at, see BORG_ASSERT_ID.
             place = assert_id_place if assert_id_place is not None else self.assert_id_place
             assert_id = (
                 self.key.id_check_is_authentication
                 or place in ASSERT_ID_PLACES_MANDATORY
                 or place in self.assert_id_places
             )
-            if assert_id and not AUTHENTICATED_NO_KEY:
+            # the authenticated_no_key workaround fakes key material it could not unlock, so checks that
+            # need that key material can not work. The unkeyed modes need none, so they keep checking.
+            if assert_id and not (AUTHENTICATED_NO_KEY and self.key.has_secret_key):
                 self.key.assert_id(id, data)
         else:
             meta, data = None, None

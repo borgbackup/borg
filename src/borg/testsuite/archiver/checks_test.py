@@ -46,7 +46,7 @@ def test_repository_swap_detection(archivers, request):
     repository_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "create", "test", "input")
     shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     _set_repository_id(archiver.repository_path, repository_id)
     assert repository_id == _extract_repository_id(archiver.repository_path)
     if archiver.FORK_DEFAULT:
@@ -61,7 +61,7 @@ def test_repository_swap_detection2(archivers, request):
     create_test_files(archiver.input_path)
     original_location = archiver.repository_location
     archiver.repository_location = original_location + "_unencrypted"
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     os.environ["BORG_PASSPHRASE"] = "passphrase"
     archiver.repository_location = original_location + "_encrypted"
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -83,7 +83,7 @@ def test_repository_swap_detection_no_cache(archivers, request):
     repository_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "create", "test", "input")
     shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     _set_repository_id(archiver.repository_path, repository_id)
     assert repository_id == _extract_repository_id(archiver.repository_path)
     cmd(archiver, "repo-delete", "--cache-only")
@@ -99,7 +99,7 @@ def test_repository_swap_detection2_no_cache(archivers, request):
     original_location = archiver.repository_location
     create_test_files(archiver.input_path)
     archiver.repository_location = original_location + "_unencrypted"
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     os.environ["BORG_PASSPHRASE"] = "passphrase"
     archiver.repository_location = original_location + "_encrypted"
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -175,7 +175,7 @@ def test_repository_move(archivers, request, monkeypatch):
 
 def test_unknown_unencrypted(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     # Ok: repository is known
     cmd(archiver, "repo-info")
 

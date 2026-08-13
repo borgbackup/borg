@@ -1,7 +1,7 @@
 import pytest
 
 from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
-from ..crypto.key import PlaintextKey, AuthenticatedKey, CHPOKey
+from ..crypto.key import ChecksumKey, AuthenticatedKey, CHPOKey, LegacyPlaintextKey
 from ..helpers import msgpack
 from ..helpers.errors import Error, IntegrityError
 from ..repository import Repository
@@ -26,12 +26,19 @@ def repository(tmpdir):
 
 @pytest.fixture
 def key(repository):
-    return PlaintextKey(repository)
+    # "none-sha256" mode: not encrypted and not authenticated, but checksummed.
+    return ChecksumKey(repository)
+
+
+@pytest.fixture
+def legacy_key(repository):
+    # borg 1.x "none" mode: no envelope protection at all (read-only in borg 2).
+    return LegacyPlaintextKey(repository)
 
 
 @pytest.fixture
 def authenticated_key(repository):
-    # "authenticated" mode: not encrypted, the id check is the only read path authentication.
+    # "authenticated-sha256" mode: not encrypted, but the envelope is MAC-authenticated.
     key = AuthenticatedKey(repository)
     key.init_from_random_data()
     key.init_ciphers()
@@ -40,7 +47,6 @@ def authenticated_key(repository):
 
 @pytest.fixture
 def aead_key(repository):
-    # AEAD key, needed to test header_aad authentication; PlaintextKey is unauthenticated.
     key = CHPOKey(repository)
     key.init_from_random_data()
     key.init_ciphers()
@@ -70,8 +76,8 @@ def test_format_parse_roundtrip(key):
     assert edata.startswith(bytes((key.TYPE,)))
 
 
-def test_format_parse_roundtrip_borg1(key):  # legacy
-    repo_objs = RepoObj1(key)
+def test_format_parse_roundtrip_borg1(legacy_key):  # legacy
+    repo_objs = RepoObj1(legacy_key)
     data = b"foobar" * 10
     id = repo_objs.id_hash(data)
     meta = {}  # borg1 does not support this kind of metadata
@@ -90,13 +96,14 @@ def test_format_parse_roundtrip_borg1(key):  # legacy
     assert edata.startswith(bytes((key.TYPE, compressor.ID, compressor.level)))
 
 
-def test_borg1_borg2_transition(key):
+def test_borg1_borg2_transition(legacy_key, key):
     # Borg transfer reads Borg 1.x repository objects (without decompressing them),
     # and writes Borg 2 repository objects (providing already-compressed data to avoid recompression).
+    # The borg 1.x "none" and the borg 2 "none-sha256" mode use the same (unkeyed sha256) chunk ids.
     meta = {}  # borg1 does not support this kind of metadata
     data = b"foobar" * 10
     len_data = len(data)
-    repo_objs1 = RepoObj1(key)
+    repo_objs1 = RepoObj1(legacy_key)
     id = repo_objs1.id_hash(data)
     borg1_cdata = repo_objs1.format(id, meta, data, ro_type=ROBJ_FILE_STREAM)
     meta1, compr_data1 = repo_objs1.parse(
@@ -196,16 +203,23 @@ def _tamper(cdata, offset):
     return bytes(tampered)
 
 
-def test_tampered_header_chunk_id_detected(aead_key):
-    # chunk_id is part of header_aad, so tampering with it fails AEAD authentication in
+@pytest.fixture(params=["key", "authenticated_key", "aead_key"])
+def protected_key(request):
+    # every borg 2 mode protects the object with a tag over the payload and the AAD - an unkeyed
+    # checksum for "none-*", a MAC for "authenticated-*", the AEAD tag for the encrypted modes.
+    return request.getfixturevalue(request.param)
+
+
+def test_tampered_header_chunk_id_detected(protected_key):
+    # chunk_id is part of header_aad, so tampering with it fails the tag verification in
     # parse()/parse_meta().
-    repo_objs = RepoObj(aead_key)
+    repo_objs = RepoObj(protected_key)
     data = b"foobar" * 10
     id = repo_objs.id_hash(data)
     cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
 
     # chunk_id is at header offset 9..41 (after 8-byte magic + 1-byte version). It has no structural
-    # check, so tampering is detected only through AEAD authentication.
+    # check, so tampering is detected only through the tag.
     tampered = _tamper(cdata, offset=9)
     with pytest.raises(IntegrityError):
         repo_objs.parse_meta(id, tampered, ro_type=ROBJ_FILE_STREAM)
@@ -213,11 +227,11 @@ def test_tampered_header_chunk_id_detected(aead_key):
         repo_objs.parse(id, tampered, ro_type=ROBJ_FILE_STREAM)
 
 
-def test_tampered_header_magic_detected(aead_key):
+def test_tampered_header_magic_detected(protected_key):
     # A tampered magic byte is rejected by the structural check (`hdr.magic != OBJ_MAGIC`) before
-    # key.decrypt() runs, so this does not test AEAD authentication of header_aad - see
+    # key.decrypt() runs, so this does not test the authentication of header_aad - see
     # test_header_aad_tamper_detected_at_key_layer for that.
-    repo_objs = RepoObj(aead_key)
+    repo_objs = RepoObj(protected_key)
     data = b"foobar" * 10
     id = repo_objs.id_hash(data)
     cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
@@ -230,34 +244,90 @@ def test_tampered_header_magic_detected(aead_key):
         repo_objs.parse(id, tampered, ro_type=ROBJ_FILE_STREAM)
 
 
-def test_header_aad_tamper_detected_at_key_layer(aead_key):
+def test_tampered_meta_detected(protected_key):
+    # The metadata (which selects the decompressor and the payload size!) is covered by the tag in
+    # every mode, so it can not be modified without the read failing - and the check happens before
+    # the metadata is used for anything, see RepoObj.parse.
+    repo_objs = RepoObj(protected_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    hdr_size = RepoObj.obj_header.size
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(cdata[:hdr_size]))
+    for offset in range(hdr_size, hdr_size + hdr.meta_size):  # every byte of the meta slot
+        tampered = _tamper(cdata, offset=offset)
+        with pytest.raises(IntegrityError):
+            repo_objs.parse_meta(id, tampered, ro_type=ROBJ_FILE_STREAM)
+        with pytest.raises(IntegrityError):
+            repo_objs.parse(id, tampered, ro_type=ROBJ_FILE_STREAM)
+
+
+def test_tampered_data_detected(protected_key):
+    repo_objs = RepoObj(protected_key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    hdr_size = RepoObj.obj_header.size
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(cdata[:hdr_size]))
+    for offset in range(hdr_size + hdr.meta_size, len(cdata)):  # every byte of the data slot
+        tampered = _tamper(cdata, offset=offset)
+        with pytest.raises(IntegrityError):
+            repo_objs.parse(id, tampered, ro_type=ROBJ_FILE_STREAM)
+
+
+def test_checksum_mode_does_not_authenticate(key):
+    # The honest limit of the "none-*" modes: their tag is an unkeyed checksum, so somebody who
+    # modifies an object can just recompute it. Detecting that needs a secret - the
+    # "authenticated-*" and the encrypted modes have one, this mode does not.
+    repo_objs = RepoObj(key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
+
+    hdr_size = RepoObj.obj_header.size
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(cdata[:hdr_size]))
+    header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
+    # rewrite the meta slot with attacker-chosen content and a recomputed checksum
+    forged_meta = dict(repo_objs.parse_meta(id, cdata, ro_type=ROBJ_FILE_STREAM), custom="forged")
+    forged_meta_slot = key.encrypt(id, msgpack.packb(forged_meta), aad=header_aad + b"M")
+    forged = (
+        RepoObj.obj_header.pack(hdr.magic, hdr.version, hdr.chunk_id, len(forged_meta_slot), hdr.data_size)
+        + forged_meta_slot
+        + cdata[hdr_size + hdr.meta_size :]
+    )
+    assert repo_objs.parse_meta(id, forged, ro_type=ROBJ_FILE_STREAM)["custom"] == "forged"
+
+
+def test_header_aad_tamper_detected_at_key_layer(protected_key):
     # Calls key.encrypt()/key.decrypt() directly with header_aad, to check that every byte of
     # header_aad (magic, version, chunk_id) is authenticated, not just chunk_id.
     data = b"foobar" * 10
-    id = aead_key.id_hash(data)
+    id = protected_key.id_hash(data)
     header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
-    encrypted = aead_key.encrypt(id, data, aad=header_aad)
+    encrypted = protected_key.encrypt(id, data, aad=header_aad)
 
-    assert aead_key.decrypt(id, encrypted, aad=header_aad) == data
+    assert protected_key.decrypt(id, encrypted, aad=header_aad) == data
 
     # tamper the magic byte (offset 0) after encryption; decrypt gets a different header_aad than encrypt did.
     tampered_header_aad = bytearray(header_aad)
     tampered_header_aad[0] ^= 0x01
     with pytest.raises(IntegrityError):
-        aead_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
+        protected_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
 
     # tamper the version byte (offset 8) after encryption.
     tampered_header_aad = bytearray(header_aad)
     tampered_header_aad[8] ^= 0x01
     with pytest.raises(IntegrityError):
-        aead_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
+        protected_key.decrypt(id, encrypted, aad=bytes(tampered_header_aad))
 
 
-def test_meta_data_slot_swap_detected(aead_key):
-    # meta_encrypted and data_encrypted carry different slot tags in their AAD, so splicing one
+def test_meta_data_slot_swap_detected(protected_key):
+    # the meta and the data slot carry different slot tags in their AAD, so splicing one
     # into the other's position (fixing up meta_size/data_size to match the swapped lengths) must
-    # fail authentication instead of silently decrypting under the wrong slot.
-    repo_objs = RepoObj(aead_key)
+    # fail the tag verification instead of silently being read under the wrong slot.
+    repo_objs = RepoObj(protected_key)
     data = b"foobar" * 10
     id = repo_objs.id_hash(data)
     cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
@@ -378,11 +448,10 @@ def test_assert_id_places_env_var_mandatory_place(aead_key, monkeypatch):
     assert "verify_data: always verifies, can not be configured" in str(exc_info.value)
 
 
-@pytest.mark.parametrize("key_fixture", ["key", "authenticated_key"])
-def test_assert_id_never_skipped_for_non_aead_key(key_fixture, request, monkeypatch):
-    # PlaintextKey ("none" mode) and AuthenticatedKey ("authenticated" mode): there is no AEAD, so the id
-    # check is the only integrity check reads have and thus must happen no matter what the user configured.
-    key = request.getfixturevalue(key_fixture)
+def test_assert_id_never_skipped_for_unauthenticated_key(key, monkeypatch):
+    # ChecksumKey ("none-sha256" mode): the envelope checksum is unkeyed and thus no authentication,
+    # so the id check is the only integrity check reads have and must happen no matter what the
+    # user configured.
     monkeypatch.setenv("BORG_ASSERT_ID", "")  # verify nowhere - but this is not switchable off
     assert key.id_check_is_authentication
     repo_objs = RepoObj(key)
@@ -390,6 +459,22 @@ def test_assert_id_never_skipped_for_non_aead_key(key_fixture, request, monkeypa
     cdata = wrong_content_object(repo_objs, id)
 
     for place in ASSERT_ID_PLACES:
+        with pytest.raises(IntegrityError):
+            repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
+
+
+def test_assert_id_configurable_for_authenticated_key(authenticated_key, monkeypatch):
+    # AuthenticatedKey ("authenticated-sha256"): the envelope MAC authenticates every read (the
+    # chunk id is in the AAD), so verifying the id on top of that is configurable, like for AEAD.
+    monkeypatch.setenv("BORG_ASSERT_ID", "")  # verify at none of the configurable places
+    assert not authenticated_key.id_check_is_authentication
+    repo_objs = RepoObj(authenticated_key)
+    id = repo_objs.id_hash(b"foobar" * 10)
+    cdata = wrong_content_object(repo_objs, id)
+
+    for place in ASSERT_ID_PLACES:
+        repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
+    for place in ASSERT_ID_PLACES_MANDATORY:  # ... but check --verify-data always verifies
         with pytest.raises(IntegrityError):
             repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
 

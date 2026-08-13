@@ -6,21 +6,22 @@ from unittest.mock import MagicMock
 import pytest
 
 from ...crypto.key import BLAKE3_MT_THRESHOLD_KIB, get_blake3_mt_threshold
-from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey, keyfile_parse
-from ...crypto.key import AESCTRKey, Blake2AESCTRKey
+from ...crypto.key import ChecksumKey, Blake3ChecksumKey, keyfile_parse
+from ...crypto.key import AuthenticatedKey, Blake3AuthenticatedKey
+from ...crypto.key import AESCTRKey, Blake2AESCTRKey, Blake2AuthenticatedKey
+from ...crypto.key import LegacyPlaintextKey, LegacyAuthenticatedKey
 from ...crypto.key import AEADKeyBase
 from ...crypto.key import AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey
 from ...crypto.key import AES_OCB_MAX_SESSION_BLOCKS
-from ...crypto.key import Blake3AuthenticatedKey
 from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
-from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
+from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError, UnsupportedPayloadError
 from ...crypto.key import identify_key
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
 from ...helpers import Error
 from ...helpers import IntegrityError
 from ...helpers import Location
 from ...helpers import msgpack
-from ...constants import KEY_ALGORITHMS
+from ...constants import KEY_ALGORITHMS, KeyBlobStorage, KeyType, ROBJ_MANIFEST
 from ...helpers import hex_to_bin, bin_to_hex
 
 
@@ -87,11 +88,12 @@ class TestKey:
         params=(
             # keyfile and repokey are no longer separate classes (storage is a per-key property),
             # so each crypto suite appears once here.
-            # not encrypted
-            PlaintextKey,
+            # not encrypted, but tagged
+            ChecksumKey,
+            Blake3ChecksumKey,
             AuthenticatedKey,
             Blake3AuthenticatedKey,
-            # legacy crypto
+            # legacy crypto (read-only, borg 1.x)
             AESCTRKey,
             Blake2AESCTRKey,
             Blake2AuthenticatedKey,
@@ -128,11 +130,19 @@ class TestKey:
             # is storage-agnostic now and always probes repo candidates, even for keyfile keys.
             return getattr(self, "key_data", b"")
 
-    def test_plaintext(self):
-        key = PlaintextKey.create(None, None)
+    def test_none_sha256(self):
+        key = ChecksumKey.create(None, None)
         chunk = b"foo"
         id = key.id_hash(chunk)
+        # the chunk id of the "none-*" modes is the plain (unkeyed) hash of the chunk
         assert bin_to_hex(id) == "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+        assert chunk == key.decrypt(id, key.encrypt(id, chunk))
+
+    def test_none_blake3(self):
+        key = Blake3ChecksumKey.create(None, None)
+        chunk = b"foo"
+        id = key.id_hash(chunk)
+        assert bin_to_hex(id) == "04e0bb39f30b1a3feb89f536c93be15055482df748674b00d26e5a75777702e9"
         assert chunk == key.decrypt(id, key.encrypt(id, chunk))
 
     def test_keyfile(self, monkeypatch, keys_dir):
@@ -292,10 +302,13 @@ class TestKey:
         plaintext = b"123456789"
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
-        # 0x07 is the key TYPE.
-        assert authenticated == b"\x07" + plaintext
+        # TYPE(1) + reserved(1) + tag(32) + payload, see MACKeyBase
+        assert authenticated[0:2] == b"\x60\x00"
+        assert authenticated[34:] == plaintext
+        assert key.decrypt(id, authenticated) == plaintext
 
     def test_blake2_authenticated_encrypt(self, monkeypatch):
+        # borg 1.x mode, read-only: its envelope is just the type byte plus the payload.
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
         key = Blake2AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
         assert Blake2AuthenticatedKey.id_hash is ID_BLAKE2b_256.id_hash
@@ -314,8 +327,9 @@ class TestKey:
         plaintext = b"123456789"
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
-        # 0x50 is the key TYPE.
-        assert authenticated == b"\x50" + plaintext
+        assert authenticated[0:2] == b"\x70\x00"
+        assert authenticated[34:] == plaintext
+        assert key.decrypt(id, authenticated) == plaintext
 
     def test_blake3_mt_threshold_from_env(self, monkeypatch):
         # the env var gives the threshold in KiB, get_blake3_mt_threshold() returns bytes
@@ -363,6 +377,190 @@ class TestTAM:
         unpacked = key.unpack_archive(blob)
         assert unpacked["foo"] == "bar"
         assert "tam" not in unpacked  # legacy
+
+
+class TestMACEnvelope:
+    """The tagged envelope of the modes that do not encrypt, see MACKeyBase."""
+
+    # fixed key material, so the tests can check exact envelope bytes
+    CRYPT_KEY = bytes(range(64))
+    ID_KEY = bytes(range(100, 132))
+
+    ALL_CLASSES = (ChecksumKey, Blake3ChecksumKey, AuthenticatedKey, Blake3AuthenticatedKey)
+    KEYED_CLASSES = (AuthenticatedKey, Blake3AuthenticatedKey)
+    UNKEYED_CLASSES = (ChecksumKey, Blake3ChecksumKey)
+
+    class MockRepository:
+        id = bytes(32)
+        version = 2
+
+    def make_key(self, cls, crypt_key=None):
+        key = cls(self.MockRepository())
+        if cls.has_secret_key:
+            key.init_from_given_data(crypt_key=crypt_key or self.CRYPT_KEY, id_key=self.ID_KEY, chunk_seed=0)
+        return key
+
+    @pytest.fixture(params=ALL_CLASSES)
+    def key(self, request):
+        return self.make_key(request.param)
+
+    def test_envelope_layout(self, key):
+        payload = b"payload"
+        id = key.id_hash(payload)
+        envelope = key.encrypt(id, payload, aad=b"aad")
+        assert envelope[0] == key.TYPE
+        assert envelope[1] == 0  # reserved
+        assert len(envelope) == key.PAYLOAD_OVERHEAD + len(payload) == 34 + len(payload)
+        assert envelope[34:] == payload  # the payload is stored as-is, these modes do not encrypt
+        assert key.decrypt(id, envelope, aad=b"aad") == payload
+
+    def test_envelope_is_deterministic(self, key):
+        # no nonce, no session: same input -> same bytes (see MACKeyBase)
+        payload = b"payload"
+        id = key.id_hash(payload)
+        assert key.encrypt(id, payload, aad=b"aad") == key.encrypt(id, payload, aad=b"aad")
+
+    @pytest.mark.parametrize("cls", ALL_CLASSES)
+    def test_format_is_stable(self, cls):
+        # golden vectors: these bytes must not change silently, they are an on-disk format.
+        expected = {
+            ChecksumKey: "80001ab01692fad0f0b89f27983cbf51b1bd20ab73de736aea83363b749ee6ba314f",
+            Blake3ChecksumKey: "90008dec559eda6de95536f198f6b54b3b2728678c94ca1b3f0b77cf37e5b11c9b7c",
+            AuthenticatedKey: "600033ecaaf8c34d4142fa502278986c8f49efbcbf879de16d3c2767e1252bfb1994",
+            Blake3AuthenticatedKey: "70006de48e2139f8995790ec81b256e87f40ef5810d140d28396a8d07734ab05a358",
+        }[cls]
+        key = self.make_key(cls)
+        plaintext = b"123456789"
+        envelope = key.encrypt(key.id_hash(plaintext), plaintext, aad=b"")
+        assert bin_to_hex(envelope) == expected + bin_to_hex(plaintext)
+
+    @pytest.mark.parametrize("cls", UNKEYED_CLASSES)
+    def test_unkeyed_modes_are_repo_independent(self, cls):
+        # no key material at all, so any two repositories of such a mode store identical objects
+        # for identical input - that is what allows deduplicating them on the filesystem level.
+        key1, key2 = self.make_key(cls), self.make_key(cls)
+        payload = b"payload"
+        id = key1.id_hash(payload)
+        assert key1.id_hash(payload) == key2.id_hash(payload)
+        assert key1.encrypt(id, payload, aad=b"aad") == key2.encrypt(id, payload, aad=b"aad")
+
+    @pytest.mark.parametrize("cls", KEYED_CLASSES)
+    def test_keyed_modes_depend_on_crypt_key(self, cls):
+        # the tag key is derived from crypt_key: same crypt_key -> same objects (that is what
+        # "repo-create --other-repo --copy-crypt-key" gives), different crypt_key -> different tag.
+        payload = b"payload"
+        same = [self.make_key(cls), self.make_key(cls)]
+        other = self.make_key(cls, crypt_key=bytes(range(1, 65)))
+        id = same[0].id_hash(payload)
+        assert same[0].encrypt(id, payload, aad=b"aad") == same[1].encrypt(id, payload, aad=b"aad")
+        assert same[0].encrypt(id, payload, aad=b"aad") != other.encrypt(id, payload, aad=b"aad")
+        # a key that can not verify the tag must not be able to read
+        with pytest.raises(IntegrityError):
+            other.decrypt(id, same[0].encrypt(id, payload, aad=b"aad"), aad=b"aad")
+
+    def test_tampered_envelope_detected(self, key):
+        # every single byte of the envelope is covered by the tag
+        payload = b"0123456789"
+        id = key.id_hash(payload)
+        envelope = key.encrypt(id, payload, aad=b"aad")
+        for offset in range(len(envelope)):
+            tampered = bytearray(envelope)
+            tampered[offset] ^= 64  # stays within TYPES_ACCEPTABLE if it hits the type byte
+            with pytest.raises(IntegrityError):
+                key.decrypt(id, bytes(tampered), aad=b"aad")
+
+    def test_tampered_aad_detected(self, key):
+        # the AAD carries the object header, the meta/data slot tag and the chunk id, see RepoObj
+        payload = b"payload"
+        id = key.id_hash(payload)
+        envelope = key.encrypt(id, payload, aad=b"aadM")
+        with pytest.raises(IntegrityError):
+            key.decrypt(id, envelope, aad=b"aadD")  # e.g. meta and data slot swapped
+        other_id = key.id_hash(b"other payload")
+        with pytest.raises(IntegrityError):
+            key.decrypt(other_id, envelope, aad=b"aadM")  # chunk taken from another object
+
+    def test_truncated_envelope_detected(self, key):
+        payload = b"payload"
+        id = key.id_hash(payload)
+        envelope = key.encrypt(id, payload, aad=b"aad")
+        for length in range(key.PAYLOAD_OVERHEAD):  # cut into the header/tag
+            with pytest.raises(IntegrityError):
+                key.decrypt(id, envelope[:length], aad=b"aad")
+        with pytest.raises(IntegrityError):  # cut into the payload
+            key.decrypt(id, envelope[:-1], aad=b"aad")
+
+    @pytest.mark.parametrize("cls", ALL_CLASSES)
+    def test_flags(self, cls):
+        key = self.make_key(cls)
+        assert not key.encrypts
+        assert not key.logically_encrypted
+        assert key.IDHASH_IN_ENC_NAME
+        assert key.ENC_NAME.endswith("-" + key.IDHASH_NAME)
+        if cls in self.KEYED_CLASSES:
+            assert key.has_secret_key
+            # the envelope tag authenticates every read, so verifying the chunk id on top of that
+            # is optional (see BORG_ASSERT_ID), like for the AEAD modes.
+            assert not key.id_check_is_authentication
+            assert key.STORAGE == KeyBlobStorage.REPO
+            assert key.LOCATION_CONFIGURABLE
+        else:
+            assert not key.has_secret_key
+            # the checksum can be recomputed by anybody, thus it is no authentication: the chunk id
+            # check is the only one left and must never be skipped.
+            assert key.id_check_is_authentication
+            assert key.STORAGE == KeyBlobStorage.NO_STORAGE
+            assert not key.LOCATION_CONFIGURABLE
+
+    @pytest.mark.parametrize("cls", ALL_CLASSES)
+    def test_type_bytes_are_distinct(self, cls):
+        # identify_key must be able to tell the modes apart by the first envelope byte
+        key = self.make_key(cls)
+        envelope = key.encrypt(key.id_hash(b"x"), b"x")
+        assert identify_key(envelope) is cls
+
+    def test_authenticated_no_key_workaround(self, monkeypatch):
+        # without the key material, the keyed modes can not verify the tag - but they can still
+        # read the data (that is the point of the workaround, see BORG_WORKAROUNDS).
+        key = self.make_key(AuthenticatedKey)
+        payload = b"payload"
+        id = key.id_hash(payload)
+        envelope = bytearray(key.encrypt(id, payload, aad=b"aad"))
+        envelope[5] ^= 1  # corrupt the tag
+        monkeypatch.setattr("borg.crypto.key.AUTHENTICATED_NO_KEY", True)
+        assert key.decrypt(id, bytes(envelope), aad=b"aad") == payload
+
+    def test_unkeyed_modes_verify_despite_workaround(self, monkeypatch):
+        # the unkeyed modes need no key material, so the workaround must not switch their
+        # checksum verification off.
+        monkeypatch.setattr("borg.crypto.key.AUTHENTICATED_NO_KEY", True)
+        key = self.make_key(ChecksumKey)
+        payload = b"payload"
+        id = key.id_hash(payload)
+        envelope = bytearray(key.encrypt(id, payload, aad=b"aad"))
+        envelope[5] ^= 1
+        with pytest.raises(IntegrityError):
+            key.decrypt(id, bytes(envelope), aad=b"aad")
+
+
+def test_dropped_borg2_beta_key_types(tmpdir):
+    # the borg2 beta "none"/"authenticated" formats were dropped, see #9104. A borg2 repository
+    # using them must be refused instead of being read with the legacy classes.
+    from ...repoobj import RepoObj
+    from ...crypto.key import key_factory
+
+    for legacy_cls in (LegacyPlaintextKey, LegacyAuthenticatedKey):
+        key = legacy_cls(MagicMock(id=bytes(32)))
+        if legacy_cls is LegacyAuthenticatedKey:
+            key.id_key = bytes(32)
+        manifest_chunk = RepoObj(key).format(bytes(32), {}, b"manifest", ro_type=ROBJ_MANIFEST)
+        with pytest.raises(UnsupportedPayloadError):
+            key_factory(MagicMock(id=bytes(32)), manifest_chunk, ro_cls=RepoObj)
+
+
+def test_dropped_blake3_authenticated_type_byte():
+    with pytest.raises(UnsupportedPayloadError):
+        identify_key(bytes([KeyType.DROPPED_BLAKE3AUTHENTICATED]) + b"payload")
 
 
 def test_decrypt_key_file_unsupported_algorithm():

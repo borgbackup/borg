@@ -28,7 +28,7 @@ def test_with_lock(tmp_path):
     print("sys.path: %r" % sys.path)
     print("PYTHONPATH: %s" % env.get("PYTHONPATH", ""))
     print("PATH: %s" % env.get("PATH", ""))
-    command0 = "python3", "-m", "borg", "repo-create", "--encryption=none"
+    command0 = "python3", "-m", "borg", "repo-create", "--encryption=none-sha256"
     # Timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
     # so that lock acquisition for command2 fails as the test expects it.
     lock_wait = 2

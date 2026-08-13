@@ -846,9 +846,15 @@ class HelpMixIn:
                     in WSL1 (Windows Subsystem for Linux 1).
 
                 authenticated_no_key
-                    Work around a lost passphrase or key for an ``authenticated`` mode repository
+                    Work around a lost passphrase or key for an ``authenticated-*`` mode repository
                     (these are only authenticated, but not encrypted).
                     If the key is missing in the repository config, add ``key = anything`` there.
+
+                    Without the key, borg can not verify anything that needs it: neither the
+                    authentication tag of the repository objects nor the chunk ids. It therefore
+                    reads the repository **unverified** - a corrupted or tampered repository will
+                    not be detected. (This only concerns the ``authenticated-*`` modes; the
+                    ``none-*`` modes need no key and keep verifying their checksums.)
 
                     This workaround is **only** for emergencies and **only** to extract data
                     from an affected repository (read-only access)::

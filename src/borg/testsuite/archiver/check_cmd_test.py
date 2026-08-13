@@ -716,7 +716,7 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         assert not repository._pack_writer._pieces  # finish() stored it
 
 
-@pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none"]])
+@pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none-sha256"]])
 def test_verify_data(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() != "local":
@@ -809,7 +809,7 @@ def test_repair_wrong_item_metadata_chunk_content(archivers, request, monkeypatc
     assert "id verification failed" in output
 
 
-@pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none"]])
+@pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "none-sha256"]])
 def test_corrupted_file_chunk(archivers, request, init_args):
     ## like test_verify_data, but also checks a repository-only check passes after repair and a plain
     ## archives check reports the missing chunk.

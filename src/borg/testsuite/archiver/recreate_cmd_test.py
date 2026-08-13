@@ -66,7 +66,7 @@ def test_recreate_exclude_keep_tagged(archivers, request):
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
 def test_recreate_hardlinked_tags(archivers, request):  # test for issue #4911
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
     create_regular_file(
         archiver.input_path, "file1", contents=CACHE_TAG_CONTENTS
     )  # "wrong" filename, but correct tag contents

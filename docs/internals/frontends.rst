@@ -735,6 +735,8 @@ Warnings
         {}: {}
     BackupFileNotFoundError rc: 107
         {}: {}
+    BackupTimeoutError rc: 111
+        {}: {}
 
 Operations
     - cache.begin_transaction

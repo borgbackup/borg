@@ -129,6 +129,17 @@ def decode_dict(d, keys, encoding="utf-8", errors="surrogateescape"):
     return d
 
 
+def nonnegative_seconds(s):
+    """Parse a nonnegative number of seconds (int or float, e.g. ``0``, ``30`` or ``2.5``)."""
+    try:
+        seconds = float(s)
+    except ValueError:
+        raise ArgumentTypeError(f"invalid seconds value: {s!r}") from None
+    if not seconds >= 0.0:
+        raise ArgumentTypeError("seconds value must be >= 0")
+    return seconds
+
+
 def interval(s):
     """Parse an interval string (e.g. ``7d``, ``2w``, ``30M``) into a timedelta.
 

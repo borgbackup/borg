@@ -217,5 +217,13 @@ class BackupHardlinkSourceError(BackupError):
     exit_mcode = 110
 
 
+class BackupTimeoutError(BackupOSError):
+    """{}: {}"""
+
+    # Timed out waiting for data while reading from a special file (fifo / character device),
+    # see the --read-special-timeout option of borg create.
+    exit_mcode = 111
+
+
 class BackupItemExcluded(Exception):
     """Used internally to skip an item from processing when it is excluded."""

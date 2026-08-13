@@ -768,6 +768,10 @@ def write_chunkindex_to_repo(
     return new_hashes
 
 
+class CorruptChunkIndexFragment(Exception):
+    """A chunk index fragment's name matches its content hash, but the content does not deserialize."""
+
+
 def read_chunkindex_from_repo(repository, hash):
     index_name = f"index/{hash}"
     logger.debug(f"trying to load {index_name} from the repo...")
@@ -778,8 +782,13 @@ def read_chunkindex_from_repo(repository, hash):
     else:
         if hashlib.sha256(chunks_data).digest() == hex_to_bin(hash):
             logger.debug(f"{index_name} is valid.")
-            with io.BytesIO(chunks_data) as f:
-                chunks = ChunkIndex.read(f)
+            try:
+                with io.BytesIO(chunks_data) as f:
+                    chunks = ChunkIndex.read(f)
+            except (ValueError, KeyError, struct.error) as err:
+                # the name matches the content hash, so the bytes are intact but do not deserialize
+                # into a ChunkIndex: the fragment is corrupt.
+                raise CorruptChunkIndexFragment(index_name) from err
             return chunks
         else:
             logger.debug(f"{index_name} is invalid.")
@@ -817,7 +826,11 @@ def repack_chunkindex(repository):
     merged = ChunkIndex()
     merged_hashes = []
     for name, _ in small:
-        fragment = read_chunkindex_from_repo(repository, name)
+        try:
+            fragment = read_chunkindex_from_repo(repository, name)
+        except CorruptChunkIndexFragment:
+            # a corrupt fragment cannot be merged; leave it in place and skip it.
+            continue
         if fragment is None:
             # gone or invalid (e.g. deleted by another client); just don't merge it.
             continue
@@ -839,8 +852,12 @@ def repack_chunkindex(repository):
 
 
 def build_chunkindex_from_repo(
-    repository, *, slow_rebuild=False, write_immediately=False, init_flags=ChunkIndex.F_USED
+    repository, *, slow_rebuild=False, fragments_only=False, write_immediately=False, init_flags=ChunkIndex.F_USED
 ):
+    # fragments_only: build the index from the index/ fragments only, returning None if they cannot be
+    # read completely, and never write to the repo.
+    assert not (slow_rebuild and fragments_only)
+    assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
     if not slow_rebuild:
         # a concurrent repack_chunkindex (another client, shared lock) deletes the small fragments it
@@ -852,6 +869,8 @@ def build_chunkindex_from_repo(
         # set (e.g. a persistently unreadable fragment), fall through to the slow rebuild instead.
         for _ in range(CHUNKINDEX_MERGE_ATTEMPTS):
             if chunkindex_is_invalid(repository):
+                if fragments_only:
+                    return None
                 # leftover fragments may be incomplete or stale. Finish the interrupted deletion
                 # (best-effort; a read-only client rebuilds in memory only), then rebuild from packs.
                 logger.warning("chunk index is invalid (interrupted operation), rebuilding it.")
@@ -862,19 +881,34 @@ def build_chunkindex_from_repo(
                 break
             hashes = list_chunkindex_hashes(repository)
             if not hashes:  # no chunk index fragments available
+                if fragments_only:
+                    return None
                 break
             chunks = ChunkIndex()  # we'll merge all fragments into this
             complete = True
+            corrupt_fragment = None
             for hash in hashes:
-                chunks_to_merge = read_chunkindex_from_repo(repository, hash)
+                try:
+                    chunks_to_merge = read_chunkindex_from_repo(repository, hash)
+                except CorruptChunkIndexFragment as err:
+                    corrupt_fragment = err
+                    break
                 if chunks_to_merge is None:
-                    logger.debug(f"chunk index fragment {hash} vanished or is invalid, restarting the merge...")
+                    logger.debug(f"chunk index fragment {hash} vanished, restarting the merge...")
                     complete = False
                     break
                 logger.debug(f"chunk index fragment {hash} gets merged...")
                 for k, v in chunks_to_merge.items():
                     chunks[k] = v
                 chunks_to_merge.clear()
+            if corrupt_fragment is not None:
+                # retrying would re-read the same corrupt fragment; rebuild the whole index from
+                # the packs instead (or return None in fragments_only mode).
+                chunks.clear()
+                if fragments_only:
+                    return None
+                logger.warning(f"{corrupt_fragment} is corrupt, rebuilding the chunk index from the packs.")
+                break
             if complete:
                 if len(hashes) > 1 and write_immediately:
                     # consolidate small fragments on the repo so they don't pile up. this is a
@@ -887,6 +921,8 @@ def build_chunkindex_from_repo(
                 return chunks
             chunks.clear()  # free the partial merge before retrying
         else:
+            if fragments_only:
+                return None
             logger.warning("could not read a complete set of chunk index fragments, rebuilding the index.")
     # if we didn't get anything from the index fragments, compute the ChunkIndex the slow way:
     logger.debug("rebuilding the chunk index from the repo the slow way...")

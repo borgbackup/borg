@@ -12,6 +12,7 @@ from .. import cache as cache_mod
 from ..cache import (
     AdHocWithFilesCache,
     ChunksMixin,
+    CorruptChunkIndexFragment,
     FileCacheEntry,
     build_chunkindex_from_repo,
     chunkindex_is_invalid,
@@ -144,6 +145,35 @@ def test_read_chunkindex_from_repo_missing(tmp_path):
         # Try to load a non-existent index entry — should return None, not raise.
         result = read_chunkindex_from_repo(repository, "f" * 64)
         assert result is None
+
+
+def test_read_chunkindex_from_repo_corrupt(tmp_path):
+    """A fragment whose name matches its content hash but does not deserialize raises."""
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        content = b"not a serialized chunk index"
+        name = hashlib.sha256(content).hexdigest()  # valid name, so the name check passes
+        repository.store_store(f"index/{name}", content)
+        with pytest.raises(CorruptChunkIndexFragment):
+            read_chunkindex_from_repo(repository, name)
+
+
+def test_build_chunkindex_rebuilds_on_corrupt_fragment(tmp_path):
+    """A corrupt fragment (valid name, unreadable content) triggers a rebuild from the packs, no retry."""
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        ci = ChunkIndex()
+        ci[H(1)] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, H(1), 0, 4)
+        write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
+        content = b"not a serialized chunk index"
+        name = hashlib.sha256(content).hexdigest()
+        repository.store_store(f"index/{name}", content)
+        chunks = build_chunkindex_from_repo(repository)
+        # the rebuild reads the (empty) packs namespace, so H(1) from the corrupt fragment is absent
+        assert H(1) not in chunks
+        assert len(chunks) == 0
+        # fragments_only returns None here rather than rebuilding from the packs
+        assert build_chunkindex_from_repo(repository, fragments_only=True) is None
 
 
 def test_build_chunkindex_retries_on_vanished_fragment(tmp_path):

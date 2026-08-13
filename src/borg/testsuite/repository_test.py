@@ -1172,9 +1172,9 @@ def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, ca
         assert "Cannot cross-check packs against the chunk index" in caplog.text
 
 
-def test_check_partial_skips_missing_pack_cross_check(tmp_path, caplog):
-    # a partial check (max_duration) does not cross-check the index against packs/; missing-pack
-    # detection runs on the full check instead (refs #9898).
+def test_check_partial_still_detects_missing_pack(tmp_path, caplog):
+    # a partial check (max_duration) cross-checks the index against packs/ before the pack loop, so
+    # it detects a missing pack and fails just like a full check (refs #9898).
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         for x in range(3):
@@ -1184,8 +1184,8 @@ def test_check_partial_skips_missing_pack_cross_check(tmp_path, caplog):
         pack_id = repository.chunks[H(0)].pack_id
         repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
         with caplog.at_level(logging.ERROR):
-            assert repository.check(repair=False, max_duration=3600) is True
-        assert "Missing pack" not in caplog.text
+            assert repository.check(repair=False, max_duration=3600) is False
+        assert f"Missing pack: {bin_to_hex(pack_id)}" in caplog.text
 
 
 def test_check_checked_packs_roundtrip(tmp_path):

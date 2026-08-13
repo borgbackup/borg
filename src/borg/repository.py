@@ -1098,7 +1098,10 @@ class Repository:
             # the loop stays inactive during a repair.
             packs_scanned = True
             if index_errors:
-                logger.warning("Repository index is corrupted; verifying all packs before rebuilding it from them.")
+                logger.warning(
+                    "Repository index is corrupted; verifying all packs before deciding whether to "
+                    "rebuild it from them."
+                )
             # packs are the bulk of the work and the part --max-duration spreads over several checks.
             pack_infos = store_list("packs")
             # drop objects whose name is not a valid pack name and count them as errors; the code

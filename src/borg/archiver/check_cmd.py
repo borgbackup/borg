@@ -236,8 +236,9 @@ class CheckMixIn:
 
         1. When checking the repository's consistency, repair mode rebuilds the repository
            index from the packs if the index is corrupt, provided every pack is intact. If
-           any pack is corrupt, the index is left as-is and the corruption is reported;
-           salvaging a corrupt pack's still-intact objects is not implemented yet.
+           any pack is corrupt, the repository check leaves the index and the packs untouched
+           and reports the corruption; salvaging a corrupt pack's still-intact objects is not
+           implemented yet (refs #8572).
 
         2. When checking the consistency and correctness of archives, repair mode might
            remove whole archives from the manifest if their archive metadata chunk is

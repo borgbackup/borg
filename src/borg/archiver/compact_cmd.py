@@ -287,20 +287,29 @@ class ArchiveGarbageCollector:
                     pack_used[pid] += entry.obj_size
 
         if stale_ids:
-            # keep these entries: they may be an archive's only pointer to a chunk. dropping them is
-            # "borg check --repair"'s call.
-            logger.warning(f'{len(stale_ids)} index entries reference missing pack files; run "borg check --repair".')
+            # keep these entries: they may be an archive's only pointer to a chunk. dropping them
+            # (repairing the index) is not implemented yet, refs #8572.
+            n = len(stale_ids)
+            if n == 1:
+                subject = "1 index entry references a missing pack file"
+            else:
+                subject = f"{n} index entries reference missing pack files"
+            logger.warning(
+                f"{subject}. Repairing the index (dropping the stale references) is tracked in "
+                "https://github.com/borgbackup/borg/issues/8572."
+            )
             if stale_used:
                 logger.error(f"{stale_used} of them are still in use: repository data is missing!")
                 set_ec(EXIT_ERROR)
 
         # bytes no index entry covers. compact_pack reclaims the redundant duplicates among them while
-        # rewriting a pack; the rest is left for "borg check --repair".
+        # rewriting a pack; reclaiming the rest is tracked in #8572.
         unindexed = sum(total - pack_indexed[pid] for pid, total in pack_total.items() if total > pack_indexed[pid])
         if unindexed:
             logger.info(
                 f"{format_file_size(unindexed)} in pack files is not covered by the index; "
-                'redundant copies are reclaimed on pack rewrite, the rest by "borg check --repair".'
+                "redundant copies are reclaimed on pack rewrite, reclaiming the rest is tracked in "
+                "https://github.com/borgbackup/borg/issues/8572."
             )
 
         # decide each pack's fate. a pack's reclaimable bytes are its indexed-but-unused bytes; the

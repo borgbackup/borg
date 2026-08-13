@@ -1095,13 +1095,12 @@ class Repository:
                     self.chunks = chunks
                     # index entries pointing to a pack absent from packs/: data loss.
                     missing_pack_ids = sorted(referenced_pack_ids - present_pack_ids)
-                    # packs no index entry references: leftovers of an interrupted operation, not an error.
+                    # packs no index entry references: not an error, so info + ids at debug only.
                     orphan_pack_ids = sorted(present_pack_ids - referenced_pack_ids)
                     if orphan_pack_ids:
-                        logger.info(
-                            f"{len(orphan_pack_ids)} pack(s) in packs/ are not referenced by the index "
-                            f"(leftovers from an interrupted operation)."
-                        )
+                        logger.info(f"{len(orphan_pack_ids)} pack(s) are not referenced by the index.")
+                        for pack_id in orphan_pack_ids:
+                            logger.debug(f"Orphan pack: {bin_to_hex(pack_id)}")
             if partial:
                 # a partial check stops after max_duration; verify the least-recently-checked packs
                 # first so repeated runs cover every pack. sort by recorded check time, unrecorded

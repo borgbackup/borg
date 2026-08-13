@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-with-lock" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-with-lock" "1" "2026-08-13" "" "borg backup tool"
 .SH Name
 borg-with-lock \- Runs a user-specified command with the repository lock held.
 .SH SYNOPSIS
@@ -55,9 +55,9 @@ code as Borg\(aqs return code.
 .INDENT 0.0
 .INDENT 3.5
 If you copy a repository with the lock held, the lock will be present in
-the copy. Before using Borg on the copy from a different host,
-you need to run \fBborg break\-lock\fP on the copied repository, because
-Borg is cautious and does not automatically remove stale locks made by a different host.
+the copy. Borg removes such a leftover lock automatically, but only after
+a safety period of about half an hour, so to use Borg on the copy right
+away, first run \fBborg break\-lock\fP on the copied repository.
 .UNINDENT
 .UNINDENT
 .SH OPTIONS

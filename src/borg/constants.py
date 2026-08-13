@@ -38,6 +38,11 @@ UMASK_DEFAULT = 0o077
 # forcing to 0o100XXX later
 STDIN_MODE_DEFAULT = 0o660
 
+# default for --read-special-timeout [s]: how long reading a fifo / char device may wait
+# for data to arrive (incl. waiting for a fifo's writer to connect) before the file is
+# skipped with an error. 0 means "wait forever".
+READ_SPECIAL_TIMEOUT_DEFAULT = 1800.0
+
 # RepoObj types
 ROBJ_MANIFEST = "M"  # Manifest (directory of archives, other metadata) object
 ROBJ_ARCHIVE_META = "A"  # main archive metadata object

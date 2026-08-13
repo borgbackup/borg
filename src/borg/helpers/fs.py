@@ -3,10 +3,12 @@ import hashlib
 import os
 import posixpath
 import re
+import select
 import stat
 import subprocess
 import sys
 import textwrap
+import time
 from pathlib import Path
 
 import platformdirs
@@ -572,6 +574,68 @@ def os_stat(*, path=None, parent_fd=None, name=None, follow_symlinks=False):
     else:
         fname, parent_fd = path, None  # just use the path
     return os.stat(fname, dir_fd=parent_fd, follow_symlinks=follow_symlinks)
+
+
+class SpecialFileReader:
+    """
+    File-like reader for special files (fifos / character devices) opened with O_NONBLOCK,
+    enforcing a timeout while waiting for data.
+
+    The timeout limits how long a read waits for data to *arrive*: as long as data keeps
+    flowing with gaps shorter than the timeout, reading never times out. When the timeout
+    is exceeded, OSError(ETIMEDOUT) is raised.
+
+    This also covers waiting for a fifo's writer to connect: opening a fifo read-only with
+    O_NONBLOCK succeeds immediately even when there is no writer (yet) and until one connects,
+    os.read() returns b"" (which otherwise means EOF). Thus, b"" only counts as EOF after some
+    data was received before - until then, it means "no writer connected (yet)" and we keep
+    waiting. Consequence: a writer connecting, but closing without writing anything, results
+    in a timeout, not in empty file content.
+    """
+
+    NO_WRITER_POLL_INTERVAL = 0.1  # [s] how often to re-check a fifo nobody has opened for writing
+
+    def __init__(self, fd, timeout):
+        self.fd = fd  # OS-level file descriptor, opened with O_RDONLY | O_NONBLOCK
+        self.timeout = timeout  # [s] maximum time to wait for data to arrive
+        self.got_data = False  # whether any data was received yet
+
+    def read(self, size):
+        # Loop until we have <size> bytes, EOF or a timeout: the chunker's FileReader expects
+        # short reads only at EOF, and a single os.read from a fifo returns at most the pipe
+        # buffer's current content.
+        parts = []
+        remaining = size
+        deadline = time.monotonic() + self.timeout
+        while remaining:
+            try:
+                data = os.read(self.fd, remaining)
+            except BlockingIOError:
+                data = None  # a writer is connected, but no data is available right now
+            if data:
+                parts.append(data)
+                remaining -= len(data)
+                self.got_data = True
+                deadline = time.monotonic() + self.timeout
+                continue
+            if data == b"" and self.got_data:
+                break  # EOF - all writers closed after having sent data.
+            wait = deadline - time.monotonic()
+            if wait <= 0.0:
+                raise OSError(errno.ETIMEDOUT, f"no data received for more than {self.timeout} seconds")
+            if data is None:
+                # wait for data to arrive (select returns early when it does or when writers close)
+                select.select([self.fd], [], [], wait)
+            else:
+                # fifo without a connected writer: there is nothing to select() on that would
+                # signal a writer connecting, so re-check periodically.
+                time.sleep(min(self.NO_WRITER_POLL_INTERVAL, wait))
+        return parts[0] if len(parts) == 1 else b"".join(parts)
+
+    def seek(self, pos, whence=os.SEEK_SET):
+        # Special files are not seekable - raise what lseek on a fifo fd would raise
+        # (the sparse file support probes seekability and handles OSError).
+        raise OSError(errno.ESPIPE, os.strerror(errno.ESPIPE))
 
 
 def umount(mountpoint):

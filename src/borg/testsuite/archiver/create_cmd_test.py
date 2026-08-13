@@ -16,7 +16,7 @@ from ...manifest import Manifest
 from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
-from ...helpers import CommandError, BackupPermissionError
+from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -952,6 +952,150 @@ def test_create_topical(archivers, request):
     # should list the file as changed
     output = cmd(archiver, "create", "test", "input", "--list", "--filter=AM")
     assert "file1" in output
+
+
+def _drain_fifo_and_join(fifo_fn, thread, size=65536):
+    """In case `borg create` failed to open/read the FIFO, unblock the feeder thread."""
+    fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        while os.read(fd, size):
+            pass
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+    thread.join()
+
+
+@pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
+@pytest.mark.parametrize("timeout_args", ([], ["--read-special-timeout=0"]), ids=["default-timeout", "no-timeout"])
+def test_create_read_special_big_fifo(archivers, request, timeout_args):
+    # os.read() on a fifo returns at most the pipe buffer's content (often just 64 KiB),
+    # usually much less than the chunker requests per read - especially with a writer
+    # that pauses between bursts. borg must keep reading and not treat a short read as
+    # EOF, else the archived fifo content gets truncated.
+    # Parametrization covers both read paths: the SpecialFileReader wrapper (default
+    # timeout) and the plain blocking reads (--read-special-timeout=0 == wait forever).
+    archiver = request.getfixturevalue(archivers)
+    import time
+    from threading import Thread
+
+    data = b"".join(length.to_bytes(4, "big") * 1024 for length in range(512))  # 2 MiB, way > pipe buffer
+
+    def fifo_feeder(fifo_fn, data):
+        fd = os.open(fifo_fn, os.O_WRONLY)
+        try:
+            burst_size = len(data) // 4
+            for start in range(0, len(data), burst_size):
+                burst = data[start : start + burst_size]
+                pos = 0
+                while pos < len(burst):
+                    pos += os.write(fd, burst[pos:])
+                time.sleep(0.1)  # writer pause: reads on the other side come up short
+        except BrokenPipeError:
+            pass  # borg closed the fifo prematurely (that is the bug this test is about)
+        finally:
+            os.close(fd)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    fifo_fn = os.path.join(archiver.input_path, "fifo")
+    os.mkfifo(fifo_fn)
+    t = Thread(target=fifo_feeder, args=(fifo_fn, data))
+    t.start()
+    try:
+        cmd(archiver, "create", "--read-special", *timeout_args, "test", "input/fifo")
+    finally:
+        _drain_fifo_and_join(fifo_fn, t)
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        with open("input/fifo", "rb") as f:
+            extracted_data = f.read()
+    assert len(extracted_data) == len(data)
+    assert extracted_data == data
+
+
+@pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
+def test_create_read_special_timeout_expired(archivers, request):
+    # a fifo nobody ever opens for writing: borg must give up after --read-special-timeout,
+    # skip the fifo with an error and still back up the other files.
+    archiver = request.getfixturevalue(archivers)
+    import time
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    os.mkfifo(os.path.join(archiver.input_path, "fifo"))
+    expected_ec = BackupTimeoutError("read", OSError(errno.ETIMEDOUT, "timeout")).exit_code
+    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
+        expected_ec = EXIT_WARNING
+    started = time.monotonic()
+    out = cmd(
+        archiver,
+        "create",
+        "--read-special",
+        "--read-special-timeout=1",
+        "test",
+        "input",
+        exit_code=expected_ec,  # WARNING status: could not back up the fifo.
+    )
+    assert time.monotonic() - started < 30  # timed out, no eternal hang
+    assert "retry: 1 of " not in out  # timeouts are NOT retried
+    listing = cmd(archiver, "list", "test", "--format={path}{NL}")
+    assert "input/file1" in listing
+    assert "fifo" not in listing
+
+
+def test_create_read_special_timeout_requires_read_special(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    if archiver.FORK_DEFAULT:
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "create", "--read-special-timeout=5", "test", "input", exit_code=expected_ec)
+        assert "--read-special-timeout requires --read-special." in output
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "create", "--read-special-timeout=5", "test", "input")
+
+
+@pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
+def test_create_read_special_timeout_slow_writer(archivers, request):
+    # a writer that connects late and pauses between bursts must not trigger the timeout,
+    # as long as the pauses stay below --read-special-timeout.
+    archiver = request.getfixturevalue(archivers)
+    import time
+    from threading import Thread
+
+    data = b"".join(length.to_bytes(4, "big") * 256 for length in range(64))  # 64 KiB
+    burst_size = len(data) // 4
+
+    def fifo_feeder(fifo_fn, data):
+        time.sleep(0.3)  # writer connects late
+        fd = os.open(fifo_fn, os.O_WRONLY)
+        try:
+            for start in range(0, len(data), burst_size):
+                burst = data[start : start + burst_size]
+                pos = 0
+                while pos < len(burst):
+                    pos += os.write(fd, burst[pos:])
+                time.sleep(0.2)  # data flows with gaps < timeout
+        except BrokenPipeError:
+            pass  # borg gave up early - the asserts below will complain
+        finally:
+            os.close(fd)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    fifo_fn = os.path.join(archiver.input_path, "fifo")
+    os.mkfifo(fifo_fn)
+    t = Thread(target=fifo_feeder, args=(fifo_fn, data))
+    t.start()
+    try:
+        cmd(archiver, "create", "--read-special", "--read-special-timeout=30", "test", "input/fifo")
+    finally:
+        _drain_fifo_and_join(fifo_fn, t)
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        with open("input/fifo", "rb") as f:
+            extracted_data = f.read()
+    assert extracted_data == data
 
 
 @pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")

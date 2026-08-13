@@ -119,6 +119,18 @@ block devices, like e.g. LVM snapshots or inactive LVs or disk partitions.
 You need to be careful about what you include when using ``--read-special``,
 e.g. if you include ``/dev/zero``, your backup will never terminate.
 
+Reading from a FIFO blocks until a writer connects and sends data - if that
+never happens (e.g. due to a broken producer script), ``borg create`` would
+appear to hang. Thus, when no data arrives from a FIFO or character device
+for ``--read-special-timeout SECONDS`` (default: 1800, i.e. 30 minutes; this
+includes waiting for a FIFO's writer to connect), borg gives up on that file:
+it is skipped with an error and the backup continues with the remaining
+files. Choose a timeout larger than the pauses a legitimate (slow) producer
+makes while sending data - or give 0 to disable the timeout and wait forever.
+Note: with the timeout active, a writer that connects, but closes without
+sending anything, is reported as a timeout, too (instead of storing a file
+with empty content).
+
 Restoring such files' content is currently only supported one at a time via
 ``--stdout`` option (and you have to redirect stdout to where ever it shall go,
 maybe directly into an existing device file of your choice or indirectly via

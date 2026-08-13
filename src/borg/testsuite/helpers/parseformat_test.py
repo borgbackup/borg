@@ -21,6 +21,7 @@ from ...helpers.parseformat import (
     parse_file_size,
     interval,
     int_or_interval,
+    nonnegative_seconds,
     partial_format,
     clean_lines,
     format_line,
@@ -488,6 +489,17 @@ def test_interval_invalid_time_format(invalid_input, error_regex):
     with pytest.raises(ArgumentTypeError) as exc:
         interval(invalid_input)
     assert re.search(error_regex, exc.value.args[0])
+
+
+@pytest.mark.parametrize("input, result", [("0", 0.0), ("30", 30.0), ("2.5", 2.5), ("1800", 1800.0)])
+def test_nonnegative_seconds(input, result):
+    assert nonnegative_seconds(input) == result
+
+
+@pytest.mark.parametrize("invalid_input", ["-1", "-0.5", "foo", ""])
+def test_nonnegative_seconds_invalid(invalid_input):
+    with pytest.raises(ArgumentTypeError):
+        nonnegative_seconds(invalid_input)
 
 
 @pytest.mark.parametrize(

@@ -23,9 +23,10 @@ from ...helpers.fs import (
     remove_dotdot_prefixes,
     make_path_safe,
     map_chars,
+    SpecialFileReader,
 )
 from ...platform import is_win32, is_darwin
-from .. import are_hardlinks_supported
+from .. import are_fifos_supported, are_hardlinks_supported
 from .. import rejected_dotdot_paths
 
 
@@ -468,3 +469,140 @@ def test_map_chars(monkeypatch):
     assert map_chars("foo|bar") == "foo\uf07cbar"
     assert map_chars("foo?bar") == "foo\uf03fbar"
     assert map_chars("foo*bar") == "foo\uf02abar"
+
+
+posix_only = pytest.mark.skipif(is_win32, reason="POSIX-only (non-blocking pipe reads, select)")
+
+
+@contextmanager
+def nonblocking_pipe():
+    r, w = os.pipe()
+    os.set_blocking(r, False)  # SpecialFileReader expects an O_NONBLOCK fd
+    try:
+        yield r, w
+    finally:
+        os.close(r)
+        try:
+            os.close(w)
+        except OSError:
+            pass  # feeder already closed it
+
+
+@posix_only
+def test_special_file_reader_loops_until_filled():
+    # a single os.read from a pipe returns at most the pipe buffer's content -
+    # read() must loop until it has the requested amount (or EOF).
+    import time
+    from threading import Thread
+
+    data = bytes(range(256)) * 1024  # 256 kiB, > default pipe buffer
+
+    with nonblocking_pipe() as (r, w):
+
+        def feeder():
+            burst_size = len(data) // 4
+            for start in range(0, len(data), burst_size):
+                burst = data[start : start + burst_size]
+                pos = 0
+                while pos < len(burst):
+                    pos += os.write(w, burst[pos:])
+                time.sleep(0.05)  # make sure the reader sees short reads
+            os.close(w)
+
+        t = Thread(target=feeder)
+        t.start()
+        try:
+            reader = SpecialFileReader(r, timeout=5.0)
+            assert reader.read(len(data)) == data
+            assert reader.read(1024) == b""  # EOF
+        finally:
+            t.join()
+
+
+@posix_only
+def test_special_file_reader_eof():
+    with nonblocking_pipe() as (r, w):
+        os.write(w, b"data")
+        os.close(w)
+        reader = SpecialFileReader(r, timeout=5.0)
+        assert reader.read(1024) == b"data"  # short read at EOF
+        assert reader.read(1024) == b""
+
+
+@posix_only
+def test_special_file_reader_timeout_silent_writer():
+    # a connected writer that never sends anything must trigger the timeout.
+    import time
+
+    with nonblocking_pipe() as (r, w):
+        reader = SpecialFileReader(r, timeout=0.2)
+        started = time.monotonic()
+        with pytest.raises(OSError) as exc_info:
+            reader.read(1024)
+        assert exc_info.value.errno == errno.ETIMEDOUT
+        assert 0.1 < time.monotonic() - started < 5.0
+
+
+@posix_only
+def test_special_file_reader_timeout_stalled_writer():
+    # a writer stalling mid-stream (after data was already received) must trigger the timeout, too.
+    with nonblocking_pipe() as (r, w):
+        os.write(w, b"data")
+        reader = SpecialFileReader(r, timeout=0.2)
+        with pytest.raises(OSError) as exc_info:
+            reader.read(1024)  # got 4 bytes, then nothing more
+        assert exc_info.value.errno == errno.ETIMEDOUT
+
+
+@pytest.mark.skipif(not are_fifos_supported(), reason="FIFOs not supported")
+def test_special_file_reader_fifo_no_writer(tmp_path):
+    # opening a fifo with O_NONBLOCK succeeds without a writer and os.read returns b"" -
+    # that must count as "waiting for a writer" (-> timeout), not as EOF (-> empty file).
+    fifo_fn = str(tmp_path / "fifo")
+    os.mkfifo(fifo_fn)
+    fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        reader = SpecialFileReader(fd, timeout=0.3)
+        with pytest.raises(OSError) as exc_info:
+            reader.read(1024)
+        assert exc_info.value.errno == errno.ETIMEDOUT
+    finally:
+        os.close(fd)
+
+
+@pytest.mark.skipif(not are_fifos_supported(), reason="FIFOs not supported")
+def test_special_file_reader_fifo_late_writer(tmp_path):
+    # a writer connecting late (but within the timeout) must not trigger the timeout.
+    import time
+    from threading import Thread
+
+    fifo_fn = str(tmp_path / "fifo")
+    os.mkfifo(fifo_fn)
+
+    def feeder():
+        time.sleep(0.2)
+        wfd = os.open(fifo_fn, os.O_WRONLY)
+        try:
+            os.write(wfd, b"late data")
+        finally:
+            os.close(wfd)
+
+    fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+    t = Thread(target=feeder)
+    t.start()
+    try:
+        reader = SpecialFileReader(fd, timeout=5.0)
+        assert reader.read(1024) == b"late data"
+        assert reader.read(1024) == b""  # EOF
+    finally:
+        t.join()
+        os.close(fd)
+
+
+@posix_only
+def test_special_file_reader_not_seekable():
+    with nonblocking_pipe() as (r, w):
+        reader = SpecialFileReader(r, timeout=1.0)
+        with pytest.raises(OSError) as exc_info:
+            reader.seek(0)
+        assert exc_info.value.errno == errno.ESPIPE

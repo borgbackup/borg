@@ -29,7 +29,7 @@ from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError, BackupItemExcluded
 from .helpers import BackupSymlinkParentError, BackupPathTraversalError
-from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
+from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError, BackupTimeoutError
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec, sig_int
@@ -42,7 +42,7 @@ from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
-from .helpers import os_open, flags_normal, flags_dir
+from .helpers import os_open, flags_normal, flags_dir, O_, SpecialFileReader
 from .helpers import os_stat
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
@@ -267,6 +267,7 @@ class BackupIO:
                 errno.EBUSY: BackupPermissionError,
                 errno.ENOENT: BackupFileNotFoundError,
                 errno.EIO: BackupIOError,
+                errno.ETIMEDOUT: BackupTimeoutError,
             }
             e_cls = E_MAP.get(exc_val.errno, BackupOSError)
             raise e_cls(self.op, exc_val) from exc_val
@@ -1370,6 +1371,7 @@ class FilesystemObjectProcessors:
         log_json,
         file_status_printer=None,
         files_changed="mtime" if is_win32 else "ctime",
+        read_special_timeout=None,
     ):
         self.metadata_collector = metadata_collector
         self.cache = cache
@@ -1379,6 +1381,7 @@ class FilesystemObjectProcessors:
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
         self.files_changed = files_changed
+        self.read_special_timeout = read_special_timeout
 
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
@@ -1531,6 +1534,15 @@ class FilesystemObjectProcessors:
         return status
 
     def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal, last_try=False, strip_prefix):
+        if self.read_special_timeout is not None and (stat.S_ISFIFO(st.st_mode) or stat.S_ISCHR(st.st_mode)):
+            # timeout-limited reading of fifos / char devices (--read-special-timeout).
+            # O_NONBLOCK makes opening a fifo succeed immediately even without a connected
+            # writer - waiting for a writer / for data is then subject to the timeout,
+            # see SpecialFileReader.
+            read_special_timeout = self.read_special_timeout
+            flags |= O_("NONBLOCK")
+        else:
+            read_special_timeout = None
         with self.create_helper(path, st, None, strip_prefix=strip_prefix) as (
             item,
             status,
@@ -1600,14 +1612,15 @@ class FilesystemObjectProcessors:
                         # and still commit the archive -- referencing chunks that were never durably
                         # stored. An unwrapped repository OSError is critical and aborts create before
                         # archive.save() runs (see the BackupOSError docstring).
-                        self.process_file_chunks(
-                            item,
-                            cache,
-                            self.stats,
-                            self.show_progress,
+                        if read_special_timeout is not None:
+                            # all reads go through the timeout-enforcing wrapper (fh stays unused).
+                            chunk_iter = self.chunker.chunkify(SpecialFileReader(fd, read_special_timeout), st=st)
+                        else:
                             # passing st saves FileReader a stat call; regular files take the
                             # direct read path, special files (--read-special) the buffered one.
-                            backup_io_iter(self.chunker.chunkify(None, fd, st=st)),
+                            chunk_iter = self.chunker.chunkify(None, fd, st=st)
+                        self.process_file_chunks(
+                            item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
                         )
                         self.stats.chunking_time = self.chunker.chunking_time
                         end_reading = time.time_ns()

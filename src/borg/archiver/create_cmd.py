@@ -16,7 +16,7 @@ from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProce
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
-from ..helpers import archivename_validator, FilesCacheMode, octal_int
+from ..helpers import archivename_validator, FilesCacheMode, octal_int, nonnegative_seconds
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
@@ -43,6 +43,13 @@ class CreateMixIn:
     @with_repository(compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest):
         """Creates a new archive."""
+        if args.read_special_timeout is not None and not args.read_special:
+            raise CommandError("--read-special-timeout requires --read-special.")
+        read_special_timeout = args.read_special_timeout
+        if read_special_timeout is None:
+            read_special_timeout = READ_SPECIAL_TIMEOUT_DEFAULT
+        if read_special_timeout == 0:
+            read_special_timeout = None  # wait forever
         key = manifest.key
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
@@ -268,6 +275,7 @@ class CreateMixIn:
                     log_json=args.log_json,
                     file_status_printer=self.print_file_status,
                     files_changed=args.files_changed,
+                    read_special_timeout=read_special_timeout,
                 )
                 create_inner(archive, cache, fso)
             args.stats |= args.json
@@ -395,8 +403,9 @@ class CreateMixIn:
                 return "-"
             except BackupError as err:
                 if isinstance(err, BackupOSError):
-                    if err.errno in (errno.EPERM, errno.EACCES):
-                        # Do not try again, such errors can not be fixed by retrying.
+                    if err.errno in (errno.EPERM, errno.EACCES, errno.ETIMEDOUT):
+                        # Do not try again: permission errors can not be fixed by retrying
+                        # and a --read-special-timeout would just expire again (10 more times).
                         raise
                 if last_try:
                     # giving up with retries, error will be dealt with (logged) by upper error handler
@@ -981,6 +990,18 @@ class CreateMixIn:
             action="store_true",
             help="open and read block and char device files as well as FIFOs as if they were "
             "regular files. Also follows symlinks pointing to these kinds of files.",
+        )
+        fs_group.add_argument(
+            "--read-special-timeout",
+            metavar="SECONDS",
+            dest="read_special_timeout",
+            type=nonnegative_seconds,
+            default=None,
+            action=Highlander,
+            help="when reading from FIFOs or character devices (see --read-special): skip the "
+            "file with an error if no data arrives for more than SECONDS (this includes waiting "
+            "for a FIFO's writer to connect). Give 0 to wait forever. default: %d seconds."
+            % READ_SPECIAL_TIMEOUT_DEFAULT,
         )
 
         archive_group = subparser.add_argument_group("Archive options")

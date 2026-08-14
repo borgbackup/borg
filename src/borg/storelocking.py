@@ -109,9 +109,10 @@ class Lock:
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.id!r}>"
 
-    def _create_lock(self, *, exclusive=None, update_last_refresh=False):
+    def _create_lock(self, *, exclusive=None, dt=None, update_last_refresh=False):
         assert exclusive is not None
-        now = datetime.datetime.now(datetime.UTC)
+        # dt: explicit content timestamp (default: now) - tests use it to simulate skewed clocks.
+        now = dt if dt is not None else datetime.datetime.now(datetime.UTC)
         timestamp = now.isoformat(timespec="milliseconds")
         lock = dict(exclusive=exclusive, hostid=self.id[0], processid=self.id[1], threadid=self.id[2], time=timestamp)
         value = json.dumps(lock).encode("utf-8")

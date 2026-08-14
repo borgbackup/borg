@@ -155,6 +155,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "src/borg/testsuite/archiver/return_codes_test.py" = ["F811"]
 "src/borg/testsuite/benchmark_test.py" = ["F811"]
 "src/borg/testsuite/platform/platform_test.py" = ["F811"]
+"src/borg/testsuite/storelocking_test.py" = ["F811"]
 
 [tool.pytest.ini_options]
 markers = []

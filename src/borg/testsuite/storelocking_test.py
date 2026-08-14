@@ -1,8 +1,5 @@
 import datetime
-import hashlib
-import json
 import os
-import random
 import time
 from pathlib import Path
 
@@ -10,22 +7,12 @@ import pytest
 
 from borgstore.store import ObjectNotFound, Store
 
-from ..platform import get_process_id, process_alive
+from .fslocking_test import free_pid  # NOQA
+from ..platform import get_process_id
 from ..storelocking import Lock, NotLocked, LockTimeout
 
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2
-
-
-@pytest.fixture()
-def free_pid():
-    """Return a free PID not used by any process (naturally this is racy)."""
-    host, pid, tid = get_process_id()
-    while True:
-        # PIDs are often restricted to a small range. On Linux the range >32k is by default not used.
-        pid = random.randint(33000, 65000)
-        if not process_alive(host, pid, tid):
-            return pid
 
 
 @pytest.fixture()
@@ -39,15 +26,11 @@ def lockstore(tmp_path):
 
 def write_raw_lock(store, id, *, exclusive, dt, mtime=None):
     """
-    Write a lock object like Lock._create_lock does, but with an arbitrary content timestamp <dt>
-    (simulating a writer whose clock is skewed against ours). The object's store-side mtime is
-    "now" (a real store write), unless <mtime> is given (then the file's mtime is set to it).
+    Write a lock object with an arbitrary content timestamp <dt> (simulating a writer whose clock
+    is skewed against ours). The object's store-side mtime is "now" (a real store write), unless
+    <mtime> is given (then the file's mtime is set to it).
     """
-    timestamp = dt.isoformat(timespec="milliseconds")
-    lock = dict(exclusive=exclusive, hostid=id[0], processid=id[1], threadid=id[2], time=timestamp)
-    value = json.dumps(lock).encode("utf-8")
-    key = hashlib.sha256(value).hexdigest()
-    store.store(f"locks/{key}", value)
+    key = Lock(store, id=id)._create_lock(exclusive=exclusive, dt=dt)
     if mtime is not None:
         path = store.backend.base_path / "locks" / key  # posixfs, locks/ nesting levels [0]
         os.utime(path, (mtime, mtime))

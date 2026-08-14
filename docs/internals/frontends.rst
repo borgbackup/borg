@@ -356,6 +356,10 @@ Archive formats
 array under the *archives* key, while :ref:`borg_create` returns a single archive object under the
 *archive* key.
 
+:ref:`borg_create` with ``--dry-run`` does not create an archive, so there is no *archive* key.
+Instead, it returns *dry_run* (true) and a reduced *stats* object with *nfiles* and *original_size*,
+both computed from file system metadata without reading the file contents.
+
 Both formats contain a *name* key with the archive name, the *id* key with the hexadecimal archive ID,
 and the *start* key with the start timestamp.
 

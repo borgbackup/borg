@@ -10,7 +10,7 @@ from io import TextIOWrapper
 
 from ._common import with_repository, Highlander
 from .. import helpers
-from ..archive import Archive, is_special, SF_DATALESS
+from ..archive import Archive, Statistics, is_special, SF_DATALESS
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
@@ -22,7 +22,7 @@ from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
 from ..helpers import dir_is_tagged
 from ..helpers import log_multi
-from ..helpers import basic_json_data, json_print
+from ..helpers import basic_json_data, json_print, FileSize
 from ..helpers import flags_dir, flags_special_follow, flags_special
 from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
@@ -97,6 +97,7 @@ class CreateMixIn:
                         raise Error(f"{path!r}: {e}")
                 else:
                     status = "+"  # included
+                    self.dry_run_stats.nfiles += 1  # size unknown without running the command
                 self.print_file_status(status, path)
             elif args.paths_from_command or args.paths_from_shell_command or args.paths_from_stdin:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
@@ -174,6 +175,7 @@ class CreateMixIn:
                                 status = "E"
                         else:
                             status = "+"  # included
+                            self.dry_run_stats.nfiles += 1  # size unknown without reading stdin
                         self.print_file_status(status, path)
                         if not dry_run and status is not None:
                             fso.stats.files_stats[status] += 1
@@ -226,6 +228,7 @@ class CreateMixIn:
         self.noxattrs = args.noxattrs
         self.exclude_dataless = args.exclude_dataless
         dry_run = args.dry_run
+        self.dry_run_stats = Statistics() if dry_run else None
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
         logger.info('Creating archive "%s" in repository %s' % (args.name, args.location.processed))
@@ -288,6 +291,24 @@ class CreateMixIn:
                     log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
         else:
             create_inner(None, None, None)
+            args.stats |= args.json
+            if args.stats:
+                stats = self.dry_run_stats
+                if args.json:
+                    json_data = basic_json_data(
+                        manifest,
+                        extra={
+                            "dry_run": True,
+                            "stats": {"nfiles": stats.nfiles, "original_size": FileSize(stats.osize)},
+                        },
+                    )
+                    json_print(json_data)
+                else:
+                    log_multi(
+                        f"Number of files: {stats.nfiles}",
+                        f"Original size: {stats.osize_fmt}",
+                        logger=logging.getLogger("borg.output.stats"),
+                    )
 
     def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix):
         """
@@ -295,6 +316,22 @@ class CreateMixIn:
         """
 
         if dry_run:
+            stats = self.dry_run_stats
+            if stat.S_ISREG(st.st_mode):
+                stats.nfiles += 1
+                stats.osize += st.st_size
+            elif read_special:
+                if stat.S_ISLNK(st.st_mode):
+                    try:
+                        st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
+                    except OSError:
+                        special = False
+                    else:
+                        special = is_special(st_target.st_mode)
+                else:
+                    special = is_special(st.st_mode)
+                if special:
+                    stats.nfiles += 1  # size unknown without reading the special file
             return "+"  # included
         MAX_RETRIES = 10  # count includes the initial try (initial try == "retry 0")
         for retry in range(MAX_RETRIES):
@@ -673,8 +710,14 @@ class CreateMixIn:
         When using ``--stats``, you will get some statistics about how much data was
         added - the "This Archive" deduplicated size there is most interesting as that is
         how much your repository will grow. Please note that the "All archives" stats refer to
-        the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
-        exclusive because the data is not actually compressed and deduplicated during a dry run.
+        the state after creation.
+
+        When ``--stats`` is used together with ``--dry-run``, only the number of files and the
+        original size are reported. They are computed from file system metadata, without reading
+        the file contents, so a dry run stays fast. As data is not actually read, chunked, and
+        deduplicated during a dry run, the deduplicated size is unknown. The sizes of data read
+        from standard input, from a command's output, or from special files (``--read-special``)
+        are also unknown in a dry run and counted as zero.
 
         The ``--stats`` output also reports the store statistics (lines prefixed with
         "Store"), taken from the storage layer after this run. These cover the backend and
@@ -834,8 +877,6 @@ class CreateMixIn:
         subparser = ArgumentParser(parents=[common_parser], description=self.do_create.__doc__, epilog=create_epilog)
         subparsers.add_subcommand("create", subparser, help="create a backup")
 
-        # note: --dry-run and --stats are mutually exclusive, but we do not want to abort when
-        #  parsing, but rather proceed with the dry-run, but without stats (see run() method).
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not create a backup archive"
         )

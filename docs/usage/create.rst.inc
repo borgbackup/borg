@@ -274,8 +274,14 @@ does not go to a terminal (e.g. into a logfile), the precise format is always us
 When using ``--stats``, you will get some statistics about how much data was
 added - the "This Archive" deduplicated size there is most interesting as that is
 how much your repository will grow. Please note that the "All archives" stats refer to
-the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
-exclusive because the data is not actually compressed and deduplicated during a dry run.
+the state after creation.
+
+When ``--stats`` is used together with ``--dry-run``, only the number of files and the
+original size are reported. They are computed from file system metadata, without reading
+the file contents, so a dry run stays fast. As data is not actually read, chunked, and
+deduplicated during a dry run, the deduplicated size is unknown. The sizes of data read
+from standard input, from a command's output, or from special files (``--read-special``)
+are also unknown in a dry run and counted as zero.
 
 The ``--stats`` output also reports the store statistics (lines prefixed with
 "Store"), taken from the storage layer after this run. These cover the backend and

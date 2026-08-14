@@ -1032,33 +1032,79 @@ code).
 Is there a way to limit bandwidth with Borg?
 --------------------------------------------
 
-Borg has no built-in bandwidth limiting - the ``--remote-ratelimit`` and
-``--upload-ratelimit`` options were removed.
+Borg has no bandwidth limiting option - ``--remote-ratelimit`` and
+``--upload-ratelimit`` were removed. There are 2 ways to do it anyway:
 
-For repositories accessed via ssh, bandwidth can be limited with pipeviewer_:
+Using borgstore's bandwidth limit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Create a wrapper script:  /usr/local/bin/pv-wrapper
+borgstore, which Borg uses for repository access, can limit the transfer rate::
 
-::
+    # 16 Mbit/s == 2 MB/s, 0 (the default) means unlimited:
+    export BORGSTORE_BANDWIDTH=16000000
 
-    #!/bin/sh
+Pros:
+
+- works for all backends (``sftp://``, ``rest://``, ``rclone:``, ``s3://``, ...).
+- limits both directions.
+- needs no additional software.
+
+Cons:
+
+- the value is given in **bits** per second (easy to confuse with ``pv``, which
+  uses bytes per second).
+- only the object payload is accounted for, protocol overhead (ssh, TLS, http,
+  ...) comes on top, so the real usage is a bit higher than the given rate.
+- it does not shape the traffic: an object is transferred at full speed and
+  Borg then waits until the given rate is reached on average. As Borg transfers
+  rather big objects (pack files are up to 50MB), the connection will be busy
+  for a while and idle afterwards.
+
+There is also ``BORGSTORE_LATENCY`` (in microseconds), which adds a delay per
+backend call.
+
+Using pv on the ssh connection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For ``rest://`` repositories, Borg connects via ssh, so the transfer can be
+limited with pipeviewer_. Put a ``pv`` on each side of the connection using an
+ssh ``ProxyCommand`` (this needs ``nc``), e.g. in ``~/.ssh/config``::
+
+    Host borghost
         ## -q, --quiet              do not output any transfer information at all
         ## -L, --rate-limit RATE    limit transfer to RATE bytes per second
-    RATE=307200
-    pv -q -L $RATE  | "$@"
+        ProxyCommand pv -q -L 307200 | nc %h %p | pv -q -L 307200
 
-Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh.
+The first ``pv`` limits the upload, the second one the download, each to RATE
+bytes per second.
 
-::
+Pros:
 
-    export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
+- smoother, as ``pv`` limits the rate of the data stream itself.
+- each direction has its own limit.
+- the ssh protocol overhead is included in the limit.
+- the rate can be changed on the fly::
 
-Now Borg will be bandwidth limited. The nice thing about ``pv`` is that you can
-change rate-limit on the fly:
+      pv -R $(pidof pv) -L 102400
 
-::
+  As the ``ProxyCommand`` above runs 2 ``pv`` processes, ``pidof`` will print 2
+  pids - give ``pv -R`` the pid of the direction you want to change.
 
-    pv -R $(pidof pv) -L 102400
+Cons:
+
+- only works for ``rest://`` repositories. ``sftp://`` does not run an external
+  ssh command (borgstore uses paramiko and creates the connection itself) and
+  a ``ProxyCommand`` in ``~/.ssh/config`` is not used there.
+- needs ``pv`` and ``nc``.
+
+Using rclone's bandwidth limit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For ``rclone:`` repositories, you can also use rclone's own bandwidth limiting,
+see its ``--bwlimit`` option. rclone picks up options from the environment, so
+you can use::
+
+    export RCLONE_BWLIMIT=300k
 
 .. _pipeviewer: https://www.ivarch.com/programs/pv.shtml
 

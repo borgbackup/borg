@@ -88,8 +88,9 @@ class Lock:
         self.refresh_td = datetime.timedelta(seconds=stale // 2)  # don't refresh it if younger
         self.last_refresh_dt = None
         self.my_lock_key = None  # store key of the lock we currently hold, None if we hold none
-        # LockAnchor of our current lock object - its mtime and monotonic fields together let us
-        # compute the current time in the store's clock domain, see _store_now().
+        # LockAnchor of the lock object we most recently created - its mtime and monotonic fields
+        # together let us compute the current time in the store's clock domain, see _store_now().
+        # it deliberately outlives its lock object: the calibration stays valid after deletion.
         self.my_lock_anchor = None
         self.skew_warned = False  # emit the clock-skew warning only once per Lock instance
         self.id = id or platform.get_process_id()
@@ -138,7 +139,10 @@ class Lock:
             if update_last_refresh:
                 self.last_refresh_dt = None
                 self.my_lock_key = None
-                self.my_lock_anchor = None
+                # my_lock_anchor is deliberately kept: it is a store-clock calibration, not a
+                # property of the deleted object. keeping it lets an acquire that is blocked by
+                # a healthy-but-skewed lock veto the kill on the first listing of every retry,
+                # instead of re-deferring and re-creating a transient lock each time.
 
     def _is_our_lock(self, lock):
         return self.id == (lock["hostid"], lock["processid"], lock["threadid"])
@@ -149,8 +153,12 @@ class Lock:
         if anchor is None or anchor.mtime is None:
             return None
         # note: on most platforms time.monotonic() does not advance while the machine is suspended,
-        # so after a suspend this underestimates store "now". that errs towards NOT considering
-        # other locks stale (the safe direction) and self-heals at our next lock creation/refresh.
+        # so after a suspend the extrapolation below lags behind store "now" by up to the suspend
+        # duration. that errs towards NOT considering other locks stale (the safe direction), but
+        # do not extrapolate from a too old anchor at all: its age is measured with our wall clock
+        # at both ends, so suspends count here. self-heals at our next lock creation/refresh.
+        if datetime.datetime.now(datetime.UTC) > anchor.dt + self.stale_td:
+            return None
         return anchor.mtime + (time.monotonic() - anchor.monotonic)
 
     def _mutual_skew(self, lock):
@@ -214,6 +222,9 @@ class Lock:
             # thus, cross-check in the store's clock domain: the lock object's store-side mtime
             # vs. store "now". store timestamps are advisory only: they can veto a kill here,
             # but they can never cause a kill on their own (the store might be hostile).
+            # residual risk: a store clock that steps BACK by more than the stale timeout during
+            # the lifetime of our anchor defeats the veto; accepted - pre-#9870 there was no
+            # cross-check at all, and re-anchoring at each lock creation bounds the window.
             if lock["mtime"]:
                 store_now = self._store_now()
                 if store_now is None:

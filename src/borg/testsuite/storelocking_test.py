@@ -264,6 +264,30 @@ class TestLock:
         assert not lock.skew_warned
         lock.release()
 
+    def test_no_lock_churn_when_blocked_by_skewed_lock(self, lockstore, monkeypatch):
+        # a healthy exclusive lock of a writer whose clock runs >stale behind ours blocks us
+        # (correctly so - we must never kill it). the store-clock anchor survives the deletion
+        # of our transient lock object, so only the first acquire iteration needs to create
+        # one: later iterations veto the kill on their first listing instead of repeating the
+        # whole defer/create/veto/delete cycle, see #9870.
+        dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
+        foreign_key = write_raw_lock(lockstore, ID1, exclusive=True, dt=dt)  # store mtime: now
+
+        lock_writes = []
+        orig_store = lockstore.store
+
+        def counting_store(name, *args, **kwargs):
+            lock_writes.append(name)
+            return orig_store(name, *args, **kwargs)
+
+        monkeypatch.setattr(lockstore, "store", counting_store)
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.retry_delay_min = lock.retry_delay_max = 0.1  # several retry iterations within timeout
+        with pytest.raises(LockTimeout):
+            lock.acquire()  # the healthy exclusive lock does not go away
+        assert len(lock_writes) == 1  # only the first iteration created a transient lock
+        assert foreign_key in Lock(lockstore, id=ID2)._get_locks()  # the blocker survived
+
     def test_no_skew_warning_when_only_our_store_time_lags(self, lockstore):
         # while we are suspended, time.monotonic() stands still, so our store "now" estimate
         # lags afterwards. a foreign lock that went genuinely stale meanwhile then gets vetoed

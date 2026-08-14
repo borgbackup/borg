@@ -188,7 +188,7 @@ def create_zstd_filter(stream, stream_close, decompress):
     if decompress:
         zstream = zstd.ZstdFile(stream, "rb")
     else:
-        workers = get_zstd_mt_workers()
+        workers = get_zstd_mt_workers(stream=True)
         if workers > 1:
             params = zstd.CompressionParameter
             options = {params.compression_level: ZSTD_TAR_LEVEL, params.nb_workers: workers}

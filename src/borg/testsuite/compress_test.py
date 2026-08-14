@@ -339,17 +339,20 @@ def test_robj_specific_obfuscation(data_length, expected_padding, robj_type):
 
 
 def test_zstd_mt_workers_from_env(monkeypatch):
-    def workers_for(env_value):
+    def workers_for(env_value, stream=False):
         monkeypatch.setattr("borg.compress._zstd_mt_workers", None)  # drop the cache
         if env_value is None:
             monkeypatch.delenv("BORG_ZSTD_MT_WORKERS", raising=False)
         else:
             monkeypatch.setenv("BORG_ZSTD_MT_WORKERS", env_value)
-        return get_zstd_mt_workers()
+        return get_zstd_mt_workers(stream=stream)
 
-    assert workers_for(None) == (os.cpu_count() or 1)
-    for value, expected in [("0", 0), ("1", 1), ("4", 4)]:
-        assert workers_for(value) == expected
+    cpus = os.cpu_count() or 1
+    assert workers_for(None) == min(cpus, 4)  # per-chunk default is capped
+    assert workers_for(None, stream=True) == cpus  # stream default is not
+    for value, expected in [("0", 0), ("1", 1), ("4", 4), ("12", 12)]:
+        assert workers_for(value) == expected  # the env var is not capped
+        assert workers_for(value, stream=True) == expected
     for invalid in ["", "yes", "4x", "1.5", "-1"]:
         with pytest.raises(Error):
             workers_for(invalid)

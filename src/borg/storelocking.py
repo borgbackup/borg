@@ -4,6 +4,7 @@ import json
 import random
 import threading
 import time
+from collections import namedtuple
 
 from borgstore.store import ObjectNotFound
 
@@ -13,6 +14,12 @@ from .helpers import Error, ErrorWithTraceback
 from .logger import create_logger
 
 logger = create_logger(__name__)
+
+# all we know about the lock object we most recently created: its store key, its content timestamp
+# (stamped by our clock) and its store-side mtime [s] (stamped by the store's clock, harvested from
+# lock listings, None until harvested), plus time.monotonic() at its creation. always replaced as a
+# whole, so concurrent readers (e.g. a LockRefresher thread) never see a torn mix of its fields.
+LockAnchor = namedtuple("LockAnchor", "key dt mtime monotonic")
 
 
 class LockError(Error):
@@ -81,11 +88,9 @@ class Lock:
         self.refresh_td = datetime.timedelta(seconds=stale // 2)  # don't refresh it if younger
         self.last_refresh_dt = None
         self.my_lock_key = None  # store key of the lock we currently hold, None if we hold none
-        # store-side mtime [s] of our current lock object (stamped by the store's clock, harvested
-        # from lock listings) and time.monotonic() at its creation - together they let us compute
-        # the current time in the store's clock domain, see _store_now().
-        self.my_lock_mtime = None
-        self.my_lock_monotonic = None
+        # LockAnchor of our current lock object - its mtime and monotonic fields together let us
+        # compute the current time in the store's clock domain, see _store_now().
+        self.my_lock_anchor = None
         self.skew_warned = False  # emit the clock-skew warning only once per Lock instance
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
@@ -119,8 +124,7 @@ class Lock:
             # the store-side mtime of the new lock object is not known yet - it is harvested
             # from the next locks listing. anchor the monotonic clock at creation time so the
             # harvested mtime can be extrapolated to "now" later, see _store_now().
-            self.my_lock_mtime = None
-            self.my_lock_monotonic = time.monotonic()
+            self.my_lock_anchor = LockAnchor(key, self.last_refresh_dt, None, time.monotonic())
         return key
 
     def _delete_lock(self, key, *, ignore_not_found=False, update_last_refresh=False):
@@ -134,20 +138,20 @@ class Lock:
             if update_last_refresh:
                 self.last_refresh_dt = None
                 self.my_lock_key = None
-                self.my_lock_mtime = None
-                self.my_lock_monotonic = None
+                self.my_lock_anchor = None
 
     def _is_our_lock(self, lock):
         return self.id == (lock["hostid"], lock["processid"], lock["threadid"])
 
     def _store_now(self):
         """Return the current time in the store's clock domain [UNIX timestamp], or None if unknown."""
-        if self.my_lock_mtime is None or self.my_lock_monotonic is None:
+        anchor = self.my_lock_anchor  # single read - it gets replaced atomically as a whole
+        if anchor is None or anchor.mtime is None:
             return None
         # note: on most platforms time.monotonic() does not advance while the machine is suspended,
         # so after a suspend this underestimates store "now". that errs towards NOT considering
         # other locks stale (the safe direction) and self-heals at our next lock creation/refresh.
-        return self.my_lock_mtime + (time.monotonic() - self.my_lock_monotonic)
+        return anchor.mtime + (time.monotonic() - anchor.monotonic)
 
     def _mutual_skew(self, lock):
         """
@@ -160,9 +164,10 @@ class Lock:
         writers' offsets yields their mutual skew, with the store's absolute clock error cancelled
         out (the store's clock is only used as a common reference and may itself be wrong).
         """
-        if not lock.get("mtime") or self.my_lock_mtime is None or self.last_refresh_dt is None:
+        anchor = self.my_lock_anchor  # single read - it gets replaced atomically as a whole
+        if not lock.get("mtime") or anchor is None or anchor.mtime is None:
             return None
-        offset_self = self.last_refresh_dt.timestamp() - self.my_lock_mtime
+        offset_self = anchor.dt.timestamp() - anchor.mtime
         offset_other = lock["dt"].timestamp() - lock["mtime"]
         return offset_other - offset_self
 
@@ -250,12 +255,15 @@ class Lock:
             lock["dt"] = datetime.datetime.fromisoformat(lock["time"])
             lock["mtime"] = info.mtime  # store-side mtime [s], 0 if the backend can not provide it
             locks[key] = lock
-        if self.my_lock_key in locks:
-            # harvest the store-side mtime of our own lock object from this listing (this pairs
-            # with the monotonic anchor set at its creation, see _create_lock / _store_now).
-            mtime = locks[self.my_lock_key]["mtime"]
-            if mtime:
-                self.my_lock_mtime = mtime
+        my_key = self.my_lock_key  # single read - a LockRefresher thread may rebind it concurrently
+        if my_key in locks:
+            # harvest the store-side mtime of our own lock object from this listing into the
+            # anchor set at its creation (see _create_lock / _store_now) - but only if the anchor
+            # still describes the same lock object (a concurrent refresh may have replaced it).
+            mtime = locks[my_key]["mtime"]
+            anchor = self.my_lock_anchor
+            if mtime and anchor is not None and anchor.key == my_key:
+                self.my_lock_anchor = anchor._replace(mtime=mtime)
         for key in list(locks):
             if self._is_stale_lock(locks[key]):
                 # ignore it and delete it (even if it is not from us).

@@ -271,8 +271,10 @@ class TestLock:
         # produce a bogus "clock skew of ~0s" warning, see #9870.
         lock = Lock(lockstore, exclusive=False, id=ID2)
         lock.acquire()
-        assert lock.my_lock_mtime is not None  # store time reference was harvested
-        lock.my_lock_monotonic += 45 * 60  # simulate a 45 minute suspend after the anchor
+        anchor = lock.my_lock_anchor
+        assert anchor.mtime is not None  # store time reference was harvested
+        # simulate a 45 minute suspend after the anchor was set (time.monotonic() stood still):
+        lock.my_lock_anchor = anchor._replace(monotonic=anchor.monotonic + 45 * 60)
         dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
         foreign_key = write_raw_lock(lockstore, ID1, exclusive=False, dt=dt, mtime=dt.timestamp())
         locks = lock._get_locks()

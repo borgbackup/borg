@@ -1,0 +1,49 @@
+# Inverted canary: watch for Python 3.12 becoming available on ubuntu-26.04.
+#
+# ubuntu-26.04 runners currently only work with the image's default Python
+# (3.14) - actions/setup-python has no cached builds of older Pythons for
+# this image yet, so requesting 3.12 fails. This probe tries daily.
+#
+# The logic is inverted on purpose: while 3.12 is still unavailable, the
+# run stays GREEN (expected state, no noise). The day setup-python 3.12
+# succeeds, the job FAILS loudly - GitHub emails scheduled-workflow
+# failures to the user who last modified the cron line, so a red run here
+# is the "3.12 works now" notification. When it fires: add ubuntu-26.04
+# / 3.12 jobs to ci.yml and delete this workflow.
+
+name: Canary (Python 3.12 on ubuntu-26.04)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Run at 06:00 UTC
+  workflow_dispatch:      # Allow manual trigger
+
+permissions: {}
+
+jobs:
+  probe:
+    name: Probe setup-python 3.12
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+
+    steps:
+    - name: Try to set up Python 3.12
+      id: setup
+      continue-on-error: true
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.12'
+
+    - name: Still unsupported - stay green
+      if: steps.setup.outcome == 'failure'
+      run: |
+        echo "::notice::Python 3.12 is still unavailable on ubuntu-26.04 (expected - nothing to do)."
+
+    - name: Python 3.12 works now - fail to trigger the notification email
+      if: steps.setup.outcome == 'success'
+      run: |
+        python --version
+        python -c 'import ssl, sqlite3, zlib, lzma'
+        python -m pip --version
+        echo "::error::Python 3.12 is NOW AVAILABLE on ubuntu-26.04! Add it to ci.yml and delete this canary workflow. (This failure is the notification - see the comment at the top of the workflow file.)"
+        exit 1

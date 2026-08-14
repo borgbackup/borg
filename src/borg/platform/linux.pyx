@@ -64,7 +64,6 @@ cdef extern from "linux/fs.h":
     int FS_NODUMP_FL
     int FS_IMMUTABLE_FL
     int FS_APPEND_FL
-    int FS_COMPR_FL
 
 cdef extern from "sys/ioctl.h":
     int ioctl(int fildes, int request, ...)
@@ -137,6 +136,7 @@ def set_flags(path, bsd_flags, fd=None):
         if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
             # see comment in get_flags()
             return
+    cdef int current
     cdef int flags
     cdef int mask = LINUX_MASK  # 1 at positions we want to influence
     cdef int new_flags = 0
@@ -149,23 +149,32 @@ def set_flags(path, bsd_flags, fd=None):
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
     try:
         # Get current flags.
-        if ioctl(fd, FS_IOC_GETFLAGS, &flags) == -1:
+        if ioctl(fd, FS_IOC_GETFLAGS, &current) == -1:
             # If this fails, give up because it is either not supported by the fs
             # or maybe not permitted? If we can't determine the current flags,
             # we better not risk corrupting them by setflags, see the comment below.
             return  # give up silently
 
-        # Replace only the bits we actually want to influence, keep others.
-        # We can't just set all flags to the archived value, because we might
-        # reset flags that are not controllable from userspace, see #9039.
-        flags = (flags & ~mask) | (new_flags & mask)
+        while True:
+            # Replace only the bits we actually want to influence, keep others.
+            # We can't just set all flags to the archived value, because we might
+            # reset flags that are not controllable from userspace, see #9039.
+            flags = (current & ~mask) | (new_flags & mask)
 
-        if ioctl(fd, FS_IOC_SETFLAGS, &flags) == -1:
+            if ioctl(fd, FS_IOC_SETFLAGS, &flags) != -1:
+                return
             error_number = errno.errno
             # Usually we would only catch EOPNOTSUPP here, but Linux Kernel 6.17
             # has a bug where it returns ENOTTY instead of EOPNOTSUPP.
-            if error_number not in (errno.EOPNOTSUPP, errno.ENOTTY):
-                raise OSError(error_number, strerror(error_number).decode(), path)
+            if error_number in (errno.EOPNOTSUPP, errno.ENOTTY):
+                return
+            if error_number == errno.EPERM and mask != FS_NODUMP_FL:
+                # Changing FS_IMMUTABLE_FL / FS_APPEND_FL needs CAP_LINUX_IMMUTABLE.
+                # Retry, influencing only FS_NODUMP_FL, so an unprivileged extract
+                # can still restore the nodump flag.
+                mask = FS_NODUMP_FL
+                continue
+            raise OSError(error_number, strerror(error_number).decode(), path)
     finally:
         if open_fd:
             os.close(fd)

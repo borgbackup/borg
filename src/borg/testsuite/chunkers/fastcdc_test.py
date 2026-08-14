@@ -5,7 +5,8 @@ import random
 
 import pytest
 
-from . import cf, cf_expand, chunker_with_kernel
+from . import cf, cf_expand
+from .pytest_helpers import chunker_with_kernel
 from ...chunkers import ChunkerFastCDC, get_chunker
 from ...chunkers.fastcdc import fastcdc_get_gear_table
 from ...constants import *  # NOQA

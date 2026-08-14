@@ -42,8 +42,8 @@ jobs:
     timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v7
-    - uses: astral-sh/ruff-action@v4.1.0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+    - uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89  # v4.1.0
 
   security:
 
@@ -51,9 +51,9 @@ jobs:
     timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
     - name: Set up Python
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
         python-version: '3.11'
     - name: Install dependencies
@@ -71,14 +71,14 @@ jobs:
     needs: [lint]
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
         fetch-tags: true
 
     - name: Set up Python
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
         python-version: '3.12'
 
@@ -182,19 +182,19 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
         fetch-tags: true
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
@@ -203,7 +203,7 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-
 
     - name: Cache tox environments
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: .tox
         key: ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.lock.txt', 'pyproject.toml') }}
@@ -352,13 +352,13 @@ jobs:
 
     - name: Attest binaries provenance (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/attest-build-provenance@v4
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
       with:
         subject-path: 'artifacts/*'
 
     - name: Upload binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: ${{ matrix.binary }}
         path: artifacts/*
@@ -374,7 +374,7 @@ jobs:
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
-      uses: codecov/codecov-action@v7
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}
@@ -386,7 +386,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
-      uses: codecov/codecov-action@v7
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}
@@ -436,7 +436,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -445,7 +445,7 @@ jobs:
       # rsyncs into the VM and back, so wheels built from sdists in one run
       # (most of the VM setup time) are reused by the next one.
       - name: Cache pip-built wheels
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: .pip-cache
           key: ${{ matrix.os }}-${{ matrix.version }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
@@ -457,7 +457,7 @@ jobs:
         # a normal boot takes < 1 minute; since 1.4.0 the action bounds
         # waiting for boot itself, this is just an additional safety net.
         timeout-minutes: 15
-        uses: cross-platform-actions/action@v1.4.0
+        uses: cross-platform-actions/action@24ef01df165c76df1ed2b9f9e9212e78dc2fc963  # v1.4.0
         with:
           operating_system: ${{ matrix.os }}
           version: ${{ matrix.version }}
@@ -644,7 +644,7 @@ jobs:
 
       - name: Upload artifacts
         if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ matrix.artifact_prefix }}
           path: artifacts/*
@@ -652,13 +652,13 @@ jobs:
 
       - name: Attest provenance
         if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: 'artifacts/*'
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
         env:
           OS: ${{ matrix.os }}
         with:
@@ -669,7 +669,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
         env:
           OS: ${{ matrix.os }}
         with:
@@ -697,7 +697,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
@@ -705,14 +705,14 @@ jobs:
       # all compiled deps from source - incl. building maturin via cargo, just
       # to build the blake3 wheel. Persist the wheels pip builds.
       - name: Cache pip-built wheels
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: .pip-cache
           key: windows-msys2-pip-${{ hashFiles('pyproject.toml', 'requirements.d/pyinstaller.txt') }}
           restore-keys: |
             windows-msys2-pip-
 
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884  # v2.32.0
         with:
           msystem: UCRT64
           update: true
@@ -738,7 +738,7 @@ jobs:
           # build sdist and wheel in dist/...
           python -m build
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: borg-windows
           path: dist/binary/borg.exe
@@ -753,7 +753,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
         env:
           OS: ${{ runner.os }}
           python: '3.11'
@@ -765,7 +765,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
         env:
           OS: ${{ runner.os }}
           python: '3.11'

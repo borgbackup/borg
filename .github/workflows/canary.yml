@@ -44,13 +44,13 @@ jobs:
             toxenv: py314-none
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: 0
         fetch-tags: true
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -125,7 +125,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
@@ -134,14 +134,14 @@ jobs:
       # unlocked requirements may resolve to different versions; falls back
       # to (and gets picked up by) the ci.yml cache via the shared prefix.
       - name: Cache pip-built wheels
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: .pip-cache
           key: windows-msys2-pip-canary-${{ hashFiles('pyproject.toml', 'requirements.d/pyinstaller.txt') }}
           restore-keys: |
             windows-msys2-pip-
 
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884  # v2.32.0
         with:
           msystem: UCRT64
           update: true

@@ -16,7 +16,8 @@ from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProce
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
-from ..helpers import archivename_validator, FilesCacheMode, octal_int, nonnegative_seconds
+from ..helpers import archivename_validator, FilesCacheMode, files_cache_mode_no_ctime
+from ..helpers import octal_int, nonnegative_seconds
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
@@ -50,6 +51,19 @@ class CreateMixIn:
             read_special_timeout = READ_SPECIAL_TIMEOUT_DEFAULT
         if read_special_timeout == 0:
             read_special_timeout = None  # wait forever
+        if is_win32:
+            # st_ctime is the file *creation* time on Windows, not the "metadata change time",
+            # so a ctime based files cache mode would not detect content changes of a file that
+            # keeps its size and inode number. Use the mtime based equivalent instead, see #7193.
+            # note: this must happen before the Cache is created (it gets the files cache mode).
+            files_cache_mode, changed = files_cache_mode_no_ctime(args.files_cache_mode)
+            if changed:
+                self.print_warning(
+                    "--files-cache=ctime,... is not supported on Windows "
+                    "(ctime is file creation time, not change time). Using mtime instead.",
+                    wc=None,
+                )
+                args.files_cache_mode = files_cache_mode
         key = manifest.key
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
@@ -619,8 +633,8 @@ class CreateMixIn:
 
         This comparison can operate in different modes as given by ``--files-cache``:
 
-        - ctime,size,inode (default)
-        - mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+        - ctime,size,inode (default on POSIX systems)
+        - mtime,size,inode (default on Windows)
         - ctime,size (ignore the inode number)
         - mtime,size (ignore the inode number)
         - rechunk,ctime (all files are considered modified - rechunk, cache ctime)
@@ -647,6 +661,13 @@ class CreateMixIn:
           can be arbitrarily set from userspace, e.g., to set mtime back to the same value
           it had before a content change happened. This can be used maliciously as well as
           well-meant, but in both cases mtime-based cache modes can be problematic.
+
+        On Windows, ctime is the file *creation* time, not the "metadata change time" it is
+        on POSIX systems. A ctime based mode would therefore not notice content changes of a
+        file that keeps its size and inode number, so borg defaults to ``mtime,size,inode``
+        there. If a ctime based mode is given explicitly on Windows, borg warns and uses the
+        corresponding mtime based mode instead: ctime,size,inode -> mtime,size,inode,
+        ctime,size -> mtime,size, rechunk,ctime -> rechunk,mtime.
 
         The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
          - ctime (default on POSIX): Use ctime to detect changes. This is the safest option.
@@ -971,8 +992,9 @@ class CreateMixIn:
             dest="files_cache_mode",
             action=Highlander,
             type=FilesCacheMode,
-            default=FILES_CACHE_MODE_UI_DEFAULT,
-            help="operate files cache in MODE. default: %s" % FILES_CACHE_MODE_UI_DEFAULT,
+            default=FILES_CACHE_MODE_UI_DEFAULT_WIN32 if is_win32 else FILES_CACHE_MODE_UI_DEFAULT_POSIX,
+            help="operate files cache in MODE. default: %s (on Windows: %s, because ctime is "
+            "file creation time there)." % (FILES_CACHE_MODE_UI_DEFAULT_POSIX, FILES_CACHE_MODE_UI_DEFAULT_WIN32),
         )
         fs_group.add_argument(
             "--files-changed",

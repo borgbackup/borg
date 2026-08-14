@@ -429,6 +429,23 @@ def FilesCacheMode(s):
     return mode
 
 
+# ctime based files cache modes and their mtime based equivalent, see #7193.
+FILES_CACHE_MODE_CTIME_TO_MTIME = {"cis": "ims", "cs": "ms", "cr": "mr"}
+
+
+def files_cache_mode_no_ctime(mode):
+    """
+    Return (new_mode, changed): <mode> with ctime replaced by mtime.
+
+    <mode> may be given in long form ("ctime,size,inode") or in short form ("cis"),
+    the returned mode is always the short form, as FilesCacheMode() gives it.
+    "changed" tells whether a ctime -> mtime replacement actually happened.
+    """
+    mode = FilesCacheMode(mode)  # long form -> short form (idempotent for the short form)
+    new_mode = FILES_CACHE_MODE_CTIME_TO_MTIME.get(mode, mode)
+    return new_mode, new_mode != mode
+
+
 def partial_format(format, mapping):
     """
     Apply format.format_map(mapping) while preserving unknown keys

@@ -1239,36 +1239,32 @@ Is there a way to limit bandwidth with Borg?
 --------------------------------------------
 
 To limit upload (i.e. :ref:`borg_create`) bandwidth, use the
-``--remote-ratelimit`` option.
+``--upload-ratelimit`` option.
 
-There is no built-in way to limit *download*
-(i.e. :ref:`borg_extract`) bandwidth, but limiting download bandwidth
-can be accomplished with pipeviewer_:
+There is no built-in way to limit *download* (i.e. :ref:`borg_extract`)
+bandwidth, but for repositories accessed via ssh, both directions can be
+limited with pipeviewer_.
 
-Create a wrapper script:  /usr/local/bin/pv-wrapper
+Put a ``pv`` on each side of the connection using an ssh ``ProxyCommand``
+(this needs ``nc``), e.g. in ``~/.ssh/config``::
 
-::
-
-    #!/bin/sh
+    Host borghost
         ## -q, --quiet              do not output any transfer information at all
         ## -L, --rate-limit RATE    limit transfer to RATE bytes per second
-    RATE=307200
-    pv -q -L $RATE  | "$@"
+        ProxyCommand pv -q -L 307200 | nc %h %p | pv -q -L 307200
 
-Add BORG_RSH environment variable to use pipeviewer wrapper script with ssh.
+The first ``pv`` limits the upload, the second one the download, each to RATE
+bytes per second. As this throttles the encrypted ssh stream, the effective
+payload rate is slightly lower.
 
-::
-
-    export BORG_RSH='/usr/local/bin/pv-wrapper ssh'
-
-Now Borg will be bandwidth limited. The nice thing about ``pv`` is that you can
-change rate-limit on the fly:
-
-::
+The nice thing about ``pv`` is that you can change the rate limit on the fly::
 
     pv -R $(pidof pv) -L 102400
 
-.. _pipeviewer: http://www.ivarch.com/programs/pv.shtml
+As the ``ProxyCommand`` above runs two ``pv`` processes, ``pidof`` will print
+two pids - give ``pv -R`` the pid of the direction you want to change.
+
+.. _pipeviewer: https://www.ivarch.com/programs/pv.shtml
 
 
 How can I avoid unwanted base directories getting stored into archives?

@@ -86,7 +86,6 @@ class Lock:
         # the current time in the store's clock domain, see _store_now().
         self.my_lock_mtime = None
         self.my_lock_monotonic = None
-        self.last_seen_locks = {}  # all locks seen by the most recent listing (for skew diagnostics)
         self.skew_warned = False  # emit the clock-skew warning only once per Lock instance
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
@@ -179,9 +178,11 @@ class Lock:
             f"The clocks of machines sharing a repository should be synchronized (e.g. via NTP)."
         )
 
-    def _check_clock_skew(self):
+    def _check_clock_skew(self, locks):
         """Warn (once) if another current lock writer's clock is skewed against ours."""
-        for lock in self.last_seen_locks.values():
+        if self.skew_warned:
+            return
+        for lock in locks.values():
             if lock["key"] == self.my_lock_key:
                 continue
             skew = self._mutual_skew(lock)
@@ -264,7 +265,10 @@ class Lock:
                 # can only be a leftover of a dead process (pid reuse), not our own lock.
                 self._delete_lock(key, ignore_not_found=True)
                 del locks[key]
-        self.last_seen_locks = locks
+        # check for clock skew on every listing, not just on acquire success: the listing that
+        # satisfies an exclusive acquire only contains our own lock, so a skewed peer is only
+        # visible in earlier listings, e.g. while we wait for its healthy lock to go away.
+        self._check_clock_skew(locks)
         return locks
 
     def _find_locks(self, *, only_exclusive=False, only_mine=False):
@@ -305,7 +309,6 @@ class Lock:
                             locks = self._find_locks(only_exclusive=False)
                             if len(locks) == 1 and locks[0]["key"] == key:
                                 logger.debug("LOCK-ACQUIRE: success! no non-exclusive locks are left!")
-                                self._check_clock_skew()
                                 return self
                             time.sleep(self.other_locks_go_away_delay)
                         logger.debug("LOCK-ACQUIRE: timeout while waiting for non-exclusive locks to go away.")
@@ -320,7 +323,6 @@ class Lock:
                     if len(exclusive_locks) == 0:
                         logger.debug("LOCK-ACQUIRE: success! no exclusive locks detected.")
                         # We don't care for other non-exclusive locks.
-                        self._check_clock_skew()
                         return self
                     else:
                         logger.debug("LOCK-ACQUIRE: exclusive locks detected, deleting our shared lock.")

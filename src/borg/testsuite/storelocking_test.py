@@ -264,6 +264,18 @@ class TestLock:
         assert not lock.skew_warned
         lock.release()
 
+    def test_skew_warning_during_exclusive_acquire(self, lockstore):
+        # an exclusive acquirer must warn about a skewed peer it sees while (unsuccessfully)
+        # waiting for the peer's healthy shared lock to go away: the listing that would satisfy
+        # the exclusive acquire can only contain our own lock, so the skewed peer is only
+        # visible in the intermediate listings, see #9870.
+        dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=10)
+        write_raw_lock(lockstore, ID1, exclusive=False, dt=dt)  # store mtime: now
+        lock = Lock(lockstore, exclusive=True, id=ID2)
+        with pytest.raises(LockTimeout):
+            lock.acquire()  # the healthy shared lock does not go away
+        assert lock.skew_warned
+
     def test_dead_process_lock_killed_despite_fresh_store_mtime(self, lockstore, free_pid):
         # knowing locally that the lock-owning process (on THIS machine) is dead must not be
         # vetoable by store-side timestamps: a store serving bogus, always-fresh mtimes could

@@ -37,7 +37,7 @@ On some platforms additional features are supported:
 +-------------------------+----------+-----------+------------+
 | NetBSD                  | n/a      | Yes       | Yes (all)  |
 +-------------------------+----------+-----------+------------+
-| Solaris and derivatives | No [2]_  | No [2]_   | n/a        |
+| Solaris and derivatives | No [2]_  | Yes       | n/a        |
 +-------------------------+----------+-----------+------------+
 | Windows (cygwin)        | No [3]_  | No        | No         |
 +-------------------------+----------+-----------+------------+

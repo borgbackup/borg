@@ -4,7 +4,12 @@ import pytest
 
 from ..platform.xattr import buffer, split_lstring
 from ..xattr import is_enabled, getxattr, setxattr, listxattr, XATTR_FAKEROOT
-from ..platformflags import is_linux
+from ..platformflags import is_linux, is_sunos
+
+# Whether xattrs can be set on a symlink itself:
+# Linux does not allow setting user.* xattrs on symlinks; on illumos/Solaris,
+# symlinks cannot have extended attributes at all.
+symlink_xattrs = not is_linux and not is_sunos
 
 
 @pytest.fixture()
@@ -35,22 +40,22 @@ def test(tempfile_symlink):
     setxattr(tmp_fn, b"user.foo", b"bar")
     setxattr(tmp_fd, b"user.bar", b"foo")
     setxattr(tmp_fn, b"user.empty", b"")
-    if not is_linux:
-        # Linux does not allow setting user.* xattrs on symlinks.
+    if symlink_xattrs:
         setxattr(tmp_lfn, b"user.linkxattr", b"baz")
     assert_equal_se(listxattr(tmp_fn), [b"user.foo", b"user.bar", b"user.empty"])
     assert_equal_se(listxattr(tmp_fd), [b"user.foo", b"user.bar", b"user.empty"])
     assert_equal_se(listxattr(tmp_lfn, follow_symlinks=True), [b"user.foo", b"user.bar", b"user.empty"])
-    if not is_linux:
+    if symlink_xattrs:
         assert_equal_se(listxattr(tmp_lfn), [b"user.linkxattr"])
     assert getxattr(tmp_fn, b"user.foo") == b"bar"
     assert getxattr(tmp_fd, b"user.foo") == b"bar"
     assert getxattr(tmp_lfn, b"user.foo", follow_symlinks=True) == b"bar"
-    if not is_linux:
+    if symlink_xattrs:
         assert getxattr(tmp_lfn, b"user.linkxattr") == b"baz"
     assert getxattr(tmp_fn, b"user.empty") == b""
 
 
+@pytest.mark.skipif(is_sunos, reason="the illumos/Solaris xattr backend does not use the shared buffer")
 def test_listxattr_buffer_growth(tempfile_symlink):
     temp_file, symlink = tempfile_symlink
     tmp_fn = os.fsencode(temp_file.name)
@@ -65,6 +70,7 @@ def test_listxattr_buffer_growth(tempfile_symlink):
     assert len(buffer) > 64
 
 
+@pytest.mark.skipif(is_sunos, reason="the illumos/Solaris xattr backend does not use the shared buffer")
 def test_getxattr_buffer_growth(tempfile_symlink):
     temp_file, symlink = tempfile_symlink
     tmp_fn = os.fsencode(temp_file.name)

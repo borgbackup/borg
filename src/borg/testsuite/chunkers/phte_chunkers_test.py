@@ -14,7 +14,8 @@ import random
 
 import pytest
 
-from . import cf, cf_expand, chunker_with_kernel
+from . import cf, cf_expand
+from .pytest_helpers import chunker_with_kernel
 from ...chunkers import ChunkerRabinAES, ChunkerGoldilocksAES, ChunkerToeplitzAES, get_chunker
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin

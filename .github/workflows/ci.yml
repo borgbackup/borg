@@ -292,7 +292,7 @@ jobs:
             do_binaries: true
             artifact_prefix: borg-freebsd-14-x86_64-gh
           - os: netbsd
-            version: '10.1'
+            version: '11.0'
             display_name: NetBSD
             do_binaries: false
           - os: openbsd
@@ -313,7 +313,7 @@ jobs:
 
     - name: Test on ${{ matrix.display_name }}
       id: cross_os
-      uses: cross-platform-actions/action@v1.0.0
+      uses: cross-platform-actions/action@v1.4.0
       env:
         DO_BINARIES: ${{ matrix.do_binaries }}
       with:
@@ -381,7 +381,7 @@ jobs:
               hostname
               arch="$(uname -m)"
               sudo -E mkdir -p /usr/pkg/etc/pkgin
-              echo "http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+              echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/11.0/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
               sudo -E pkgin update
               sudo -E pkgin -y upgrade
               sudo -E pkgin -y install zstd lz4 xxhash git

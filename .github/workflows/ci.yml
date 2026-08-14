@@ -598,6 +598,12 @@ jobs:
               export TMPDIR=/var/tmp/borg-ci
               mkdir -p "$TMPDIR"
 
+              # show whether xattrs work on the ZFS-backed TMPDIR (they are files in a
+              # hidden per-file attribute directory there, listed via runat(1))
+              touch "$TMPDIR/testfile"
+              /usr/bin/runat "$TMPDIR/testfile" ls -a && echo "*** xattrs supported on $TMPDIR ***"
+              rm "$TMPDIR/testfile"
+
               python3 -m venv .venv
               . .venv/bin/activate
               python -V

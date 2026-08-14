@@ -1,4 +1,4 @@
-"""A basic extended attributes (xattr) implementation for Linux, FreeBSD and macOS."""
+"""A basic extended attributes (xattr) implementation for Linux, FreeBSD, macOS, NetBSD and illumos/Solaris."""
 
 import errno
 import os

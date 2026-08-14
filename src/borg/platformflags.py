@@ -16,6 +16,7 @@ is_netbsd = sys.platform.startswith("netbsd")
 is_openbsd = sys.platform.startswith("openbsd")
 is_darwin = sys.platform.startswith("darwin")
 is_haiku = sys.platform.startswith("haiku")
+is_sunos = sys.platform.startswith("sunos")  # illumos and Solaris
 
 # MSYS2 (on Windows)
 is_msystem = is_win32 and "MSYSTEM" in os.environ

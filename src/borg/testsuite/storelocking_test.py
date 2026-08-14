@@ -264,6 +264,22 @@ class TestLock:
         assert not lock.skew_warned
         lock.release()
 
+    def test_no_skew_warning_when_only_our_store_time_lags(self, lockstore):
+        # while we are suspended, time.monotonic() stands still, so our store "now" estimate
+        # lags afterwards. a foreign lock that went genuinely stale meanwhile then gets vetoed
+        # (the safe direction), but that veto is no evidence of clock skew and must not
+        # produce a bogus "clock skew of ~0s" warning, see #9870.
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.acquire()
+        assert lock.my_lock_mtime is not None  # store time reference was harvested
+        lock.my_lock_monotonic += 45 * 60  # simulate a 45 minute suspend after the anchor
+        dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
+        foreign_key = write_raw_lock(lockstore, ID1, exclusive=False, dt=dt, mtime=dt.timestamp())
+        locks = lock._get_locks()
+        assert foreign_key in locks  # genuinely stale, but vetoed: store "now" lags behind
+        assert not lock.skew_warned  # the writer's clock is not skewed - no warning
+        lock.release()
+
     def test_skew_warning_during_exclusive_acquire(self, lockstore):
         # an exclusive acquirer must warn about a skewed peer it sees while (unsuccessfully)
         # waiting for the peer's healthy shared lock to go away: the listing that would satisfy

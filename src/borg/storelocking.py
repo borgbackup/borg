@@ -166,14 +166,12 @@ class Lock:
         offset_other = lock["dt"].timestamp() - lock["mtime"]
         return offset_other - offset_self
 
-    def _warn_clock_skew(self, lock, skew=None):
+    def _warn_clock_skew(self, lock, skew):
         if self.skew_warned:
             return
         self.skew_warned = True
-        skew = skew if skew is not None else self._mutual_skew(lock)
-        skew_info = f" of ~{abs(skew):.0f}s" if skew is not None else ""
         logger.warning(
-            f"Clock skew{skew_info} detected between this machine and the borg client on "
+            f"Clock skew of ~{abs(skew):.0f}s detected between this machine and the borg client on "
             f"{lock['hostid']!r} (also using this repository). "
             f"The clocks of machines sharing a repository should be synchronized (e.g. via NTP)."
         )
@@ -221,10 +219,11 @@ class Lock:
                     logger.debug(f"LOCK-STALE: lock looks stale, deferring until store time is known. lock: {lock}.")
                     return False
                 if store_now <= lock["mtime"] + self.stale_td.total_seconds():
-                    # the store saw this lock object being written recently: it is NOT stale,
-                    # its writer's clock is just skewed against ours. never kill it!
-                    self._warn_clock_skew(lock)
-                    logger.debug(f"LOCK-STALE: lock only looks stale due to clock skew. lock: {lock}.")
+                    # the store saw this lock object being written recently: it is NOT stale.
+                    # either its writer's clock is skewed against ours (the skew check in
+                    # _get_locks warns about that) or our store "now" estimate lags behind
+                    # (e.g. time.monotonic() stood still while we were suspended). never kill it!
+                    logger.debug(f"LOCK-STALE: lock looks stale locally, but not to the store. lock: {lock}.")
                     return False
             # either both clock domains agree that the lock is stale, or the backend can not
             # provide store-side mtimes (mtime == 0) and the content timestamp has to suffice.

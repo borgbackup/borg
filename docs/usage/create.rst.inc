@@ -91,7 +91,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--sparse``                                      | detect sparse holes in input (supported only by fixed chunker)                                                                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                                                                                                                         |
+    |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode (on Windows: mtime,size,inode, because ctime is file creation time there).                                                                                                              |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--files-changed MODE``                          | specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -169,7 +169,7 @@ borg create
         --noacls                  do not read and store ACLs into archive
         --noxattrs                do not read and store xattrs into archive
         --sparse                  detect sparse holes in input (supported only by fixed chunker)
-        --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
+        --files-cache MODE        operate files cache in MODE. default: ctime,size,inode (on Windows: mtime,size,inode, because ctime is file creation time there).
         --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
         --read-special-timeout SECONDS    when reading from FIFOs or character devices (see --read-special): skip the file with an error if no data arrives for more than SECONDS (this includes waiting for a FIFO's writer to connect). Give 0 to wait forever. default: 1800 seconds.
@@ -220,8 +220,8 @@ the files cache.
 
 This comparison can operate in different modes as given by ``--files-cache``:
 
-- ctime,size,inode (default)
-- mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+- ctime,size,inode (default on POSIX systems)
+- mtime,size,inode (default on Windows)
 - ctime,size (ignore the inode number)
 - mtime,size (ignore the inode number)
 - rechunk,ctime (all files are considered modified - rechunk, cache ctime)
@@ -248,6 +248,13 @@ ctime vs. mtime: safety vs. speed
   can be arbitrarily set from userspace, e.g., to set mtime back to the same value
   it had before a content change happened. This can be used maliciously as well as
   well-meant, but in both cases mtime-based cache modes can be problematic.
+
+On Windows, ctime is the file *creation* time, not the "metadata change time" it is
+on POSIX systems. A ctime based mode would therefore not notice content changes of a
+file that keeps its size and inode number, so borg defaults to ``mtime,size,inode``
+there. If a ctime based mode is given explicitly on Windows, borg warns and uses the
+corresponding mtime based mode instead: ctime,size,inode -> mtime,size,inode,
+ctime,size -> mtime,size, rechunk,ctime -> rechunk,mtime.
 
 The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
  - ctime (default on POSIX): Use ctime to detect changes. This is the safest option.

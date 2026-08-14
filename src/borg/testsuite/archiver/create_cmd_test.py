@@ -741,7 +741,7 @@ def test_create_invalid_tags(archivers, request):
 
 
 @pytest.mark.skipif(
-    is_win32, reason="ctime attribute is file creation time on Windows"
+    is_win32, reason="ctime is file creation time on Windows, ctime cache modes fall back to mtime there, see #7193"
 )  # see https://docs.python.org/3/library/os.html#os.stat_result.st_ctime
 def test_file_status_cs_cache_mode(archivers, request):
     archiver = request.getfixturevalue(archivers)
@@ -756,6 +756,25 @@ def test_file_status_cs_cache_mode(archivers, request):
     create_regular_file(archiver.input_path, "file1", contents=b"321")
     os.utime("input/file1", ns=(st.st_atime_ns, st.st_mtime_ns))
     # this mode uses ctime for change detection, so it should find file1 as modified
+    output = cmd(archiver, "create", "test", "input", "--list", "--files-cache=ctime,size")
+    assert "M input/file1" in output
+
+
+@pytest.mark.skipif(not is_win32, reason="Windows-only: ctime is file creation time there, see #7193")
+def test_files_cache_ctime_fallback_win32(archivers, request):
+    """test that a ctime based --files-cache mode warns and falls back to the mtime based mode on Windows"""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"123")
+    granularity_sleep()  # file2 must have newer timestamps than file1
+    create_regular_file(archiver.input_path, "file2", size=10)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # note: cmd() asserts rc == 0, so this also covers that the warning does not change the exit code.
+    output = cmd(archiver, "create", "test", "input", "--list", "--files-cache=ctime,size")
+    assert "ctime is file creation time" in output
+    granularity_sleep()  # the rewrite below must get a newer mtime
+    # rewrite in place: same size, same inode, same creation time (== st_ctime on Windows),
+    # only the mtime changes. Without the fallback, this file would be considered unchanged.
+    create_regular_file(archiver.input_path, "file1", contents=b"321")
     output = cmd(archiver, "create", "test", "input", "--list", "--files-cache=ctime,size")
     assert "M input/file1" in output
 

@@ -253,6 +253,12 @@ New features:
 
 Fixes:
 
+- create: do not use ctime for the files cache on Windows, #7193.
+
+  ctime is the file *creation* time on Windows, so a ctime based files cache mode
+  did not notice content changes of files that kept their size and inode number.
+  The default is ``mtime,size,inode`` there now and an explicitly given ctime based
+  mode warns and uses the corresponding mtime based mode.
 - re-add XXH64 to read borg 1.x integrity data, #9935
 - list: add {blake3} format key, #9984
 - support date: archive patterns for --from-borg1, #9949

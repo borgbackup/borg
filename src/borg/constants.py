@@ -177,8 +177,12 @@ ITEMS_CHUNKER_PARAMS = (CH_FASTCDC, 15, 19, 17, NC_LEVEL)
 # normal on-disk data, allocated (but not written, all zeros), not allocated hole (all zeros)
 CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
 
-# operating mode of the files cache (for fast skipping of unchanged files)
-FILES_CACHE_MODE_UI_DEFAULT = "ctime,size,inode"  # default for "borg create" command (CLI UI)
+# operating mode of the files cache (for fast skipping of unchanged files).
+# note: on Windows, os.stat_result.st_ctime[_ns] is the file *creation* time, not the
+# "metadata change time" it is on POSIX systems. A ctime based mode would not detect
+# content changes of a file that keeps its size and inode number there. See #7193.
+FILES_CACHE_MODE_UI_DEFAULT_POSIX = "ctime,size,inode"  # default for "borg create" command (CLI UI)
+FILES_CACHE_MODE_UI_DEFAULT_WIN32 = "mtime,size,inode"  # same, but on Windows
 FILES_CACHE_MODE_DISABLED = "d"  # most borg commands do not use the files cache at all (disable)
 
 # account for clocks being slightly out-of-sync, timestamps granularity.

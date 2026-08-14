@@ -30,6 +30,7 @@ from ...helpers.parseformat import (
     swidth_slice,
     eval_escapes,
     ChunkerParams,
+    files_cache_mode_no_ctime,
     get_size_units,
     normalize_local_path,
     ArchiveFormatter,
@@ -913,6 +914,35 @@ def test_valid_chunkerparams(chunker_params, expected_return):
 def test_invalid_chunkerparams(invalid_chunker_params):
     with pytest.raises(ArgumentTypeError):
         ChunkerParams(invalid_chunker_params)
+
+
+@pytest.mark.parametrize(
+    "mode, expected_mode, expected_changed",
+    [
+        # ctime based modes get replaced by their mtime based equivalent:
+        ("ctime,size,inode", "ims", True),
+        ("cis", "ims", True),
+        ("ctime,size", "ms", True),
+        ("cs", "ms", True),
+        ("rechunk,ctime", "mr", True),
+        ("cr", "mr", True),
+        # everything else stays as it is (but is normalized to the short form):
+        ("mtime,size,inode", "ims", False),
+        ("ims", "ims", False),
+        ("mtime,size", "ms", False),
+        ("rechunk,mtime", "mr", False),
+        ("disabled", "d", False),
+        ("d", "d", False),
+    ],
+)
+def test_files_cache_mode_no_ctime(mode, expected_mode, expected_changed):
+    assert files_cache_mode_no_ctime(mode) == (expected_mode, expected_changed)
+
+
+def test_files_cache_mode_ui_default():
+    # borg create must not default to a ctime based files cache mode on Windows, see #7193.
+    assert FILES_CACHE_MODE_UI_DEFAULT_POSIX == "ctime,size,inode"
+    assert FILES_CACHE_MODE_UI_DEFAULT_WIN32 == "mtime,size,inode"
 
 
 @pytest.mark.parametrize(

@@ -879,7 +879,7 @@ and disk space on subsequent runs. Here what Borg does when you run ``borg creat
 - Then it checks whether this chunk is already in the repo (local hashtable lookup,
   fast). If so, the processing of the chunk is completed here. Otherwise it needs to
   process the chunk:
-- Compresses (the default lz4 is super fast)
+- Compresses (the default zstd,-4 is very fast)
 - Encrypts and authenticates (AES-OCB, usually fast if your CPU has AES acceleration as usual
   since about 10y, or chacha20-poly1305, fast pure-software crypto)
 - Transmits to repo. If the repo is remote, this usually involves an SSH connection
@@ -916,8 +916,8 @@ If you feel your Borg backup is too slow somehow, here is what you can do:
   files you have)
 - Use one of the blake2 modes for --encryption except if you positively know
   your CPU (and openssl) accelerates sha256 (then stay with hmac-sha256).
-- Don't use any expensive compression. The default is lz4 and super fast.
-  Uncompressed is often slower than lz4.
+- Don't use any expensive compression. The default is zstd,-4 and very fast.
+  Uncompressed is often slower than fast compression.
 - Just wait. You can also interrupt it and start it again as often as you like,
   it will converge against a valid "completed" state. It is starting
   from the beginning each time, but it is still faster then as it does not store

@@ -292,12 +292,12 @@ E.g. if your crypto device supports GPG and borg calls ``gpg`` via
 Backup compression
 ------------------
 
-The default is lz4 (very fast, but low compression ratio), but other methods are
+The default is zstd,-4 (very fast, moderate compression ratio), but other methods are
 supported for different situations. Compression not only helps you save disk space,
 but will especially speed up remote backups since less data needs to be transferred.
 
 zstd is a modern compression algorithm which can be parametrized to anything between
-N=1 for highest speed (and relatively low compression) to N=22 for highest compression
+N=-128 for highest speed (and low compression) to N=22 for highest compression
 (and lower speed)::
 
     $ borg create --compression zstd,N arch ~

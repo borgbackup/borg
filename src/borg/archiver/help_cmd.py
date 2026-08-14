@@ -468,7 +468,7 @@ class HelpMixIn:
         So if you use different compression specs for the backups, whichever stores a
         chunk first determines its compression. See also ``borg recreate``.
 
-        Compression is lz4 by default. If you want something else, you have to specify what you want.
+        Compression is zstd,-4 by default. If you want something else, you have to specify what you want.
 
         Valid compression specifiers are:
 
@@ -476,10 +476,10 @@ class HelpMixIn:
             Do not compress.
 
         lz4
-            Use lz4 compression. Very high speed, very low compression. (default)
+            Use lz4 compression. Very high speed, very low compression.
 
         zstd[,L]
-            Use zstd ("zstandard") compression, a modern wide-range algorithm.
+            Use zstd ("zstandard") compression, a modern wide-range algorithm. (default: zstd,-4)
             If you do not explicitly give the compression level L (ranging from -128
             to 22), it will use level 3.
             Negative levels are zstd's "fast" levels (level -N is what the zstd command

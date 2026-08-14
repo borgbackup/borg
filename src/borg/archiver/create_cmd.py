@@ -1183,7 +1183,7 @@ class CreateMixIn:
             metavar="COMPRESSION",
             dest="compression",
             type=CompressionSpec,
-            default=CompressionSpec("lz4"),
+            default=CompressionSpec("zstd,-4"),
             action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )

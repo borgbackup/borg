@@ -476,7 +476,7 @@ another backup that also uses this chunk will not change the stored chunk.
 So if you use different compression specs for the backups, whichever stores a
 chunk first determines its compression. See also ``borg recreate``.
 
-Compression is lz4 by default. If you want something else, you have to specify what you want.
+Compression is zstd,-4 by default. If you want something else, you have to specify what you want.
 
 Valid compression specifiers are:
 
@@ -484,12 +484,19 @@ none
     Do not compress.
 
 lz4
-    Use lz4 compression. Very high speed, very low compression. (default)
+    Use lz4 compression. Very high speed, very low compression.
 
 zstd[,L]
-    Use zstd ("zstandard") compression, a modern wide-range algorithm.
-    If you do not explicitly give the compression level L (ranging from 1
+    Use zstd ("zstandard") compression, a modern wide-range algorithm. (default: zstd,-4)
+    If you do not explicitly give the compression level L (ranging from -128
     to 22), it will use level 3.
+    Negative levels are zstd's "fast" levels (level -N is what the zstd command
+    line tool calls --fast=N): they give up compression ratio for speed.
+    -1 to -10 is the useful range for general data; going lower only pays off for
+    data with long repeats (disk/VM images, database files), where it stays fast
+    while still finding the big matches.
+    Level 0 selects zstd's default level (3) - for zstd it does not mean
+    "no compression" (use "none" for that), unlike for zlib below.
 
 zlib[,L]
     Use zlib ("gz") compression. Medium speed, medium compression.

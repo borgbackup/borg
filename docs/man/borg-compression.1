@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-compression" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-compression" "1" "2026-08-14" "" "borg backup tool"
 .SH Name
 borg-compression \- Details regarding compression
 .SH DESCRIPTION
@@ -42,7 +42,7 @@ another backup that also uses this chunk will not change the stored chunk.
 So if you use different compression specs for the backups, whichever stores a
 chunk first determines its compression. See also \fBborg recreate\fP\&.
 .sp
-Compression is lz4 by default. If you want something else, you have to specify what you want.
+Compression is zstd,\-4 by default. If you want something else, you have to specify what you want.
 .sp
 Valid compression specifiers are:
 .INDENT 0.0
@@ -51,12 +51,19 @@ Valid compression specifiers are:
 Do not compress.
 .TP
 .B lz4
-Use lz4 compression. Very high speed, very low compression. (default)
+Use lz4 compression. Very high speed, very low compression.
 .TP
 .B zstd[,L]
-Use zstd (\(dqzstandard\(dq) compression, a modern wide\-range algorithm.
-If you do not explicitly give the compression level L (ranging from 1
+Use zstd (\(dqzstandard\(dq) compression, a modern wide\-range algorithm. (default: zstd,\-4)
+If you do not explicitly give the compression level L (ranging from \-128
 to 22), it will use level 3.
+Negative levels are zstd\(aqs \(dqfast\(dq levels (level \-N is what the zstd command
+line tool calls \-\-fast=N): they give up compression ratio for speed.
+\-1 to \-10 is the useful range for general data; going lower only pays off for
+data with long repeats (disk/VM images, database files), where it stays fast
+while still finding the big matches.
+Level 0 selects zstd\(aqs default level (3) \- for zstd it does not mean
+\(dqno compression\(dq (use \(dqnone\(dq for that), unlike for zlib below.
 .TP
 .B zlib[,L]
 Use zlib (\(dqgz\(dq) compression. Medium speed, medium compression.

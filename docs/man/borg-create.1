@@ -407,8 +407,11 @@ $ borg create \-\-sparse \-\-chunker\-params fixed,4194304 my\-disk my\-disk.raw
 # No compression (none)
 $ borg create \-\-compression none arch ~
 
-# Super fast, low compression (lz4, default)
+# Fast, moderate compression (zstd,\-4, default)
 $ borg create arch ~
+
+# Super fast, low compression (lz4)
+$ borg create \-\-compression lz4 arch ~
 
 # Less fast, higher compression (zlib, N = 0..9)
 $ borg create \-\-compression zlib,N arch ~

@@ -35,11 +35,11 @@ On some platforms additional features are supported:
 +-------------------------+----------+-----------+------------+
 | OpenBSD                 | n/a      | n/a       | Yes (all)  |
 +-------------------------+----------+-----------+------------+
-| NetBSD                  | n/a      | No [2]_   | Yes (all)  |
+| NetBSD                  | n/a      | Yes       | Yes (all)  |
 +-------------------------+----------+-----------+------------+
-| Solaris and derivatives | No [3]_  | No [3]_   | n/a        |
+| Solaris and derivatives | No [2]_  | No [2]_   | n/a        |
 +-------------------------+----------+-----------+------------+
-| Windows (cygwin)        | No [4]_  | No        | No         |
+| Windows (cygwin)        | No [3]_  | No        | No         |
 +-------------------------+----------+-----------+------------+
 
 Other Unix-like operating systems may work as well, but have not been tested yet.
@@ -49,9 +49,8 @@ For example, ntfs-3g on Linux is not able to convey NTFS ACLs.
 
 .. [1] Only "nodump", "immutable", "compressed" and "append" are supported.
     Feature request :issue:`618` for more flags.
-.. [2] Feature request :issue:`1332`
-.. [3] Feature request :issue:`1337`
-.. [4] Cygwin tries to map NTFS ACLs to permissions with varying degrees of success.
+.. [2] Feature request :issue:`1337`
+.. [3] Cygwin tries to map NTFS ACLs to permissions with varying degrees of success.
 
 .. [#acls] The native access control list mechanism of the OS. This normally limits access to
     non-native ACLs. For example, NTFS ACLs are not completely accessible on Linux with ntfs-3g.

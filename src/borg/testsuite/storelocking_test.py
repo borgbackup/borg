@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from borgstore.store import Store
+from borgstore.store import ObjectNotFound, Store
 
 from ..storelocking import Lock, NotLocked, LockTimeout
 
@@ -155,6 +155,24 @@ class TestLock:
         with pytest.raises(LockTimeout):
             lock.refresh()
         assert len(list(lockstore.list("locks"))) == 0  # no new lock left behind
+
+    def test_lock_vanished_between_list_and_load(self, lockstore, monkeypatch):
+        # another client can delete a lock (e.g. kill it as stale, or its owner releases it)
+        # between our listing and our loading of it - such a lock must be skipped, not crash us.
+        foreign_key = Lock(lockstore, id=ID1)._create_lock(exclusive=True)
+
+        orig_load = lockstore.load
+
+        def load_vanished(name, *args, **kwargs):
+            if name == f"locks/{foreign_key}":
+                raise ObjectNotFound(name)
+            return orig_load(name, *args, **kwargs)
+
+        monkeypatch.setattr(lockstore, "load", load_vanished)
+        lock = Lock(lockstore, exclusive=True, id=ID2)
+        assert foreign_key not in lock._get_locks()  # skipped, no exception
+        lock.acquire()  # the vanished exclusive lock must not block us
+        lock.release()
 
     def test_migrate_lock(self, lockstore):
         old_id, new_id = ID1, ID2

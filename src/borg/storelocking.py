@@ -150,7 +150,12 @@ class Lock:
             return {}
         for info in infos:
             key = info.name
-            content = self.store.load(f"locks/{key}")
+            try:
+                content = self.store.load(f"locks/{key}")
+            except ObjectNotFound:
+                # the lock vanished between our listing and loading it, e.g. it was released
+                # by its owner or another client killed it as stale - so just ignore it.
+                continue
             lock = json.loads(content.decode("utf-8"))
             lock["key"] = key
             lock["dt"] = datetime.datetime.fromisoformat(lock["time"])

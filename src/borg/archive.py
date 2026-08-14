@@ -1126,8 +1126,9 @@ Duration: {0.duration}
         if not is_win32 and not self.noflags and "bsdflags" in item:
             try:
                 set_flags(path, item.bsdflags, fd=fd)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.warning("%s: when setting file flags: %s", remove_surrogates(str(path)), e)
+                set_ec(EXIT_WARNING)
 
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)

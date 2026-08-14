@@ -847,6 +847,25 @@ def test_extract_restores_append_flag(archivers, request):
         assert (flags & stat.UF_APPEND) == stat.UF_APPEND
 
 
+@pytest.mark.skipif(is_win32, reason="file flags are not restored on win32")
+def test_extract_flags_errors(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+
+    def patched_set_flags(path, bsd_flags, fd=None):
+        raise OSError(errno.EPERM, "EPERM")
+
+    create_regular_file(archiver.input_path, "file")
+    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        with patch.object(archive_module, "set_flags", patched_set_flags):
+            out = cmd(archiver, "extract", "test", exit_code=EXIT_WARNING)
+            assert "when setting file flags: " in out
+            assert "EPERM" in out
+
+
 def test_overwrite(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.EXE:

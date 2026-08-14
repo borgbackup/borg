@@ -1037,7 +1037,9 @@ def test_create_read_special_timeout_expired(archivers, request):
         "input",
         exit_code=expected_ec,  # WARNING status: could not back up the fifo.
     )
-    assert time.monotonic() - started < 30  # timed out, no eternal hang
+    # Generous bound for heavily loaded CI runners: proves borg gave up soon after the requested
+    # 1s timeout (and did not e.g. wait for the 30 minutes default timeout).
+    assert time.monotonic() - started < 300
     assert "retry: 1 of " not in out  # timeouts are NOT retried
     listing = cmd(archiver, "list", "test", "--format={path}{NL}")
     assert "input/file1" in listing

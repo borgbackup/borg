@@ -4,6 +4,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      # default-days also covers patch releases and actions not using semver.
+      default-days: 14
+      semver-major-days: 90
+      semver-minor-days: 30
     groups:
       actions:
         patterns:

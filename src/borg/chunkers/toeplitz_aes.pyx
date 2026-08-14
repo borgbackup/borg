@@ -57,7 +57,7 @@ cdef extern from "toeplitz_aes_impl.h":
     void tp_free(TP_CTX *ctx)
     const char *tp_kind(const TP_CTX *ctx)
     uint64_t tp_digest64(const TP_CTX *ctx, const uint8_t *q)
-    int64_t tp_scan(TP_CTX *ctx, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
+    int64_t tp_scan(TP_CTX *ctx, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) nogil
 
 
 # --- GF(2)[x] helpers (pure Python, used at chunker setup only) ----------
@@ -166,7 +166,10 @@ cdef class ChunkerToeplitzAES(ChunkerPHTE):
             self.ctx = NULL
 
     cdef int64_t _scan(self, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) noexcept:
-        return tp_scan(self.ctx, p, n, digest, mask)
+        cdef int64_t r
+        with nogil:
+            r = tp_scan(self.ctx, p, n, digest, mask)
+        return r
 
     cdef uint64_t _digest64(self, const uint8_t *q) noexcept:
         return tp_digest64(self.ctx, q)

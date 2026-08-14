@@ -64,7 +64,7 @@ cdef extern from "rabin_aes_impl.h":
     void ra_free(RA_CTX *ctx)
     const char *ra_kind(const RA_CTX *ctx)
     uint64_t ra_digest64(const RA_CTX *ctx, const uint8_t *q)
-    int64_t ra_scan(RA_CTX *ctx, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
+    int64_t ra_scan(RA_CTX *ctx, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) nogil
 
 
 # --- GF(2)[x] polynomial helpers (pure Python, used at chunker setup only) ---
@@ -234,7 +234,10 @@ cdef class ChunkerRabinAES(ChunkerPHTE):
             self.ctx = NULL
 
     cdef int64_t _scan(self, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) noexcept:
-        return ra_scan(self.ctx, p, n, digest, mask)
+        cdef int64_t r
+        with nogil:
+            r = ra_scan(self.ctx, p, n, digest, mask)
+        return r
 
     cdef uint64_t _digest64(self, const uint8_t *q) noexcept:
         return ra_digest64(self.ctx, q)

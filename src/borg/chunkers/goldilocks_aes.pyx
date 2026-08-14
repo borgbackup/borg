@@ -53,7 +53,7 @@ cdef extern from "goldilocks_aes_impl.h":
     void gl_free(GL_CTX *ctx)
     const char *gl_kind(const GL_CTX *ctx)
     uint64_t gl_digest64(const GL_CTX *ctx, const uint8_t *q)
-    int64_t gl_scan(GL_CTX *ctx, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
+    int64_t gl_scan(GL_CTX *ctx, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) nogil
 
 
 # --- Goldilocks field helpers (pure Python, used at chunker setup only) ---
@@ -165,7 +165,10 @@ cdef class ChunkerGoldilocksAES(ChunkerPHTE):
             self.ctx = NULL
 
     cdef int64_t _scan(self, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask) noexcept:
-        return gl_scan(self.ctx, p, n, digest, mask)
+        cdef int64_t r
+        with nogil:
+            r = gl_scan(self.ctx, p, n, digest, mask)
+        return r
 
     cdef uint64_t _digest64(self, const uint8_t *q) noexcept:
         return gl_digest64(self.ctx, q)

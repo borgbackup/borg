@@ -52,6 +52,7 @@ Usage
    usage/extract
    usage/check
    usage/list
+   usage/find
    usage/tag
    usage/rename
    usage/diff

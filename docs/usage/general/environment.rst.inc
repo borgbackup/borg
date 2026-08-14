@@ -288,6 +288,8 @@ General:
 Output formatting:
     BORG_CHECK_FORMAT
         Giving the default value for ``borg check --format=X``.
+    BORG_FIND_FORMAT
+        Giving the default value for ``borg find --format=X``.
     BORG_LIST_FORMAT
         Giving the default value for ``borg list --format=X``.
     BORG_REPO_LIST_FORMAT

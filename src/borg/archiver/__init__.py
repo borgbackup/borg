@@ -74,6 +74,7 @@ from .debug_cmd import DebugMixIn
 from .delete_cmd import DeleteMixIn
 from .diff_cmd import DiffMixIn
 from .extract_cmd import ExtractMixIn
+from .find_cmd import FindMixIn
 from .help_cmd import HelpMixIn
 from .info_cmd import InfoMixIn
 from .key_cmds import KeysMixIn
@@ -109,6 +110,7 @@ class Archiver(
     DeleteMixIn,
     DiffMixIn,
     ExtractMixIn,
+    FindMixIn,
     HelpMixIn,
     InfoMixIn,
     KeysMixIn,
@@ -301,6 +303,7 @@ class Archiver(
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)
         self.build_parser_diff(subparsers, common_parser, mid_common_parser)
         self.build_parser_extract(subparsers, common_parser, mid_common_parser)
+        self.build_parser_find(subparsers, common_parser, mid_common_parser)
         self.build_parser_help(subparsers, common_parser, mid_common_parser, parser)
         self.build_parser_info(subparsers, common_parser, mid_common_parser)
         self.build_parser_keys(subparsers, common_parser, mid_common_parser)

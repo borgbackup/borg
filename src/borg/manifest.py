@@ -120,7 +120,7 @@ class ArchivesInterface(Protocol):  # pragma: no cover
         newest=None,
         deleted=False,
     ): ...
-    def list_considering(self, args): ...
+    def list_considering(self, args, *, reverse=False): ...
     def get_one(self, match, *, match_end=r"\Z", deleted=False): ...
 
 
@@ -413,7 +413,7 @@ class Archives:
             archive_infos.reverse()
         return archive_infos
 
-    def list_considering(self, args):
+    def list_considering(self, args, *, reverse=False):
         """
         get a list of archives, considering --first/last/prefix/match-archives/sort cmdline args
         """
@@ -424,6 +424,7 @@ class Archives:
             )
         return self.list(
             sort_by=args.sort_by.split(","),
+            reverse=reverse,
             match=args.match_archives,
             first=getattr(args, "first", None),
             last=getattr(args, "last", None),

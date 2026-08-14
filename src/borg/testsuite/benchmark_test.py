@@ -29,7 +29,8 @@ def repo_url(request, tmpdir, monkeypatch):
 
 @pytest.fixture(params=["none-sha256", "aes256-ocb"])
 def repo(request, cmd_fixture, repo_url):
-    cmd_fixture(f"--repo={repo_url}", "repo-create", "--encryption", request.param)
+    ret, out = cmd_fixture(f"--repo={repo_url}", "repo-create", "--encryption", request.param)
+    assert ret == 0, out
     return repo_url
 
 
@@ -61,7 +62,8 @@ def testdata(request, tmpdir_factory):
 @pytest.fixture(params=["none", "lz4"])
 def repo_archive(request, cmd_fixture, repo, testdata):
     archive = "test"
-    cmd_fixture(f"--repo={repo}", "create", "--compression", request.param, archive, testdata)
+    ret, out = cmd_fixture(f"--repo={repo}", "create", "--compression", request.param, archive, testdata)
+    assert ret == 0, out
     return repo, archive
 
 

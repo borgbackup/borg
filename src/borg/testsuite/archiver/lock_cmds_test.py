@@ -1,4 +1,3 @@
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -6,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ...constants import *  # NOQA
-from . import cmd, generate_archiver_tests, RK_ENCRYPTION
+from . import cmd, generate_archiver_tests, RK_ENCRYPTION, borg_subprocess_env
 from ...helpers import CommandError
 from ...platformflags import is_haiku, is_win32
 
@@ -22,7 +21,7 @@ def test_break_lock(archivers, request):
 @pytest.mark.skipif(is_haiku or is_win32, reason="does not find borg python module on Haiku OS and Windows")
 def test_with_lock(tmp_path):
     repo_path = tmp_path / "repo"
-    env = os.environ.copy()
+    env = borg_subprocess_env()
     env["BORG_REPO"] = Path(repo_path).as_uri()
     # test debug output:
     print("sys.path: %r" % sys.path)

@@ -46,17 +46,33 @@ src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 
 requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
 
+# Parent directory of the borg package this testsuite belongs to. Forked ``python -m borg``
+# subprocesses get this prepended to PYTHONPATH so they run the same code as the testsuite,
+# not whatever borg happens to be installed in the environment (e.g. an editable install
+# pointing at another checkout would silently get tested instead of this source tree).
+borg_source_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+
+def borg_subprocess_env():
+    # environment for spawning ``python -m borg``, see borg_source_root above.
+    env = dict(os.environ)
+    pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = borg_source_root if not pythonpath else borg_source_root + os.pathsep + pythonpath
+    return env
+
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_output=False, **kw):
     if fork:
         try:
+            env = None
             if exe is None:
                 borg = (sys.executable, "-m", "borg")
+                env = borg_subprocess_env()
             elif isinstance(exe, str):
                 borg = (exe,)
             elif not isinstance(exe, tuple):
                 raise ValueError("exe must be None, a tuple or a str")
-            output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT, input=input)
+            output = subprocess.check_output(borg + args, stderr=subprocess.STDOUT, input=input, env=env)
             ret = 0
         except subprocess.CalledProcessError as e:
             output = e.output

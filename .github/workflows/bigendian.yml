@@ -1,0 +1,200 @@
+# Big-endian test: build and test borg on s390x (big-endian) under qemu
+# user-mode emulation, and check that a repository written on a big-endian
+# machine can be read on a little-endian one and the other way round.
+#
+# Why: borg's repository format is architecture independent and the native code
+# has explicit big-endian code paths (e.g. the __builtin_bswap64 calls in the
+# chunker kernels), but every other machine we test on is little-endian, so
+# those code paths are never executed and a bug in them would only be found by
+# the users of s390x, some ppc64 and some mips machines.
+#
+# Everything inside the container is emulated instruction by instruction, so
+# this is slow. Therefore it does not run for every pull request, but only when
+# native code or format relevant code was touched (plus weekly and on demand).
+
+name: Big-endian
+
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+    - '**.pyx'
+    - '**.pxd'
+    - 'src/borg/**/*.c'
+    - 'src/borg/**/*.h'
+    - 'src/borg/chunkers/**'
+    - 'src/borg/crypto/**'
+    - 'src/borg/repository.py'
+    - 'src/borg/repoobj.py'
+    - 'src/borg/archive.py'
+    - 'scripts/endian_interop_test.py'
+    - '.github/workflows/bigendian.yml'
+  schedule:
+    - cron: '43 5 * * 3'  # Wednesdays at 05:43 UTC
+  workflow_dispatch:      # Allow manual trigger
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  PY_COLORS: "1"
+
+jobs:
+  s390x:
+    name: s390x (big-endian, emulated)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    env:
+      # Debian trixie has python 3.13, and all our dependencies that ship binary
+      # wheels (blake3, backports-zstd, PyYAML, cffi) have s390x wheels for it -
+      # only the small C/Cython extensions are compiled (emulated) from source.
+      IMAGE: docker.io/s390x/debian:trixie-slim
+      CONTAINER: borg-s390x
+      # both sides of the interoperability test share this directory:
+      INTEROP: ${{ github.workspace }}/.interop
+      # a hung emulated test must fail instead of eating the job timeout:
+      PYTEST_TIMEOUT: "600"
+      # The endianness sensitive parts: the native code (chunkers, crypto,
+      # compression, hashindex, item) and the code that reads/writes the
+      # repository format. Extend this if it turns out to be too narrow.
+      PYTEST_TARGETS: >-
+        borg.testsuite.chunkers
+        borg.testsuite.crypto
+        borg.testsuite.compress_test
+        borg.testsuite.hashindex_test
+        borg.testsuite.item_test
+        borg.testsuite.repoobj_test
+        borg.testsuite.repository_test
+        borg.testsuite.archive_test
+        borg.testsuite.helpers.msgpack_test
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        # same python version as in the container, so both sides are comparable
+        python-version: '3.13'
+
+    # The wheels pip has to build from source inside the emulated container
+    # (msgpack, argon2-cffi-bindings, borghash, borgstore) are the expensive
+    # part of the container setup, so keep them from run to run.
+    - name: Cache pip-built wheels (s390x)
+      uses: actions/cache@v6
+      with:
+        path: .pip-cache-s390x
+        key: s390x-pip-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          s390x-pip-
+
+    - name: Install Linux packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev
+
+    - name: Build borg (native, little-endian)
+      run: |
+        set -euxo pipefail
+        # Note: a non-editable install on purpose - the s390x build below uses
+        # the same source tree and an editable install would put the extension
+        # modules of one architecture in there for the other one to pick up.
+        python -m venv "$RUNNER_TEMP/venv-native"
+        "$RUNNER_TEMP/venv-native/bin/pip" install --upgrade pip wheel
+        # Note: no pytest and no other development dependencies in this venv on
+        # purpose - this is what a normal borg installation looks like.
+        "$RUNNER_TEMP/venv-native/bin/pip" install .
+        "$RUNNER_TEMP/venv-native/bin/borg" --version
+        "$RUNNER_TEMP/venv-native/bin/python" -c 'import sys; assert sys.byteorder == "little", sys.byteorder'
+        # the container has no git, so tell setuptools-scm the version we got here:
+        echo "BORG_VERSION=$("$RUNNER_TEMP/venv-native/bin/borg" --version | cut -d' ' -f2)" >> $GITHUB_ENV
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: s390x
+
+    - name: Start the s390x container
+      run: |
+        set -euxo pipefail
+        mkdir -p .pip-cache-s390x
+        docker run -d --name "$CONTAINER" --platform linux/s390x \
+          -v "${{ github.workspace }}:/borg" -w /borg \
+          -e PIP_CACHE_DIR=/borg/.pip-cache-s390x \
+          -e SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BORGBACKUP="$BORG_VERSION" \
+          -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+          "$IMAGE" sleep infinity
+        # if this says anything but s390x, the emulation did not kick in:
+        test "$(docker exec "$CONTAINER" uname -m)" = "s390x"
+
+    - name: Build borg (s390x, big-endian)
+      run: |
+        docker exec -i "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          python3 python3-dev python3-venv \
+          build-essential pkg-config libssl-dev libacl1-dev liblz4-dev
+        python3 -c 'import sys; assert sys.byteorder == "big", sys.byteorder; print("byteorder:", sys.byteorder)'
+        python3 -m venv /venv
+        /venv/bin/pip install --upgrade pip wheel
+        /venv/bin/pip install pytest pytest-xdist pytest-benchmark pytest-timeout
+        /venv/bin/pip install /borg
+        /venv/bin/borg --version
+        chown -R "$HOST_UID:$HOST_GID" /borg/.pip-cache-s390x
+        EOF
+
+    - name: Run the endianness sensitive tests on s390x
+      run: |
+        docker exec -i \
+          -e PYTEST_TARGETS="$PYTEST_TARGETS" \
+          -e PYTEST_TIMEOUT="$PYTEST_TIMEOUT" \
+          -e PY_COLORS="$PY_COLORS" \
+          "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        # run against the installed borg, not against the source tree:
+        cd /tmp
+        /venv/bin/python -m pytest -v -n4 -rs --benchmark-skip --pyargs $PYTEST_TARGETS
+        EOF
+
+    - name: Write test data and a repository on s390x
+      run: |
+        set -euxo pipefail
+        "$RUNNER_TEMP/venv-native/bin/python" scripts/endian_interop_test.py testdata "$INTEROP"
+        docker exec -i -e INTEROP=/borg/.interop "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        BORG=/venv/bin/borg /venv/bin/python /borg/scripts/endian_interop_test.py write "$INTEROP" be
+        chown -R "$HOST_UID:$HOST_GID" "$INTEROP"
+        EOF
+
+    - name: Read the s390x repository on x86_64 (and write to it)
+      run: |
+        set -euxo pipefail
+        export BORG="$RUNNER_TEMP/venv-native/bin/borg"
+        PY="$RUNNER_TEMP/venv-native/bin/python"
+        $PY scripts/endian_interop_test.py verify "$INTEROP" be --as le
+        $PY scripts/endian_interop_test.py write "$INTEROP" le
+        $PY scripts/endian_interop_test.py compare "$INTEROP" be le
+
+    - name: Read the x86_64 archives on s390x
+      run: |
+        docker exec -i -e INTEROP=/borg/.interop "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        BORG=/venv/bin/borg /venv/bin/python /borg/scripts/endian_interop_test.py verify "$INTEROP" le --as be
+        chown -R "$HOST_UID:$HOST_GID" "$INTEROP"
+        EOF
+
+    - name: Stop the s390x container
+      if: ${{ always() }}
+      run: docker rm -f "$CONTAINER" || true

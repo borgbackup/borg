@@ -764,15 +764,24 @@ class HelpMixIn:
                 0 means "always multi-threaded", a very large value effectively disables multi-threading.
             BORG_ZSTD_MT_WORKERS
                 When set to a numeric value, use that many threads to zstd-compress a single chunk
-                (default: the cpu count). 0 or 1 means single-threaded compression.
+                (default: the cpu count, but at most 4). 0 or 1 means single-threaded compression.
                 Only relevant when compressing with ``zstd``.
                 Chunks below 768KiB are always compressed single-threaded: libzstd will not use a
                 compression job smaller than 512KiB, so a small chunk gets split very unevenly and
                 multi-threading it would be slower than not doing it at all.
+                The default is capped at 4 because a chunk of the size the default chunker aims at
+                (2MiB) splits into just 4 such jobs: threads beyond that get (nearly) no work, but
+                the whole thread pool is created again for every chunk. Measured on a 12-core
+                machine, 4 threads beat 12 on every test corpus at the default ``zstd,-4``
+                (+13% .. +37%). Raising the value only pays off if you configured the chunker
+                for much bigger chunks. ``borg export-tar`` compresses one long stream instead of
+                separate chunks and always defaults to the cpu count.
                 Multi-threading trades a little compression ratio for speed (measured at ``zstd,3``:
                 +0.05% archive size for 1MiB chunks, +0.64% for 8MiB ones, more at higher levels), and
                 it uses more cpu time in total to reduce the wallclock time. Set it to 1 if you would
                 rather have the smaller archive, or if borg has to share the cpu with other work.
+                Single-threaded can even be faster on data zstd races through anyway, e.g.
+                already-compressed/incompressible data or long-repeat data like VM images.
             BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
                 Select the scan kernel the ``fastcdc`` / ``buzhash64`` chunker uses (default:
                 ``scalar``, the plain sequential loop). Accepted values are ``avx512``, ``avx2``,

@@ -53,17 +53,30 @@ ZSTD_JOB_SIZE_MIN = 512 * 1024
 # 768KiB (= 1.5 jobs) keeps some margin over break-even, as the overhead is machine dependent.
 ZSTD_MT_MIN_SIZE = 768 * 1024
 
-_zstd_mt_workers = None
+_zstd_mt_workers = None  # cached (chunk workers, stream workers)
 
 
-def get_zstd_mt_workers():
-    """How many threads libzstd may use to compress a single chunk.
+def get_zstd_mt_workers(stream=False):
+    """How many threads libzstd may use to compress a single chunk (or stream).
 
-    Defaults to the cpu count, BORG_ZSTD_MT_WORKERS overrides it. 0 or 1 means
-    single-threaded compression, which also avoids the small loss of compression ratio
-    that splitting a chunk into jobs causes (measured at zstd,3: +0.05% for a 1MiB chunk,
-    +0.64% for an 8MiB one; higher levels lose a bit more as they rely on longer match
-    history).
+    BORG_ZSTD_MT_WORKERS overrides the defaults below (for chunks and streams alike).
+    0 or 1 means single-threaded compression, which also avoids the small loss of
+    compression ratio that splitting a chunk into jobs causes (measured at zstd,3:
+    +0.05% for a 1MiB chunk, +0.64% for an 8MiB one; higher levels lose a bit more as
+    they rely on longer match history).
+
+    For chunks (stream=False), the default is the cpu count, but at most 4: a chunk
+    only yields ceil(size / ZSTD_JOB_SIZE_MIN) jobs - 4 for the 2 MiB chunks the
+    default chunker aims at - so threads beyond that get (nearly) no work, while the
+    whole thread pool is still created and torn down again for every single chunk.
+    Measured on a 12-core machine, 4 workers beat 12 on every corpus tested at the
+    default zstd,-4, by +13% (source code) .. +37% (VM image) big-chunk throughput;
+    higher levels showed smaller differences, but no clear win for 12 anywhere.
+    Raise the value if you configured the chunker for much bigger chunks.
+
+    For long streams (stream=True, used by export-tar), the default is the cpu count:
+    one pool with libzstd's default (large) job size compresses the whole stream, so
+    there are enough jobs and the pool overhead is paid only once.
 
     This is called for every chunk, so the result is cached. The env var is evaluated on
     first use rather than at import time, so that an invalid value is reported via borg's
@@ -72,17 +85,19 @@ def get_zstd_mt_workers():
     global _zstd_mt_workers
     if _zstd_mt_workers is None:
         value = os.environ.get("BORG_ZSTD_MT_WORKERS")
+        cpus = os.cpu_count() or 1
         if value is None:
-            workers = os.cpu_count() or 1
+            workers = (min(cpus, 4), cpus)
         else:
             try:
-                workers = int(value)
+                configured = int(value)
             except ValueError:
                 raise Error(f"BORG_ZSTD_MT_WORKERS must be an integer, but is: {value!r}") from None
-            if workers < 0:
-                raise Error(f"BORG_ZSTD_MT_WORKERS must not be negative, but is: {workers}")
+            if configured < 0:
+                raise Error(f"BORG_ZSTD_MT_WORKERS must not be negative, but is: {configured}")
+            workers = (configured, configured)
         _zstd_mt_workers = workers
-    return _zstd_mt_workers
+    return _zstd_mt_workers[1 if stream else 0]
 
 cdef extern from "lz4.h":
     int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil

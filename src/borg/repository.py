@@ -1195,8 +1195,6 @@ class Repository:
             # run: sig_int breaks the loop early, so "no pack errors" must be paired with "all packs
             # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs.
             if index_errors and pack_errors == 0 and not sig_int and pack_files == len(pack_infos):
-                from .cache import build_chunkindex_from_repo
-
                 # the exclusive check lock keeps the pack set fixed, so re-listing packs/ inside
                 # build_chunkindex_from_repo matches this verification. write_immediately persists the
                 # index and drops the corrupt fragments.
@@ -1240,7 +1238,7 @@ class Repository:
             logger.info(f"{done} {mode} repository check, no problems found{so_far}.")
         elif not repair:
             logger.error(f"{done} {mode} repository check, errors found{so_far}.")
-        elif index_repaired and not (pack_errors or corrupt_ids):
+        elif index_repaired and not (pack_errors or corrupt_ids or missing_pack_ids):
             # the index was the only problem and it has been rebuilt from the packs.
             logger.info(f"{done} {mode} repository check, repaired{so_far}.")
         elif pack_errors or corrupt_ids:
@@ -1253,16 +1251,19 @@ class Repository:
                 # a full check's archives phase reads archive/item metadata (and file content with
                 # --verify-data), so it repairs a corrupt pack holding such objects; warn rather than fail.
                 logger.warning(f"{done} {mode} repository check, corrupt pack(s) found{so_far}.")
-        else:
+        elif index_errors and not index_repaired:
             # the index is corrupt but was not rebuilt, e.g. the pack verification was interrupted
             # before every pack was confirmed intact; the corrupt index is left in place.
             logger.error(f"{done} {mode} repository check, index still corrupt{so_far}.")
-        # in repair mode a corrupt index left unrebuilt is a failure; a corrupt pack fails only a
-        # repository-only run, while a full check defers it to the archives phase.
+        else:
+            # index-referenced packs are missing, so their chunks are lost.
+            logger.error(f"{done} {mode} repository check, errors found{so_far}.")
+        # in repair mode a corrupt index left unrebuilt is a failure; a corrupt or missing pack fails
+        # only a repository-only run, while a full check defers it to the archives phase.
         if repair:
             if index_errors and not index_repaired:
                 return False
-            return not (repo_only and (pack_errors or corrupt_ids))
+            return not (repo_only and (pack_errors or corrupt_ids or missing_pack_ids))
         return not problems
 
     def list(self, limit=None, marker=None):

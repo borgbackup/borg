@@ -761,6 +761,15 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
     def delete_segment(self, segment):
         self.repository.io.delete_segment(segment)
 
+    def delete_segment_dir(self, segment_dir):
+        shutil.rmtree(os.path.join(self.tmppath, 'repository', 'data', str(segment_dir)))
+
+    def set_segments_per_dir(self, segments_per_dir):
+        # note: only call this on a repository that does not have any segment files yet.
+        self.repository.config.set('repository', 'segments_per_dir', str(segments_per_dir))
+        self.repository.save_config(self.repository.path, self.repository.config)
+        self.reopen()
+
     def delete_index(self):
         os.unlink(os.path.join(self.tmppath, 'repository', f'index.{self.get_head()}'))
 
@@ -795,6 +804,31 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.repository.rollback()
         self.check(repair=True, status=True)
         self.assert_equal({1, 2, 3}, self.list_objects())
+
+    def test_missing_segment_file(self):
+        # a segment file the (still valid) repository index refers to is gone, e.g. because a
+        # filesystem check removed it. borg must tell what is wrong instead of crashing with a
+        # FileNotFoundError traceback, see #3225.
+        self.add_objects([[1, 2, 3], [4, 5, 6]])
+        self.delete_segment(2)  # the segment file with objects 4, 5, 6 in it
+        self.assert_raises(IntegrityError, lambda: self.get_objects(4))
+
+    def test_repair_missing_segment_dir(self):
+        # the segment dir borg needs to write a segment file into is gone, e.g. because a
+        # filesystem check removed it. borg must re-create it instead of crashing with a
+        # FileNotFoundError traceback, see #3225.
+        self.set_segments_per_dir(3)  # so the segments of this test are spread over multiple dirs
+        self.add_objects([[1, 2, 3], [4, 5, 6]])  # segments 0, 2: data, segments 1, 3: commits
+        # break the commit tag in segment 1 and remove data/1 (which has the commit segment 3 in
+        # it), so no valid commit is left and check --repair has to write a commit tag to segment
+        # 4 - which belongs into the removed data/1 dir.
+        with open(os.path.join(self.tmppath, 'repository', 'data', '0', '1'), 'r+b') as fd:
+            fd.seek(-1, os.SEEK_END)
+            fd.write(b'X')
+        self.delete_segment_dir(1)
+        self.check(repair=True, status=True)
+        self.check(status=True)
+        self.assert_equal({1, 2, 3, 4, 5, 6}, self.list_objects())
 
     def test_repair_missing_commit_segment(self):
         self.add_objects([[1, 2, 3], [4, 5, 6]])
@@ -1053,6 +1087,14 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
         pass
 
     def test_repair_missing_segment(self):
+        # skip this test, files in RemoteRepository cannot be deleted
+        pass
+
+    def test_missing_segment_file(self):
+        # skip this test, files in RemoteRepository cannot be deleted
+        pass
+
+    def test_repair_missing_segment_dir(self):
         # skip this test, files in RemoteRepository cannot be deleted
         pass
 

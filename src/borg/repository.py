@@ -1470,11 +1470,13 @@ class LoggedIO:
                 raise self.SegmentFull
             self.close_segment()
         if not self._write_fd:
-            if self.segment % self.segments_per_dir == 0:
-                dirname = os.path.join(self.path, 'data', str(self.segment // self.segments_per_dir))
-                if not os.path.exists(dirname):
-                    os.mkdir(dirname)
-                    sync_dir(os.path.join(self.path, 'data'))
+            # usually the segment dir already exists, but it does not when we start a new one and
+            # it also might be missing in a damaged repository (e.g. after a filesystem issue),
+            # so always check for it rather than only for the first segment of a dir, see #3225.
+            dirname = os.path.join(self.path, 'data', str(self.segment // self.segments_per_dir))
+            if not os.path.exists(dirname):
+                os.makedirs(dirname, exist_ok=True)
+                sync_dir(os.path.join(self.path, 'data'))
             self._write_fd = SyncFile(self.segment_filename(self.segment), binary=True)
             self._write_fd.write(MAGIC)
             self.offset = MAGIC_LEN
@@ -1492,7 +1494,16 @@ class LoggedIO:
         now = time.monotonic()
 
         def open_fd():
-            fd = open(self.segment_filename(segment), 'rb')
+            filename = self.segment_filename(segment)
+            try:
+                fd = open(filename, 'rb')
+            except FileNotFoundError:
+                # the repository is damaged: something (or somebody) removed a segment file that
+                # the repository index still refers to. give a clear error instead of a
+                # FileNotFoundError traceback, see #3225.
+                raise IntegrityError(f'Segment file {filename} is missing. '
+                                     'Run borg check (full check, not --archives-only) '
+                                     'and then borg check --repair to fix the repository.') from None
             self.fds[segment] = (now, fd)
             return fd
 

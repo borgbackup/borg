@@ -1132,6 +1132,53 @@ def test_check_repair_refuses_when_pack_corrupt(tmp_path):
         assert repository.check(repair=False) is False  # index was not rebuilt; still corrupt
 
 
+def test_check_repair_leaves_index_when_interrupted(tmp_path, caplog, monkeypatch):
+    # an interrupted repair (SIGINT before every pack is verified) must not rebuild the index from
+    # packs it did not confirm intact: it leaves the corrupt index in place and fails.
+    location = os.fspath(tmp_path / "repo")
+    ids = [H(x) for x in range(10)]
+    with Repository(location, exclusive=True, create=True) as repository:
+        for i, cid in enumerate(ids):
+            repository.put(cid, fchunk(bytes([i]) * 20, chunk_id=cid))
+        repository.flush()  # seal the pack(s) and let close() persist the index
+    with reopen(repository) as repository:
+        for info in repository.store_list("index"):  # rot every fragment so repair takes the rebuild path
+            name = f"index/{info.name}"
+            data = bytearray(repository.store_load(name))
+            data[0] ^= 0xFF
+            repository.store_store(name, bytes(data))
+    with reopen(repository) as repository:
+        monkeypatch.setattr("borg.repository.sig_int", True)  # simulate a SIGINT before the pack loop
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert repository.check(repair=True) is False  # interrupted: index not rebuilt, so it fails
+        assert "index still corrupt" in caplog.text
+    with reopen(repository) as repository:
+        assert repository.check(repair=False) is False  # repair left the index corrupt
+
+
+def test_check_repair_reports_missing_pack_as_error(tmp_path, caplog):
+    # a repair with an intact index but a pack the index references missing from packs/ reports the
+    # loss and fails a repository-only run; a full check defers it to the archives phase (refs #9898,
+    # #8572).
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()  # flush before close persists the index
+    with reopen(repository) as repository:
+        pack_id = repository.chunks[H(0)].pack_id
+        repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
+    with reopen(repository) as repository:
+        # a repository-only repair cannot recover the lost chunks, so it fails and reports the error.
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert repository.check(repair=True, repo_only=True) is False
+        assert f"Missing pack: {bin_to_hex(pack_id)}" in caplog.text
+        assert "errors found" in caplog.text
+    with reopen(repository) as repository:
+        # a full check defers the missing pack to the archives phase, so the repository phase passes.
+        assert repository.check(repair=True, repo_only=False) is True
+
+
 def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):
     # check warns about an invalid chunk index but does not fail, since the index is not part of
     # the repository's object integrity.

@@ -531,22 +531,29 @@ Checklist:
 - Optional: run tox and/or binary builds on all supported platforms via vagrant,
   check for test failures. This is now optional as we do platform testing and
   binary building on GitHub.
-- Create sdist, sign it, upload release to (test) PyPi:
+- When GitHub CI looks good on the release PR, merge it and push the release tag.
 
-  ::
+  Pushing the tag makes CI build the standalone binaries and then release:
+  the ``release`` job (``.github/workflows/release.yml``) builds the sdist,
+  checks that it can be installed, attests its provenance and drafts the GitHub
+  release with the sdist and all standalone binaries attached. The ``pypi`` job
+  then uploads the sdist to PyPI.
+
+  If the ``pypi`` environment has required reviewers configured, the upload to
+  PyPI waits for an approval - that is the last chance to stop it. Also watch
+  out for a warning while the release is drafted: it means that a binary is
+  missing because its build did not succeed.
+- Sign the sdist and add the signature to the drafted GitHub release::
 
     scripts/sdist-sign X.Y.Z
-    scripts/upload-pypi X.Y.Z test
-    scripts/upload-pypi X.Y.Z
 
   Note: the signature is not uploaded to PyPi any more, but we upload it to
   github releases.
-- When GitHub CI looks good on the release PR, merge it and then check "Actions":
-  GitHub will create binary assets after the release PR is merged within the
-  CI testing of the merge. Check the "Upload binaries" step on Ubuntu (AMD/Intel
-  and ARM64) and macOS (Intel and ARM64), fetch the ZIPs with the binaries.
-- Unpack the ZIPs and test the binaries, upload the binaries to the GitHub
-  release page (borg-OS-SPEC-ARCH-gh and borg-OS-SPEC-ARCH-gh.tgz).
+- Download the binaries from the drafted release and test them. For macOS
+  binaries **with** FUSE support, document the macFUSE version in the release
+  notes: macFUSE uses a kernel extension that needs to be compatible with the
+  code contained in the binary.
+- Review the release notes and publish the drafted GitHub release.
 
 - Close the release milestone on GitHub.
 - `Update borgbackup.org
@@ -557,13 +564,3 @@ Checklist:
   - Mailing list.
   - Mastodon / BlueSky / X (aka Twitter).
   - IRC channel (change ``/topic``).
-
-- Create a GitHub release, include:
-
-  - pypi dist package and signature
-  - Standalone binaries (see above for how to create them).
-
-    - For macOS binaries **with** FUSE support, document the macFUSE version
-      in the README of the binaries. macFUSE uses a kernel extension that needs
-      to be compatible with the code contained in the binary.
-  - A link to ``CHANGES.rst``.

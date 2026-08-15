@@ -685,6 +685,11 @@ jobs:
     timeout-minutes: 90
     needs: [lint]
 
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
     env:
       MSYS2_ARG_CONV_EXCL: "*"
       MSYS2_ENV_CONV_EXCL: "*"
@@ -738,10 +743,36 @@ jobs:
           # build sdist and wheel in dist/...
           python -m build
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      # Same layout and naming as the binaries of the other platforms, so that
+      # the release job picks this up as a release asset, too. The single-file
+      # binary keeps its .exe extension - Windows needs it to run the file.
+      - name: Prepare binaries (borg-windows-x86_64-gh)
+        run: |
+          pushd dist/binary
+          echo "single-file binary"
+          ./borg.exe -V
+          echo "single-directory binary"
+          ./borg-dir/borg.exe -V
+          tar czf borg.tgz borg-dir
+          popd
+          mkdir -p artifacts
+          cp dist/binary/borg.exe artifacts/borg-windows-x86_64-gh.exe
+          cp dist/binary/borg.tgz artifacts/borg-windows-x86_64-gh.tgz
+          echo "binary files"
+          ls -l artifacts/
+
+      - name: Attest binaries provenance (borg-windows-x86_64-gh)
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
-          name: borg-windows
-          path: dist/binary/borg.exe
+          subject-path: 'artifacts/*'
+
+      - name: Upload binaries (borg-windows-x86_64-gh)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: borg-windows-x86_64-gh
+          path: artifacts/*
+          if-no-files-found: error
 
       - name: Run tests
         run: |
@@ -774,3 +805,61 @@ jobs:
           report_type: coverage
           env_vars: OS,python
           files: coverage.xml
+
+  release:
+    # Build the sdist and draft the GitHub release with the binaries the jobs
+    # above built for this tag, see .github/workflows/release.yml.
+    #
+    # vm_tests is continue-on-error (a flaky BSD VM must not stop a release), so
+    # this waits for it, but only requires native_tests to have succeeded. A
+    # binary that did not get built is warned about while drafting the release.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') && needs.native_tests.result == 'success' }}
+    needs: [native_tests, vm_tests]
+
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    uses: ./.github/workflows/release.yml
+
+  pypi:
+    # Upload the sdist the release job built to PyPI.
+    #
+    # This job can not live in release.yml with the rest of the release code:
+    # PyPI trusted publishing does not work from a reusable workflow, see
+    # https://docs.pypi.org/trusted-publishers/troubleshooting/
+    #
+    # One-time setup, so that no API token has to be stored anywhere:
+    #  - on pypi.org, add a trusted publisher to the "borgbackup" project:
+    #    owner "borgbackup", repository "borg", workflow "ci.yml",
+    #    environment "pypi".
+    #  - create the "pypi" environment in the repository settings. Configuring
+    #    required reviewers for it makes this (irreversible) upload wait for an
+    #    approval, which is the last chance to stop a release.
+    if: ${{ startsWith(github.ref, 'refs/tags/') && needs.release.result == 'success' }}
+    needs: [release]
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/borgbackup/
+
+    permissions:
+      contents: read
+      id-token: write  # trusted publishing
+
+    steps:
+    - name: Get the sdist built by the release job
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      with:
+        name: sdist
+        path: dist
+
+    - name: What we are about to upload
+      run: ls -l dist/
+
+    - name: Upload to PyPI
+      uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2

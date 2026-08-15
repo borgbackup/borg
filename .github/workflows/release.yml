@@ -1,0 +1,171 @@
+# Release automation: build the source distribution, publish it to PyPI and
+# create a GitHub release with the standalone binaries.
+#
+# This is called by ci.yml when a tag is pushed, and it deliberately runs as
+# part of that same workflow run: that is where the binaries for the tag are
+# built, and artifacts can only be downloaded within the run that created them.
+#
+# The GitHub release is created as a *draft* on purpose:
+#  - the release notes want a human,
+#  - the detached GPG signature of the sdist can only be made locally
+#    (scripts/sdist-sign), so it has to be added by hand,
+#  - and the binaries should be tried out before the release becomes visible.
+# Publishing the draft is a single click in the GitHub UI.
+#
+# The upload to PyPI is *not* done here, but by the "pypi" job in ci.yml: PyPI
+# trusted publishing can not be used from a reusable workflow, see
+# https://docs.pypi.org/trusted-publishers/troubleshooting/ - so that job has to
+# live in a workflow that is triggered by an event. This job hands the sdist
+# over to it as a workflow artifact.
+
+name: Release
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # The standalone binaries expected for a release: for every platform the
+  # single-file binary and, as a .tgz, the single-directory variant.  See the
+  # "binary" entries of the native_tests matrix, the "artifact_prefix" entries
+  # of the vm_tests matrix and the windows_tests job in ci.yml - keep in sync.
+  EXPECTED_ASSETS: >-
+    borg-linux-glibc239-x86_64-gh
+    borg-linux-glibc239-x86_64-gh.tgz
+    borg-linux-glibc239-arm64-gh
+    borg-linux-glibc239-arm64-gh.tgz
+    borg-macos-15-arm64-gh
+    borg-macos-15-arm64-gh.tgz
+    borg-macos-15-x86_64-gh
+    borg-macos-15-x86_64-gh.tgz
+    borg-freebsd-15-x86_64-gh
+    borg-freebsd-15-x86_64-gh.tgz
+    borg-windows-x86_64-gh.exe
+    borg-windows-x86_64-gh.tgz
+
+jobs:
+  github_release:
+    name: Draft the GitHub release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    permissions:
+      contents: write      # to create the release
+      id-token: write      # to attest the sdist
+      attestations: write
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version: '3.13'
+
+    - name: Install Linux packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev
+
+    - name: Build the sdist
+      run: |
+        set -euxo pipefail
+        python -m pip install --upgrade pip build twine
+        # only a sdist: we do not publish wheels, they would be platform specific.
+        python -m build --sdist
+        twine check dist/*
+        ls -l dist/
+
+    - name: Check that the sdist is complete and installable
+      # A release that cannot be installed from PyPI is the worst kind of
+      # release, and nothing else in CI ever installs borg from a sdist or
+      # without the development requirements.
+      run: |
+        set -euxo pipefail
+        python -m venv "$RUNNER_TEMP/venv-sdist"
+        "$RUNNER_TEMP/venv-sdist/bin/pip" install --upgrade pip
+        "$RUNNER_TEMP/venv-sdist/bin/pip" install dist/borgbackup-*.tar.gz
+        "$RUNNER_TEMP/venv-sdist/bin/borg" --version
+        "$RUNNER_TEMP/venv-sdist/bin/borg" --help > /dev/null
+
+    - name: Attest the sdist provenance
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+      with:
+        subject-path: 'dist/*.tar.gz'
+
+    - name: Download the binaries built for this tag
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      with:
+        path: assets
+        # the binary artifacts are all named like the binaries they contain
+        pattern: 'borg-*-gh'
+        merge-multiple: true
+
+    - name: Check that no binary is missing
+      run: |
+        set -uo pipefail
+        ls -l assets/ || true
+        missing=""
+        for asset in $EXPECTED_ASSETS; do
+          test -f "assets/$asset" || missing="$missing $asset"
+        done
+        if [ -n "$missing" ]; then
+          # not an error: vm_tests is continue-on-error, so e.g. a flaky FreeBSD
+          # VM should not stop the release - but do not lose it silently either.
+          echo "::warning::binaries missing from this release:$missing"
+        fi
+
+    - name: Create the draft release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ github.ref_name }}
+      run: |
+        set -euxo pipefail
+        # 2.0.0b23 and friends are pre-releases, 2.1.0 is not.
+        prerelease=""
+        case "$TAG" in *a*|*b*|*rc*) prerelease="--prerelease" ;; esac
+        cat > release-notes.md <<EOF
+        See the [changelog](https://github.com/borgbackup/borg/blob/$TAG/CHANGES.rst) for what changed in this release.
+
+        ### Installation
+
+        \`pip install borgbackup==$TAG\`, or use one of the standalone binaries below - they
+        contain everything they need and just have to be made executable.
+
+        For each platform there is a single-file binary (\`borg-*-gh\`, \`.exe\` on Windows)
+        and, as a \`.tgz\`, the same thing as a directory (\`borg-dir/borg.exe\`), which
+        starts up faster.
+
+        The macOS binaries are built **with** FUSE support: \`borg mount\` needs a macFUSE
+        version that is compatible with the one they were built against.
+
+        All release assets have a [build provenance attestation](https://github.com/borgbackup/borg/attestations),
+        verifiable with \`gh attestation verify --owner borgbackup <file>\`.
+        EOF
+        mkdir -p assets  # there may not have been any artifact to download
+        if gh release view "$TAG" > /dev/null 2>&1; then
+          # a re-run of this job: keep the (possibly already edited) release and
+          # just replace its assets.
+          gh release upload "$TAG" --clobber dist/*.tar.gz $(find assets -type f | sort)
+        else
+          gh release create "$TAG" \
+            --draft $prerelease \
+            --title "borg $TAG" \
+            --notes-file release-notes.md \
+            dist/*.tar.gz $(find assets -type f | sort)
+        fi
+        gh release view "$TAG" --json isDraft,isPrerelease,assets
+
+    - name: Keep the sdist for the PyPI upload
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: sdist
+        path: dist/*.tar.gz
+        if-no-files-found: error

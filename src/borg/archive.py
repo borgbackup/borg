@@ -23,7 +23,7 @@ logger = create_logger()
 
 from . import xattr
 from .chunkers import get_chunker, Chunk, release_chunk_data
-from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_from_repo
+from .cache import ChunkListEntry, build_chunkindex_from_repo, write_chunkindex_to_repo
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -1865,6 +1865,9 @@ class ArchiveChecker:
     def __init__(self):
         self.error_found = False
         self.key = None
+        # True once repair drops a defect chunk or writes a new one, i.e. once the chunks index no
+        # longer matches the packs.
+        self.chunks_modified = False
 
     def check(
         self,
@@ -2062,6 +2065,7 @@ class ArchiveChecker:
                         # keeping the other chunks. update_index=False: finish() rebuilds the index from
                         # the rewritten packs anyway, so a per-chunk full index write would be wasted.
                         self.repository.delete(defect_chunk, update_index=False)
+                        self.chunks_modified = True
                         # drop it from our own index too, so rebuild_archives reports the file it belongs to.
                         del self.chunks[defect_chunk]
                     else:
@@ -2218,6 +2222,7 @@ class ArchiveChecker:
                 if self.repair:
                     pack_results = self.repository.put(id_, cdata)
                     self.chunks.update_pack_info(pack_results)
+                    self.chunks_modified = True
 
         def verify_file_chunks(archive_name, item):
             """Verify that all of a file's chunks are present, collecting any missing ones for the report."""
@@ -2431,13 +2436,22 @@ class ArchiveChecker:
 
     def finish(self):
         if self.repair:
-            # store packs still buffered from chunks re-added during repair, so their index entries
-            # are set before the index is dropped below and no chunk is left buffered at close().
+            # flush chunks re-added during repair so their packs are on the store and out of the pack
+            # writer buffer (close() requires an empty buffer, #10055) before we (re)build the index.
             self.repository.flush()
-            # we may have deleted chunks. delete_chunkindex_from_repo() removes the on-disk index and
-            # drops the stale in-memory index, so the next repository access rebuilds it from the repo.
-            logger.info("Deleting chunk indexes in repository - next repository access will cause a rebuild.")
-            delete_chunkindex_from_repo(self.repository)
+            if self.chunks_modified:
+                # the packs changed, so the index no longer matches them: rebuild it from the packs
+                # and persist it.
+                logger.info("Rebuilding and writing the repository chunks index.")
+                build_chunkindex_from_repo(self.repository, slow_rebuild=True, write_immediately=True)
+            else:
+                # the packs are unchanged, so the index still matches them: persist it as is.
+                logger.info("Writing the rebuilt repository chunks index.")
+                write_chunkindex_to_repo(
+                    self.repository, self.chunks, incremental=False, clear=False, force_write=True, delete_other=True
+                )
+            # drop the in-memory index so close() does not persist it over the index just written.
+            self.repository.invalidate_chunk_index()
             logger.info("Writing Manifest.")
             self.manifest.write()
 

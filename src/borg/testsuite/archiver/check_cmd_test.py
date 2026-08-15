@@ -594,6 +594,36 @@ def test_spoofed_manifest(archivers, request):
     cmd(archiver, "check", exit_code=0)
 
 
+def test_check_repair_rebuilds_corrupt_index(archivers, request):
+    # A corrupt index with all packs intact: the default (full) --repair rebuilds the index from the
+    # packs and persists it (via the archives check, see ArchiveChecker.finish), leaving the repository
+    # usable again without a slow rebuild on the next access.
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        assert isinstance(repository, Repository)
+        for info in repository.store_list("index"):  # rot every index fragment
+            name = f"index/{info.name}"
+            data = bytearray(repository.store_load(name))
+            data[0] ^= 0xFF
+            repository.store_store(name, bytes(data))
+    cmd(archiver, "check", exit_code=1)  # read-only check reports the corrupt index
+    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+    assert "rebuilt" in output.lower()
+    # item 6: repair persisted a fresh index instead of leaving it for a slow rebuild on the next
+    # access. confirm the on-disk index exists and every fragment is intact.
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        index_infos = list(repository.store_list("index"))
+        assert index_infos  # a fresh index was persisted
+        for info in index_infos:  # each fragment's content still matches its sha256 name
+            assert repository.store.hash(f"index/{info.name}") == info.name
+    cmd(archiver, "check", exit_code=0)  # the repository is consistent again
+    assert "archive1" in cmd(archiver, "repo-list")  # and remains usable
+
+
 @pytest.mark.skip(reason="TODO: repair does not yet rewrite store-corrupted packs, refs #8572")
 def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
@@ -689,7 +719,7 @@ def test_extra_chunks(archivers, request):
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):
-    """finish() stores chunks re-added during --repair before it drops the index (#10055).
+    """finish() stores chunks re-added during --repair before it (re)builds the index (#10055).
 
     close() asserts an empty pack writer buffer, so a chunk left buffered by finish() would
     trip it.
@@ -706,6 +736,8 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.repository = repository
         checker.key = checker.make_key(repository)
         checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
+        # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
+        checker.chunks_modified = True
 
         # a chunk re-added during repair, buffered in the pack writer:
         key = b"01234567890123456789012345678901"

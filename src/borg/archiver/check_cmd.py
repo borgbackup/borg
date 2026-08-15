@@ -78,7 +78,9 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
-            if not repository.check(repair=args.repair, max_duration=args.max_duration, max_age=max_age):
+            if not repository.check(
+                repair=args.repair, max_duration=args.max_duration, max_age=max_age, repo_only=args.repo_only
+            ):
                 set_ec(EXIT_WARNING)
             if sig_int:  # repository check interrupted; skip the archive check
                 raise Error("Got Ctrl-C / SIGINT.")
@@ -232,8 +234,11 @@ class CheckMixIn:
 
         In practice, repair mode hooks into both the repository and archive checks:
 
-        1. When checking the repository's consistency, repair mode removes corrupted
-           objects from the repository after it did a 2nd try to read them correctly.
+        1. When checking the repository's consistency, repair mode rebuilds the repository
+           index from the packs if the index is corrupt, provided every pack is intact. If
+           any pack is corrupt, the repository check leaves the index and the packs untouched
+           and reports the corruption; salvaging a corrupt pack's still-intact objects is not
+           implemented yet (refs #8572).
 
         2. When checking the consistency and correctness of archives, repair mode might
            remove whole archives from the manifest if their archive metadata chunk is

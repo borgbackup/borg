@@ -50,7 +50,7 @@ from .manifest import Manifest
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from . import platform
-from .platform import acl_get, acl_set, set_flags, get_flags, swidth
+from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
 from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
 
@@ -1096,44 +1096,23 @@ Duration: {0.duration}
                 warning = xattr.set_all(fd or path, item.xattrs, follow_symlinks=False)
                 if warning:
                     set_ec(EXIT_WARNING)
-            # set timestamps rather late
-            mtime = item.mtime
-            atime = item.atime if "atime" in item else mtime
-            if "birthtime" in item:
-                birthtime = item.birthtime
-                try:
-                    # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
-                    # See utimes(2) on either of the BSDs for details.
-                    if fd:
-                        os.utime(fd, None, ns=(atime, birthtime))
-                    else:
-                        os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
-                except OSError:
-                    # some systems don't support calling utime on a symlink
-                    pass
+        # set timestamps rather late
+        mtime = item.mtime
+        atime = item.atime if "atime" in item else mtime
+        birthtime = item.get("birthtime")
+        try:
+            set_times(path, atime_ns=atime, mtime_ns=mtime, birthtime_ns=birthtime, fd=fd, follow_symlinks=False)
+        except OSError as e:
+            # some POSIX systems don't support setting the timestamps of a symlink.
+            if is_win32:
+                # win32 can set the timestamps of a symlink itself, so this is a real problem.
+                logger.warning("%s: when setting timestamps: %s", remove_surrogates(item.path), e)
+                set_ec(EXIT_WARNING)
+        # bsdflags include the immutable flag and need to be set last:
+        if not is_win32 and not self.noflags and "bsdflags" in item:
             try:
-                if fd:
-                    os.utime(fd, None, ns=(atime, mtime))
-                else:
-                    os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
+                set_flags(path, item.bsdflags, fd=fd)
             except OSError:
-                # some systems don't support calling utime on a symlink
-                pass
-            # bsdflags include the immutable flag and need to be set last:
-            if not self.noflags and "bsdflags" in item:
-                try:
-                    set_flags(path, item.bsdflags, fd=fd)
-                except OSError:
-                    pass
-        else:  # win32
-            # set timestamps rather late
-            mtime = item.mtime
-            atime = item.atime if "atime" in item else mtime
-            try:
-                # note: no fd support on win32
-                os.utime(path, None, ns=(atime, mtime))
-            except OSError:
-                # some systems don't support calling utime on a symlink
                 pass
 
     def set_meta(self, key, value):

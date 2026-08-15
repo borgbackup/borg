@@ -112,6 +112,32 @@ def get_flags(path, st, fd=None):
     return getattr(st, "st_flags", 0)
 
 
+def set_times(path, *, atime_ns, mtime_ns, birthtime_ns=None, fd=None, follow_symlinks=True):
+    """
+    Set the timestamps of *path* (or of the open file descriptor *fd*, if given).
+
+    *birthtime_ns* is only honoured on platforms that can set the birthtime (creation time),
+    it is silently ignored on the other ones.
+
+    Raises OSError if the timestamps could not be set.
+    """
+    if birthtime_ns is not None:
+        try:
+            # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
+            # See utimes(2) on either of the BSDs for details.
+            if fd is not None:
+                os.utime(fd, None, ns=(atime_ns, birthtime_ns))
+            else:
+                os.utime(path, None, ns=(atime_ns, birthtime_ns), follow_symlinks=follow_symlinks)
+        except OSError:
+            # some systems don't support calling utime on a symlink
+            pass
+    if fd is not None:
+        os.utime(fd, None, ns=(atime_ns, mtime_ns))
+    else:
+        os.utime(path, None, ns=(atime_ns, mtime_ns), follow_symlinks=follow_symlinks)
+
+
 def sync_dir(path):
     if is_win32:
         # Opening directories is not supported on Windows.

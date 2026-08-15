@@ -12,6 +12,7 @@ from .base import ENOATTR
 from .base import SaveFile, sync_dir, fdatasync, safe_fadvise
 from .base import get_process_id, fqdn, hostname, hostid, swidth
 from .base import acl_text_to_xattr  # overridden below for platforms supporting it
+from .base import set_times  # overridden below for win32
 
 # work around pyinstaller "forgetting" to include the xattr module
 from . import xattr  # noqa: F401
@@ -84,6 +85,7 @@ else:  # pragma: win32 only
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
     from .windows import SyncFile
+    from .windows import set_times  # type: ignore[no-redef]
     from .windows import process_alive, local_pid_alive
     from .windows import getosusername
     from . import windows_ug as platform_ug

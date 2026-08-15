@@ -507,7 +507,7 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
 
 
 def test_build_chunkindex_repair_resyncs_after_corrupt_header(tmp_path):
-    """A corrupt object header fails the rebuild, but with repair=True the rest of the pack is indexed."""
+    """A corrupt object header fails the rebuild; with validate, the objects after it are indexed."""
     from .repository_test import accept_all, fchunk
 
     obj1 = bytearray(fchunk(b"first", chunk_id=H(90)))
@@ -518,10 +518,10 @@ def test_build_chunkindex_repair_resyncs_after_corrupt_header(tmp_path):
         repository.store_store("packs/" + bin_to_hex(pack_id), bytes(obj1) + obj2)
         with pytest.raises(IntegrityError):
             build_chunkindex_from_repo(repository, slow_rebuild=True)
-        # accept_all: accepts every candidate, so this exercises the plumbing only.
+        # accept_all takes any candidate, so this covers the plumbing, not the authentication.
         index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_all)
         assert H(91) in index  # found by resyncing past the damaged header
-        assert H(90) not in index  # its header is gone, so the object can not be indexed
+        assert H(90) not in index  # its header is damaged, so its id is unknown
         assert index[H(91)].pack_id == pack_id
         assert index[H(91)].obj_offset == len(obj1)
 

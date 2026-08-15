@@ -719,11 +719,10 @@ def test_extra_chunks(archivers, request):
 
 
 def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request):
-    """--repair rebuilds the index from a pack whose object header is damaged.
+    """--repair rebuilds the chunks index from a pack whose object header is damaged.
 
-    A damaged header makes the walk lose the object boundaries, so the rebuild scans for the next
-    object that authenticates and carries on there. That needs the key, which --repair makes before
-    the rebuild. Repairing the pack itself is a separate step, see #10026.
+    A damaged header loses the object boundaries, so the rebuild scans for the next object that
+    authenticates and continues there. Authenticating needs the key, which --repair reads first.
     """
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() != "local":

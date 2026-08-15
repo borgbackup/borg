@@ -17,7 +17,7 @@ from .. import repository as repository_module
 from ..archive import resync_validator
 from ..compress import CNONE
 from ..constants import ROBJ_FILE_STREAM
-from ..crypto.key import CHPOKey, PlaintextKey
+from ..crypto.key import CHPOKey, ChecksumKey
 from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
 from ..repository import PackTracker
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
@@ -1885,9 +1885,6 @@ def accept_all(chunk_id, obj):
     return True
 
 
-accept_all.needs_data = False
-
-
 def test_pack_reader_resync_skips_to_next_object():
     # after a corrupt header the walk continues at the next object.
     obj1 = bytearray(fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1)))
@@ -1982,16 +1979,17 @@ def test_pack_reader_resync_accepts_an_object_with_corrupt_data(tmp_path):
         repo_objs.parse(real_id, bytes(obj2), ro_type=ROBJ_FILE_STREAM)
 
 
-def test_pack_reader_resync_rejects_user_content_that_looks_like_an_object(tmp_path):
-    # In "none" mode with no compression, user content lands in the pack as it is, so a backed up
-    # file can contain something shaped like an object. Those keys authenticate by the id check over
-    # the content, so the scan reads whole candidates.
+def test_pack_reader_resync_rejects_damaged_user_content_without_a_key(tmp_path):
+    # In "none-*" mode with no compression, user content lands in the pack as it is, so a backed up
+    # file can contain something shaped like an object. The metadata slot's checksum covers the
+    # object header, so damaged candidate bytes are still ruled out - what these modes can not rule
+    # out is an intact object put into a file on purpose, there being no secret to tell them apart.
     repository = Repository(str(tmp_path / "repo"), create=True)
-    repo_objs = RepoObj(PlaintextKey(repository))
-    assert resync_validator(repo_objs).needs_data
+    repo_objs = RepoObj(ChecksumKey(repository))
     repo_objs.compressor = CNONE()
     decoy = bytearray(repo_objs.format(repo_objs.id_hash(b"decoy"), {}, b"decoy", ro_type=ROBJ_FILE_STREAM))
-    decoy[-1] ^= 0xFF  # its content no longer hashes to the id in its header
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(bytes(decoy[: RepoObj.obj_header.size])))
+    decoy[RepoObj.obj_header.size + hdr.meta_size - 1] ^= 0xFF  # damage its metadata slot
     content = bytes(decoy)  # a user stores exactly those bytes in a file
     obj1 = bytearray(repo_objs.format(repo_objs.id_hash(content), {}, content, ro_type=ROBJ_FILE_STREAM))
     assert content in obj1  # the decoy is in the pack verbatim

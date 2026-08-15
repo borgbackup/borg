@@ -2084,26 +2084,22 @@ class RobustUnpacker:
 def resync_validator(repo_objs):
     """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
 
-    obj holds an object's header and encrypted metadata, plus its encrypted data when
-    validate.needs_data is set. For most keys, decrypting the metadata authenticates it against the
-    header (magic, version, chunk_id), so the metadata alone decides. Keys that authenticate by
-    chunk_id == id_hash(content) (id_check_is_authentication) need the data; for them
-    validate.needs_data is set and parse() checks that id at the "repair" id place.
+    obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
+    computed over the header's magic, version and chunk id as well (AAD, additional authenticated
+    data: bytes the tag covers without being part of the ciphertext).
+
+    In the "none-*" modes the tag is an unkeyed checksum, so validate accepts any well-formed
+    object, including one that a backed up file contains.
     """
-    needs_data = repo_objs.key.id_check_is_authentication
 
     def validate(chunk_id, obj):
         try:
-            if needs_data:
-                repo_objs.parse(chunk_id, obj, ro_type=ROBJ_DONTCARE, assert_id_place="repair")
-            else:
-                repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
+            repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
         except Exception:
-            # authentication, id check, msgpack or decompression can each raise on non-object bytes.
+            # arbitrary bytes fail the tag, the msgpack unpacking or the length checks.
             return False
         return True
 
-    validate.needs_data = needs_data
     return validate
 
 
@@ -2161,10 +2157,10 @@ class ArchiveChecker:
         # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
         # --repair does rebuild from the packs (slow_rebuild=repair), working from the real packs so it
         # can detect and fix archives that reference chunks whose pack has gone missing.
-        # Under --repair, validate lets the rebuild resync past a corrupt object header (see resync_validator).
-        # It authenticates objects with the key, so make the key first; manifest_only=True makes make_key use
-        # the manifest, not self.chunks, which is still unset here.
-        if self.key is None:
+        # --repair also passes validate, which makes the rebuild resync past a corrupt object header.
+        # Validating needs the key, so read it here. manifest_only=True, because the other source
+        # make_key reads keys from is self.chunks, which is only built below.
+        if repair and self.key is None:
             try:
                 self.key = self.make_key(repository, manifest_only=True)
             except IntegrityError as err:

@@ -388,7 +388,7 @@ class PackReader:
 
         A pack has no framing besides the object headers, so this searches for OBJ_MAGIC. That byte
         sequence also occurs inside payloads, so a candidate is accepted only when its header parses
-        and validate confirms it.
+        and validate(chunk_id, obj) confirms the header and metadata slot at that position.
         """
         hdr_size = RepoObj.obj_header.size
         while offset + hdr_size <= pack_size:
@@ -404,10 +404,10 @@ class PackReader:
                 hdr = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
                 if hdr is not None:
                     obj_size = hdr_size + hdr.meta_size + hdr.data_size
-                    # an object is at most MAX_DATA_SIZE bytes (Repository.put), so a larger candidate is a
-                    # false match on OBJ_MAGIC in a payload.
+                    # an object is at most MAX_DATA_SIZE bytes, so a bigger one is a false match on
+                    # OBJ_MAGIC inside a payload.
                     if obj_size <= MAX_DATA_SIZE:
-                        size = obj_size if validate.needs_data else hdr_size + hdr.meta_size
+                        size = hdr_size + hdr.meta_size  # the bytes validate looks at
                         end = pos + size
                         # the window holds these bytes, unless the candidate crosses its end.
                         obj = buf[pos:end] if end <= len(buf) else self.read(offset + pos, size)
@@ -428,10 +428,10 @@ class PackReader:
         the pack, otherwise the pack is corrupt and IntegrityError is raised. A read shorter than
         a header ends the walk: that is the end of the pack.
 
-        validate(chunk_id, obj): returns whether obj is a repo object with id chunk_id, where obj is
-        its header and metadata, plus its data when validate.needs_data is set. When validate is
-        given, a corrupt header makes the walk resync: it scans for the next object validate accepts
-        (see _find_header), continues there, and logs the skipped bytes.
+        validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
+        repo object with id chunk_id. Given one, a corrupt header makes the walk resync instead:
+        it scans for the next object validate accepts, logs how many bytes that skipped and
+        continues there.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()

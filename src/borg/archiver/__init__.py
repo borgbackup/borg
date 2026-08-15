@@ -476,7 +476,8 @@ class Archiver(
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
         # extract --dry-run reads, decrypts and decompresses every object, so its store stats are accurate.
-        stats_supported_with_dry_run = func_name == "do_extract"
+        # create --dry-run counts the files and sums up their sizes from file system metadata.
+        stats_supported_with_dry_run = func_name in ("do_extract", "do_create")
         if getattr(args, "stats", False) and getattr(args, "dry_run", False) and not stats_supported_with_dry_run:
             logger.warning("Ignoring --stats. It is not supported when using --dry-run.")
             args.stats = False

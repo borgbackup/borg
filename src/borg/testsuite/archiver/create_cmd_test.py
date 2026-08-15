@@ -687,6 +687,39 @@ def test_create_dry_run(archivers, request):
         assert manifest.archives.count() == 0
 
 
+def test_create_dry_run_stats(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file2", size=1024 * 20)
+    expected_nfiles = 2
+    if are_hardlinks_supported():
+        os.link(os.path.join(archiver.input_path, "file1"), os.path.join(archiver.input_path, "hardlink1"))
+        expected_nfiles = 3  # as in a real create, each hardlink counts as a file
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "create", "--dry-run", "--stats", "test", "input")
+    assert f"Number of files: {expected_nfiles}" in output
+    assert "Original size:" in output
+    assert "Deduplicated size:" not in output
+    # Make sure no archive has been created
+    with Repository(archiver.repository_path) as repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        assert manifest.archives.count() == 0
+
+
+def test_create_dry_run_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file2", size=1024 * 20)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "create", "--dry-run", "--json", "test", "input")
+    result = json.loads(output)
+    assert result["dry_run"] is True
+    assert result["stats"]["nfiles"] == 2
+    assert result["stats"]["original_size"] == 1024 * 100
+    assert "archive" not in result
+    assert "repository" in result
+
+
 def test_progress_on(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

@@ -326,6 +326,28 @@ def test_birthtime(archivers, request):
     assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
 
 
+@pytest.mark.skipif(not is_win32, reason="Windows-only test")
+def test_timestamps_win32(archivers, request):
+    """windows: extract restores atime, mtime and (with Python >= 3.12) birthtime, see #7269"""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file", contents=b"stuff")
+    # os.utime can not set the birthtime on Windows, so use our own platform code for the setup.
+    # a FILETIME has a resolution of 100ns, thus only use timestamps that are a multiple of 100ns.
+    atime_ns, mtime_ns, birthtime_ns = 1500000000000000100, 1400000000000000200, 1300000000000000300
+    platform.set_times("input/file", atime_ns=atime_ns, mtime_ns=mtime_ns, birthtime_ns=birthtime_ns)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--atime", "test", "input")
+    sti = os.stat("input/file")
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    sto = os.stat("output/input/file")
+    assert sto.st_mtime_ns == mtime_ns
+    # reading the input file for the backup might have updated its atime, so compare with the input file.
+    assert sto.st_atime_ns == sti.st_atime_ns
+    if hasattr(sti, "st_birthtime_ns"):  # Python >= 3.12
+        assert sto.st_birthtime_ns == birthtime_ns
+
+
 def test_sparse_file(archivers, request):
     archiver = request.getfixturevalue(archivers)
 

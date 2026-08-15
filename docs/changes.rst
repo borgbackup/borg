@@ -259,6 +259,12 @@ Fixes:
   did not notice content changes of files that kept their size and inode number.
   The default is ``mtime,size,inode`` there now and an explicitly given ctime based
   mode warns and uses the corresponding mtime based mode.
+- extract: restore the timestamps using SetFileTime on Windows, #7269.
+
+  os.utime can not set the birthtime (creation time) there, nor can it work on a file
+  descriptor or on a symlink itself. Thus, the birthtime was not restored at all and the
+  timestamps of a symlink were set on the symlink's target. Also, failing to set the
+  timestamps is not silently ignored anymore, but gives a warning.
 - re-add XXH64 to read borg 1.x integrity data, #9935
 - list: add {blake3} format key, #9984
 - support date: archive patterns for --from-borg1, #9949

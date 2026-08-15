@@ -286,6 +286,7 @@ rst_plain_text_references = {
     "cache_security": 'FAQ -> "Do I need to take security precautions regarding the cache?"',
     "home_config_borg": 'FAQ -> "How important is the borg config directory?"',
     "home_data_borg": 'FAQ -> "How important is the borg data directory?"',
+    "json_output": "Internals -> All about JSON: How to develop frontends",
 }
 
 

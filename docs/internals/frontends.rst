@@ -565,6 +565,84 @@ Example (excerpt) of ``borg diff --json-lines``::
     {"path": "file3", "changes": [{"type": "removed", "size": 0}]}
 
 
+Archive Analysis
+++++++++++++++++
+
+:ref:`borg_analyze` ``--json`` emits the numbers of its text report as one object. All sizes are
+byte values; the compression factor the text report shows is ``stored_size / source_size``.
+
+Without ``--by-name``, the *dedup_size* and *hotspots* keys are present.
+
+*dedup_size* describes the considered set of archives:
+
+considered_archives
+    Number of archives matching the archive filters
+total_archives
+    Number of non-deleted archives in the repository
+whole_repository
+    True if no archive was left over by the filters, so the considered set is the whole
+    repository. Every referenced chunk is then trivially exclusive to the set, and the
+    *exclusive* key is absent.
+deduplicated
+    Object with *source_size* and *stored_size*: the summed size of the union of chunks the
+    considered archives reference, chunks shared within the set counted once
+exclusive
+    Object with *source_size* and *stored_size*: the chunks referenced only by the considered
+    set, i.e. what deleting the whole set would free. Absent if *whole_repository* is true.
+unreferenced
+    Object with *stored_size* and *chunks*: the chunks no non-deleted archive references, which
+    ``borg compact`` could free. Their source size is not known, as it is only recorded in the
+    archives referencing a chunk.
+total_chunks
+    Number of chunks in the repository chunk index
+missing_chunks
+    Number of chunks referenced by an archive but absent from the repository chunk index
+
+*hotspots* is a list of objects with *path* (directory path) and *size* (bytes of chunks added or
+removed in that directory between consecutive archives), busiest directory first. It is ``null``
+if fewer than two archives matched, as hot spots need at least two archives to compare.
+
+With ``--by-name``, the *by_name* key is present instead, decomposing the whole repository:
+
+archives
+    Number of non-deleted archives in the repository
+names
+    List of objects with *name*, *archives* (number of archives with that name), *source_size*
+    and *stored_size*. The sizes are what is exclusive to that name: no archive of another name
+    references those chunks. Biggest *stored_size* first.
+shared
+    Object with *source_size* and *stored_size*: the chunks referenced by two or more names
+unreferenced
+    As above
+total
+    Object with *archives*, *source_size* and *stored_size*. Each chunk is counted in exactly one
+    of *names*, *shared* and *unreferenced*, so the *names* and *shared* sizes add up to *total*.
+total_chunks, missing_chunks
+    As above
+
+Example of ``borg analyze -a 'sh:userA-*' --json``::
+
+    {
+        "dedup_size": {
+            "considered_archives": 2,
+            "deduplicated": {"source_size": 3000, "stored_size": 3536},
+            "exclusive": {"source_size": 2000, "stored_size": 3338},
+            "missing_chunks": 0,
+            "total_archives": 3,
+            "total_chunks": 13,
+            "unreferenced": {"chunks": 0, "stored_size": 0},
+            "whole_repository": false
+        },
+        "encryption": {"encryption": "aes256-ocb", "id_hash": "sha256"},
+        "hotspots": [{"path": "home/user/src", "size": 1000}],
+        "repository": {
+            "id": "06e4027d32f8eae8333f8fe06b1c2c46bf12f22ad10bd4d04a0f30751a26d77b",
+            "last_modified": "2026-08-01T22:46:05.886533",
+            "location": "/home/user/repository"
+        }
+    }
+
+
 .. _msgid:
 
 Message IDs

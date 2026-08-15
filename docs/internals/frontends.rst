@@ -819,6 +819,8 @@ Warnings
         {}: {}
     BackupTimeoutError rc: 111
         {}: {}
+    BackupBrokenSymlinkError rc: 112
+        {}: {}
 
 Operations
     - cache.begin_transaction

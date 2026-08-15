@@ -103,19 +103,18 @@ repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``
 rebuilds the chunks index from the packs) scans forward for the next blob and
 resumes there, so the blobs after the damaged part of the pack are still found.
 
-``OBJ_MAGIC`` occurs inside the payloads as well, and in ``none`` and
-``authenticated`` mode the payloads are user content stored as it is, so a
-backed up file can contain something shaped like a blob. The scan therefore
-accepts a candidate only if it parses. For the AEAD keys it reads the header and
-the encrypted metadata, a few hundred bytes: decrypting the metadata
-authenticates it together with the header's magic, version and chunk_id, which
-are its AAD (additional authenticated data: authenticated with the ciphertext,
-but not encrypted). The other keys authenticate by ``chunk_id == id_hash(content)``
-(``KeyBase.id_check_is_authentication``), which needs the blob's data, so for
-those the scan reads the whole blob. The key is needed either way; a repair that
-cannot read the manifest walks without scanning.
+``OBJ_MAGIC`` occurs inside the payloads as well, and in the ``none-*`` and
+``authenticated-*`` modes the payloads are user content stored as it is, so a
+backed up file can contain something shaped like a blob. A candidate is
+therefore accepted only when its metadata slot verifies against the header AAD
+described above; the header and that slot, a few hundred bytes, are what the
+scan reads. Verifying needs the key, so a repair that cannot read the manifest
+walks without scanning.
 
-``data_size`` is not part of that AAD, so accepting a candidate authenticates
+In the ``none-*`` modes the tag is an unkeyed checksum, so the scan accepts any
+well-formed blob, including one a backed up file contains.
+
+``data_size`` is not part of the AAD, so accepting a candidate authenticates
 its chunk id, and its size only as far as the blob fits into the pack. Bit flips
 in the data are caught when the blob is read, on that blob alone.
 

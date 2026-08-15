@@ -900,6 +900,8 @@ def build_chunkindex_from_repo(
 ):
     # fragments_only: build the index from the index/ fragments only, returning None if they cannot be
     # read completely, and never write to the repo.
+    # validate: handed to PackReader.iter_headers when rebuilding from the packs, making it resync
+    # past a corrupt object header rather than raise IntegrityError.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
@@ -991,7 +993,6 @@ def build_chunkindex_from_repo(
         repository._lock_refresh()
         pi.show(increase=1)
         pack_id = hex_to_bin(info.name)
-        # validate makes iter_headers resync past a corrupt object header and index the objects after it.
         for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_id).iter_headers(validate=validate):
             num_chunks += 1
             chunks[chunk_id] = ChunkIndexEntry(

@@ -17,6 +17,7 @@ from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError, BackupBrokenSymlinkError
+from ...helpers import BackupWarning
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -322,9 +323,8 @@ def test_create_no_permission_file(archivers, request):
         os.chmod(file_path + "2", 0o000)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     flist = "".join(f"input/file{n}\n" for n in range(1, 4))
-    expected_ec = BackupPermissionError("open", OSError(13, "permission denied")).exit_code
-    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
-        expected_ec = EXIT_WARNING
+    exc = BackupPermissionError("open", OSError(13, "permission denied"))
+    expected_ec = BackupWarning("input/file2", exc).exit_code
     out = cmd(
         archiver,
         "create",
@@ -1076,9 +1076,8 @@ def test_create_read_special_timeout_expired(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(archiver.input_path, "file1", size=1024)
     os.mkfifo(os.path.join(archiver.input_path, "fifo"))
-    expected_ec = BackupTimeoutError("read", OSError(errno.ETIMEDOUT, "timeout")).exit_code
-    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
-        expected_ec = EXIT_WARNING
+    exc = BackupTimeoutError("read", OSError(errno.ETIMEDOUT, "timeout"))
+    expected_ec = BackupWarning("input/fifo", exc).exit_code
     started = time.monotonic()
     out = cmd(
         archiver,
@@ -1278,9 +1277,8 @@ def test_create_symlink_root_broken(archivers, request):
     create_regular_file(archiver.input_path, "file", contents=b"content")
     os.symlink("somewhere does not exist", os.path.join(archiver.input_path, "link"))
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    expected_ec = BackupBrokenSymlinkError("stat", "broken symlink, skipping it").exit_code
-    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
-        expected_ec = EXIT_WARNING
+    exc = BackupBrokenSymlinkError("stat", "broken symlink, skipping it")
+    expected_ec = BackupWarning("input/link", exc).exit_code
     out = cmd(archiver, "create", "test", "input/link", "input/file", exit_code=expected_ec)
     assert "input/link: stat: broken symlink, skipping it" in out
     output = cmd(archiver, "list", "test")

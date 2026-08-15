@@ -196,6 +196,23 @@ The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
 strip the prefix on the left side of ``./`` from the archived items (in this case,
 ``this/gets/archived`` will be the path in the archived item).
 
+If a recursion root (a path given on the command line or in a patterns file) is a
+symlink, borg follows it and archives what it points to - using the path you gave.
+If ``current`` is a symlink pointing to the directory ``20260801-2345``,
+``borg create ARCHIVE current`` thus archives ``current`` as a directory (with the
+metadata of ``20260801-2345``) and recurses into it, archiving the contained fs
+objects as ``current/...``. As the archived paths do not change when the symlink
+target changes, the files cache keeps working for such backups.
+
+Note that the symlink itself is then not in the archive (and neither is its target
+path), so restoring will create a real directory (or file) where the symlink was.
+If you want the symlink archived as a symlink, do not give it as a recursion root,
+but let borg find it while recursing (symlinks found that way are never followed).
+A recursion root that is a symlink with a non-existing target is skipped with a warning.
+
+If you give both a symlink and its target as recursion roots, borg archives the fs
+objects only once, under the path given first (like for any other root given twice).
+
 When specifying '-' as a path, borg will read data from standard input and create a
 file named 'stdin' in the created archive from that data. In some cases, it is more
 appropriate to use --content-from-command. See the section *Reading from stdin*
@@ -442,3 +459,6 @@ to borg (maybe implementing your own recursion or your own rules), you can use
 
 Borg supports paths with the slashdot hack to strip path prefixes here also.
 So, be careful not to unintentionally trigger that.
+
+Symlinks given this way are never followed (unlike recursion roots are), they are
+archived as symlinks.

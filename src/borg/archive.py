@@ -1433,7 +1433,7 @@ class FilesystemObjectProcessors:
                 item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
                 return status
 
-    def process_fifo(self, *, path, parent_fd, name, st, strip_prefix):
+    def process_fifo(self, *, path, parent_fd, name, st, strip_prefix, flags=flags_normal):
         with self.create_helper(path, st, "f", strip_prefix=strip_prefix) as (
             item,
             status,
@@ -1442,13 +1442,13 @@ class FilesystemObjectProcessors:
         ):  # fifo
             if item is None:
                 return status
-            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
+            with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io("fstat"):
                     st = stat_update_check(st, os.fstat(fd))
                 item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
                 return status
 
-    def process_dev(self, *, path, parent_fd, name, st, dev_type, strip_prefix):
+    def process_dev(self, *, path, parent_fd, name, st, dev_type, strip_prefix, follow_symlinks=False):
         with self.create_helper(path, st, dev_type, strip_prefix=strip_prefix) as (
             item,
             status,
@@ -1459,7 +1459,9 @@ class FilesystemObjectProcessors:
             if item is None:
                 return status
             with backup_io("stat"):
-                st = stat_update_check(st, os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False))
+                st = stat_update_check(
+                    st, os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=follow_symlinks)
+                )
             item.rdev = st.st_rdev
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status

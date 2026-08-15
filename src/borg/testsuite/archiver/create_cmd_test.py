@@ -16,7 +16,8 @@ from ...manifest import Manifest
 from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
-from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError
+from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError, BackupBrokenSymlinkError
+from ...helpers import BackupWarning
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -322,9 +323,8 @@ def test_create_no_permission_file(archivers, request):
         os.chmod(file_path + "2", 0o000)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     flist = "".join(f"input/file{n}\n" for n in range(1, 4))
-    expected_ec = BackupPermissionError("open", OSError(13, "permission denied")).exit_code
-    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
-        expected_ec = EXIT_WARNING
+    exc = BackupPermissionError("open", OSError(13, "permission denied"))
+    expected_ec = BackupWarning("input/file2", exc).exit_code
     out = cmd(
         archiver,
         "create",
@@ -1076,9 +1076,8 @@ def test_create_read_special_timeout_expired(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(archiver.input_path, "file1", size=1024)
     os.mkfifo(os.path.join(archiver.input_path, "fifo"))
-    expected_ec = BackupTimeoutError("read", OSError(errno.ETIMEDOUT, "timeout")).exit_code
-    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
-        expected_ec = EXIT_WARNING
+    exc = BackupTimeoutError("read", OSError(errno.ETIMEDOUT, "timeout"))
+    expected_ec = BackupWarning("input/fifo", exc).exit_code
     started = time.monotonic()
     out = cmd(
         archiver,
@@ -1203,6 +1202,113 @@ def test_create_read_special_broken_symlink(archivers, request):
     cmd(archiver, "create", "--read-special", "test", "input")
     output = cmd(archiver, "list", "test")
     assert "input/link -> somewhere does not exist" in output
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_root_dir(archivers, request):
+    # a recursion root that is a symlink to a directory is followed, see #4737
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "target/file", contents=b"content")
+    os.symlink("target", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/link")
+    output = cmd(archiver, "list", "test")
+    assert "input/link -> target" not in output  # not archived as a symlink, but as a directory
+    assert "input/link/file" in output  # we recursed into the symlink target
+    assert "input/target" not in output  # the target path is not in the archive
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert not os.path.islink("input/link")
+        assert os.path.isdir("input/link")
+        with open("input/link/file", "rb") as f:
+            assert f.read() == b"content"
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_root_file(archivers, request):
+    # a recursion root that is a symlink to a regular file is followed, see #4737
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "target", contents=b"content")
+    os.symlink("target", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/link")
+    output = cmd(archiver, "list", "test")
+    assert "input/link -> target" not in output  # not archived as a symlink, but as a regular file
+    assert "input/link" in output
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert not os.path.islink("input/link")
+        with open("input/link", "rb") as f:
+            assert f.read() == b"content"
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_below_root_not_followed(archivers, request):
+    # only recursion roots are followed, symlinks found while recursing are not, see #4737
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "target/file", contents=b"content")
+    os.symlink("target", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "list", "test")
+    assert "input/link -> target" in output
+    assert "input/link/file" not in output
+    assert "input/target/file" in output
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_root_and_target(archivers, request):
+    # a followed symlink root and its target are the same fs objects, so they are archived
+    # only once, under the path given first (like any other recursion root given twice).
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "target/file", contents=b"content")
+    os.symlink("target", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/link", "input/target")
+    output = cmd(archiver, "list", "test")
+    assert "input/link/file" in output
+    assert "input/target/file" not in output
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_root_broken(archivers, request):
+    # a recursion root that is a symlink with a non-existing target is skipped with a warning
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file", contents=b"content")
+    os.symlink("somewhere does not exist", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    exc = BackupBrokenSymlinkError("stat", "broken symlink, skipping it")
+    expected_ec = BackupWarning("input/link", exc).exit_code
+    out = cmd(archiver, "create", "test", "input/link", "input/file", exit_code=expected_ec)
+    assert "input/link: stat: broken symlink, skipping it" in out
+    output = cmd(archiver, "list", "test")
+    assert "input/link" not in output
+    assert "input/file" in output  # the other recursion root was archived
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_paths_from_stdin_not_followed(archivers, request):
+    # only recursion roots are followed, paths fed in via --paths-from-* are not, see #4737
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "target", contents=b"content")
+    os.symlink("target", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--paths-from-stdin", "test", input=b"input/link")
+    output = cmd(archiver, "list", "test")
+    assert "input/link -> target" in output
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_root_dotslash_hack(archivers, request):
+    # the slashdot hack also works for a recursion root that is a symlink, see #4737
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "target/file", contents=b"content")
+    os.symlink("target", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/link/./")  # hack!
+    output = cmd(archiver, "list", "test")
+    assert "input" not in output  # the prefix left of the slashdot was stripped
+    assert "file" in output
 
 
 def test_create_dotslash_hack(archivers, request):

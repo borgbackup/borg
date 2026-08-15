@@ -505,8 +505,10 @@ flags_base = O_("BINARY", "NOCTTY", "RDONLY")
 flags_special = flags_base | O_("NOFOLLOW")  # BLOCK == wait when reading devices or fifos
 flags_special_follow = flags_base  # BLOCK == wait when reading symlinked devices or fifos
 flags_normal = flags_base | O_("NONBLOCK", "NOFOLLOW")
+flags_normal_follow = flags_base | O_("NONBLOCK")  # follow a symlinked recursion root, see #4737
 flags_noatime = flags_normal | O_("NOATIME")
 flags_dir = O_("DIRECTORY", "RDONLY", "NOFOLLOW")
+flags_dir_follow = O_("DIRECTORY", "RDONLY")  # follow a symlinked recursion root, see #4737
 
 
 def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):

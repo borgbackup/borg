@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-create" "1" "2026-08-13" "" "borg backup tool"
+.TH "borg-create" "1" "2026-08-15" "" "borg backup tool"
 .SH Name
 borg-create \- Creates a new archive.
 .SH SYNOPSIS
@@ -45,6 +45,23 @@ The slashdot hack in paths (recursion roots) is triggered by using \fB/./\fP:
 \fB/this/gets/stripped/./this/gets/archived\fP means to process that fs object, but
 strip the prefix on the left side of \fB\&./\fP from the archived items (in this case,
 \fBthis/gets/archived\fP will be the path in the archived item).
+.sp
+If a recursion root (a path given on the command line or in a patterns file) is a
+symlink, borg follows it and archives what it points to \- using the path you gave.
+If \fBcurrent\fP is a symlink pointing to the directory \fB20260801\-2345\fP,
+\fBborg create ARCHIVE current\fP thus archives \fBcurrent\fP as a directory (with the
+metadata of \fB20260801\-2345\fP) and recurses into it, archiving the contained fs
+objects as \fBcurrent/...\fP\&. As the archived paths do not change when the symlink
+target changes, the files cache keeps working for such backups.
+.sp
+Note that the symlink itself is then not in the archive (and neither is its target
+path), so restoring will create a real directory (or file) where the symlink was.
+If you want the symlink archived as a symlink, do not give it as a recursion root,
+but let borg find it while recursing (symlinks found that way are never followed).
+A recursion root that is a symlink with a non\-existing target is skipped with a warning.
+.sp
+If you give both a symlink and its target as recursion roots, borg archives the fs
+objects only once, under the path given first (like for any other root given twice).
 .sp
 When specifying \(aq\-\(aq as a path, borg will read data from standard input and create a
 file named \(aqstdin\(aq in the created archive from that data. In some cases, it is more
@@ -71,9 +88,9 @@ the files cache.
 This comparison can operate in different modes as given by \fB\-\-files\-cache\fP:
 .INDENT 0.0
 .IP \(bu 2
-ctime,size,inode (default)
+ctime,size,inode (default on POSIX systems)
 .IP \(bu 2
-mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+mtime,size,inode (default on Windows)
 .IP \(bu 2
 ctime,size (ignore the inode number)
 .IP \(bu 2
@@ -109,6 +126,13 @@ can be arbitrarily set from userspace, e.g., to set mtime back to the same value
 it had before a content change happened. This can be used maliciously as well as
 well\-meant, but in both cases mtime\-based cache modes can be problematic.
 .UNINDENT
+.sp
+On Windows, ctime is the file \fIcreation\fP time, not the \(dqmetadata change time\(dq it is
+on POSIX systems. A ctime based mode would therefore not notice content changes of a
+file that keeps its size and inode number, so borg defaults to \fBmtime,size,inode\fP
+there. If a ctime based mode is given explicitly on Windows, borg warns and uses the
+corresponding mtime based mode instead: ctime,size,inode \-> mtime,size,inode,
+ctime,size \-> mtime,size, rechunk,ctime \-> rechunk,mtime.
 .INDENT 0.0
 .TP
 .B The \fB\-\-files\-changed\fP option controls how Borg detects if a file has changed during backup:
@@ -134,11 +158,22 @@ The \fB\-\-progress\fP option shows (from left to right) Original and (uncompres
 deduplicated size (O and U respectively), then the Number of files (N) processed so far,
 followed by the currently processed path.
 .sp
+Sizes of GB and above are shown with enough decimal places that even MB\-sized progress
+stays visible. On a terminal, this needs a width of at least 110 columns \- on narrower
+terminals, the compact format is used, so that the path stays readable. If the output
+does not go to a terminal (e.g. into a logfile), the precise format is always used.
+.sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
 added \- the \(dqThis Archive\(dq deduplicated size there is most interesting as that is
 how much your repository will grow. Please note that the \(dqAll archives\(dq stats refer to
-the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
-exclusive because the data is not actually compressed and deduplicated during a dry run.
+the state after creation.
+.sp
+When \fB\-\-stats\fP is used together with \fB\-\-dry\-run\fP, only the number of files and the
+original size are reported. They are computed from file system metadata, without reading
+the file contents, so a dry run stays fast. As data is not actually read, chunked, and
+deduplicated during a dry run, the deduplicated size is unknown. The sizes of data read
+from standard input, from a command\(aqs output, or from special files (\fB\-\-read\-special\fP)
+are also unknown in a dry run and counted as zero.
 .sp
 The \fB\-\-stats\fP output also reports the store statistics (lines prefixed with
 \(dqStore\(dq), taken from the storage layer after this run. These cover the backend and
@@ -275,7 +310,7 @@ do not read and store xattrs into archive
 detect sparse holes in input (supported only by fixed chunker)
 .TP
 .BI \-\-files\-cache \ MODE
-operate files cache in MODE. default: ctime,size,inode
+operate files cache in MODE. default: ctime,size,inode (on Windows: mtime,size,inode, because ctime is file creation time there).
 .TP
 .BI \-\-files\-changed \ MODE
 specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).
@@ -559,6 +594,9 @@ to borg (maybe implementing your own recursion or your own rules), you can use
 .sp
 Borg supports paths with the slashdot hack to strip path prefixes here also.
 So, be careful not to unintentionally trigger that.
+.sp
+Symlinks given this way are never followed (unlike recursion roots are), they are
+archived as symlinks.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP, \fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-check(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-compression(1)\fP, \fIborg\-repo\-create(1)\fP

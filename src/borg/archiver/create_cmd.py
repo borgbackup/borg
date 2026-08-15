@@ -21,10 +21,12 @@ from ..helpers import octal_int, nonnegative_seconds
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
+from ..helpers import BackupBrokenSymlinkError
 from ..helpers import dir_is_tagged
 from ..helpers import log_multi
 from ..helpers import basic_json_data, json_print, FileSize
-from ..helpers import flags_dir, flags_special_follow, flags_special
+from ..helpers import flags_dir, flags_dir_follow, flags_special_follow, flags_special
+from ..helpers import flags_normal, flags_normal_follow
 from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
@@ -38,6 +40,24 @@ from ..platform import is_win32, get_flags
 from ..logger import create_logger
 
 logger = create_logger()
+
+
+def stat_root(path):
+    """
+    stat a recursion root, following it if it is a symlink, see #4737.
+
+    Returns (st, followed): for a symlink, st is the stat of what it points to and followed
+    is True, so the caller knows that it must not use O_NOFOLLOW when opening path.
+
+    Raises BackupBrokenSymlinkError if path is a symlink with a non-existing target.
+    """
+    st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
+    if not stat.S_ISLNK(st.st_mode):
+        return st, False
+    try:
+        return os_stat(path=path, parent_fd=None, name=None, follow_symlinks=True), True
+    except FileNotFoundError:
+        raise BackupBrokenSymlinkError("stat", "broken symlink, skipping it") from None
 
 
 class CreateMixIn:
@@ -144,6 +164,7 @@ class CreateMixIn:
                     path = posixpath.normpath(path)
                     try:
                         with backup_io("stat"):
+                            # symlinks given this way are never followed, see #4737.
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
                         status = self._process_any(
                             path=path,
@@ -199,7 +220,7 @@ class CreateMixIn:
                     path = posixpath.normpath(path)
                     try:
                         with backup_io("stat"):
-                            st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
+                            st, followed = stat_root(path)
                         restrict_dev = st.st_dev if args.one_file_system else None
                         self._rec_walk(
                             path=path,
@@ -216,6 +237,7 @@ class CreateMixIn:
                             read_special=args.read_special,
                             dry_run=dry_run,
                             strip_prefix=strip_prefix,
+                            follow_symlink=followed,
                         )
                         # if we get back here, we've finished recursing into <path>,
                         # we do not ever want to get back in there (even if path is given twice as recursion root)
@@ -324,9 +346,14 @@ class CreateMixIn:
                         logger=logging.getLogger("borg.output.stats"),
                     )
 
-    def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix):
+    def _process_any(
+        self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix, followed_symlink=False
+    ):
         """
         Call the right method on the given FilesystemObjectProcessor.
+
+        If followed_symlink is True, *path* is a symlink we followed (recursion root, see #4737)
+        and *st* is the stat of its target, so we must not use O_NOFOLLOW when opening it.
         """
 
         if dry_run:
@@ -348,6 +375,9 @@ class CreateMixIn:
                     stats.nfiles += 1  # size unknown without reading the special file
             return "+"  # included
         MAX_RETRIES = 10  # count includes the initial try (initial try == "retry 0")
+        # if we followed a symlink, we must not refuse to open its target via the symlink:
+        flags_file = flags_normal_follow if followed_symlink else flags_normal
+        flags_specialfile = flags_special_follow if followed_symlink else flags_special
         for retry in range(MAX_RETRIES):
             last_try = retry == MAX_RETRIES - 1
             try:
@@ -358,10 +388,12 @@ class CreateMixIn:
                         name=name,
                         st=st,
                         cache=cache,
+                        flags=flags_file,
                         last_try=last_try,
                         strip_prefix=strip_prefix,
                     )
                 elif stat.S_ISDIR(st.st_mode):
+                    # note: a followed symlink to a directory does not get here, _rec_walk deals with it.
                     return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
                 elif stat.S_ISLNK(st.st_mode):
                     if not read_special:
@@ -393,7 +425,12 @@ class CreateMixIn:
                 elif stat.S_ISFIFO(st.st_mode):
                     if not read_special:
                         return fso.process_fifo(
-                            path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                            path=path,
+                            parent_fd=parent_fd,
+                            name=name,
+                            st=st,
+                            strip_prefix=strip_prefix,
+                            flags=flags_file,
                         )
                     else:
                         return fso.process_file(
@@ -402,14 +439,20 @@ class CreateMixIn:
                             name=name,
                             st=st,
                             cache=cache,
-                            flags=flags_special,
+                            flags=flags_specialfile,
                             last_try=last_try,
                             strip_prefix=strip_prefix,
                         )
                 elif stat.S_ISCHR(st.st_mode):
                     if not read_special:
                         return fso.process_dev(
-                            path=path, parent_fd=parent_fd, name=name, st=st, dev_type="c", strip_prefix=strip_prefix
+                            path=path,
+                            parent_fd=parent_fd,
+                            name=name,
+                            st=st,
+                            dev_type="c",
+                            strip_prefix=strip_prefix,
+                            follow_symlinks=followed_symlink,
                         )
                     else:
                         return fso.process_file(
@@ -418,14 +461,20 @@ class CreateMixIn:
                             name=name,
                             st=st,
                             cache=cache,
-                            flags=flags_special,
+                            flags=flags_specialfile,
                             last_try=last_try,
                             strip_prefix=strip_prefix,
                         )
                 elif stat.S_ISBLK(st.st_mode):
                     if not read_special:
                         return fso.process_dev(
-                            path=path, parent_fd=parent_fd, name=name, st=st, dev_type="b", strip_prefix=strip_prefix
+                            path=path,
+                            parent_fd=parent_fd,
+                            name=name,
+                            st=st,
+                            dev_type="b",
+                            strip_prefix=strip_prefix,
+                            follow_symlinks=followed_symlink,
                         )
                     else:
                         return fso.process_file(
@@ -434,7 +483,7 @@ class CreateMixIn:
                             name=name,
                             st=st,
                             cache=cache,
-                            flags=flags_special,
+                            flags=flags_specialfile,
                             last_try=last_try,
                             strip_prefix=strip_prefix,
                         )
@@ -469,7 +518,7 @@ class CreateMixIn:
                 # mode right (which could have changed due to a race condition and is important for
                 # dispatching) and also to get current inode number of that file.
                 with backup_io("stat"):
-                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
+                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=followed_symlink)
 
     def _rec_walk(
         self,
@@ -488,9 +537,14 @@ class CreateMixIn:
         read_special,
         dry_run,
         strip_prefix,
+        follow_symlink=False,
     ):
         """
         Process *path* (or, preferably, parent_fd/name) recursively according to the various parameters.
+
+        follow_symlink is only given for a recursion root that is a symlink, see #4737: we then
+        archive what the symlink points to (using the symlink's path). Symlinks encountered while
+        recursing are never followed, so this is never passed on to the recursive calls.
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
@@ -503,7 +557,7 @@ class CreateMixIn:
             recurse_excluded_dir = False
             if matcher.match(path):
                 with backup_io("stat"):
-                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
+                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=follow_symlink)
             else:
                 self.print_file_status("-", path)  # excluded
                 # get out here as quickly as possible:
@@ -514,7 +568,7 @@ class CreateMixIn:
                     return
                 recurse_excluded_dir = True
                 with backup_io("stat"):
-                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
+                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=follow_symlink)
                 if not stat.S_ISDIR(st.st_mode):
                     return
 
@@ -547,10 +601,16 @@ class CreateMixIn:
                     read_special=read_special,
                     dry_run=dry_run,
                     strip_prefix=strip_prefix,
+                    followed_symlink=follow_symlink,
                 )
             else:
                 with OsOpen(
-                    path=path, parent_fd=parent_fd, name=name, flags=flags_dir, noatime=True, op="dir_open"
+                    path=path,
+                    parent_fd=parent_fd,
+                    name=name,
+                    flags=flags_dir_follow if follow_symlink else flags_dir,
+                    noatime=True,
+                    op="dir_open",
                 ) as child_fd:
                     # child_fd is None for directories on windows, in that case a race condition check is not possible.
                     if child_fd is not None:
@@ -645,6 +705,23 @@ class CreateMixIn:
         ``/this/gets/stripped/./this/gets/archived`` means to process that fs object, but
         strip the prefix on the left side of ``./`` from the archived items (in this case,
         ``this/gets/archived`` will be the path in the archived item).
+
+        If a recursion root (a path given on the command line or in a patterns file) is a
+        symlink, borg follows it and archives what it points to - using the path you gave.
+        If ``current`` is a symlink pointing to the directory ``20260801-2345``,
+        ``borg create ARCHIVE current`` thus archives ``current`` as a directory (with the
+        metadata of ``20260801-2345``) and recurses into it, archiving the contained fs
+        objects as ``current/...``. As the archived paths do not change when the symlink
+        target changes, the files cache keeps working for such backups.
+
+        Note that the symlink itself is then not in the archive (and neither is its target
+        path), so restoring will create a real directory (or file) where the symlink was.
+        If you want the symlink archived as a symlink, do not give it as a recursion root,
+        but let borg find it while recursing (symlinks found that way are never followed).
+        A recursion root that is a symlink with a non-existing target is skipped with a warning.
+
+        If you give both a symlink and its target as recursion roots, borg archives the fs
+        objects only once, under the path given first (like for any other root given twice).
 
         When specifying '-' as a path, borg will read data from standard input and create a
         file named 'stdin' in the created archive from that data. In some cases, it is more
@@ -892,6 +969,9 @@ class CreateMixIn:
 
         Borg supports paths with the slashdot hack to strip path prefixes here also.
         So, be careful not to unintentionally trigger that.
+
+        Symlinks given this way are never followed (unlike recursion roots are), they are
+        archived as symlinks.
         """
         )
 

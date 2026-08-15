@@ -225,5 +225,13 @@ class BackupTimeoutError(BackupOSError):
     exit_mcode = 111
 
 
+class BackupBrokenSymlinkError(BackupError):
+    """{}: {}"""
+
+    # A recursion root that is a symlink pointing to a non-existing target: as we follow
+    # symlinked recursion roots, there is nothing to archive there, see #4737.
+    exit_mcode = 112
+
+
 class BackupItemExcluded(Exception):
     """Used internally to skip an item from processing when it is excluded."""

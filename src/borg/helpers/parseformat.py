@@ -496,14 +496,15 @@ def format_line(format, data):
 
 def _replace_placeholders(text, overrides={}):
     """Replace placeholders in text with their values."""
-    from ..platform import fqdn, hostname, getosusername
+    from ..platform import get_fqdn, get_hostname, getosusername
 
+    fqdn = get_fqdn()
     current_time = datetime.now(UTC)
     data = {
         "pid": os.getpid(),
         "fqdn": fqdn,
         "reverse-fqdn": ".".join(reversed(fqdn.split("."))),
-        "hostname": os.environ.get("BORG_HOSTNAME") or hostname,
+        "hostname": os.environ.get("BORG_HOSTNAME") or get_hostname(),
         "now": DatetimeWrapper(current_time.astimezone()),
         "utcnow": DatetimeWrapper(current_time),
         "unixtime": int(current_time.timestamp()),

@@ -149,7 +149,7 @@ class ListMixIn:
         - type, mode: the file type character resp. the full file mode string
         - user, group: the owner/group name, or the numeric id if the name is not known
         - uid, gid: the numeric owner/group id
-        - size: the file size (0 for hardlink slaves, same as {size})
+        - size: the file size (same as {size}, 0 for items without content)
         - mtime, ctime, atime: the timestamps (atime/ctime fall back to mtime if not stored)
 
         There is no ``birthtime`` field, as there is no {birthtime} format key either.

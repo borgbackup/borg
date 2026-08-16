@@ -286,7 +286,7 @@ cdef class Item(PropDict):
     inode = PropDictProperty(int)
 
     hlid = PropDictProperty(bytes)  # hard link id: same value means same hard link.
-    hardlink_master = PropDictProperty(bool)  # legacy
+    hardlink_master = PropDictProperty(bool)  # legacy borg1 on-disk key, only read when transferring borg1 archives
 
     chunks = PropDictProperty(list, 'list')
     chunks_healthy = PropDictProperty(list, 'list')

@@ -279,7 +279,10 @@ def test_zsh_sortby_wiring(archivers, request, command, fn):
     lines = completion_lines(archivers, request, "zsh")
     block = lines[lines.index(f"_shtab_borg_{command.replace('-', '_')}_options=(") :]
     block = block[: block.index(")")]
-    assert any(f':sort_by:{fn}"' in line for line in block)
+    # The ":<label>:<helper>" label is only what zsh displays while completing: shtab used the
+    # argument's dest for it and uses its metavar since 1.11.0. Do not pin the label down, just
+    # require that --sort-by is wired to our helper.
+    assert any(re.search(rf'^\s*"--sort-by\[.*\]:[^:]+:{fn}"', line) for line in block)
     assert f"{fn}() {{" in lines
 
 

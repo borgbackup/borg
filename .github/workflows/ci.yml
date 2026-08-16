@@ -409,10 +409,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # pyver: python the test step installs; part of the pip cache key.
+        # 3.14+ gets coverage's near-zero-overhead sysmon core, see #9470.
         include:
           - os: freebsd
             version: '15.1'
             display_name: FreeBSD
+            pyver: '3.14'
             # Controls binary build and provenance attestation on tags
             do_binaries: true
             artifact_prefix: borg-freebsd-15-x86_64-gh
@@ -420,11 +423,13 @@ jobs:
           - os: netbsd
             version: '11.0'
             display_name: NetBSD
+            pyver: '3.14'
             do_binaries: false
 
           - os: openbsd
             version: '7.9'
             display_name: OpenBSD
+            pyver: '3.13'
             do_binaries: false
             # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
             memory: 12G
@@ -432,6 +437,7 @@ jobs:
           - os: omnios
             version: 'r151056'
             display_name: OmniOS
+            pyver: '3.13'
             do_binaries: false
 
     steps:
@@ -448,9 +454,9 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: .pip-cache
-          key: ${{ matrix.os }}-${{ matrix.version }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
+          key: ${{ matrix.os }}-${{ matrix.version }}-py${{ matrix.pyver }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
           restore-keys: |
-            ${{ matrix.os }}-${{ matrix.version }}-pip-
+            ${{ matrix.os }}-${{ matrix.version }}-py${{ matrix.pyver }}-pip-
 
       - name: Start VM for ${{ matrix.display_name }}
         id: cross_os
@@ -546,12 +552,12 @@ jobs:
               sudo -E pkgin -y install lz4 git
               sudo -E pkgin -y install rust
               sudo -E pkgin -y install pkg-config
-              # rust already depends on python313, so use that
-              sudo -E pkgin -y install py313-pip py313-virtualenv py313-tox
-              sudo -E ln -sf /usr/pkg/bin/python3.13 /usr/pkg/bin/python3
-              sudo -E ln -sf /usr/pkg/bin/pip3.13 /usr/pkg/bin/pip3
-              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.13 /usr/pkg/bin/virtualenv3
-              sudo -E ln -sf /usr/pkg/bin/tox-3.13 /usr/pkg/bin/tox3
+              # python 3.14 for coverage's fast sysmon core, see #9470
+              sudo -E pkgin -y install py314-pip py314-virtualenv py314-tox
+              sudo -E ln -sf /usr/pkg/bin/python3.14 /usr/pkg/bin/python3
+              sudo -E ln -sf /usr/pkg/bin/pip3.14 /usr/pkg/bin/pip3
+              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.14 /usr/pkg/bin/virtualenv3
+              sudo -E ln -sf /usr/pkg/bin/tox-3.14 /usr/pkg/bin/tox3
 
               # Ensure base system admin tools are on PATH for the non-root shell
               export PATH="/sbin:/usr/sbin:$PATH"
@@ -564,7 +570,7 @@ jobs:
               touch ${TMPDIR}/testfile
               lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
 
-              tox3 -e py313-none
+              tox3 -e py314-none
               ;;
 
             openbsd)
@@ -579,6 +585,7 @@ jobs:
               sudo chmod 1777 /mfs
               export TMPDIR=/mfs
 
+              # 7.9 has no python 3.14 pkg yet - move to 3.14 + update pyver when it ships (#9470)
               sudo -E pkg_add lz4 git rust openssl%3.5 py3-pip py3-virtualenv py3-tox
 
               export BORG_OPENSSL_NAME=eopenssl35
@@ -586,6 +593,7 @@ jobs:
               ;;
 
             omnios)
+              # r151056 has no python-314 pkg yet - move to 3.14 + update pyver when it ships (#9470)
               sudo pkg install gcc14 git pkg-config python-313 gnu-make gnu-coreutils rust
               sudo ln -sf /usr/bin/python3.13 /usr/bin/python3
               sudo ln -sf /usr/bin/python3.13-config /usr/bin/python3-config

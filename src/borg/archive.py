@@ -2626,12 +2626,15 @@ class ArchiveRecreater:
 
     def create_target(self, archive, target_name):
         """Create target archive."""
-        target = self.create_target_archive(target_name)
-        # If the archives use the same chunker params, then don't rechunkify
         source_chunker_params = tuple(archive.metadata.get("chunker_params", []))
         if len(source_chunker_params) == 4 and isinstance(source_chunker_params[0], int):
             # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
             source_chunker_params = (CH_BUZHASH,) + source_chunker_params
+        # if we do not rechunkify, the target archive just reuses the source archive's chunks,
+        # so it must also keep the source archive's chunker params (if we know them), see #10127.
+        target_chunker_params = self.chunker_params if self.rechunkify else source_chunker_params
+        target = self.create_target_archive(target_name, target_chunker_params or self.chunker_params)
+        # If the archives use the same chunker params, then don't rechunkify
         target.recreate_rechunkify = self.rechunkify and source_chunker_params != target.chunker_params
         if target.recreate_rechunkify:
             logger.debug(
@@ -2643,13 +2646,13 @@ class ArchiveRecreater:
         target.chunker = get_chunker(*target.chunker_params, key=self.key, sparse=False)
         return target
 
-    def create_target_archive(self, name):
+    def create_target_archive(self, name, chunker_params=None):
         target = Archive(
             self.manifest,
             name,
             create=True,
             progress=self.progress,
-            chunker_params=self.chunker_params,
+            chunker_params=chunker_params or self.chunker_params,
             cache=self.cache,
         )
         return target

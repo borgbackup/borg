@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import time
@@ -213,6 +214,26 @@ def test_recreate_no_rechunkify(archivers, request):
     output = cmd(archiver, "list", "test", "input/file", "--format", "{num_chunks}")
     num_chunks_after_recreate = int(output)
     assert num_chunks == num_chunks_after_recreate
+
+
+def test_recreate_keeps_chunker_params(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+
+    def chunker_params():
+        info = json.loads(cmd(archiver, "info", "--json", "-a", "test"))
+        return info["archives"][0]["chunker_params"]
+
+    create_regular_file(archiver.input_path, "file", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # first create an archive with non-default params for the default chunker:
+    cmd(archiver, "create", "test", "input", "--chunker-params", "fastcdc,7,9,8,2")
+    assert chunker_params() == ["fastcdc", 7, 9, 8, 2]
+    # recreating without --chunker-params does not rechunk, so the chunker params must be kept:
+    cmd(archiver, "recreate", "-a", "test", "--comment", "a comment")
+    assert chunker_params() == ["fastcdc", 7, 9, 8, 2]
+    # recreating with --chunker-params rechunks, so the new chunker params must be recorded:
+    cmd(archiver, "recreate", "-a", "test", "--chunker-params", "default")
+    assert chunker_params() == list(CHUNKER_PARAMS)
 
 
 def test_recreate_keep_original_timestamp(archivers, request):

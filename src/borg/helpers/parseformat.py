@@ -1262,7 +1262,8 @@ class ItemFormatter(BaseFormatter):
         return len(item.get("chunks", []))
 
     def calculate_size(self, item):
-        # note: does not support hard link slaves, they will be size 0
+        # note: 0 for items without a chunks list, e.g. directories, symlinks, devices, fifos.
+        # borg2 hard links all have their own chunks list, so they get their real size.
         return item.get_size()
 
     def calculate_fingerprint(self, item):

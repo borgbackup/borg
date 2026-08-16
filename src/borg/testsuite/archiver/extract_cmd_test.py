@@ -120,7 +120,7 @@ def test_extract_hardlinked_symlink_does_not_leak_target(archivers, request):
         archiver,
         "evil",
         [
-            # master: a symlink pointing at the external victim file
+            # first item: a symlink pointing at the external victim file
             Item(path="s", mode=stat.S_IFLNK | 0o777, target=victim_file, hlid=hlid, **attrs),
             # contentless hardlink to the same hlid
             Item(path="h", mode=stat.S_IFLNK | 0o777, hlid=hlid, **attrs),

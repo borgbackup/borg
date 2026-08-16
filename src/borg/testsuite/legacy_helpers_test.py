@@ -1,9 +1,9 @@
-"""Tests for borg.legacy.helpers (borg1_hardlinkable, borg1_hardlink_master, borg1_hardlink_slave)."""
+"""Tests for borg.legacy.helpers (borg1_hardlinkable, borg1_hardlink_with_content, borg1_hardlink_reference)."""
 
 import stat
 
 from ..item import Item
-from ..legacy.helpers import borg1_hardlink_master, borg1_hardlink_slave, borg1_hardlinkable
+from ..legacy.helpers import borg1_hardlink_with_content, borg1_hardlink_reference, borg1_hardlinkable
 
 
 def _item(**kwargs):
@@ -43,38 +43,45 @@ def test_hardlinkable_socket_is_false():
     assert not borg1_hardlinkable(stat.S_IFSOCK | 0o600)
 
 
-# ── borg1_hardlink_master ─────────────────────────────────────────────────────
+# ── borg1_hardlink_with_content ───────────────────────────────────────────────
 
 
-def test_hardlink_master_true_when_all_conditions_met():
+def test_hardlink_with_content_true_when_all_conditions_met():
     item = _item(hardlink_master=True)
-    assert borg1_hardlink_master(item)
+    assert borg1_hardlink_with_content(item)
 
 
-def test_hardlink_master_false_when_flag_missing():
+def test_hardlink_with_content_false_when_flag_missing():
     item = _item()
-    assert not borg1_hardlink_master(item)
+    assert not borg1_hardlink_with_content(item)
 
 
-def test_hardlink_master_false_when_flag_is_false():
+def test_hardlink_with_content_false_when_flag_is_false():
     item = _item(hardlink_master=False)
-    assert not borg1_hardlink_master(item)
+    assert not borg1_hardlink_with_content(item)
 
 
-# ── borg1_hardlink_slave ──────────────────────────────────────────────────────
+def test_hardlink_with_content_false_when_source_present():
+    # since #7175, borg1 set the hardlink_master flag on all hardlinkable items,
+    # so only the absence of .source identifies the item that has the content.
+    item = _item(hardlink_master=True, source="dir/original")
+    assert not borg1_hardlink_with_content(item)
 
 
-def test_hardlink_slave_true_when_source_and_hardlinkable():
+# ── borg1_hardlink_reference ──────────────────────────────────────────────────
+
+
+def test_hardlink_reference_true_when_source_and_hardlinkable():
     item = _item(source="dir/original")
-    assert borg1_hardlink_slave(item)
+    assert borg1_hardlink_reference(item)
 
 
-def test_hardlink_slave_true_for_non_regular_hardlinkable_type():
+def test_hardlink_reference_true_for_non_regular_hardlinkable_type():
     # borg1_hardlinkable covers FIFO/block/char as well as regular files
     item = _item(source="dir/original", mode=stat.S_IFIFO | 0o644)
-    assert borg1_hardlink_slave(item)
+    assert borg1_hardlink_reference(item)
 
 
-def test_hardlink_slave_false_when_no_source():
+def test_hardlink_reference_false_when_no_source():
     item = _item()
-    assert not borg1_hardlink_slave(item)
+    assert not borg1_hardlink_reference(item)

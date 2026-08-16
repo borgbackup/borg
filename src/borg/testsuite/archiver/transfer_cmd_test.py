@@ -129,7 +129,7 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
                 if key in e:
                     e[key] = convert_tz(e[key], repo12_tzoffset, None)
 
-            # borg 1 used hard link slaves linking back to their hard link masters.
+            # borg 1 used contentless hard link items back referencing the item with the content.
             # borg 2 uses symmetric approach: just normal items. if they are hard links,
             # each item has normal attributes, including the chunks list, size. additionally,
             # they have a hlid and same hlid means same inode / belonging to same set of hard links.
@@ -137,16 +137,16 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             if hardlink:
                 hardlinks[g["path"]] = g["hlid"]
                 if e["mode"].startswith("h"):
-                    # fix expectations: borg1 signalled a hard link slave with "h"
+                    # fix expectations: borg1 signalled a contentless hard link with "h"
                     # borg2 treats all hard links symmetrically as normal files
                     e["mode"] = g["mode"][0] + e["mode"][1:]
-                    # borg1 used source/linktarget to link back to hard link master
+                    # borg1 used source/linktarget to link back to the item with the content
                     assert e["source"] != ""
                     assert e["linktarget"] != ""
                     # fix expectations: borg2 does not use source/linktarget any more for hard links
                     e["source"] = ""
                     e["linktarget"] = ""
-                    # borg 1 has size == 0 for hard link slaves, borg 2 has the real file size
+                    # borg 1 has size == 0 for contentless hard links, borg 2 has the real file size
                     assert e["size"] == 0
                     assert g["size"] >= 0
                     # fix expectation for size

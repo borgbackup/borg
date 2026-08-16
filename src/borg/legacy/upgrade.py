@@ -6,7 +6,7 @@ from ..compress import ZLIB, ZLIB_legacy, ObfuscateSize
 from ..helpers import HardLinkManager, join_cmd
 from ..item import Item
 from ..logger import create_logger
-from .helpers import borg1_hardlink_master, borg1_hardlink_slave
+from .helpers import borg1_hardlink_with_content, borg1_hardlink_reference
 
 logger = create_logger(__name__)
 
@@ -48,10 +48,10 @@ class UpgraderFrom12To20:
             "acl_extended",
         }
 
-        if borg1_hardlink_master(item):
+        if borg1_hardlink_with_content(item):
             item.hlid = hlid = self.hlm.hardlink_id_from_path(item.path)
             self.hlm.remember(id=hlid, info=item.get("chunks"))
-        elif borg1_hardlink_slave(item):
+        elif borg1_hardlink_reference(item):
             item.hlid = hlid = self.hlm.hardlink_id_from_path(item.source)
             chunks = self.hlm.retrieve(id=hlid)
             if chunks is not None:

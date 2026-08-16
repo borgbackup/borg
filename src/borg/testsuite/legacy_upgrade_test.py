@@ -81,7 +81,7 @@ def test_symlink_source_renamed_to_target():
     assert "source" not in d
 
 
-def test_hardlink_master_gets_hlid_and_strips_hardlink_master_key():
+def test_hardlink_with_content_gets_hlid_and_strips_hardlink_master_key():
     u, _, _ = _upgrader()
     item = _item(hardlink_master=True, chunks=[[CHUNK_ID, CHUNK_SIZE]])
     result = u.upgrade_item(item=item)
@@ -91,19 +91,19 @@ def test_hardlink_master_gets_hlid_and_strips_hardlink_master_key():
     assert d["chunks"] == [[CHUNK_ID, CHUNK_SIZE]]
 
 
-def test_hardlink_slave_gets_master_hlid_and_chunks():
+def test_hardlink_reference_gets_hlid_and_chunks_of_item_with_content():
     u, cache, archive = _upgrader()
-    master = _item(hardlink_master=True, chunks=[[CHUNK_ID, CHUNK_SIZE]])
-    master_result = u.upgrade_item(item=master)
+    with_content = _item(hardlink_master=True, chunks=[[CHUNK_ID, CHUNK_SIZE]])
+    with_content_result = u.upgrade_item(item=with_content)
 
-    slave = _item(path="dir/link2", source="dir/file")
-    slave_result = u.upgrade_item(item=slave)
+    reference = _item(path="dir/link2", source="dir/file")
+    reference_result = u.upgrade_item(item=reference)
 
-    d = slave_result.as_dict()
+    d = reference_result.as_dict()
     assert "hlid" in d
     assert "source" not in d
     assert d["chunks"] == [[CHUNK_ID, CHUNK_SIZE]]
-    assert slave_result.hlid == master_result.hlid
+    assert reference_result.hlid == with_content_result.hlid
     cache.reuse_chunk.assert_called_once_with(CHUNK_ID, CHUNK_SIZE, archive.stats)
 
 

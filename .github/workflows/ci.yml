@@ -146,26 +146,28 @@ jobs:
       # the matrix, see continue-on-error below.
       fail-fast: true
       # noinspection YAMLSchemaValidation
+      # "coverage": "1" collects coverage in that entry - we only do that for the
+      # oldest and the newest supported python, measuring is not free, see #9470.
       matrix: >-
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "mypy"},
               {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
+              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse", "coverage": "1"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3", "store_cache": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy", "coverage": "1"},
               {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
+              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse", "coverage": "1"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy", "store_cache": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
-              {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
-              {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
-              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "coverage": "1", "binary": "borg-linux-glibc239-x86_64-gh"},
+              {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "coverage": "1", "binary": "borg-linux-glibc239-arm64-gh"},
+              {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "coverage": "1", "binary": "borg-macos-15-arm64-gh"},
+              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "coverage": "1", "binary": "borg-macos-15-x86_64-gh"},
               {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }'
@@ -365,6 +367,9 @@ jobs:
         if-no-files-found: error
 
     - name: run tox env
+      env:
+        # tox passes this through to pytest (pass_env = ["*"])
+        PYTEST_ADDOPTS: ${{ !matrix.coverage && '--no-cov' || '' }}
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
@@ -385,7 +390,7 @@ jobs:
         files: test-results.xml
 
     - name: Upload coverage to Codecov
-      if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
+      if: ${{ !cancelled() && matrix.coverage }}
       uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
       env:
         OS: ${{ runner.os }}

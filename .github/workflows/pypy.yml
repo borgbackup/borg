@@ -34,8 +34,8 @@ env:
 
 jobs:
   pypy_nightly:
-    name: Tests (pypy-3.11-nightly, ubuntu-24.04)
-    runs-on: ubuntu-24.04
+    name: Tests (pypy-3.11-nightly, ubuntu-26.04)
+    runs-on: ubuntu-26.04
     timeout-minutes: 120
     continue-on-error: true
 

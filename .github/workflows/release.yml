@@ -32,10 +32,10 @@ env:
   # "binary" entries of the native_tests matrix, the "artifact_prefix" entries
   # of the vm_tests matrix and the windows_tests job in ci.yml - keep in sync.
   EXPECTED_ASSETS: >-
-    borg-linux-glibc239-x86_64-gh
-    borg-linux-glibc239-x86_64-gh.tgz
-    borg-linux-glibc239-arm64-gh
-    borg-linux-glibc239-arm64-gh.tgz
+    borg-linux-glibc243-x86_64-gh
+    borg-linux-glibc243-x86_64-gh.tgz
+    borg-linux-glibc243-arm64-gh
+    borg-linux-glibc243-arm64-gh.tgz
     borg-macos-15-arm64-gh
     borg-macos-15-arm64-gh.tgz
     borg-macos-15-x86_64-gh
@@ -48,7 +48,7 @@ env:
 jobs:
   github_release:
     name: Draft the GitHub release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     permissions:

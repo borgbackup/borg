@@ -13,7 +13,7 @@ permissions:
 jobs:
   backport:
     name: Backport pull request
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
 
     # Only run when pull request is merged

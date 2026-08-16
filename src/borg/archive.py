@@ -2533,11 +2533,13 @@ class ArchiveRecreater:
     def create_target(self, archive, target_name=None):
         """Create target archive."""
         target_name = target_name or archive.name + '.recreate'
-        target = self.create_target_archive(target_name)
-        # If the archives use the same chunker params, then don't rechunkify
         src_cp = archive.metadata.get('chunker_params')
         src_cp = normalize_chunker_params(src_cp) if src_cp is not None else None
-        dst_cp = target.chunker_params
+        # if we do not rechunkify, the target archive just reuses the source archive's chunks,
+        # so it must also keep the source archive's chunker params (if we know them), see #10127.
+        dst_cp = self.chunker_params if self.rechunkify else (src_cp or self.chunker_params)
+        target = self.create_target_archive(target_name, dst_cp)
+        # If the archives use the same chunker params, then don't rechunkify
         target.recreate_rechunkify = self.rechunkify and src_cp != dst_cp
         if target.recreate_rechunkify:
             logger.debug('Rechunking archive from %s to %s', src_cp or '(unknown)', dst_cp)
@@ -2548,10 +2550,10 @@ class ArchiveRecreater:
         target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed, sparse=False)
         return target
 
-    def create_target_archive(self, name):
+    def create_target_archive(self, name, chunker_params=None):
         target = Archive(self.repository, self.key, self.manifest, name, create=True,
-                          progress=self.progress, chunker_params=self.chunker_params, cache=self.cache,
-                          checkpoint_interval=self.checkpoint_interval)
+                          progress=self.progress, chunker_params=chunker_params or self.chunker_params,
+                          cache=self.cache, checkpoint_interval=self.checkpoint_interval)
         return target
 
     def open_archive(self, name, **kwargs):

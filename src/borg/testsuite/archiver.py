@@ -3648,6 +3648,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         num_chunks_after_recreate = int(output)
         assert num_chunks == num_chunks_after_recreate
 
+    def test_recreate_keeps_chunker_params(self):
+        def chunker_params(archive):
+            info = json.loads(self.cmd('info', '--json', self.repository_location + '::' + archive))
+            return info['archives'][0]['chunker_params']
+
+        self.create_regular_file('file', size=1024)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        # first create an archive with non-default chunker params:
+        self.cmd('create', '--chunker-params', '7,9,8,127', self.repository_location + '::test', 'input')
+        assert chunker_params('test') == ['buzhash', 7, 9, 8, 127]
+        # recreating without --chunker-params does not rechunk, so the chunker params must be kept:
+        self.cmd('recreate', '--comment', 'a comment', self.repository_location + '::test')
+        assert chunker_params('test') == ['buzhash', 7, 9, 8, 127]
+        # recreating with --chunker-params rechunks, so the new chunker params must be recorded:
+        self.cmd('recreate', '--chunker-params', 'fixed,4096', self.repository_location + '::test')
+        assert chunker_params('test') == ['fixed', 4096, 0]
+
     def test_recreate_recompress(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)

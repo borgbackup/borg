@@ -132,7 +132,8 @@ jobs:
         set -euo pipefail
         export LD_PRELOAD="$(gcc -print-file-name=libasan.so):$(gcc -print-file-name=libubsan.so)"
         echo "Using LD_PRELOAD=$LD_PRELOAD"
-        pytest -v --benchmark-skip -k "not remote"
+        # the sanitizer runtimes write their reports to stderr, so they still show up per worker
+        pytest -v -n auto --benchmark-skip -k "not remote"
 
   native_tests:
 

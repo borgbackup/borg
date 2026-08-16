@@ -213,8 +213,11 @@ def archiver(tmp_path, set_env_variables):
 
 
 @pytest.fixture()
-def remote_archiver(archiver):
+def remote_archiver(archiver, monkeypatch):
     archiver.repository_location = "rest://" + "/" + str(archiver.repository_path)
+    # don't measure coverage in the "borg serve --rest" children, see #9470
+    monkeypatch.delenv("COVERAGE_PROCESS_CONFIG", raising=False)
+    monkeypatch.delenv("COVERAGE_PROCESS_START", raising=False)
     yield archiver
 
 

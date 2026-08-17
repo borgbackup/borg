@@ -323,6 +323,12 @@ when reading from FIFOs or character devices (see \-\-read\-special): skip the f
 .TP
 .BI \-\-map \ MAPFILE
 give a map file describing the content ranges of the (single) input file, so borg does not need to read all of it. See the \fIInput maps\fP section below.
+.TP
+.BI \-\-reuse\-from \ ARCHIVE
+reuse the chunks of this reference archive for the input map\(aqs \fBsame\fP ranges (requires \-\-map). See the \fIInput maps\fP section below.
+.TP
+.BI \-\-reuse\-path \ PATH
+archive\-internal path of the reference item in the \-\-reuse\-from archive (only needed if that archive contains more than one file item).
 .UNINDENT
 .SS Archive options
 .INDENT 0.0
@@ -606,10 +612,27 @@ STATE is one of:
 .IP \(bu 2
 \fBzero\fP: the range is known to read as all\-zero bytes. borg stores a hole
 (all\-zero range) of that size without reading the range.
+.IP \(bu 2
+\fBsame\fP: the range is known to be identical to the same range of the input
+backed up in the \fB\-\-reuse\-from REFARCHIVE\fP reference archive (usually: the
+previous backup of an earlier snapshot of the same device). borg reuses the
+reference archive\(aqs chunks for such ranges without reading them. This state
+requires \fB\-\-reuse\-from\fP\&.
 .UNINDENT
 .sp
+The reference archive must contain exactly one file item; if it contains more,
+select the reference item with \fB\-\-reuse\-path PATH\fP (its archive\-internal path).
+Reference chunks that only partially overlap \fBsame\fP ranges are re\-read from
+the input, so any chunker gives correct results \- but a fixed block size chunker
+(e.g. \fB\-\-chunker\-params fixed,4194304\fP, same parameters as used for the
+reference archive) avoids re\-reading at the edges of changed ranges and gives
+stable chunk boundaries across backups.
+.sp
 \fBThe map is trusted\fP: if it is wrong (e.g. a range marked \fBzero\fP actually
-contains data), the archive will not match the input and borg cannot detect that.
+contains data, or a range marked \fBsame\fP actually changed), the archive will
+not match the input and borg cannot detect that. Independently verify the
+source producing the maps, and consider doing a periodic full read backup
+(without \fB\-\-map\fP).
 .SS Feeding all file paths from externally
 .sp
 Usually, you give a starting path (recursion root) to borg and then borg

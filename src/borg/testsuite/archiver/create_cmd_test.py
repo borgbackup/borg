@@ -17,7 +17,7 @@ from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError, BackupBrokenSymlinkError
-from ...helpers import BackupWarning
+from ...helpers import BackupWarning, Error
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -1554,3 +1554,55 @@ def test_exclude_nodump_dir_with_file(archivers, request):
     list_output = cmd(archiver, "list", "test", "--short")
     assert "input/nd\n" not in list_output
     assert "input/nd/file_in_ndir\n" not in list_output
+
+
+def test_create_map(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    block = 4096
+    data_a, data_b, data_c = os.urandom(block), os.urandom(block), os.urandom(block)
+    # data_b is real data, but the map claims that range reads as zero:
+    # borg must not read "zero" ranges, so the archive must contain zeros there.
+    create_regular_file(archiver.input_path, "file", contents=data_a + data_b + data_c + b"\0" * block)
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write("# test input map\n")
+        f.write(f"0 {block} data\n")
+        f.write(f"0x1000 {block} zero\n")
+        f.write(f"{2 * block} {block} data\n")
+        f.write(f"{3 * block} {block} zero\n")
+    expected = data_a + b"\0" * block + data_c + b"\0" * block
+    for name, chunker_args in [("test-fixed", ("--chunker-params", "fixed,4096")), ("test-default", ())]:
+        cmd(archiver, "create", *chunker_args, "--map", map_path, name, "input/file")
+        with changedir("output"):
+            cmd(archiver, "extract", name)
+        with open(os.path.join("output", "input", "file"), "rb") as f:
+            assert f.read() == expected
+        shutil.rmtree("output")
+        os.mkdir("output")
+
+
+def test_create_map_errors(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", size=2 * 4096)
+    create_regular_file(archiver.input_path, "file2", size=100)
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write("0 4096 data\n")
+
+    def expect_error(exc_class, *args):
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, *args, exit_code=exc_class().exit_code)
+        else:
+            with pytest.raises(exc_class):
+                cmd(archiver, *args)
+
+    # --map requires exactly one input path
+    expect_error(CommandError, "create", "--map", map_path, "test", "input/file", "input/file2")
+    # --map input must not be a directory
+    expect_error(CommandError, "create", "--map", map_path, "test", "input")
+    # --map cannot be used with stdin input
+    expect_error(CommandError, "create", "--map", map_path, "test", "-")
+    # the map covers 4096 bytes, but the input file has 8192 bytes
+    expect_error(Error, "create", "--map", map_path, "test", "input/file")

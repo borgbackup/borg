@@ -18,6 +18,7 @@ from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
 from ..helpers import archivename_validator, FilesCacheMode, files_cache_mode_no_ctime
 from ..helpers import octal_int, nonnegative_seconds
+from ..helpers import read_input_map
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
@@ -71,6 +72,27 @@ class CreateMixIn:
             read_special_timeout = READ_SPECIAL_TIMEOUT_DEFAULT
         if read_special_timeout == 0:
             read_special_timeout = None  # wait forever
+        input_map = None
+        if args.input_map is not None:
+            # --map only makes sense for a single, seekable input file, see #4363.
+            if args.paths_from_stdin or args.paths_from_command or args.paths_from_shell_command:
+                raise CommandError("--map cannot be used with --paths-from-*.")
+            if args.content_from_command:
+                raise CommandError("--map cannot be used with --content-from-command.")
+            if len(args.paths) != 1:
+                raise CommandError("--map requires exactly one input path.")
+            if args.paths[0] == "-":
+                raise CommandError("--map cannot be used with stdin input.")
+            try:
+                st_map = os.stat(args.paths[0], follow_symlinks=True)
+            except OSError as e:
+                raise CommandError(f"--map input: {args.paths[0]}: {e}")
+            if stat.S_ISBLK(st_map.st_mode):
+                if not args.read_special:
+                    raise CommandError("--map with a block device requires --read-special.")
+            elif not stat.S_ISREG(st_map.st_mode):
+                raise CommandError("--map input must be a regular file or a block device.")
+            input_map = read_input_map(args.input_map)
         if is_win32:
             # st_ctime is the file *creation* time on Windows, not the "metadata change time",
             # so a ctime based files cache mode would not detect content changes of a file that
@@ -315,6 +337,7 @@ class CreateMixIn:
                     file_status_printer=self.print_file_status,
                     files_changed=args.files_changed,
                     read_special_timeout=read_special_timeout,
+                    input_map=input_map,
                 )
                 create_inner(archive, cache, fso)
             args.stats |= args.json
@@ -955,6 +978,31 @@ class CreateMixIn:
         By default, the content read from stdin is stored in a file called 'stdin'.
         Use ``--stdin-name`` to change the name.
 
+        Input maps
+        ++++++++++
+
+        Usually, borg reads the complete input to determine its contents. If you already
+        know the contents of parts of the input from an external source of truth, you can
+        give that information via ``--map MAPFILE`` and borg will not read the known parts.
+        The primary use case is backing up snapshots of large block devices (e.g. LVM thin
+        volumes), where the storage layer knows which ranges are in use.
+
+        ``--map`` requires giving exactly one input path, which must be a regular file or
+        (with ``--read-special``) a block device.
+
+        The map file must describe the whole input: one range per line, in the form
+        ``START LENGTH STATE`` (byte values, decimal or 0x-prefixed hexadecimal). The
+        ranges must be sorted, non-overlapping and contiguous, starting at offset 0 and
+        covering the exact input size. ``#`` starts a comment, empty lines are ignored.
+        STATE is one of:
+
+        - ``data``: the range's contents are read and backed up.
+        - ``zero``: the range is known to read as all-zero bytes. borg stores a hole
+          (all-zero range) of that size without reading the range.
+
+        **The map is trusted**: if it is wrong (e.g. a range marked ``zero`` actually
+        contains data), the archive will not match the input and borg cannot detect that.
+
         Feeding all file paths from externally
         ++++++++++++++++++++++++++++++++++++++
 
@@ -1145,6 +1193,14 @@ class CreateMixIn:
             "file with an error if no data arrives for more than SECONDS (this includes waiting "
             "for a FIFO's writer to connect). Give 0 to wait forever. default: %d seconds."
             % READ_SPECIAL_TIMEOUT_DEFAULT,
+        )
+        fs_group.add_argument(
+            "--map",
+            metavar="MAPFILE",
+            dest="input_map",
+            action=Highlander,
+            help="give a map file describing the content ranges of the (single) input file, "
+            "so borg does not need to read all of it. See the *Input maps* section below.",
         )
 
         archive_group = subparser.add_argument_group("Archive options")

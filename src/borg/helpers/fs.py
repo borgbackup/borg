@@ -640,6 +640,59 @@ class SpecialFileReader:
         raise OSError(errno.ESPIPE, os.strerror(errno.ESPIPE))
 
 
+# input map range states (borg create --map), see #4363.
+MAP_DATA = "data"  # range contains data, read and store it
+MAP_ZERO = "zero"  # range is known to read as all-zero, store a hole without reading it
+MAP_SAME = "same"  # range is known unchanged vs. a reference archive, reuse its chunks (--reuse-from)
+
+
+def read_input_map(path, *, allow_same=False):
+    """
+    Read and validate an input map file (borg create --map), see #4363.
+
+    Format: one range per line: "START LENGTH STATE" (decimal or 0x-prefixed hex),
+    STATE being data, zero or same. '#' starts a comment, empty lines are ignored.
+    The ranges must be sorted, non-overlapping and contiguous, starting at offset 0.
+
+    Returns a list of (start, length, state) tuples.
+    """
+    states = {MAP_DATA, MAP_ZERO} | ({MAP_SAME} if allow_same else set())
+    input_map = []
+    expected_start = 0
+    with open(path) as f:
+        for lineno, line in enumerate(f, start=1):
+            line = line.split("#", 1)[0].strip()
+            if not line:
+                continue
+            err = f"{path}:{lineno}: invalid input map line"
+            try:
+                start_s, length_s, state = line.split()
+                start, length = int(start_s, 0), int(length_s, 0)
+            except ValueError:
+                raise Error(f"{err}: expected 'START LENGTH STATE', got: {line!r}") from None
+            if state not in states:
+                raise Error(f"{err}: invalid state {state!r} (expected: {', '.join(sorted(states))})")
+            if length <= 0:
+                raise Error(f"{err}: LENGTH must be positive")
+            if start != expected_start:
+                raise Error(
+                    f"{err}: ranges must be sorted, contiguous and start at offset 0 "
+                    f"(expected START {expected_start}, got {start})"
+                )
+            input_map.append((start, length, state))
+            expected_start = start + length
+    if not input_map:
+        raise Error(f"{path}: empty input map")
+    return input_map
+
+
+def input_map_check_size(input_map, size):
+    """Check that *input_map* covers [0, size) exactly - a mismatch means the map does not belong to this input."""
+    covered = input_map[-1][0] + input_map[-1][1]
+    if covered != size:
+        raise Error(f"input map covers {covered} bytes, but the input has {size} bytes")
+
+
 def umount(mountpoint):
     from . import set_ec
 

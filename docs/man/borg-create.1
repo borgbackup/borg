@@ -320,6 +320,9 @@ open and read block and char device files as well as FIFOs as if they were regul
 .TP
 .BI \-\-read\-special\-timeout \ SECONDS
 when reading from FIFOs or character devices (see \-\-read\-special): skip the file with an error if no data arrives for more than SECONDS (this includes waiting for a FIFO\(aqs writer to connect). Give 0 to wait forever. default: 1800 seconds.
+.TP
+.BI \-\-map \ MAPFILE
+give a map file describing the content ranges of the (single) input file, so borg does not need to read all of it. See the \fIInput maps\fP section below.
 .UNINDENT
 .SS Archive options
 .INDENT 0.0
@@ -581,6 +584,32 @@ creation a bit.
 .sp
 By default, the content read from stdin is stored in a file called \(aqstdin\(aq.
 Use \fB\-\-stdin\-name\fP to change the name.
+.SS Input maps
+.sp
+Usually, borg reads the complete input to determine its contents. If you already
+know the contents of parts of the input from an external source of truth, you can
+give that information via \fB\-\-map MAPFILE\fP and borg will not read the known parts.
+The primary use case is backing up snapshots of large block devices (e.g. LVM thin
+volumes), where the storage layer knows which ranges are in use.
+.sp
+\fB\-\-map\fP requires giving exactly one input path, which must be a regular file or
+(with \fB\-\-read\-special\fP) a block device.
+.sp
+The map file must describe the whole input: one range per line, in the form
+\fBSTART LENGTH STATE\fP (byte values, decimal or 0x\-prefixed hexadecimal). The
+ranges must be sorted, non\-overlapping and contiguous, starting at offset 0 and
+covering the exact input size. \fB#\fP starts a comment, empty lines are ignored.
+STATE is one of:
+.INDENT 0.0
+.IP \(bu 2
+\fBdata\fP: the range\(aqs contents are read and backed up.
+.IP \(bu 2
+\fBzero\fP: the range is known to read as all\-zero bytes. borg stores a hole
+(all\-zero range) of that size without reading the range.
+.UNINDENT
+.sp
+\fBThe map is trusted\fP: if it is wrong (e.g. a range marked \fBzero\fP actually
+contains data), the archive will not match the input and borg cannot detect that.
 .SS Feeding all file paths from externally
 .sp
 Usually, you give a starting path (recursion root) to borg and then borg

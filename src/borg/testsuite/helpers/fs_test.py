@@ -24,7 +24,13 @@ from ...helpers.fs import (
     make_path_safe,
     map_chars,
     SpecialFileReader,
+    MAP_DATA,
+    MAP_ZERO,
+    MAP_SAME,
+    read_input_map,
+    input_map_check_size,
 )
+from ...helpers.errors import Error
 from ...platform import is_win32, is_darwin
 from .. import are_fifos_supported, are_hardlinks_supported
 from .. import rejected_dotdot_paths
@@ -606,3 +612,48 @@ def test_special_file_reader_not_seekable():
         with pytest.raises(OSError) as exc_info:
             reader.seek(0)
         assert exc_info.value.errno == errno.ESPIPE
+
+
+def test_read_input_map(tmp_path):
+    p = tmp_path / "input.map"
+    p.write_text("# a comment\n\n0 0x1000 data\n0x1000 4096 zero  # trailing comment\n8192 100 data\n")
+    assert read_input_map(os.fspath(p)) == [(0, 4096, MAP_DATA), (4096, 4096, MAP_ZERO), (8192, 100, MAP_DATA)]
+
+
+def test_read_input_map_same_state(tmp_path):
+    p = tmp_path / "input.map"
+    p.write_text("0 100 same\n")
+    with pytest.raises(Error, match="invalid state"):
+        read_input_map(os.fspath(p))
+    assert read_input_map(os.fspath(p), allow_same=True) == [(0, 100, MAP_SAME)]
+
+
+@pytest.mark.parametrize(
+    "content, match",
+    [
+        ("", "empty input map"),
+        ("0 100\n", "expected 'START LENGTH STATE'"),
+        ("0 100 data extra\n", "expected 'START LENGTH STATE'"),
+        ("x 100 data\n", "expected 'START LENGTH STATE'"),
+        ("0 100 nodata\n", "invalid state"),
+        ("0 0 data\n", "LENGTH must be positive"),
+        ("0 -5 data\n", "LENGTH must be positive"),
+        ("100 100 data\n", "expected START 0"),
+        ("0 100 data\n50 100 zero\n", "expected START 100"),
+        ("0 100 data\n200 100 zero\n", "expected START 100"),
+    ],
+)
+def test_read_input_map_invalid(tmp_path, content, match):
+    p = tmp_path / "input.map"
+    p.write_text(content)
+    with pytest.raises(Error, match=match):
+        read_input_map(os.fspath(p))
+
+
+def test_input_map_check_size():
+    input_map = [(0, 100, MAP_DATA), (100, 50, MAP_ZERO)]
+    input_map_check_size(input_map, 150)  # exact coverage - ok
+    with pytest.raises(Error, match="covers 150 bytes, but the input has 151"):
+        input_map_check_size(input_map, 151)
+    with pytest.raises(Error, match="covers 150 bytes, but the input has 149"):
+        input_map_check_size(input_map, 149)

@@ -43,6 +43,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
 from .helpers import os_open, flags_normal, flags_dir, O_, SpecialFileReader
+from .helpers import MAP_DATA, input_map_check_size
 from .helpers import os_stat
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
@@ -1388,6 +1389,7 @@ class FilesystemObjectProcessors:
         file_status_printer=None,
         files_changed="mtime" if is_win32 else "ctime",
         read_special_timeout=None,
+        input_map=None,
     ):
         self.metadata_collector = metadata_collector
         self.cache = cache
@@ -1398,6 +1400,7 @@ class FilesystemObjectProcessors:
         self.print_file_status = file_status_printer or (lambda *args: None)
         self.files_changed = files_changed
         self.read_special_timeout = read_special_timeout
+        self.input_map = input_map  # --map: content range info for the single input file, see #4363
 
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
@@ -1589,7 +1592,11 @@ class FilesystemObjectProcessors:
                         chunk_entry = cache.reuse_chunk(chunk_id, chunk_size, self.stats)
                         item.chunks.append(chunk_entry)
                 else:  # normal case, no "2nd+" hard link
-                    if not is_special_file:
+                    if self.input_map is not None:
+                        # --map: the given map replaces the files cache as content/change information, see #4363.
+                        hashed_path = path_hash = None
+                        known, chunks = False, None
+                    elif not is_special_file:
                         hashed_path = safe_encode(item.path)  # path as in archive item!
                         started_hashing = time.monotonic()
                         path_hash = self.key.id_hash(hashed_path)
@@ -1630,7 +1637,16 @@ class FilesystemObjectProcessors:
                         # and still commit the archive -- referencing chunks that were never durably
                         # stored. An unwrapped repository OSError is critical and aborts create before
                         # archive.save() runs (see the BackupOSError docstring).
-                        if read_special_timeout is not None:
+                        if self.input_map is not None:
+                            # --map: read only the "data" ranges, store "zero" ranges as holes without
+                            # reading them, see #4363. Non-seekable inputs (fifo/chr) are rejected earlier.
+                            with backup_io("seek"):
+                                input_size = st.st_size if stat.S_ISREG(st.st_mode) else os.lseek(fd, 0, os.SEEK_END)
+                                os.lseek(fd, 0, os.SEEK_SET)
+                            input_map_check_size(self.input_map, input_size)
+                            fmap = [(start, length, state == MAP_DATA) for start, length, state in self.input_map]
+                            chunk_iter = self.chunker.chunkify(None, fd, fmap=fmap, st=st)
+                        elif read_special_timeout is not None:
                             # all reads go through the timeout-enforcing wrapper (fh stays unused).
                             chunk_iter = self.chunker.chunkify(SpecialFileReader(fd, read_special_timeout), st=st)
                         else:

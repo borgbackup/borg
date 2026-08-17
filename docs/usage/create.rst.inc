@@ -99,6 +99,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special-timeout SECONDS``                | when reading from FIFOs or character devices (see --read-special): skip the file with an error if no data arrives for more than SECONDS (this includes waiting for a FIFO's writer to connect). Give 0 to wait forever. default: 1800 seconds. |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--map MAPFILE``                                 | give a map file describing the content ranges of the (single) input file, so borg does not need to read all of it. See the *Input maps* section below.                                                                                         |
+    +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Archive options**                                                                                                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--comment COMMENT``                             | add a comment text to the archive                                                                                                                                                                                                              |
@@ -173,6 +175,7 @@ borg create
         --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
         --read-special-timeout SECONDS    when reading from FIFOs or character devices (see --read-special): skip the file with an error if no data arrives for more than SECONDS (this includes waiting for a FIFO's writer to connect). Give 0 to wait forever. default: 1800 seconds.
+        --map MAPFILE             give a map file describing the content ranges of the (single) input file, so borg does not need to read all of it. See the *Input maps* section below.
 
 
     Archive options
@@ -444,6 +447,31 @@ creation a bit.
 
 By default, the content read from stdin is stored in a file called 'stdin'.
 Use ``--stdin-name`` to change the name.
+
+Input maps
+++++++++++
+
+Usually, borg reads the complete input to determine its contents. If you already
+know the contents of parts of the input from an external source of truth, you can
+give that information via ``--map MAPFILE`` and borg will not read the known parts.
+The primary use case is backing up snapshots of large block devices (e.g. LVM thin
+volumes), where the storage layer knows which ranges are in use.
+
+``--map`` requires giving exactly one input path, which must be a regular file or
+(with ``--read-special``) a block device.
+
+The map file must describe the whole input: one range per line, in the form
+``START LENGTH STATE`` (byte values, decimal or 0x-prefixed hexadecimal). The
+ranges must be sorted, non-overlapping and contiguous, starting at offset 0 and
+covering the exact input size. ``#`` starts a comment, empty lines are ignored.
+STATE is one of:
+
+- ``data``: the range's contents are read and backed up.
+- ``zero``: the range is known to read as all-zero bytes. borg stores a hole
+  (all-zero range) of that size without reading the range.
+
+**The map is trusted**: if it is wrong (e.g. a range marked ``zero`` actually
+contains data), the archive will not match the input and borg cannot detect that.
 
 Feeding all file paths from externally
 ++++++++++++++++++++++++++++++++++++++

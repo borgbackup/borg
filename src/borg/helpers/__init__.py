@@ -24,6 +24,7 @@ from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get
 from .fs import dir_is_tagged, dir_is_cachedir, remove_dotdot_prefixes, make_path_safe, scandir_inorder
 from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, get_strip_prefix, umount, slashify
 from .fs import SpecialFileReader
+from .fs import MAP_DATA, MAP_ZERO, MAP_SAME, read_input_map, input_map_check_size
 from .fs import O_, flags_dir, flags_dir_follow, flags_special_follow, flags_special
 from .fs import flags_base, flags_normal, flags_normal_follow, flags_noatime
 from .fs import HardLinkManager

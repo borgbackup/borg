@@ -1,0 +1,71 @@
+# Optional (non-blocking) test run on a PyPy 3.11 nightly build, see #1755.
+#
+# borg does not officially support pypy, this job is here to notice breakage on
+# either side early: pypy nightlies change daily, and borg's C extension code
+# keeps running into cpyext differences (pypy/pypy#5543, #5544, #5545, #5546,
+# #5564, #5565 all came out of this).
+#
+# Deliberately not part of ci.yml: it runs on a schedule (and on demand), not on
+# every PR, and continue-on-error keeps a red pypy from looking like a broken
+# build. If pypy support ever becomes a supported target, move it into ci.yml's
+# native_tests matrix instead (that matrix has an "allow-failure" flag).
+
+name: PyPy (nightly)
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # Run at 05:00 UTC
+  workflow_dispatch:      # Allow manual trigger
+
+permissions:
+  contents: read
+
+env:
+  # Force colored pytest output even without a tty - the GitHub Actions log
+  # viewer renders ANSI colors.
+  PY_COLORS: "1"
+
+jobs:
+  pypy_nightly:
+    name: Tests (pypy-3.11-nightly, ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    continue-on-error: true  # optional job: pypy is a best-effort target
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set up PyPy 3.11 (nightly)
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version: 'pypy-3.11-nightly'
+
+    - name: Install Linux packages
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev
+        # no fuse packages: the fuse bindings do not support pypy, the mount tests skip.
+
+    - name: Install Python requirements
+      shell: bash
+      run: |
+        python -VV
+        python -m pip install --upgrade pip setuptools wheel
+        # unlocked requirements: development.lock.txt pins versions/wheels for CPython.
+        python -m pip install -r requirements.d/development.txt
+
+    - name: Install borgbackup
+      shell: bash
+      run: |
+        python -m pip install -e .
+        borg -V
+
+    - name: Run tests
+      shell: bash
+      run: |
+        python -m pytest -n auto -v -rs --benchmark-skip --junitxml=test-results.xml --pyargs borg.testsuite

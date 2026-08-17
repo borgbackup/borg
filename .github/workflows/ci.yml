@@ -305,6 +305,8 @@ jobs:
             version: '7.9'
             display_name: OpenBSD
             do_binaries: false
+            # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
+            memory: 12G
           - os: haiku
             version: 'r1beta5'
             display_name: Haiku
@@ -414,6 +416,17 @@ jobs:
               tox3 -e py314-none
               ;;
             openbsd)
+              # Put the temp tree (pip/cc build temps, pytest tmp dirs and the
+              # borg test repos in them) on a memory-backed filesystem instead
+              # of the slow FFS disk. Sized generously (the pytest tmp tree is
+              # only cleaned up after the run); the VM gets 12G RAM for this.
+              sudo mkdir -p /mfs
+              # -O2: FFS2 format - mfs defaults to FFS1, whose 32 bit
+              # timestamps silently wrap (breaks test_extract_y2261).
+              sudo mount_mfs -O2 -s 6g swap /mfs
+              sudo chmod 1777 /mfs
+              export TMPDIR=/mfs
+
               sudo -E pkg_add xxhash lz4 zstd git
               sudo -E pkg_add rust
               sudo -E pkg_add openssl%3.5

@@ -1105,7 +1105,7 @@ class CreateMixIn:
             "--sparse",
             dest="sparse",
             action="store_true",
-            help="detect sparse holes in input (supported only by fixed chunker)",
+            help="detect sparse holes in input and seek over them instead of reading them",
         )
         fs_group.add_argument(
             "--files-cache",

@@ -425,6 +425,10 @@ Borg has these chunkers (the default is "fastcdc"):
   underlying paper); about half the rabin-aes speed, mainly a comparison
   baseline.
 
+All chunkers support sparse file processing (``borg create --sparse``): hole
+ranges in the input file are then detected (via ``SEEK_HOLE``/``SEEK_DATA``)
+and seeked over instead of being read, processing their content as all-zero.
+
 For some more general usage hints see also ``--chunker-params``.
 
 "fixed" chunker
@@ -443,11 +447,6 @@ The default is not to have a differently sized header.
 - BLOCK_SIZE: no default value, multiple of the system page size (usually 4096
   bytes) recommended. E.g.: 4194304 would cut 4MiB sized chunks.
 - HEADER_SIZE: optional, defaults to 0 (no header).
-
-The fixed chunker also supports processing sparse files (reading only the ranges
-with data and seeking over the empty hole ranges).
-
-``borg create --sparse --chunker-params fixed,BLOCK_SIZE[,HEADER_SIZE]``
 
 "fastcdc" chunker
 +++++++++++++++++

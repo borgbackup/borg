@@ -305,6 +305,8 @@ jobs:
             version: '7.9'
             display_name: OpenBSD
             do_binaries: false
+            # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
+            memory: 12G
           - os: haiku
             version: 'r1beta5'
             display_name: Haiku
@@ -326,6 +328,9 @@ jobs:
         operating_system: ${{ matrix.os }}
         version: ${{ matrix.version }}
         shell: bash
+        # the default VM size (2 cpus) leaves half of the runner's 4 vcpus idle
+        cpu_count: 4
+        memory: ${{ matrix.memory || '8G' }}
         run: |
           set -euxo pipefail
           case "${{ matrix.os }}" in
@@ -393,11 +398,12 @@ jobs:
               sudo -E pkgin -y install zstd lz4 xxhash git
               sudo -E pkgin -y install rust
               sudo -E pkgin -y install pkg-config
-              sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
-              sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
-              sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
-              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
-              sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
+              # python 3.14 for coverage's fast sysmon core, see #9470
+              sudo -E pkgin -y install py314-pip py314-virtualenv py314-tox
+              sudo -E ln -sf /usr/pkg/bin/python3.14 /usr/pkg/bin/python3
+              sudo -E ln -sf /usr/pkg/bin/pip3.14 /usr/pkg/bin/pip3
+              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.14 /usr/pkg/bin/virtualenv3
+              sudo -E ln -sf /usr/pkg/bin/tox-3.14 /usr/pkg/bin/tox3
               # Ensure base system admin tools are on PATH for the non-root shell
               export PATH="/sbin:/usr/sbin:$PATH"
               # On the netbsd 11 VM, / is a fs with extended attributes,
@@ -407,9 +413,20 @@ jobs:
               sudo -E chmod 1777 ${TMPDIR}
               touch ${TMPDIR}/testfile
               lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
-              tox3 -e py311-none
+              tox3 -e py314-none
               ;;
             openbsd)
+              # Put the temp tree (pip/cc build temps, pytest tmp dirs and the
+              # borg test repos in them) on a memory-backed filesystem instead
+              # of the slow FFS disk. Sized generously (the pytest tmp tree is
+              # only cleaned up after the run); the VM gets 12G RAM for this.
+              sudo mkdir -p /mfs
+              # -O2: FFS2 format - mfs defaults to FFS1, whose 32 bit
+              # timestamps silently wrap (breaks test_extract_y2261).
+              sudo mount_mfs -O2 -s 6g swap /mfs
+              sudo chmod 1777 /mfs
+              export TMPDIR=/mfs
+
               sudo -E pkg_add xxhash lz4 zstd git
               sudo -E pkg_add rust
               sudo -E pkg_add openssl%3.5

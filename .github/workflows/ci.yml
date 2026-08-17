@@ -186,7 +186,13 @@ jobs:
 
     - name: Install macOS packages
       if: ${{ runner.os == 'macOS' }}
-      run: brew bundle install
+      run: |
+        brew bundle install
+        # the runner's unresolvable .local hostname takes macOS ~35s to give up on,
+        # which borg paid per spawned process (import-time fqdn) - hours of test time,
+        # see #9470. .local is mDNS territory, an /etc/hosts entry alone does not help.
+        sudo scutil --set HostName borg-ci-mac
+        echo "127.0.0.1 borg-ci-mac" | sudo tee -a /etc/hosts
 
     - name: Install Python requirements
       run: |

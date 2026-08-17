@@ -743,7 +743,7 @@ Duration: {0.duration}
             "item_ptrs": item_ptrs,  # see #1473
             "command_line": join_cmd(sys.argv),
             "cwd": self.cwd,
-            "hostname": os.environ.get("BORG_HOSTNAME") or platform.hostname,
+            "hostname": os.environ.get("BORG_HOSTNAME") or platform.get_hostname(),
             "username": os.environ.get("BORG_USERNAME") or getuser(),
             "time": nominal.isoformat(timespec="microseconds"),
             "start": start.isoformat(timespec="microseconds"),

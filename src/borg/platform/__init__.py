@@ -10,9 +10,10 @@ from ..platformflags import is_win32, is_linux, is_freebsd, is_netbsd, is_darwin
 
 from .base import ENOATTR
 from .base import SaveFile, sync_dir, fdatasync, safe_fadvise
-from .base import get_process_id, fqdn, hostname, hostid, swidth
+from .base import get_process_id, get_hostname, get_fqdn, get_hostid, swidth
 from .base import acl_text_to_xattr  # overridden below for platforms supporting it
 from .base import set_times  # overridden below for win32
+
 
 # work around pyinstaller "forgetting" to include the xattr module
 from . import xattr  # noqa: F401

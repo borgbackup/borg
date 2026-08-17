@@ -18,8 +18,9 @@ def process_alive(host, pid, thread):
     always returns True, since there is no real way to check.
     """
     from . import local_pid_alive
-    from . import hostid
+    from . import get_hostid
 
+    hostid = get_hostid()
     assert isinstance(host, str)
     assert isinstance(hostid, str)
     assert isinstance(pid, int)

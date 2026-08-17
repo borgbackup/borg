@@ -393,11 +393,12 @@ jobs:
               sudo -E pkgin -y install zstd lz4 xxhash git
               sudo -E pkgin -y install rust
               sudo -E pkgin -y install pkg-config
-              sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
-              sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
-              sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
-              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
-              sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
+              # python 3.14 for coverage's fast sysmon core, see #9470
+              sudo -E pkgin -y install py314-pip py314-virtualenv py314-tox
+              sudo -E ln -sf /usr/pkg/bin/python3.14 /usr/pkg/bin/python3
+              sudo -E ln -sf /usr/pkg/bin/pip3.14 /usr/pkg/bin/pip3
+              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.14 /usr/pkg/bin/virtualenv3
+              sudo -E ln -sf /usr/pkg/bin/tox-3.14 /usr/pkg/bin/tox3
               # Ensure base system admin tools are on PATH for the non-root shell
               export PATH="/sbin:/usr/sbin:$PATH"
               # On the netbsd 11 VM, / is a fs with extended attributes,
@@ -407,7 +408,7 @@ jobs:
               sudo -E chmod 1777 ${TMPDIR}
               touch ${TMPDIR}/testfile
               lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
-              tox3 -e py311-none
+              tox3 -e py314-none
               ;;
             openbsd)
               sudo -E pkg_add xxhash lz4 zstd git

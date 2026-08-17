@@ -72,6 +72,9 @@ jobs:
       shell: bash
       run: |
         brew bundle install || true
+        # unresolvable .local runner hostname = ~35s resolver timeout per borg process, see #9470
+        sudo scutil --set HostName borg-ci-mac
+        echo "127.0.0.1 borg-ci-mac" | sudo tee -a /etc/hosts
 
     - name: Install Python requirements (UNLOCKED)
       shell: bash

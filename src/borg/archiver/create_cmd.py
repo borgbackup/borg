@@ -1041,6 +1041,10 @@ class CreateMixIn:
         source producing the maps, and consider doing a periodic full read backup
         (without ``--map``).
 
+        For LVM thin volume snapshots, maps can be generated from ``thin_dump`` /
+        ``thin_delta`` XML with the ``scripts/lvm-thin-map.py`` converter from the
+        borg sources; its docstring shows the complete workflow.
+
         Feeding all file paths from externally
         ++++++++++++++++++++++++++++++++++++++
 

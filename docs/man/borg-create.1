@@ -633,6 +633,10 @@ contains data, or a range marked \fBsame\fP actually changed), the archive will
 not match the input and borg cannot detect that. Independently verify the
 source producing the maps, and consider doing a periodic full read backup
 (without \fB\-\-map\fP).
+.sp
+For LVM thin volume snapshots, maps can be generated from \fBthin_dump\fP /
+\fBthin_delta\fP XML with the \fBscripts/lvm\-thin\-map.py\fP converter from the
+borg sources; its docstring shows the complete workflow.
 .SS Feeding all file paths from externally
 .sp
 Usually, you give a starting path (recursion root) to borg and then borg

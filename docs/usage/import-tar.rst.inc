@@ -110,7 +110,9 @@ stdout.
 Most documentation of borg create applies. Note that this command does not
 support excluding files.
 
-A ``--sparse`` option (as found in borg create) is not supported.
+A ``--sparse`` option (as found in borg create) is not needed: sparse members in
+input tarballs (old GNU and PAX sparse formats) are read correctly and their
+holes are stored as deduplicated all-zero chunks.
 
 About tar formats and metadata conservation or loss, please see ``borg export-tar``.
 

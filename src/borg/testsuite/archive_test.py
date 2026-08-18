@@ -13,6 +13,7 @@ from ..constants import ROBJ_FILE_STREAM, zeros
 from ..crypto.key import ChecksumKey
 from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacker, valid_msgpacked_dict
 from ..archive import ITEM_KEYS, Statistics
+from ..archive import zero_chunk_flags, zero_chunk_id, zero_chunk_ids
 from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
 from ..helpers import msgpack
 from ..repoobj import RepoObj
@@ -338,6 +339,31 @@ def test_download_pipeline_zero_chunks_served_locally():
     result = list(pipeline.fetch_many([ChunkListEntry(other_id, other_size)], ro_type=ROBJ_FILE_STREAM))
     assert result == [zeros[:other_size]]
     assert repository.requested_ids == [other_id]
+
+
+def test_zero_chunk_flags():
+    # cheap all-zero chunk detection from the chunk ids/sizes alone: the zero chunk id
+    # is computed for ids occurring repeatedly, while unique ids are only compared
+    # against already memoized zero chunk ids.
+    key = ChecksumKey(None)
+    id_hash = key.id_hash
+    data = b"foobar" * 100
+    data_id = id_hash(data)
+    repeated_size, unique_size = 1234, 4321
+    repeated_id = id_hash(zeros[:repeated_size])
+    unique_id = id_hash(zeros[:unique_size])
+    # make sure nothing is memoized for these sizes yet
+    for size in (repeated_size, unique_size):
+        zero_chunk_ids.pop((id_hash, size), None)
+    ids = [repeated_id, data_id, repeated_id, unique_id]
+    sizes = [repeated_size, len(data), repeated_size, unique_size]
+    # the repeated zero id gets detected, the unique one is missed (nothing memoized yet)
+    assert zero_chunk_flags(ids, sizes, id_hash) == [True, False, True, False]
+    # once its size's zero chunk id is memoized, the unique one gets detected, too
+    zero_chunk_id(id_hash, unique_size)
+    assert zero_chunk_flags(ids, sizes, id_hash) == [True, False, True, True]
+    # unknown (None) or out-of-range sizes disable the detection
+    assert zero_chunk_flags([repeated_id, repeated_id], [None, None], id_hash) == [False, False]
 
 
 def make_chunks(items):

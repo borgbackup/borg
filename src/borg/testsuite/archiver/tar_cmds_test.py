@@ -1,3 +1,5 @@
+import io
+import json
 import os
 import random
 import shutil
@@ -123,6 +125,33 @@ def test_import_tar(archivers, request, tar_format="PAX"):
     with changedir(archiver.output_path):
         cmd(archiver, "extract", "dst")
     assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
+
+
+def test_import_tar_nfiles(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # Build a tar with 2 regular files, 1 hardlink, 1 directory and 1 symlink.
+    with tarfile.open("input.tar", "w") as tar:
+        for name in ("dir/file1", "dir/file2"):
+            data = name.encode()
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.size = len(data)
+            tar.addfile(tarinfo, io.BytesIO(data))
+        tarinfo = tarfile.TarInfo("dir/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/subdir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "import-tar", "dst", "input.tar")
+    info = json.loads(cmd(archiver, "info", "--json", "dst"))
+    # as with borg create, each regular file and each hardlink counts, directories/symlinks do not
+    assert info["archives"][0]["stats"]["nfiles"] == 3
 
 
 def test_import_unusual_tar(archivers, request):

@@ -2,9 +2,11 @@ import base64
 import contextlib
 import logging
 import os
+import posixpath
 import stat
 import sys
 import tarfile
+from collections import Counter
 
 if sys.version_info >= (3, 14):
     from compression import zstd
@@ -24,11 +26,13 @@ from ..helpers import ChunkIteratorFileWrapper
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CompressionSpec
 from ..helpers import FilesystemPathSpec
 from ..helpers import remove_surrogates
+from ..helpers import StableDict, make_path_safe
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
+from ..platform.solaris import SYSATTR_PREFIX, XATTR_SIZE_LIMIT
 
 from ._common import with_repository, with_archive, Highlander, define_exclusion_group
 from ._common import build_matcher, build_filter
@@ -341,6 +345,146 @@ def create_zstd_filter(stream, stream_close, decompress):
             stream.close()
 
 
+XATTR_HDRTYPE = b"E"  # Solaris tar/pax extended attribute member, see #8479
+SUN_XATTR_HDR_SIZE_LIMIT = 2**16  # sanity limit for xattr header members, real ones are ~100 bytes
+
+
+def parse_sun_xattr_hdr(payload):
+    """Parse the payload of a Solaris tar extended attribute header member, see #8479.
+
+    Returns (typeflag, names, hardlinked): the typeflag of the attribute file, the
+    NUL-separated path segments (parent file path, attribute name, ...) as bytes and
+    whether the attribute is a hard link to another attribute.
+    Returns None if the payload is not a Solaris xattr header (e.g. IBM i pax uses
+    tarinfo type b'E' with a different, proprietary payload).
+    """
+    # layout (numbers are NUL-terminated ASCII decimals):
+    # h_version[7] "1.0", h_size[10], h_component_len[10], h_link_component_len[10],
+    # then one section per attribute path: h_namesz[7], h_typeflag[1], h_names[h_namesz].
+    if len(payload) < 46 or not payload.startswith(b"1.0\x00"):
+        return None
+
+    def num(offset, width):
+        field = payload[offset : offset + width].split(b"\x00", 1)[0]
+        return int(field) if field.isdigit() else None
+
+    h_size, component_len, link_len, namesz = num(7, 10), num(17, 10), num(27, 10), num(37, 7)
+    if None in (h_size, component_len, link_len, namesz):
+        return None
+    if h_size != len(payload) or 45 + namesz > len(payload):
+        return None
+    typeflag = payload[44:45]
+    names = payload[45 : 45 + namesz].split(b"\x00")
+    while names and names[-1] == b"":
+        names.pop()
+    if len(names) < 2:
+        return None
+    return typeflag, names, link_len > 0
+
+
+class DeferredItemAdder:
+    """add_item wrapper deferring item storage, so that Solaris tar extended attributes,
+    whose members trail the parent member (for a directory: its whole subtree), can still
+    be attached to the parent item, see #8479.
+
+    A directory stays pending while members inside it are processed (memory use is thus
+    bounded by directory nesting depth), any other item only until the next item arrives.
+    """
+
+    def __init__(self, add_item):
+        self._add_item = add_item
+        self._pending = []  # stack of (item, add_item kwargs)
+
+    @staticmethod
+    def _covers(dir_path, path):
+        # whether an item at dir_path is a directory ancestor of an item at path
+        return (dir_path == "." and path != ".") or path.startswith(dir_path + "/")
+
+    def _flush_finished(self, path, *, keep_path_item=False):
+        # store pending items that cannot receive xattrs anymore once a member at *path* arrived
+        while self._pending:
+            item, kw = self._pending[-1]
+            if keep_path_item and item.path == path:
+                break
+            if stat.S_ISDIR(item.mode) and self._covers(item.path, path):
+                break
+            self._pending.pop()
+            self._add_item(item, **kw)
+
+    def add(self, item, **kw):
+        self._flush_finished(item.path)
+        self._pending.append((item, kw))
+
+    def attach_xattr(self, path, name, value):
+        """Attach a name/value xattr to the pending item at *path*, return False if there is none."""
+        self._flush_finished(path, keep_path_item=True)
+        for item, _ in reversed(self._pending):
+            if item.path == path:
+                if "xattrs" in item:
+                    item.xattrs[name] = value  # merge - PAX headers may already have set xattrs
+                else:
+                    item.xattrs = StableDict({name: value})
+                return True
+        return False
+
+    def flush(self):
+        while self._pending:
+            item, kw = self._pending.pop()
+            self._add_item(item, **kw)
+
+
+def process_sun_xattrs(tar, tarinfo, adder, skipped):
+    """Process a Solaris tar extended attribute header member and its value member, see #8479.
+
+    Returns (status, pushback, hit_eof): the file status to display for the header member,
+    a member consumed by lookahead that still must be dispatched normally (or None) and
+    whether tar.next() already returned None (end of the tar stream reached).
+    """
+    hdr = None
+    if tarinfo.size <= SUN_XATTR_HDR_SIZE_LIMIT:
+        hdr = parse_sun_xattr_hdr(tar.extractfile(tarinfo).read())
+    if hdr is None:
+        skipped["skipped unrecognized extended attribute members (tarinfo type b'E')"] += 1
+        return "E", None, False
+    typeflag, names, hardlinked = hdr
+    value_ti = tar.next()
+    if value_ti is None:
+        skipped["skipped Solaris extended attribute headers without a value member"] += 1
+        return "E", None, True
+    if value_ti.type != XATTR_HDRTYPE:
+        # not the expected value member - hand it back for normal dispatching
+        skipped["skipped Solaris extended attribute headers without a value member"] += 1
+        return "E", value_ti, False
+    # from here on, the value member is consumed together with the header member.
+    attrname = names[1]
+    if typeflag == b"5" or attrname == b".":
+        # the hidden attribute directory itself, expected member, no borg representation
+        return None, None, False
+    if attrname.startswith(SYSATTR_PREFIX.encode()):
+        # OS-maintained system attributes, not user xattrs - same exclusion as borg create
+        return None, None, False
+    if len(names) > 2 or b"/" in attrname:
+        skipped["skipped Solaris extended attributes of extended attributes (unsupported)"] += 1
+        return "E", None, False
+    if hardlinked:
+        skipped["skipped hard-linked Solaris extended attributes (unsupported)"] += 1
+        return "E", None, False
+    if value_ti.size > XATTR_SIZE_LIMIT:  # same limit as borg create uses on Solaris
+        skipped["skipped too big Solaris extended attribute values"] += 1
+        return "E", None, False
+    try:
+        parent_path = names[0].decode(tar.encoding or "utf-8", "surrogateescape")
+        parent_path = make_path_safe(posixpath.normpath(parent_path))
+    except ValueError:
+        skipped["skipped Solaris extended attributes with an unsafe parent path"] += 1
+        return "E", None, False
+    value = tar.extractfile(value_ti).read()
+    if not adder.attach_xattr(parent_path, attrname, value):
+        skipped["skipped Solaris extended attributes without a parent item"] += 1
+        return "E", None, False
+    return None, None, False
+
+
 class TarMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
@@ -553,11 +697,12 @@ class TarMixIn:
             log_json=args.log_json,
         )
         cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)
+        adder = DeferredItemAdder(archive.add_item)
         tfo = TarfileObjectProcessors(
             cache=cache,
             key=key,
             process_file_chunks=cp.process_file_chunks,
-            add_item=archive.add_item,
+            add_item=adder.add,
             chunker_params=args.chunker_params,
             show_progress=args.progress,
             log_json=args.log_json,
@@ -566,7 +711,14 @@ class TarMixIn:
 
         tar = tarfile.open(fileobj=tarstream, mode="r|", ignore_zeros=args.ignore_zeros)
 
-        while tarinfo := tar.next():
+        skipped = Counter()  # skip reason -> count, summarized as warnings at the end
+        pushback = None  # member consumed by xattr lookahead, still to be dispatched
+        hit_eof = False
+        while not hit_eof:
+            tarinfo = pushback or tar.next()
+            pushback = None
+            if not tarinfo:
+                break
             if tarinfo.isreg():
                 status = tfo.process_file(tarinfo=tarinfo, status="A", type=stat.S_IFREG, tar=tar)
                 archive.stats.nfiles += 1
@@ -584,13 +736,19 @@ class TarMixIn:
                 status = tfo.process_dev(tarinfo=tarinfo, status="c", type=stat.S_IFCHR)
             elif tarinfo.isfifo():
                 status = tfo.process_fifo(tarinfo=tarinfo, status="f", type=stat.S_IFIFO)
+            elif tarinfo.type == XATTR_HDRTYPE:
+                status, pushback, hit_eof = process_sun_xattrs(tar, tarinfo, adder, skipped)
             else:
                 status = "E"
-                self.print_warning("%s: Unsupported tarinfo type %s", tarinfo.name, tarinfo.type)
+                skipped[f"skipped unsupported tarinfo type {tarinfo.type!r}"] += 1
             self.print_file_status(status, tarinfo.name)
+        adder.flush()
 
         # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
         tar.close()
+
+        for reason, count in sorted(skipped.items()):
+            self.print_warning("%s (%d members)", reason, count)
 
         if args.progress:
             archive.stats.show_progress(final=True)
@@ -748,6 +906,13 @@ class TarMixIn:
         - POSIX.1-1988 (ustar)
         - UNIX V7 tar
         - SunOS tar with extended attributes
+
+        Extended attributes archived by Solaris/illumos tar or pax (special member
+        type "E") are imported as xattrs of the respective archive item (matching how
+        borg create archives them on those platforms). System attributes
+        (``SUNWattr_*``), hard-linked attributes and attributes of attributes are not
+        imported. Members of other/unknown vendor-specific types are skipped and
+        reported in a summarizing warning at the end.
 
         To import multiple tarballs into a single archive, they can be simply
         concatenated (e.g. using "cat") into a single file, and imported with an

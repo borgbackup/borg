@@ -1,3 +1,4 @@
+import io
 import os
 import random
 import shutil
@@ -9,6 +10,7 @@ import pytest
 
 from ... import xattr
 from ...archiver.tar_cmds import chunks_to_sparse_info, gnu_sparse_10_map, SparseTarInfo
+from ...archiver.tar_cmds import parse_sun_xattr_hdr, XATTR_HDRTYPE
 from ...constants import *  # NOQA
 from ...helpers import Error
 from ...item import ChunkListEntry
@@ -686,3 +688,233 @@ def test_acl_roundtrip(archivers, request):
         assert "acl_default" in extracted_dir_acl
         assert extracted_dir_acl["acl_default"] == dir_acl["acl_default"]
         assert b"user:root:r--" in dir_acl["acl_default"]
+
+
+def make_sun_xattr_hdr_payload(parent, attrpath, typeflag=b"0", link_names=None):
+    """Byte-exact reimplementation of illumos tar's prepare_xattr(), see #8479."""
+    # a "/" in attrpath separates an attribute of an attribute - stored as another NUL-separated segment
+    names = parent + b"\x00" + attrpath.replace(b"/", b"\x00", 1) + b"\x00"
+    complen = len(names) + 9  # 9 = sizeof(struct xattr_buf), incl. its 1 byte h_names placeholder
+    if link_names:
+        link = link_names[0] + b"\x00" + link_names[1] + b"\x00"
+        linklen = len(link) + 9
+    else:
+        linklen = 0
+    size = 37 + complen + linklen
+    buf = bytearray(size)  # zero-filled, like the calloc() there
+    buf[0:4] = b"1.0\x00"
+    buf[7:17] = b"%09d\x00" % size
+    buf[17:27] = b"%09d\x00" % complen
+    buf[27:37] = b"%09d\x00" % linklen
+    buf[37:44] = b"%06d\x00" % len(names)
+    buf[44:45] = typeflag
+    buf[45 : 45 + len(names)] = names
+    if link_names:
+        offset = 37 + complen
+        buf[offset : offset + 7] = b"%06d\x00" % len(link)
+        buf[offset + 7 : offset + 8] = typeflag
+        buf[offset + 8 : offset + 8 + len(link)] = link
+    return bytes(buf)
+
+
+def add_tar_member(tar, name, type, content=b""):
+    tarinfo = tarfile.TarInfo(name)
+    tarinfo.type = type
+    tarinfo.size = len(content)
+    tarinfo.mode = 0o755 if type == tarfile.DIRTYPE else 0o644
+    tarinfo.mtime = 1234567890
+    tar.addfile(tarinfo, io.BytesIO(content) if content else None)
+
+
+def add_sun_xattr_pair(tar, parent, attrname, value, typeflag=b"0", link_names=None, hdr_payload=None):
+    # Solaris tar names xattr members with a decoy path, only the payloads matter.
+    if hdr_payload is None:
+        hdr_payload = make_sun_xattr_hdr_payload(parent, attrname, typeflag, link_names)
+    decoy = (b"/dev/null/" + attrname).decode("utf-8", "surrogateescape")
+    add_tar_member(tar, decoy + ".hdr", XATTR_HDRTYPE, hdr_payload)
+    add_tar_member(tar, decoy, XATTR_HDRTYPE, value)
+
+
+def exported_xattrs(archiver, name):
+    """Return {path: {attr: value}} of all items with xattrs, platform-independently via a PAX export."""
+    cmd(archiver, "export-tar", name, "xa.tar", "--tar-format=PAX")
+    result = {}
+    with tarfile.open("xa.tar") as tar:
+        for tarinfo in tar:
+            xa = {
+                key.removeprefix("SCHILY.xattr.").encode("utf-8", "surrogateescape"): value.encode(
+                    "utf-8", "surrogateescape"
+                )
+                for key, value in tarinfo.pax_headers.items()
+                if key.startswith("SCHILY.xattr.")
+            }
+            if xa:
+                result[tarinfo.name] = xa
+    return result
+
+
+def test_parse_sun_xattr_hdr():
+    # header payloads captured from a real Solaris 10 tar archive (see #8479)
+    payload_attr = (
+        b"1.0\x00\x00\x00\x00000000076\x00000000039\x00000000000\x00000030\x000SolarisMetadata\x00ANewAttribute\x00\x00"
+    )
+    assert parse_sun_xattr_hdr(payload_attr) == (b"0", [b"SolarisMetadata", b"ANewAttribute"], False)
+    assert make_sun_xattr_hdr_payload(b"SolarisMetadata", b"ANewAttribute") == payload_attr
+    payload_attrdir = (
+        b"1.0\x00\x00\x00\x00000000064\x00000000027\x00000000000\x00000018\x005SolarisMetadata\x00.\x00\x00"
+    )
+    assert parse_sun_xattr_hdr(payload_attrdir) == (b"5", [b"SolarisMetadata", b"."], False)
+    linked = make_sun_xattr_hdr_payload(b"file1", b"attr1", link_names=(b"file0", b"attr0"))
+    assert parse_sun_xattr_hdr(linked) == (b"0", [b"file1", b"attr1"], True)
+    assert parse_sun_xattr_hdr(b"") is None
+    assert parse_sun_xattr_hdr(b"\xfd\xff\x32\x00" + b"\x40" * 50) is None  # IBM i pax style payload
+    assert parse_sun_xattr_hdr(payload_attr[:-10]) is None  # truncated (h_size mismatch)
+
+
+def test_import_tar_solaris_xattrs(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "file1", tarfile.REGTYPE, b"data1")
+        add_sun_xattr_pair(tar, b"file1", b".", b"", typeflag=b"5")  # the hidden attr directory itself
+        add_sun_xattr_pair(tar, b"file1", b"SUNWattr_ro", b"sysattr stuff")  # system attr
+        add_sun_xattr_pair(tar, b"file1", b"attr1", b"value1")
+        add_sun_xattr_pair(tar, b"file1", b"attr2", b"not valid utf-8: \xff")
+        add_tar_member(tar, "file2", tarfile.REGTYPE, b"data2")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    output = cmd(archiver, "import-tar", "dst", "sun.tar")
+    assert "skipped" not in output
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"file1", "file2"}
+    assert exported_xattrs(archiver, "dst") == {"file1": {b"attr1": b"value1", b"attr2": b"not valid utf-8: \xff"}}
+
+
+def test_import_tar_solaris_xattrs_dir(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # a directory's xattr members only arrive after the directory's whole subtree
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "dir", tarfile.DIRTYPE)
+        add_tar_member(tar, "dir/sub", tarfile.DIRTYPE)
+        add_tar_member(tar, "dir/sub/file", tarfile.REGTYPE, b"data")
+        add_sun_xattr_pair(tar, b"dir/sub/file", b"fattr", b"fvalue")
+        add_sun_xattr_pair(tar, b"dir/sub", b"sattr", b"svalue")
+        add_sun_xattr_pair(tar, b"dir", b"dattr", b"dvalue")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "import-tar", "dst", "sun.tar")
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"dir", "dir/sub", "dir/sub/file"}
+    assert exported_xattrs(archiver, "dst") == {
+        "dir": {b"dattr": b"dvalue"},
+        "dir/sub": {b"sattr": b"svalue"},
+        "dir/sub/file": {b"fattr": b"fvalue"},
+    }
+
+
+def test_import_tar_solaris_xattrs_root_dir(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # "tar cf x ." style archive: the root member "./" becomes item path ".", its xattrs arrive last
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "./", tarfile.DIRTYPE)
+        add_tar_member(tar, "./file", tarfile.REGTYPE, b"data")
+        add_sun_xattr_pair(tar, b".", b"rootattr", b"rootvalue")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "import-tar", "dst", "sun.tar")
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {".", "file"}
+    assert exported_xattrs(archiver, "dst") == {".": {b"rootattr": b"rootvalue"}}
+
+
+def test_import_tar_solaris_xattrs_nonascii(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "fö", tarfile.REGTYPE, b"data")
+        add_sun_xattr_pair(tar, "fö".encode(), "ättr".encode(), b"value")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "import-tar", "dst", "sun.tar")
+    assert exported_xattrs(archiver, "dst") == {"fö": {"ättr".encode(): b"value"}}
+
+
+def test_import_tar_solaris_xattrs_skipped(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "file1", tarfile.REGTYPE, b"data1")
+        # hard-linked attribute
+        add_sun_xattr_pair(tar, b"file1", b"lattr", b"", link_names=(b"file0", b"attr0"))
+        # attribute of an attribute (three name segments)
+        add_sun_xattr_pair(tar, b"file1", b"attr1/nested", b"v")
+        # hostile header: "/" kept inside the attribute name instead of segment splitting
+        unsplit = make_sun_xattr_hdr_payload(b"file1", b"attrX?nested").replace(b"?", b"/")
+        add_sun_xattr_pair(tar, b"file1", b"attrX", b"v", hdr_payload=unsplit)
+        # unsafe parent path
+        add_sun_xattr_pair(tar, b"../evil", b"attr2", b"v")
+        # parent path not in the archive (anymore)
+        add_sun_xattr_pair(tar, b"nosuchfile", b"attr3", b"v")
+        add_tar_member(tar, "file2", tarfile.REGTYPE, b"data2")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    output = cmd(archiver, "import-tar", "dst", "sun.tar", exit_code=1)
+    assert "skipped hard-linked Solaris extended attributes (unsupported) (1 members)" in output
+    assert "skipped Solaris extended attributes of extended attributes (unsupported) (2 members)" in output
+    assert "skipped Solaris extended attributes with an unsafe parent path (1 members)" in output
+    assert "skipped Solaris extended attributes without a parent item (1 members)" in output
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"file1", "file2"}
+    assert exported_xattrs(archiver, "dst") == {}
+
+
+def test_import_tar_type_E_fallback(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # IBM i pax also uses tarinfo type b'E', but with a proprietary payload - and no pairing,
+    # so each member must be skipped on its own, without lookahead.
+    with tarfile.open("ibmi.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "file1", tarfile.REGTYPE, b"data1")
+        add_tar_member(tar, ".SUBJECT", XATTR_HDRTYPE, b"\xfd\xff\x32\x00" + b"\x40" * 50)
+        add_tar_member(tar, ".CODEPAGE", XATTR_HDRTYPE, b"\xfe\xff\x02\x00\x11\x01")
+        add_tar_member(tar, "file2", tarfile.REGTYPE, b"data2")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    output = cmd(archiver, "import-tar", "dst", "ibmi.tar", "--list", exit_code=1)
+    assert "skipped unrecognized extended attribute members (tarinfo type b'E') (2 members)" in output
+    assert "E .SUBJECT" in output
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"file1", "file2"}
+
+
+def test_import_tar_solaris_xattr_hdr_at_eof(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # a lone xattr header member at the end of the tar must not crash the import
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "file1", tarfile.REGTYPE, b"data1")
+        add_tar_member(tar, "/dev/null/attr1.hdr", XATTR_HDRTYPE, make_sun_xattr_hdr_payload(b"file1", b"attr1"))
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    output = cmd(archiver, "import-tar", "dst", "sun.tar", exit_code=1)
+    assert "skipped Solaris extended attribute headers without a value member (1 members)" in output
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"file1"}
+
+
+def test_import_tar_solaris_xattr_hdr_mispaired(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # an xattr header member followed by a regular member: the regular member must not get lost
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "file1", tarfile.REGTYPE, b"data1")
+        add_tar_member(tar, "/dev/null/attr1.hdr", XATTR_HDRTYPE, make_sun_xattr_hdr_payload(b"file1", b"attr1"))
+        add_tar_member(tar, "file2", tarfile.REGTYPE, b"data2")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    output = cmd(archiver, "import-tar", "dst", "sun.tar", exit_code=1)
+    assert "skipped Solaris extended attribute headers without a value member (1 members)" in output
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"file1", "file2"}
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+        with open("file2", "rb") as f:
+            assert f.read() == b"data2"
+
+
+def test_import_tar_solaris_xattr_value_too_big(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("sun.tar", "w", format=tarfile.USTAR_FORMAT) as tar:
+        add_tar_member(tar, "file1", tarfile.REGTYPE, b"data1")
+        add_sun_xattr_pair(tar, b"file1", b"big", b"\x00" * (2**24 + 1))
+        add_sun_xattr_pair(tar, b"file1", b"attr1", b"value1")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    output = cmd(archiver, "import-tar", "dst", "sun.tar", exit_code=1)
+    assert "skipped too big Solaris extended attribute values (1 members)" in output
+    assert exported_xattrs(archiver, "dst") == {"file1": {b"attr1": b"value1"}}

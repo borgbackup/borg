@@ -5467,10 +5467,6 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
 
     @requires_hardlinks
-    @pytest.mark.skipif(
-        (not are_hardlinks_supported()) or is_freebsd or is_netbsd,
-        reason='Skip when hardlinks unsupported or on FreeBSD/NetBSD due to differing ctime/link handling; see #9147, #9153.',
-    )
     def test_multiple_link_exclusion(self):
         path_a = os.path.join(self.input_path, 'a')
         path_b = os.path.join(self.input_path, 'b')
@@ -5480,12 +5476,20 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         hl_b = os.path.join(path_b, 'hardlink')
         self.create_regular_file(hl_a, contents=b'123456')
         os.link(hl_a, hl_b)
+        # create processes dir entries in inode order (scandir_inorder), so the hardlink in the
+        # dir with the lower inode number becomes the hardlink master. dirs do not necessarily
+        # get their inode numbers assigned in creation order (e.g. ufs dirpref spreads dirs over
+        # cylinder groups), so determine master/slave from the actual inode numbers, see #8740.
+        if os.stat(path_a).st_ino < os.stat(path_b).st_ino:
+            hl_master, slave_dir = hl_a, 'b'
+        else:
+            hl_master, slave_dir = hl_b, 'a'
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test0', 'input')
-        os.unlink(hl_a)  # Don't duplicate warning message- one is enough.
+        os.unlink(hl_master)  # Don't duplicate warning message- one is enough.
         self.cmd('create', self.repository_location + '::test1', 'input')
 
-        output = self.cmd('diff', '--pattern=+ fm:input/b', '--pattern=! **/', self.repository_location + '::test0', 'test1', exit_code=EXIT_WARNING)
+        output = self.cmd('diff', '--pattern=+ fm:input/' + slave_dir, '--pattern=! **/', self.repository_location + '::test0', 'test1', exit_code=EXIT_WARNING)
         lines = output.splitlines()
         self.assert_line_exists(lines, 'cannot find hardlink source for.*skipping compare.')
 

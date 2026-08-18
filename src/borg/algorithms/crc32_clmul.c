@@ -354,36 +354,33 @@ crc32_clmul(const uint8_t *src, long len, uint32_t initial_crc)
     uint32_t crc;
     __m128i x_tmp0, x_tmp1, x_tmp2, crc_fold;
 
-    if (len < 16) {
-        if (len == 0)
-            return initial_crc;
-        if (len < 4) {
-            /*
-             * no idea how to do this for <4 bytes, delegate to classic impl.
-             */
-            uint32_t crc = ~initial_crc;
-            switch (len) {
-                case 3: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++]; // fallthrough
-                case 2: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++]; // fallthrough
-                case 1: crc = (crc >> 8) ^ Crc32Lookup[0][(crc & 0xFF) ^ *src++];
-            }
-            return ~crc;
-        }
-        xmm_crc_part = _mm_loadu_si128((__m128i *)src);
-        XOR_INITIAL(xmm_crc_part);
-        goto partial;
-    }
+    if (len == 0)
+        return initial_crc;
 
-    /* this alignment computation would be wrong for len<16 handled above */
+    /*
+     * The folding code below loads full 16 byte vectors from 16 byte aligned
+     * addresses. Hand both short inputs and the bytes in front of the first
+     * alignment boundary to the table driven implementation, so that the
+     * vector code only ever sees full aligned blocks:
+     *
+     * - loading a 16 byte vector from a shorter buffer reads up to 12 bytes
+     *   past its end, which faults when the buffer ends flush against the
+     *   last mapped page (#10149)
+     * - folding fewer than 4 bytes ahead of the aligned part would discard
+     *   the upper bytes of initial_crc, giving a wrong result (#10150)
+     *
+     * This mirrors what zlib-ng does, see crc32_copy_small() there.
+     */
     algn_diff = (0 - (uintptr_t)src) & 0xF;
+    if (len < (long)(algn_diff + 16))
+        algn_diff = (unsigned long)len;  /* too short to fold at all */
     if (algn_diff) {
-        xmm_crc_part = _mm_loadu_si128((__m128i *)src);
-        XOR_INITIAL(xmm_crc_part);
-
+        initial_crc = crc32_slice_by_8(src, (size_t)algn_diff, initial_crc);
         src += algn_diff;
         len -= algn_diff;
-
-        partial_fold(algn_diff, &xmm_crc0, &xmm_crc1, &xmm_crc2, &xmm_crc3, &xmm_crc_part);
+        if (len == 0)
+            return initial_crc;
+        xmm_initial = _mm_cvtsi32_si128(initial_crc);
     }
 
     while ((len -= 64) >= 0) {

@@ -27,6 +27,9 @@ Examples
     # Remote extraction via 'tarpipe'
     $ borg export-tar Monday - | ssh somewhere "cd extracted; tar x"
 
+    # Export sparse files (e.g. disk images) as sparse tar members (GNU sparse format 1.0)
+    $ borg export-tar --sparse disk-images disk-images.tar
+
 Archives transfer script
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -54,4 +57,5 @@ Please note:
 - the pipe is dumb, there is no data or transfer time reduction there due to deduplication
 - maybe add compression
 - pipe over ssh for remote transfer
-- no special sparse file support
+- maybe add ``--sparse`` to the export-tar command, so runs of all-zero chunks
+  travel as a compact sparse map instead of literal zeros

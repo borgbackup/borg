@@ -11,7 +11,7 @@ if sys.version_info >= (3, 14):
 else:
     from backports import zstd
 
-from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
+from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor, zero_chunk_flags, zero_chunk_id
 from ..compress import get_zstd_mt_workers
 from ..constants import *  # NOQA
 from ..helpers import Error
@@ -156,6 +156,140 @@ def item_to_paxheaders(format, item):
     return ph
 
 
+def chunks_to_sparse_info(chunks, zero_flags):
+    """Compute a GNU sparse map from an item's chunk list.
+
+    *zero_flags* tells for each chunk in *chunks* whether it is an all-zero chunk;
+    runs of all-zero chunks become the holes of the sparse file. Holes are shrunk
+    to whole 512-byte tar blocks (a trailing hole may end unaligned at the file's
+    end): GNU tar's sparse reader processes the data segments block-wise, so it
+    desyncs on unaligned segments - and this also matches what GNU tar itself
+    produces, as its own hole detection is block-granular. The zero bytes shaved
+    off the hole edges become part of the neighboring data segments.
+
+    Return a tuple (map_entries, stream_plan, realsize): *map_entries* is a list of
+    (offset, length) data segments - with a terminating (realsize, 0) entry if the
+    file ends in a hole, like GNU tar creates it -, *stream_plan* tells how to
+    produce the data segments' bytes: a list of ChunkListEntry (a chunk to fetch and
+    emit completely) and int (a count of zero bytes to emit literally) elements,
+    *realsize* is the logical file size.
+    Return None if there is no hole (the file shall be a normal dense tar member).
+    """
+    if not chunks or all(not zero for zero in zero_flags):
+        return None
+    realsize = sum(chunk.size for chunk in chunks)
+    # runs of all-zero chunks, shrunk to 512-byte block alignment, become the holes.
+    holes = []
+
+    def add_hole(start, end):
+        start = -(-start // tarfile.BLOCKSIZE) * tarfile.BLOCKSIZE
+        if end != realsize:  # a trailing hole may end unaligned, gtar just truncates the file
+            end = end // tarfile.BLOCKSIZE * tarfile.BLOCKSIZE
+        if end > start:
+            holes.append((start, end))
+
+    offset = 0
+    run_start = None  # start offset of the current run of all-zero chunks
+    for chunk, zero in zip(chunks, zero_flags):
+        if zero and run_start is None:
+            run_start = offset
+        elif not zero and run_start is not None:
+            add_hole(run_start, offset)
+            run_start = None
+        offset += chunk.size
+    if run_start is not None:
+        add_hole(run_start, realsize)
+    if not holes:
+        return None  # all zero runs were too short to make a block-aligned hole
+    # the data segments are the complement of the holes.
+    map_entries = []
+    pos = 0
+    for hole_start, hole_end in holes:
+        if hole_start > pos:
+            map_entries.append((pos, hole_start - pos))
+        pos = hole_end
+    if pos < realsize:
+        map_entries.append((pos, realsize - pos))
+    else:
+        # the file ends in a hole: terminate the map like GNU tar does.
+        map_entries.append((realsize, 0))
+    # plan the emission of the data segments' bytes, chunk by chunk: data chunks are
+    # emitted completely, all-zero chunks only with their parts sticking out of the
+    # hole (shaved-off hole edges and the chunks of too-short zero runs) - those are
+    # emitted as literal zero bytes, so all-zero chunks never need to be fetched.
+    stream_plan = []
+    offset = 0
+    hole_idx = 0
+    for chunk, zero in zip(chunks, zero_flags):
+        chunk_end = offset + chunk.size
+        if not zero:
+            stream_plan.append(chunk)
+        else:
+            pos = offset
+            while pos < chunk_end:
+                while hole_idx < len(holes) and holes[hole_idx][1] <= pos:
+                    hole_idx += 1
+                if hole_idx < len(holes) and holes[hole_idx][0] <= pos:
+                    pos = min(holes[hole_idx][1], chunk_end)  # covered by a hole: emit nothing
+                else:
+                    emit_end = min(holes[hole_idx][0], chunk_end) if hole_idx < len(holes) else chunk_end
+                    stream_plan.append(emit_end - pos)
+                    pos = emit_end
+        offset = chunk_end
+    return map_entries, stream_plan, realsize
+
+
+class SparseTarInfo(tarfile.TarInfo):
+    """TarInfo for GNU sparse format 1.0 members.
+
+    A sparse member must never get a pax "size" record: readers recalculate the offset of
+    the next header from it *after* the sparse processing already consumed the sparse map,
+    so they desync on it - the pax-standard way of representing big sizes is broken for
+    sparse members. Thus, the member's stored size (sparse map + data segments) always
+    lives in the ustar size field: as standard octal while it fits (< 8 GiB, so those
+    members stay as standard-conforming as sparse members can be), else base-256 encoded
+    (the GNU/star big-number encoding; not POSIX, but GNU tar does the same for big
+    numbers in pax mode, and GNU tar, libarchive/bsdtar and python's tarfile all read it
+    in any tar format). The logical file size (GNU.sparse.realsize) is unlimited anyway.
+
+    The base-256 field is patched in manually: python's tarfile writes base-256 only for
+    GNU_FORMAT - for PAX_FORMAT it conforms to POSIX and emits a pax "size" record, the
+    very thing that must be avoided here.
+    """
+
+    __slots__ = ()  # keep the TarInfo object layout, so plain TarInfos can be converted
+
+    octal_size_limit = 8**11  # what fits into the 12-digit octal ustar size field
+
+    def create_pax_header(self, info, encoding):
+        stored_size = info["size"]
+        if stored_size < self.octal_size_limit:
+            return super().create_pax_header(info, encoding)
+        info["size"] = 0  # suppresses both the automatic pax "size" record and the octal overflow
+        buf = super().create_pax_header(info, encoding)
+        # patch the base-256 encoded stored size into the ustar block's size field
+        # and recompute the block's checksum.
+        ustar = bytearray(buf[-tarfile.BLOCKSIZE :])
+        ustar[124:136] = tarfile.itn(stored_size, 12, tarfile.GNU_FORMAT)
+        chksum = tarfile.calc_chksums(bytes(ustar))[0]
+        ustar[148:156] = bytes("%06o\0 " % chksum, "ascii")
+        return buf[: -tarfile.BLOCKSIZE] + bytes(ustar)
+
+
+def gnu_sparse_10_map(map_entries):
+    """Serialize a sparse map as a GNU sparse format 1.0 map block.
+
+    That is a series of decimal numbers delimited by newlines: the number of map
+    entries, then offset and length of each entry - NUL-padded to a multiple of
+    the 512 byte tar block size. It precedes the data segments in the tar member.
+    """
+    numbers = [len(map_entries)]
+    for offset, length in map_entries:
+        numbers += [offset, length]
+    text = "".join(f"{number}\n" for number in numbers).encode()
+    return text + b"\0" * (-len(text) % tarfile.BLOCKSIZE)
+
+
 # Sentinel returned by get_tar_filter for zstd suffixes: (de)compress in-process
 # via the zstd module instead of piping through an external filter program.
 IN_PROCESS_ZSTD = "zstd (in-process)"
@@ -213,6 +347,9 @@ class TarMixIn:
     def do_export_tar(self, args, repository, manifest, archive):
         """Export archive contents as a tarball"""
         self.output_list = args.output_list
+
+        if args.sparse and args.tar_format not in ("BORG", "PAX"):
+            raise Error("--sparse requires --tar-format BORG or PAX (GNU sparse format 1.0 members are PAX-based).")
 
         # A quick note about the general design of tar_filter and tarfile;
         # The tarfile module of Python can provide some compression mechanisms
@@ -276,11 +413,24 @@ class TarMixIn:
         else:
             pi = None
 
-        def item_content_stream(item):
+        def sparse_chunk_iterator(stream_plan, map_bytes):
+            """Generate a sparse member's payload: the sparse map, then the data segments'
+            bytes as told by *stream_plan* (chunks to fetch, counts of literal zero bytes)."""
+            yield map_bytes
+            data_chunks = [entry for entry in stream_plan if not isinstance(entry, int)]
+            fetched = archive.pipeline.fetch_many(data_chunks, ro_type=ROBJ_FILE_STREAM)
+            for entry in stream_plan:
+                yield zeros[:entry] if isinstance(entry, int) else next(fetched)
+
+        def item_content_stream(item, stream_plan=None, map_bytes=None):
             """
-            Return a file-like object that reads from the chunks of *item*.
+            Return a file-like object that reads from the chunks of *item*
+            (or produces a sparse member's payload from *stream_plan* / *map_bytes*).
             """
-            chunk_iterator = archive.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM)
+            if stream_plan is not None:
+                chunk_iterator = sparse_chunk_iterator(stream_plan, map_bytes)
+            else:
+                chunk_iterator = archive.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM)
             if pi:
                 info = [remove_surrogates(item.path)]
                 return ChunkIteratorFileWrapper(
@@ -288,6 +438,57 @@ class TarMixIn:
                 )
             else:
                 return ChunkIteratorFileWrapper(chunk_iterator)
+
+        def sparsify_tarinfo(item, tarinfo):
+            """Try to turn *tarinfo* into a GNU sparse format 1.0 member.
+
+            If the item's content has detectable holes (runs of all-zero chunks) and storing
+            it sparsely is possible and worthwhile, modify *tarinfo* accordingly (mangled
+            name, stored size, GNU.sparse.* pax headers) and return (data_chunks, map_bytes);
+            else return None and leave *tarinfo* alone (dense member).
+            """
+            if not item.chunks:
+                return None
+            ids = [chunk.id for chunk in item.chunks]
+            sizes = [chunk.size for chunk in item.chunks]
+            # Warm up the zero chunk id memo for likely hole chunk sizes, so such zero chunks
+            # get detected even when their id does not repeat within this item: all-zero
+            # chunks usually are max-chunk-sized (a power of two, as the chunkers do not cut
+            # within runs of zeros) or a file's last chunk (a trailing hole of any size).
+            candidate_sizes = {size for size in sizes if size & (size - 1) == 0} | {sizes[-1]}
+            for size in candidate_sizes:
+                if 0 < size <= len(zeros):
+                    zero_chunk_id(archive.key.id_hash, size)
+            sparse_info = chunks_to_sparse_info(item.chunks, zero_chunk_flags(ids, sizes, archive.key.id_hash))
+            if sparse_info is None:
+                return None
+            map_entries, stream_plan, realsize = sparse_info
+            if realsize != item.get_size():
+                return None  # do not write self-contradicting sparse headers for an inconsistent item
+            map_bytes = gnu_sparse_10_map(map_entries)
+            stored_size = len(map_bytes) + sum(length for _, length in map_entries)
+            if stored_size >= realsize:
+                return None  # not worthwhile, the map costs more than the holes save
+            # SparseTarInfo suppresses the pax "size" record (sparse readers desync on it)
+            # and base-256 encodes a stored size beyond the octal ustar field limit.
+            tarinfo.__class__ = SparseTarInfo
+            # Do like GNU tar: store the member under a mangled name, so that a sparse-unaware
+            # tar does not extract the raw map + data segments under the original name - the
+            # real name is in the GNU.sparse.name pax header. GNU tar uses its pid where we
+            # always use 0, for reproducible output.
+            mangled_name = "GNUSparseFile.0/" + tarinfo.name
+            # pax record order matters for readers applying them in-order: "path" (mangled)
+            # first, the GNU.sparse.* records (real name / size) last, so the latter win.
+            ph = {"path": mangled_name}
+            ph.update(tarinfo.pax_headers)
+            ph["GNU.sparse.major"] = "1"
+            ph["GNU.sparse.minor"] = "0"
+            ph["GNU.sparse.name"] = tarinfo.name
+            ph["GNU.sparse.realsize"] = str(realsize)
+            tarinfo.pax_headers = ph
+            tarinfo.name = mangled_name
+            tarinfo.size = stored_size  # sparse map + data segments, excluding the holes
+            return stream_plan, map_bytes
 
         for item in archive.iter_items(filter):
             orig_path = item.path
@@ -299,8 +500,17 @@ class TarMixIn:
                     tarinfo.pax_headers = item_to_paxheaders(args.tar_format, item)
                 if output_list:
                     logging.getLogger("borg.output.list").info(remove_surrogates(orig_path))
-                stream = item_content_stream(item) if needs_content else None
+                sparse_content = sparsify_tarinfo(item, tarinfo) if args.sparse and needs_content else None
+                if sparse_content is not None:
+                    stream_plan, map_bytes = sparse_content
+                    stream = item_content_stream(item, stream_plan=stream_plan, map_bytes=map_bytes)
+                else:
+                    stream = item_content_stream(item) if needs_content else None
                 tar.addfile(tarinfo, stream)
+                if pi and sparse_content is not None:
+                    # the stream callback counted only the stored bytes (sparse map + data
+                    # segments), but the progress total is based on the logical file sizes.
+                    pi.show(increase=max(0, item.get_size() - tarinfo.size), info=[remove_surrogates(item.path)])
 
         if pi:
             pi.finish()
@@ -434,7 +644,20 @@ class TarMixIn:
         |              |                           | no ACLs/xattrs/bsdflags    |
         +--------------+---------------------------+----------------------------+
 
-        A ``--sparse`` option (as found in borg extract) is not supported.
+        With ``--sparse``, files whose content contains runs of all-zero chunks are written
+        as sparse tar members (GNU sparse format 1.0, as GNU tar creates it in POSIX mode),
+        storing only a hole map and the non-zero data. This requires ``--tar-format BORG``
+        or ``PAX``. Such tarballs can be much smaller for sparse files (e.g. disk images)
+        and extract to sparse files again with GNU tar's or bsdtar's sparse support
+        (as well as with ``borg import-tar`` / ``borg extract --sparse``).
+        Notes: hole detection works at the granularity of borg's content chunks (it does not
+        depend on the original file having been a sparse file - but some short or unaligned
+        zero runs may be stored literally); sparse-unaware tar implementations will extract
+        a member as ``GNUSparseFile.0/<name>`` containing the raw hole map and data (the
+        same caveat applies to tarballs created by GNU tar); for members needing >= 8 GiB
+        of stored (non-hole) data, the stored size is base-256 encoded in the tar header
+        (the GNU/star encoding of big numbers, understood by GNU tar, libarchive/bsdtar
+        and python) - logical file sizes are unlimited anyway.
 
         By default the entire archive is extracted but a subset of files and directories
         can be selected by passing a list of ``PATHs`` as arguments.
@@ -468,6 +691,13 @@ class TarMixIn:
             choices=("BORG", "PAX", "GNU"),
             action=Highlander,
             help="select tar format: BORG, PAX or GNU",
+        )
+        subparser.add_argument(
+            "--sparse",
+            dest="sparse",
+            action="store_true",
+            help="write sparse tar members (GNU sparse format 1.0) for files containing all-zero "
+            "chunks (BORG and PAX formats only)",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
@@ -504,7 +734,9 @@ class TarMixIn:
         Most documentation of borg create applies. Note that this command does not
         support excluding files.
 
-        A ``--sparse`` option (as found in borg create) is not supported.
+        A ``--sparse`` option (as found in borg create) is not needed: sparse members in
+        input tarballs (old GNU and PAX sparse formats) are read correctly and their
+        holes are stored as deduplicated all-zero chunks.
 
         About tar formats and metadata conservation or loss, please see ``borg export-tar``.
 

@@ -1,11 +1,17 @@
 import os
+import random
 import shutil
 import subprocess
+import sys
+import tarfile
 
 import pytest
 
 from ... import xattr
+from ...archiver.tar_cmds import chunks_to_sparse_info, gnu_sparse_10_map, SparseTarInfo
 from ...constants import *  # NOQA
+from ...helpers import Error
+from ...item import ChunkListEntry
 from .. import changedir
 from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, requires_hardlinks, RK_ENCRYPTION
 from . import create_test_files, create_regular_file
@@ -340,6 +346,260 @@ def test_roundtrip_pax_xattrs(archivers, request):
         extracted_path = os.path.abspath("input/file")
         xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
     assert xa_value_extracted == xa_value
+
+
+def _sparse_entries(sizes):
+    return [ChunkListEntry(id=bytes([i]) * 32, size=size) for i, size in enumerate(sizes)]
+
+
+def test_chunks_to_sparse_info():
+    # no chunks / no holes: not sparse
+    assert chunks_to_sparse_info([], []) is None
+    assert chunks_to_sparse_info(_sparse_entries([512, 1024]), [False, False]) is None
+    # a zero run shorter than a tar block cannot make a (block-aligned) hole
+    assert chunks_to_sparse_info(_sparse_entries([512, 511, 512]), [False, True, False]) is None
+    # leading hole; adjacent zero chunks coalesce into one hole
+    chunks = _sparse_entries([1024, 512, 1536])
+    map_entries, stream_plan, realsize = chunks_to_sparse_info(chunks, [True, True, False])
+    assert map_entries == [(1536, 1536)]
+    assert stream_plan == [chunks[2]]
+    assert realsize == 3072
+    # middle hole
+    chunks = _sparse_entries([512, 1024, 1024, 512])
+    map_entries, stream_plan, realsize = chunks_to_sparse_info(chunks, [False, True, True, False])
+    assert map_entries == [(0, 512), (2560, 512)]
+    assert stream_plan == [chunks[0], chunks[3]]
+    assert realsize == 3072
+    # trailing hole: terminating (realsize, 0) entry, like GNU tar creates it
+    chunks = _sparse_entries([512, 1024])
+    map_entries, stream_plan, realsize = chunks_to_sparse_info(chunks, [False, True])
+    assert map_entries == [(0, 512), (1536, 0)]
+    assert stream_plan == [chunks[0]]
+    assert realsize == 1536
+    # all-hole file (its trailing hole may end unaligned)
+    chunks = _sparse_entries([512, 100])
+    map_entries, stream_plan, realsize = chunks_to_sparse_info(chunks, [True, True])
+    assert map_entries == [(612, 0)]
+    assert stream_plan == []
+    assert realsize == 612
+    # holes shrink to whole 512-byte tar blocks (GNU tar's sparse reader needs block-aligned
+    # data segments); the shaved-off zero bytes at the hole edges are emitted literally.
+    chunks = _sparse_entries([10000, 40000, 10000])
+    map_entries, stream_plan, realsize = chunks_to_sparse_info(chunks, [False, True, False])
+    assert map_entries == [(0, 10240), (49664, 10336)]
+    assert stream_plan == [chunks[0], 240, 336, chunks[2]]
+    assert realsize == 60000
+    # the stream plan produces exactly the data segments' bytes
+    emitted = sum(entry if isinstance(entry, int) else entry.size for entry in stream_plan)
+    assert emitted == sum(length for _, length in map_entries)
+
+
+def test_gnu_sparse_10_map():
+    # exactly the numbers/layout GNU tar writes, NUL-padded to a multiple of 512.
+    map_bytes = gnu_sparse_10_map([(0, 1048576), (5242880, 1048576), (10485760, 0)])
+    assert map_bytes == b"3\n0\n1048576\n5242880\n1048576\n10485760\n0\n" + b"\0" * (512 - 39)
+    assert len(gnu_sparse_10_map([(1000, 0)])) == 512
+    # a large map spills into multiple 512 byte blocks
+    map_bytes = gnu_sparse_10_map([(i * 10000, 5000) for i in range(100)])
+    assert len(map_bytes) % 512 == 0 and len(map_bytes) > 512
+    numbers = [int(n) for n in map_bytes.rstrip(b"\0").split()]
+    assert numbers[0] == 100 and numbers[1:3] == [0, 5000]
+
+
+# chunkers used by the sparse tests: a fixed chunker (all-zero chunks exactly aligned with
+# the zero runs) and a small-target fastcdc chunker (content-defined chunk boundaries, so the
+# zero runs yield multiple repeated pure all-zero chunks of max. chunk size (64 KiB), possibly
+# surrounded by mixed data/zeros chunks at the edges - like real sparse files chunked by the
+# default chunker, just scaled down to small test files).
+SPARSE_CHUNKER_FIXED = "--chunker-params=fixed,65536"
+SPARSE_CHUNKER_CDC = "--chunker-params=fastcdc,12,16,14,2"  # 4 KiB min, 16 KiB target, 64 KiB max
+
+
+def _create_sparse_test_input(input_path):
+    """Create files containing runs of all-zero chunks (the files need not be sparse on disk)."""
+    B = 65536  # the max. chunk size of the chunkers used by the sparse tests
+    rnd = random.Random(42)  # pseudorandom data, so the cdc chunker cuts realistic chunks
+    contents = {
+        "sparse_img": rnd.randbytes(B) + b"\0" * (4 * B) + rnd.randbytes(B) + b"\0" * (4 * B),
+        "allzero": b"\0" * (3 * B),
+        "unaligned": b"\0" * (2 * B) + b"tail",  # leading hole, small unaligned trailing data chunk
+        "dense": rnd.randbytes(B + 42),
+        "empty": b"",
+    }
+    for name, data in contents.items():
+        create_regular_file(input_path, name, contents=data)
+    return contents
+
+
+@pytest.mark.parametrize("chunker_params", [SPARSE_CHUNKER_FIXED, SPARSE_CHUNKER_CDC])
+def test_export_tar_sparse(archivers, request, chunker_params):
+    archiver = request.getfixturevalue(archivers)
+    contents = _create_sparse_test_input(archiver.input_path)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", chunker_params, "test", "input")
+    cmd(archiver, "export-tar", "test", "dense.tar")
+    cmd(archiver, "export-tar", "--sparse", "test", "sparse.tar", "--progress")
+    # storing the holes as sparse members must save space (~832 KiB of holes here)
+    assert os.path.getsize("sparse.tar") < os.path.getsize("dense.tar") - 500000
+    expected_sparse = {"input/sparse_img", "input/allzero", "input/unaligned"}
+    seen = set()
+    with tarfile.open("sparse.tar") as tar:
+        for tarinfo in tar.getmembers():
+            if not tarinfo.isreg():
+                continue
+            seen.add(tarinfo.name)
+            # the tarinfo has the real (unmangled) name and the logical size,
+            # and the member expands to the original content.
+            name = tarinfo.name.rsplit("/", 1)[-1]
+            assert tarinfo.size == len(contents[name])
+            assert tar.extractfile(tarinfo).read() == contents[name]
+            assert tarinfo.issparse() == (tarinfo.name in expected_sparse)
+    assert seen == {"input/" + name for name in contents}
+
+
+@pytest.mark.parametrize("chunker_params", [SPARSE_CHUNKER_FIXED, SPARSE_CHUNKER_CDC])
+@pytest.mark.parametrize("tar_format", ["PAX", "BORG"])
+def test_export_tar_sparse_roundtrip(archivers, request, tar_format, chunker_params):
+    archiver = request.getfixturevalue(archivers)
+    _create_sparse_test_input(archiver.input_path)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", chunker_params, "src", "input")
+    cmd(archiver, "export-tar", "--sparse", f"--tar-format={tar_format}", "src", "sparse.tar")
+    cmd(archiver, "import-tar", "dst", "sparse.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+    assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
+
+
+def test_export_tar_sparse_not_worthwhile(archivers, request):
+    # when the sparse map would cost more space than the holes save, store a dense member.
+    archiver = request.getfixturevalue(archivers)
+    contents = b"X" * 448 + b"\0" * 64
+    create_regular_file(archiver.input_path, "tinyhole", contents=contents)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", "--chunker-params=fixed,64", "test", "input")
+    cmd(archiver, "export-tar", "--sparse", "test", "sparse.tar")
+    with tarfile.open("sparse.tar") as tar:
+        tarinfo = tar.getmember("input/tinyhole")
+        assert not tarinfo.issparse()
+        assert tar.extractfile(tarinfo).read() == contents
+
+
+@requires_gnutar
+def test_export_tar_sparse_gnutar(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    _create_sparse_test_input(archiver.input_path)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", SPARSE_CHUNKER_CDC, "test", "input")
+    cmd(archiver, "export-tar", "--sparse", "test", "sparse.tar")
+    with changedir("output"):
+        subprocess.check_call(["tar", "xpf", "../sparse.tar", "--warning=no-timestamp"])
+    assert_dirs_equal("input", "output/input", ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
+    if sys.platform == "linux":
+        # GNU tar recreates the holes when extracting sparse members.
+        st = os.stat("output/input/sparse_img")
+        assert st.st_blocks * 512 < st.st_size
+
+
+@requires_hardlinks
+def test_export_tar_sparse_hardlinks(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    contents = b"\0" * 2 * 65536 + b"data"
+    create_regular_file(archiver.input_path, "sparse1", contents=contents)
+    os.link(os.path.join(archiver.input_path, "sparse1"), os.path.join(archiver.input_path, "sparse2"))
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", SPARSE_CHUNKER_CDC, "src", "input")
+    cmd(archiver, "export-tar", "--sparse", "src", "sparse.tar")
+    with tarfile.open("sparse.tar") as tar:
+        members = [ti for ti in tar.getmembers() if ti.name.startswith("input/sparse")]
+        regs = [ti for ti in members if ti.isreg()]
+        lnks = [ti for ti in members if ti.islnk()]
+        assert len(regs) == 1 and len(lnks) == 1
+        # the first occurrence carries the sparse content, the second one is a tar hard link
+        # referencing the first one's real (unmangled) name.
+        assert regs[0].issparse()
+        assert tar.extractfile(regs[0]).read() == contents
+        assert lnks[0].linkname == regs[0].name
+    # roundtrip: as usual for import-tar, tar hard links become separate files (sharing chunks).
+    cmd(archiver, "import-tar", "dst", "sparse.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+        for name in "input/sparse1", "input/sparse2":
+            with open(name, "rb") as f:
+                assert f.read() == contents
+
+
+def test_export_tar_sparse_strip_components(archivers, request):
+    # the mangled member name and GNU.sparse.name must be based on the stripped path.
+    archiver = request.getfixturevalue(archivers)
+    contents = b"\0" * 2 * 65536 + b"end"
+    create_regular_file(archiver.input_path, "dir/sparsefile", contents=contents)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", SPARSE_CHUNKER_CDC, "test", "input")
+    cmd(archiver, "export-tar", "--sparse", "--strip-components=1", "test", "sparse.tar")
+    with tarfile.open("sparse.tar") as tar:
+        tarinfo = tar.getmember("dir/sparsefile")
+        assert tarinfo.issparse()
+        assert tar.extractfile(tarinfo).read() == contents
+
+
+def test_sparse_tarinfo_base256_size():
+    # a stored size beyond the 12-digit octal ustar field limit is base-256 encoded in the
+    # ustar size field (with a correct checksum), and no pax "size" record is emitted
+    # (sparse readers desync on such a record).
+    tarinfo = SparseTarInfo(name="GNUSparseFile.0/big")
+    tarinfo.size = 3 * 8**11  # 24 GiB of stored data, does not fit the octal field
+    tarinfo.pax_headers = {"GNU.sparse.realsize": str(100 * 8**11)}
+    buf = tarinfo.tobuf(tarfile.PAX_FORMAT, tarfile.ENCODING, "surrogateescape")
+    assert b" size=" not in buf  # no pax "size" record (" realsize=" does not match)
+    # frombuf validates the checksum and decodes the base-256 size field:
+    parsed = tarfile.TarInfo.frombuf(buf[-tarfile.BLOCKSIZE :], tarfile.ENCODING, "surrogateescape")
+    assert parsed.size == 3 * 8**11
+    # small stored sizes keep the plain octal encoding:
+    tarinfo.size = 4711
+    buf = tarinfo.tobuf(tarfile.PAX_FORMAT, tarfile.ENCODING, "surrogateescape")
+    assert buf[-tarfile.BLOCKSIZE :][124:136] == b"00000011147\x00"
+
+
+def test_export_tar_sparse_base256_size(archivers, request, monkeypatch):
+    # end-to-end wire-format test of the base-256 stored size: the encoding does not depend
+    # on the value, so force it for small members instead of storing 8 GiB of data.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("monkeypatching does not reach a borg binary")
+    monkeypatch.setattr(SparseTarInfo, "octal_size_limit", 1)
+    contents = _create_sparse_test_input(archiver.input_path)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", SPARSE_CHUNKER_CDC, "src", "input")
+    cmd(archiver, "export-tar", "--sparse", "src", "sparse.tar")
+    with tarfile.open("sparse.tar") as tar:
+        for tarinfo in tar.getmembers():
+            if tarinfo.isreg():
+                name = tarinfo.name.rsplit("/", 1)[-1]
+                assert tar.extractfile(tarinfo).read() == contents[name]
+    if have_gnutar():
+        with changedir("output"):
+            subprocess.check_call(["tar", "xpf", "../sparse.tar", "--warning=no-timestamp"])
+        assert_dirs_equal("input", "output/input", ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
+        shutil.rmtree("output/input")
+    cmd(archiver, "import-tar", "dst", "sparse.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+    assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
+
+
+def test_export_tar_sparse_gnu_format_error(archivers, request):
+    # --sparse requires a PAX-based tar format, the GNU format cannot store the sparse headers.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file", contents=b"x")
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "create", "test", "input")
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "export-tar", "--sparse", "--tar-format=GNU", "test", "out.tar", exit_code=2)
+        assert "--sparse requires --tar-format" in output
+    else:
+        with pytest.raises(Error, match="--sparse requires --tar-format"):
+            cmd(archiver, "export-tar", "--sparse", "--tar-format=GNU", "test", "out.tar")
 
 
 @skipif_not_linux

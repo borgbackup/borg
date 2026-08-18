@@ -371,23 +371,8 @@ class DownloadPipeline:
             sizes = [None] * len(ids)
         else:
             raise TypeError(f"unsupported or mixed element types: {chunks}")
-        # All-zero chunks can be served directly from the zeros constant, without repository
-        # access, by comparing against the (memoized) id of an all-zero chunk of same size.
-        # Only compute that id for ids occurring repeatedly within this stream: a repeated id
-        # means repeating plaintext, which usually is a run of zeros (e.g. the "holes" of a
-        # sparse file, see issue #1678) - and the repetition also keeps the memoization
-        # effective, as it bounds the computations to a few chunk sizes.
-        id_hash = self.repo_objs.key.id_hash
-        counts = Counter(ids)
-        zero_flags = []
-        for id, size in zip(ids, sizes):
-            if size is None or not 0 < size <= len(zeros):
-                zero_flags.append(False)
-            elif counts[id] > 1:
-                zero_flags.append(id == zero_chunk_id(id_hash, size))
-            else:
-                # unique id: only compare against already memoized zero chunk ids (cheap).
-                zero_flags.append(id == zero_chunk_ids.get((id_hash, size)))
+        # All-zero chunks can be served directly from the zeros constant, without repository access.
+        zero_flags = zero_chunk_flags(ids, sizes, self.repo_objs.key.id_hash)
         fetch_ids = [id for id, zero in zip(ids, zero_flags) if not zero]
         fetched = self.repository.get_many(fetch_ids, raise_missing=False)
         for id, size, zero in zip(ids, sizes, zero_flags):
@@ -1273,6 +1258,30 @@ def zero_chunk_id(id_hash, size):
         chunk_id = id_hash(memoryview(zeros)[:size])
         zero_chunk_ids[(id_hash, size)] = chunk_id
         return chunk_id
+
+
+def zero_chunk_flags(ids, sizes, id_hash):
+    """
+    Return a list of bools telling whether the chunk with ids[i] / sizes[i] is an all-zero chunk,
+    detected by comparing against the (memoized) id of an all-zero chunk of same size.
+
+    Only compute that id for ids occurring repeatedly within this stream: a repeated id
+    means repeating plaintext, which usually is a run of zeros (e.g. the "holes" of a
+    sparse file, see issue #1678) - and the repetition also keeps the memoization
+    effective, as it bounds the computations to a few chunk sizes. For unique ids, only
+    already memoized zero chunk ids are compared against (cheap), so the detection may
+    have false negatives.
+    """
+    counts = Counter(ids)
+    zero_flags = []
+    for id, size in zip(ids, sizes):
+        if size is None or not 0 < size <= len(zeros):
+            zero_flags.append(False)
+        elif counts[id] > 1:
+            zero_flags.append(id == zero_chunk_id(id_hash, size))
+        else:
+            zero_flags.append(id == zero_chunk_ids.get((id_hash, size)))
+    return zero_flags
 
 
 def cached_hash(chunk, id_hash):

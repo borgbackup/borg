@@ -125,6 +125,13 @@ import-tar reads these tar formats:
 - UNIX V7 tar
 - SunOS tar with extended attributes
 
+Extended attributes archived by Solaris/illumos tar or pax (special member
+type "E") are imported as xattrs of the respective archive item (matching how
+borg create archives them on those platforms). System attributes
+(``SUNWattr_*``), hard-linked attributes and attributes of attributes are not
+imported. Members of other/unknown vendor-specific types are skipped and
+reported in a summarizing warning at the end.
+
 To import multiple tarballs into a single archive, they can be simply
 concatenated (e.g. using "cat") into a single file, and imported with an
 ``--ignore-zeros`` option to skip through the stop markers between them.

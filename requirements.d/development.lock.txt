@@ -1,7 +1,7 @@
 pip==26.1.2
 virtualenv==21.6.1
 build==1.5.1
-tox==4.56.4
+tox==4.57.0
 pytest==9.1.1
 pytest-xdist==3.8.0
 coverage[toml]==7.15.4
@@ -9,4 +9,4 @@ pytest-cov==7.1.0
 pytest-benchmark==5.2.3
 pytest-timeout==2.4.0
 pre-commit==4.6.2
-types-PyYAML==6.0.12.20260724
+types-PyYAML==6.0.12.20260815

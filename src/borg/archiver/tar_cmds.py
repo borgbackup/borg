@@ -569,7 +569,6 @@ class TarMixIn:
         while tarinfo := tar.next():
             if tarinfo.isreg():
                 status = tfo.process_file(tarinfo=tarinfo, status="A", type=stat.S_IFREG, tar=tar)
-                archive.stats.nfiles += 1
             elif tarinfo.isdir():
                 status = tfo.process_dir(tarinfo=tarinfo, status="d", type=stat.S_IFDIR)
             elif tarinfo.issym():

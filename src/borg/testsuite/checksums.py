@@ -34,7 +34,6 @@ def test_crc32(implementation):
             assert zlib.crc32(d, initial_crc) == implementation(d, initial_crc)
 
 
-
 # Big enough that random start/end offsets land on every 16B alignment and
 # produce large slices, i.e. the folding path with an unaligned head.
 CRC32_BUFFER_SIZE = 1024 * 1024
@@ -73,6 +72,7 @@ def test_crc32_short_slices(implementation):
             for initial_crc in (0, 0x12345678, 0xffffffff):
                 assert zlib.crc32(d, initial_crc) == implementation(d, initial_crc), \
                     'start=%d end=%d initial_crc=%#x' % (start, end, initial_crc)
+
 
 # Runs in a subprocess: reading past the end of the buffer is a SIGSEGV, which
 # would take the whole test runner down with it.

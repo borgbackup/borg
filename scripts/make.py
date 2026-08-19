@@ -570,21 +570,12 @@ class BuildMan:
             write(option.ljust(padding), desc)
 
 
-cython_sources = """
-src/borg/compress.pyx
-src/borg/crypto/low_level.pyx
-src/borg/chunkers/buzhash.pyx
-src/borg/chunkers/buzhash64.pyx
-src/borg/chunkers/reader.pyx
-src/borg/hashindex.pyx
-src/borg/item.pyx
-src/borg/platform/posix.pyx
-src/borg/platform/linux.pyx
-src/borg/platform/syncfilerange.pyx
-src/borg/platform/darwin.pyx
-src/borg/platform/freebsd.pyx
-src/borg/platform/windows.pyx
-""".strip().splitlines()
+def cython_sources():
+    """Find all Cython sources below src/borg/.
+
+    They are discovered rather than hardcoded, so that new modules are covered automatically.
+    """
+    return sorted(glob.glob("src/borg/**/*.pyx", recursive=True))
 
 
 def rm(file):
@@ -598,7 +589,7 @@ def rm(file):
 
 class Clean:
     def run(self):
-        for source in cython_sources:
+        for source in cython_sources():
             genc = source.replace(".pyx", ".c")
             rm(genc)
             compiled_glob = source.replace(".pyx", ".cpython*")

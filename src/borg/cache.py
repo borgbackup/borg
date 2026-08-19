@@ -130,7 +130,8 @@ class SecurityManager:
             logger.debug('security: updating location stored in cache and security dir')
             with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
-            if cache_config:
+            if cache_config and cache_config.lock is not None:
+                # only write to the cache config if we hold its lock, see #7255
                 cache_config.save()
 
     def assert_no_manifest_replay(self, manifest, key, cache_config=None):
@@ -161,14 +162,14 @@ class SecurityManager:
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True, lock_wait=None):
+    def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True, lock_wait=None, lock=True):
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         self.assert_access_unknown(warn_if_unencrypted, manifest, key)
         if cache_config:
             self._assert_secure(manifest, key, cache_config)
         else:
-            cache_config = CacheConfig(self.repository, lock_wait=lock_wait)
+            cache_config = CacheConfig(self.repository, lock_wait=lock_wait, lock=lock)
             if cache_config.exists():
                 with cache_config:
                     self._assert_secure(manifest, key, cache_config)
@@ -203,9 +204,9 @@ class SecurityManager:
                 raise Cache.CacheInitAbortedError()
 
 
-def assert_secure(repository, manifest, lock_wait):
+def assert_secure(repository, manifest, lock_wait, lock=True):
     sm = SecurityManager(repository)
-    sm.assert_secure(manifest, manifest.key, lock_wait=lock_wait)
+    sm.assert_secure(manifest, manifest.key, lock_wait=lock_wait, lock=lock)
 
 
 def recanonicalize_relative_location(cache_location, repository):
@@ -238,12 +239,13 @@ def discover_files_cache_name(path):
 
 
 class CacheConfig:
-    def __init__(self, repository, path=None, lock_wait=None):
+    def __init__(self, repository, path=None, lock_wait=None, lock=True):
         self.repository = repository
         self.path = cache_dir(repository, path)
         self.config_path = os.path.join(self.path, 'config')
         self.lock = None
         self.lock_wait = lock_wait
+        self.do_lock = lock
 
     def __enter__(self):
         self.open()
@@ -268,7 +270,8 @@ class CacheConfig:
             config.write(fd)
 
     def open(self):
-        self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=self.lock_wait).acquire()
+        if self.do_lock:
+            self.lock = Lock(os.path.join(self.path, 'lock'), exclusive=True, timeout=self.lock_wait).acquire()
         self.load()
 
     def load(self):

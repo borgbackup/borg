@@ -132,6 +132,34 @@ def is_root():
 
 
 @functools.lru_cache
+def can_revoke_read_access():
+    """Return True if taking away our own read permissions for a file really works.
+
+    Highly privileged users can read files no matter what the permissions say: root ignores
+    the permission bits, and on cygwin a user holding SeBackupPrivilege bypasses the ACL
+    checks (cygwin always opens files with FILE_OPEN_FOR_BACKUP_INTENT). Tests that need an
+    unreadable file must be skipped for such users.
+    """
+    if is_win32:
+        # there, read access is revoked via a deny ACE (see the icacls calls in the tests)
+        # rather than via chmod, and such an ACE is honoured also for privileged users.
+        return True
+    with unopened_tempfile() as filepath:
+        with open(filepath, "wb") as fd:
+            fd.write(b"secret")
+        os.chmod(filepath, 0o000)
+        try:
+            with open(filepath, "rb") as fd:
+                fd.read(1)
+        except OSError:
+            return True  # good, we can not read it any more.
+        else:
+            return False
+        finally:
+            os.chmod(filepath, 0o600)  # make sure the tempfile can be cleaned up.
+
+
+@functools.lru_cache
 def are_symlinks_supported():
     with unopened_tempfile() as filepath:
         try:

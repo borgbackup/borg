@@ -27,7 +27,7 @@ from .. import (
     is_utime_fully_supported,
     is_birthtime_fully_supported,
     same_ts_ns,
-    is_root,
+    can_revoke_read_access,
     granularity_sleep,
 )
 from . import (
@@ -308,7 +308,7 @@ def test_create_erroneous_file(archivers, request):
     assert "input/file3" in out
 
 
-@pytest.mark.skipif(is_root(), reason="test must not be run as (fake)root")
+@pytest.mark.skipif(not can_revoke_read_access(), reason="can not revoke our own read permissions")
 def test_create_no_permission_file(archivers, request):
     archiver = request.getfixturevalue(archivers)
     file_path = os.path.join(archiver.input_path, "file")
@@ -317,7 +317,9 @@ def test_create_no_permission_file(archivers, request):
     create_regular_file(archiver.input_path, file_path + "3", size=1000)
     # revoke read permissions on file2 for everybody, including us:
     if is_win32:
-        subprocess.run(["icacls.exe", file_path + "2", "/deny", "everyone:(R)"])
+        # "*S-1-1-0" is the well-known SID of the "Everyone" group. Using the SID instead of the
+        # group name keeps this working on non-English Windows installations.
+        subprocess.run(["icacls.exe", file_path + "2", "/deny", "*S-1-1-0:(R)"])
     else:
         # note: this will NOT take away read permissions for root
         os.chmod(file_path + "2", 0o000)

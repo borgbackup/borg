@@ -511,6 +511,10 @@ jobs:
               sudo -E kldload fusefs
               sudo -E sysctl vfs.usermount=1
               sudo -E chmod 666 /dev/fuse
+
+              # enable POSIX.1e ACLs on the UFS root fs (covers /tmp), so the ACL tests do not skip (#9144)
+              sudo mount -u -o acls /
+              mount | grep ' / ' | grep -w acls
               sudo -E pkg install -y rust
               sudo -E pkg install -y gmake
               sudo -E pkg install -y git

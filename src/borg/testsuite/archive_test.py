@@ -7,14 +7,15 @@ from unittest.mock import Mock
 
 import pytest
 
-from . import rejected_dotdot_paths
+from . import rejected_dotdot_paths, is_utime_fully_supported
 from ..cache import ChunkListEntry
 from ..constants import ROBJ_FILE_STREAM, zeros
 from ..crypto.key import ChecksumKey
 from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacker, valid_msgpacked_dict
 from ..archive import ITEM_KEYS, Statistics
 from ..archive import zero_chunk_flags, zero_chunk_id, zero_chunk_ids
-from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
+from ..archive import BackupOSError, BackupRaceConditionError, backup_io, backup_io_iter, get_item_uid_gid
+from ..archive import stat_update_check
 from ..helpers import msgpack
 from ..repoobj import RepoObj
 from ..item import Item, ArchiveItem
@@ -491,6 +492,59 @@ def test_backup_io_iter():
     normal_iterator = Iterator(StopIteration)
     for _ in backup_io_iter(normal_iterator):
         assert False, "StopIteration handled incorrectly"
+
+
+def _stat_with_atime(path, atime_ns, mtime_ns=234567890000000000):
+    os.utime(path, ns=(atime_ns, mtime_ns))
+    return os.stat(path)
+
+
+@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
+def test_stat_update_check_atime_updated(tmpdir):
+    path = str(tmpdir.join("file"))
+    with open(path, "wb") as f:
+        f.write(b"12345")
+    st_old = _stat_with_atime(path, 123456789000000000)
+    st_curr = _stat_with_atime(path, 987654321000000000)
+    st = stat_update_check(st_old, st_curr)
+    # the atime is the one from before we (usually: by opening the file) touched it, see #6194:
+    assert st.st_atime_ns == st_old.st_atime_ns
+    assert st.st_atime == st_old.st_atime
+    # everything else comes from the current stat:
+    assert st.st_mode == st_curr.st_mode
+    assert st.st_ino == st_curr.st_ino
+    assert st.st_size == st_curr.st_size
+    assert st.st_mtime_ns == st_curr.st_mtime_ns
+    # optional attributes must be present (or absent) just like on a real stat result:
+    assert hasattr(st, "st_birthtime_ns") == hasattr(st_curr, "st_birthtime_ns")
+    with pytest.raises(AttributeError):
+        st.st_does_not_exist
+
+
+@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
+def test_stat_update_check_atime_unchanged(tmpdir):
+    path = str(tmpdir.join("file"))
+    with open(path, "wb") as f:
+        f.write(b"12345")
+    st_old = _stat_with_atime(path, 123456789000000000)
+    st_curr = os.stat(path)
+    assert st_old.st_atime_ns == st_curr.st_atime_ns
+    # nothing to fix up, so we get the current stat result as is:
+    assert stat_update_check(st_old, st_curr) is st_curr
+
+
+def test_stat_update_check_race_conditions(tmpdir):
+    file_path = str(tmpdir.join("file"))
+    with open(file_path, "wb"):
+        pass
+    other_path = str(tmpdir.join("other_file"))
+    with open(other_path, "wb"):
+        pass
+    st_file, st_other, st_dir = os.stat(file_path), os.stat(other_path), os.stat(str(tmpdir))
+    with pytest.raises(BackupRaceConditionError):  # file type changed
+        stat_update_check(st_file, st_dir)
+    with pytest.raises(BackupRaceConditionError):  # inode changed
+        stat_update_check(st_file, st_other)
 
 
 def test_get_item_uid_gid():

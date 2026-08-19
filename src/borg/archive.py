@@ -287,6 +287,28 @@ def backup_io_iter(iterator):
         yield item
 
 
+class StatOrigAtime:
+    """
+    An os.stat_result look-alike: all attributes come from *st*, only the
+    access time comes from *st_orig*.
+
+    Rationale: borg needs to open() a fs item before it can fstat() it. If the
+    platform does not support O_NOATIME (or we are not allowed to use it), that
+    open() might have already updated the atime - we do not want to archive such
+    an atime, but the one the item had before borg touched it.
+    """
+
+    __slots__ = ("_st", "st_atime", "st_atime_ns")
+
+    def __init__(self, st, st_orig):
+        self._st = st
+        self.st_atime = st_orig.st_atime
+        self.st_atime_ns = st_orig.st_atime_ns
+
+    def __getattr__(self, name):
+        return getattr(self._st, name)
+
+
 def stat_update_check(st_old, st_curr):
     """
     this checks for some race conditions between the first filename-based stat()
@@ -309,6 +331,12 @@ def stat_update_check(st_old, st_curr):
     if st_old.st_ino != st_curr.st_ino:
         # in this case, the hard-links-related code in create_helper has the wrong inode - abort!
         raise BackupRaceConditionError("file inode changed (race condition), skipping file")
+    if st_old.st_atime_ns != st_curr.st_atime_ns:
+        # the atime was updated in between the 2 stat calls - most likely by us, because we
+        # had to open the item and O_NOATIME was not available / not usable, see #6194.
+        # in the (rare) case that somebody else accessed the item at just that moment, we
+        # lose that atime update, but that is much less of an issue than archiving our own.
+        return StatOrigAtime(st_curr, st_old)
     # looks ok, we are still dealing with the same thing - return current stat:
     return st_curr
 

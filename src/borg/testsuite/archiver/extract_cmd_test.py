@@ -9,6 +9,7 @@ import pytest
 
 from ... import xattr
 from ... import platform
+from ... import archive as archive_module
 from ...archive import Archive
 from ...cache import Cache
 from ...chunkers import has_seek_hole
@@ -286,7 +287,10 @@ def test_atime(archivers, request):
             noatime_used = flags_noatime != flags_normal
             return noatime_used and atime_before == atime_after
 
-    create_test_files(archiver.input_path)
+    # No hardlinks: input/hardlink would share the inode with input/file1, so anything
+    # touching one of them also changes the atime of the other. That has nothing to do with
+    # what is tested here, it only makes the results hard to interpret.
+    create_test_files(archiver.input_path, create_hardlinks=False)
     atime, mtime = 123456780, 234567890
     have_noatime = has_noatime("input/file1")
     os.utime("input/file1", (atime, mtime))
@@ -304,6 +308,47 @@ def test_atime(archivers, request):
     else:
         # it touched the input file's atime while backing it up
         assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
+
+
+@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
+def test_atime_open_updates_atime(archiver):
+    # simulate a platform where already the open() updates the atime (no O_NOATIME support,
+    # e.g. cygwin) - borg must archive the atime the item had before borg opened it, see #6194.
+    atime, mtime = 123456780, 234567890
+
+    def updates_atime(some_file):
+        os.utime(some_file, (atime, mtime))
+        with open(some_file, "rb") as f:
+            f.read(1)
+        return os.stat(some_file).st_atime_ns != atime * 10**9
+
+    real_os_open = archive_module.os_open
+
+    def os_open_updating_atime(**kwargs):
+        # open without O_NOATIME (as on a platform not having it), so that reading
+        # updates the atime - and read right away, as if the open() had done that.
+        fd = real_os_open(**dict(kwargs, noatime=False))
+        if fd is not None:
+            try:
+                os.pread(fd, 1, 0)  # a read updates the atime (but not the ctime)
+            except OSError:
+                pass  # not seekable / not readable (fifo, directory, ...)
+        return fd
+
+    create_test_files(archiver.input_path)
+    if not updates_atime("input/file1"):
+        pytest.skip("filesystem does not update the atime when reading")
+    os.utime("input/file1", (atime, mtime))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with patch.object(archive_module, "os_open", os_open_updating_atime):
+        cmd(archiver, "create", "--atime", "test", "input")
+    # make sure the simulation worked: the open() did update the input file's atime.
+    assert os.stat("input/file1").st_atime_ns != atime * 10**9
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    sto = os.stat("output/input/file1")
+    assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
+    assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
 
 
 @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot setup and execute test without utime")

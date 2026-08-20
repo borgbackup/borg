@@ -18,10 +18,12 @@ class MountMixIn:
         """Mounts an archive or an entire repository as a FUSE filesystem."""
         # Perform these checks before opening the repository and asking for a passphrase.
 
-        from ..fuse_impl import llfuse, has_mfusepy, BORG_FUSE_IMPL
+        from ..fuse_impl import llfuse, has_mfusepy, BORG_FUSE_IMPL, fuse_import_errors
 
         if llfuse is None and not has_mfusepy:
-            raise RTError("borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s." % BORG_FUSE_IMPL)
+            msg = "borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s." % BORG_FUSE_IMPL
+            msg += "".join(f"\nimport of {impl} failed: {err}" for impl, err in fuse_import_errors.items())
+            raise RTError(msg)
 
         if not os.path.isdir(args.mountpoint):
             raise RTError(f"{args.mountpoint}: Mountpoint must be an **existing directory**")

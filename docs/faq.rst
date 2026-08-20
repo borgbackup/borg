@@ -615,6 +615,43 @@ will only be applied to new chunks, not existing chunks. So it's safe
 to change them.
 
 
+Which chunker parameters should I use for SQLite databases?
+------------------------------------------------------------
+
+SQLite database files (as used by browsers, mail clients, chat clients and
+many applications) are usually modified in place: only a few pages (4 kiB by
+default) change, but the file itself is rewritten and thus needs to be read
+and chunked again by borg.
+
+With the default chunker parameters (target chunk size ~2 MiB), every changed
+page spoils a whole ~2 MiB chunk, so even tiny changes cost a lot of
+repository space. Using smaller chunks for such files helps::
+
+    borg create --chunker-params=buzhash,15,19,17,4095 ...
+
+This gives a target chunk size of ~128 kiB (minimum 32 kiB, maximum 512 kiB).
+Users reported that this reduces the amount of deduplicated data stored for
+consecutive backups of mostly unchanged SQLite databases a lot. Even smaller
+chunks (e.g. ``--chunker-params=buzhash,14,18,16,4095``, ~64 kiB target) can help
+some more - shift all three size exponents, so the range stays about as narrow.
+
+The price for this is a much larger number of chunks and thus more RAM and
+disk space needed to manage them, see :ref:`cache-memory-usage`. Because
+``--chunker-params`` applies to a whole ``borg create`` run and not to
+individual files, it is usually better to not use fine-grained chunking for
+everything, but to back up the databases in a separate run (excluding them
+from the main run) - or to just accept the resource usage if the data volume
+is small.
+
+See :ref:`chunker-params` for general notes, especially about changing the
+chunker parameters of an existing repository.
+
+Note that borg just copies the file as it is - if the database is written to
+while borg reads it, the backed up file might be inconsistent. Use a SQLite-aware
+method (like ``sqlite3 db.sqlite "VACUUM INTO 'copy.sqlite'"``, note that the
+target file must not exist yet) or a filesystem snapshot if you need a
+guaranteed consistent state.
+
 Why is backing up an unmodified FAT filesystem slow on Linux?
 -------------------------------------------------------------
 

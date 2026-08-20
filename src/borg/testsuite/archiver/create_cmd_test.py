@@ -1559,19 +1559,19 @@ def test_exclude_nodump_dir_with_file(archivers, request):
 def test_create_map(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    block = 4096
-    data_a, data_b, data_c = os.urandom(block), os.urandom(block), os.urandom(block)
+    block_size = 4096
+    data_a, data_b, data_c = os.urandom(block_size), os.urandom(block_size), os.urandom(block_size)
     # data_b is real data, but the map claims that range reads as zero:
     # borg must not read "zero" ranges, so the archive must contain zeros there.
-    create_regular_file(archiver.input_path, "file", contents=data_a + data_b + data_c + b"\0" * block)
+    create_regular_file(archiver.input_path, "file", contents=data_a + data_b + data_c + b"\0" * block_size)
     map_path = os.fspath(archiver.tmpdir / "input.map")
     with open(map_path, "w") as f:
         f.write("# test input map\n")
-        f.write(f"0 {block} data\n")
-        f.write(f"0x1000 {block} zero\n")
-        f.write(f"{2 * block} {block} data\n")
-        f.write(f"{3 * block} {block} zero\n")
-    expected = data_a + b"\0" * block + data_c + b"\0" * block
+        f.write(f"0 {block_size} data\n")
+        f.write(f"0x1000 {block_size} zero\n")
+        f.write(f"{2 * block_size} {block_size} data\n")
+        f.write(f"{3 * block_size} {block_size} zero\n")
+    expected = data_a + b"\0" * block_size + data_c + b"\0" * block_size
     for name, chunker_args in [("test-fixed", ("--chunker-params", "fixed,4096")), ("test-default", ())]:
         cmd(archiver, "create", *chunker_args, "--map", map_path, name, "input/file")
         with changedir("output"):
@@ -1611,27 +1611,27 @@ def test_create_map_errors(archivers, request):
 def test_create_map_reuse_from_fixed(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    block = 4096
-    blocks = [os.urandom(block) for _ in range(4)]
+    block_size = 4096
+    blocks = [os.urandom(block_size) for _ in range(4)]
     fname = os.path.join(archiver.input_path, "file")
     create_regular_file(archiver.input_path, "file", contents=b"".join(blocks))
     map_path = os.fspath(archiver.tmpdir / "input.map")
     with open(map_path, "w") as f:
-        f.write(f"0 {4 * block} data\n")
+        f.write(f"0 {4 * block_size} data\n")
     cmd(archiver, "create", "--chunker-params", "fixed,4096", "--map", map_path, "ref", "input/file")
     # modify block 1 (declared "data" below) and block 2 (declared "same"!): the new archive
     # must contain the new block 1, but the OLD block 2 - proving that borg reused the
     # reference archive's chunks instead of reading the "same" ranges.
-    new_block1, sneaky_block2 = os.urandom(block), os.urandom(block)
+    new_block1, sneaky_block2 = os.urandom(block_size), os.urandom(block_size)
     with open(fname, "r+b") as f:
-        f.seek(block)
+        f.seek(block_size)
         f.write(new_block1)
         f.write(sneaky_block2)
     with open(map_path, "w") as f:
-        f.write(f"0 {block} same\n")
-        f.write(f"{block} {block} data\n")
-        f.write(f"{2 * block} {block} same\n")
-        f.write(f"{3 * block} {block} zero\n")
+        f.write(f"0 {block_size} same\n")
+        f.write(f"{block_size} {block_size} data\n")
+        f.write(f"{2 * block_size} {block_size} same\n")
+        f.write(f"{3 * block_size} {block_size} zero\n")
     cmd(
         archiver,
         "create",
@@ -1647,7 +1647,7 @@ def test_create_map_reuse_from_fixed(archivers, request):
     with changedir("output"):
         cmd(archiver, "extract", "test")
     with open(os.path.join("output", "input", "file"), "rb") as f:
-        assert f.read() == blocks[0] + new_block1 + blocks[2] + b"\0" * block
+        assert f.read() == blocks[0] + new_block1 + blocks[2] + b"\0" * block_size
 
 
 def test_create_map_reuse_from_cdc(archivers, request):
@@ -1682,20 +1682,20 @@ def test_create_map_reuse_from_cdc(archivers, request):
 def test_create_map_reuse_from_resize(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    block = 4096
-    blocks = [os.urandom(block) for _ in range(3)]
+    block_size = 4096
+    blocks = [os.urandom(block_size) for _ in range(3)]
     fname = os.path.join(archiver.input_path, "file")
     create_regular_file(archiver.input_path, "file", contents=blocks[0] + blocks[1])
     map_path = os.fspath(archiver.tmpdir / "input.map")
     with open(map_path, "w") as f:
-        f.write(f"0 {2 * block} data\n")
+        f.write(f"0 {2 * block_size} data\n")
     cmd(archiver, "create", "--chunker-params", "fixed,4096", "ref", "input/file")
     # input grew: the tail beyond the reference chunks must be read.
     with open(fname, "ab") as f:
         f.write(blocks[2])
     with open(map_path, "w") as f:
-        f.write(f"0 {2 * block} same\n")
-        f.write(f"{2 * block} {block} data\n")
+        f.write(f"0 {2 * block_size} same\n")
+        f.write(f"{2 * block_size} {block_size} data\n")
     cmd(
         archiver,
         "create",
@@ -1710,9 +1710,9 @@ def test_create_map_reuse_from_resize(archivers, request):
     )
     # input shrank: reference chunks beyond the new size must be dropped.
     with open(fname, "r+b") as f:
-        f.truncate(block)
+        f.truncate(block_size)
     with open(map_path, "w") as f:
-        f.write(f"0 {block} same\n")
+        f.write(f"0 {block_size} same\n")
     cmd(
         archiver,
         "create",
@@ -1743,15 +1743,15 @@ def test_create_map_reuse_from_missing_chunk(archivers, request, monkeypatch):
     if archiver.FORK_DEFAULT:
         pytest.skip("needs in-process monkeypatching")
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    block = 4096
-    content = os.urandom(2 * block)
+    block_size = 4096
+    content = os.urandom(2 * block_size)
     create_regular_file(archiver.input_path, "file", contents=content)
     map_path = os.fspath(archiver.tmpdir / "input.map")
     with open(map_path, "w") as f:
-        f.write(f"0 {2 * block} data\n")
+        f.write(f"0 {2 * block_size} data\n")
     cmd(archiver, "create", "--chunker-params", "fixed,4096", "ref", "input/file")
     with open(map_path, "w") as f:
-        f.write(f"0 {2 * block} same\n")
+        f.write(f"0 {2 * block_size} same\n")
     from ...cache import AdHocWithFilesCache
 
     monkeypatch.setattr(AdHocWithFilesCache, "seen_chunk", lambda self, id, size=None: False)

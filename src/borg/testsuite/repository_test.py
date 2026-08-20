@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import struct
 import sys
 import time
 from collections import namedtuple
@@ -1894,7 +1895,7 @@ def test_pack_reader_resync_skips_to_next_object():
     assert list(reader.iter_headers(validate=accept_all)) == [(H(2), len(obj1), len(obj2))]
 
 
-def test_pack_reader_resync_recovers_from_corrupted_size():
+def test_pack_reader_resync_recovers_from_size_past_the_pack_end():
     # a header whose sizes point past the pack, so the next object is found by scanning.
     obj1 = bytearray(fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1)))
     obj2 = fchunk(b"payload-two", meta=b"meta2", chunk_id=H(2))
@@ -1906,6 +1907,34 @@ def test_pack_reader_resync_recovers_from_corrupted_size():
     reader = PackReader(pack_contents=pack)
     assert list(reader.iter_headers(validate=accept_all)) == [
         (H(2), len(obj1), len(obj2)),
+        (H(3), len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+def test_pack_reader_resync_recovers_from_size_pointing_into_the_pack():
+    # a data_size corrupted to a value that keeps the object inside the pack leaves the header
+    # valid, so the walk jumps 60 bytes into obj3. Scanning from obj1 finds obj2 and obj3; obj1 is
+    # dropped, obj2 starting inside the extent it claims.
+    obj1 = bytearray(fchunk(b"A" * 100, meta=b"m1", chunk_id=H(1)))
+    obj2 = fchunk(b"B" * 100, meta=b"m2", chunk_id=H(2))
+    obj3 = fchunk(b"C" * 100, meta=b"m3", chunk_id=H(3))
+    obj1[45:49] = struct.pack("<I", 100 + len(obj2) + 60)  # the header's data_size field
+    reader = PackReader(pack_contents=bytes(obj1) + obj2 + obj3)
+    assert list(reader.iter_headers(validate=accept_all)) == [
+        (H(2), len(obj1), len(obj2)),
+        (H(3), len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+def test_pack_reader_resync_keeps_the_object_before_a_corrupt_header():
+    # the scan starts inside the last accepted object, which must still be yielded, once.
+    obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))
+    obj2 = bytearray(fchunk(b"payload-two", meta=b"meta2", chunk_id=H(2)))
+    obj3 = fchunk(b"payload-three", chunk_id=H(3))
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    reader = PackReader(pack_contents=obj1 + bytes(obj2) + obj3)
+    assert list(reader.iter_headers(validate=accept_all)) == [
+        (H(1), 0, len(obj1)),
         (H(3), len(obj1) + len(obj2), len(obj3)),
     ]
 

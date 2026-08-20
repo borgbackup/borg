@@ -2701,7 +2701,12 @@ class ArchiveChecker:
                 # the packs changed, so the index no longer matches them: rebuild it from the packs
                 # and persist it.
                 logger.info("Rebuilding and writing the repository chunks index.")
-                build_chunkindex_from_repo(self.repository, slow_rebuild=True, write_immediately=True)
+                build_chunkindex_from_repo(
+                    self.repository,
+                    slow_rebuild=True,
+                    validate=resync_validator(self.repo_objs),
+                    write_immediately=True,
+                )
             else:
                 # the packs are unchanged, so the index still matches them: persist it as is.
                 logger.info("Writing the rebuilt repository chunks index.")

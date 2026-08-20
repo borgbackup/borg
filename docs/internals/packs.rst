@@ -97,8 +97,13 @@ fails these checks means a corrupt pack, and ``IntegrityError`` is raised.
 
 The per-blob magic limits the blast radius of corrupted length fields. The
 repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``
-rebuilds the chunks index from the packs) scans forward for the next blob and
-resumes there, so the blobs after the damaged part of the pack are still found.
+rebuilds the chunks index from the packs) scans for the next blob and resumes
+there, so the blobs after the damaged part of the pack are still found. The scan
+starts just past the last blob the walk accepted: a corrupted length field that
+keeps the blob inside the pack leaves the header valid, and is noticed only at
+the misaligned offset it points to. The blob carrying it is dropped when a
+recovered blob starts inside the extent it claims - its length field is wrong,
+so it can not be read back.
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, and in the ``none-*`` and
 ``authenticated-*`` modes the payloads are user content stored as it is, so a

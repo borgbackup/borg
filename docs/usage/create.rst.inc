@@ -463,9 +463,6 @@ give that information via ``--map MAPFILE`` and borg will not read the known par
 The primary use case is backing up snapshots of large block devices (e.g. LVM thin
 volumes), where the storage layer knows which ranges are in use.
 
-``--map`` requires giving exactly one input path, which must be a regular file or
-(with ``--read-special``) a block device.
-
 The map file must describe the whole input: one range per line, in the form
 ``START LENGTH STATE`` (byte values, decimal or 0x-prefixed hexadecimal). The
 ranges must be sorted, non-overlapping and contiguous, starting at offset 0 and
@@ -481,14 +478,6 @@ STATE is one of:
   reference archive's chunks for such ranges without reading them. This state
   requires ``--reuse-from``.
 
-The reference archive must contain exactly one file item; if it contains more,
-select the reference item with ``--reuse-path PATH`` (its archive-internal path).
-Reference chunks that only partially overlap ``same`` ranges are re-read from
-the input, so any chunker gives correct results - but a fixed block size chunker
-(e.g. ``--chunker-params fixed,4194304``, same parameters as used for the
-reference archive) avoids re-reading at the edges of changed ranges and gives
-stable chunk boundaries across backups.
-
 **The map is trusted**: if it is wrong (e.g. a range marked ``zero`` actually
 contains data, or a range marked ``same`` actually changed), the archive will
 not match the input and borg cannot detect that. Independently verify the
@@ -498,6 +487,17 @@ source producing the maps, and consider doing a periodic full read backup
 For LVM thin volume snapshots, maps can be generated from ``thin_dump`` /
 ``thin_delta`` XML with the ``scripts/lvm-thin-map.py`` converter from the
 borg sources; its docstring shows the complete workflow.
+
+``--map`` requires giving exactly one input path, which must be a regular file or
+(with ``--read-special``) a block device.
+
+The reference archive must contain exactly one file item; if it contains more,
+select the reference item with ``--reuse-path PATH`` (its archive-internal path).
+Reference chunks that only partially overlap ``same`` ranges are re-read from
+the input, so any chunker gives correct results - but a fixed block size chunker
+(e.g. ``--chunker-params fixed,4194304``, same parameters as used for the
+reference archive) avoids re-reading at the edges of changed ranges and gives
+stable chunk boundaries across backups.
 
 Feeding all file paths from externally
 ++++++++++++++++++++++++++++++++++++++

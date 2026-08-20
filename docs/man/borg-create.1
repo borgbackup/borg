@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-create" "1" "2026-08-17" "" "borg backup tool"
+.TH "borg-create" "1" "2026-08-19" "" "borg backup tool"
 .SH Name
 borg-create \- Creates a new archive.
 .SH SYNOPSIS
@@ -598,9 +598,6 @@ give that information via \fB\-\-map MAPFILE\fP and borg will not read the known
 The primary use case is backing up snapshots of large block devices (e.g. LVM thin
 volumes), where the storage layer knows which ranges are in use.
 .sp
-\fB\-\-map\fP requires giving exactly one input path, which must be a regular file or
-(with \fB\-\-read\-special\fP) a block device.
-.sp
 The map file must describe the whole input: one range per line, in the form
 \fBSTART LENGTH STATE\fP (byte values, decimal or 0x\-prefixed hexadecimal). The
 ranges must be sorted, non\-overlapping and contiguous, starting at offset 0 and
@@ -620,14 +617,6 @@ reference archive\(aqs chunks for such ranges without reading them. This state
 requires \fB\-\-reuse\-from\fP\&.
 .UNINDENT
 .sp
-The reference archive must contain exactly one file item; if it contains more,
-select the reference item with \fB\-\-reuse\-path PATH\fP (its archive\-internal path).
-Reference chunks that only partially overlap \fBsame\fP ranges are re\-read from
-the input, so any chunker gives correct results \- but a fixed block size chunker
-(e.g. \fB\-\-chunker\-params fixed,4194304\fP, same parameters as used for the
-reference archive) avoids re\-reading at the edges of changed ranges and gives
-stable chunk boundaries across backups.
-.sp
 \fBThe map is trusted\fP: if it is wrong (e.g. a range marked \fBzero\fP actually
 contains data, or a range marked \fBsame\fP actually changed), the archive will
 not match the input and borg cannot detect that. Independently verify the
@@ -637,6 +626,17 @@ source producing the maps, and consider doing a periodic full read backup
 For LVM thin volume snapshots, maps can be generated from \fBthin_dump\fP /
 \fBthin_delta\fP XML with the \fBscripts/lvm\-thin\-map.py\fP converter from the
 borg sources; its docstring shows the complete workflow.
+.sp
+\fB\-\-map\fP requires giving exactly one input path, which must be a regular file or
+(with \fB\-\-read\-special\fP) a block device.
+.sp
+The reference archive must contain exactly one file item; if it contains more,
+select the reference item with \fB\-\-reuse\-path PATH\fP (its archive\-internal path).
+Reference chunks that only partially overlap \fBsame\fP ranges are re\-read from
+the input, so any chunker gives correct results \- but a fixed block size chunker
+(e.g. \fB\-\-chunker\-params fixed,4194304\fP, same parameters as used for the
+reference archive) avoids re\-reading at the edges of changed ranges and gives
+stable chunk boundaries across backups.
 .SS Feeding all file paths from externally
 .sp
 Usually, you give a starting path (recursion root) to borg and then borg

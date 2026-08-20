@@ -430,13 +430,17 @@ class PackReader:
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
         repo object with id chunk_id. Given one, a corrupt header makes the walk resync instead:
-        it scans for the next object validate accepts, logs how many bytes that skipped and
-        continues there.
+        it scans from just past the last object it accepted for the next object validate accepts
+        and continues there. It scans from there because a corrupt meta_size or data_size leaves
+        the header valid and moves the walk into a later object. An object is dropped when a
+        recovered object starts inside it: its size field is wrong.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
         hdr_size = RepoObj.obj_header.size
         offset = 0
+        scan_from = 1  # just past the last accepted object's header
+        pending = None  # the last object seen, yielded once the walk gets past its end
         while True:
             hdr_data = self.read(offset, hdr_size)
             if len(hdr_data) < hdr_size:
@@ -447,22 +451,38 @@ class PackReader:
                     raise IntegrityError(
                         f'pack {pack_hex}: invalid object header at offset {offset} (pack corruption), run "borg check"'
                     )
-                next_offset = self._find_header(offset + 1, pack_size, validate)
+                next_offset = self._find_header(scan_from, pack_size, validate)
                 if next_offset is None:
                     logger.warning(
-                        f"pack {pack_hex}: invalid object header at offset {offset} and none after it, "
-                        f"skipping the remaining {pack_size - offset} bytes."
+                        f"pack {pack_hex}: invalid object header at offset {offset} and no object after "
+                        f"offset {scan_from}, skipping the remaining {pack_size - offset} bytes."
                     )
                     break
                 logger.warning(
                     f"pack {pack_hex}: invalid object header at offset {offset}, "
-                    f"skipping {next_offset - offset} bytes to the next one."
+                    f"continuing at the object at offset {next_offset}."
                 )
+                if pending is not None:
+                    _, pending_offset, pending_size = pending
+                    if next_offset < pending_offset + pending_size:
+                        # the recovered object lies inside the bytes this one claims, so its size
+                        # field is wrong: it can not be read back, and index entries that overlap
+                        # are index corruption.
+                        logger.warning(
+                            f"pack {pack_hex}: object at offset {pending_offset} has a wrong size, dropping it."
+                        )
+                        pending = None
                 offset = next_offset
+                scan_from = next_offset + 1
                 continue
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
-            yield hdr.chunk_id, offset, obj_size
+            if pending is not None:
+                yield pending
+            pending = (hdr.chunk_id, offset, obj_size)
+            scan_from = offset + 1
             offset += obj_size
+        if pending is not None:
+            yield pending
 
 
 def check_pack_objects(pack_hex, obj_ranges, pack_size):

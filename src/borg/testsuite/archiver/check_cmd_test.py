@@ -10,6 +10,7 @@ from ...archive import ArchiveChecker, ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
 from ...manifest import Archives, Manifest
+from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
@@ -742,7 +743,7 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request):
 
     output = cmd(archiver, "check", "--repair", "--debug", exit_code=0)
     assert f"invalid object header at offset {damaged_offset}" in output
-    assert "bytes to the next one" in output  # the rebuild resumed at the next object
+    assert "continuing at the object at offset" in output  # the rebuild resumed at the next object
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):
@@ -762,6 +763,7 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.repair = True
         checker.repository = repository
         checker.key = checker.make_key(repository)
+        checker.repo_objs = RepoObj(checker.key)
         checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
         # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
         checker.chunks_modified = True

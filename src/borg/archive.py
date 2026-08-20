@@ -1908,7 +1908,12 @@ class ArchiveChecker:
         # longer matches the packs.
         self.chunks_modified = False
 
-    def _note_problem(self, *, repaired=False):
+    def _note_problem(self, *, repaired):
+        """Record a problem found during the check.
+
+        Callers must always pass repaired= explicitly: True only when the problem was
+        actually fixed (not merely detected, and not when --repair only discarded data).
+        """
         self.error_found = True
         self.problems_found += 1
         if repaired and self.repair:
@@ -1982,11 +1987,11 @@ class ArchiveChecker:
                 logger.error("Repository manifest is corrupted: %s", exc)
                 rebuild_manifest = True
         if rebuild_manifest:
-            if self.repair:
-                self._note_problem(repaired=True)
-            else:
-                self._note_problem()
+            # Rebuild first; only then can we say whether the problem was repaired.
+            # Without --repair, rebuild_manifest() only builds an in-memory manifest for the
+            # rest of this check run; finish() writes it only when self.repair is set.
             self.manifest = self.rebuild_manifest()
+            self._note_problem(repaired=self.repair)
         # On Ctrl-C, skip any scan not yet started; a scan already running stops at its own boundary.
         if find_lost_archives and not sig_int:
             self.rebuild_archives_directory()
@@ -2010,7 +2015,8 @@ class ArchiveChecker:
                 logger.info("Archive consistency check interrupted, no problems found so far.")
             raise Error("Got Ctrl-C / SIGINT.")
         if self.error_found:
-            if self.repair and self.repairs_done:
+            if self.repair:
+                # Always report the repair count in --repair mode, including 0 repaired.
                 logger.error(
                     "Archive consistency check complete, %d problem(s) found, %d repaired.",
                     self.problems_found,
@@ -2081,9 +2087,9 @@ class ArchiveChecker:
                 if isinstance(err, IntegrityErrorBase):
                     defect_chunks.append(chunk_id)
                     if not self.repair:
-                        self._note_problem()
+                        self._note_problem(repaired=False)
                 else:
-                    self._note_problem()
+                    self._note_problem(repaired=False)
             else:
                 try:
                     # we must decompress, so it'll call assert_id() in there.
@@ -2097,7 +2103,7 @@ class ArchiveChecker:
                     logger.error("chunk %s, integrity error: %s", bin_to_hex(chunk_id), integrity_error)
                     defect_chunks.append(chunk_id)
                     if not self.repair:
-                        self._note_problem()
+                        self._note_problem(repaired=False)
         pi.finish()
         if defect_chunks:
             if self.repair:
@@ -2126,7 +2132,8 @@ class ArchiveChecker:
                         self.chunks_modified = True
                         # drop it from our own index too, so rebuild_archives reports the file it belongs to.
                         del self.chunks[defect_chunk]
-                        self._note_problem(repaired=True)
+                        # Removing a defect chunk is not a repair: referenced data is still lost.
+                        self._note_problem(repaired=False)
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
             else:
@@ -2191,7 +2198,7 @@ class ArchiveChecker:
                 meta = self.repo_objs.parse_meta(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
             except IntegrityErrorBase as exc:
                 logger.error("Skipping corrupted chunk: %s", exc)
-                self._note_problem()
+                self._note_problem(repaired=False)
                 continue
             if meta["type"] != ROBJ_ARCHIVE_META:
                 continue
@@ -2201,7 +2208,7 @@ class ArchiveChecker:
                 meta, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
             except IntegrityErrorBase as exc:
                 logger.error("Skipping corrupted chunk: %s", exc)
-                self._note_problem()
+                self._note_problem(repaired=False)
                 continue
             if meta["type"] != ROBJ_ARCHIVE_META:
                 continue  # should never happen
@@ -2228,7 +2235,7 @@ class ArchiveChecker:
                         self._note_problem(repaired=True)
                     else:
                         logger.warning(f"Would create archives directory entry for {name} {archive_id_hex}.")
-                        self._note_problem()
+                        self._note_problem(repaired=False)
 
         pi.finish()
         if sig_int:
@@ -2296,7 +2303,7 @@ class ArchiveChecker:
                         )
                     )
                     record_missing_chunk(archive_name, item.path, chunk_id, size)
-                    self._note_problem()
+                    self._note_problem(repaired=False)
                 offset += size
             if "size" in item:
                 item_size = item.size
@@ -2348,7 +2355,7 @@ class ArchiveChecker:
             def report(msg, chunk_id, chunk_no):
                 cid = bin_to_hex(chunk_id)
                 msg += " [chunk: %06d_%s]" % (chunk_no, cid)  # see "debug dump-archive-items"
-                self._note_problem()
+                self._note_problem(repaired=False)
                 logger.error(msg)
 
             def list_keys_safe(keys):
@@ -2453,7 +2460,7 @@ class ArchiveChecker:
                         self._note_problem(repaired=True)
                     else:
                         logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                        self._note_problem()
+                        self._note_problem(repaired=False)
                     continue
                 cdata = self.repository.get(archive_id)
                 try:
@@ -2466,7 +2473,7 @@ class ArchiveChecker:
                         self._note_problem(repaired=True)
                     else:
                         logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                        self._note_problem()
+                        self._note_problem(repaired=False)
                     continue
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)

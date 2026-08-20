@@ -410,3 +410,58 @@ def test_filereader_no_direct_for_fifo(tmpdir):
     st = os.stat(fifo_fn)
     reader = FileReader(fd=BytesIO(b""), fh=-1, read_size=1024, sparse=False, fmap=None, st=st)
     assert not reader.direct
+
+
+def test_filereader_fmap_not_covering_eof(tmpdir):
+    """An fmap that ends before EOF must not be replayed once it is exhausted, see #4363.
+
+    --map with --reuse-from reads only the parts of a file that are not reused, so the
+    fmap it gives ends before EOF. FileReader used to restart the blockify generator
+    then, which re-read the file from the current position (appending duplicate data)
+    or looped forever for an fmap that does not start at 0.
+    """
+    fn = str(tmpdir / "file")
+    with open(fn, "wb") as f:
+        f.write(b"0123456789" * 10)  # 100 bytes
+    fd = os.open(fn, os.O_RDONLY)
+    try:
+        for fmap, expected in [
+            ([(0, 30, True)], b"0123456789" * 3),  # prefix only
+            ([(20, 20, True)], b"0123456789" * 2),  # neither at offset 0 nor at EOF
+            ([(0, 10, True), (10, 20, True)], b"0123456789" * 3),  # multiple ranges, still not to EOF
+        ]:
+            os.lseek(fd, 0, os.SEEK_SET)
+            reader = FileReader(fd=None, fh=fd, read_size=1024, sparse=False, fmap=list(fmap))
+            got = b""
+            while True:
+                chunk = reader.read(1024)
+                if not chunk.meta["size"]:
+                    break
+                got += chunk.data
+                assert len(got) <= len(expected)  # do not loop forever if this regresses
+            assert got == expected
+    finally:
+        os.close(fd)
+
+
+def test_filereader_short_reads_are_not_eof():
+    """A file object returning less than requested is not at EOF - keep reading, see #4363."""
+
+    class SmallReadFile:
+        def __init__(self, data):
+            self.data = data
+
+        def read(self, nbytes):
+            chunk, self.data = self.data[:1], self.data[1:]  # always at most 1 byte
+            return chunk
+
+    content = b"a" * 20
+    reader = FileReader(fd=SmallReadFile(content), fh=-1, read_size=1024, sparse=False, fmap=[(0, 20, True)])
+    got = b""
+    while True:
+        chunk = reader.read(1024)
+        if not chunk.meta["size"]:
+            break
+        got += chunk.data
+        assert len(got) <= len(content)
+    assert got == content

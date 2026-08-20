@@ -213,8 +213,10 @@ class FileFMAPReader:
                     offset += got
                     range_size -= got
                     yield Chunk(data, size=got, allocation=allocation)
-                if got < wanted:
-                    # We did not get enough data; looks like EOF.
+                if got == 0:
+                    # Nothing read at all - this is EOF. A short read (0 < got < wanted) is
+                    # not EOF: file objects may return less than requested, so just continue
+                    # with the rest of the range.
                     return
 
 
@@ -235,6 +237,7 @@ class FileReader:
         self.offset = 0  # offset into the first buffer object's data
         self.remaining_bytes = 0  # total bytes available in buffer
         self.blockify_gen = None  # generator from FileFMAPReader.blockify
+        self.blockify_done = False  # the blockify generator was exhausted (do not restart it)
         self.fd = fd
         self.fh = fh
         self.fmap = fmap
@@ -265,7 +268,7 @@ class FileReader:
         Fill the buffer with more data from the blockify generator.
         Returns True if more data was added, False if EOF.
         """
-        if self.blockify_gen is None:
+        if self.blockify_gen is None or self.blockify_done:
             return False
 
         try:
@@ -275,7 +278,9 @@ class FileReader:
             self.remaining_bytes += chunk.meta["size"]
             return True
         except StopIteration:
-            self.blockify_gen = None
+            # do NOT clear blockify_gen here: an fmap that does not extend to EOF would
+            # otherwise be replayed from its start by the next read()/readinto() call.
+            self.blockify_done = True
             return False
 
     def read(self, size):
@@ -297,7 +302,7 @@ class FileReader:
                  than requested.
         """
         # Initialize if not already done
-        if self.blockify_gen is None:
+        if self.blockify_gen is None and not self.blockify_done:
             self.buffer = []
             self.offset = 0
             self.remaining_bytes = 0
@@ -437,7 +442,7 @@ class FileReader:
                 return self._readinto_direct(tv, size)
 
         # Initialize if not already done
-        if self.blockify_gen is None:
+        if self.blockify_gen is None and not self.blockify_done:
             self.buffer = []
             self.offset = 0
             self.remaining_bytes = 0

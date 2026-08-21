@@ -887,6 +887,11 @@ class HelpMixIn:
                 Giving the default value for ``borg repo-list --format=X``.
             BORG_PRUNE_FORMAT
                 Giving the default value for ``borg prune --format=X``.
+            BORG_MOUNT_ARCHIVE_DIR_FORMAT
+                Giving the format of the archive directory names when ``borg mount`` or
+                ``borg webdav`` show a whole repository, default: ``{name}``. The placeholders
+                are the ones of ``borg repo-list --format``; names that are not unique get
+                ``-{id:.8}`` appended. See ``borg mount --help``.
 
         Some automatic "answerers" (if set, they automatically answer confirmation questions):
             BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)

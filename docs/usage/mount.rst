@@ -7,12 +7,20 @@ Examples
 
 ::
 
-    # Mounting the repository shows all archives.
+    # Mounting the repository shows all archives (here: two archives of the series
+    # "root", the short archive id is appended to make the directory names unique).
     # Archives are loaded lazily, expect some delay when navigating to an archive
     # for the first time.
     $ borg mount /tmp/mymountpoint
     $ ls /tmp/mymountpoint
-    root-2016-02-14 root-2016-02-15
+    root-1f7b3c2a  root-9e4d0b58
+    $ borg umount /tmp/mymountpoint
+
+    # BORG_MOUNT_ARCHIVE_DIR_FORMAT names the archive directories differently,
+    # using the placeholders of "borg repo-list --format":
+    $ BORG_MOUNT_ARCHIVE_DIR_FORMAT='{name}-{time:%Y-%m-%d}' borg mount /tmp/mymountpoint
+    $ ls /tmp/mymountpoint
+    root-2016-02-14  root-2016-02-15
     $ borg umount /tmp/mymountpoint
 
     # The "versions view" merges all archives in the repository

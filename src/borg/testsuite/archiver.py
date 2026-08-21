@@ -40,7 +40,7 @@ from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMReq
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..hashindex import ChunkIndex
-from ..helpers import Location, get_security_dir
+from ..helpers import Location, get_cache_dir, get_security_dir
 from ..helpers import Manifest, MandatoryFeatureUnsupported, ArchiveInfo
 from ..helpers import init_ec_warnings
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, Error, CancelledByUser, RTError, CommandError
@@ -52,7 +52,7 @@ from ..helpers import utcnow
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff, chunks_contents_equal
-from ..locking import LockFailed
+from ..locking import Lock, LockFailed, LockTimeout
 from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
@@ -2118,6 +2118,24 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # verify that command works with read-only repo when using --bypass-lock
             with self.fuse_mount(self.repository_location, None, '--bypass-lock'):
                 pass
+
+    def test_bypass_lock_locked_cache(self):
+        # --bypass-lock shall not be blocked by the cache lock another borg process holds, see #7255
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('test')
+        with Repository(self.repository_path) as repository:
+            cache_path = os.path.join(get_cache_dir(), repository.id_str)
+        host, pid, tid = platform.get_process_id()
+        with Lock(os.path.join(cache_path, 'lock'), exclusive=True, id=(host, pid, tid + 1)):
+            # verify that the cache lock normally blocks other borg processes
+            if self.FORK_DEFAULT:
+                self.cmd('list', self.repository_location, exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises(LockTimeout):
+                    self.cmd('list', self.repository_location)
+            # verify that command works despite the locked cache when using --bypass-lock
+            output = self.cmd('list', self.repository_location, '--bypass-lock')
+        self.assert_in('test', output)
 
     @pytest.mark.skipif('BORG_TESTS_IGNORE_MODES' in os.environ, reason='modes unreliable')
     def test_umask(self):

@@ -793,6 +793,8 @@ Errors
         File failed integrity check: {}
     DecompressionError rc: 92 traceback: yes
         Decompression error: {}
+    CorruptPack rc: 93 traceback: no
+        {}. Run "borg check --repair" to recover the objects that are still readable.
 
 
 Warnings

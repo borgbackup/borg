@@ -2006,6 +2006,28 @@ class RobustUnpacker:
             return next(self._unpacker)
 
 
+def resync_validator(repo_objs):
+    """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
+
+    obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
+    computed over the header's magic, version and chunk id as well (AAD, additional authenticated
+    data: bytes the tag covers without being part of the ciphertext).
+
+    In the "none-*" modes the tag is an unkeyed checksum, so validate accepts any well-formed
+    object, including one that a backed up file contains.
+    """
+
+    def validate(chunk_id, obj):
+        try:
+            repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
+        except Exception:
+            # arbitrary bytes fail the tag, the msgpack unpacking or the length checks.
+            return False
+        return True
+
+    return validate
+
+
 class ArchiveChecker:
     # Bound how many missing file chunks rebuild_archives buffers for its end-of-run report,
     # so checking a badly damaged repo with very many missing chunks can not exhaust memory.
@@ -2060,7 +2082,22 @@ class ArchiveChecker:
         # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
         # --repair does rebuild from the packs (slow_rebuild=repair), working from the real packs so it
         # can detect and fix archives that reference chunks whose pack has gone missing.
-        self.chunks = build_chunkindex_from_repo(self.repository, slow_rebuild=repair, write_immediately=False)
+        # --repair also passes validate, which makes the rebuild resync past a corrupt object header.
+        # Validating needs the key, so read it here. manifest_only=True, because the other source
+        # make_key reads keys from is self.chunks, which is only built below.
+        if repair and self.key is None:
+            try:
+                self.key = self.make_key(repository, manifest_only=True)
+            except IntegrityError as err:
+                logger.warning(f"{err}. Packs with a corrupt object header can not be repaired.")
+        validate = resync_validator(RepoObj(self.key)) if repair and self.key is not None else None
+        self.chunks = build_chunkindex_from_repo(
+            self.repository, slow_rebuild=repair, validate=validate, write_immediately=False
+        )
+        if repair:
+            # repository.chunks is a separate index, lazily built when repository.get() resolves a
+            # chunk location. It needs the same validator to resync past the same corrupt headers.
+            self.repository.chunkindex_validate = validate
         if self.key is None:
             self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
@@ -2593,7 +2630,12 @@ class ArchiveChecker:
                 # the packs changed, so the index no longer matches them: rebuild it from the packs
                 # and persist it.
                 logger.info("Rebuilding and writing the repository chunks index.")
-                build_chunkindex_from_repo(self.repository, slow_rebuild=True, write_immediately=True)
+                build_chunkindex_from_repo(
+                    self.repository,
+                    slow_rebuild=True,
+                    validate=resync_validator(self.repo_objs),
+                    write_immediately=True,
+                )
             else:
                 # the packs are unchanged, so the index still matches them: persist it as is.
                 logger.info("Writing the rebuilt repository chunks index.")

@@ -8,8 +8,10 @@ import pytest
 
 from ...archive import ArchiveChecker, ChunkBuffer
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
+from ...cache import delete_chunkindex_from_repo
+from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
 from ...manifest import Archives, Manifest
+from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
@@ -718,6 +720,64 @@ def test_extra_chunks(archivers, request):
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
+def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request):
+    """--repair rebuilds the chunks index from a pack whose object header is damaged.
+
+    A damaged header loses the object boundaries, so the rebuild scans for the next object that
+    authenticates and continues there. Authenticating needs the key, which --repair reads first.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        # damage the header of the second object of a pack that holds more than two.
+        by_pack = {}
+        for chunk_id, entry in repository.chunks.items():
+            by_pack.setdefault(entry.pack_id, []).append((entry.obj_offset, chunk_id))
+        pack_id, objs = next((p, sorted(o)) for p, o in by_pack.items() if len(o) > 2)
+        damaged_offset, _ = objs[1]
+        key = "packs/" + bin_to_hex(pack_id)
+        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
+
+    output = cmd(archiver, "check", "--repair", "--debug", exit_code=0)
+    assert f"invalid object header at offset {damaged_offset}" in output
+    assert "continuing at the object at offset" in output  # the rebuild resumed at the next object
+
+
+def test_repo_list_aborts_cleanly_on_corrupt_pack(archivers, request):
+    """A command rebuilding the chunks index over a corrupt object header aborts with a hint (#10122)."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        # damage the header of the 2nd object of a pack holding more than 2, so the walk aborts mid-pack.
+        by_pack = {}
+        for entry in repository.chunks.values():
+            by_pack.setdefault(entry.pack_id, []).append(entry.obj_offset)
+        pack_id, offsets = next((p, sorted(o)) for p, o in by_pack.items() if len(o) > 2)
+        damaged_offset = offsets[1]
+        key = "packs/" + bin_to_hex(pack_id)
+        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
+        # drop the index fragments, so the next command has to read the pack headers.
+        delete_chunkindex_from_repo(repository)
+
+    # fork: only a subprocess runs borg's top-level error handler, which turns the Error into a rc.
+    output = cmd(archiver, "repo-list", fork=True, exit_code=CorruptPack.exit_mcode)
+    assert "Traceback" not in output
+    assert f"invalid object header at offset {damaged_offset}" in output
+    assert "borg check --repair" in output
+
+    # --repair passes a validator, so it resyncs past the damaged header instead of aborting.
+    # TODO: it does not rewrite the pack yet, so a later rebuild hits the same header again.
+    cmd(archiver, "check", "--repair", exit_code=0)
+
+
 def test_repair_finish_flushes_pack_writer(archivers, request):
     """finish() stores chunks re-added during --repair before it (re)builds the index (#10055).
 
@@ -735,6 +795,7 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.repair = True
         checker.repository = repository
         checker.key = checker.make_key(repository)
+        checker.repo_objs = RepoObj(checker.key)
         checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
         # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
         checker.chunks_modified = True

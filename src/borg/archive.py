@@ -43,6 +43,7 @@ from .helpers import bin_to_hex
 from .helpers import safe_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
 from .helpers import os_open, flags_normal, flags_dir, O_, SpecialFileReader
+from .helpers import MAP_DATA, MAP_ZERO, MAP_SAME, input_map_check_size
 from .helpers import os_stat
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
@@ -1336,7 +1337,7 @@ class ChunksProcessor:
         self.add_item = add_item
         self.rechunkify = rechunkify
 
-    def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None):
+    def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None, append=False):
         if not chunk_processor:
 
             def chunk_processor(chunk):
@@ -1349,7 +1350,8 @@ class ChunksProcessor:
                     release_chunk_data(data)
                 return chunk_entry
 
-        item.chunks = []
+        if not append:
+            item.chunks = []  # a --reuse-from caller calls this repeatedly, appending to existing chunks.
         for chunk in chunk_iter:
             chunk_entry = chunk_processor(chunk)
             item.chunks.append(chunk_entry)
@@ -1367,6 +1369,71 @@ def maybe_exclude_by_attr(item):
     if flags := item.get("bsdflags"):
         if flags & stat.UF_NODUMP:
             raise BackupItemExcluded
+
+
+def build_reuse_plan(input_map, ref_chunks, size, seen_chunk):
+    """
+    Build a processing plan for --map with --reuse-from, see #4363.
+
+    A reference chunk is reused iff its whole extent lies within "same" map ranges and it
+    still exists in the repo (seen_chunk). Everything else is read from the input (with
+    "zero" ranges stored as holes without reading). Reading whole reference chunks that
+    intersect changed ranges keeps the result correct for any chunker; with the fixed
+    chunker, reference chunk boundaries and read windows align exactly.
+
+    Returns a list of parts covering [0, size) in order:
+    ("reuse", [ChunkListEntry, ...]) or ("read", [(start, length, is_data), ...]).
+    """
+    # merge adjacent "same" ranges, so a reference chunk spanning two of them is still reusable.
+    same = []
+    for start, length, state in input_map:
+        if state != MAP_SAME:
+            continue
+        if same and same[-1][1] == start:
+            same[-1][1] = start + length
+        else:
+            same.append([start, start + length])
+
+    def read_part(a, b):
+        # intersect extent [a, b) with the map's ranges: "zero" ranges become holes (not read),
+        # everything else (data, or same parts of non-reusable reference chunks) is read.
+        fmap = []
+        for start, length, state in input_map:
+            sub_start, sub_end = max(start, a), min(start + length, b)
+            if sub_start < sub_end:
+                fmap.append((sub_start, sub_end - sub_start, state != MAP_ZERO))
+        return "read", fmap
+
+    parts = []
+    read_start = None  # start of the current not-yet-flushed read extent
+    offset = 0
+    si = 0  # index into same[], both same[] and the chunks are sorted by offset
+    for entry in ref_chunks:
+        start, end = offset, offset + entry.size
+        offset = end
+        if start >= size:
+            break
+        while si < len(same) and same[si][1] <= start:
+            si += 1
+        reusable = (
+            end <= size and si < len(same) and same[si][0] <= start and end <= same[si][1] and seen_chunk(entry.id)
+        )
+        if reusable:
+            if read_start is not None:
+                parts.append(read_part(read_start, start))
+                read_start = None
+            if parts and parts[-1][0] == "reuse":
+                parts[-1][1].append(entry)
+            else:
+                parts.append(("reuse", [entry]))
+        elif read_start is None:
+            read_start = start
+    if read_start is not None:
+        # covers non-reusable chunks at the end and any input tail beyond the reference chunks.
+        parts.append(read_part(read_start, size))
+    elif offset < size:
+        parts.append(read_part(offset, size))
+    return parts
 
 
 class FilesystemObjectProcessors:
@@ -1388,6 +1455,8 @@ class FilesystemObjectProcessors:
         file_status_printer=None,
         files_changed="mtime" if is_win32 else "ctime",
         read_special_timeout=None,
+        input_map=None,
+        reuse_chunks=None,
     ):
         self.metadata_collector = metadata_collector
         self.cache = cache
@@ -1398,6 +1467,8 @@ class FilesystemObjectProcessors:
         self.print_file_status = file_status_printer or (lambda *args: None)
         self.files_changed = files_changed
         self.read_special_timeout = read_special_timeout
+        self.input_map = input_map  # --map: content range info for the single input file, see #4363
+        self.reuse_chunks = reuse_chunks  # --reuse-from: the reference archive item's chunk list, see #4363
 
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
@@ -1589,7 +1660,11 @@ class FilesystemObjectProcessors:
                         chunk_entry = cache.reuse_chunk(chunk_id, chunk_size, self.stats)
                         item.chunks.append(chunk_entry)
                 else:  # normal case, no "2nd+" hard link
-                    if not is_special_file:
+                    if self.input_map is not None:
+                        # --map: the given map replaces the files cache as content/change information, see #4363.
+                        hashed_path = path_hash = None
+                        known, chunks = False, None
+                    elif not is_special_file:
                         hashed_path = safe_encode(item.path)  # path as in archive item!
                         started_hashing = time.monotonic()
                         path_hash = self.key.id_hash(hashed_path)
@@ -1630,16 +1705,54 @@ class FilesystemObjectProcessors:
                         # and still commit the archive -- referencing chunks that were never durably
                         # stored. An unwrapped repository OSError is critical and aborts create before
                         # archive.save() runs (see the BackupOSError docstring).
-                        if read_special_timeout is not None:
+                        if self.input_map is not None:
+                            # --map: read only the "data" ranges, store "zero" ranges as holes without
+                            # reading them, see #4363. Non-seekable inputs (fifo/chr) are rejected earlier.
+                            with backup_io("seek"):
+                                input_size = st.st_size if stat.S_ISREG(st.st_mode) else os.lseek(fd, 0, os.SEEK_END)
+                                os.lseek(fd, 0, os.SEEK_SET)
+                            input_map_check_size(self.input_map, input_size)
+                            if self.reuse_chunks is not None:
+                                # --reuse-from: reuse the reference archive's chunks for "same" ranges
+                                # without reading them. Each "read" part gets its own chunkify call, so
+                                # chunks never span the gap left by reused parts.
+                                plan = build_reuse_plan(self.input_map, self.reuse_chunks, input_size, cache.seen_chunk)
+                                item.chunks = []
+                                for kind, payload in plan:
+                                    if kind == "reuse":
+                                        for entry in payload:
+                                            item.chunks.append(cache.reuse_chunk(entry.id, entry.size, self.stats))
+                                        if self.show_progress:
+                                            self.stats.show_progress(item=item)
+                                    else:
+                                        chunk_iter = self.chunker.chunkify(None, fd, fmap=payload, st=st)
+                                        self.process_file_chunks(
+                                            item,
+                                            cache,
+                                            self.stats,
+                                            self.show_progress,
+                                            backup_io_iter(chunk_iter),
+                                            append=True,
+                                        )
+                            else:
+                                fmap = [(start, length, state == MAP_DATA) for start, length, state in self.input_map]
+                                chunk_iter = self.chunker.chunkify(None, fd, fmap=fmap, st=st)
+                                self.process_file_chunks(
+                                    item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
+                                )
+                        elif read_special_timeout is not None:
                             # all reads go through the timeout-enforcing wrapper (fh stays unused).
                             chunk_iter = self.chunker.chunkify(SpecialFileReader(fd, read_special_timeout), st=st)
+                            self.process_file_chunks(
+                                item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
+                            )
                         else:
                             # passing st saves FileReader a stat call; regular files take the
                             # direct read path, special files (--read-special) the buffered one.
                             chunk_iter = self.chunker.chunkify(None, fd, st=st)
-                        self.process_file_chunks(
-                            item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
-                        )
+                            self.process_file_chunks(
+                                item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
+                            )
                         self.stats.chunking_time = self.chunker.chunking_time
                         end_reading = time.time_ns()
                         with backup_io("fstat2"):

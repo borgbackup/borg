@@ -180,6 +180,26 @@ Now, let's see how to restore some LVs from such a backup.
     $ borg extract --stdout arch dev/vg0/root-snapshot > /dev/vg0/root
     $ borg extract --stdout arch dev/vg0/home-snapshot > /dev/vg0/home
 
+Efficient backups of LVM thin volume snapshots
+++++++++++++++++++++++++++++++++++++++++++++++
+
+Backing up a block device as shown above reads the whole device every time.
+For snapshots of LVM *thin* volumes, the thin pool's metadata already knows
+which ranges are allocated and which ranges changed between two snapshots,
+so most of the reading can be skipped: see the ``--map`` and ``--reuse-from``
+options of ``borg create`` (section *Input maps* in ``borg create --help``)
+and the ``scripts/lvm-thin-map.py`` converter in the borg sources, which
+turns ``thin_dump`` / ``thin_delta`` XML into borg input maps. The script's
+docstring shows the complete workflow: an initial full backup using the
+allocation map (unallocated ranges are stored as holes without reading them),
+then incremental backups that only read the ranges that changed since the
+previous snapshot, while reusing the previous archive's chunks for everything
+else. Use ``--chunker-params fixed,4194304`` (or similar) for such backups.
+
+Note that borg trusts these maps - it cannot detect a wrong or stale map, so
+keep the snapshot discipline described in the script's docstring and consider
+doing a periodic full read backup (without ``--map``).
+
 
 .. _separate_compaction:
 

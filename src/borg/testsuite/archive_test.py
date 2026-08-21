@@ -659,3 +659,74 @@ def test_archives_get_by_id_missing_returns_none():
     manifest = Mock()
     archives = Archives(repo, manifest)
     assert archives.get_by_id(b"\x01" * 32) is None
+
+
+class TestBuildReusePlan:
+    """Tests for the --map/--reuse-from processing plan, see #4363."""
+
+    @staticmethod
+    def plan(input_map, chunk_sizes, size, missing=()):
+        from ..archive import build_reuse_plan
+
+        ref_chunks = [ChunkListEntry(i.to_bytes(4, "big"), chunk_size) for i, chunk_size in enumerate(chunk_sizes)]
+        return ref_chunks, build_reuse_plan(input_map, ref_chunks, size, lambda id: id not in missing)
+
+    def test_all_same(self):
+        ref, plan = self.plan([(0, 8192, "same")], [4096, 4096], 8192)
+        assert plan == [("reuse", ref)]
+
+    def test_all_data_and_zero(self):
+        _, plan = self.plan([(0, 4096, "data"), (4096, 4096, "zero")], [4096, 4096], 8192)
+        assert plan == [("read", [(0, 4096, True), (4096, 4096, False)])]
+
+    def test_mixed(self):
+        # chunks 0 and 2 reusable, chunk 1 changed.
+        input_map = [(0, 4096, "same"), (4096, 4096, "data"), (8192, 4096, "same")]
+        ref, plan = self.plan(input_map, [4096, 4096, 4096], 12288)
+        assert plan == [("reuse", ref[0:1]), ("read", [(4096, 4096, True)]), ("reuse", ref[2:3])]
+
+    def test_partial_overlap_reads_whole_chunk(self):
+        # a reference chunk that only partially lies in a "same" range is re-read completely,
+        # including its "same" part.
+        input_map = [(0, 6000, "same"), (6000, 2192, "data")]
+        ref, plan = self.plan(input_map, [4096, 4096], 8192)
+        assert plan == [("reuse", ref[0:1]), ("read", [(4096, 1904, True), (6000, 2192, True)])]
+
+    def test_adjacent_same_ranges_merge(self):
+        # a chunk spanning two adjacent "same" map ranges is still reusable.
+        input_map = [(0, 2048, "same"), (2048, 6144, "same")]
+        ref, plan = self.plan(input_map, [4096, 4096], 8192)
+        assert plan == [("reuse", ref)]
+
+    def test_zero_inside_read_part(self):
+        # a "zero" range makes its chunk non-reusable, but is stored as a hole, not read.
+        input_map = [(0, 4096, "same"), (4096, 4096, "zero")]
+        ref, plan = self.plan(input_map, [4096, 4096], 8192)
+        assert plan == [("reuse", ref[0:1]), ("read", [(4096, 4096, False)])]
+
+    def test_grown_input(self):
+        # the tail beyond the reference chunks must be read.
+        input_map = [(0, 8192, "same"), (8192, 4096, "data")]
+        ref, plan = self.plan(input_map, [4096, 4096], 12288)
+        assert plan == [("reuse", ref), ("read", [(8192, 4096, True)])]
+
+    def test_shrunk_input(self):
+        # reference chunks beyond the new input size are dropped.
+        input_map = [(0, 4096, "same")]
+        ref, plan = self.plan(input_map, [4096, 4096, 4096], 4096)
+        assert plan == [("reuse", ref[0:1])]
+
+    def test_shrunk_input_straddling_chunk(self):
+        # a reference chunk straddling the new end of the input cannot be reused.
+        input_map = [(0, 6000, "same")]
+        ref, plan = self.plan(input_map, [4096, 4096], 6000)
+        assert plan == [("reuse", ref[0:1]), ("read", [(4096, 1904, True)])]
+
+    def test_missing_chunk_is_read(self):
+        input_map = [(0, 8192, "same")]
+        ref, plan = self.plan(input_map, [4096, 4096], 8192, missing={ref_id(1)})
+        assert plan == [("reuse", ref[0:1]), ("read", [(4096, 4096, True)])]
+
+
+def ref_id(i):
+    return i.to_bytes(4, "big")

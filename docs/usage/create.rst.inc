@@ -99,6 +99,12 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special-timeout SECONDS``                | when reading from FIFOs or character devices (see --read-special): skip the file with an error if no data arrives for more than SECONDS (this includes waiting for a FIFO's writer to connect). Give 0 to wait forever. default: 1800 seconds. |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--map MAPFILE``                                 | give a map file describing the content ranges of the (single) input file, so borg does not need to read all of it. See the *Input maps* section below.                                                                                         |
+    +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--reuse-from ARCHIVE``                          | reuse the chunks of this reference archive for the input map's ``same`` ranges (requires --map). See the *Input maps* section below.                                                                                                           |
+    +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--reuse-path PATH``                             | archive-internal path of the reference item in the --reuse-from archive (only needed if that archive contains more than one file item).                                                                                                        |
+    +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Archive options**                                                                                                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--comment COMMENT``                             | add a comment text to the archive                                                                                                                                                                                                              |
@@ -173,6 +179,9 @@ borg create
         --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
         --read-special-timeout SECONDS    when reading from FIFOs or character devices (see --read-special): skip the file with an error if no data arrives for more than SECONDS (this includes waiting for a FIFO's writer to connect). Give 0 to wait forever. default: 1800 seconds.
+        --map MAPFILE             give a map file describing the content ranges of the (single) input file, so borg does not need to read all of it. See the *Input maps* section below.
+        --reuse-from ARCHIVE      reuse the chunks of this reference archive for the input map's ``same`` ranges (requires --map). See the *Input maps* section below.
+        --reuse-path PATH         archive-internal path of the reference item in the --reuse-from archive (only needed if that archive contains more than one file item).
 
 
     Archive options
@@ -444,6 +453,51 @@ creation a bit.
 
 By default, the content read from stdin is stored in a file called 'stdin'.
 Use ``--stdin-name`` to change the name.
+
+Input maps
+++++++++++
+
+Usually, borg reads the complete input to determine its contents. If you already
+know the contents of parts of the input from an external source of truth, you can
+give that information via ``--map MAPFILE`` and borg will not read the known parts.
+The primary use case is backing up snapshots of large block devices (e.g. LVM thin
+volumes), where the storage layer knows which ranges are in use.
+
+The map file must describe the whole input: one range per line, in the form
+``START LENGTH STATE`` (byte values, decimal or 0x-prefixed hexadecimal). The
+ranges must be sorted, non-overlapping and contiguous, starting at offset 0 and
+covering the exact input size. ``#`` starts a comment, empty lines are ignored.
+STATE is one of:
+
+- ``data``: the range's contents are read and backed up.
+- ``zero``: the range is known to read as all-zero bytes. borg stores a hole
+  (all-zero range) of that size without reading the range.
+- ``same``: the range is known to be identical to the same range of the input
+  backed up in the ``--reuse-from REFARCHIVE`` reference archive (usually: the
+  previous backup of an earlier snapshot of the same device). borg reuses the
+  reference archive's chunks for such ranges without reading them. This state
+  requires ``--reuse-from``.
+
+**The map is trusted**: if it is wrong (e.g. a range marked ``zero`` actually
+contains data, or a range marked ``same`` actually changed), the archive will
+not match the input and borg cannot detect that. Independently verify the
+source producing the maps, and consider doing a periodic full read backup
+(without ``--map``).
+
+For LVM thin volume snapshots, maps can be generated from ``thin_dump`` /
+``thin_delta`` XML with the ``scripts/lvm-thin-map.py`` converter from the
+borg sources; its docstring shows the complete workflow.
+
+``--map`` requires giving exactly one input path, which must be a regular file or
+(with ``--read-special``) a block device.
+
+The reference archive must contain exactly one file item; if it contains more,
+select the reference item with ``--reuse-path PATH`` (its archive-internal path).
+Reference chunks that only partially overlap ``same`` ranges are re-read from
+the input, so any chunker gives correct results - but a fixed block size chunker
+(e.g. ``--chunker-params fixed,4194304``, same parameters as used for the
+reference archive) avoids re-reading at the edges of changed ranges and gives
+stable chunk boundaries across backups.
 
 Feeding all file paths from externally
 ++++++++++++++++++++++++++++++++++++++

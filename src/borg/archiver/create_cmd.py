@@ -18,6 +18,7 @@ from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
 from ..helpers import archivename_validator, FilesCacheMode, files_cache_mode_no_ctime
 from ..helpers import octal_int, nonnegative_seconds
+from ..helpers import read_input_map
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
@@ -71,6 +72,48 @@ class CreateMixIn:
             read_special_timeout = READ_SPECIAL_TIMEOUT_DEFAULT
         if read_special_timeout == 0:
             read_special_timeout = None  # wait forever
+        if args.reuse_from is not None and args.input_map is None:
+            raise CommandError("--reuse-from requires --map.")
+        if args.reuse_path is not None and args.reuse_from is None:
+            raise CommandError("--reuse-path requires --reuse-from.")
+        input_map = None
+        if args.input_map is not None:
+            # --map only makes sense for a single, seekable input file, see #4363.
+            if args.paths_from_stdin or args.paths_from_command or args.paths_from_shell_command:
+                raise CommandError("--map cannot be used with --paths-from-*.")
+            if args.content_from_command:
+                raise CommandError("--map cannot be used with --content-from-command.")
+            if len(args.paths) != 1:
+                raise CommandError("--map requires exactly one input path.")
+            if args.paths[0] == "-":
+                raise CommandError("--map cannot be used with stdin input.")
+            try:
+                st_map = os.stat(args.paths[0], follow_symlinks=True)
+            except OSError as e:
+                raise CommandError(f"--map input: {args.paths[0]}: {e}")
+            if stat.S_ISBLK(st_map.st_mode):
+                if not args.read_special:
+                    raise CommandError("--map with a block device requires --read-special.")
+            elif not stat.S_ISREG(st_map.st_mode):
+                raise CommandError("--map input must be a regular file or a block device.")
+            input_map = read_input_map(args.input_map, allow_same=args.reuse_from is not None)
+        reuse_chunks = None
+        if args.reuse_from is not None:
+            ref_info = manifest.archives.get_one([args.reuse_from])
+            ref_archive = Archive(manifest, ref_info.id)
+            ref_items = [item for item in ref_archive.iter_items() if "chunks" in item]
+            if args.reuse_path is not None:
+                ref_items = [item for item in ref_items if item.path == args.reuse_path]
+                if not ref_items:
+                    raise CommandError(
+                        f"--reuse-from: no file item with path {args.reuse_path!r} in reference archive."
+                    )
+            if len(ref_items) != 1:
+                raise CommandError(
+                    f"--reuse-from: reference archive has {len(ref_items)} file items, "
+                    f"use --reuse-path to select the reference item."
+                )
+            reuse_chunks = ref_items[0].chunks
         if is_win32:
             # st_ctime is the file *creation* time on Windows, not the "metadata change time",
             # so a ctime based files cache mode would not detect content changes of a file that
@@ -315,6 +358,8 @@ class CreateMixIn:
                     file_status_printer=self.print_file_status,
                     files_changed=args.files_changed,
                     read_special_timeout=read_special_timeout,
+                    input_map=input_map,
+                    reuse_chunks=reuse_chunks,
                 )
                 create_inner(archive, cache, fso)
             args.stats |= args.json
@@ -955,6 +1000,51 @@ class CreateMixIn:
         By default, the content read from stdin is stored in a file called 'stdin'.
         Use ``--stdin-name`` to change the name.
 
+        Input maps
+        ++++++++++
+
+        Usually, borg reads the complete input to determine its contents. If you already
+        know the contents of parts of the input from an external source of truth, you can
+        give that information via ``--map MAPFILE`` and borg will not read the known parts.
+        The primary use case is backing up snapshots of large block devices (e.g. LVM thin
+        volumes), where the storage layer knows which ranges are in use.
+
+        The map file must describe the whole input: one range per line, in the form
+        ``START LENGTH STATE`` (byte values, decimal or 0x-prefixed hexadecimal). The
+        ranges must be sorted, non-overlapping and contiguous, starting at offset 0 and
+        covering the exact input size. ``#`` starts a comment, empty lines are ignored.
+        STATE is one of:
+
+        - ``data``: the range's contents are read and backed up.
+        - ``zero``: the range is known to read as all-zero bytes. borg stores a hole
+          (all-zero range) of that size without reading the range.
+        - ``same``: the range is known to be identical to the same range of the input
+          backed up in the ``--reuse-from REFARCHIVE`` reference archive (usually: the
+          previous backup of an earlier snapshot of the same device). borg reuses the
+          reference archive's chunks for such ranges without reading them. This state
+          requires ``--reuse-from``.
+
+        **The map is trusted**: if it is wrong (e.g. a range marked ``zero`` actually
+        contains data, or a range marked ``same`` actually changed), the archive will
+        not match the input and borg cannot detect that. Independently verify the
+        source producing the maps, and consider doing a periodic full read backup
+        (without ``--map``).
+
+        For LVM thin volume snapshots, maps can be generated from ``thin_dump`` /
+        ``thin_delta`` XML with the ``scripts/lvm-thin-map.py`` converter from the
+        borg sources; its docstring shows the complete workflow.
+
+        ``--map`` requires giving exactly one input path, which must be a regular file or
+        (with ``--read-special``) a block device.
+
+        The reference archive must contain exactly one file item; if it contains more,
+        select the reference item with ``--reuse-path PATH`` (its archive-internal path).
+        Reference chunks that only partially overlap ``same`` ranges are re-read from
+        the input, so any chunker gives correct results - but a fixed block size chunker
+        (e.g. ``--chunker-params fixed,4194304``, same parameters as used for the
+        reference archive) avoids re-reading at the edges of changed ranges and gives
+        stable chunk boundaries across backups.
+
         Feeding all file paths from externally
         ++++++++++++++++++++++++++++++++++++++
 
@@ -1145,6 +1235,30 @@ class CreateMixIn:
             "file with an error if no data arrives for more than SECONDS (this includes waiting "
             "for a FIFO's writer to connect). Give 0 to wait forever. default: %d seconds."
             % READ_SPECIAL_TIMEOUT_DEFAULT,
+        )
+        fs_group.add_argument(
+            "--map",
+            metavar="MAPFILE",
+            dest="input_map",
+            action=Highlander,
+            help="give a map file describing the content ranges of the (single) input file, "
+            "so borg does not need to read all of it. See the *Input maps* section below.",
+        )
+        fs_group.add_argument(
+            "--reuse-from",
+            metavar="ARCHIVE",
+            dest="reuse_from",
+            action=Highlander,
+            help="reuse the chunks of this reference archive for the input map's ``same`` "
+            "ranges (requires --map). See the *Input maps* section below.",
+        )
+        fs_group.add_argument(
+            "--reuse-path",
+            metavar="PATH",
+            dest="reuse_path",
+            action=Highlander,
+            help="archive-internal path of the reference item in the --reuse-from archive "
+            "(only needed if that archive contains more than one file item).",
         )
 
         archive_group = subparser.add_argument_group("Archive options")

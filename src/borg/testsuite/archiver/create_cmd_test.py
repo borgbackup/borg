@@ -17,7 +17,7 @@ from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError, BackupBrokenSymlinkError
-from ...helpers import BackupWarning
+from ...helpers import BackupWarning, Error
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -1554,3 +1554,273 @@ def test_exclude_nodump_dir_with_file(archivers, request):
     list_output = cmd(archiver, "list", "test", "--short")
     assert "input/nd\n" not in list_output
     assert "input/nd/file_in_ndir\n" not in list_output
+
+
+def test_create_map(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    block_size = 4096
+    data_a, data_b, data_c = os.urandom(block_size), os.urandom(block_size), os.urandom(block_size)
+    # data_b is real data, but the map claims that range reads as zero:
+    # borg must not read "zero" ranges, so the archive must contain zeros there.
+    create_regular_file(archiver.input_path, "file", contents=data_a + data_b + data_c + b"\0" * block_size)
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write("# test input map\n")
+        f.write(f"0 {block_size} data\n")
+        f.write(f"0x1000 {block_size} zero\n")
+        f.write(f"{2 * block_size} {block_size} data\n")
+        f.write(f"{3 * block_size} {block_size} zero\n")
+    expected = data_a + b"\0" * block_size + data_c + b"\0" * block_size
+    for name, chunker_args in [("test-fixed", ("--chunker-params", "fixed,4096")), ("test-default", ())]:
+        cmd(archiver, "create", *chunker_args, "--map", map_path, name, "input/file")
+        with changedir("output"):
+            cmd(archiver, "extract", name)
+        with open(os.path.join("output", "input", "file"), "rb") as f:
+            assert f.read() == expected
+        shutil.rmtree("output")
+        os.mkdir("output")
+
+
+def test_create_map_errors(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", size=2 * 4096)
+    create_regular_file(archiver.input_path, "file2", size=100)
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write("0 4096 data\n")
+
+    def expect_error(exc_class, *args):
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, *args, exit_code=exc_class().exit_code)
+        else:
+            with pytest.raises(exc_class):
+                cmd(archiver, *args)
+
+    # --map requires exactly one input path
+    expect_error(CommandError, "create", "--map", map_path, "test", "input/file", "input/file2")
+    # --map input must not be a directory
+    expect_error(CommandError, "create", "--map", map_path, "test", "input")
+    # --map cannot be used with stdin input
+    expect_error(CommandError, "create", "--map", map_path, "test", "-")
+    # the map covers 4096 bytes, but the input file has 8192 bytes
+    expect_error(Error, "create", "--map", map_path, "test", "input/file")
+
+
+def test_create_map_reuse_from_fixed(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    block_size = 4096
+    blocks = [os.urandom(block_size) for _ in range(4)]
+    fname = os.path.join(archiver.input_path, "file")
+    create_regular_file(archiver.input_path, "file", contents=b"".join(blocks))
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write(f"0 {4 * block_size} data\n")
+    cmd(archiver, "create", "--chunker-params", "fixed,4096", "--map", map_path, "ref", "input/file")
+    # modify block 1 (declared "data" below) and block 2 (declared "same"!): the new archive
+    # must contain the new block 1, but the OLD block 2 - proving that borg reused the
+    # reference archive's chunks instead of reading the "same" ranges.
+    new_block1, sneaky_block2 = os.urandom(block_size), os.urandom(block_size)
+    with open(fname, "r+b") as f:
+        f.seek(block_size)
+        f.write(new_block1)
+        f.write(sneaky_block2)
+    with open(map_path, "w") as f:
+        f.write(f"0 {block_size} same\n")
+        f.write(f"{block_size} {block_size} data\n")
+        f.write(f"{2 * block_size} {block_size} same\n")
+        f.write(f"{3 * block_size} {block_size} zero\n")
+    cmd(
+        archiver,
+        "create",
+        "--chunker-params",
+        "fixed,4096",
+        "--map",
+        map_path,
+        "--reuse-from",
+        "ref",
+        "test",
+        "input/file",
+    )
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    with open(os.path.join("output", "input", "file"), "rb") as f:
+        assert f.read() == blocks[0] + new_block1 + blocks[2] + b"\0" * block_size
+
+
+def test_create_map_reuse_from_cdc(archivers, request):
+    # the reuse plan re-reads reference chunks that only partially overlap changed ranges,
+    # so it must also be correct with content-defined chunking (default chunker).
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    size = 1 << 20
+    content = bytearray(os.urandom(size))
+    fname = os.path.join(archiver.input_path, "file")
+    create_regular_file(archiver.input_path, "file", contents=bytes(content))
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write(f"0 {size} data\n")
+    cmd(archiver, "create", "ref", "input/file")
+    # change an unaligned range in the middle, keep everything else really unchanged.
+    start, length = 400000, 5000
+    content[start : start + length] = os.urandom(length)
+    with open(fname, "wb") as f:
+        f.write(content)
+    with open(map_path, "w") as f:
+        f.write(f"0 {start} same\n")
+        f.write(f"{start} {length} data\n")
+        f.write(f"{start + length} {size - start - length} same\n")
+    cmd(archiver, "create", "--map", map_path, "--reuse-from", "ref", "test", "input/file")
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    with open(os.path.join("output", "input", "file"), "rb") as f:
+        assert f.read() == bytes(content)
+
+
+def test_create_map_reuse_from_resize(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    block_size = 4096
+    blocks = [os.urandom(block_size) for _ in range(3)]
+    fname = os.path.join(archiver.input_path, "file")
+    create_regular_file(archiver.input_path, "file", contents=blocks[0] + blocks[1])
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write(f"0 {2 * block_size} data\n")
+    cmd(archiver, "create", "--chunker-params", "fixed,4096", "ref", "input/file")
+    # input grew: the tail beyond the reference chunks must be read.
+    with open(fname, "ab") as f:
+        f.write(blocks[2])
+    with open(map_path, "w") as f:
+        f.write(f"0 {2 * block_size} same\n")
+        f.write(f"{2 * block_size} {block_size} data\n")
+    cmd(
+        archiver,
+        "create",
+        "--chunker-params",
+        "fixed,4096",
+        "--map",
+        map_path,
+        "--reuse-from",
+        "ref",
+        "grown",
+        "input/file",
+    )
+    # input shrank: reference chunks beyond the new size must be dropped.
+    with open(fname, "r+b") as f:
+        f.truncate(block_size)
+    with open(map_path, "w") as f:
+        f.write(f"0 {block_size} same\n")
+    cmd(
+        archiver,
+        "create",
+        "--chunker-params",
+        "fixed,4096",
+        "--map",
+        map_path,
+        "--reuse-from",
+        "ref",
+        "shrunk",
+        "input/file",
+    )
+    with changedir("output"):
+        cmd(archiver, "extract", "grown")
+    with open(os.path.join("output", "input", "file"), "rb") as f:
+        assert f.read() == blocks[0] + blocks[1] + blocks[2]
+    shutil.rmtree("output")
+    os.mkdir("output")
+    with changedir("output"):
+        cmd(archiver, "extract", "shrunk")
+    with open(os.path.join("output", "input", "file"), "rb") as f:
+        assert f.read() == blocks[0]
+
+
+def test_create_map_reuse_from_missing_chunk(archivers, request, monkeypatch):
+    # when a reference chunk is not in the repo (any more), borg must fall back to reading.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.FORK_DEFAULT:
+        pytest.skip("needs in-process monkeypatching")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    block_size = 4096
+    content = os.urandom(2 * block_size)
+    create_regular_file(archiver.input_path, "file", contents=content)
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write(f"0 {2 * block_size} data\n")
+    cmd(archiver, "create", "--chunker-params", "fixed,4096", "ref", "input/file")
+    with open(map_path, "w") as f:
+        f.write(f"0 {2 * block_size} same\n")
+    from ...cache import AdHocWithFilesCache
+
+    monkeypatch.setattr(AdHocWithFilesCache, "seen_chunk", lambda self, id, size=None: False)
+    cmd(
+        archiver,
+        "create",
+        "--chunker-params",
+        "fixed,4096",
+        "--map",
+        map_path,
+        "--reuse-from",
+        "ref",
+        "test",
+        "input/file",
+    )
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    with open(os.path.join("output", "input", "file"), "rb") as f:
+        assert f.read() == content
+
+
+def test_create_map_reuse_from_errors(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", size=4096)
+    create_regular_file(archiver.input_path, "file2", size=4096)
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write("0 4096 same\n")
+
+    def expect_error(exc_class, *args):
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, *args, exit_code=exc_class().exit_code)
+        else:
+            with pytest.raises(exc_class):
+                cmd(archiver, *args)
+
+    cmd(archiver, "create", "ref2", "input")  # two file items
+    # --reuse-from requires --map
+    expect_error(CommandError, "create", "--reuse-from", "ref2", "test", "input/file")
+    # --reuse-path requires --reuse-from
+    expect_error(CommandError, "create", "--map", map_path, "--reuse-path", "input/file", "test", "input/file")
+    # "same" state requires --reuse-from
+    expect_error(Error, "create", "--map", map_path, "test", "input/file")
+    # ambiguous reference archive (two file items, no --reuse-path)
+    expect_error(CommandError, "create", "--map", map_path, "--reuse-from", "ref2", "test", "input/file")
+    # --reuse-path selecting a non-existing item
+    expect_error(
+        CommandError,
+        "create",
+        "--map",
+        map_path,
+        "--reuse-from",
+        "ref2",
+        "--reuse-path",
+        "nosuch",
+        "test",
+        "input/file",
+    )
+    # disambiguated via --reuse-path: works
+    cmd(
+        archiver,
+        "create",
+        "--map",
+        map_path,
+        "--reuse-from",
+        "ref2",
+        "--reuse-path",
+        "input/file",
+        "test",
+        "input/file",
+    )

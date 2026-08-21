@@ -12,6 +12,10 @@ expanded by your shell).
 
 Note: You may also prepend ``file://`` to a filesystem path to use URL style.
 
+Note: UNC paths (``//server/share/path``, ``\\server\share\path``) are not
+supported — mount the share (on Windows: map it to a drive letter, e.g.
+``net use X: \\server\share``) and use the mounted path instead.
+
 **Remote repositories** accessed via SSH user@host (REST http over stdio):
 
 ``rest://user@host:port//abs/path/to/repo`` — absolute path

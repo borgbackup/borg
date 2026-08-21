@@ -724,9 +724,9 @@ class Location:
     BORGSTORE_SCHEMES = ("sftp", "http", "https", "s3", "b2", "rclone")
 
     # path may contain any chars. to avoid ambiguities with other regexes, it must not start with
-    # "//", a "scheme://" or one of the borgstore "scheme:" specifiers (all of which are matched
+    # a "scheme://" or one of the borgstore "scheme:" specifiers (all of which are matched
     # before local_re in _parse). the borgstore scheme list is sourced from BORGSTORE_SCHEMES.
-    local_path_re = r"(?!(//|(?:ssh|file)://|(?:" + "|".join(BORGSTORE_SCHEMES) + r"):))" r"(?P<path>.+)"
+    local_path_re = r"(?!((?:ssh|file)://|(?:" + "|".join(BORGSTORE_SCHEMES) + r"):))" r"(?P<path>.+)"
 
     # abs_path must start with a slash (or drive letter on Windows).
     abs_path_re = r"(?P<path>[A-Za-z]:/.+)" if is_win32 else r"(?P<path>/.+)"
@@ -796,11 +796,15 @@ class Location:
 
         self.raw = text  # as given by user, might contain placeholders
         self.processed = replace_placeholders(self.raw, overrides)  # after placeholder replacement
-        valid = self._parse(self.processed)
-        if valid:
-            self.valid = True
-        else:
+        if not self._parse(self.processed):
             raise ValueError('Invalid location format: "%s"' % self.processed)
+        if self.proto == "file" and self.path.startswith("//"):
+            # UNC path (//server/share/..., \\server\share\...): not supported, fail early with a hint, see #10164.
+            raise ValueError(
+                f'UNC paths are not supported: "{self.processed}". '
+                "Mount the share (Windows: net use X: \\\\server\\share) and use the mounted path instead."
+            )
+        self.valid = True
 
     def _parse(self, text):
         m = self.ssh_re.match(text)

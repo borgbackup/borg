@@ -832,6 +832,9 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
+        # validate callable passed to PackReader.iter_headers by the lazy .chunks rebuild:
+        # if set, the rebuild resyncs past a corrupt object header instead of aborting.
+        self.chunkindex_validate = None
         # pack_id -> PackReader holding the whole pack; get_many loads into it, get() reuses it
         self._pack_cache = LRUCache(capacity=self.PACK_READER_CACHE_SIZE)
 
@@ -997,7 +1000,7 @@ class Repository:
         if self._chunks is None:
             from .cache import build_chunkindex_from_repo
 
-            self._chunks = build_chunkindex_from_repo(self)
+            self._chunks = build_chunkindex_from_repo(self, validate=self.chunkindex_validate)
         return self._chunks
 
     @chunks.setter

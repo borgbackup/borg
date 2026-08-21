@@ -1981,6 +1981,10 @@ class ArchiveChecker:
         self.chunks = build_chunkindex_from_repo(
             self.repository, slow_rebuild=repair, validate=validate, write_immediately=False
         )
+        if repair:
+            # repository.chunks is a separate index, lazily built when repository.get() resolves a
+            # chunk location. It needs the same validator to resync past the same corrupt headers.
+            self.repository.chunkindex_validate = validate
         if self.key is None:
             self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)

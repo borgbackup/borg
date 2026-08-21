@@ -11,7 +11,7 @@ from ... import archive as archive_module
 from ...archive import ArchiveChecker, ChunkBuffer
 from ...cache import delete_chunkindex_from_repo
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
+from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
@@ -893,13 +893,52 @@ def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monk
     monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
     # --archives-only: the repository check would stop at the damaged pack (a pack is named by the
     # sha256 of its content) before the archives check ever walks it.
-    with pytest.raises(IntegrityError) as excinfo:
+    with pytest.raises(CorruptPack) as excinfo:
         cmd(archiver, "check", "--archives-only")
     assert f"no object header at offset {damaged_offset} (pack corruption)" in str(excinfo.value)
     drop_corrupt_tail, outcome = rebuilds[0]
     # the rebuild raised, it did not return an index with the pack's tail missing
-    assert isinstance(outcome, IntegrityError)
+    assert isinstance(outcome, CorruptPack)
     assert drop_corrupt_tail is False  # a check that only diagnoses does not ask for the drop
+
+
+def test_repo_list_aborts_cleanly_on_corrupt_pack(archivers, request):
+    """A command rebuilding the chunks index over a corrupt object header aborts with a hint (#10122)."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        # damage the header of the 2nd object of a pack holding more than 2, so the walk aborts mid-pack.
+        by_pack = {}
+        for entry in repository.chunks.values():
+            by_pack.setdefault(entry.pack_id, []).append(entry.obj_offset)
+        pack_id, offsets = next((p, sorted(o)) for p, o in by_pack.items() if len(o) > 2)
+        damaged_offset = offsets[1]
+        key = "packs/" + bin_to_hex(pack_id)
+        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
+        # drop the index fragments, so the next command has to read the pack headers.
+        delete_chunkindex_from_repo(repository)
+
+    # fork: only a subprocess runs borg's top-level error handler, which turns the Error into a rc.
+    output = cmd(archiver, "repo-list", fork=True, exit_code=CorruptPack.exit_mcode)
+    assert "Traceback" not in output
+    assert f"no object header at offset {damaged_offset} (pack corruption)" in output
+    assert "borg check --repair" in output
+
+    # a check without --repair passes a validator too, so it resyncs past the damaged header and
+    # runs to the end of its diagnosis, reporting the object the resync skipped as missing. Which
+    # object that is depends on how the pack was filled, so only the last line is asserted here.
+    output = cmd(archiver, "check", fork=True, exit_code=1)
+    assert "Traceback" not in output
+    assert f"no object header at offset {damaged_offset}" in output
+    assert "Archive consistency check complete, problems found." in output
+
+    # --repair passes a validator, so it resyncs past the damaged header instead of aborting.
+    # TODO: it does not rewrite the pack yet, so a later rebuild hits the same header again.
+    cmd(archiver, "check", "--repair", exit_code=0)
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):

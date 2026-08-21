@@ -495,9 +495,9 @@ class PackReader:
                     # no validator, so payload bytes that look like a header can not be told from
                     # an object: there is no way to resync past this header.
                     if not drop_corrupt_tail:
-                        raise IntegrityError(
-                            f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
-                        )
+                        # the callers that can say something more useful than "there is corruption
+                        # here" wrap this, see build_chunkindex_from_repo.
+                        raise IntegrityError(f"pack {pack_hex}: {problem} at offset {offset} (pack corruption)")
                     if on_drop is not None:
                         on_drop()
                     logger.warning(

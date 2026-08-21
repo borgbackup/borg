@@ -100,7 +100,10 @@ A reader locates the next blob by advancing::
 ``iter_headers()`` checks every header it walks: it must have ``OBJ_MAGIC``, a
 supported version, and sizes that keep the blob inside the pack and within
 ``MAX_DATA_SIZE``. A header that fails these checks means a corrupt pack, and
-``IntegrityError`` is raised, naming which check it failed.
+``IntegrityError`` is raised, naming which check it failed. A chunks index
+rebuild without a repair walk (see below) would be incomplete from that point
+on, so it turns that into ``CorruptPack``, telling the user to run
+``borg check --repair``.
 
 The per-blob magic limits the blast radius of corrupted length fields. The
 repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``

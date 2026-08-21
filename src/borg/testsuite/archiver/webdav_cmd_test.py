@@ -22,6 +22,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...archive import Archive
+from ...helpers import Error
 from ...manifest import Manifest
 from ...platform import is_win32
 from ...repository import Repository
@@ -147,6 +148,40 @@ def test_webdav_browse(archivers, request):
         if are_symlinks_supported():
             assert "link1 -&gt; somewhere/else" in page
             assert 'href="link1"' not in page  # symlinks are not downloadable
+
+
+def test_webdav_archive_dir_format(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"data1")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "duplicate", "input")
+    cmd(archiver, "create", "duplicate", "input")
+    cmd(archiver, "create", "unique", "input")
+    output = cmd(archiver, "repo-list", "--format={name} {id}{NL}")
+    archives = [line.split() for line in output.splitlines()]
+
+    def archive_dirs(base_url):
+        _, _, body = propfind(base_url + "/", depth="1")
+        return {href.strip("/") for href in propfind_hrefs(body) if href != "/"}
+
+    # by default, the archive directories are named like the archives, with the short
+    # archive id appended where the name is not unique (the archives of a series):
+    with webdav_server(archiver) as base_url:
+        expected = {f"duplicate-{id[:8]}" for name, id in archives if name == "duplicate"} | {"unique"}
+        assert archive_dirs(base_url) == expected
+    # BORG_MOUNT_ARCHIVE_DIR_FORMAT gives another format, using the repo-list placeholders:
+    monkeypatch.setenv("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{name}-{id}")
+    with webdav_server(archiver) as base_url:
+        assert archive_dirs(base_url) == {f"{name}-{id}" for name, id in archives}
+    # a format that gives the same name for all archives: the short archive id is appended to all
+    monkeypatch.setenv("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "archive")
+    with webdav_server(archiver) as base_url:
+        assert archive_dirs(base_url) == {f"archive-{id[:8]}" for name, id in archives}
+    # unknown placeholders are rejected
+    monkeypatch.setenv("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{nonsense}")
+    with pytest.raises(Error, match="BORG_MOUNT_ARCHIVE_DIR_FORMAT"):
+        with webdav_server(archiver):
+            pass
 
 
 def test_webdav_download(archivers, request):

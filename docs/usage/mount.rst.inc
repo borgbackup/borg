@@ -120,9 +120,17 @@ are exposed (read-only) via the ``system.posix_acl_access`` and
 not enforce the ACLs for permission checks. On other platforms, ACLs are not
 supported.
 
-When mounting a repository, the top directories will be named like the
-archives and the directory structure below these will be loaded on-demand from
-the repository when entering these directories, so expect some delay.
+When mounting a repository, there is one top directory per archive and the
+directory structure below these will be loaded on-demand from the repository
+when entering these directories, so expect some delay.
+
+By default, these top directories are named like the archives; as the archives
+of a series all have the same name, ``-{id:.8}`` (the first 8 hex digits of the
+archive id) is appended whenever a name is not unique. To name them differently,
+set the ``BORG_MOUNT_ARCHIVE_DIR_FORMAT`` environment variable to a format string
+using the placeholders of ``borg repo-list --format``, e.g.
+``{name}-{time:%Y-%m-%dT%H:%M:%S}`` or ``{hostname}-{name}``; names that are
+still not unique get ``-{id:.8}`` appended.
 
 .. note::
 

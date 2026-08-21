@@ -250,6 +250,8 @@ New features:
 - list: --sort-by=field[,field,...], #9009
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
+- BORG_MOUNT_ARCHIVE_DIR_FORMAT env var: how the archive directories of a repository
+  mount (borg mount, borg webdav) are named, #9991
 
 Fixes:
 

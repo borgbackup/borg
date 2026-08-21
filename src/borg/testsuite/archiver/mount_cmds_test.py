@@ -282,6 +282,26 @@ def test_fuse_duplicate_name(archivers, request):
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+def test_fuse_archive_dir_format(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "duplicate", "input")
+    cmd(archiver, "create", "duplicate", "input")
+    cmd(archiver, "create", "unique", "input")
+    output = cmd(archiver, "repo-list", "--format={name} {hostname} {id}{NL}")
+    archives = [line.split() for line in output.splitlines()]
+    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
+    # BORG_MOUNT_ARCHIVE_DIR_FORMAT names the archive directories, using the repo-list placeholders:
+    monkeypatch.setenv("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{name}-{id}")
+    with fuse_mount(archiver, mountpoint):
+        assert set(os.listdir(mountpoint)) == {f"{name}-{id}" for name, hostname, id in archives}
+    # names that are not unique get the short archive id appended (here: all of them):
+    monkeypatch.setenv("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{hostname}")
+    with fuse_mount(archiver, mountpoint):
+        assert set(os.listdir(mountpoint)) == {f"{hostname}-{id[:8]}" for name, hostname, id in archives}
+
+
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse_allow_damaged_files(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

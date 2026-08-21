@@ -97,9 +97,11 @@ authentication and no encryption - anything that can connect to
 localhost TCP ports on the machine can read the served archive contents.
 
 The top level lists the selected archives (use the archive filter options
-to select fewer archives); below that, the archive contents can be
-browsed like a directory tree. The directory tree of an archive is built
-in memory when it is first entered, so expect some delay for big archives.
+to select fewer archives), named as for ``borg mount`` (see the
+``BORG_MOUNT_ARCHIVE_DIR_FORMAT`` environment variable there); below that,
+the archive contents can be browsed like a directory tree. The directory
+tree of an archive is built in memory when it is first entered, so expect
+some delay for big archives.
 
 Any directory can be downloaded as a tar archive by appending ``?tar`` to its
 URL (the web browser listings show a download icon next to the heading for this).

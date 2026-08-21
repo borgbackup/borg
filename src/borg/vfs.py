@@ -32,7 +32,7 @@ from typing import NamedTuple
 from .archive import Archive, DownloadPipeline, get_item_uid_gid
 from .constants import ROBJ_FILE_STREAM
 from .hashindex import FuseVersionsIndex
-from .helpers import Error, bin_to_hex, format_file_size, remove_surrogates
+from .helpers import ArchiveFormatter, CommandError, Error, bin_to_hex, format_file_size, remove_surrogates
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
 from .item import ChunkListEntry, Item
@@ -198,11 +198,11 @@ def versioned_name(name, version):
 class ArchiveVFS:
     """A read-only file system view of the archives selected by *args*.
 
-    The root directory has one directory per (deduplicated) archive name; each of
-    these archive trees is built when it is first accessed - building it means
-    reading the whole item metadata stream of that archive, which takes a while for
-    a big archive. In the versions view, the contents of all selected archives are
-    merged into one tree instead, which is built completely upfront.
+    The root directory has one directory per archive (see create_filesystem for how
+    they are named); each of these archive trees is built when it is first accessed -
+    building it means reading the whole item metadata stream of that archive, which
+    takes a while for a big archive. In the versions view, the contents of all selected
+    archives are merged into one tree instead, which is built completely upfront.
 
     Directories are addressable by inode number (get_node); everything else is
     reached by looking up names in a directory node (lookup / resolve).
@@ -237,11 +237,12 @@ class ArchiveVFS:
     def create_filesystem(self):
         """Populate the root directory (this also selects the archives to be shown)."""
         archives = self.manifest.archives.list_considering(self.args)
-        # archives of a series all have the same name, so make the display names unique
-        name_counter = Counter(archive.name for archive in archives)
-        for archive in archives:
-            name = archive.name
-            if name_counter[name] > 1:
+        names = self._archive_dir_names(archives)
+        # the archives of a series all have the same name (and other formats can be
+        # ambiguous, too), so append the archive id to the names that are not unique.
+        name_counter = Counter(names)
+        for archive, name in zip(archives, names):
+            if name_counter[name] > 1 or name in ("", ".", ".."):
                 name += f"-{bin_to_hex(archive.id):.8}"
             self.archives[name] = archive
         timestamps = [archive.ts for archive in archives]
@@ -259,6 +260,17 @@ class ArchiveVFS:
                 self._set_item(node.ino, self._dir_item(int(archive.ts.timestamp() * 1e9)))
                 self.root.children[name] = node
                 self._pending[node] = archive
+
+    def _archive_dir_names(self, archives):
+        """The root directory names of *archives*, see BORG_MOUNT_ARCHIVE_DIR_FORMAT (borg mount --help)."""
+        format = os.environ.get("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{name}")
+        try:
+            formatter = ArchiveFormatter(format, self.repository, self.manifest, self.manifest.key)
+            names = [formatter.format_item(archive) for archive in archives]
+        except (CommandError, ValueError) as err:  # unknown placeholder, malformed format string / format spec
+            raise Error(f"BORG_MOUNT_ARCHIVE_DIR_FORMAT: {err}") from None
+        # "/" and NUL can not be part of a directory name
+        return [name.replace("/", "_").replace("\0", "_") for name in names]
 
     def _dir_item(self, mtime):
         """Return the item used for a synthesized directory, with mtime *mtime*."""

@@ -1,4 +1,5 @@
 import re
+import time
 
 import pytest
 
@@ -76,6 +77,17 @@ def check(path, pattern):
         ("{foobar", ["{foo{,bar}"]),
         ("{foo},bar}", ["{foo},bar}"]),
         ("bar/foobar", ["**/foo{ba[!z]*,[0-9]}"]),
+        # Adjacent wildcards are equivalent to one
+        ("foo/bar", ["foo/**/**/bar", "foo/***/bar", "f**o/bar"]),
+        ("foo/1/22/bar", ["foo/**/**/bar", "foo/**/**/**/bar"]),
+        # Star-fixed-star sequences are matched atomically (leftmost fixed occurrence), see #2624.
+        # These must still match, the leftmost occurrence is not the right one if the right neighbour is
+        # not a plain star, or if the fixed part is an alternative group.
+        ("aab", ["*a**/b", "*a*b"]),
+        ("a/ab", ["**/a*b"]),
+        ("abc", ["*{a,ab}c"]),
+        ("xaab", ["*a*b", "*a*a*b"]),
+        ("xa/by", ["*a/b*"]),
     ],
 )
 def test_match(path, patterns):
@@ -114,6 +126,10 @@ def test_match(path, patterns):
         ("foo", ["foo{1,2}"]),
         ("foo{1,2}", ["foo{1,2}"]),
         ("bar/foobaz", ["**/foo{ba[!z]*,[0-9]}"]),
+        # Star-fixed-star sequences, see #2624
+        ("a/ab", ["*a*b"]),
+        ("aab", ["*a*b*c"]),
+        ("ab", ["*a*a*b"]),
     ],
 )
 def test_mismatch(path, patterns):
@@ -130,3 +146,19 @@ def test_match_end():
     regex = shellpattern.translate("*-home", match_end=match_end)
     assert re.match(regex, "2017-07-03-home")
     assert re.match(regex, "2017-07-03-home.xxx")
+
+
+def test_translate_atomic_wildcards():
+    # "* FIXED *" becomes an atomic group, so that many wildcards can not cause exponential backtracking, see #2624
+    assert shellpattern.translate("a*b*c*d") == r"(?ms)a(?>[^\/]*?b)(?>[^\/]*?c)[^\/]*d\Z"
+    # Not for "**/" or alternative-group neighbours, where the leftmost occurrence is not always the right one.
+    assert shellpattern.translate("*a**/b") == r"(?ms)[^\/]*a(?:[^\/]*\/)*b\Z"
+    assert shellpattern.translate("*{a,ab}c*") == r"(?ms)[^\/]*(a|ab)c[^\/]*\Z"
+
+
+def test_no_exponential_backtracking():
+    # see #2624: this took "forever" before wildcard runs were matched atomically
+    regex = re.compile(shellpattern.translate("input/" + "a*" * 50 + "b"))
+    start = time.monotonic()
+    assert not regex.match("input/" + "a" * 200)
+    assert time.monotonic() - start < 10

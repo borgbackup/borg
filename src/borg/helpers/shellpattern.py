@@ -23,7 +23,7 @@ def translate(pat, match_end=r"\Z"):
     sep = os.path.sep
     n = len(pat)
     i = 0
-    res = ""
+    tokens = []  # (kind, regex) with kind "star" (*), "dstar" (**<sep>), "group" (alternatives) or "fixed"
 
     while i < n:
         c = pat[i]
@@ -32,15 +32,16 @@ def translate(pat, match_end=r"\Z"):
         if c == "*":
             if i + 1 < n and pat[i] == "*" and pat[i + 1] == sep:
                 # **/ == wildcard for 0+ full (relative) directory names with trailing slashes; the forward slash stands
-                # for the platform-specific path separator
-                res += rf"(?:[^\{sep}]*\{sep})*"
+                # for the platform-specific path separator. Adjacent **/ are collapsed into one.
+                if not (tokens and tokens[-1][0] == "dstar"):
+                    tokens.append(("dstar", rf"(?:[^\{sep}]*\{sep})*"))
                 i += 2
-            else:
-                # * == wildcard for name parts (does not cross path separator)
-                res += r"[^\%s]*" % sep
+            elif not (tokens and tokens[-1][0] == "star"):
+                # * == wildcard for name parts (does not cross path separator). Adjacent * are collapsed into one.
+                tokens.append(("star", r"[^\%s]*" % sep))
         elif c == "?":
             # ? == any single character excluding path separator
-            res += r"[^\%s]" % sep
+            tokens.append(("fixed", r"[^\%s]" % sep))
         elif c == "[":
             j = i
             if j < n and pat[j] == "!":
@@ -50,7 +51,7 @@ def translate(pat, match_end=r"\Z"):
             while j < n and pat[j] != "]":
                 j += 1
             if j >= n:
-                res += "\\["
+                tokens.append(("fixed", "\\["))
             else:
                 stuff = pat[i:j].replace("\\", "\\\\")
                 i = j + 1
@@ -58,14 +59,33 @@ def translate(pat, match_end=r"\Z"):
                     stuff = "^" + stuff[1:]
                 elif stuff[0] == "^":
                     stuff = "\\" + stuff
-                res += "[%s]" % stuff
+                tokens.append(("fixed", "[%s]" % stuff))
         elif c in "(|)":
             if i > 0 and pat[i - 1] != "\\":
-                res += c
+                tokens.append(("group", c))
         else:
-            res += re.escape(c)
+            tokens.append(("fixed", re.escape(c)))
 
-    return "(?ms)" + res + match_end
+    # Join the tokens. A "* FIXED *" sequence (FIXED: one or more "fixed" tokens) is emitted as an atomic group
+    # matching FIXED at its leftmost occurrence, so that runs of wildcards can not cause exponential backtracking,
+    # see #2624. This is only correct for "star" neighbours on both sides, not for "dstar" or "group" neighbours.
+    res = []
+    i = 0
+    n = len(tokens)
+    while i < n:
+        kind, regex = tokens[i]
+        if kind == "star":
+            j = i + 1
+            while j < n and tokens[j][0] == "fixed":
+                j += 1
+            if j > i + 1 and j < n and tokens[j][0] == "star":
+                res.append("(?>" + regex + "?" + "".join(r for _, r in tokens[i + 1 : j]) + ")")
+                i = j
+                continue
+        res.append(regex)
+        i += 1
+
+    return "(?ms)" + "".join(res) + match_end
 
 
 def _parse_braces(pat):

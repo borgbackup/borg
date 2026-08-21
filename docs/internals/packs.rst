@@ -64,6 +64,9 @@ the AAD; tampering with either still fails the check, because it changes the len
 slice being read. A forged ``chunk_id``, version, or magic byte therefore fails
 authentication in ``RepoObj.parse()``/``parse_meta()``.
 
+``parse_meta()`` reads the metadata slot only, so of the two length fields it covers
+``meta_size`` alone; ``data_size`` is covered by ``parse()``.
+
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
 AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data`` -- binding each ciphertext to
 its slot. This stops an attacker controlling repo storage from swapping the two ciphertexts (adjusting
@@ -214,6 +217,28 @@ Only ``borg compact`` and ``borg check --repair`` delete pack files. When compac
 determines via mark-and-sweep that none of a pack's blobs are referenced by any
 archive, it removes the whole file. Individual blobs cannot be removed without
 rewriting the entire pack, so deletion always operates at pack granularity.
+
+Gap bytes
+~~~~~~~~~
+
+A pack can hold bytes that no chunks index entry covers -- its *gaps*: a copy of a chunk
+that was stored again elsewhere, or blobs from a backup that crashed before writing its
+index. Rewriting a pack (``compact_pack``, ``transform_pack``) walks the gaps and drops
+the blobs among them that are *superseded*: whose chunk id the index maps to a copy at
+another location, which by the id/content invariant holds the same plaintext.
+
+A gap blob is dropped only when both hold:
+
+* its header and metadata slot authenticate (``repoobj.object_validator``), verifying its
+  magic, version, chunk id and ``meta_size``. ``OBJ_MAGIC`` plus a well-formed header is
+  not evidence that bytes are a blob: in the ``none-*`` and ``authenticated-*`` modes the
+  payloads are user content stored as it is, so a backed up file can contain one.
+* its total size equals the index entry's ``obj_size``. ``data_size`` lies outside what
+  the authentication covers and sets how far the dropped range reaches, so the entry
+  serves as a second source for it.
+
+Anything else keeps its bytes, for ``borg check --repair`` to re-index. Authenticating
+needs the key, so a caller without one drops no gap bytes.
 
 
 .. _pack-index-namespace:

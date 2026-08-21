@@ -75,7 +75,8 @@ REPOOBJ_HEADER_SIZE = 49
 # Size of the header prefix used as AEAD AAD (additional authenticated data: authenticated together
 # with the ciphertext, but not itself encrypted) for OBJ_VERSION_HEADER_AAD objects: magic(8) +
 # version(1) + chunk_id(32). meta_size and data_size are excluded, since they are only known after
-# encryption; a change to either still fails authentication, by changing the ciphertext slice length.
+# encryption; a change to either still fails authentication, by changing the ciphertext slice
+# length. parse() covers both, parse_meta() only meta_size - it does not read the data slot.
 REPOOBJ_HEADER_AAD_SIZE = len(OBJ_MAGIC) + 1 + 32
 
 META_AAD_TAG = b"M"
@@ -275,6 +276,26 @@ class RepoObj:
         else:
             meta, data = None, None
         return meta_compressed if want_compressed else meta, data_compressed if want_compressed else data
+
+
+def object_validator(repo_objs):
+    """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
+
+    obj is an object's header and metadata slot, trailing bytes allowed. Parsing the slot verifies
+    its tag, which covers the header's magic, version, chunk id and meta_size, but not data_size.
+
+    In the "none-*" modes the tag is an unkeyed checksum, so any well-formed object validates.
+    """
+
+    def validate(chunk_id, obj):
+        try:
+            repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
+        except Exception:
+            # arbitrary bytes fail the tag, the msgpack unpacking or the length checks.
+            return False
+        return True
+
+    return validate
 
 
 # Backward compatibility: RepoObj1 has moved to borg.legacy.repoobj

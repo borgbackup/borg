@@ -13,15 +13,14 @@ from borghash import HashTableNT
 from ..cache import write_chunkindex_invalid
 from ..constants import MAX_CLOCK_SKEW
 from ..helpers import IntegrityError, Location, bin_to_hex
-from ..hashindex import ChunkIndex
+from ..hashindex import ChunkIndex, ChunkIndexEntry
 from .. import repository as repository_module
-from ..archive import resync_validator
 from ..compress import CNONE
 from ..constants import ROBJ_FILE_STREAM
 from ..crypto.key import CHPOKey, ChecksumKey
 from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
-from ..repository import PackTracker
-from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
+from ..repository import PackTracker, superseded_gap_ranges
+from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
 from .hashindex_test import H
 
 
@@ -120,6 +119,11 @@ def pchunk(chunk):
 def pdchunk(chunk):
     # Parse only the data from a raw chunk made by fchunk.
     return pchunk(chunk)[0]
+
+
+def accept_all(chunk_id, obj):
+    # validate stand-in: accepts every candidate.
+    return True
 
 
 def test_basic_operations(repo_fixtures, request):
@@ -500,7 +504,9 @@ def test_compact_pack_drops_superseded_gap(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         repository.chunks[H(1)] = repository.chunks[H(1)]._replace(pack_id=H(9))  # authoritative copy elsewhere
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set(), validate=accept_all
+        )
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert dropped == len(chunk1)  # the superseded gap's bytes are counted as freed
@@ -524,7 +530,9 @@ def test_compact_pack_keeps_self_referencing_gap(repo_fixtures, request):
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set(), validate=accept_all
+        )
 
         assert new_pack_id == old_pack_id  # nothing dropped, defrag reproduced the same pack
         assert dropped == 0  # the self-referencing gap is kept, nothing freed
@@ -1881,11 +1889,6 @@ def test_pack_reader_raises_on_unsupported_version():
         list(PackReader(pack_contents=bytes(obj)).iter_headers())
 
 
-def accept_all(chunk_id, obj):
-    # validate stand-in: accepts every candidate.
-    return True
-
-
 def test_pack_reader_resync_skips_to_next_object():
     # after a corrupt header the walk continues at the next object.
     obj1 = bytearray(fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1)))
@@ -1987,7 +1990,7 @@ def test_pack_reader_resync_rejects_metadata_that_does_not_authenticate(tmp_path
     garbage = fchunk(b"payload", meta=b"not encrypted metadata", chunk_id=H(9))
     obj2 = repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM)
     reader = PackReader(pack_contents=bytes(obj1) + garbage + obj2)
-    headers = list(reader.iter_headers(validate=resync_validator(repo_objs)))
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
     assert headers == [(real_id, len(obj1) + len(garbage), len(obj2))]
 
 
@@ -2002,7 +2005,7 @@ def test_pack_reader_resync_accepts_an_object_with_corrupt_data(tmp_path):
     obj2 = bytearray(repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM))
     obj2[-1] ^= 0xFF  # damage the encrypted data, leaving the header and the metadata intact
     reader = PackReader(pack_contents=bytes(obj1) + bytes(obj2))
-    headers = list(reader.iter_headers(validate=resync_validator(repo_objs)))
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
     assert headers == [(real_id, len(obj1), len(obj2))]
     with pytest.raises(IntegrityError):
         repo_objs.parse(real_id, bytes(obj2), ro_type=ROBJ_FILE_STREAM)
@@ -2027,7 +2030,7 @@ def test_pack_reader_resync_rejects_damaged_user_content_without_a_key(tmp_path)
     real_id = repo_objs.id_hash(data)
     obj2 = repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM)
     reader = PackReader(pack_contents=bytes(obj1) + obj2)
-    headers = list(reader.iter_headers(validate=resync_validator(repo_objs)))
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
     assert headers == [(real_id, len(obj1), len(obj2))]
 
 
@@ -2062,3 +2065,73 @@ def test_pack_reader_in_memory_read_returns_view():
     assert bytes(view) == obj2
     pack[len(obj1)] ^= 0xFF  # a write to pack_contents is visible through the view
     assert view[0] == obj2[0] ^ 0xFF
+
+
+THIS_PACK = H(98)  # the pack whose gaps are walked
+OTHER_PACK = H(99)  # the pack the index points a superseded duplicate's authoritative copy at
+
+
+def gap_pack(repo_objs, datas):
+    """Build a pack of repo objects, plus a chunks index that supersedes every one of them.
+
+    datas: each object's plaintext, in pack order.
+    Returns (objects, chunks): chunks maps each object's id to an entry in OTHER_PACK of the same
+    size, so superseded_gap_ranges reports an object exactly when it passes both of its checks.
+    """
+    objs = [repo_objs.format(repo_objs.id_hash(data), {}, data, ro_type=ROBJ_FILE_STREAM) for data in datas]
+    chunks = {repo_objs.id_hash(data): ChunkIndexEntry(0, 0, OTHER_PACK, 0, len(obj)) for data, obj in zip(datas, objs)}
+    return objs, chunks
+
+
+def gap_ranges(pack, chunks, validate):
+    # the whole pack is one gap: no indexed object of THIS_PACK covers any of it.
+    reader = PackReader(pack_contents=pack)
+    return superseded_gap_ranges(reader, chunks, THIS_PACK, [], len(pack), validate=validate)
+
+
+def test_superseded_gap_ranges_reports_an_authenticated_duplicate(tmp_path):
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+
+    assert gap_ranges(obj, chunks, object_validator(repo_objs)) == [(0, len(obj))]
+    assert gap_ranges(obj, chunks, None) == []  # no validator, nothing to report
+
+
+def test_superseded_gap_ranges_rejects_a_forged_chunk_id(tmp_path):
+    # The chunk id sits in cleartext in the header. Overwriting it with the id of an indexed chunk
+    # of the same size passes the size check, so only the metadata slot's tag rules the object out.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+    victim = repo_objs.id_hash(b"a chunk stored elsewhere")
+    chunks[victim] = ChunkIndexEntry(0, 0, OTHER_PACK, 0, len(obj))
+    forged = bytearray(obj)
+    forged[len(OBJ_MAGIC) + 1 : len(OBJ_MAGIC) + 1 + 32] = victim  # the header's chunk_id field
+
+    assert gap_ranges(bytes(forged), chunks, object_validator(repo_objs)) == []
+
+
+def test_superseded_gap_ranges_rejects_a_size_the_index_contradicts(tmp_path):
+    # data_size is authenticated by nothing the metadata slot covers. Inflating it would stretch the
+    # reported range over the bytes behind the object; the index entry's obj_size rules it out.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj, behind), chunks = gap_pack(repo_objs, [b"superseded", b"innocent bystander"])
+    hdr_size = RepoObj.obj_header.size
+    inflated = bytearray(obj + behind)
+    data_size_at = hdr_size - 4
+    (data_size,) = struct.unpack("<I", inflated[data_size_at:hdr_size])
+    inflated[data_size_at:hdr_size] = struct.pack("<I", data_size + len(behind))
+
+    assert gap_ranges(bytes(inflated), chunks, object_validator(repo_objs)) == []
+
+
+def test_superseded_gap_ranges_continues_past_a_rejected_object(tmp_path):
+    # A rejected object ends nothing: its size held up, so the next object is still at a known offset.
+    repo_objs = aead_repo_objs(tmp_path)
+    (rejected, wanted), chunks = gap_pack(repo_objs, [b"tampered", b"superseded"])
+    damaged = bytearray(rejected)
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(bytes(damaged[: RepoObj.obj_header.size])))
+    damaged[RepoObj.obj_header.size + hdr.meta_size - 1] ^= 0xFF  # last byte of the metadata slot
+
+    ranges = gap_ranges(bytes(damaged) + wanted, chunks, object_validator(repo_objs))
+
+    assert ranges == [(len(rejected), len(wanted))]

@@ -52,7 +52,7 @@ from .item import Item, ArchiveItem, ItemDiff
 from . import platform
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
 from .repository import Repository, NoManifestError
-from .repoobj import RepoObj
+from .repoobj import RepoObj, object_validator
 
 # macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
 # Reading such files triggers downloading their content. stat.SF_DATALESS is only available
@@ -1893,28 +1893,6 @@ class RobustUnpacker:
             return next(self._unpacker)
 
 
-def resync_validator(repo_objs):
-    """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
-
-    obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
-    computed over the header's magic, version and chunk id as well (AAD, additional authenticated
-    data: bytes the tag covers without being part of the ciphertext).
-
-    In the "none-*" modes the tag is an unkeyed checksum, so validate accepts any well-formed
-    object, including one that a backed up file contains.
-    """
-
-    def validate(chunk_id, obj):
-        try:
-            repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
-        except Exception:
-            # arbitrary bytes fail the tag, the msgpack unpacking or the length checks.
-            return False
-        return True
-
-    return validate
-
-
 class ArchiveChecker:
     # Bound how many missing file chunks rebuild_archives buffers for its end-of-run report,
     # so checking a badly damaged repo with very many missing chunks can not exhaust memory.
@@ -1977,7 +1955,7 @@ class ArchiveChecker:
                 self.key = self.make_key(repository, manifest_only=True)
             except IntegrityError as err:
                 logger.warning(f"{err}. Packs with a corrupt object header can not be repaired.")
-        validate = resync_validator(RepoObj(self.key)) if repair and self.key is not None else None
+        validate = object_validator(RepoObj(self.key)) if repair and self.key is not None else None
         self.chunks = build_chunkindex_from_repo(
             self.repository, slow_rebuild=repair, validate=validate, write_immediately=False
         )
@@ -2114,6 +2092,7 @@ class ArchiveChecker:
         if defect_chunks:
             if self.repair:
                 logger.warning("Found defect chunks, removing them from the repository.")
+                validate = object_validator(self.repo_objs)
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
@@ -2134,7 +2113,7 @@ class ArchiveChecker:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
                         # keeping the other chunks. update_index=False: finish() rebuilds the index from
                         # the rewritten packs anyway, so a per-chunk full index write would be wasted.
-                        self.repository.delete(defect_chunk, update_index=False)
+                        self.repository.delete(defect_chunk, update_index=False, validate=validate)
                         self.chunks_modified = True
                         # drop it from our own index too, so rebuild_archives reports the file it belongs to.
                         del self.chunks[defect_chunk]
@@ -2516,7 +2495,7 @@ class ArchiveChecker:
                 build_chunkindex_from_repo(
                     self.repository,
                     slow_rebuild=True,
-                    validate=resync_validator(self.repo_objs),
+                    validate=object_validator(self.repo_objs),
                     write_immediately=True,
                 )
             else:

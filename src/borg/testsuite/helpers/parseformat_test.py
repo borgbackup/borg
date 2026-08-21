@@ -264,13 +264,17 @@ class TestLocationWithoutEnv:
             repr(Location(url)) == f"Location(proto='file', user=None, pass=None, host=None, port=None, path='{path}')"
         )
 
-    @pytest.mark.skipif(is_win32, reason="still broken")
-    def test_smb(self, monkeypatch):
+    def test_unc_rejected(self, monkeypatch):
+        # UNC paths are not supported (#3141), the parser rejects all spellings early, see #10164.
         monkeypatch.delenv("BORG_REPO", raising=False)
-        assert (
-            repr(Location("file:////server/share/path"))
-            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='//server/share/path')"
-        )
+        with pytest.raises(ValueError, match="UNC paths are not supported"):
+            Location("//server/share/repo")
+        # on win32, file:/// must be followed by a drive letter, so this is invalid even earlier.
+        with pytest.raises(ValueError, match="Invalid location" if is_win32 else "UNC paths are not supported"):
+            Location("file:////server/share/repo")
+        if is_win32:
+            with pytest.raises(ValueError, match="UNC paths are not supported"):
+                Location(r"\\server\share\repo")
 
     def test_folder(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)

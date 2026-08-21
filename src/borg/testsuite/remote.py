@@ -1,12 +1,15 @@
 import errno
 import os
 import io
+import sys
+import threading
 import time
+from subprocess import Popen, PIPE
 from unittest.mock import patch
 
 import pytest
 
-from ..remote import SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
+from ..remote import RemoteRepository, SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
 from ..repository import Repository
 from ..crypto.key import PlaintextKey
 from ..compress import CompressionSpec
@@ -199,3 +202,34 @@ class TestRepositoryCache:
 
         with pytest.raises(IntegrityError):
             assert next(iterator) == (7, b'5678')
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='remote repositories are not supported on Windows')
+def test_close_drains_stderr():
+    """RemoteRepository.close() must not deadlock on a child that still writes to stderr, see #10165.
+
+    borg is the only reader of the child's stderr pipe, so if it stopped reading it while waiting
+    for the child to terminate, the child would block forever writing into the full pipe buffer.
+    """
+    # the child waits for EOF on stdin (like the remote does when we close our end),
+    # then writes way more than a pipe buffer (64kiB) worth of stderr output:
+    code = 'import sys; sys.stdin.read(); sys.stderr.write(("E" * 4095 + "\\n") * 64)'
+    p = Popen([sys.executable, '-c', code], bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    # set up just enough of a RemoteRepository for close() to work on:
+    rr = RemoteRepository.__new__(RemoteRepository)
+    rr.p = p
+    rr.stderr_fd = p.stderr.fileno()
+    rr.stderr_received = b''
+    rr.rx_bytes = 0
+    rr.responses = {}  # only used by RemoteRepository.__del__
+    os.set_blocking(rr.stderr_fd, False)
+    # if close() deadlocks, it never returns - so do not call it in the main thread:
+    closer = threading.Thread(target=rr.close, daemon=True)
+    closer.start()
+    closer.join(timeout=30)
+    if closer.is_alive():
+        p.kill()  # unblock the deadlocked close(), so the child does not stay around
+        pytest.fail('RemoteRepository.close() did not return, see #10165.')
+    assert rr.p is None
+    assert p.returncode == 0  # the child could write all its output and terminated by itself
+    assert rr.rx_bytes == 64 * 4096  # we have received all of the child's stderr output

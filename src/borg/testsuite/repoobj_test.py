@@ -19,8 +19,9 @@ from ..repoobj import (
 from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
 
-# offsets of the size fields in the object header.
-META_SIZE_OFFSET = len(OBJ_MAGIC) + 1 + 32  # the magic, the version byte and the chunk id precede it
+# offsets of object header fields.
+CHUNK_ID_OFFSET = len(OBJ_MAGIC) + 1  # after the magic and the version byte
+META_SIZE_OFFSET = CHUNK_ID_OFFSET + 32
 DATA_SIZE_OFFSET = META_SIZE_OFFSET + 4
 
 

@@ -3,6 +3,7 @@ import textwrap
 
 from ..archive import Archive
 from ..constants import *  # NOQA
+from ..crypto.key import key_from_repository, KeyfileInvalidError, RepoKeyNotFoundError, UnsupportedKeyFormatError
 from ..helpers import msgpack
 from ..helpers import FilesystemPathSpec
 from ..helpers import sysinfo
@@ -10,15 +11,35 @@ from ..helpers import bin_to_hex, hex_to_bin, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
 from ..helpers import archivename_validator, CompressionSpec
-from ..helpers import CommandError, RTError
+from ..helpers import CommandError, IntegrityError, RTError
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
-from ..repoobj import RepoObj
+from ..repoobj import RepoObj, object_validator
 
 from ._common import with_repository, Highlander
 from ._common import process_epilog
+
+from ..logger import create_logger
+
+logger = create_logger()
+
+
+def gap_validator(repository):
+    """Return repoobj.object_validator for the key of repository, or None if there is no key to use.
+
+    The key is loaded with key_from_repository. There is no key to use if no stored object identifies
+    the key type (IntegrityError), no key is found (RepoKeyNotFoundError), or the key is invalid
+    (KeyfileInvalidError, UnsupportedKeyFormatError); a warning is logged then. Other errors, e.g. a
+    wrong passphrase, propagate.
+    """
+    try:
+        key = key_from_repository(repository)
+    except (IntegrityError, RepoKeyNotFoundError, KeyfileInvalidError, UnsupportedKeyFormatError) as err:
+        logger.warning(f"Could not set up the key, so rewritten packs keep their superseded gap bytes: {err}")
+        return None
+    return object_validator(RepoObj(key))
 
 
 class DebugMixIn:
@@ -111,7 +132,6 @@ class DebugMixIn:
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
         """Dumps (decrypted, decompressed) repository objects."""
-        from ..crypto.key import key_factory
 
         def decrypt_dump(id, cdata):
             if cdata is not None:
@@ -123,12 +143,7 @@ class DebugMixIn:
             with open(filename, "wb") as fd:
                 fd.write(data)
 
-        # set up the key without depending on a manifest obj
-        result = repository.list(limit=1, marker=None)
-        id, _ = result[0]
-        cdata = repository.get(id)
-        key = key_factory(repository, cdata)
-        repo_objs = RepoObj(key)
+        repo_objs = RepoObj(key_from_repository(repository))
         for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
             cdata = repository.get(id)
             decrypt_dump(id, cdata)
@@ -161,14 +176,7 @@ class DebugMixIn:
         if not wanted:
             raise CommandError("search term needs to be hex:123abc or str:foobar style")
 
-        from ..crypto.key import key_factory
-
-        # set up the key without depending on a manifest obj
-        result = repository.list(limit=1, marker=None)
-        id, _ = result[0]
-        cdata = repository.get(id)
-        key = key_factory(repository, cdata)
-        repo_objs = RepoObj(key)
+        repo_objs = RepoObj(key_from_repository(repository))
 
         last_data = b""
         last_id = None
@@ -288,14 +296,19 @@ class DebugMixIn:
     @with_repository(manifest=False, exclusive=True)
     def do_debug_delete_obj(self, args, repository):
         """Deletes the objects with the given IDs from the repository."""
+        ids = []
         for hex_id in args.ids:
             try:
-                id = hex_to_bin(hex_id, length=32)
+                ids.append((hex_id, hex_to_bin(hex_id, length=32)))
             except ValueError:
+                ids.append((hex_id, None))
+        validate = gap_validator(repository) if any(id is not None for _, id in ids) else None
+        for hex_id, id in ids:
+            if id is None:
                 print("object id %s is invalid." % hex_id)
             else:
                 try:
-                    repository.delete(id)
+                    repository.delete(id, validate=validate)
                 except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
                 else:

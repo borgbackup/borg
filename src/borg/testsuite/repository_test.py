@@ -16,12 +16,12 @@ from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
 from ..crypto.key import CHPOKey, ChecksumKey
 from ..helpers import IntegrityError, Location, bin_to_hex
-from ..hashindex import ChunkIndex
+from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
-from ..repository import PackWriter, PackReader, PackTracker
+from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
 from .hashindex_test import H
-from .repoobj_test import DATA_SIZE_OFFSET, META_SIZE_OFFSET
+from .repoobj_test import CHUNK_ID_OFFSET, DATA_SIZE_OFFSET, META_SIZE_OFFSET
 
 
 def test_rest_serve_command_local():
@@ -187,7 +187,7 @@ def test_consistency(repo_fixtures, request):
         repository.flush()
         assert pdchunk(repository.get(H(0))) == b"bar"
         # delete removes the object the index points at; the stale earlier copies are not resurrected.
-        repository.delete(H(0))
+        repository.delete(H(0), validate=None)
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(H(0))
 
@@ -202,7 +202,7 @@ def test_delete_with_stale_earlier_object_in_pack(repo_fixtures, request):
         repository.put(H(1), fchunk(b"bbb"))  # fills the pack, flushing both objects
         repository.put(H(0), fchunk(b"ccc"))  # re-put: H(0)'s index entry moves to a new pack
         repository.flush()
-        repository.delete(H(1))
+        repository.delete(H(1), validate=None)
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(H(1))
         assert pdchunk(repository.get(H(0))) == b"ccc"  # H(0) still served from its new pack
@@ -391,7 +391,9 @@ def test_compact_pack_copy_forward(repo_fixtures, request):
         assert repository.chunks[H(1)].pack_id == old_pack_id
         assert repository.chunks[H(2)].pack_id == old_pack_id
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids={H(1)})
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(0), H(2)}, drop_ids={H(1)}, validate=None
+        )
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert dropped == len(chunk1)  # reported freed bytes for --stats
@@ -412,7 +414,9 @@ def test_compact_pack_drops_whole_pack(repo_fixtures, request):
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids=set(), drop_ids={H(0), H(1)})
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids=set(), drop_ids={H(0), H(1)}, validate=None
+        )
         assert new_pack_id is None  # every byte dropped: no replacement pack
         assert dropped == len(chunk0) + len(chunk1)
 
@@ -432,7 +436,7 @@ def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
 
         new_pack_id, dropped = repository.compact_pack(
-            old_pack_id, keep_ids={H(1), H(0)}, drop_ids=set()
+            old_pack_id, keep_ids={H(1), H(0)}, drop_ids=set(), validate=None
         )  # out of order
 
         assert new_pack_id == old_pack_id
@@ -455,7 +459,7 @@ def test_compact_pack_keeps_gap(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         del repository.chunks[H(1)]  # H(1)'s bytes stay in the pack but are now unindexed (a gap)
 
-        new_pack_id, _ = repository.compact_pack(old_pack_id, keep_ids={H(2)}, drop_ids={H(0)})
+        new_pack_id, _ = repository.compact_pack(old_pack_id, keep_ids={H(2)}, drop_ids={H(0)}, validate=None)
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert pdchunk(repository.get(H(2))) == b"DATA2"
@@ -477,7 +481,7 @@ def test_compact_pack_keeps_trailing_bytes(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         del repository.chunks[H(2)]  # trailing unindexed bytes
 
-        new_pack_id, _ = repository.compact_pack(old_pack_id, keep_ids={H(1)}, drop_ids={H(0)})
+        new_pack_id, _ = repository.compact_pack(old_pack_id, keep_ids={H(1)}, drop_ids={H(0)}, validate=None)
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert pdchunk(repository.get(H(1))) == b"DATA1"
@@ -499,7 +503,9 @@ def test_compact_pack_drops_superseded_gap(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         repository.chunks[H(1)] = repository.chunks[H(1)]._replace(pack_id=H(9))  # authoritative copy elsewhere
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set(), validate=accept_all
+        )
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert dropped == len(chunk1)  # the superseded gap's bytes are counted as freed
@@ -523,7 +529,9 @@ def test_compact_pack_keeps_self_referencing_gap(repo_fixtures, request):
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set(), validate=accept_all
+        )
 
         assert new_pack_id == old_pack_id  # nothing dropped, defrag reproduced the same pack
         assert dropped == 0  # the self-referencing gap is kept, nothing freed
@@ -544,7 +552,7 @@ def test_compact_pack_detects_overlap(repo_fixtures, request):
         repository.chunks[H(1)] = entry._replace(obj_offset=0)  # now overlaps H(0) at offset 0
 
         with pytest.raises(IntegrityError):
-            repository.compact_pack(old_pack_id, keep_ids={H(0), H(1)}, drop_ids=set())
+            repository.compact_pack(old_pack_id, keep_ids={H(0), H(1)}, drop_ids=set(), validate=None)
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
 
 
@@ -561,7 +569,7 @@ def test_compact_pack_detects_past_eof(repo_fixtures, request):
         repository.chunks[H(1)] = entry._replace(obj_size=entry.obj_size + 1000)  # now claims to end past EOF
 
         with pytest.raises(IntegrityError):
-            repository.compact_pack(old_pack_id, keep_ids={H(0), H(1)}, drop_ids=set())
+            repository.compact_pack(old_pack_id, keep_ids={H(0), H(1)}, drop_ids=set(), validate=None)
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
 
 
@@ -583,7 +591,7 @@ def test_compact_pack_translates_read_range_error(repo_fixtures, request, monkey
 
         monkeypatch.setattr(repository.store, "defrag", short_read)
         with pytest.raises(IntegrityError):
-            repository.compact_pack(old_pack_id, keep_ids={H(0)}, drop_ids={H(1)})
+            repository.compact_pack(old_pack_id, keep_ids={H(0)}, drop_ids={H(1)}, validate=None)
         assert bin_to_hex(old_pack_id) in [info.name for info in repository.store_list("packs")]
         assert H(1) in repository.chunks  # still indexed: aborted before deleting the dropped id
 
@@ -723,7 +731,7 @@ def test_max_data_size(repo_fixtures, request):
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):
             repository.put(H(1), fchunk(max_data + b"x"))
-        repository.delete(H(0))
+        repository.delete(H(0), validate=None)
 
 
 def check(repository, repo_path, repair=False, status=True):
@@ -2254,3 +2262,121 @@ def test_pack_reader_in_memory_read_returns_view():
     assert bytes(view) == obj2
     pack[len(obj1)] ^= 0xFF  # a write to pack_contents is visible through the view
     assert view[0] == obj2[0] ^ 0xFF
+
+
+THIS_PACK = H(98)  # id of the pack whose gaps are walked
+OTHER_PACK = H(99)  # id of the pack holding the indexed copies
+
+
+def gap_pack(repo_objs, datas):
+    """Return (objects, chunks): datas formatted as repo objects, and an index mapping each to OTHER_PACK.
+
+    superseded_gap_ranges reports such an object if validate accepts it.
+    """
+    objs = [repo_objs.format(repo_objs.id_hash(data), {}, data, ro_type=ROBJ_FILE_STREAM) for data in datas]
+    chunks = {repo_objs.id_hash(data): ChunkIndexEntry(0, 0, OTHER_PACK, 0, len(obj)) for data, obj in zip(datas, objs)}
+    return objs, chunks
+
+
+def gap_ranges(pack, chunks, validate):
+    # no indexed objects: the whole pack is one gap.
+    reader = PackReader(pack_contents=pack)
+    return superseded_gap_ranges(reader, chunks, THIS_PACK, [], len(pack), validate=validate)
+
+
+def test_superseded_gap_ranges_reports_an_authenticated_duplicate(tmp_path):
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+
+    assert gap_ranges(obj, chunks, object_validator(repo_objs)) == [(0, len(obj))]
+    assert gap_ranges(obj, chunks, None) == []  # no validator, nothing to report
+
+
+def test_superseded_gap_ranges_rejects_a_forged_chunk_id(tmp_path):
+    # the header's chunk id is replaced by the id of another indexed chunk, which the metadata
+    # slot's tag does not authenticate.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+    victim = repo_objs.id_hash(b"a chunk stored elsewhere")
+    chunks[victim] = ChunkIndexEntry(0, 0, OTHER_PACK, 0, len(obj))
+    forged = bytearray(obj)
+    forged[CHUNK_ID_OFFSET : CHUNK_ID_OFFSET + 32] = victim
+
+    assert gap_ranges(bytes(forged), chunks, object_validator(repo_objs)) == []
+
+
+def test_superseded_gap_ranges_rejects_an_inflated_data_size(tmp_path):
+    # data_size is increased to also cover the next object. validate rejects it: data_size must
+    # match csize, the data size recorded in the authenticated metadata.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj, behind), chunks = gap_pack(repo_objs, [b"superseded", b"innocent bystander"])
+    inflated = bytearray(obj + behind)
+    (data_size,) = struct.unpack("<I", inflated[DATA_SIZE_OFFSET : DATA_SIZE_OFFSET + 4])
+    inflated[DATA_SIZE_OFFSET : DATA_SIZE_OFFSET + 4] = struct.pack("<I", data_size + len(behind))
+
+    assert gap_ranges(bytes(inflated), chunks, object_validator(repo_objs)) == []
+
+
+def test_superseded_gap_ranges_reports_a_differently_sized_authoritative_copy(tmp_path):
+    # the indexed copy has another obj_size, as with other compression or obfuscation padding.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+    (chunk_id,) = chunks
+    chunks[chunk_id] = chunks[chunk_id]._replace(obj_size=len(obj) + 4096)
+
+    assert gap_ranges(obj, chunks, object_validator(repo_objs)) == [(0, len(obj))]
+
+
+def test_superseded_gap_ranges_continues_past_a_rejected_object(tmp_path):
+    # the first object's metadata slot is damaged, its header is intact: the walk steps over it.
+    repo_objs = aead_repo_objs(tmp_path)
+    (rejected, wanted), chunks = gap_pack(repo_objs, [b"tampered", b"superseded"])
+    damaged = bytearray(rejected)
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(bytes(damaged[: RepoObj.obj_header.size])))
+    damaged[RepoObj.obj_header.size + hdr.meta_size - 1] ^= 0xFF  # last byte of the metadata slot
+
+    ranges = gap_ranges(bytes(damaged) + wanted, chunks, object_validator(repo_objs))
+
+    assert ranges == [(len(rejected), len(wanted))]
+
+
+def test_superseded_gap_ranges_warns_where_it_keeps_bytes(tmp_path, caplog):
+    # a rejected object, a header that does not parse and a gap too short for a header.
+    repo_objs = aead_repo_objs(tmp_path)
+    (rejected,), chunks = gap_pack(repo_objs, [b"tampered"])
+    damaged = bytearray(rejected)
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(bytes(damaged[: RepoObj.obj_header.size])))
+    damaged[RepoObj.obj_header.size + hdr.meta_size - 1] ^= 0xFF  # last byte of the metadata slot
+    garbage = b"\0" * 100
+    validate = object_validator(repo_objs)
+    pack_hex = bin_to_hex(THIS_PACK)
+
+    with caplog.at_level(logging.WARNING, logger="borg.repository"):
+        assert gap_ranges(bytes(damaged) + garbage, chunks, validate) == []
+        assert gap_ranges(b"\0" * 3, chunks, validate) == []
+
+    assert f"pack {pack_hex}: object does not authenticate at offset 0 in a gap, keeping its bytes." in caplog.text
+    assert (
+        f"pack {pack_hex}: no object header at offset {len(rejected)} in a gap, "
+        f"keeping the remaining {len(garbage)} bytes of the gap." in caplog.text
+    )
+    assert f"pack {pack_hex}: 3 bytes, too few for an object header, at offset 0 in a gap" in caplog.text
+
+
+def test_superseded_gap_ranges_ends_at_an_object_reaching_past_the_gap(tmp_path, caplog):
+    # the object fits into the pack, but overlaps the indexed object after its gap.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+    reader = PackReader(pack_contents=obj + b"\0" * 100)
+    obj_ranges = [(len(obj) - 1, 101)]  # an indexed object overlapping the duplicate's last byte
+
+    with caplog.at_level(logging.WARNING, logger="borg.repository"):
+        ranges = superseded_gap_ranges(
+            reader, chunks, THIS_PACK, obj_ranges, len(obj) + 100, validate=object_validator(repo_objs)
+        )
+
+    assert ranges == []
+    assert (
+        f"pack {bin_to_hex(THIS_PACK)}: object reaching past its gap at offset 0 in a gap, "
+        f"keeping the remaining {len(obj) - 1} bytes of the gap." in caplog.text
+    )

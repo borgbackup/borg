@@ -23,7 +23,7 @@ logger = create_logger()
 from . import xattr
 from .chunkers import get_chunker, Chunk, release_chunk_data
 from .cache import ChunkListEntry, build_chunkindex_from_repo, write_chunkindex_to_repo
-from .crypto.key import key_factory, UnsupportedPayloadError
+from .crypto.key import key_from_repository
 from .constants import *  # NOQA
 from .digests import ContentDigester
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -2303,41 +2303,16 @@ class ArchiveChecker:
         return self.repair or not self.error_found
 
     def make_key(self, repository, manifest_only=False):
-        attempt = 0
+        """Return the key loaded by key_from_repository.
 
-        #  try the manifest first!
-        try:
-            cdata = repository.get_manifest()
-        except NoManifestError:
-            pass
-        else:
-            try:
-                return key_factory(repository, cdata)
-            except UnsupportedPayloadError:
-                # we get here, if the cdata we got has a corrupted key type byte
-                pass  # ignore it, just continue trying
+        manifest_only: read only the manifest, else also the objects of the chunk ids in self.chunks.
+        """
 
-        if not manifest_only:
-            for chunkid, _ in self.chunks.iteritems():
-                attempt += 1
-                if attempt > 999:
-                    # we did a lot of attempts, but could not create the key via key_factory, give up.
-                    break
-                cdata = repository.get(chunkid)
-                try:
-                    return key_factory(repository, cdata)
-                except UnsupportedPayloadError:
-                    # we get here, if the cdata we got has a corrupted key type byte
-                    pass  # ignore it, just try the next chunk
+        def chunk_ids():  # reads self.chunks only if the manifest does not identify the key type
+            for id, _ in self.chunks.iteritems():
+                yield id
 
-        if attempt == 0:
-            if manifest_only:
-                msg = "make_key: failed to create the key (tried only the manifest)"
-            else:
-                msg = "make_key: repository has no chunks at all!"
-        else:
-            msg = "make_key: failed to create the key (tried %d chunks)" % attempt
-        raise IntegrityError(msg)
+        return key_from_repository(repository, () if manifest_only else chunk_ids())
 
     def verify_data(self):
         logger.info("Starting cryptographic data integrity verification...")
@@ -2378,6 +2353,7 @@ class ArchiveChecker:
         if defect_chunks:
             if self.repair:
                 logger.warning("Found defect chunks, removing them from the repository.")
+                validate = object_validator(self.repo_objs)
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
@@ -2398,7 +2374,7 @@ class ArchiveChecker:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
                         # keeping the other chunks. update_index=False: finish() rebuilds the index from
                         # the rewritten packs anyway, so a per-chunk full index write would be wasted.
-                        self.repository.delete(defect_chunk, update_index=False)
+                        self.repository.delete(defect_chunk, update_index=False, validate=validate)
                         self.chunks_modified = True
                         # drop it from our own index too, so rebuild_archives reports the file it belongs to.
                         del self.chunks[defect_chunk]

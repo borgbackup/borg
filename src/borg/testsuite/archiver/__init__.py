@@ -235,7 +235,7 @@ def write_wrong_content_chunk(archive, repository, chunk_id, *, ro_type=ROBJ_FIL
     if wrong_data is None:
         data = read_chunk(archive, repository, chunk_id, ro_type=ro_type)
         wrong_data = bytes([data[0] ^ 0xFF]) + data[1:]
-    repository.delete(chunk_id)  # put() would not replace an id the repo already has
+    repository.delete(chunk_id, validate=None)  # put() would not replace an id the repo already has
     repository.put(chunk_id, repo_objs.format(chunk_id, {}, wrong_data, ro_type=ro_type))
     repository.flush()
 

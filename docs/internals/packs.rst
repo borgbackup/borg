@@ -244,6 +244,26 @@ single blob cannot be removed from a pack in place: all of these paths write a n
 pack file without it and then delete the old one, so store-level deletion always
 operates at pack granularity.
 
+Gap bytes
+~~~~~~~~~
+
+The *gaps* of a pack are its byte ranges that no chunks index entry covers. They hold chunk
+copies that were stored again in another pack, and blobs of a backup that crashed before
+writing its index. A gap blob is *superseded* when the index maps its chunk id to another
+location. Equal chunk ids mean equal plaintext, so a superseded blob is redundant, whatever
+the stored size of the indexed copy (compression and obfuscation padding change it).
+
+Rewriting a pack (``compact_pack``, ``transform_pack``) drops the superseded gap blobs whose
+header and metadata slot validate, checked as in the repair walk above
+(``repoobj.object_validator``), and copies all other gap bytes into the new pack.
+Validation covers ``meta_size`` and ``data_size``, so a dropped range is exactly one blob.
+Without a validator (``validate=None``), no gap bytes are dropped.
+
+The walk over a gap steps from header to header by the blob size each header states. It ends
+at a header that does not parse or that reaches past the gap. The rest of that gap is kept,
+and so is a superseded blob that does not validate; both are logged as a warning with the
+pack id and the offset.
+
 
 .. _pack-index-namespace:
 

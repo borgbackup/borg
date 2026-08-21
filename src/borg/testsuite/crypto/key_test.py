@@ -16,13 +16,15 @@ from ...crypto.key import AES_OCB_MAX_SESSION_BLOCKS
 from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError, UnsupportedPayloadError
 from ...crypto.key import RepoKeyNotFoundError
-from ...crypto.key import identify_key
+from ...crypto.key import identify_key, key_from_repository
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
 from ...helpers import Error
 from ...helpers import IntegrityError
 from ...helpers import Location
 from ...helpers import msgpack
-from ...constants import KEY_ALGORITHMS, KeyBlobStorage, KeyType, ROBJ_MANIFEST
+from ...manifest import NoManifestError
+from ...repoobj import RepoObj
+from ...constants import KEY_ALGORITHMS, KeyBlobStorage, KeyType, ROBJ_FILE_STREAM, ROBJ_MANIFEST
 from ...helpers import hex_to_bin, bin_to_hex
 
 
@@ -665,3 +667,72 @@ def test_argon2_wrong_passphrase_returns_none(monkeypatch):
     saved = repository.store_key.call_args.args[0]
     _, saved_b64 = keyfile_parse(saved)
     assert key.decrypt_key_file(a2b_base64(saved_b64), "wrong passphrase") is None
+
+
+class StoredObjectsRepository:
+    """A repository with a stored manifest (None: no manifest) and objects by chunk id."""
+
+    def __init__(self, manifest, objects):
+        self.manifest = manifest
+        self.objects = objects
+
+    def get_manifest(self):
+        if self.manifest is None:
+            raise NoManifestError
+        return self.manifest
+
+    def get(self, id):
+        return self.objects[id]
+
+    def list(self, limit=None):
+        return [(id, len(obj)) for id, obj in self.objects.items()][:limit]
+
+
+def stored_object(key_cls, id):
+    return RepoObj(key_cls(MagicMock(id=bytes(32)))).format(id, {}, b"data", ro_type=ROBJ_FILE_STREAM)
+
+
+def with_key_type(cdata, key_type):
+    """Return cdata with its key type byte, the first byte of the data slot, set to key_type."""
+    offset = len(cdata) - len(RepoObj.extract_crypted_data(cdata))
+    return cdata[:offset] + bytes([key_type]) + cdata[offset + 1 :]
+
+
+def test_key_from_repository_reads_the_key_type_from_the_manifest():
+    objects = {b"o" * 32: stored_object(ChecksumKey, b"o" * 32)}
+    repository = StoredObjectsRepository(stored_object(Blake3ChecksumKey, bytes(32)), objects)
+    assert isinstance(key_from_repository(repository), Blake3ChecksumKey)
+
+
+def test_key_from_repository_skips_objects_that_do_not_identify_a_key_type():
+    good = stored_object(ChecksumKey, b"g" * 32)
+    objects = {
+        b"d" * 32: b"damaged",
+        b"u" * 32: with_key_type(good, KeyType.DROPPED_BLAKE3AUTHENTICATED),
+        b"g" * 32: good,
+    }
+    repository = StoredObjectsRepository(b"damaged manifest", objects)
+    assert isinstance(key_from_repository(repository), ChecksumKey)
+
+
+def test_key_from_repository_raises_if_no_object_identifies_the_key_type():
+    objects = {b"g" * 32: stored_object(ChecksumKey, b"g" * 32)}
+    with pytest.raises(IntegrityError):
+        key_from_repository(StoredObjectsRepository(None, objects), ids=())  # the manifest only
+    with pytest.raises(IntegrityError):
+        key_from_repository(StoredObjectsRepository(None, {b"d" * 32: b"damaged"}))
+
+
+def test_key_from_repository_loads_the_key_once(monkeypatch):
+    ids = (b"a" * 32, b"b" * 32)
+    repository = StoredObjectsRepository(None, {id: stored_object(ChecksumKey, id) for id in ids})
+    detected = []
+
+    def detect(repository, manifest_data, *, other=False):
+        detected.append(manifest_data)
+        raise IntegrityError("the key can not be loaded")
+
+    monkeypatch.setattr(ChecksumKey, "detect", detect)
+    with pytest.raises(IntegrityError, match="the key can not be loaded"):
+        key_from_repository(repository)
+    assert len(detected) == 1

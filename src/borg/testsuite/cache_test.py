@@ -27,7 +27,7 @@ from ..cache import (
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
 from ..helpers import bin_to_hex, safe_ns
-from ..helpers import IntegrityError
+from ..helpers import CorruptPack
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import Repository
@@ -507,7 +507,7 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
 
 
 def test_build_chunkindex_repair_resyncs_after_corrupt_header(tmp_path):
-    """A corrupt object header fails the rebuild; with validate, the objects after it are indexed."""
+    """A corrupt object header aborts the rebuild; with validate, the objects after it are indexed."""
     from .repository_test import accept_all, fchunk
 
     obj1 = bytearray(fchunk(b"first", chunk_id=H(90)))
@@ -516,7 +516,7 @@ def test_build_chunkindex_repair_resyncs_after_corrupt_header(tmp_path):
     pack_id = H(92)
     with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(pack_id), bytes(obj1) + obj2)
-        with pytest.raises(IntegrityError):
+        with pytest.raises(CorruptPack, match="borg check --repair"):  # no validator: abort, #10122
             build_chunkindex_from_repo(repository, slow_rebuild=True)
         # accept_all takes any candidate, so this covers the plumbing, not the authentication.
         index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_all)

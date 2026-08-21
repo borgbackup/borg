@@ -448,9 +448,7 @@ class PackReader:
             hdr = self._parse_header(hdr_data, offset, pack_size)
             if hdr is None:
                 if validate is None:
-                    raise IntegrityError(
-                        f'pack {pack_hex}: invalid object header at offset {offset} (pack corruption), run "borg check"'
-                    )
+                    raise IntegrityError(f"pack {pack_hex}: invalid object header at offset {offset} (pack corruption)")
                 next_offset = self._find_header(scan_from, pack_size, validate)
                 if next_offset is None:
                     logger.warning(

@@ -37,6 +37,10 @@ dependencies = [
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0.
   "platformdirs >=2.6.0, <5.0.0; sys_platform != 'darwin'",  # for others: 2.6+ works consistently.
   "argon2-cffi",
+  # 26.x builds via scikit-build-core and thus needs cmake, which has no wheels for
+  # the BSDs / OmniOS - pip builds it from source there for ~30min, then fails.
+  # Temporary: argon2 is moving to OpenSSL, which drops argon2-cffi entirely, see #9602.
+  "argon2-cffi-bindings == 25.1.0",
   "shtab>=1.9.3",  # older versions generate broken zsh (tqdm/shtab#224) or fish (tqdm/shtab#227) completions
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
   "jsonargparse>=4.47.0",

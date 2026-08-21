@@ -11,6 +11,7 @@ from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec
 from ..helpers import format_file_size, hex_to_bin
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
+from ..repoobj import object_validator
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -104,6 +105,7 @@ class PackRecompressor:
         pi = ProgressIndicatorPercent(
             total=len(packs), msg="Recompressing %3.1f%%", step=0.1, msgid="repo_compress.recompress"
         )
+        validate = object_validator(self.repo_objs)
         for i, (pack_id, pack_size) in enumerate(packs):
             if sig_int:
                 break  # stop cleanly at a pack boundary: save the index below, then raise
@@ -111,7 +113,12 @@ class PackRecompressor:
             # a pack without indexed objects (all-gap) is left for "borg check --repair", see #9868.
             if ids:
                 new_pack_id, new_size = self.repository.transform_pack(
-                    pack_id, ids, self.transform, chunks=self.chunks, before_change=self.invalidate_stored_index
+                    pack_id,
+                    ids,
+                    self.transform,
+                    chunks=self.chunks,
+                    before_change=self.invalidate_stored_index,
+                    validate=validate,
                 )
                 if new_pack_id != pack_id:
                     self.packs_rewritten += 1

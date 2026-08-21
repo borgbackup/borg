@@ -30,13 +30,21 @@ from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
-from .repoobj import RepoObj, OBJ_MAGIC
+from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
 from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
 
 # an object name is its sha256 as 64 lowercase hex digits.
 _valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
+
+# how much of a pack PackReader reads at once when searching for the next object header.
+RESYNC_WINDOW_SIZE = 1024 * 1024
+
+# how much superseded_gap_ranges reads past an object header, so the metadata slot behind it comes
+# in the same request. A metadata slot is at most 112 bytes over all key modes; a larger one costs
+# one more read.
+GAP_META_READAHEAD = 256
 
 
 def repo_lister(repository, *, limit=None):
@@ -362,46 +370,124 @@ class PackReader:
         return self.store.load(self.key, offset=offset, size=size)
 
     def size(self):
-        """Return the pack size in bytes; for a store-backed pack this is one metadata lookup."""
+        """Return the pack size in bytes (a store metadata lookup, unless the pack is in memory)."""
         if self.pack_contents is not None:
             return len(self.pack_contents)
         return self.store.info(self.key).size
 
-    def iter_headers(self):
+    @staticmethod
+    def _parse_header(hdr_data, offset, pack_size):
+        """Return the ObjHeader in hdr_data if it is a valid header at offset, None otherwise.
+
+        Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack.
+        """
+        hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+        if hdr.magic != OBJ_MAGIC or hdr.version not in SUPPORTED_OBJ_VERSIONS:
+            return None
+        if offset + RepoObj.obj_header.size + hdr.meta_size + hdr.data_size > pack_size:
+            return None
+        return hdr
+
+    def _find_header(self, offset, pack_size, validate):
+        """Scan forward from offset for the next object validate accepts, return its offset or None.
+
+        A pack has no framing besides the object headers, so this searches for OBJ_MAGIC. That byte
+        sequence also occurs inside payloads, so a candidate is accepted only when its header parses
+        and validate(chunk_id, obj) confirms the header and metadata slot at that position.
+        """
+        hdr_size = RepoObj.obj_header.size
+        while offset + hdr_size <= pack_size:
+            # a window at a time, so the scan costs one store request per RESYNC_WINDOW_SIZE bytes.
+            buf = bytes(self.read(offset, min(RESYNC_WINDOW_SIZE, pack_size - offset)))
+            if len(buf) < hdr_size:
+                break
+            pos = 0
+            while True:
+                pos = buf.find(OBJ_MAGIC, pos)
+                if pos < 0 or pos + hdr_size > len(buf):
+                    break  # not in this window, or a header overlapping its end: the next window has it
+                hdr = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
+                if hdr is not None:
+                    obj_size = hdr_size + hdr.meta_size + hdr.data_size
+                    # an object is at most MAX_DATA_SIZE bytes, so a bigger one is a false match on
+                    # OBJ_MAGIC inside a payload.
+                    if obj_size <= MAX_DATA_SIZE:
+                        size = hdr_size + hdr.meta_size  # the bytes validate looks at
+                        end = pos + size
+                        # the window holds these bytes, unless the candidate crosses its end.
+                        obj = buf[pos:end] if end <= len(buf) else self.read(offset + pos, size)
+                        if validate(hdr.chunk_id, obj):
+                            return offset + pos
+                pos += 1
+            # step by the window less one header, so a magic straddling the boundary is still found.
+            offset += max(len(buf) - (hdr_size - 1), 1)
+        return None
+
+    def iter_headers(self, validate=None):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
-        Only the headers are read, not the payloads, so locating every object costs one short
-        range read per object (or just a slice, when the pack is already in memory), plus one
-        store metadata lookup for the pack size.
+        The walk reads a header per object: one short range read each (or a slice, for a pack in
+        memory), plus one store metadata lookup for the pack size.
 
-        Each full header must have OBJ_MAGIC and describe an object that fits into the pack,
-        otherwise the pack is corrupt and IntegrityError is raised. Ending the walk instead
-        would be worse than raising: the chunks index rebuilt from these headers would just be
-        missing the rest of the pack, and borg check --repair would then "fix" the archives by
-        dropping chunks that are there.
-        A trailing partial header is the clean end of the pack, not corruption.
+        A header must have OBJ_MAGIC, a supported version and describe an object that fits into
+        the pack, otherwise the pack is corrupt and IntegrityError is raised. A read shorter than
+        a header ends the walk: that is the end of the pack.
+
+        validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
+        repo object with id chunk_id. Given one, a corrupt header makes the walk resync instead:
+        it scans from just past the last object it accepted for the next object validate accepts
+        and continues there. It scans from there because a corrupt meta_size or data_size leaves
+        the header valid and moves the walk into a later object. An object is dropped when a
+        recovered object starts inside it: its size field is wrong.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
         hdr_size = RepoObj.obj_header.size
         offset = 0
+        scan_from = 1  # just past the last accepted object's header
+        pending = None  # the last object seen, yielded once the walk gets past its end
         while True:
             hdr_data = self.read(offset, hdr_size)
             if len(hdr_data) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
-            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
-            if hdr.magic != OBJ_MAGIC:
-                raise IntegrityError(
-                    f'pack {pack_hex}: no object header at offset {offset} (pack corruption), run "borg check"'
+            hdr = self._parse_header(hdr_data, offset, pack_size)
+            if hdr is None:
+                if validate is None:
+                    raise IntegrityError(
+                        f'pack {pack_hex}: invalid object header at offset {offset} (pack corruption), run "borg check"'
+                    )
+                next_offset = self._find_header(scan_from, pack_size, validate)
+                if next_offset is None:
+                    logger.warning(
+                        f"pack {pack_hex}: invalid object header at offset {offset} and no object after "
+                        f"offset {scan_from}, skipping the remaining {pack_size - offset} bytes."
+                    )
+                    break
+                logger.warning(
+                    f"pack {pack_hex}: invalid object header at offset {offset}, "
+                    f"continuing at the object at offset {next_offset}."
                 )
+                if pending is not None:
+                    _, pending_offset, pending_size = pending
+                    if next_offset < pending_offset + pending_size:
+                        # the recovered object lies inside the bytes this one claims, so its size
+                        # field is wrong: it can not be read back, and index entries that overlap
+                        # are index corruption.
+                        logger.warning(
+                            f"pack {pack_hex}: object at offset {pending_offset} has a wrong size, dropping it."
+                        )
+                        pending = None
+                offset = next_offset
+                scan_from = next_offset + 1
+                continue
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
-            if offset + obj_size > pack_size:
-                raise IntegrityError(
-                    f"pack {pack_hex}: object extends past end of file at offset {offset} "
-                    f'(pack corruption), run "borg check"'
-                )
-            yield hdr.chunk_id, offset, obj_size
+            if pending is not None:
+                yield pending
+            pending = (hdr.chunk_id, offset, obj_size)
+            scan_from = offset + 1
             offset += obj_size
+        if pending is not None:
+            yield pending
 
 
 def check_pack_objects(pack_hex, obj_ranges, pack_size):
@@ -424,7 +510,7 @@ def check_pack_objects(pack_hex, obj_ranges, pack_size):
         )
 
 
-def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size):
+def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, validate=None):
     """Find the superseded duplicates among a pack's gap bytes (bytes no index entry covers).
 
     A gap holds a chunk copy stored again elsewhere, or objects from a backup that crashed before
@@ -434,10 +520,24 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size):
     (borg check --repair re-indexes it) or whose entry points back at this offset (its only copy)
     is not reported. A header that does not parse or overruns its gap ends the walk over that gap.
 
+    A duplicate is reported only when both hold:
+
+    - validate accepts its header and metadata slot, authenticating magic, version, chunk id and
+      meta_size.
+    - its total size equals the index entry's obj_size. data_size is outside what validate covers,
+      and it sets how far the reported range reaches; the entry is a second source for it.
+
+    Anything else keeps its bytes and the walk continues past it.
+
     obj_ranges: the offset-ordered, validated (obj_offset, obj_size) ranges of the pack's indexed
     objects; the gaps are the byte ranges between (and after) them.
+    validate: validate(chunk_id, obj) -> bool over an object's header and metadata slot, see
+    repoobj.object_validator. None reports nothing.
     Returns the offset-ordered list of (offset, size) ranges holding superseded duplicates.
     """
+    if validate is None:
+        return []
+
     # find the gaps: byte ranges no indexed object covers.
     gaps = []  # (start, end) of each gap, offset-ordered
     cursor = 0
@@ -453,17 +553,26 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size):
     for gstart, gend in gaps:
         offset = gstart
         while offset < gend:
-            hdr_data = reader.read(offset, hdr_size)
-            if len(hdr_data) < hdr_size:
+            # the header, and the metadata slot behind it in the same request.
+            buf = reader.read(offset, min(gend - offset, hdr_size + GAP_META_READAHEAD))
+            if len(buf) < hdr_size:
                 break
-            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+            # gend, not pack_size: an object reaching past this gap is not one of its objects.
+            hdr = PackReader._parse_header(buf[:hdr_size], offset, gend)
+            if hdr is None:
+                break
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
-            if hdr.magic != OBJ_MAGIC or offset + obj_size > gend:
-                break
-            if hdr.chunk_id in chunks:
-                entry = chunks[hdr.chunk_id]
-                if entry.pack_id != pack_id or entry.obj_offset != offset:
+            if obj_size > MAX_DATA_SIZE:
+                break  # larger than any object: not a header
+            entry = chunks.get(hdr.chunk_id)
+            superseded = entry is not None and (entry.pack_id != pack_id or entry.obj_offset != offset)
+            if superseded and obj_size == entry.obj_size:
+                meta_end = hdr_size + hdr.meta_size
+                obj = buf[:meta_end] if meta_end <= len(buf) else reader.read(offset, meta_end)
+                if validate(hdr.chunk_id, obj):
                     drop_ranges.append((offset, obj_size))
+            # obj_size is unauthenticated: a wrong one lands the walk at a wrong offset, where the
+            # two checks above apply again.
             offset += obj_size
     return drop_ranges
 
@@ -1398,12 +1507,15 @@ class Repository:
         # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
-    def delete(self, id, *, update_index=True):
+    def delete(self, id, *, update_index=True, validate=None):
         """Delete a single repo object by rewriting its pack without it (via compact_pack).
 
         With update_index=True the full chunk index is written back so the next borg process sees the
         deletion; callers that rebuild the index themselves (check --repair) pass update_index=False to
         skip the per-object index rewrite.
+
+        validate: authenticates a gap object before its bytes are dropped, see
+        superseded_gap_ranges. None drops no gap bytes.
         """
         self._lock_refresh()
         entry = self.chunks.get(id)
@@ -1413,7 +1525,7 @@ class Repository:
         # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
-        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id})
+        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id}, validate=validate)
         if update_index:
             # close() only persists new entries incrementally, so write the full index here to record
             # the removal for the next borg process.
@@ -1421,22 +1533,24 @@ class Repository:
 
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
 
-    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, chunks=None):
+    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, chunks=None, validate=None):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
         keep_ids: chunk ids in this pack to copy into the new pack.
         drop_ids: chunk ids in this pack to discard. Must not overlap keep_ids.
         chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
             updates to. Must be the index keep_ids and drop_ids were derived from. Default: self.chunks.
+        validate: authenticates a gap object before its bytes are dropped, see
+            superseded_gap_ranges. None drops no gap bytes. Default: None.
 
         Together, keep_ids and drop_ids must cover every object the chunk index lists for this pack;
         an unlisted indexed object would keep its bytes in the new pack but its index entry would go
         stale when the old pack is deleted. Bytes that no index entry covers appear as gaps between the
-        listed objects: a gap object whose chunk id is in the index is a superseded duplicate (its
-        authoritative copy is elsewhere) and is dropped; a gap object whose id is not in the index is
-        copied into the new pack unchanged, to be handled by "borg check --repair". An overlap between
-        listed objects, or an object claiming to end past the pack file, means index corruption and
-        raises IntegrityError.
+        listed objects: a gap object that authenticates as a superseded duplicate (its authoritative
+        copy is elsewhere) is dropped, every other gap byte is copied into the new pack unchanged, to
+        be handled by "borg check --repair" - see superseded_gap_ranges. An overlap between listed
+        objects, or an object claiming to end past the pack file, means index corruption and raises
+        IntegrityError.
 
         The new pack is the old pack minus the dropped objects, built via store.defrag; kept objects are
         repointed in the chunk index and dropped objects' chunk index entries are removed.
@@ -1478,7 +1592,7 @@ class Repository:
         # toward the rewrite threshold and a wholly superseded orphan pack can be dropped outright.
         drop_ranges = [(offset, size) for offset, _, size, keep in located if not keep]
         reader = PackReader(store=self.store, pack_id=pack_id)
-        drop_ranges += superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size)
+        drop_ranges += superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, validate=validate)
         drop_ranges.sort()
         dropped_bytes = sum(size for _, size in drop_ranges)  # on-disk bytes this rewrite frees, for --stats
 
@@ -1632,7 +1746,7 @@ class Repository:
             pi.show(increase=1)
         pi.finish()
 
-    def transform_pack(self, pack_id, ids, transform, *, chunks=None, before_change=None):
+    def transform_pack(self, pack_id, ids, transform, *, chunks=None, before_change=None, validate=None):
         """Rewrite pack <pack_id>, passing each indexed object's bytes through <transform>.
 
         ids: the chunk ids of this pack's objects. Must cover every object the chunk index lists
@@ -1646,13 +1760,15 @@ class Repository:
             updates to. Must be the index <ids> was derived from. Default: self.chunks.
         before_change: called once, just before the first store modification; use it to invalidate
             stored chunk indexes for crash safety (see #9748). Not called when the pack is kept.
+        validate: authenticates a gap object before its bytes are dropped, see
+            superseded_gap_ranges. None drops no gap bytes. Default: None.
 
         The whole pack file is loaded into memory (bounded by the pack size limit). Gap bytes
-        (bytes no index entry covers) are handled like in compact_pack: an object superseded by a
-        copy stored elsewhere is dropped, all other unindexed bytes are copied into the new pack
-        unchanged, to be handled by "borg check --repair". An overlap between indexed objects, or
-        an object claiming to end past the pack file, means index corruption and raises
-        IntegrityError, before anything is written.
+        (bytes no index entry covers) are handled like in compact_pack: an object that authenticates
+        as superseded by a copy stored elsewhere is dropped, all other unindexed bytes are copied
+        into the new pack unchanged, to be handled by "borg check --repair". An overlap between
+        indexed objects, or an object claiming to end past the pack file, means index corruption and
+        raises IntegrityError, before anything is written.
 
         If every object is kept and no gap bytes are dropped, the store and the chunk index are not
         touched at all. Otherwise the new pack (named sha256 of its content) is stored, the indexed
@@ -1684,7 +1800,7 @@ class Repository:
         located.sort()
         obj_ranges = [(offset, size) for offset, _, size in located]
         check_pack_objects(pack_hex, obj_ranges, pack_size)
-        drop_ranges = superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size)
+        drop_ranges = superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, validate=validate)
 
         # assemble the new pack in offset order: transformed objects, dropped ranges skipped, all
         # other bytes copied verbatim. the two range lists never overlap (drops lie in gaps), so a

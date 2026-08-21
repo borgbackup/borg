@@ -12,7 +12,7 @@ from ...compress import ZSTD, ZLIB, LZ4, CNONE
 from ...archiver.repo_compress_cmd import PackRecompressor
 
 from . import create_regular_file, cmd, RK_ENCRYPTION
-from ..repository_test import H, fchunk, pdchunk
+from ..repository_test import H, accept_all, fchunk, pdchunk
 
 
 def test_repo_compress(archiver):
@@ -303,7 +303,10 @@ def test_transform_pack_drops_superseded_gap(tmp_path):
         assert pack_b != pack_a
 
         w_new = fchunk(b"W" * 100, chunk_id=H(0))
-        new_pack_id, new_size = repository.transform_pack(pack_a, [H(0)], transform_via({H(0): w_new}))
+        # fchunk objects have no authenticating metadata slot, so accept_all stands in for validate.
+        new_pack_id, new_size = repository.transform_pack(
+            pack_a, [H(0)], transform_via({H(0): w_new}), validate=accept_all
+        )
         assert new_pack_id != pack_a
         assert new_size == len(w_new)  # only W remains, X's superseded bytes were dropped
         assert pdchunk(repository.get(H(0))) == b"W" * 100

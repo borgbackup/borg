@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import struct
 import sys
 import time
 from collections import namedtuple
@@ -12,10 +13,14 @@ from borghash import HashTableNT
 from ..cache import write_chunkindex_invalid
 from ..constants import MAX_CLOCK_SKEW
 from ..helpers import IntegrityError, Location, bin_to_hex
-from ..hashindex import ChunkIndex
+from ..hashindex import ChunkIndex, ChunkIndexEntry
+from .. import repository as repository_module
+from ..compress import CNONE
+from ..constants import ROBJ_FILE_STREAM
+from ..crypto.key import CHPOKey, ChecksumKey
 from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
-from ..repository import PackTracker
-from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
+from ..repository import PackTracker, superseded_gap_ranges
+from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
 from .hashindex_test import H
 
 
@@ -114,6 +119,11 @@ def pchunk(chunk):
 def pdchunk(chunk):
     # Parse only the data from a raw chunk made by fchunk.
     return pchunk(chunk)[0]
+
+
+def accept_all(chunk_id, obj):
+    # validate stand-in: accepts every candidate.
+    return True
 
 
 def test_basic_operations(repo_fixtures, request):
@@ -494,7 +504,9 @@ def test_compact_pack_drops_superseded_gap(repo_fixtures, request):
         old_pack_id = repository.chunks[H(0)].pack_id
         repository.chunks[H(1)] = repository.chunks[H(1)]._replace(pack_id=H(9))  # authoritative copy elsewhere
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set(), validate=accept_all
+        )
 
         assert new_pack_id is not None and new_pack_id != old_pack_id
         assert dropped == len(chunk1)  # the superseded gap's bytes are counted as freed
@@ -518,7 +530,9 @@ def test_compact_pack_keeps_self_referencing_gap(repo_fixtures, request):
     with repository:
         old_pack_id = repository.chunks[H(0)].pack_id
 
-        new_pack_id, dropped = repository.compact_pack(old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set())
+        new_pack_id, dropped = repository.compact_pack(
+            old_pack_id, keep_ids={H(0), H(2)}, drop_ids=set(), validate=accept_all
+        )
 
         assert new_pack_id == old_pack_id  # nothing dropped, defrag reproduced the same pack
         assert dropped == 0  # the self-referencing gap is kept, nothing freed
@@ -1868,6 +1882,169 @@ def test_pack_reader_raises_on_object_past_end_of_pack_through_store(tmp_path):
             list(reader.iter_headers())
 
 
+def test_pack_reader_raises_on_unsupported_version():
+    obj = bytearray(fchunk(b"data", chunk_id=H(7)))
+    obj[len(OBJ_MAGIC)] = 0xEE  # version byte
+    with pytest.raises(IntegrityError):
+        list(PackReader(pack_contents=bytes(obj)).iter_headers())
+
+
+def test_pack_reader_resync_skips_to_next_object():
+    # after a corrupt header the walk continues at the next object.
+    obj1 = bytearray(fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1)))
+    obj2 = fchunk(b"payload-two", meta=b"meta2", chunk_id=H(2))
+    obj1[0] ^= 0xFF  # break the magic of the first object's header
+    reader = PackReader(pack_contents=bytes(obj1) + obj2)
+    assert list(reader.iter_headers(validate=accept_all)) == [(H(2), len(obj1), len(obj2))]
+
+
+def test_pack_reader_resync_recovers_from_size_past_the_pack_end():
+    # a header whose sizes point past the pack, so the next object is found by scanning.
+    obj1 = bytearray(fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1)))
+    obj2 = fchunk(b"payload-two", meta=b"meta2", chunk_id=H(2))
+    obj3 = fchunk(b"payload-three", chunk_id=H(3))
+    # the header's data_size field (magic 8, version 1, chunk_id 32, meta_size 4, data_size 4),
+    # set to a value reaching far past the end of the pack:
+    obj1[45:49] = b"\xff\xff\xff\x00"
+    pack = bytes(obj1) + obj2 + obj3
+    reader = PackReader(pack_contents=pack)
+    assert list(reader.iter_headers(validate=accept_all)) == [
+        (H(2), len(obj1), len(obj2)),
+        (H(3), len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+def test_pack_reader_resync_recovers_from_size_pointing_into_the_pack():
+    # a data_size corrupted to a value that keeps the object inside the pack leaves the header
+    # valid, so the walk jumps 60 bytes into obj3. Scanning from obj1 finds obj2 and obj3; obj1 is
+    # dropped, obj2 starting inside the extent it claims.
+    obj1 = bytearray(fchunk(b"A" * 100, meta=b"m1", chunk_id=H(1)))
+    obj2 = fchunk(b"B" * 100, meta=b"m2", chunk_id=H(2))
+    obj3 = fchunk(b"C" * 100, meta=b"m3", chunk_id=H(3))
+    obj1[45:49] = struct.pack("<I", 100 + len(obj2) + 60)  # the header's data_size field
+    reader = PackReader(pack_contents=bytes(obj1) + obj2 + obj3)
+    assert list(reader.iter_headers(validate=accept_all)) == [
+        (H(2), len(obj1), len(obj2)),
+        (H(3), len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+def test_pack_reader_resync_keeps_the_object_before_a_corrupt_header():
+    # the scan starts inside the last accepted object, which must still be yielded, once.
+    obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))
+    obj2 = bytearray(fchunk(b"payload-two", meta=b"meta2", chunk_id=H(2)))
+    obj3 = fchunk(b"payload-three", chunk_id=H(3))
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    reader = PackReader(pack_contents=obj1 + bytes(obj2) + obj3)
+    assert list(reader.iter_headers(validate=accept_all)) == [
+        (H(1), 0, len(obj1)),
+        (H(3), len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+def test_pack_reader_resync_ignores_magic_in_payload():
+    # both headers are broken, so the scan runs into the OBJ_MAGIC in obj2's payload before obj3.
+    obj1 = bytearray(fchunk(b"data", chunk_id=H(1)))
+    obj2 = bytearray(fchunk(OBJ_MAGIC + b"looks like a header, is not", chunk_id=H(2)))
+    obj3 = fchunk(b"payload-three", chunk_id=H(3))
+    obj1[0] ^= 0xFF
+    obj2[0] ^= 0xFF
+    reader = PackReader(pack_contents=bytes(obj1) + bytes(obj2) + obj3)
+    assert list(reader.iter_headers(validate=accept_all)) == [(H(3), len(obj1) + len(obj2), len(obj3))]
+
+
+def test_pack_reader_resync_finds_header_across_window_boundary(monkeypatch):
+    # the next header straddles a scan window boundary.
+    monkeypatch.setattr(repository_module, "RESYNC_WINDOW_SIZE", 64)
+    obj1 = bytearray(fchunk(b"x" * 100, chunk_id=H(1)))
+    obj2 = fchunk(b"payload-two", chunk_id=H(2))
+    obj1[0] ^= 0xFF
+    reader = PackReader(pack_contents=bytes(obj1) + obj2)
+    assert list(reader.iter_headers(validate=accept_all)) == [(H(2), len(obj1), len(obj2))]
+
+
+def test_pack_reader_resync_no_further_header():
+    # no object after the damage: the walk ends with what it found.
+    obj = fchunk(b"data", chunk_id=H(1))
+    pack = obj + b"\xaa" * 200
+    reader = PackReader(pack_contents=pack)
+    assert list(reader.iter_headers(validate=accept_all)) == [(H(1), 0, len(obj))]
+
+
+def aead_repo_objs(tmp_path):
+    # a RepoObj with an AEAD key, whose metadata authenticates on its own.
+    repository = Repository(str(tmp_path / "repo"), create=True)
+    key = CHPOKey(repository)
+    key.init_from_random_data()
+    key.init_ciphers()
+    return RepoObj(key)
+
+
+def test_pack_reader_resync_rejects_metadata_that_does_not_authenticate(tmp_path):
+    # bytes with a well-formed header whose metadata does not decrypt: the scan must walk past them.
+    repo_objs = aead_repo_objs(tmp_path)
+    data = b"the real next object"
+    real_id = repo_objs.id_hash(data)
+    obj1 = bytearray(repo_objs.format(repo_objs.id_hash(b"first"), {}, b"first", ro_type=ROBJ_FILE_STREAM))
+    obj1[0] ^= 0xFF  # break obj1's header, so the walk has to resync
+    garbage = fchunk(b"payload", meta=b"not encrypted metadata", chunk_id=H(9))
+    obj2 = repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM)
+    reader = PackReader(pack_contents=bytes(obj1) + garbage + obj2)
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
+    assert headers == [(real_id, len(obj1) + len(garbage), len(obj2))]
+
+
+def test_pack_reader_resync_accepts_an_object_with_corrupt_data(tmp_path):
+    # the AEAD keys authenticate the metadata, so the scan resyncs at an object with damaged data.
+    # Reading that object reports the damage.
+    repo_objs = aead_repo_objs(tmp_path)
+    data = b"the real next object"
+    real_id = repo_objs.id_hash(data)
+    obj1 = bytearray(repo_objs.format(repo_objs.id_hash(b"first"), {}, b"first", ro_type=ROBJ_FILE_STREAM))
+    obj1[0] ^= 0xFF  # break obj1's header, so the walk has to resync
+    obj2 = bytearray(repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM))
+    obj2[-1] ^= 0xFF  # damage the encrypted data, leaving the header and the metadata intact
+    reader = PackReader(pack_contents=bytes(obj1) + bytes(obj2))
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
+    assert headers == [(real_id, len(obj1), len(obj2))]
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(real_id, bytes(obj2), ro_type=ROBJ_FILE_STREAM)
+
+
+def test_pack_reader_resync_rejects_damaged_user_content_without_a_key(tmp_path):
+    # In "none-*" mode with no compression, user content lands in the pack as it is, so a backed up
+    # file can contain something shaped like an object. The metadata slot's checksum covers the
+    # object header, so damaged candidate bytes are still ruled out - what these modes can not rule
+    # out is an intact object put into a file on purpose, there being no secret to tell them apart.
+    repository = Repository(str(tmp_path / "repo"), create=True)
+    repo_objs = RepoObj(ChecksumKey(repository))
+    repo_objs.compressor = CNONE()
+    decoy = bytearray(repo_objs.format(repo_objs.id_hash(b"decoy"), {}, b"decoy", ro_type=ROBJ_FILE_STREAM))
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(bytes(decoy[: RepoObj.obj_header.size])))
+    decoy[RepoObj.obj_header.size + hdr.meta_size - 1] ^= 0xFF  # damage its metadata slot
+    content = bytes(decoy)  # a user stores exactly those bytes in a file
+    obj1 = bytearray(repo_objs.format(repo_objs.id_hash(content), {}, content, ro_type=ROBJ_FILE_STREAM))
+    assert content in obj1  # the decoy is in the pack verbatim
+    obj1[0] ^= 0xFF  # break obj1's header, so the walk resyncs and runs into the decoy
+    data = b"the real next object"
+    real_id = repo_objs.id_hash(data)
+    obj2 = repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM)
+    reader = PackReader(pack_contents=bytes(obj1) + obj2)
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
+    assert headers == [(real_id, len(obj1), len(obj2))]
+
+
+def test_pack_reader_resync_through_store(tmp_path):
+    obj1 = bytearray(fchunk(b"FIRST", chunk_id=H(47)))
+    obj2 = fchunk(b"SECOND", chunk_id=H(48))
+    obj1[0] ^= 0xFF
+    pack_id = H(50)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), bytes(obj1) + obj2)
+        reader = PackReader(repository.store, pack_id)
+        assert list(reader.iter_headers(validate=accept_all)) == [(H(48), len(obj1), len(obj2))]
+
+
 def test_pack_reader_size(tmp_path):
     obj = fchunk(b"data", meta=b"meta", chunk_id=H(6))
     assert PackReader(pack_contents=obj).size() == len(obj)
@@ -1888,3 +2065,73 @@ def test_pack_reader_in_memory_read_returns_view():
     assert bytes(view) == obj2
     pack[len(obj1)] ^= 0xFF  # a write to pack_contents is visible through the view
     assert view[0] == obj2[0] ^ 0xFF
+
+
+THIS_PACK = H(98)  # the pack whose gaps are walked
+OTHER_PACK = H(99)  # the pack the index points a superseded duplicate's authoritative copy at
+
+
+def gap_pack(repo_objs, datas):
+    """Build a pack of repo objects, plus a chunks index that supersedes every one of them.
+
+    datas: each object's plaintext, in pack order.
+    Returns (objects, chunks): chunks maps each object's id to an entry in OTHER_PACK of the same
+    size, so superseded_gap_ranges reports an object exactly when it passes both of its checks.
+    """
+    objs = [repo_objs.format(repo_objs.id_hash(data), {}, data, ro_type=ROBJ_FILE_STREAM) for data in datas]
+    chunks = {repo_objs.id_hash(data): ChunkIndexEntry(0, 0, OTHER_PACK, 0, len(obj)) for data, obj in zip(datas, objs)}
+    return objs, chunks
+
+
+def gap_ranges(pack, chunks, validate):
+    # the whole pack is one gap: no indexed object of THIS_PACK covers any of it.
+    reader = PackReader(pack_contents=pack)
+    return superseded_gap_ranges(reader, chunks, THIS_PACK, [], len(pack), validate=validate)
+
+
+def test_superseded_gap_ranges_reports_an_authenticated_duplicate(tmp_path):
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+
+    assert gap_ranges(obj, chunks, object_validator(repo_objs)) == [(0, len(obj))]
+    assert gap_ranges(obj, chunks, None) == []  # no validator, nothing to report
+
+
+def test_superseded_gap_ranges_rejects_a_forged_chunk_id(tmp_path):
+    # The chunk id sits in cleartext in the header. Overwriting it with the id of an indexed chunk
+    # of the same size passes the size check, so only the metadata slot's tag rules the object out.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+    victim = repo_objs.id_hash(b"a chunk stored elsewhere")
+    chunks[victim] = ChunkIndexEntry(0, 0, OTHER_PACK, 0, len(obj))
+    forged = bytearray(obj)
+    forged[len(OBJ_MAGIC) + 1 : len(OBJ_MAGIC) + 1 + 32] = victim  # the header's chunk_id field
+
+    assert gap_ranges(bytes(forged), chunks, object_validator(repo_objs)) == []
+
+
+def test_superseded_gap_ranges_rejects_a_size_the_index_contradicts(tmp_path):
+    # data_size is authenticated by nothing the metadata slot covers. Inflating it would stretch the
+    # reported range over the bytes behind the object; the index entry's obj_size rules it out.
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj, behind), chunks = gap_pack(repo_objs, [b"superseded", b"innocent bystander"])
+    hdr_size = RepoObj.obj_header.size
+    inflated = bytearray(obj + behind)
+    data_size_at = hdr_size - 4
+    (data_size,) = struct.unpack("<I", inflated[data_size_at:hdr_size])
+    inflated[data_size_at:hdr_size] = struct.pack("<I", data_size + len(behind))
+
+    assert gap_ranges(bytes(inflated), chunks, object_validator(repo_objs)) == []
+
+
+def test_superseded_gap_ranges_continues_past_a_rejected_object(tmp_path):
+    # A rejected object ends nothing: its size held up, so the next object is still at a known offset.
+    repo_objs = aead_repo_objs(tmp_path)
+    (rejected, wanted), chunks = gap_pack(repo_objs, [b"tampered", b"superseded"])
+    damaged = bytearray(rejected)
+    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(bytes(damaged[: RepoObj.obj_header.size])))
+    damaged[RepoObj.obj_header.size + hdr.meta_size - 1] ^= 0xFF  # last byte of the metadata slot
+
+    ranges = gap_ranges(bytes(damaged) + wanted, chunks, object_validator(repo_objs))
+
+    assert ranges == [(len(rejected), len(wanted))]

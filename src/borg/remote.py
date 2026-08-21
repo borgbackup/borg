@@ -13,7 +13,7 @@ import tempfile
 import textwrap
 import time
 import traceback
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, TimeoutExpired
 
 from . import __version__
 from .compress import Compressor
@@ -43,6 +43,12 @@ MSGID, MSG, ARGS, RESULT = b'i', b'm', b'a', b'r'
 MAX_INFLIGHT = 100
 
 RATELIMIT_PERIOD = 0.1
+
+# when shutting down the connection, we still want to receive (and log) the remote's stderr output,
+# but we must not wait for it forever if the remote is stuck or gone:
+STDERR_DRAIN_IDLE_TIMEOUT = 30.0  # seconds without any stderr data before we stop draining it
+# after that, wait for the child process to exit - and make it exit if it does not do so voluntarily:
+CHILD_EXIT_TIMEOUT = 10.0  # seconds to wait for the child, before SIGTERM and (again) before SIGKILL
 
 
 def os_write(fd, data):
@@ -857,17 +863,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     data = os.read(fd, 32768)
                     if not data:
                         raise ConnectionClosed()
-                    self.rx_bytes += len(data)
-                    # deal with incomplete lines (may appear due to block buffering)
-                    if self.stderr_received:
-                        data = self.stderr_received + data
-                        self.stderr_received = b''
-                    lines = data.splitlines(keepends=True)
-                    if lines and not lines[-1].endswith((b'\r', b'\n')):
-                        self.stderr_received = lines.pop()
-                    # now we have complete lines in <lines> and any partial line in self.stderr_received.
-                    for line in lines:
-                        handle_remote_line(line.decode())  # decode late, avoid partial utf-8 sequences
+                    self.handle_stderr_data(data)
             if w:
                 while (len(self.to_send) <= maximum_to_send) and (calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT:
                     if calls:
@@ -973,11 +969,56 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def break_lock(self):
         """actual remoting is done via self.call in the @api decorator"""
 
+    def handle_stderr_data(self, data):
+        """Log the remote's stderr output (given as bytes, maybe not ending on a line boundary)."""
+        self.rx_bytes += len(data)
+        # deal with incomplete lines (may appear due to block buffering)
+        if self.stderr_received:
+            data = self.stderr_received + data
+            self.stderr_received = b''
+        lines = data.splitlines(keepends=True)
+        if lines and not lines[-1].endswith((b'\r', b'\n')):
+            self.stderr_received = lines.pop()
+        # now we have complete lines in <lines> and any partial line in self.stderr_received.
+        for line in lines:
+            handle_remote_line(line.decode())  # decode late, avoid partial utf-8 sequences
+
+    def drain_stderr(self):
+        """Read and log the remote's stderr until EOF (or until it is idle for too long).
+
+        We are the only reader of that pipe, so we must keep reading it: if we did not, the child
+        could block forever writing into a full pipe buffer while we wait for it to terminate.
+        Also, the remote's stderr transports its error messages, so we want to see them.
+        """
+        while True:
+            r, w, x = select.select([self.stderr_fd], [], [], STDERR_DRAIN_IDLE_TIMEOUT)
+            if not r:
+                logger.debug('drain_stderr: remote stderr idle for %.1fs, giving up on it.',
+                             STDERR_DRAIN_IDLE_TIMEOUT)
+                break
+            data = os.read(self.stderr_fd, 32768)
+            if not data:
+                break  # EOF
+            self.handle_stderr_data(data)
+        if self.stderr_received:  # log a trailing partial line, if any
+            self.handle_stderr_data(b'\n')
+
     def close(self):
         if self.p:
             self.p.stdin.close()
             self.p.stdout.close()
-            self.p.wait()
+            self.drain_stderr()
+            self.p.stderr.close()
+            # the child should terminate now, but just in case it does not, do not wait forever:
+            for make_it_terminate in (self.p.terminate, self.p.kill):
+                try:
+                    self.p.wait(timeout=CHILD_EXIT_TIMEOUT)
+                    break
+                except TimeoutExpired:
+                    logger.warning('Remote process %d did not terminate, sending it a signal.', self.p.pid)
+                    make_it_terminate()
+            else:
+                self.p.wait()  # SIGKILLed, so this will not block for long
             self.p = None
 
     def async_response(self, wait=True):

@@ -118,6 +118,12 @@ are available on the releases_ page for the following platforms:
 
 ARM binaries are built by Johann Bauer, see: https://borg.bauerj.eu/
 
+.. note:: ``borg mount`` only works if the binary was built with FUSE support
+          (third-party binaries might lack it) and your OS has FUSE installed
+          (e.g. the ``fuse3`` package on Linux, macFUSE on macOS).
+          If ``borg mount`` fails, the error message will tell for each FUSE
+          implementation why it could not be loaded.
+
 To install such a binary, just drop it into a directory in your ``PATH``,
 make borg readable and executable for its users and then you can run ``borg``::
 

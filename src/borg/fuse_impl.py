@@ -12,13 +12,16 @@ BORG_FUSE_IMPL = os.environ.get("BORG_FUSE_IMPL", "mfusepy,pyfuse3,llfuse")
 hlfuse: types.ModuleType | None = None
 llfuse: types.ModuleType | None = None
 
+# import failures by implementation name, see issue #8657
+fuse_import_errors: dict[str, str] = {}
+
 for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
     FUSE_IMPL = FUSE_IMPL.strip()
     if FUSE_IMPL == "pyfuse3":
         try:
             import pyfuse3
-        except ImportError:
-            pass
+        except Exception as err:
+            fuse_import_errors[FUSE_IMPL] = str(err)
         else:
             llfuse = pyfuse3
             has_llfuse = False
@@ -30,8 +33,8 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
     elif FUSE_IMPL == "llfuse":
         try:
             import llfuse as llfuse_module
-        except ImportError:
-            pass
+        except Exception as err:
+            fuse_import_errors[FUSE_IMPL] = str(err)
         else:
             llfuse = llfuse_module
             has_llfuse = True
@@ -43,8 +46,8 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
     elif FUSE_IMPL == "mfusepy":
         try:
             import mfusepy
-        except ImportError:
-            pass
+        except Exception as err:  # mfusepy raises OSError (not ImportError) if libfuse is missing
+            fuse_import_errors[FUSE_IMPL] = str(err)
         else:
             hlfuse = mfusepy
             has_llfuse = False

@@ -5,7 +5,11 @@ can not convert as a ValueError - both FUSE adapters have to turn these into the
 errno, which is what we check here without mounting anything.
 """
 
+import builtins
 import errno
+import importlib
+import os
+from unittest.mock import patch
 
 import pytest
 
@@ -126,3 +130,33 @@ def test_mfusepy_getxattr_broken_acl():
     with pytest.raises(hlfuse.FuseOSError) as excinfo:
         getxattr(ops, "/file", "system.posix_acl_access")
     assert excinfo.value.errno == errno.EIO
+
+
+def test_fuse_import_errors_recorded():
+    """A FUSE impl failing to import must not crash borg and must record why, see #8657."""
+    import borg.fuse_impl
+
+    real_import = builtins.__import__
+
+    def failing_import(name, *args, **kwargs):
+        if name == "mfusepy":
+            raise OSError("Unable to find libfuse")  # mfusepy raises OSError, not ImportError
+        if name in ("pyfuse3", "llfuse"):
+            raise ImportError(f"No module named '{name}'")
+        return real_import(name, *args, **kwargs)
+
+    try:
+        with (
+            patch.object(builtins, "__import__", failing_import),
+            patch.dict(os.environ, {"BORG_FUSE_IMPL": "mfusepy,pyfuse3,llfuse"}),
+        ):
+            fuse_impl = importlib.reload(borg.fuse_impl)
+            assert not fuse_impl.has_any_fuse
+            assert fuse_impl.hlfuse is None and fuse_impl.llfuse is None
+            assert fuse_impl.fuse_import_errors == {
+                "mfusepy": "Unable to find libfuse",
+                "pyfuse3": "No module named 'pyfuse3'",
+                "llfuse": "No module named 'llfuse'",
+            }
+    finally:
+        importlib.reload(borg.fuse_impl)  # restore the real state

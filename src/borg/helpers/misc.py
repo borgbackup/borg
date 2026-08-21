@@ -36,11 +36,14 @@ def sysinfo():
         msgpack_version = ".".join(str(v) for v in msgpack.version)
     except:  # noqa
         msgpack_version = "unknown"
-    from ..fuse_impl import llfuse, BORG_FUSE_IMPL
+    from ..fuse_impl import hlfuse, llfuse, BORG_FUSE_IMPL, fuse_import_errors
 
-    llfuse_name = llfuse.__name__ if llfuse else "None"
-    llfuse_version = (" %s" % llfuse.__version__) if llfuse else ""
-    llfuse_info = f"{llfuse_name}{llfuse_version} [{BORG_FUSE_IMPL}]"
+    fuse_mod = hlfuse or llfuse
+    fuse_name = fuse_mod.__name__ if fuse_mod else "None"
+    fuse_version = getattr(fuse_mod, "__version__", "") if fuse_mod else ""
+    fuse_version = " %s" % fuse_version if fuse_version else ""
+    fuse_errors = "".join(f" {impl}: {err}." for impl, err in fuse_import_errors.items()) if not fuse_mod else ""
+    fuse_info = f"{fuse_name}{fuse_version} [{BORG_FUSE_IMPL}]{fuse_errors}"
     info = []
     if uname is not None:
         info.append("Platform: {}".format(" ".join(uname)))
@@ -48,7 +51,7 @@ def sysinfo():
         info.append("Linux: %s %s %s" % linux_distribution)
     info.append(
         "Borg: {}  Python: {} {} msgpack: {} fuse: {}".format(
-            borg_version, python_implementation, python_version, msgpack_version, llfuse_info
+            borg_version, python_implementation, python_version, msgpack_version, fuse_info
         )
     )
     info.append("PID: %d  CWD: %s" % (os.getpid(), os.getcwd()))

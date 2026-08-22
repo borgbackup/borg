@@ -22,6 +22,9 @@ except:  # noqa
 
 from ..fuse_impl import llfuse, has_any_fuse, has_llfuse, has_pyfuse3, has_mfusepy, ENOATTR  # NOQA
 from .. import platform
+
+# import these directly: the borg.testsuite.platform subpackage shadows the platform name above.
+from ..platform import get_birthtime_ns, set_times
 from ..platformflags import is_win32, is_darwin
 
 # Does this version of llfuse support ns precision?
@@ -46,6 +49,9 @@ else:
 
 if sys.platform.startswith("netbsd"):
     st_mtime_ns_round = -4  # 10us - strange: only >1 microsecond resolution here?
+
+if is_win32:
+    st_mtime_ns_round = -2  # 100ns - the resolution of a FILETIME, see platform.windows.set_times
 
 
 def same_ts_ns(ts_ns1, ts_ns2):
@@ -207,16 +213,19 @@ def are_fifos_supported():
 
 @functools.lru_cache
 def is_utime_fully_supported():
+    # note: platform.set_times is used rather than os.utime, because os.utime can not set the
+    # timestamps of a symlink itself on win32 (it raises NotImplementedError there), see #8730.
     with unopened_tempfile() as filepath:
-        # Some filesystems (such as SSHFS) don't support utime on symlinks
+        # Some filesystems (such as SSHFS) don't support setting the timestamps of symlinks
         if are_symlinks_supported():
             os.symlink("something", filepath)
         else:
             open(filepath, "w").close()
         try:
-            os.utime(filepath, (1000, 2000), follow_symlinks=False)
+            atime_ns, mtime_ns = 1000 * 10**9, 2000 * 10**9
+            set_times(filepath, atime_ns=atime_ns, mtime_ns=mtime_ns, follow_symlinks=False)
             new_stats = os.stat(filepath, follow_symlinks=False)
-            if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
+            if new_stats.st_atime_ns == atime_ns and new_stats.st_mtime_ns == mtime_ns:
                 return True
         except OSError:
             pass
@@ -227,20 +236,23 @@ def is_utime_fully_supported():
 
 @functools.lru_cache
 def is_birthtime_fully_supported():
-    if not hasattr(os.stat_result, "st_birthtime"):
-        return False
+    # note: platform.set_times is used rather than the "os.utime twice" trick, because that only
+    # works on the BSDs and on macOS - on win32, the birthtime needs SetFileTime, see #8730.
     with unopened_tempfile() as filepath:
-        # Some filesystems (such as SSHFS) don't support utime on symlinks
+        # Some filesystems (such as SSHFS) don't support setting the timestamps of symlinks
         if are_symlinks_supported():
             os.symlink("something", filepath)
         else:
             open(filepath, "w").close()
         try:
-            birthtime, mtime, atime = 946598400, 946684800, 946771200
-            os.utime(filepath, (atime, birthtime), follow_symlinks=False)
-            os.utime(filepath, (atime, mtime), follow_symlinks=False)
+            birthtime_ns, mtime_ns, atime_ns = 946598400 * 10**9, 946684800 * 10**9, 946771200 * 10**9
+            set_times(filepath, atime_ns=atime_ns, mtime_ns=mtime_ns, birthtime_ns=birthtime_ns, follow_symlinks=False)
             new_stats = os.stat(filepath, follow_symlinks=False)
-            if new_stats.st_birthtime == birthtime and new_stats.st_mtime == mtime and new_stats.st_atime == atime:
+            if (
+                get_birthtime_ns(new_stats, filepath) == birthtime_ns
+                and new_stats.st_mtime_ns == mtime_ns
+                and new_stats.st_atime_ns == atime_ns
+            ):
                 return True
         except OSError:
             pass

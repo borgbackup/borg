@@ -414,6 +414,20 @@ def ChunkerParams(s):
     raise ArgumentTypeError("invalid chunker params")
 
 
+def DigestAlgos(s):
+    """--digests: parse a comma-separated list of hash algorithm names (or "none")"""
+    if isinstance(s, (list, tuple)):  # the default value is given as a tuple already, see ChunkerParams
+        return tuple(s)
+    if s == "none":
+        return ()
+    algos = tuple(sorted(set(s.strip().split(","))))
+    if not set(algos) <= HASH_ALGORITHMS:
+        raise ArgumentTypeError(
+            'digests must be "none" or a comma-separated list of: %s' % ",".join(sorted(HASH_ALGORITHMS))
+        )
+    return algos
+
+
 def FilesCacheMode(s):
     ENTRIES_MAP = dict(ctime="c", mtime="m", size="s", inode="i", rechunk="r", disabled="d")
     VALID_MODES = ("cis", "ims", "cs", "ms", "cr", "mr", "d", "s")  # letters in alpha order
@@ -1151,9 +1165,7 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    # we provide the hash algos from python stdlib (except shake_*) and blake3.
-    # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
-    hash_algorithms = set(hashlib.algorithms_guaranteed).difference({"shake_128", "shake_256"}) | {"blake3"}
+    hash_algorithms = HASH_ALGORITHMS  # the same algos that "borg create --digests" can compute
     KEY_DESCRIPTIONS = {
         "type": "file type (file, dir, symlink, ...)",
         "mode": "file mode (as in stat)",
@@ -1284,6 +1296,10 @@ class ItemFormatter(BaseFormatter):
     def hash_item(self, hash_function, item):
         if "chunks" not in item:
             return ""
+        digest = item.get("digests", {}).get(hash_function)
+        if digest is not None:
+            # borg create computed this over the file content, so we do not need to read it again.
+            return bin_to_hex(digest)
         if hash_function == "blake3":
             hash = blake3()
         else:

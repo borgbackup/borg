@@ -26,6 +26,7 @@ from .chunkers import get_chunker, Chunk, release_chunk_data
 from .cache import ChunkListEntry, build_chunkindex_from_repo, write_chunkindex_to_repo
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .constants import *  # NOQA
+from .digests import ContentDigester
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError, BackupItemExcluded
 from .helpers import BackupSymlinkParentError, BackupPathTraversalError
@@ -1339,7 +1340,15 @@ class ChunksProcessor:
         self.add_item = add_item
         self.rechunkify = rechunkify
 
-    def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None, append=False):
+    def process_file_chunks(
+        self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None, append=False, digester=None
+    ):
+        """
+        Process all chunks of an item's content.
+
+        :param digester: if given, the content is also fed to this ContentDigester (see #4699).
+                         Only the default chunk_processor does that, a given one is on its own.
+        """
         if not chunk_processor:
 
             def chunk_processor(chunk):
@@ -1349,7 +1358,12 @@ class ChunksProcessor:
                 try:
                     chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, ro_type=ROBJ_FILE_STREAM)
                 finally:
-                    release_chunk_data(data)
+                    if digester is None:
+                        release_chunk_data(data)
+                    else:
+                        # the digester takes ownership of data and releases it after hashing.
+                        # we are done with data here, so it can be hashed in the background.
+                        digester.update(data)
                 return chunk_entry
 
         if not append:
@@ -1459,6 +1473,7 @@ class FilesystemObjectProcessors:
         read_special_timeout=None,
         input_map=None,
         reuse_chunks=None,
+        digest_algos=DIGEST_ALGOS_DEFAULT,
     ):
         self.metadata_collector = metadata_collector
         self.cache = cache
@@ -1472,10 +1487,12 @@ class FilesystemObjectProcessors:
         self.input_map = input_map  # --map: content range info for the single input file, see #4363
         self.reuse_chunks = reuse_chunks  # --reuse-from: the reference archive item's chunk list, see #4363
 
-        self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
+        self.hlm = HardLinkManager(id_type=tuple, info_type=tuple)  # (dev, ino) -> (chunks, digests)
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
         self.chunker = get_chunker(*chunker_params, key=key, sparse=sparse)
+        # computes item.digests (--digests) while we read a file's content
+        self.digester = ContentDigester(digest_algos)
 
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True, strip_prefix=None):
@@ -1500,11 +1517,13 @@ class FilesystemObjectProcessors:
         if hardlinked:
             status = "h"  # hard link
             nothing = object()
-            chunks = self.hlm.retrieve(id=(st.st_ino, st.st_dev), default=nothing)
-            if chunks is nothing:
+            info = self.hlm.retrieve(id=(st.st_ino, st.st_dev), default=nothing)
+            if info is nothing:
                 update_map = True
-            elif chunks is not None:
-                hl_chunks = chunks
+            else:
+                hl_chunks, hl_digests = info
+                if hl_digests is not None and self.digester.enabled:
+                    item.digests = hl_digests  # same content as the first hard link, thus same digests
             item.hlid = self.hlm.hardlink_id_from_inode(ino=st.st_ino, dev=st.st_dev)
         yield item, status, hardlinked, hl_chunks
         maybe_exclude_by_attr(item)
@@ -1513,7 +1532,8 @@ class FilesystemObjectProcessors:
             # remember the hlid of this fs object and if the item has chunks,
             # also remember them, so we do not have to re-chunk a hard link.
             chunks = item.chunks if "chunks" in item else None
-            self.hlm.remember(id=(st.st_ino, st.st_dev), info=chunks)
+            digests = item.digests if "digests" in item else None
+            self.hlm.remember(id=(st.st_ino, st.st_dev), info=(chunks, digests))
 
     def process_dir_with_fd(self, *, path, fd, st, strip_prefix):
         with self.create_helper(path, st, "d", hardlinkable=False, strip_prefix=strip_prefix) as (
@@ -1618,7 +1638,18 @@ class FilesystemObjectProcessors:
             item.uid = uid
         if gid is not None:
             item.gid = gid
-        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
+        self.digester.start()
+        self.process_file_chunks(
+            item,
+            cache,
+            self.stats,
+            self.show_progress,
+            backup_io_iter(self.chunker.chunkify(fd)),
+            digester=self.digester,
+        )
+        digests = self.digester.finish()
+        if digests is not None:
+            item.digests = digests
         item.get_size(memorize=True)
         self.stats.nfiles += 1
         self.add_item(item, stats=self.stats)
@@ -1665,19 +1696,19 @@ class FilesystemObjectProcessors:
                     if self.input_map is not None:
                         # --map: the given map replaces the files cache as content/change information, see #4363.
                         hashed_path = path_hash = None
-                        known, chunks = False, None
+                        known, chunks, digests = False, None, None
                     elif not is_special_file:
                         hashed_path = safe_encode(item.path)  # path as in archive item!
                         started_hashing = time.monotonic()
                         path_hash = self.key.id_hash(hashed_path)
                         self.stats.hashing_time += time.monotonic() - started_hashing
-                        known, chunks = cache.file_known_and_unchanged(hashed_path, path_hash, st)
+                        known, chunks, digests = cache.file_known_and_unchanged(hashed_path, path_hash, st)
                     else:
                         # in --read-special mode, we may be called for special files.
                         # there should be no information in the cache about special files processed in
                         # read-special mode, but we better play safe as this was wrong in the past:
                         hashed_path = path_hash = None
-                        known, chunks = False, None
+                        known, chunks, digests = False, None, None
                     if chunks is not None:
                         # Make sure all ids are available
                         for chunk in chunks:
@@ -1691,6 +1722,10 @@ class FilesystemObjectProcessors:
                                 # process one-by-one, so we will know in item.chunks how far we got
                                 cache.reuse_chunk(chunk.id, chunk.size, self.stats)
                                 item.chunks.append(chunk)
+                            if digests is not None and self.digester.enabled:
+                                # the file did not change, so its digests are still valid and we
+                                # do not have to read the file to compute them again.
+                                item.digests = StableDict(digests)
                             status = "U"  # regular file, unchanged
                     else:
                         status = "M" if known else "A"  # regular file, modified or added
@@ -1698,6 +1733,7 @@ class FilesystemObjectProcessors:
                     # Only chunkify the file if needed
                     changed_while_backup = False
                     if "chunks" not in item:
+                        self.digester.start()
                         start_reading = time.time_ns()
                         # Do NOT wrap this in backup_io("read"): the source-file reads are already
                         # guarded individually by backup_io_iter() below. Wrapping the whole call would
@@ -1719,6 +1755,9 @@ class FilesystemObjectProcessors:
                                 # without reading them. Each "read" part gets its own chunkify call, so
                                 # chunks never span the gap left by reused parts.
                                 plan = build_reuse_plan(self.input_map, self.reuse_chunks, input_size, cache.seen_chunk)
+                                if any(kind == "reuse" for kind, payload in plan):
+                                    # reused chunks are not read, so we can not digest the full content.
+                                    self.digester.discard()
                                 item.chunks = []
                                 for kind, payload in plan:
                                     if kind == "reuse":
@@ -1735,26 +1774,45 @@ class FilesystemObjectProcessors:
                                             self.show_progress,
                                             backup_io_iter(chunk_iter),
                                             append=True,
+                                            digester=self.digester,
                                         )
                             else:
                                 fmap = [(start, length, state == MAP_DATA) for start, length, state in self.input_map]
                                 chunk_iter = self.chunker.chunkify(None, fd, fmap=fmap, st=st)
                                 self.process_file_chunks(
-                                    item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
+                                    item,
+                                    cache,
+                                    self.stats,
+                                    self.show_progress,
+                                    backup_io_iter(chunk_iter),
+                                    digester=self.digester,
                                 )
                         elif read_special_timeout is not None:
                             # all reads go through the timeout-enforcing wrapper (fh stays unused).
                             chunk_iter = self.chunker.chunkify(SpecialFileReader(fd, read_special_timeout), st=st)
                             self.process_file_chunks(
-                                item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
+                                item,
+                                cache,
+                                self.stats,
+                                self.show_progress,
+                                backup_io_iter(chunk_iter),
+                                digester=self.digester,
                             )
                         else:
                             # passing st saves FileReader a stat call; regular files take the
                             # direct read path, special files (--read-special) the buffered one.
                             chunk_iter = self.chunker.chunkify(None, fd, st=st)
                             self.process_file_chunks(
-                                item, cache, self.stats, self.show_progress, backup_io_iter(chunk_iter)
+                                item,
+                                cache,
+                                self.stats,
+                                self.show_progress,
+                                backup_io_iter(chunk_iter),
+                                digester=self.digester,
                             )
+                        digests = self.digester.finish()
+                        if digests is not None:
+                            item.digests = digests
                         self.stats.chunking_time = self.chunker.chunking_time
                         end_reading = time.time_ns()
                         with backup_io("fstat2"):
@@ -1797,7 +1855,7 @@ class FilesystemObjectProcessors:
                             # block or char device will change without its mtime/size/inode changing.
                             # also, we must not memorize a potentially inconsistent/corrupt file that
                             # changed while we backed it up.
-                            cache.memorize_file(hashed_path, path_hash, st, item.chunks)
+                            cache.memorize_file(hashed_path, path_hash, st, item.chunks, digests)
                     self.stats.files_stats[status] += 1  # must be done late
                     if not changed_while_backup:
                         status = None  # we already called print_file_status
@@ -1818,6 +1876,7 @@ class TarfileObjectProcessors:
         show_progress,
         log_json,
         file_status_printer=None,
+        digest_algos=DIGEST_ALGOS_DEFAULT,
     ):
         self.cache = cache
         self.key = key
@@ -1828,7 +1887,9 @@ class TarfileObjectProcessors:
 
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
         self.chunker = get_chunker(*chunker_params, key=key, sparse=False)
-        self.hlm = HardLinkManager(id_type=str, info_type=list)  # normalized/safe path -> chunks
+        self.hlm = HardLinkManager(id_type=str, info_type=tuple)  # normalized/safe path -> (chunks, digests)
+        # computes item.digests (--digests) while we read a file's content
+        self.digester = ContentDigester(digest_algos)
 
     @contextmanager
     def create_helper(self, tarinfo, status=None, type=None):
@@ -1908,9 +1969,12 @@ class TarfileObjectProcessors:
             # create a not hardlinked borg item, reusing the chunks, see HardLinkManager.__doc__
             normalized_path = posixpath.normpath(tarinfo.linkname)
             safe_path = make_path_safe(normalized_path)
-            chunks = self.hlm.retrieve(safe_path)
-            if chunks is not None:
+            info = self.hlm.retrieve(safe_path)
+            if info is not None:
+                chunks, digests = info
                 item.chunks = chunks
+                if digests is not None and self.digester.enabled:
+                    item.digests = digests  # same content as the file we link to, thus same digests
             item.get_size(memorize=True, from_chunks=True)
             self.stats.nfiles += 1
             return status
@@ -1920,13 +1984,22 @@ class TarfileObjectProcessors:
             self.print_file_status(status, item.path)
             status = None  # we already printed the status
             fd = tar.extractfile(tarinfo)
+            self.digester.start()
             self.process_file_chunks(
-                item, self.cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
+                item,
+                self.cache,
+                self.stats,
+                self.show_progress,
+                backup_io_iter(self.chunker.chunkify(fd)),
+                digester=self.digester,
             )
+            digests = self.digester.finish()
+            if digests is not None:
+                item.digests = digests
             item.get_size(memorize=True, from_chunks=True)
             self.stats.nfiles += 1
             # we need to remember ALL files, see HardLinkManager.__doc__
-            self.hlm.remember(id=item.path, info=item.chunks)
+            self.hlm.remember(id=item.path, info=(item.chunks, digests))
             return status
 
 

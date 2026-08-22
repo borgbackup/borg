@@ -40,6 +40,7 @@ from .parseformat import (
     SortBySpec,
     CompressionSpec,
     ChunkerParams,
+    DigestAlgos,
     FilesCacheMode,
     files_cache_mode_no_ctime,
     partial_format,

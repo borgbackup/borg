@@ -30,6 +30,7 @@ from ...helpers.parseformat import (
     swidth_slice,
     eval_escapes,
     ChunkerParams,
+    DigestAlgos,
     files_cache_mode_no_ctime,
     get_size_units,
     normalize_local_path,
@@ -975,3 +976,14 @@ def test_json_dump_indent(monkeypatch, env_value, expect_newlines):
     else:
         assert "\n" not in result
     assert json.loads(result) == obj
+
+
+def test_digest_algos():
+    assert DigestAlgos("blake3") == ("blake3",)
+    assert DigestAlgos("sha256,blake3") == ("blake3", "sha256")  # sorted and deduplicated
+    assert DigestAlgos("blake3,blake3") == ("blake3",)
+    assert DigestAlgos("none") == ()
+    assert DigestAlgos(("blake3",)) == ("blake3",)  # the default value comes in as a tuple
+    for invalid in ("nosuchhash", "blake3,nosuchhash", "shake_128", ""):
+        with pytest.raises(ArgumentTypeError):
+            DigestAlgos(invalid)

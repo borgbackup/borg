@@ -310,6 +310,7 @@ def test_atime(archivers, request):
         assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
 
 
+@pytest.mark.skipif(is_win32, reason="no os.pread and no O_NOATIME on win32")
 @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
 def test_atime_open_updates_atime(archiver):
     # simulate a platform where already the open() updates the atime (no O_NOATIME support,
@@ -356,19 +357,20 @@ def test_atime_open_updates_atime(archiver):
 def test_birthtime(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    birthtime, mtime, atime = 946598400, 946684800, 946771200
-    os.utime("input/file1", (atime, birthtime))
-    os.utime("input/file1", (atime, mtime))
+    birthtime_ns, mtime_ns, atime_ns = 946598400 * 10**9, 946684800 * 10**9, 946771200 * 10**9
+    platform.set_times("input/file1", atime_ns=atime_ns, mtime_ns=mtime_ns, birthtime_ns=birthtime_ns)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
     sti = os.stat("input/file1")
     sto = os.stat("output/input/file1")
-    assert same_ts_ns(sti.st_birthtime * 1e9, sto.st_birthtime * 1e9)
-    assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
+    birthtime_in = get_birthtime_ns(sti, "input/file1")
+    birthtime_out = get_birthtime_ns(sto, "output/input/file1")
+    assert same_ts_ns(birthtime_in, birthtime_out)
+    assert same_ts_ns(birthtime_out, birthtime_ns)
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime_ns)
 
 
 @pytest.mark.skipif(not is_win32, reason="Windows-only test")

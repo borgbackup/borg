@@ -175,7 +175,7 @@ def test_basic_functionality(archivers, request):
         unexpected = {"type": "modified", "added": 0, "removed": 0}
         assert unexpected not in get_changes("input/file_touched", joutput)
         if not content_only:
-            # on win32, ctime is the file creation time and does not change.
+            # on win32, no ctime is archived, see #8730.
             expected = {"mtime"} if is_win32 else {"mtime", "ctime"}
             assert expected.issubset({c["type"] for c in get_changes("input/file_touched", joutput)})
         else:
@@ -274,18 +274,20 @@ def test_time_diffs(archivers, request):
     cmd(archiver, "create", "archive2", "input")
     output = cmd(archiver, "diff", "archive1", "archive2", "--format", "'{mtime}{ctime} {path}{NL}'")
     assert "mtime" in output
-    assert "ctime" in output  # Should show up on Windows as well since it is a new file.
+    if is_win32:
+        assert "ctime" not in output  # win32: no ctime is archived, see #8730
+    else:
+        assert "ctime" in output
 
     granularity_sleep()
     os.chmod("input/test_file", 0o777)
     cmd(archiver, "create", "archive3", "input")
     output = cmd(archiver, "diff", "archive2", "archive3", "--format", "'{mtime}{ctime} {path}{NL}'")
     assert "mtime" not in output
-    # Checking platform because ctime should not be shown on Windows since it wasn't recreated.
-    if not is_win32:
-        assert "ctime" in output
+    if is_win32:
+        assert "ctime" not in output  # win32: no ctime is archived, see #8730
     else:
-        assert "ctime" not in output
+        assert "ctime" in output
 
 
 def test_sort_by_option(archivers, request):

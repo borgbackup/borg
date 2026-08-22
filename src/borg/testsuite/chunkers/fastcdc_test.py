@@ -1,7 +1,9 @@
 from hashlib import sha256
 from io import BytesIO
 import os
+import platform
 import random
+import sys
 
 import pytest
 
@@ -196,7 +198,7 @@ def test_fastcdc_kernels_identical(kernel, monkeypatch):
     # Every scan kernel this platform accepts must produce identical cut points.
     # Kernels this build/CPU cannot run are skipped, so the same test covers
     # whatever tier the machine happens to have - including kernels that exist
-    # but are not auto-selected, which nothing else would exercise.
+    # but are not the default here, which nothing else would exercise.
     data = os.urandom(4 * 1024 * 1024)
 
     def sizes(chunker):
@@ -220,6 +222,51 @@ def test_fastcdc_portable_kernel_available(kernel, monkeypatch):
     assert ChunkerFastCDC(key0, 10, 16, 14, 2).kernel == kernel
 
 
+# What an unset BORG_*_KERNEL must resolve to, per architecture, most preferred
+# first: the first entry this build and CPU can actually run is the default.
+# Mirrors fc_kernel_default() / bz64_kernel_default() (fastcdc_impl.c,
+# buzhash64_impl.c) and phte_kernel_default() (phte_core.h).
+ROLLING_HASH_DEFAULTS = {"x86_64": ["scalar"], "aarch64": ["neon", "blockwise"]}
+AES_DEFAULTS = {"x86_64": ["vaes", "aes-ni", "evp"], "aarch64": ["aes-arm64", "evp"]}
+
+
+def default_kernel_arch():
+    """Which key of those tables applies here.
+
+    uname spells the same architecture differently per OS - x86-64 is "amd64"
+    on the BSDs and "i86pc" on illumos - while the C side just asks the
+    compiler for __x86_64__ / __aarch64__.
+    """
+    machine = platform.machine().lower()
+    if machine in ("x86_64", "amd64") or (machine == "i86pc" and sys.maxsize > 2**32):
+        return "x86_64"
+    if machine in ("aarch64", "arm64"):
+        return "aarch64"
+    return machine
+
+
+def expected_default_kernel(envvar, make, key, monkeypatch):
+    """The kernel <envvar> unset must give here: the first of this architecture's
+    preference order that this build and CPU can run.
+
+    Determined by asking for each candidate explicitly, so this checks the
+    fallback chain rather than just repeating whatever the default resolved to.
+    """
+    machine = default_kernel_arch()
+    if envvar == "BORG_AES_CHUNKER_KERNEL":
+        preference = AES_DEFAULTS.get(machine, ["evp"])
+    else:
+        preference = ROLLING_HASH_DEFAULTS.get(machine, ["blockwise"])
+    for kernel in preference:
+        monkeypatch.setenv(envvar, kernel)
+        try:
+            make(key)
+        except ValueError:
+            continue  # not in this build, or this CPU can not run it
+        return kernel
+    raise AssertionError(f"none of {preference} is usable for {envvar} on {machine}")
+
+
 @pytest.mark.parametrize("envvar", ["BORG_FASTCDC_KERNEL", "BORG_BUZHASH64_KERNEL", "BORG_AES_CHUNKER_KERNEL"])
 def test_kernel_env_rejects_unusable(envvar, monkeypatch):
     # A kernel that cannot run here must fail loudly instead of silently
@@ -227,10 +274,10 @@ def test_kernel_env_rejects_unusable(envvar, monkeypatch):
     # means to pin one kernel, into a measurement of a different one.
     from ...chunkers import ChunkerBuzHash64, ChunkerToeplitzAES
 
-    make, default = {
-        "BORG_FASTCDC_KERNEL": (lambda k: ChunkerFastCDC(k, 10, 16, 14, 2), "scalar"),
-        "BORG_BUZHASH64_KERNEL": (lambda k: ChunkerBuzHash64(k, 10, 16, 14, 4095, 2), "scalar"),
-        "BORG_AES_CHUNKER_KERNEL": (lambda k: ChunkerToeplitzAES(k, 10, 16, 14, 2), "evp"),
+    make = {
+        "BORG_FASTCDC_KERNEL": lambda k: ChunkerFastCDC(k, 10, 16, 14, 2),
+        "BORG_BUZHASH64_KERNEL": lambda k: ChunkerBuzHash64(k, 10, 16, 14, 4095, 2),
+        "BORG_AES_CHUNKER_KERNEL": lambda k: ChunkerToeplitzAES(k, 10, 16, 14, 2),
     }[envvar]
     key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
 
@@ -238,12 +285,14 @@ def test_kernel_env_rejects_unusable(envvar, monkeypatch):
     with pytest.raises(ValueError, match="no-such-kernel"):
         make(key0)
 
-    # there is no automatic selection, so "auto" is not a kernel name either
+    # the default is picked without naming it, so "auto" is not a kernel name either
     monkeypatch.setenv(envvar, "auto")
     with pytest.raises(ValueError, match="auto"):
         make(key0)
 
-    # unset means the simplest implementation, on every platform
+    # unset means the kernel measured fastest on this architecture, falling back
+    # where this build or this CPU does not have it
+    default = expected_default_kernel(envvar, make, key0, monkeypatch)
     monkeypatch.delenv(envvar)
     assert make(key0).kernel == default
 

@@ -1,16 +1,15 @@
 """Shared parsing for the BORG_*_KERNEL scan-kernel selection env vars.
 
-Each chunker runs the simplest implementation - the plain sequential loop, or
-the portable OpenSSL path for the AES chunkers - unless one of these env vars
-names a different one. There is no automatic selection: which kernel is
-fastest turned out not to be predictable from the instruction set (an Apple M3
-runs NEON 2.1x faster than the sequential loop; gcc on a Zen 4 runs the
-sequential loop 1.7x faster than AVX-512), so nothing guesses on the user's
-behalf.
+Unset, each chunker runs the kernel that measured fastest on this platform
+(*_kernel_default() on the C side). Which one that is is not predictable from
+the instruction set - an Apple M3 runs NEON 2.1x faster than the sequential
+loop, while gcc on a Zen 4 runs the sequential loop 1.7x faster than AVX-512 -
+so the defaults encode benchmark results, not "the widest vectors available".
 
-A value is a demand, not a preference: if that kernel cannot run here, chunker
-creation raises ValueError rather than quietly falling back, because a silent
-fallback turns a benchmark or a test into a measurement of something else.
+A value here is a demand, not a preference: if that kernel cannot run here,
+chunker creation raises ValueError rather than quietly falling back to the
+default, because a silent fallback turns a benchmark or a test into a
+measurement of something else.
 
 The C side resolves names, since which names exist depends on the build and
 the CPU; this module only turns its verdict into an exception.

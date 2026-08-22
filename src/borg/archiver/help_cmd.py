@@ -783,15 +783,18 @@ class HelpMixIn:
                 Single-threaded can even be faster on data zstd races through anyway, e.g.
                 already-compressed/incompressible data or long-repeat data like VM images.
             BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
-                Select the scan kernel the ``fastcdc`` / ``buzhash64`` chunker uses (default:
-                ``scalar``, the plain sequential loop). Accepted values are ``avx512``, ``avx2``,
-                ``neon``, ``blockwise`` and ``scalar``.
+                Select the scan kernel the ``fastcdc`` / ``buzhash64`` chunker uses. Accepted values
+                are ``avx512``, ``avx2``, ``neon``, ``blockwise`` and ``scalar``.
+                The default is whichever benchmarked fastest for the architecture: ``neon`` on
+                aarch64, and ``scalar`` (the plain sequential loop) on x86-64, where the compiler
+                folds the rolling hash update into a single instruction and thereby beats the vector
+                kernels. Other architectures get ``blockwise``, the portable multi-lane C kernel.
                 All kernels chunk identically - same cut points, same chunk ids - and differ only in
                 speed, so this is safe to change at any time, also for an existing repository.
                 Which kernel is fastest is not predictable from the instruction set: it depends on the
                 cpu and on the compiler that built borg, and the sequential loop wins on some machines.
-                Nothing is selected automatically, so measure on your own hardware with
-                ``borg benchmark cpu --chunking`` before setting these.
+                Measure on your own hardware with ``borg benchmark cpu --chunking`` before overriding
+                the default.
                 ``avx512`` and ``avx2`` exist only on x86-64, ``neon`` only on aarch64, and only if the
                 compiler that built borg supported them; ``scalar`` and ``blockwise`` are portable C
                 and always available.
@@ -800,11 +803,14 @@ class HelpMixIn:
                 ``borg create --debug`` logs the chunker and the kernel it was created with.
             BORG_AES_CHUNKER_KERNEL
                 Select the scan kernel used by the AES based chunkers - one variable for all three of
-                ``toeplitz-aes``, ``rabin-aes`` and ``goldilocks-aes`` (default: ``evp``, the portable
-                OpenSSL path). Accepted values are ``vaes``, ``aes-ni``, ``aes-arm64`` and ``evp``.
+                ``toeplitz-aes``, ``rabin-aes`` and ``goldilocks-aes``. Accepted values are ``vaes``,
+                ``aes-ni``, ``aes-arm64`` and ``evp``.
+                Unlike the chunker kernels above, wider is simply faster here, so the default is the
+                best path this build and cpu offer: ``vaes``, else ``aes-ni`` on x86-64, ``aes-arm64``
+                on aarch64, and ``evp`` (the portable OpenSSL path) where there is no AES hardware
+                path.
                 As with the chunker kernels above, all of them chunk identically and differ only in
-                speed, nothing is selected automatically, and a kernel that can not run here is an
-                error rather than a silent fallback.
+                speed, and a kernel that can not run here is an error rather than a silent fallback.
                 ``vaes`` and ``aes-ni`` exist only on x86-64, ``aes-arm64`` only on aarch64.
                 ``vaes`` additionally needs a compiler that knows it (gcc >= 11 / clang >= 14), so a
                 cpu supporting VAES is not by itself enough to have that kernel available.

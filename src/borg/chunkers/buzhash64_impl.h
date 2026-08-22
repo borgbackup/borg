@@ -23,11 +23,10 @@
  * (p_add = p_rem + window_size); both must have n readable bytes.
  * kernel is one of BZ_K_*.
  * All kernels return bit-identical results. */
-/* Scan kernel ids; see fastcdc_impl.h for the rationale. There is no
- * automatic selection - the caller says which kernel to run. */
+/* Scan kernel ids; see fastcdc_impl.h for the rationale. */
 #define BZ_K_SCALAR 0    /* sequential reference loop */
 #define BZ_K_BLOCKWISE 1 /* portable 8-lane C */
-#define BZ_K_VECTOR 2    /* neon / avx2 (neon is not auto-selected) */
+#define BZ_K_VECTOR 2    /* the platform's vector kernel: neon or avx2 */
 #define BZ_K_VECTOR512 3 /* avx512 */
 
 /* Results of bz64_kernel_select(). */
@@ -41,6 +40,10 @@ int bz64_kernel_select(const char *name, int *out_id);
 
 /* Comma-separated list of the kernel names this build accepts. */
 const char *bz64_kernel_names(void);
+
+/* The kernel to run when the caller did not ask for a specific one, see
+ * bz64_kernel_default() in buzhash64_impl.c for what is chosen where. */
+int bz64_kernel_default(void);
 
 size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
                  const uint8_t *p_rem, const uint8_t *p_add,

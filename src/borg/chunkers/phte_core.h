@@ -202,6 +202,21 @@ int phte_kernel_select(const char *name, int *out_id)
     return PHTE_KSEL_UNKNOWN;
 }
 
+int phte_kernel_default(void)
+{
+    int kid;
+    (void)kid;
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    if (phte_kernel_select("vaes", &kid) == PHTE_KSEL_OK)
+        return kid;
+#endif
+#if PHTE_HAVE_HW
+    if (phte_kernel_select(PHTE_KIND_HW, &kid) == PHTE_KSEL_OK)
+        return kid;
+#endif
+    return PHTE_K_EVP;
+}
+
 /* --- context base management ------------------------------------------- */
 
 /* Expand the AES key, select the scan path and set up the OpenSSL context.

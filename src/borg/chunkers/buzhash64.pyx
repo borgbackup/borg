@@ -21,7 +21,7 @@ cdef extern from "buzhash64_impl.h":
     const char *bz64_kernel_name(int kernel)
     int bz64_kernel_select(const char *name, int *out_id)
     const char *bz64_kernel_names()
-    int BZ_K_SCALAR
+    int bz64_kernel_default()
 
 from .kernel_env import kernel_error, requested_kernel
 
@@ -109,14 +109,14 @@ cdef uint64_t _buzhash64_update(uint64_t sum, unsigned char remove, unsigned cha
 cdef int _select_kernel() except -1:
     """Resolve BORG_BUZHASH64_KERNEL to a kernel id, raising if it cannot be honoured.
 
-    Unset means the simplest implementation, not the fastest one: nothing here
-    guesses which kernel a given CPU and compiler make fastest.
+    Unset means the kernel that measured fastest on this platform, see
+    bz64_kernel_default().
     """
-    cdef int kid = BZ_K_SCALAR
+    cdef int kid
     cdef int rc
     want = requested_kernel("BORG_BUZHASH64_KERNEL")
     if want is None:
-        return BZ_K_SCALAR
+        return bz64_kernel_default()
     rc = bz64_kernel_select(want.encode("ascii"), &kid)
     if rc != 0:
         raise kernel_error("BORG_BUZHASH64_KERNEL", want, rc,
@@ -180,8 +180,8 @@ cdef class ChunkerBuzHash64(ChunkerBase):
     def kernel(self):
         """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blockwise' or 'scalar'.
 
-        'scalar' unless BORG_BUZHASH64_KERNEL names another one, in which case
-        this is always that one - creating the chunker fails otherwise.
+        The platform default unless BORG_BUZHASH64_KERNEL names another one, in
+        which case this is always that one - creating the chunker fails otherwise.
         """
         return (<bytes>bz64_kernel_name(self.kernel_id)).decode("ascii")
 

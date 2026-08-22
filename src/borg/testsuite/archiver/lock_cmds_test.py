@@ -28,13 +28,14 @@ def test_with_lock(tmp_path):
     print("sys.path: %r" % sys.path)
     print("PYTHONPATH: %s" % env.get("PYTHONPATH", ""))
     print("PATH: %s" % env.get("PATH", ""))
-    command0 = "python3", "-m", "borg", "repo-create", "--encryption=none-sha256"
+    python = sys.executable or "python3"
+    command0 = python, "-m", "borg", "repo-create", "--encryption=none-sha256"
     # Timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
     # so that lock acquisition for command2 fails as the test expects it.
     lock_wait = 2
-    command1 = ("python3", "-c", 'import sys; print("first command - acquires the lock", flush=True); sys.stdin.read()')
-    command2 = "python3", "-c", 'print("second command - should never get executed")'
-    borgwl = "python3", "-m", "borg", "with-lock", f"--lock-wait={lock_wait}"
+    command1 = (python, "-c", 'import sys; print("first command - acquires the lock", flush=True); sys.stdin.read()')
+    command2 = python, "-c", 'print("second command - should never get executed")'
+    borgwl = python, "-m", "borg", "with-lock", f"--lock-wait={lock_wait}"
     popen_options = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     subprocess.run(command0, env=env, check=True, text=True, capture_output=True)
     assert repo_path.exists()
@@ -50,7 +51,12 @@ def test_with_lock(tmp_path):
             assert "Failed to create/acquire the lock" in err_out
             assert p2.returncode == 73  # LockTimeout: could not acquire the lock, p1 already has it
         out, err_out = p1.communicate(input="")  # Unblock command1 and read output
-        assert not err_out
+        # ignore warnings that are unrelated to the lock handling: the pure-python msgpack
+        # warning borg emits on pypy and cython's collection_type warning (cython >= 3.3.0
+        # emits it at import time on pypy unless borg is built with CYTHON_USE_TYPE_SPECS=1,
+        # which costs a lot of performance)
+        noise = ("pure-python msgpack", "cython.collection_type")
+        assert not [line for line in err_out.splitlines() if not any(n in line for n in noise)]
         assert p1.returncode == 0
 
 

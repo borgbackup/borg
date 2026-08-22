@@ -3,6 +3,7 @@ import pytest
 
 from ...helpers.msgpack import is_slow_msgpack
 from ...platform import is_cygwin
+from ...platformflags import is_pypy
 
 
 def expected_py_mp_slow_combination():
@@ -12,6 +13,9 @@ def expected_py_mp_slow_combination():
 
     # msgpack is slow on Cygwin
     if is_cygwin:
+        return True
+    # pypy only has the pure-python msgpack (which pypy's jit hopefully makes fast enough)
+    if is_pypy:
         return True
     # msgpack < 1.0.6 did not have Python 3.12 wheels
     if sys.version_info[:2] == (3, 12) and msgpack.version < (1, 0, 6):

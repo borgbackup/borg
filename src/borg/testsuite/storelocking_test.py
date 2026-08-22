@@ -289,6 +289,25 @@ class TestLock:
         assert not lock.skew_warned  # the writer's clock is not skewed - no warning
         lock.release()
 
+    def test_refresh_judges_with_fresh_store_time(self, lockstore):
+        # refresh() creates the new lock object BEFORE listing, so the listing's stale sweep judges
+        # other locks with a seconds-old store-clock anchor, not with the one of the previous
+        # refresh (up to 15min old). if the storage's clock stepped back meanwhile (simulated by
+        # an anchor that extrapolates 1h ahead of the storage's clock), that old anchor would
+        # wrongly confirm a skewed peer's healthy lock as stale in both clock domains, see #9870.
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.acquire()
+        anchor = lock.my_lock_anchor
+        assert anchor.mtime is not None
+        lock.my_lock_anchor = anchor._replace(monotonic=anchor.monotonic - 3600)  # storage clock stepped back 1h
+        # a healthy peer whose clock runs 40min behind ours (content looks stale, store mtime: now):
+        dt = datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=40)
+        foreign_key = write_raw_lock(lockstore, ID1, exclusive=False, dt=dt)
+        lock.last_refresh_dt -= lock.refresh_td + datetime.timedelta(seconds=1)  # make refresh() act now
+        lock.refresh()
+        assert foreign_key in lock._get_locks()  # survived: judged with the fresh anchor
+        lock.release()
+
     def test_skew_warning_during_exclusive_acquire(self, lockstore):
         # an exclusive acquirer must warn about a skewed peer it sees while (unsuccessfully)
         # waiting for the peer's healthy shared lock to go away: the listing that would satisfy

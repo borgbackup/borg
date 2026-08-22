@@ -88,6 +88,7 @@ class Lock:
         self.refresh_td = datetime.timedelta(seconds=stale // 2)  # don't refresh it if younger
         self.last_refresh_dt = None
         self.my_lock_key = None  # store key of the lock we currently hold, None if we hold none
+        self.my_old_lock_key = None  # store key of the lock we are replacing while a refresh is in progress
         # LockAnchor of the lock object we most recently created - its mtime and monotonic fields
         # together let us compute the current time in the store's clock domain, see _store_now().
         # it deliberately outlives its lock object: the calibration stays valid after deletion.
@@ -202,11 +203,12 @@ class Lock:
                 self._warn_clock_skew(lock, skew)
 
     def _is_stale_lock(self, lock):
-        if lock["key"] == self.my_lock_key:
-            # the lock we are currently holding: we are obviously alive and can refresh or
-            # release it, so it must never be considered stale (and get deleted), no matter
-            # how old it is. it can get old e.g. if the machine is suspended while doing a
-            # backup or if there is a long stretch of work without repository access, see #9883.
+        if lock["key"] in (self.my_lock_key, self.my_old_lock_key):
+            # the lock we are currently holding (or the one we are just replacing by it, see
+            # refresh): we are obviously alive and can refresh or release it, so it must never
+            # be considered stale (and get deleted), no matter how old it is. it can get old e.g.
+            # if the machine is suspended while doing a backup or if there is a long stretch of
+            # work without repository access, see #9883.
             return False
         if not platform.process_alive(lock["hostid"], lock["processid"], lock["threadid"]):
             # the lock owner is a process on THIS machine and it is dead - local knowledge,
@@ -395,29 +397,36 @@ class Lock:
         """Refreshes the lock; call this frequently, but not later than every <stale> seconds."""
         now = datetime.datetime.now(datetime.UTC)
         if self.last_refresh_dt is not None and now > self.last_refresh_dt + self.refresh_td:
-            old_locks = self._find_locks(only_mine=True)
-            if len(old_locks) == 0:
-                # crap, my lock has been removed. :-(
-                # this can happen e.g. if my machine has been suspended while doing a backup, so that the
-                # lock became stale and a borg client on another machine killed it.
-                # if my machine then wakes up again, the lock will have vanished and we get here.
-                # note: if our lock became stale, but is still present (no other client killed it),
-                # we do not get here - we never consider our own lock stale (see _is_stale_lock),
-                # so it is found above and simply refreshed below.
-                # in this case, we need to abort the operation, because the other borg might have removed
-                # repo objects we have written, but the referential tree was not yet full present, e.g.
-                # no archive has been added yet to the manifest, thus all objects looked unused/orphaned.
-                # another scenario when this can happen is a careless user running break-lock on another
-                # machine without making sure there is no borg activity in that repo.
-                logger.debug("LOCK-REFRESH: our lock was killed, there is no safe way to continue.")
-                raise LockTimeout(str(self.store))
-            assert len(old_locks) == 1  # there shouldn't be more than 1
-            old_lock = old_locks[0]
-            if now > old_lock["dt"] + self.refresh_td:
-                logger.debug(f"LOCK-REFRESH: lock needs a refresh. lock: {old_lock}.")
-                new_key = self._create_lock(exclusive=old_lock["exclusive"], update_last_refresh=True)
+            old_key = self.my_lock_key
+            logger.debug(f"LOCK-REFRESH: lock needs a refresh. key: {old_key}.")
+            # create the new lock object BEFORE listing: the listing then harvests a fresh (seconds
+            # old) store-clock anchor before its stale sweep judges other locks with it. listing
+            # first would judge with the anchor of the previous refresh (up to refresh_td old) -
+            # a window in which a storage clock that stepped back meanwhile could make the store-
+            # domain cross-check wrongly confirm a skewed peer's healthy lock as stale, see #9870.
+            new_key = self._create_lock(exclusive=self.is_exclusive, update_last_refresh=True)
+            self.my_old_lock_key = old_key  # exempt our old lock from the stale sweep meanwhile
+            try:
+                locks = self._find_locks(only_mine=True)
+                if old_key not in {lock["key"] for lock in locks}:
+                    # crap, my lock has been removed. :-(
+                    # this can happen e.g. if my machine has been suspended while doing a backup, so that the
+                    # lock became stale and a borg client on another machine killed it.
+                    # if my machine then wakes up again, the lock will have vanished and we get here.
+                    # note: if our lock became stale, but is still present (no other client killed it),
+                    # we do not get here - we never consider our own lock stale (see _is_stale_lock),
+                    # so it is found above and simply replaced below.
+                    # in this case, we need to abort the operation, because the other borg might have removed
+                    # repo objects we have written, but the referential tree was not yet full present, e.g.
+                    # no archive has been added yet to the manifest, thus all objects looked unused/orphaned.
+                    # another scenario when this can happen is a careless user running break-lock on another
+                    # machine without making sure there is no borg activity in that repo.
+                    # clean up the new lock (so it does not needlessly block others until it expires).
+                    logger.debug("LOCK-REFRESH: our lock was killed, there is no safe way to continue.")
+                    self._delete_lock(new_key, ignore_not_found=True, update_last_refresh=True)
+                    raise LockTimeout(str(self.store))
                 try:
-                    self._delete_lock(old_lock["key"], update_last_refresh=False)
+                    self._delete_lock(old_key, update_last_refresh=False)
                 except ObjectNotFound:
                     # our old lock vanished between listing and deleting it: another client considered
                     # it stale, killed it and (not having seen our new lock in its recheck) might have
@@ -426,6 +435,8 @@ class Lock:
                     logger.debug("LOCK-REFRESH: our lock was killed while refreshing it, no safe way to continue.")
                     self._delete_lock(new_key, ignore_not_found=True, update_last_refresh=True)
                     raise LockTimeout(str(self.store))
+            finally:
+                self.my_old_lock_key = None
 
 
 class LockRefresher:

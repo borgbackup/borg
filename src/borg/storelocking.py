@@ -297,7 +297,10 @@ class Lock:
         if self.skew_warned:
             return
         for lock in locks.values():
-            if lock["key"] == self.my_lock_key:
+            if self._is_our_lock(lock):
+                # our own lock object(s): e.g. during a refresh, our old and our new lock object -
+                # a storage clock step between their writes would make them look skewed against
+                # each other, but that is no peer with a skewed clock (see _check_store_clock_step).
                 continue
             skew = self._mutual_skew(lock)
             if skew is not None and abs(skew) > MAX_MUTUAL_CLOCK_SKEW:

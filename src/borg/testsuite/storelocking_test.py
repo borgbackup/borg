@@ -324,6 +324,21 @@ class TestLock:
         assert lock.store_clock_step_warned
         lock.release()
 
+    def test_no_skew_warning_about_our_own_old_lock(self, lockstore):
+        # during a refresh, the listing contains our old and our new lock object. a storage clock
+        # step between their writes (simulated by bumping the old object's mtime by 1h) makes the
+        # old one look skewed against our new anchor - but that is not a peer with a skewed clock,
+        # so there must be no clock skew warning (about ourselves!), see #9870.
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.acquire()
+        old_path = lockstore.backend.base_path / "locks" / lock.my_lock_key  # posixfs, levels [0]
+        mtime = os.stat(old_path).st_mtime + 3600
+        os.utime(old_path, (mtime, mtime))
+        lock.last_refresh_dt -= lock.refresh_td + datetime.timedelta(seconds=1)  # make refresh() act now
+        lock.refresh()
+        assert not lock.skew_warned
+        lock.release()
+
     def test_skew_warning_during_exclusive_acquire(self, lockstore):
         # an exclusive acquirer must warn about a skewed peer it sees while (unsuccessfully)
         # waiting for the peer's healthy shared lock to go away: the listing that would satisfy

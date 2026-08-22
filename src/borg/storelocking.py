@@ -93,7 +93,9 @@ class Lock:
         # together let us compute the current time in the store's clock domain, see _store_now().
         # it deliberately outlives its lock object: the calibration stays valid after deletion.
         self.my_lock_anchor = None
+        self.prev_lock_anchor = None  # the anchor before the current one, see _check_store_clock_step()
         self.skew_warned = False  # emit the clock-skew warning only once per Lock instance
+        self.store_clock_step_warned = False  # emit the storage-clock-step warning only once per Lock instance
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
         logger.debug(f"LOCK-INIT: initializing. store: {store}, stale: {stale}s, refresh: {stale // 2}s.")
@@ -127,6 +129,7 @@ class Lock:
             # the store-side mtime of the new lock object is not known yet - it is harvested
             # from the next locks listing. anchor the monotonic clock at creation time so the
             # harvested mtime can be extrapolated to "now" later, see _store_now().
+            self.prev_lock_anchor = self.my_lock_anchor
             self.my_lock_anchor = LockAnchor(key, self.last_refresh_dt, None, time.monotonic())
         return key
 
@@ -190,6 +193,31 @@ class Lock:
             f"{lock['hostid']!r} (also using this repository). "
             f"The clocks of machines sharing a repository should be synchronized (e.g. via NTP)."
         )
+
+    def _check_store_clock_step(self, anchor, mtime):
+        """
+        Warn (once) if the storage's clock jumped between the writes of our previous and our current
+        lock object: compare the new object's store-side mtime with what the previous anchor
+        extrapolates for the new object's creation instant. Diagnostic only: a backward step larger
+        than the stale timeout can defeat the store-domain cross-check in _is_stale_lock (see there),
+        this at least names the cause.
+        """
+        prev = self.prev_lock_anchor  # single read - it gets replaced atomically as a whole
+        if prev is None or prev.mtime is None or self.store_clock_step_warned:
+            return
+        elapsed_monotonic = anchor.monotonic - prev.monotonic
+        elapsed_wall = (anchor.dt - prev.dt).total_seconds()
+        if abs(elapsed_wall - elapsed_monotonic) > MAX_MUTUAL_CLOCK_SKEW:
+            # our own two clocks disagree about the elapsed time (suspend: time.monotonic() stood
+            # still, or our wall clock was stepped): then we can not judge the storage's clock.
+            return
+        step = (mtime - prev.mtime) - elapsed_monotonic
+        if abs(step) > MAX_MUTUAL_CLOCK_SKEW:
+            self.store_clock_step_warned = True
+            logger.warning(
+                f"The clock of the repository storage jumped by ~{step:+.0f}s between two lock writes of ours. "
+                f"Storage clock steps interfere with stale lock detection, the storage's clock should run steadily."
+            )
 
     def _check_clock_skew(self, locks):
         """Warn (once) if another current lock writer's clock is skewed against ours."""
@@ -277,6 +305,9 @@ class Lock:
             mtime = locks[my_key]["mtime"]
             anchor = self.my_lock_anchor
             if mtime and anchor is not None and anchor.key == my_key:
+                if anchor.mtime is None:
+                    # first harvest for this anchor: cross-check the storage clock's continuity.
+                    self._check_store_clock_step(anchor, mtime)
                 self.my_lock_anchor = anchor._replace(mtime=mtime)
         for key in list(locks):
             if self._is_stale_lock(locks[key]):

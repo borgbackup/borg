@@ -1198,7 +1198,9 @@ expired by age if it looks stale in both clock domains:
   store "now" is computed from the mtime of our own lock object plus the
   monotonic time elapsed since we created it, so this comparison stays
   entirely within the storage's clock domain - neither the clients' nor the
-  storage's absolute clock error matters.
+  storage's absolute clock error matters. the storage's clock should run
+  steadily, though: borg warns if it detects that it jumped between two of
+  its own lock writes.
 
 Store-side mtimes are advisory only: they can veto an expiry, but they can
 never cause one on their own, so a hostile or broken store gains no new

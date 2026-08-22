@@ -144,6 +144,7 @@ class TestLock:
         new_keys = set(lock._get_locks())
         assert len(old_keys) == len(new_keys) == 1
         assert old_keys != new_keys  # refresh done, new lock has different key
+        assert not lock.store_clock_step_warned  # the storage clock ran steadily, no warning
         lock.release()
 
     def test_refresh_killed_lock(self, lockstore):
@@ -306,6 +307,21 @@ class TestLock:
         lock.last_refresh_dt -= lock.refresh_td + datetime.timedelta(seconds=1)  # make refresh() act now
         lock.refresh()
         assert foreign_key in lock._get_locks()  # survived: judged with the fresh anchor
+        lock.release()
+
+    def test_storage_clock_step_warning(self, lockstore):
+        # when the mtime of a freshly created lock object is harvested, it is compared with what the
+        # previous anchor extrapolates for that instant: a mismatch means the storage's clock jumped
+        # between the two writes (simulated here by a previous anchor whose mtime is 1h ahead), see
+        # #9870. diagnostic only, but it names the cause of a defeated stale-lock cross-check.
+        lock = Lock(lockstore, exclusive=False, id=ID2)
+        lock.acquire()
+        anchor = lock.my_lock_anchor
+        assert anchor.mtime is not None
+        lock.my_lock_anchor = anchor._replace(mtime=anchor.mtime + 3600)  # as if the storage clock stepped back 1h
+        lock.last_refresh_dt -= lock.refresh_td + datetime.timedelta(seconds=1)  # make refresh() act now
+        lock.refresh()  # creates a new lock object and harvests its mtime: the step is detected
+        assert lock.store_clock_step_warned
         lock.release()
 
     def test_skew_warning_during_exclusive_acquire(self, lockstore):

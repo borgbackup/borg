@@ -1,3 +1,76 @@
+"""
+Repository locking on top of borgstore.
+
+Lock objects
+------------
+Each client holding a lock owns one small object below locks/ in the repository store. Its content
+(JSON) records the lock type (exclusive or shared), the owner's host / process / thread id and a
+timestamp (the "content timestamp"), stamped by the *owner's* clock when the object was written.
+Lock objects are immutable: to refresh a lock, the owner writes a new object and deletes the old one.
+Where the storage backend provides object timestamps (file, sftp, s3, current rest servers - not
+rclone), a lock object additionally carries a store-side mtime, stamped by the *storage's* clock at
+the same write instant; borgstore reports it as ItemInfo.mtime (0 if unavailable).
+
+Acquiring
+---------
+Shared locks may coexist, an exclusive lock must be alone. acquire() lists the lock objects, creates
+its own lock object if nothing forbids it, and lists again to detect a race with other clients
+creating theirs at the same time: an exclusive acquirer backs off if another exclusive lock showed
+up (and otherwise waits for remaining shared locks to go away), a shared acquirer backs off if an
+exclusive lock showed up. This is retried until the timeout.
+
+Staleness
+---------
+A lock whose owner died (crash, power loss, suspended laptop, ...) must not block others forever, so
+every listing judges each lock object and deletes it if it is stale:
+
+- Our own lock object (and, during a refresh, the one we are just replacing) is never stale: we are
+  obviously alive and will refresh or release it.
+- If the owner is a process on this machine and it is dead, the lock is stale. This is local
+  knowledge, independent of any clock, so it is checked first and can not be vetoed by anything the
+  storage says (a storage serving bogus, always-fresh mtimes must not be able to keep an abandoned
+  local lock alive forever).
+- Otherwise, a lock is stale by age if it was not refreshed for longer than the stale timeout
+  (default 30 minutes; owners refresh after half of it). But owners write the content timestamp
+  with *their* clock and we compare it with *ours*: if the owner's clock runs more than the stale
+  timeout behind ours, its just refreshed lock already looks stale to us, and killing it would e.g.
+  enable a compact to delete chunks a running backup still references (see #9870). Thus a lock is
+  only expired by age if it looks stale in BOTH clock domains:
+
+  * writer / local clock domain: our "now" vs. the lock's content timestamp, and
+  * store clock domain: store "now" vs. the lock object's store-side mtime.
+
+  Store "now" is extrapolated from our own lock object: its store-side mtime (harvested from a
+  listing after we created it) plus the time.monotonic() elapsed since its creation (LockAnchor
+  keeps these together, see there). So the store domain comparison involves no client's clock at
+  all, and the storage's absolute clock error cancels out - the storage only serves as a common
+  reference. Its clock should run steadily, though: borg warns if it detects that it jumped between
+  two of its own lock writes (see _check_store_clock_step), and refresh() creates the new lock
+  object before listing, so the stale sweep always judges with a fresh anchor.
+
+  Store-side mtimes are advisory only: they can veto an expiry, but never cause one on their own,
+  so a hostile or broken storage gains no new capabilities (it can not make us kill a healthy lock;
+  blocking us was possible for it before, anyway). A client without an own lock object can not
+  compute store "now" and defers the decision until acquire() has created one - the listing right
+  afterwards then confirms or vetoes. If the backend provides no store-side mtimes (mtime == 0),
+  staleness is judged by the content timestamp alone.
+
+Clock skew warning
+------------------
+As every lock object carries two timestamps of the same write instant (content timestamp: writer's
+clock, store-side mtime: storage's clock), the writers' clock offsets relative to the storage are
+comparable, with the storage's absolute clock error cancelled out. Every listing compares the other
+writers' offsets with ours and warns (once per Lock instance) if the clocks of concurrently active
+clients differ by more than MAX_MUTUAL_CLOCK_SKEW. This is diagnosis only, never an abort.
+
+Refreshing
+----------
+Lock holders must call refresh() regularly (LockRefresher does that from a background thread). It is
+a no-op until the lock is older than half the stale timeout, then it writes a new lock object and
+deletes the old one. If the old one turns out to be gone, another client killed it as stale (and
+might have acquired its own lock meanwhile), so there is no safe way to continue: LockTimeout.
+"""
+
 import datetime
 import hashlib
 import json

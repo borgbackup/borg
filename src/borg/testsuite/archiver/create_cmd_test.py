@@ -1,4 +1,5 @@
 import errno
+import hashlib
 import json
 import os
 import tempfile
@@ -8,6 +9,7 @@ import stat
 import subprocess
 
 import pytest
+from blake3 import blake3
 
 from ... import platform
 from ...constants import *  # NOQA
@@ -32,6 +34,7 @@ from .. import (
 )
 from . import (
     cmd,
+    open_archive,
     generate_archiver_tests,
     create_test_files,
     assert_dirs_equal,
@@ -1824,3 +1827,179 @@ def test_create_map_reuse_from_errors(archivers, request):
         "test",
         "input/file",
     )
+
+
+def item_digests(archiver, archive="test"):
+    """{path: item.digests} as STORED in the items of the newest archive of a series.
+
+    Note: "borg list --format {blake3}" can not be used for this - it falls back to
+    reading and hashing the file content if the item does not have digests.
+    """
+    archives = cmd(archiver, "repo-list", "--format", "{name} {id}{NL}").splitlines()
+    archive_id = [line.split()[1] for line in archives if line.split()[0] == archive][-1]
+    archive_obj, repository = open_archive(archiver.repository_path, f"aid:{archive_id}")
+    with repository:
+        return {item.path: item.get("digests") for item in archive_obj.iter_items()}
+
+
+def blake3_digests(data):
+    """what item.digests must look like for content <data>"""
+    return {"blake3": blake3(data).digest()}
+
+
+def test_create_digests(archivers, request):
+    # borg create computes a digest over the full content of each file, see #4699
+    archiver = request.getfixturevalue(archivers)
+    contents = {
+        "empty": b"",
+        "small": b"small file contents",  # single chunk, hashed by the main thread
+        "big": os.urandom(512 * 1024),  # multiple big chunks, hashed by a background thread
+    }
+    for name, data in contents.items():
+        create_regular_file(archiver.input_path, name, contents=data)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--digests=blake3", "--chunker-params=fixed,131072", "test", "input")
+    digests = item_digests(archiver)
+    for name, data in contents.items():
+        assert digests[f"input/{name}"] == blake3_digests(data)
+    assert digests["input"] is None  # a directory has no content and thus no digests
+
+
+def test_create_digests_from_files_cache(archivers, request):
+    # an unchanged file is not read again, so its digests must come from the files cache
+    archiver = request.getfixturevalue(archivers)
+    contents = b"some file contents"
+    create_regular_file(archiver.input_path, "file1", contents=contents)
+    granularity_sleep()  # file2 must have newer timestamps than file1, see test_file_status
+    create_regular_file(archiver.input_path, "file2", contents=b"newer file")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--digests=blake3", "test", "input")
+    output = cmd(archiver, "create", "--digests=blake3", "--list", "--filter=U", "test", "input")
+    assert "U input/file1" in output  # not read again
+    assert item_digests(archiver)["input/file1"] == blake3_digests(contents)
+
+
+@requires_hardlinks
+def test_create_digests_hardlink(archivers, request):
+    # the 2nd hard link is not read again, its digests come from the first one
+    archiver = request.getfixturevalue(archivers)
+    contents = b"some file contents"
+    create_regular_file(archiver.input_path, "file1", contents=contents)
+    os.link(os.path.join(archiver.input_path, "file1"), os.path.join(archiver.input_path, "file2"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--digests=blake3", "test", "input")
+    digests = item_digests(archiver)
+    assert digests["input/file1"] == digests["input/file2"] == blake3_digests(contents)
+
+
+def test_create_digests_holes(archivers, request):
+    # a hole is not read, but it is part of the file content, so it must be digested as zeros
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    block_size = 4096
+    data = os.urandom(block_size)
+    contents = data + b"\0" * block_size
+    create_regular_file(archiver.input_path, "file", contents=contents)
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write(f"0 {block_size} data\n")
+        f.write(f"{block_size} {block_size} zero\n")  # a hole, borg does not read it
+    cmd(
+        archiver,
+        "create",
+        "--digests=blake3",
+        "--chunker-params",
+        "fixed,4096",
+        "--map",
+        map_path,
+        "test",
+        "input/file",
+    )
+    assert item_digests(archiver)["input/file"] == blake3_digests(contents)
+
+
+def test_create_digests_reuse_from(archivers, request):
+    # --reuse-from reuses chunks without reading them, so we can not digest the full content
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    block_size = 4096
+    blocks = [os.urandom(block_size) for _ in range(2)]
+    create_regular_file(archiver.input_path, "file", contents=blocks[0] + blocks[1])
+    map_path = os.fspath(archiver.tmpdir / "input.map")
+    with open(map_path, "w") as f:
+        f.write(f"0 {2 * block_size} data\n")
+    cmd(
+        archiver, "create", "--digests=blake3", "--chunker-params", "fixed,4096", "--map", map_path, "ref", "input/file"
+    )
+    assert item_digests(archiver, "ref")["input/file"] == blake3_digests(blocks[0] + blocks[1])
+    new_block = os.urandom(block_size)
+    create_regular_file(archiver.input_path, "file", contents=blocks[0] + new_block)
+    with open(map_path, "w") as f:
+        f.write(f"0 {block_size} same\n")
+        f.write(f"{block_size} {block_size} data\n")
+    cmd(
+        archiver,
+        "create",
+        "--digests=blake3",
+        "--chunker-params",
+        "fixed,4096",
+        "--map",
+        map_path,
+        "--reuse-from",
+        "ref",
+        "test",
+        "input/file",
+    )
+    assert item_digests(archiver, "test")["input/file"] is None
+
+
+def test_create_digests_stdin(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    input_data = b"some data from a pipe"
+    cmd(archiver, "create", "--digests=blake3", "test", "-", input=input_data)
+    assert item_digests(archiver)["stdin"] == blake3_digests(input_data)
+
+
+def test_create_digests_algos(archivers, request):
+    # --digests selects the hash algorithms to compute
+    archiver = request.getfixturevalue(archivers)
+    contents = b"some file contents"
+    create_regular_file(archiver.input_path, "file1", contents=contents)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--digests", "blake3,sha256", "test", "input")
+    assert item_digests(archiver)["input/file1"] == {
+        "blake3": blake3(contents).digest(),
+        "sha256": hashlib.sha256(contents).digest(),
+    }
+
+
+def test_create_digests_default_is_none(archivers, request):
+    # digests are opt-in: without --digests, borg computes and stores none
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"some file contents")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    assert item_digests(archiver)["input/file1"] is None
+
+
+def test_create_digests_none(archivers, request):
+    # --digests=none does not compute digests and does not store known ones either
+    archiver = request.getfixturevalue(archivers)
+    contents = b"some file contents"
+    create_regular_file(archiver.input_path, "file1", contents=contents)
+    granularity_sleep()  # file2 must have newer timestamps than file1, see test_file_status
+    create_regular_file(archiver.input_path, "file2", contents=b"newer file")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--digests=blake3", "test", "input")  # this one has digests
+    output = cmd(archiver, "create", "--digests=none", "--list", "--filter=U", "test", "input")
+    assert "U input/file1" in output
+    # neither computed nor taken from the files cache (which has them from the first run):
+    assert item_digests(archiver)["input/file1"] is None
+
+
+def test_create_digests_invalid_algo(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "create", "--digests=nosuchhash", "test", "input", exit_code=2)
+    assert "digests must be" in output and "blake3" in output  # the error lists the valid algorithms

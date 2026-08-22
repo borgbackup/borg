@@ -167,6 +167,29 @@ Version 2.0.0b23 (not released yet)
 
 New features:
 
+- create, import-tar: new option "--digests ALGOS", #4699.
+
+  Computes hash digests over the full content of each regular file and stores them in
+  the item's new "digests" dict (algorithm name -> digest), e.g. --digests=blake3 gives
+  {"blake3": ...} (32 bytes). ALGOS is a comma-separated list of hash algorithm names -
+  the same algorithms that are available as "borg list" format keys - or "none".
+  Default: none, digests are opt-in.
+
+  Unlike the chunk ids, such a digest depends neither on the chunker nor on borg's key,
+  so it is the same digest as e.g. "b3sum" of that file gives. "borg list --format
+  {blake3}" uses a stored digest if the item has one, instead of reading the file
+  content from the repository.
+
+  The content is hashed while it is read and processed anyway, mostly by a background
+  thread, so one hash algorithm usually does not make borg create slower for bigger
+  files. Many small files are hashed by the main thread though, and several algorithms
+  are hashed one after the other, which the background thread may not be able to hide.
+
+  Digests are not computed if borg does not read the full content: an unchanged file gets
+  them from the files cache and additional hard links from the first hard link, but
+  "borg create --reuse-from" items do not have digests. Files that already are in the
+  files cache without digests get them when they change (and thus are read again), so
+  changing --digests only affects the files that borg reads.
 - crypto: protect metadata and object header in the modes that do not encrypt, #9104.
 
   The "none" and "authenticated" modes had a no-op repo object envelope: only the chunk

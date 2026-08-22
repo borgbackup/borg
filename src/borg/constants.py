@@ -1,13 +1,25 @@
+import hashlib
+
 # this set must be kept complete, otherwise the RobustUnpacker might malfunction:
 # fmt: off
 ITEM_KEYS = frozenset(['path', 'source', 'target', 'rdev', 'chunks', 'chunks_healthy', 'hardlink_master', 'hlid',
                        'mode', 'user', 'group', 'uid', 'gid', 'mtime', 'atime', 'ctime', 'birthtime', 'size', 'inode',
                        'xattrs', 'bsdflags', 'acl_nfs4', 'acl_access', 'acl_default', 'acl_extended',
+                       'digests',
                        'part'])
 # fmt: on
 
 # this is the set of keys that are always present in items:
 REQUIRED_ITEM_KEYS = frozenset(["path", "mtime"])
+
+# hash algorithms borg can compute over the content of a file: the ones from python's stdlib
+# (except shake_*, which use an incompatible .digest() to support variable length) and blake3.
+# used for "borg create --digests" (item.digests) and for the "borg list" format keys.
+HASH_ALGORITHMS = frozenset(hashlib.algorithms_guaranteed - {"shake_128", "shake_256"}) | {"blake3"}
+
+# what "borg create --digests" computes if the user does not give that option:
+# nothing - digests are opt-in, computing them costs time (esp. for many small files).
+DIGEST_ALGOS_DEFAULT = ()
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 # fmt: off

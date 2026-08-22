@@ -16,7 +16,7 @@ from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProce
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
-from ..helpers import archivename_validator, FilesCacheMode, files_cache_mode_no_ctime
+from ..helpers import archivename_validator, DigestAlgos, FilesCacheMode, files_cache_mode_no_ctime
 from ..helpers import octal_int, nonnegative_seconds
 from ..helpers import read_input_map
 from ..helpers import eval_escapes
@@ -360,6 +360,7 @@ class CreateMixIn:
                     read_special_timeout=read_special_timeout,
                     input_map=input_map,
                     reuse_chunks=reuse_chunks,
+                    digest_algos=args.digest_algos,
                 )
                 create_inner(archive, cache, fso)
             args.stats |= args.json
@@ -1196,6 +1197,17 @@ class CreateMixIn:
             dest="sparse",
             action="store_true",
             help="detect sparse holes in input and seek over them instead of reading them",
+        )
+        fs_group.add_argument(
+            "--digests",
+            metavar="ALGOS",
+            dest="digest_algos",
+            action=Highlander,
+            type=DigestAlgos,
+            default=DIGEST_ALGOS_DEFAULT,
+            help="compute these hash digests over the full content of each file and store them into "
+            'the archive items. Comma-separated list of hash algorithm names, e.g. "blake3", or "none". '
+            "default: %s" % (",".join(DIGEST_ALGOS_DEFAULT) or "none"),
         )
         fs_group.add_argument(
             "--files-cache",

@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import os
@@ -8,6 +9,7 @@ import sys
 import tarfile
 
 import pytest
+from blake3 import blake3
 
 from ... import xattr
 from ...archiver.tar_cmds import chunks_to_sparse_info, gnu_sparse_10_map, SparseTarInfo
@@ -15,7 +17,7 @@ from ...constants import *  # NOQA
 from ...helpers import Error
 from ...item import ChunkListEntry
 from .. import changedir
-from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, requires_hardlinks, RK_ENCRYPTION
+from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, open_archive, requires_hardlinks, RK_ENCRYPTION
 from . import create_test_files, create_regular_file
 from . import generate_archiver_tests
 from ...platform import acl_get, acl_set
@@ -152,6 +154,49 @@ def test_import_tar_nfiles(archivers, request):
     info = json.loads(cmd(archiver, "info", "--json", "dst"))
     # as with borg create, each regular file and each hardlink counts, directories/symlinks do not
     assert info["archives"][0]["stats"]["nfiles"] == 3
+
+
+def tar_item_digests(archiver, archive):
+    """{path: item.digests} as STORED in the items of an archive, see create_cmd_test.item_digests"""
+    archive_obj, repository = open_archive(archiver.repository_path, archive)
+    with repository:
+        return {item.path: item.get("digests") for item in archive_obj.iter_items()}
+
+
+def test_import_tar_digests(archivers, request):
+    # import-tar computes item.digests like borg create does, see #4699
+    archiver = request.getfixturevalue(archivers)
+    contents = {"dir/file1": os.urandom(512 * 1024), "dir/file2": b"small"}
+    with tarfile.open("input.tar", "w") as tar:
+        for name, data in contents.items():
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.size = len(data)
+            tar.addfile(tarinfo, io.BytesIO(data))
+        tarinfo = tarfile.TarInfo("dir/hardlink1")  # no content of its own, links to dir/file1
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/subdir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "import-tar", "--digests=blake3", "--chunker-params=fixed,131072", "dst", "input.tar")
+    digests = tar_item_digests(archiver, "dst")
+    for name, data in contents.items():
+        assert digests[name] == {"blake3": blake3(data).digest()}
+    # the hard link has no content in the tar, it gets the digests of the file it links to
+    assert digests["dir/hardlink1"] == {"blake3": blake3(contents["dir/file1"]).digest()}
+    assert digests["dir/subdir"] is None  # a directory has no content and thus no digests
+
+    cmd(archiver, "import-tar", "--digests", "sha256", "dst-sha256", "input.tar")
+    digests = tar_item_digests(archiver, "dst-sha256")
+    assert digests["dir/file1"] == {"sha256": hashlib.sha256(contents["dir/file1"]).digest()}
+
+    cmd(archiver, "import-tar", "--digests=none", "dst-none", "input.tar")
+    assert tar_item_digests(archiver, "dst-none")["dir/file1"] is None
+
+    cmd(archiver, "import-tar", "dst-default", "input.tar")  # digests are opt-in
+    assert tar_item_digests(archiver, "dst-default")["dir/file1"] is None
 
 
 def test_import_unusual_tar(archivers, request):

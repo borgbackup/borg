@@ -88,7 +88,7 @@ class TestAdHocWithFilesCache:
 
     def test_files_cache(self, cache):
         st = os.stat(".")
-        assert cache.file_known_and_unchanged(b"foo", bytes(32), st) == (False, None)
+        assert cache.file_known_and_unchanged(b"foo", bytes(32), st) == (False, None, None)
         assert cache.cache_mode == "d"
         assert cache.files == {}
 
@@ -663,14 +663,14 @@ def test_files_cache_save_tolerates_missing_chunk(tmp_path, monkeypatch):
             cache.memorize_file(os.fspath(realfile), path_hash, st, [(cid, 4)])
 
             # while the chunk is present, the file resolves as known/unchanged
-            known, chunks = cache.file_known_and_unchanged(os.fspath(realfile), path_hash, st)
+            known, chunks, digests = cache.file_known_and_unchanged(os.fspath(realfile), path_hash, st)
             assert known and chunks
 
             # simulate the out-of-space rollback: the referenced chunk is gone from the index
             del cache.chunks[cid]
 
             # a lookup must now report the file as unknown (re-chunk it), not raise KeyError
-            known, chunks = cache.file_known_and_unchanged(os.fspath(realfile), path_hash, st)
+            known, chunks, digests = cache.file_known_and_unchanged(os.fspath(realfile), path_hash, st)
             assert known is False and chunks is None
 
             # saving the files cache must drop the broken entry rather than raise KeyError

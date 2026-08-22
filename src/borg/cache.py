@@ -69,8 +69,9 @@ def discover_files_cache_names(path, files_cache_name="files"):
     return [p.name for p in path.iterdir() if p.name.startswith(files_cache_name + ".")]
 
 
-# chunks is a list of ChunkListEntry
-FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks")
+# chunks is a list of ChunkListEntry, digests is a dict (see item.digests) or None.
+# digests has a default, so that a files cache written by a borg without it still loads.
+FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks digests", defaults=(None,))
 
 
 def cache_dir(repository, path=None):
@@ -334,6 +335,7 @@ class FilesCacheMixin:
                     ctime=int_to_timestamp(ctime_ns),
                     mtime=int_to_timestamp(mtime_ns),
                     chunks=item.chunks,
+                    digests=item.get("digests"),
                 )
                 # note: if the repo is an a valid state, next line should not fail with KeyError:
                 files[path_hash] = self.compress_entry(entry)
@@ -456,25 +458,27 @@ class FilesCacheMixin:
         :param hashed_path: the file's path as we gave it to hash(hashed_path)
         :param path_hash: hash(hashed_path), to save some memory in the files cache
         :param st: the file's stat() result
-        :return: known, chunks (known is True if we have infos about this file in the cache,
-                               chunks is a list[ChunkListEntry] IF the file has not changed, otherwise None).
+        :return: known, chunks, digests (known is True if we have infos about this file in the cache,
+                               chunks is a list[ChunkListEntry] IF the file has not changed, otherwise None,
+                               digests is the file's digests dict IF the file has not changed and we have
+                               them, otherwise None).
         """
         if not stat.S_ISREG(st.st_mode):
-            return False, None
+            return False, None, None
         cache_mode = self.cache_mode
         if "d" in cache_mode:  # d(isabled)
             files_cache_logger.debug("UNKNOWN: files cache disabled")
-            return False, None
+            return False, None, None
         # note: r(echunk) does not need the files cache in this method, but the files cache will
         # be updated and saved to disk to memorize the files. To preserve previous generations in
         # the cache, this means that it also needs to get loaded from disk first.
         if "r" in cache_mode:  # r(echunk)
             files_cache_logger.debug("UNKNOWN: rechunking enforced")
-            return False, None
+            return False, None, None
         entry = self.files.get(path_hash)
         if not entry:
             files_cache_logger.debug("UNKNOWN: no file metadata in cache for: %r", hashed_path)
-            return False, None
+            return False, None, None
         # we know the file!
         try:
             entry = self.decompress_entry(entry)
@@ -482,21 +486,21 @@ class FilesCacheMixin:
             # the cached entry references a chunk that is no longer in the chunks index (e.g. after
             # an aborted / out-of-space backup); treat the file as unknown so it gets re-chunked.
             files_cache_logger.debug("UNKNOWN: cached entry references a missing chunk: %r", hashed_path)
-            return False, None
+            return False, None, None
         if "s" in cache_mode and entry.size != st.st_size:
             files_cache_logger.debug("KNOWN-CHANGED: file size has changed: %r", hashed_path)
-            return True, None
+            return True, None, None
         if "i" in cache_mode and entry.inode != st.st_ino:
             files_cache_logger.debug("KNOWN-CHANGED: file inode number has changed: %r", hashed_path)
-            return True, None
+            return True, None, None
         ctime = int_to_timestamp(safe_ns(st.st_ctime_ns))
         if "c" in cache_mode and entry.ctime != ctime:
             files_cache_logger.debug("KNOWN-CHANGED: file ctime has changed: %r", hashed_path)
-            return True, None
+            return True, None, None
         mtime = int_to_timestamp(safe_ns(st.st_mtime_ns))
         if "m" in cache_mode and entry.mtime != mtime:
             files_cache_logger.debug("KNOWN-CHANGED: file mtime has changed: %r", hashed_path)
-            return True, None
+            return True, None, None
         # V = any of the inode number, mtime, ctime values.
         # we ignored V in the comparison above or it is still the same value.
         # if it is still the same, replacing it in the tuple doesn't change it.
@@ -508,9 +512,9 @@ class FilesCacheMixin:
         entry = entry._replace(inode=st.st_ino, ctime=ctime, mtime=mtime, age=0)
         self.files[path_hash] = self.compress_entry(entry)
         chunks = [ChunkListEntry(*chunk) for chunk in entry.chunks]  # convert to list of namedtuple
-        return True, chunks
+        return True, chunks, entry.digests
 
-    def memorize_file(self, hashed_path, path_hash, st, chunks):
+    def memorize_file(self, hashed_path, path_hash, st, chunks, digests=None):
         if not stat.S_ISREG(st.st_mode):
             return
         # note: r(echunk) modes will update the files cache, d(isabled) mode won't
@@ -526,6 +530,7 @@ class FilesCacheMixin:
             ctime=int_to_timestamp(ctime_ns),
             mtime=int_to_timestamp(mtime_ns),
             chunks=chunks,
+            digests=digests,
         )
         self.files[path_hash] = self.compress_entry(entry)
         self._newest_cmtime = max(self._newest_cmtime or 0, ctime_ns)

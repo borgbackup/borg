@@ -388,6 +388,41 @@ dictionary created by the ``Item`` class that contains:
 * xattrs
 * acl (various OS-dependent fields)
 * flags
+* digests, hash digests over the full content of a regular file, see :ref:`item_digests`
+
+.. _item_digests:
+
+Item digests
+~~~~~~~~~~~~
+
+If asked to (``--digests ALGOS``, e.g. ``--digests=blake3``), ``borg create`` and
+``borg import-tar`` compute hash digests over the full content of each regular file
+and store them in the item's ``digests`` dict, mapping the hash algorithm name to
+the digest, e.g. ``{"blake3": b"..."}`` (32 bytes / 256 bits for blake3). The digest
+of the content is the same as the one an external tool like ``b3sum`` computes - in
+contrast to the chunk ids, it does not depend on the chunker or on borg's key.
+
+The same algorithms are available as ``borg list`` format keys, and
+``borg list --format "{blake3}"`` uses a stored digest if the item has one (otherwise
+it reads the file content to compute it).
+
+Digests are off by default (``--digests=none``): the content is hashed while it is
+read and processed anyway, mostly by a background thread (our hash implementations
+release the GIL), so one hash algorithm usually does not make ``borg create`` slower
+for bigger files - but many small files are hashed by the main thread, and several
+algorithms are hashed one after the other, which the background thread may not be
+able to hide.
+
+Digests are not computed if borg does not read the full content of a file:
+
+* an unchanged file (the files cache knows it) is not read again - borg takes the
+  digests from the files cache. Files that are already in the files cache without
+  digests only get them when they are read again (that is, when they change), so
+  changing ``--digests`` only affects files that borg reads.
+* the additional hard links to a file are not read again, they get the digests of
+  the first one.
+* ``borg create --reuse-from`` reuses chunks of a reference archive without reading
+  them, so the resulting item does not have digests.
 
 All items are serialized using msgpack and the resulting byte stream
 is fed into the same chunker algorithm as used for regular file data

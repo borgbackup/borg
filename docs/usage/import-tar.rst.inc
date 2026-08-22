@@ -47,6 +47,8 @@ borg import-tar
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                                                                  |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--digests ALGOS``                               | compute these hash digests over the full content of each file and store them into the archive items. Comma-separated list of hash algorithm names, e.g. "blake3", or "none". default: none        |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -81,6 +83,7 @@ borg import-tar
         --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
         --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: fastcdc,19,23,21,2
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
+        --digests ALGOS                               compute these hash digests over the full content of each file and store them into the archive items. Comma-separated list of hash algorithm names, e.g. "blake3", or "none". default: none
 
 
 Description

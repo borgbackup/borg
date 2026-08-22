@@ -293,6 +293,9 @@ cdef class Item(PropDict):
 
     xattrs = PropDictProperty(StableDict)
 
+    # digests over the full content of the item, hash algo name (e.g. "blake3") -> 32 bytes digest
+    digests = PropDictProperty(StableDict)
+
     deleted = PropDictProperty(bool)
     nlink = PropDictProperty(int)
 
@@ -374,6 +377,9 @@ cdef class Item(PropDict):
                 v = fix_timestamp(v)
             if k in ('acl_access', 'acl_default', 'acl_extended', 'acl_nfs4'):
                 v = fix_bytes_value(d, k)
+            if k == 'digests':
+                if not isinstance(v, StableDict):
+                    v = StableDict(v)
             if k == 'xattrs':
                 if not isinstance(v, StableDict):
                     v = StableDict(v)

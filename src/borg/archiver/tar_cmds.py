@@ -22,6 +22,7 @@ from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CompressionSpec
+from ..helpers import DigestAlgos
 from ..helpers import FilesystemPathSpec
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
@@ -557,6 +558,7 @@ class TarMixIn:
             cache=cache,
             key=key,
             process_file_chunks=cp.process_file_chunks,
+            digest_algos=args.digest_algos,
             add_item=archive.add_item,
             chunker_params=args.chunker_params,
             show_progress=args.progress,
@@ -833,6 +835,17 @@ class TarMixIn:
             default=CompressionSpec("lz4"),
             action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+        )
+        archive_group.add_argument(
+            "--digests",
+            metavar="ALGOS",
+            dest="digest_algos",
+            action=Highlander,
+            type=DigestAlgos,
+            default=DIGEST_ALGOS_DEFAULT,
+            help="compute these hash digests over the full content of each file and store them into "
+            'the archive items. Comma-separated list of hash algorithm names, e.g. "blake3", or "none". '
+            "default: %s" % (",".join(DIGEST_ALGOS_DEFAULT) or "none"),
         )
 
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")

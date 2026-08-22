@@ -46,7 +46,7 @@ env:
 jobs:
   s390x:
     name: s390x (big-endian, emulated)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 120
 
     env:
@@ -87,7 +87,7 @@ jobs:
         python-version: '3.13'
 
     # The wheels pip has to build from source inside the emulated container
-    # (msgpack, argon2-cffi-bindings, borghash, borgstore) are the expensive
+    # (msgpack, borghash, borgstore) are the expensive
     # part of the container setup, so keep them from run to run.
     - name: Cache pip-built wheels (s390x)
       uses: actions/cache@v6

@@ -38,7 +38,7 @@ env:
 jobs:
   lint:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
 
     steps:
@@ -47,7 +47,7 @@ jobs:
 
   security:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
 
     steps:
@@ -66,7 +66,7 @@ jobs:
 
   asan_ubsan:
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     needs: [lint]
 
@@ -153,23 +153,23 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "mypy"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse", "coverage": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3", "store_cache": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy", "coverage": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "mypy"},
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "docs"},
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "py311-llfuse", "coverage": "1"},
+              {"os": "ubuntu-26.04", "python-version": "3.12", "toxenv": "py312-pyfuse3", "store_cache": "1"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy", "coverage": "1"},
+              {"os": "ubuntu-26.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse", "coverage": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy", "store_cache": "1"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "coverage": "1", "binary": "borg-linux-glibc239-x86_64-gh"},
-              {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "coverage": "1", "binary": "borg-linux-glibc239-arm64-gh"},
+              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "py311-llfuse", "coverage": "1"},
+              {"os": "ubuntu-26.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-26.04", "python-version": "3.13", "toxenv": "py313-mfusepy", "store_cache": "1"},
+              {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "coverage": "1", "binary": "borg-linux-glibc243-x86_64-gh"},
+              {"os": "ubuntu-26.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "coverage": "1", "binary": "borg-linux-glibc243-arm64-gh"},
               {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "coverage": "1", "binary": "borg-macos-15-arm64-gh"},
               {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "coverage": "1", "binary": "borg-macos-15-x86_64-gh"},
-              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
+              {"os": "ubuntu-26.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy", "allow-failure": true}
             ]
           }'
         ) }}
@@ -412,7 +412,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 180
     needs: [lint]
     continue-on-error: true
@@ -645,8 +645,7 @@ jobs:
               pkgman install -y openssl3
               pkgman install -y rust_bin
               pkgman install -y python3.11
-              pkgman install -y cffi
-              pkgman install -y lz4_devel openssl3_devel libffi_devel
+              pkgman install -y lz4_devel openssl3_devel
 
               # there is no pkgman package for tox, so we install it into a venv
               python3 -m ensurepip --upgrade
@@ -750,7 +749,7 @@ jobs:
 
       - name: Build python venv
         run: |
-          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          # building native extensions in the venv fails, so we try to use the system packages
           python -m venv --system-site-packages env
           . env/bin/activate
           # python -m pip install --upgrade pip
@@ -863,7 +862,7 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/') && needs.release.result == 'success' }}
     needs: [release]
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     environment:

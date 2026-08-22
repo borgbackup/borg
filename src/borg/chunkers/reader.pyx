@@ -19,6 +19,11 @@ has_seek_hole = hasattr(os, 'SEEK_DATA') and hasattr(os, 'SEEK_HOLE')
 # os.readv is POSIX; on platforms without it (win32) we fall back to os.read + copy.
 has_readv = hasattr(os, 'readv')
 
+# Upper bound for a single os.read in that fallback: os.read allocates a buffer of the
+# requested size (pypy also zeroes it), no matter how few bytes it then returns. Asking for
+# the whole free scan buffer would thus cost MBs of allocation per small file, see #1755.
+READ_FALLBACK_SIZE = 256 * 1024
+
 _Chunk = namedtuple('_Chunk', 'meta data')
 _Chunk.__doc__ = """\
     Chunk namedtuple
@@ -396,7 +401,9 @@ class FileReader:
                 if has_readv:
                     got = os.readv(self.fh, [tv[pos:size]])
                 else:
-                    data = os.read(self.fh, size - pos)
+                    # os.read allocates a buffer of the requested size, so ask for the
+                    # block size rather than for the whole free scan buffer, see #1755.
+                    data = os.read(self.fh, min(size - pos, READ_FALLBACK_SIZE))
                     got = len(data)
                     tv[pos:pos + got] = data
                 if got > 0:

@@ -167,54 +167,6 @@ Version 2.0.0b23 (not released yet)
 
 New features:
 
-- create, import-tar: new option "--digests ALGOS", #4699.
-
-  Computes hash digests over the full content of each regular file and stores them in
-  the item's new "digests" dict (algorithm name -> digest), e.g. --digests=blake3 gives
-  {"blake3": ...} (32 bytes). ALGOS is a comma-separated list of hash algorithm names -
-  the same algorithms that are available as "borg list" format keys - or "none".
-  Default: none, digests are opt-in.
-
-  Unlike the chunk ids, such a digest depends neither on the chunker nor on borg's key,
-  so it is the same digest as e.g. "b3sum" of that file gives. "borg list --format
-  {blake3}" uses a stored digest if the item has one, instead of reading the file
-  content from the repository.
-
-  The content is hashed while it is read and processed anyway, mostly by a background
-  thread, so one hash algorithm usually does not make borg create slower for bigger
-  files. Many small files are hashed by the main thread though, and several algorithms
-  are hashed one after the other, which the background thread may not be able to hide.
-
-  Digests are not computed if borg does not read the full content: an unchanged file gets
-  them from the files cache and additional hard links from the first hard link, but
-  "borg create --reuse-from" items do not have digests. Files that already are in the
-  files cache without digests get them when they change (and thus are read again), so
-  changing --digests only affects the files that borg reads.
-- crypto: protect metadata and object header in the modes that do not encrypt, #9104.
-
-  The "none" and "authenticated" modes had a no-op repo object envelope: only the chunk
-  id over the plaintext was checked, so a repo object's metadata (which selects the
-  decompressor!) and its object header were not verified at all. They now use a tagged
-  envelope: every object slot carries a 32 byte tag over the payload, the object header,
-  the chunk id and the meta/data slot, verified before the payload is used.
-
-  - "authenticated-sha256" / "authenticated-blake3": the tag is a MAC (HMAC-SHA256 resp.
-    keyed BLAKE3, key derived from crypt_key), thus these modes now detect tampering with
-    metadata and object header, not just with the chunk content.
-  - "none-sha256" / "none-blake3": the tag is an unkeyed checksum, which detects accidental
-    corruption. It is no authentication - these modes have no key and make no such claim.
-  - The tag is deterministic (no nonce/session), so repositories with the same key material
-    store byte-identical objects for identical input.
-  - The unencrypted modes are named "<mode>-<hash>" now, because the hash *is* what protects
-    the data there: "none-sha256", "none-blake3", "authenticated-sha256",
-    "authenticated-blake3". Bare "--encryption none" / "--encryption authenticated" are
-    rejected, and "--id-hash" only applies to the encrypted modes now.
-  - "none-blake3" is new: the unencrypted mode was limited to sha256 before.
-
-  Breaking: borg 2 beta repositories using the old "none" or "authenticated" formats are not
-  supported any more - create a new repository, or transfer the archives with borg 2.0.0b23
-  or older first. Reading borg 1.x "none"/"authenticated" repositories for
-  "borg transfer --from-borg1" is not affected.
 - faster create:
 
   - use multi-threaded zstd compression for big chunks, #9961
@@ -232,7 +184,7 @@ New features:
 - more, faster, and more secure chunkers:
 
   - fastcdc is the new and faster default chunker, #9957
-  - fastcdc / buzhash64: SIMD-accelerated scan kernel, #10034, #10043:
+  - fastcdc / buzhash64: SIMD-accelerated scan kernels, #10034, #10043:
 
     - AVX-512 / AVX2 on x86-64 (Intel / AMD), NEON on aarch64, plus a portable
       blockwise one; all bit-identical to the sequential loop
@@ -244,26 +196,23 @@ New features:
       override that; a kernel this build or CPU can not run is an error, never
       a silent fallback
   - toeplitz-aes, rabin-aes, goldilocks-aes: fingerprinting-resistant chunkers
-    (UHF-then-PRF), with direct AES hardware acceleration (AES-NI or
+    (UHF-then-PRF), with AES hardware acceleration, either direct (AES-NI or
     VAES/AVX-512) or via OpenSSL, #9987, #10043. Here wider is simply faster,
     so the default is the best path the build and the CPU offer, #10160
   - zero-copy fill and lazy buffer compaction optimizations
   - log the chunker and its scan kernel at debug level
-- compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.
-  They trade compression ratio for speed. Compatible with existing repositories.
-- check:
-
-  - keep pack check results, add --max-age to reuse them, #9696, #9925
-  - report missing chunks grouped as chunk -> files -> archives, #9218, #9965
-  - calendar-aware --max-age, symmetric clock-skew window
-  - stream one line per missing chunk id, run report on abort, lower report caps, #9218
-- help environment: new help topic about environment variables, #10061
-- webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
-  replacement for `borg mount` in some use cases, #9942
-- mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
-- analyze: report deduplicated size of a set of archives, #5741
-- repo-compress: was temporarily gone, now re-added with pack support, #9663
-- version: add --json output, #10004
+- create: --map and --reuse-from for efficient block device snapshot backups.
+  Adds the lvm-thin-map.py script to generate input maps from thin_dump XML, see #4363.
+- create --dry-run --stats: count files, sum up sizes, #1648
+- create --progress: show big sizes with more decimals, #3559
+- create: add --read-special-timeout option, #5422
+- create: follow symlinks given as recursion roots, #4737
+- create/import-tar --digests: compute digests over the full file content, see #4699.
+  This uses an additional thread for bigger files, so it is cheap for fast hashes
+  like blake3 or hw-accelerated sha256. It adds a little overhead, though, when processing
+  lots of small files.
+- create --encryption: new none-* and authenticated-* modes, #9104.
+  Uses either sha256 or blake3, improves authentication and checksumming capabilities.
 - benchmark cpu:
 
   - add a throughput column (MB/s), #10049
@@ -273,47 +222,70 @@ New features:
     depending on data size)
   - use --chunking / --hashing / --encrypting / --compressing / --msgpacking
     to run only a subset of the benchmarks, #10050
+- export-tar: support sparse files, #2562
+- find: search files across archives, #9974
+- compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.
+  They trade compression ratio for speed. Compatible with existing repositories.
+- check:
+
+  - keep pack check results, add --max-age to reuse them, #9696, #9925
+  - calendar-aware --max-age, symmetric clock-skew window
+  - report missing chunks grouped as chunk -> files -> archives, #9218, #9965
+  - stream one line per missing chunk id, run report on abort, lower report caps, #9218
+- help environment: new help topic about environment variables, #10061
+- webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
+  replacement for ``borg mount`` in some use cases, #9942
+- mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
+- analyze: report deduplicated size of a set of archives, #5741
+- analyze: add --json output, #9992
+- repo-compress: was temporarily gone, now re-added with pack support, #9663
+- version: add --json output, #10004
 - completion: generate fish and tcsh completions, #9989, #9503
 - list: --sort-by=field[,field,...], #9009
 - BORG_UNITS env var: si / iec / raw size formatting, replaces the --iec option, #5513
 - BORG_PROGRESS_FPS env var: how often --progress output is updated, #8041
 - BORG_MOUNT_ARCHIVE_DIR_FORMAT env var: how the archive directories of a repository
   mount (borg mount, borg webdav) are named, #9991
+- Illumos/Solaris: add xattr support, #1337
 
 Fixes:
 
-- create: do not use ctime for the files cache on Windows, #7193.
-
-  ctime is the file *creation* time on Windows, so a ctime based files cache mode
-  did not notice content changes of files that kept their size and inode number.
-  The default is ``mtime,size,inode`` there now and an explicitly given ctime based
-  mode warns and uses the corresponding mtime based mode.
-- extract: restore the timestamps using SetFileTime on Windows, #7269.
-
-  os.utime can not set the birthtime (creation time) there, nor can it work on a file
-  descriptor or on a symlink itself. Thus, the birthtime was not restored at all and the
-  timestamps of a symlink were set on the symlink's target. Also, failing to set the
-  timestamps is not silently ignored anymore, but gives a warning.
 - re-add XXH64 to read borg 1.x integrity data, #9935
+- create:
+
+  - do not archive an atime we caused ourselves, #6194
+  - do not use ctime for the files cache on Windows, #7193
+  - win32: no ctime, archive the creation time as birthtime, #8730
+- extract: restore the timestamps using SetFileTime on Windows, #7269
+- recreate: keep original chunker_params if not rechunkifying, #10127
+- import-tar: fix nfiles being counted twice for regular files
 - list: add {blake3} format key, #9984
-- support date: archive patterns for --from-borg1, #9949
-- fix calculate_relative_offset year offset for Feb 29, #9967
-- bind pack object header into AEAD authentication
-- fix false repo relocation warning on macOS due to NFC/NFD path differences, #2913
-- release chunk data memoryviews (fixes PyPy memory leak), #1755, #9978
-- fix DownloadPipeline.fetch_many() crashing on a missing chunk, #10024
-- lrucache: make it thread-safe
-- crypto: start a new session after encrypting 2 TiB with one aes256-ocb session key, #6501
 - check:
 
   - flush pack writer in ArchiveChecker.finish() before dropping the index
   - handle Ctrl-C at safe boundaries, #7893, #9966
   - report invalid pack names instead of crashing
   - honest per-run interrupt count, drop redundant save, fix stale SIGINT docs
+  - detect missing packs referenced by the index and orphan packs, #9898
+  - --repair: rebuild a corrupt repository index from the packs, #10026
+- support date: archive patterns for --from-borg1, #9949
+- fix calculate_relative_offset year offset for Feb 29, #9967
+- bind the pack object header into the AEAD authentication
+- fix false repo relocation warning on macOS due to NFC/NFD path differences, #2913
+- release chunk data memoryviews (fixes PyPy memory leak), #1755, #9978
+- fix DownloadPipeline.fetch_many() crashing on a missing chunk, #10024
+- lrucache: make it thread-safe
+- crypto: start a new session after encrypting 2 TiB with one aes256-ocb session key, #6501
+- set_flags: use masked get/set everywhere, keep unprivileged flags on EPERM
+- fix daemonizing: don't lose an early notify signal from the background process
+- validate object headers when walking a pack, see #8476
 
 Other changes:
 
 - support Python 3.15
+- support PyPy (nightly build or next release), #1755.
+  Note: PyPy is slower than CPython due to the way it deals with C code.
+- chunkers/reader: limit the read size in the no-readv fallback (win32), see #1755
 - borgstore: require 0.6.x, with blake3 support
 - shtab: require >=1.9.3
 - list: validate --format keys, #9984
@@ -338,7 +310,7 @@ Other changes:
   - a chunk that is read to its end is no longer put into the data cache, so a
     full download does not evict the chunks that partial (range) reads need - this was
     the FUSE behavior, now webdav shares it.
-- removed some global options (they were difficult to use and spammed the help output):
+- remove some global options (they were difficult to use and spammed the help output):
 
   - --remote-path -> BORG_REMOTE_PATH
   - --rsh -> BORG_RSH
@@ -359,8 +331,17 @@ Other changes:
   - FAME.md: update contributor statistics, #10022
   - crypto: misc. improvements to code and docs, #6501, ...
   - GitHub issue #10000: "We Are Borg" joke collection
+  - describe cross-platform behavior of file flags (bsdflags), #1345
+  - create --sparse: sparse input works with all chunkers
+  - new man page borg-environment.1
+  - NetBSD xattr support is implemented, update platform feature table, #1332
+  - FAQ about chunker params for SQLite databases, #5877
+  - FAQ about limiting bandwidth, #8838
 - CI / tests:
 
+  - release automation for PyPI and GitHub releases
+  - pin GitHub Actions to commit SHAs
+  - add Dependabot cooldown
   - give the test VMs 4 CPUs / 8 GiB RAM
   - cache pip-built wheels (Windows, BSDs, OmniOS, Haiku)
   - upgrade cross-platform-actions to 1.4.0
@@ -372,6 +353,17 @@ Other changes:
   - time out the "Start VM" step after 15 minutes
   - time-bound LRUCache.test_threaded_access
   - benchmark crud json-lines: I/O throughput may round to 0
+  - give the macOS runners a resolvable hostname, fixes hours-long test jobs
+  - add big-endian (s390x) testing under QEMU emulation
+  - enable POSIX.1e ACLs on the FreeBSD VM's root fs, #9144
+  - misc. improvements to speed up coverage, #9470
+  - conftest: fix rmtree cleanup crash on Linux (os.lchflags does not exist)
+- extract: warn if file flags cannot be set, #1345
+- Location: reject UNC paths everywhere, #10164
+- mount: tell why FUSE support is unavailable, #8657
+- fslocking: fix broken exclusivity on Cygwin, #7218
+- platform: determine hostname / fqdn / hostid lazily, #9470
+- get rid of master/slave terminology for hard links, #5248
 
 
 Version 2.0.0b22 (2026-07-22)

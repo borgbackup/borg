@@ -1170,17 +1170,50 @@ To implement locking based on ``borgstore``, borg stores objects below locks/.
 
 The objects contain:
 
-- a timestamp when lock was created (or refreshed)
+- a timestamp when lock was created (or refreshed), stamped by the clock of
+  the machine writing the lock
 - host / process / thread information about lock owner
 - lock type: exclusive or shared
 
+Where the storage backend provides object timestamps (file, sftp, s3 and
+current rest servers - but not rclone), borg additionally uses the lock
+object's store-side mtime, which is stamped by the storage's clock.
+
 Using that information, borg implements:
 
+- lock auto-removal if the owner process is dead. the primary purpose of this
+  is to quickly get rid of stale locks by borg processes on the same machine.
+  process liveness is local knowledge, independent of any clock, so this check
+  runs first and can not be vetoed by store timestamps.
 - lock auto-expiry: if a lock is old and has not been refreshed in time,
   it will be automatically ignored and deleted. the primary purpose of this
   is to get rid of stale locks by borg processes on other machines.
-- lock auto-removal if the owner process is dead. the primary purpose of this
-  is to quickly get rid of stale locks by borg processes on the same machine.
+
+Lock auto-expiry must never kill a healthy lock just because its writer's
+clock is skewed against ours (see :issue:`9870`), thus a lock may only be
+expired by age if it looks stale in both clock domains:
+
+- writer / local clock domain: local "now" vs. the lock's content timestamp.
+- store clock domain: store "now" vs. the lock object's store-side mtime.
+  store "now" is computed from the mtime of our own lock object plus the
+  monotonic time elapsed since we created it, so this comparison stays
+  entirely within the storage's clock domain - neither the clients' nor the
+  storage's absolute clock error matters. the storage's clock should run
+  steadily, though: borg warns if it detects that it jumped between two of
+  its own lock writes.
+
+Store-side mtimes are advisory only: they can veto an expiry, but they can
+never cause one on their own, so a hostile or broken store gains no new
+capabilities. A client that has no own lock object yet can not compute store
+"now" and defers the expiry decision until it has created one. If the backend
+can not provide store-side mtimes (mtime is 0), staleness is judged by the
+content timestamp alone.
+
+As each lock object carries two timestamps of the same write instant (content
+timestamp: writer's clock, store-side mtime: storage's clock), the writers'
+clock offsets relative to the storage are comparable, with the storage's
+absolute clock error cancelled out. borg uses this to warn (once) if the
+clocks of concurrently active clients differ by more than a few minutes.
 
 Breaking the locks
 ------------------

@@ -14,13 +14,12 @@
 /* Scan kernel ids. Which names map onto them depends on the build: "neon"
  * exists only on aarch64, "avx2"/"avx512" only on x86-64.
  *
- * There is no automatic selection: the caller says which kernel to run, and
- * that is what runs. FC_K_SCALAR, the plain sequential loop, is id 0 and the
- * default everywhere - it is the simplest implementation and the one the
- * others are checked against. Which of the rest is fastest turned out not to
- * be predictable from the instruction set (on an Apple M3 the NEON kernel
- * beats the sequential loop 2.1x; with gcc on a Zen 4 the sequential loop
- * beats AVX-512 by 1.7x), so choosing one is left to whoever measured. */
+ * FC_K_SCALAR, the plain sequential loop, is id 0 and the one the others are
+ * checked against. Which kernel is fastest is not predictable from the
+ * instruction set (on an Apple M3 the NEON kernel beats the sequential loop
+ * 2.1x; with gcc on a Zen 4 the sequential loop beats AVX-512 by 1.7x), so
+ * fc_kernel_default() encodes what was measured per platform rather than
+ * "the widest vectors this CPU has". */
 #define FC_K_SCALAR 0    /* sequential reference loop */
 #define FC_K_BLOCKWISE 1 /* portable 8-lane C */
 #define FC_K_VECTOR 2    /* the platform's vector kernel: neon or avx2 */
@@ -41,6 +40,10 @@ int fc_kernel_select(const char *name, int *out_id);
 /* Comma-separated list of the kernel names this build accepts, for error
  * messages. Names a CPU cannot run are still listed. */
 const char *fc_kernel_names(void);
+
+/* The kernel to run when the caller did not ask for a specific one, see
+ * fc_kernel_default() in fastcdc_impl.c for what is chosen where. */
+int fc_kernel_default(void);
 
 /* Scan up to n positions: for i = 0..n-1 advance fp = (fp << 1) + gear[p[i]]
  * and test (fp & mask) == 0.

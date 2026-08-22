@@ -13,10 +13,9 @@
  * on x86-64, and the 128-bit hardware path is spelled "aes-ni" on x86-64 and
  * "aes-arm64" on aarch64.
  *
- * There is no automatic selection: the caller says which path to run.
- * PHTE_K_EVP, the portable OpenSSL batch path, is id 0 and the default - it
- * is the simplest implementation and the one the others are checked
- * against. */
+ * PHTE_K_EVP, the portable OpenSSL batch path, is id 0 and the one the others
+ * are checked against; phte_kernel_default() picks the fastest path this
+ * build and CPU can actually run. */
 #define PHTE_K_EVP 0   /* portable OpenSSL EVP batch path */
 #define PHTE_K_HW 1    /* 128-bit AES instructions: aes-ni / aes-arm64 */
 #define PHTE_K_HW512 2 /* VAES/AVX-512, 4 AES blocks per instruction */
@@ -36,5 +35,10 @@ int phte_kernel_select(const char *name, int *out_id);
 /* Comma-separated list of the scan path names this build accepts, for error
  * messages. Names a CPU cannot run are still listed. */
 const char *phte_kernel_names(void);
+
+/* The scan path to run when the caller did not ask for a specific one: the
+ * widest AES path this build and CPU support, down to the portable EVP one.
+ * Unlike the rolling-hash kernels, wider is simply faster here. */
+int phte_kernel_default(void);
 
 #endif /* BORG_PHTE_KERNEL_H */

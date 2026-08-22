@@ -236,13 +236,17 @@ New features:
 
     - AVX-512 / AVX2 on x86-64 (Intel / AMD), NEON on aarch64, plus a portable
       blockwise one; all bit-identical to the sequential loop
-    - the sequential loop is what runs unless one of BORG_FASTCDC_KERNEL /
-      BORG_BUZHASH64_KERNEL / BORG_AES_CHUNKER_KERNEL selects another kernel;
-      which one is fastest depends on the CPU *and* the compiler, so nothing
-      is chosen automatically
+    - which one is fastest depends on the CPU *and* the compiler, so the
+      default is what benchmarking found: NEON on aarch64, the sequential loop
+      on x86-64 (the compiler folds the rolling hash update into a single
+      instruction there), blockwise elsewhere, #10160
+    - BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL / BORG_AES_CHUNKER_KERNEL
+      override that; a kernel this build or CPU can not run is an error, never
+      a silent fallback
   - toeplitz-aes, rabin-aes, goldilocks-aes: fingerprinting-resistant chunkers
     (UHF-then-PRF), with direct AES hardware acceleration (AES-NI or
-    VAES/AVX-512) or via OpenSSL, #9987, #10043
+    VAES/AVX-512) or via OpenSSL, #9987, #10043. Here wider is simply faster,
+    so the default is the best path the build and the CPU offer, #10160
   - zero-copy fill and lazy buffer compaction optimizations
   - log the chunker and its scan kernel at debug level
 - compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.

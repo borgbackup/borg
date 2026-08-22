@@ -407,6 +407,22 @@ int bz64_kernel_select(const char *name, int *out_id)
     return BZ_KSEL_UNKNOWN;
 }
 
+int bz64_kernel_default(void)
+{
+#if defined(__aarch64__)
+    /* Same picture as for fastcdc: NEON is baseline on aarch64 and wins, so
+     * this only falls back if the build lacks it. */
+    int kid;
+    if (bz64_kernel_select("neon", &kid) == BZ_KSEL_OK)
+        return kid;
+    return BZ_K_BLOCKWISE;
+#elif defined(__x86_64__) || defined(_M_X64)
+    return BZ_K_SCALAR;
+#else
+    return BZ_K_BLOCKWISE;
+#endif
+}
+
 /* --- dispatch ----------------------------------------------------------- */
 
 size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,

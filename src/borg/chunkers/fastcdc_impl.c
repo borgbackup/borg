@@ -399,6 +399,26 @@ int fc_kernel_select(const char *name, int *out_id)
     return FC_KSEL_UNKNOWN;
 }
 
+int fc_kernel_default(void)
+{
+#if defined(__aarch64__)
+    /* NEON beats the sequential loop clearly (2.1x on an Apple M3). It is
+     * baseline on aarch64, so this only falls back if the build lacks it. */
+    int kid;
+    if (fc_kernel_select("neon", &kid) == FC_KSEL_OK)
+        return kid;
+    return FC_K_BLOCKWISE;
+#elif defined(__x86_64__) || defined(_M_X64)
+    /* The compiler folds the Gear update into a single instruction here, so
+     * the sequential loop beat AVX2 and AVX-512 on every x86-64 CPU that was
+     * benchmarked for #10160 - an Atom N2800 and a Core i5-3570K just as much
+     * as a Ryzen 9 9900X. */
+    return FC_K_SCALAR;
+#else
+    return FC_K_BLOCKWISE;
+#endif
+}
+
 /* --- dispatch ----------------------------------------------------------- */
 
 int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel)

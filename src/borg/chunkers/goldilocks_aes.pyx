@@ -48,6 +48,7 @@ cdef extern from "goldilocks_aes_impl.h":
     GL_CTX *gl_new(const uint64_t *tables, uint64_t k1, uint64_t k2, const uint8_t *aes_key, int kernel)
     int phte_kernel_select(const char *name, int *out_id)
     const char *phte_kernel_names()
+    int phte_kernel_default()
     int PHTE_K_EVP
     int PHTE_K_HW
     void gl_free(GL_CTX *ctx)
@@ -117,12 +118,15 @@ cdef int _select_kernel() except -1:
 
     One selector for all three AES chunkers: they share phte_scan.h, so the
     available paths never differ between them.
+
+    Unset means the fastest path this build and CPU support, see
+    phte_kernel_default().
     """
-    cdef int kid = PHTE_K_EVP
+    cdef int kid
     cdef int rc
     want = requested_kernel("BORG_AES_CHUNKER_KERNEL")
     if want is None:
-        return PHTE_K_EVP
+        return phte_kernel_default()
     rc = phte_kernel_select(want.encode("ascii"), &kid)
     if rc != 0:
         raise kernel_error("BORG_AES_CHUNKER_KERNEL", want, rc,

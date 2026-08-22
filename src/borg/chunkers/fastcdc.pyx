@@ -17,7 +17,7 @@ cdef extern from "fastcdc_impl.h":
     const char *fc_kernel_name(int kernel)
     int fc_kernel_select(const char *name, int *out_id)
     const char *fc_kernel_names()
-    int FC_K_SCALAR
+    int fc_kernel_default()
 
 from .kernel_env import kernel_error, requested_kernel
 
@@ -40,8 +40,9 @@ from .kernel_env import kernel_error, requested_kernel
 # The inner scan runs in a C kernel (fastcdc_impl.c) with SIMD implementations (NEON on
 # aarch64, AVX-512 or AVX2 on x86-64, blockwise scalar elsewhere) that are bit-identical to
 # the plain sequential Gear loop: every byte position is tested, cuts and hash state are
-# exactly the same, only faster. The sequential loop is what runs by default; the others
-# are selected via BORG_FASTCDC_KERNEL, see kernel_env.py and the .kernel property.
+# exactly the same, only faster. Which one runs by default is decided per platform by
+# fc_kernel_default(); BORG_FASTCDC_KERNEL overrides that, see kernel_env.py and the
+# .kernel property.
 
 
 @cython.boundscheck(False)
@@ -67,14 +68,14 @@ cdef uint64_t* fastcdc_init_gear(bytes key) except NULL:
 cdef int _select_kernel() except -1:
     """Resolve BORG_FASTCDC_KERNEL to a kernel id, raising if it cannot be honoured.
 
-    Unset means the simplest implementation, not the fastest one: nothing here
-    guesses which kernel a given CPU and compiler make fastest.
+    Unset means the kernel that measured fastest on this platform, see
+    fc_kernel_default().
     """
-    cdef int kid = FC_K_SCALAR
+    cdef int kid
     cdef int rc
     want = requested_kernel("BORG_FASTCDC_KERNEL")
     if want is None:
-        return FC_K_SCALAR
+        return fc_kernel_default()
     rc = fc_kernel_select(want.encode("ascii"), &kid)
     if rc != 0:
         raise kernel_error("BORG_FASTCDC_KERNEL", want, rc,
@@ -111,8 +112,8 @@ cdef class ChunkerFastCDC(ChunkerBase):
     def kernel(self):
         """Which scan kernel this chunker uses: 'neon', 'avx512', 'avx2', 'blockwise' or 'scalar'.
 
-        'scalar' unless BORG_FASTCDC_KERNEL names another one, in which case
-        this is always that one - creating the chunker fails otherwise.
+        The platform default unless BORG_FASTCDC_KERNEL names another one, in
+        which case this is always that one - creating the chunker fails otherwise.
         """
         return (<bytes>fc_kernel_name(self.kernel_id)).decode("ascii")
 

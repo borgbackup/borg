@@ -1227,7 +1227,8 @@ class MetadataCollector:
         attrs["mtime"] = safe_ns(st.st_mtime_ns)
         if not self.noatime:
             attrs["atime"] = safe_ns(st.st_atime_ns)
-        if not self.noctime:
+        if not self.noctime and not is_win32:
+            # win32: st_ctime is the file creation time, that is archived as birthtime, see #8730.
             attrs["ctime"] = safe_ns(st.st_ctime_ns)
         if not self.nobirthtime:
             birthtime_ns = get_birthtime_ns(st, path, fd=fd)

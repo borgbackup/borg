@@ -96,6 +96,9 @@ def get_birthtime_ns(st, path, fd=None):
     if hasattr(st, "st_birthtime_ns"):
         # Added in Python 3.12, but not always available.
         return st.st_birthtime_ns
+    elif is_win32:
+        # Python < 3.12 on win32: st_ctime is the file creation time, see #8730.
+        return st.st_ctime_ns
     elif is_darwin and is_darwin_feature_64_bit_inode:
         return _get_birthtime_ns(fd or path, follow_symlinks=False)
     elif hasattr(st, "st_birthtime"):

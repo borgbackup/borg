@@ -1,12 +1,14 @@
 import errno
 import functools
 import os
+import stat
 
 import pytest
 
 from ...platformflags import is_darwin, is_freebsd, is_linux, is_win32
 from ...platform import acl_get, acl_set
 from ...platform import get_process_id, process_alive
+from ...platform import base
 from .. import unopened_tempfile
 from ..fslocking_test import free_pid  # NOQA
 
@@ -95,3 +97,81 @@ def test_process_id():
     assert len(hostname) > 0
     assert pid > 0
     assert get_process_id() == (hostname, pid, tid)
+
+
+# base.set_flags tests: fake lstat/lchflags, so they run on all platforms (incl. those without chflags).
+FLAGS_TESTFILE = "base-set-flags-testfile"
+
+
+def patch_flags(monkeypatch, current_flags, lchflags_func):
+    class FakeStat:
+        st_flags = current_flags
+
+    real_lstat = os.lstat
+
+    def fake_lstat(path, *args, **kwargs):
+        return FakeStat() if path == FLAGS_TESTFILE else real_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "lstat", fake_lstat)
+    monkeypatch.setattr(os, "lchflags", lchflags_func, raising=False)
+
+
+def test_base_set_flags_masks_and_preserves(monkeypatch):
+    # only settable flags may be influenced; all other bits must be preserved as-is, see #9039.
+    calls = []
+    patch_flags(monkeypatch, stat.SF_SNAPSHOT | stat.UF_COMPRESSED | stat.UF_NODUMP, lambda p, f: calls.append(f))
+    base.set_flags(FLAGS_TESTFILE, stat.UF_IMMUTABLE | stat.UF_COMPRESSED)
+    # UF_IMMUTABLE (settable) gets applied, UF_NODUMP (settable, not archived) gets cleared,
+    # UF_COMPRESSED / SF_SNAPSHOT (not settable) keep their on-disk state, the archived value is ignored.
+    assert calls == [stat.SF_SNAPSHOT | stat.UF_COMPRESSED | stat.UF_IMMUTABLE]
+
+
+def test_base_set_flags_eperm_retries_without_sf_flags(monkeypatch):
+    # when we lack permission for super-user-only flags, the owner-settable flags shall still be restored.
+    calls = []
+
+    def fake_lchflags(path, flags):
+        calls.append(flags)
+        if len(calls) == 1:
+            raise OSError(errno.EPERM, "Operation not permitted", path)
+
+    patch_flags(monkeypatch, stat.SF_SNAPSHOT, fake_lchflags)
+    base.set_flags(FLAGS_TESTFILE, stat.UF_NODUMP | stat.SF_ARCHIVED)
+    assert calls == [
+        stat.SF_SNAPSHOT | stat.UF_NODUMP | stat.SF_ARCHIVED,  # full attempt
+        stat.SF_SNAPSHOT | stat.UF_NODUMP,  # retry without super-user-only flags
+    ]
+
+
+def test_base_set_flags_eperm_raises_after_retry(monkeypatch):
+    calls = []
+
+    def fake_lchflags(path, flags):
+        calls.append(flags)
+        raise OSError(errno.EPERM, "Operation not permitted", path)
+
+    patch_flags(monkeypatch, 0, fake_lchflags)
+    with pytest.raises(OSError):
+        base.set_flags(FLAGS_TESTFILE, stat.UF_NODUMP)
+    assert len(calls) == 2  # full attempt + owner-settable-only retry
+
+
+def test_base_set_flags_unsupported_fs(monkeypatch):
+    def fake_lchflags(path, flags):
+        raise OSError(errno.EOPNOTSUPP, "Operation not supported", path)
+
+    patch_flags(monkeypatch, 0, fake_lchflags)
+    base.set_flags(FLAGS_TESTFILE, stat.UF_NODUMP)  # must not raise
+
+
+def test_base_set_flags_no_current_flags(monkeypatch):
+    # if the current flags can't be determined, do nothing (rather than risk corrupting them).
+    calls = []
+
+    def fake_lstat(path, *args, **kwargs):
+        raise OSError(errno.ENOENT, "No such file or directory", path)
+
+    monkeypatch.setattr(os, "lstat", fake_lstat)
+    monkeypatch.setattr(os, "lchflags", lambda p, f: calls.append(f), raising=False)
+    base.set_flags(FLAGS_TESTFILE, stat.UF_NODUMP)
+    assert calls == []

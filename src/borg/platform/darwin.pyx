@@ -213,31 +213,12 @@ cdef extern from "sys/stat.h":
     int fchflags(int fd, uint32_t flags)
 
 
-# Known-good settable flags from macOS chflags(2). We intentionally do NOT include
-# internal flags like UF_COMPRESSED and SF_DATALESS. Resolved once at import time.
-# getattr(..., 0) keeps this importable on non-Darwin platforms or Python versions
-# missing some constants.
-import stat as stat_mod
-
-SETTABLE_FLAG_NAMES = (
-    # Owner-settable (UF_*)
-    'UF_NODUMP',
-    'UF_IMMUTABLE',
-    'UF_APPEND',
-    'UF_OPAQUE',
-    'UF_NOUNLINK',
-    'UF_HIDDEN',
-    # Super-user-settable (SF_*)
-    'SF_ARCHIVED',
-    'SF_IMMUTABLE',
-    'SF_APPEND',
-    # SF_NOUNLINK exists on some BSDs; include defensively
-    'SF_NOUNLINK',
-)
-
-cdef uint32_t SETTABLE_FLAGS_MASK = 0
-for _name in SETTABLE_FLAG_NAMES:
-    SETTABLE_FLAGS_MASK |= <uint32_t> getattr(stat_mod, _name, 0)
+# Known-good settable flags from macOS chflags(2). We intentionally do NOT influence
+# internal flags like UF_COMPRESSED and SF_DATALESS.
+# The masks are defined in platform.base and shared by all platforms, see #9039.
+# Same logic as platform.base.set_flags, but uses fchflags(2) when an fd is given
+# (Python has no os.fchflags), so the flags are set on the open file, not via the path.
+from .base import OWNER_SETTABLE_FLAGS_MASK, SETTABLE_FLAGS_MASK
 
 
 def set_flags(path, bsd_flags, fd=None):
@@ -253,17 +234,27 @@ def set_flags(path, bsd_flags, fd=None):
         # We can't determine the current flags, so better give up than corrupting anything.
         return
 
-    new_flags = (current & ~SETTABLE_FLAGS_MASK) | (bsd_flags & SETTABLE_FLAGS_MASK)
-
-    # Apply flags.
-    cdef uint32_t c_flags = <uint32_t> new_flags
-    if fd is not None:
-        if fchflags(fd, c_flags) == -1:
-            raise OSError(errno.errno, os.strerror(errno.errno), path)
-    else:
-        path_bytes = os.fsencode(path)
-        if lchflags(path_bytes, c_flags) == -1:
-            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path_bytes))
+    cdef uint32_t c_flags
+    mask = SETTABLE_FLAGS_MASK
+    path_bytes = os.fsencode(path)
+    while True:
+        # Replace only the bits we want to influence, keep all others.
+        c_flags = <uint32_t> ((current & ~mask) | (bsd_flags & mask))
+        if fd is not None:
+            result = fchflags(fd, c_flags)
+        else:
+            result = lchflags(path_bytes, c_flags)
+        if result != -1:
+            return
+        err = errno.errno
+        if err == errno.EOPNOTSUPP:
+            return  # some filesystems do not support flags
+        if err == errno.EPERM and mask != OWNER_SETTABLE_FLAGS_MASK:
+            # Not permitted to change super-user-only flags (e.g. not running as root):
+            # retry, influencing only the owner-settable flags.
+            mask = OWNER_SETTABLE_FLAGS_MASK
+            continue
+        raise OSError(err, os.strerror(err), path)
 
 
 import errno as errno_mod

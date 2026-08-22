@@ -81,6 +81,27 @@ On Linux, dealing with the flags needs some additional syscalls. Especially when
 dealing with lots of small files, this causes a noticeable overhead, so you can
 use this option also for speeding up operations.
 
+File flags (bsdflags) between platforms
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Borg archives file flags as BSD-style ``chflags(2)`` values, on all platforms.
+On Linux, the file attributes nodump, immutable and append-only (see
+``ioctl_iflags(2)`` / ``chattr(1)``) are translated to/from the corresponding
+BSD-style flags; other Linux attributes are not archived.
+
+The available flags differ between platforms, so when extracting, borg only
+sets the flags known to be settable from userspace on the destination platform —
+unsupported flags are dropped individually, the supported ones are still set.
+Flag bits that are not settable from userspace (like macOS's ``UF_COMPRESSED``
+or ``SF_DATALESS``, or unknown/future flags) are never modified: the extracted
+file keeps whatever the OS gives it.
+
+Some flags need special privileges to set (the super-user-only ``SF_*`` flags
+on BSD/macOS, immutable/append-only on Linux). If setting them is not
+permitted, borg still restores the remaining flags (like nodump) and skips the
+privileged ones. If the flags of a file cannot be set at all, borg issues a
+warning and sets the exit code to warning status.
+
 ``--umask``
 ~~~~~~~~~~~
 

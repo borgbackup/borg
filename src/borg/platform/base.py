@@ -3,6 +3,7 @@ import functools
 import io
 import os
 import socket
+import stat
 import unicodedata
 import uuid
 from pathlib import Path
@@ -96,16 +97,52 @@ def acl_text_to_xattr(acl, numeric_ids=False):
     raise NotImplementedError
 
 
-try:
-    from os import lchflags  # type: ignore[attr-defined]
+# BSD-style file flags: only influence flags that are known to be settable from userspace
+# and preserve everything else (including unknown or future flags), see #9039.
+# The masks are built from flag names so that a constant missing on some platform or
+# Python version simply contributes 0. They are also used by the freebsd/darwin modules.
+OWNER_SETTABLE_FLAG_NAMES = ("UF_NODUMP", "UF_IMMUTABLE", "UF_APPEND", "UF_OPAQUE", "UF_NOUNLINK", "UF_HIDDEN")
+SUPERUSER_SETTABLE_FLAG_NAMES = ("SF_ARCHIVED", "SF_IMMUTABLE", "SF_APPEND", "SF_NOUNLINK")
 
-    def set_flags(path, bsd_flags, fd=None):
-        lchflags(path, bsd_flags)
+OWNER_SETTABLE_FLAGS_MASK = 0
+for _name in OWNER_SETTABLE_FLAG_NAMES:
+    OWNER_SETTABLE_FLAGS_MASK |= getattr(stat, _name, 0)
 
-except ImportError:
+SETTABLE_FLAGS_MASK = OWNER_SETTABLE_FLAGS_MASK
+for _name in SUPERUSER_SETTABLE_FLAG_NAMES:
+    SETTABLE_FLAGS_MASK |= getattr(stat, _name, 0)
 
-    def set_flags(path, bsd_flags, fd=None):
-        pass
+
+def set_flags(path, bsd_flags, fd=None):
+    """Set BSD-style file flags, preserving flags that are not settable from userspace."""
+    # Look up lchflags dynamically: it does not exist on all platforms (then this is a no-op).
+    lchflags = getattr(os, "lchflags", None)
+    if lchflags is None:
+        return
+    # Determine current flags.
+    try:
+        st = os.fstat(fd) if fd is not None else os.lstat(path)
+        current = st.st_flags
+    except (OSError, AttributeError):
+        # We can't determine the current flags, so better give up than corrupting anything.
+        return
+    # Python has no os.fchflags: an fd can only be used for fstat, the flags must be written via the path.
+    # The freebsd/darwin modules override this function to use fchflags(2) for that case.
+    mask = SETTABLE_FLAGS_MASK
+    while True:
+        try:
+            # Replace only the bits we want to influence, keep all others.
+            lchflags(path, (current & ~mask) | (bsd_flags & mask))
+            return
+        except OSError as e:
+            if e.errno == errno.EOPNOTSUPP:
+                return  # some filesystems do not support flags
+            if e.errno == errno.EPERM and mask != OWNER_SETTABLE_FLAGS_MASK:
+                # Not permitted to change super-user-only flags (e.g. not running as root):
+                # retry, influencing only the owner-settable flags.
+                mask = OWNER_SETTABLE_FLAGS_MASK
+                continue
+            raise
 
 
 def get_flags(path, st, fd=None):

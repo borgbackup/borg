@@ -93,6 +93,12 @@ MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository modul
 # this, the pack is re-verified.
 MAX_CLOCK_SKEW = 7200  # [s]
 
+# Maximum tolerated clock skew between the clocks of borg clients concurrently using the same
+# repository before a warning is emitted (see storelocking). Must be well below the lock stale
+# timeout (30 min) / refresh interval (15 min) so users get warned long before skew could
+# interfere with lock staleness judgment or manifest timestamps.
+MAX_MUTUAL_CLOCK_SKEW = 300  # [s]
+
 # How many segment files Borg puts into a single directory by default.
 DEFAULT_SEGMENTS_PER_DIR = 1000
 

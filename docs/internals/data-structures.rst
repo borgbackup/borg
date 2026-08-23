@@ -1170,17 +1170,33 @@ To implement locking based on ``borgstore``, borg stores objects below locks/.
 
 The objects contain:
 
-- a timestamp when lock was created (or refreshed)
+- a timestamp when lock was created (or refreshed), stamped by the clock of
+  the machine writing the lock
 - host / process / thread information about lock owner
 - lock type: exclusive or shared
 
+Where the storage backend provides object timestamps (file, sftp, s3 and
+current rest servers - but not rclone), borg additionally uses the lock
+object's store-side mtime, which is stamped by the storage's clock.
+
 Using that information, borg implements:
 
-- lock auto-expiry: if a lock is old and has not been refreshed in time,
-  it will be automatically ignored and deleted. the primary purpose of this
-  is to get rid of stale locks by borg processes on other machines.
 - lock auto-removal if the owner process is dead. the primary purpose of this
   is to quickly get rid of stale locks by borg processes on the same machine.
+- lock auto-expiry: if a lock is old and has not been refreshed in time,
+  it will be automatically ignored and deleted. the primary purpose of this
+  is to get rid of stale locks by borg processes on other machines. to never
+  kill a healthy lock just because its writer's clock is skewed against ours
+  (see :issue:`9870`), a lock is only expired by age if it looks stale both by
+  the clients' clocks (content timestamp) and by the storage's clock
+  (store-side mtime); store-side timestamps can veto an expiry, but never
+  cause one.
+- a warning if the clocks of concurrently active clients differ by more than
+  a few minutes.
+
+See the module docstring of ``src/borg/storelocking.py`` for the details
+(clock domains, how store "now" is derived, what happens without store-side
+mtimes).
 
 Breaking the locks
 ------------------

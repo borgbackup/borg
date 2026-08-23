@@ -175,6 +175,8 @@ Fixes:
 - shell completions: describe each ``borg repo-create --encryption`` mode instead
   of repeating the list of modes for each of them (zsh and fish), #3086
 - shell completions: remove the RST markup from the descriptions, #3086
+- name the option, not the config key, if a required argument is missing, e.g.
+  "the following arguments are required: -e/--encryption", #3086
 - repo-create: fix outdated encryption mode names in the ``--key-location`` help
   and in the "Encryption NOT enabled" hint
 

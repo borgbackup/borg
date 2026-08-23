@@ -677,3 +677,11 @@ def test_bash_encryption_mode_completion(archivers, request):
     result = _run_bash_completion_fn(script, "_borg_complete_encryption ''\n")
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert result.stdout.split() == list(ENCRYPTION_DESCRIPTIONS)
+
+
+def test_missing_required_argument_names_the_option(archivers, request):
+    """The error message for a missing required argument names the option, not its config key."""
+    archiver = request.getfixturevalue(archivers)
+    output = cmd(archiver, "repo-create", exit_code=2)
+    assert "the following arguments are required: -e/--encryption" in output
+    assert "repo-create.encryption" not in output

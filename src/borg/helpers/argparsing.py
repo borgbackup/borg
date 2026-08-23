@@ -106,9 +106,13 @@ from jsonargparse.typing import register_type, PositiveInt  # noqa: F401
 
 
 # jsonargparse reports a missing required argument by its config key (the dotted path it has in a
-# config file), e.g. "repo-create.encryption". On the command line that argument is "--encryption"
-# though, so translate the message, see #3086.
-MISSING_REQUIRED_RE = re.compile(r"^Option '(?P<key>[^']+)' is required but not provided or its value is None\.$")
+# config file), e.g. "repo-create.encryption". On the command line that argument is "-e/--encryption"
+# though, so translate the message, see #3086. The wording changed in jsonargparse 4.51, which also
+# reports all missing arguments at once - match both.
+MISSING_REQUIRED_RES = (
+    re.compile(r"^the following arguments are required: (?P<keys>.+)$"),
+    re.compile(r"^Option '(?P<keys>[^']+)' is required but not provided or its value is None\.$"),
+)
 
 
 class ArgumentParser(_ArgumentParser):
@@ -128,16 +132,18 @@ class ArgumentParser(_ArgumentParser):
         return parser, next((a for a in parser._actions if a.dest == dest), None)
 
     def error(self, message: str, ex=None):
-        match = MISSING_REQUIRED_RE.match(message)
+        match = next(filter(None, (regex.match(message) for regex in MISSING_REQUIRED_RES)), None)
         if match:
-            parser, action = self._find_by_key(match["key"])
-            if action is not None:
+            names, parsers = [], []
+            for key in match["keys"].split(", "):
+                parser, action = self._find_by_key(key)
                 # name it as argparse does: all option strings for an option, the metavar otherwise
-                name = "/".join(action.option_strings) or action.metavar or action.dest
-                message = f"the following arguments are required: {name}"
-                if ex is not None and parser is not self:
-                    # make the usage/help hints refer to the subcommand the argument belongs to
-                    ex.subcommand_parser = parser
+                names.append("/".join(action.option_strings) or action.metavar or action.dest if action else key)
+                parsers.append(parser)
+            message = f"the following arguments are required: {', '.join(names)}"
+            if ex is not None and len(set(parsers)) == 1 and parsers[0] not in (None, self):
+                # all of them are in the same subcommand: point the usage/help hints at it
+                ex.subcommand_parser = parsers[0]
         super().error(message, ex)
 
 

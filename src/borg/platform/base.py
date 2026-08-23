@@ -1,4 +1,5 @@
 import errno
+import functools
 import os
 import socket
 import uuid
@@ -276,20 +277,33 @@ def getfqdn(name=''):
     return name
 
 
-# For performance reasons, only determine hostname / FQDN / host ID once.
-# XXX This sometimes requires live internet access for issuing a DNS query in the background.
-hostname = socket.gethostname()
-fqdn = getfqdn(hostname)
-# Some people put the FQDN into /etc/hostname (which is wrong; it should be the short hostname).
-# Fix this (do the same as "hostname --short" CLI command does internally):
-hostname = hostname.split('.')[0]
+@functools.cache
+def _gethostname():
+    """socket.gethostname(), cached so all derived values are consistent for the process lifetime."""
+    return socket.gethostname()
 
-# uuid.getnode() is problematic in some environments (e.g., OpenVZ, see #3968) where the virtual MAC address
-# is all-zero. uuid.getnode falls back to returning a random value in that case, which is not what we want.
-# Thus, we offer BORG_HOST_ID where a user can set an own, unique ID for each of his hosts.
-hostid = os.environ.get('BORG_HOST_ID')
-if not hostid:
-    hostid = f'{fqdn}@{uuid.getnode()}'
+
+def get_hostname():
+    """Return the (short) hostname of this machine."""
+    # Some people put the FQDN into /etc/hostname (which is wrong; it should be the short hostname).
+    # Fix this (do the same as "hostname --short" CLI command does internally):
+    return _gethostname().split('.')[0]
+
+
+@functools.cache
+def get_fqdn():
+    """Return the fully qualified domain name of this machine."""
+    # Cached: this issues a DNS query, which can take very long on hosts whose own
+    # hostname does not resolve (e.g., ~35s per query on github's macOS CI runners, see #9470).
+    return getfqdn(_gethostname())
+
+
+def get_hostid():
+    """Return an identifier that is unique for this machine (host)."""
+    # uuid.getnode() is problematic in some environments (e.g., OpenVZ, see #3968) where the virtual MAC address
+    # is all-zero. uuid.getnode falls back to returning a random value in that case, which is not what we want.
+    # Thus, we offer BORG_HOST_ID where a user can set an own, unique ID for each of his hosts.
+    return os.environ.get('BORG_HOST_ID') or f'{get_fqdn()}@{uuid.getnode()}'
 
 
 def get_process_id():
@@ -301,7 +315,7 @@ def get_process_id():
     """
     thread_id = 0
     pid = os.getpid()
-    return hostid, pid, thread_id
+    return get_hostid(), pid, thread_id
 
 
 def process_alive(host, pid, thread):

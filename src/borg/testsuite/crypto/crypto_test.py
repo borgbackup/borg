@@ -6,7 +6,7 @@ import unittest
 
 from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
 from ...crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
-from ...crypto.low_level import hmac_sha256
+from ...crypto.low_level import hmac_sha256, argon2_hash
 from ...legacy.crypto.low_level import AES
 from hashlib import sha256
 from ...crypto.key import CHPOKey, AESOCBKey, KeyBase, ChecksumKey
@@ -222,6 +222,13 @@ class CryptoTestCase(BaseTestCase):
             # unsuccessful auth (incorrect aad)
             cs = cs_cls(key, iv_int, header_len=len(header), aad_offset=0)
             self.assert_raises(IntegrityError, lambda: cs.decrypt(hdr_mac_iv_cdata, aad=b"incorrect_chunkid"))
+
+
+def test_argon2_hash_parallel():
+    # parallelism > 1 exercises the multi-threaded lane computation on multi-core machines.
+    # reference value cross-checked against argon2-cffi; the result must not depend on thread count.
+    out = argon2_hash(b"pass", b"saltsaltsaltsalt", 3, 65536, 4, 32, "id")
+    assert out.hex() == "bf1a482d5b69a34f3922bcc5e66747486b0527336f483e13477b0c484c8932ea"
 
 
 def test_decrypt_key_file_argon2_chacha20_poly1305():

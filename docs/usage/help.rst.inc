@@ -98,11 +98,12 @@ Path full-match, selector ``pf:``
 .. note::
 
     ``re:``, ``sh:`` and ``fm:`` patterns are all implemented on top of
-    the Python SRE engine. It is very easy to formulate patterns for each
-    of these types which requires an inordinate amount of time to match
+    the Python SRE engine. ``sh:`` and ``fm:`` patterns are translated so
+    that any number of ``*`` wildcards can be matched in reasonable time,
+    but ``re:`` patterns (and ``sh:`` patterns with many ``**/`` or ``{}``
+    alternatives) can still require an inordinate amount of time to match
     paths. If untrusted users are able to supply patterns, ensure they
-    cannot supply ``re:`` patterns. Further, ensure that ``sh:`` and
-    ``fm:`` patterns only contain a handful of wildcards at most.
+    cannot supply ``re:`` patterns and keep the other patterns simple.
 
 .. note::
 

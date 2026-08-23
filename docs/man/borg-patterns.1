@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-patterns" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-patterns" "1" "2026-08-21" "" "borg backup tool"
 .SH Name
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -141,11 +141,12 @@ Same logic applies for exclude.
 .INDENT 0.0
 .INDENT 3.5
 \fBre:\fP, \fBsh:\fP and \fBfm:\fP patterns are all implemented on top of
-the Python SRE engine. It is very easy to formulate patterns for each
-of these types which requires an inordinate amount of time to match
+the Python SRE engine. \fBsh:\fP and \fBfm:\fP patterns are translated so
+that any number of \fB*\fP wildcards can be matched in reasonable time,
+but \fBre:\fP patterns (and \fBsh:\fP patterns with many \fB**/\fP or \fB{}\fP
+alternatives) can still require an inordinate amount of time to match
 paths. If untrusted users are able to supply patterns, ensure they
-cannot supply \fBre:\fP patterns. Further, ensure that \fBsh:\fP and
-\fBfm:\fP patterns only contain a handful of wildcards at most.
+cannot supply \fBre:\fP patterns and keep the other patterns simple.
 .UNINDENT
 .UNINDENT
 .sp

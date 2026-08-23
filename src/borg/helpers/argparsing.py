@@ -94,6 +94,7 @@ the subcommand namespace and the outer (top-level) default flows through
 unchanged.
 """
 
+import re
 from typing import Any
 
 # here are the only imports from argparse and jsonargparse,
@@ -104,10 +105,40 @@ from jsonargparse import Namespace, ActionSubCommands, SUPPRESS, REMAINDER  # no
 from jsonargparse.typing import register_type, PositiveInt  # noqa: F401
 
 
+# jsonargparse reports a missing required argument by its config key (the dotted path it has in a
+# config file), e.g. "repo-create.encryption". On the command line that argument is "--encryption"
+# though, so translate the message, see #3086.
+MISSING_REQUIRED_RE = re.compile(r"^Option '(?P<key>[^']+)' is required but not provided or its value is None\.$")
+
+
 class ArgumentParser(_ArgumentParser):
     # the borg code always uses RawDescriptionHelpFormatter and add_help=False:
     def __init__(self, *args, formatter_class=RawDescriptionHelpFormatter, add_help=False, **kwargs):
         super().__init__(*args, formatter_class=formatter_class, add_help=add_help, **kwargs)
+
+    def _find_by_key(self, key):
+        """Resolve a jsonargparse config key to the (sub)parser it belongs to and its action."""
+        *subcommands, dest = key.split(".")
+        parser = self
+        for subcommand in subcommands:
+            action = next((a for a in parser._actions if isinstance(a, ActionSubCommands)), None)
+            if action is None or subcommand not in action.choices:
+                return None, None
+            parser = action.choices[subcommand]
+        return parser, next((a for a in parser._actions if a.dest == dest), None)
+
+    def error(self, message: str, ex=None):
+        match = MISSING_REQUIRED_RE.match(message)
+        if match:
+            parser, action = self._find_by_key(match["key"])
+            if action is not None:
+                # name it as argparse does: all option strings for an option, the metavar otherwise
+                name = "/".join(action.option_strings) or action.metavar or action.dest
+                message = f"the following arguments are required: {name}"
+                if ex is not None and parser is not self:
+                    # make the usage/help hints refer to the subcommand the argument belongs to
+                    ex.subcommand_parser = parser
+        super().error(message, ex)
 
 
 def flatten_namespace(ns: Any) -> Namespace:

@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from datetime import UTC, datetime, timedelta
-from functools import partial
+from functools import lru_cache, partial
 from hashlib import sha256
 from string import Formatter
 
@@ -901,6 +901,7 @@ class Location:
         )
 
 
+@lru_cache  # same args -> same object: the completion code identifies argument types by identity
 def location_validator(proto=None, other=False):
     def validator(text):
         try:

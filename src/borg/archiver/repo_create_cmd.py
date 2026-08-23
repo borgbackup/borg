@@ -12,6 +12,18 @@ from ..logger import create_logger
 logger = create_logger()
 
 
+# Short descriptions of the --encryption modes, for the shell completions (see completion_cmd).
+# Modes without an entry here still complete, just without a description.
+ENCRYPTION_DESCRIPTIONS = {
+    "aes256-ocb": "AES256 in OCB mode: encryption and authentication",
+    "chacha20-poly1305": "ChaCha20 with Poly1305: encryption and authentication",
+    "authenticated-sha256": "no encryption, authentication via HMAC-SHA-256",
+    "authenticated-blake3": "no encryption, authentication via keyed BLAKE3",
+    "none-sha256": "no encryption, no authentication, only SHA-256 checksums",
+    "none-blake3": "no encryption, no authentication, only BLAKE3 checksums",
+}
+
+
 class RepoCreateMixIn:
     @with_repository(create=True, exclusive=True, manifest=False)
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
@@ -240,7 +252,7 @@ class RepoCreateMixIn:
             default="repokey",
             action=Highlander,
             help="where to store the key: 'repokey' (in the repository, default) or 'keyfile' "
-            "(in the local keys directory). Ignored for the 'none' mode (which has no key).",
+            "(in the local keys directory). Ignored for the ``none-*`` modes (which have no key).",
         )
         subparser.add_argument(
             "--copy-crypt-key",

@@ -162,6 +162,28 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
+Version 2.0.0b24 (not released yet)
+-----------------------------------
+
+Fixes:
+
+- shell completions: complete local repository directories for ``-r`` / ``--repo``
+  and ``--other-repo``, #3086
+- shell completions: use the command borg was invoked as, e.g. ``borg2``. A borg
+  installed under such a name next to a borg 1.x registered its completions for
+  ``borg`` and queried the repository via that other borg, #3086
+- shell completions: describe each ``borg repo-create --encryption`` mode instead
+  of repeating the list of modes for each of them (zsh and fish), #3086
+- shell completions: remove the RST markup from the descriptions, #3086
+- repo-create: fix outdated encryption mode names in the ``--key-location`` help
+  and in the "Encryption NOT enabled" hint
+
+Other changes:
+
+- require shtab >= 1.11.0: it completes an argument via its ``.complete`` function
+  rather than via its choices, which is what lets the encryption modes have a
+  description each, and it completes paths outside the cwd in fish
+
 Version 2.0.0b23 (2026-08-23)
 -----------------------------
 

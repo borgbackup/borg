@@ -9,6 +9,7 @@ import pytest
 
 import borg
 from ...archiver.completion_cmd import TCSH_SORTBY_FN
+from ...archiver.repo_create_cmd import ENCRYPTION_DESCRIPTIONS
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
@@ -557,3 +558,122 @@ def test_fish_archive_aid_completion(archivers, request, tmp_path):
     assert len(candidates) >= 1, "Expected at least one archive ID completion"
     for candidate in candidates:
         assert candidate.startswith("aid:"), f"Expected aid: prefix, got: {candidate}"
+
+
+# -- issues reported for the generated completions, see #3086 -----------------
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish", "tcsh"])
+def test_completion_help_has_no_rst_markup(archivers, request, shell):
+    """The shells show the help as the completion description - RST markup is just noise there."""
+    output = "\n".join(completion_lines(archivers, request, shell))
+    assert "**(required)**" not in output  # from the --encryption help
+    assert "``" not in output  # e.g. from the --json-lines help
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish", "tcsh"])
+def test_completion_uses_invoked_command_name(archivers, request, shell, monkeypatch):
+    """A borg installed as e.g. "borg2" must complete borg2 and query the repo via borg2."""
+    monkeypatch.setattr(sys, "argv", ["/somewhere/bin/borg2", "completion", shell])
+    output = "\n".join(completion_lines(archivers, request, shell))
+    assert "borg2 repo-list" in output, "the dynamic completions call some other borg"
+    assert "borg repo-list" not in output
+    if shell == "fish":  # the only shell registering the command in a greppable way
+        assert "complete -c borg2 " in output
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish", "tcsh"])
+def test_completion_falls_back_to_borg(archivers, request, shell, monkeypatch):
+    """If borg was invoked in a way that gives no usable command name, complete "borg"."""
+    monkeypatch.setattr(sys, "argv", ["/somewhere/lib/borg/__main__.py", "completion", shell])
+    output = "\n".join(completion_lines(archivers, request, shell))
+    assert "borg repo-list" in output
+    if shell == "fish":
+        assert "complete -c borg " in output
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
+def test_completion_repo_is_a_directory(archivers, request, shell):
+    """-r/--repo and --other-repo complete local repository directories."""
+    lines = completion_lines(archivers, request, shell)
+    # how each shell spells "complete directories", and how it refers to the two options
+    directory, repo, other_repo = {
+        "bash": ("_shtab_compgen_dirs", "_shtab_borg___repo_COMPGEN=", "_shtab_borg_repo_create___other_repo_COMPGEN="),
+        "zsh": ("_files -/", "{-r,--repo}", '"--other-repo['),
+        "fish": ("__fish_complete_directories", " -l repo ", " -l other-repo "),
+    }[shell]
+    assert any(repo in line and directory in line for line in lines), "-r/--repo does not complete directories"
+    assert any(other_repo in line and directory in line for line in lines), "--other-repo does not complete dirs"
+
+
+@needs_fish
+def test_fish_repo_directory_completion(archivers, request, tmp_path):
+    """-r/--repo completes directories, but no files."""
+    archiver = request.getfixturevalue(archivers)
+    (tmp_path / "somerepo").mkdir()
+    (tmp_path / "somefile.txt").touch()
+    script = cmd(archiver, "completion", "fish")
+    prefix = str(tmp_path / "some")
+
+    for option in ("--repo", "-r"):
+        candidates = _fish_complete_candidates(script, f"borg list {option} {prefix}")
+        assert any(c.rstrip("/").endswith("somerepo") for c in candidates), f"repo dir missing: {candidates}"
+        assert not any(c.endswith("somefile.txt") for c in candidates), f"file offered: {candidates}"
+
+
+@needs_fish
+def test_fish_encryption_mode_descriptions(archivers, request):
+    """Each --encryption mode gets its own short description, not the option help."""
+    archiver = request.getfixturevalue(archivers)
+    script = cmd(archiver, "completion", "fish")
+    # _fish_complete_candidates drops the descriptions, so run fish ourselves here
+    code = script + "\ncomplete -C'borg repo-create --encryption='\n"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".fish", delete=False) as f:
+        f.write(code)
+        script_path = f.name
+    try:
+        result = subprocess.run(["fish", script_path], capture_output=True, text=True, timeout=120)
+    finally:
+        os.unlink(script_path)
+    assert result.returncode == 0, f"fish failed: {result.stderr}"
+    described = dict(line.split("\t", 1) for line in result.stdout.splitlines() if "\t" in line)
+    for mode, description in ENCRYPTION_DESCRIPTIONS.items():
+        assert described[f"--encryption={mode}"] == description
+
+
+@needs_zsh
+def test_zsh_encryption_mode_descriptions(archivers, request):
+    """The zsh helper offers all modes, each with the mode name and its description."""
+    archiver = request.getfixturevalue(archivers)
+    script = cmd(archiver, "completion", "zsh")
+    # the harness' compadd stub prints the candidates - replace it by one printing the descriptions
+    # (zsh scopes locals dynamically, so the array the helper declares is visible in here)
+    setup = "compadd() { print -rl -- $choices $descriptions }\n_borg_complete_encryption\n"
+    result = _run_zsh_completion_fn(script, setup)
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    output = result.stdout.splitlines()
+    for mode, description in ENCRYPTION_DESCRIPTIONS.items():
+        assert mode in output
+        assert f"{mode}  -- {description}" in output
+
+
+@pytest.mark.parametrize("shell", ["bash", "tcsh"])
+def test_encryption_modes_without_descriptions(archivers, request, shell):
+    """bash and tcsh have no completion descriptions, they just complete the mode names."""
+    output = "\n".join(completion_lines(archivers, request, shell))
+    # the helper is needed even without descriptions: shtab lets it win over the action's choices
+    assert "_borg_complete_encryption" in output
+    assert " ".join(ENCRYPTION_DESCRIPTIONS) in output  # the plain mode names
+    for description in ENCRYPTION_DESCRIPTIONS.values():
+        assert description not in output
+
+
+@needs_bash
+def test_bash_encryption_mode_completion(archivers, request):
+    """The bash helper offers all encryption modes."""
+    archiver = request.getfixturevalue(archivers)
+    script = cmd(archiver, "completion", "bash")
+
+    result = _run_bash_completion_fn(script, "_borg_complete_encryption ''\n")
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert result.stdout.split() == list(ENCRYPTION_DESCRIPTIONS)

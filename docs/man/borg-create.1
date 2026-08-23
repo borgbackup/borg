@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-create" "1" "2026-08-19" "" "borg backup tool"
+.TH "borg-create" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-create \- Creates a new archive.
 .SH SYNOPSIS
@@ -308,6 +308,9 @@ do not read and store xattrs into archive
 .TP
 .B  \-\-sparse
 detect sparse holes in input and seek over them instead of reading them
+.TP
+.BI \-\-digests \ ALGOS
+compute these hash digests over the full content of each file and store them into the archive items. Comma\-separated list of hash algorithm names, e.g. \(dqblake3\(dq, or \(dqnone\(dq. default: none
 .TP
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode (on Windows: mtime,size,inode, because ctime is file creation time there).

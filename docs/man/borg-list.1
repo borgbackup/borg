@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-list" "1" "2026-07-31" "" "borg backup tool"
+.TH "borg-list" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-list \- List archive contents.
 .SH SYNOPSIS
@@ -65,6 +65,9 @@ Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys u
 .TP
 .BI \-\-depth \ N
 only list files up to the specified directory depth
+.TP
+.BI \-\-sort\-by \ SPEC
+sort output by comma\-separated fields (e.g. \(aq>size,path\(aq), see Sorting below
 .UNINDENT
 .SS Include/Exclude options
 .INDENT 0.0
@@ -116,6 +119,15 @@ $ borg list archiveA \-\-pattern \(aq+ re:\e.ext$\(aq \-\-pattern \(aq\- re:^.*$
 $ borg list archiveA \-\-pattern \(aq+ re:.ext$\(aq \-\-pattern \(aq\- re:^.*$\(aq
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
+\&...
+
+# Use \-\-sort\-by with a comma\-separated list; sorts apply stably from last to first.
+# Here: primary by size descending, tie\-breaker by path ascending.
+# Note the quoting \- \(dq>\(dq would otherwise be a shell redirection.
+$ borg list archiveA \-\-sort\-by=\(aq>size,path\(aq \-\-format=\(aq{size:8d} {path}{NL}\(aq
+ 1416192 code/myproject/file.ext
+ 1416192 code/myproject/file.text
+       0 .
 \&...
 .EE
 .UNINDENT
@@ -227,6 +239,40 @@ archivename: name of the archive
 .IP \(bu 2
 extra: prepends {target} with \(dq \-> \(dq for soft links and \(dq link to \(dq for hard links
 .UNINDENT
+.SS Sorting
+.sp
+Use \fB\-\-sort\-by SPEC\fP where SPEC is a comma\-separated list of fields.
+Sorts are applied stably from last to first in the given list, thus the first
+field is the primary sort criterion. Prepend \(dq>\(dq for descending, \(dq<\(dq (or no
+prefix) for ascending order, e.g. \fB\-\-sort\-by=\(aq>size,path\(aq\fP (quote it, \(dq>\(dq is
+a shell redirection).
+.sp
+Supported fields, sorting by the same value that \fB\-\-format\fP would print:
+.INDENT 0.0
+.IP \(bu 2
+path: the item path
+.IP \(bu 2
+type, mode: the file type character resp. the full file mode string
+.IP \(bu 2
+user, group: the owner/group name, or the numeric id if the name is not known
+.IP \(bu 2
+uid, gid: the numeric owner/group id
+.IP \(bu 2
+size: the file size (same as {size}, 0 for items without content)
+.IP \(bu 2
+mtime, ctime, atime: the timestamps (atime/ctime fall back to mtime if not stored)
+.UNINDENT
+.sp
+There is no \fBbirthtime\fP field, as there is no {birthtime} format key either.
+.sp
+The sort fields are independent of \fB\-\-format\fP, you may sort by a field you do
+not print.
+.sp
+Note: \fB\-\-sort\-by\fP needs to read all (matching) items into memory before it can
+print anything, so listing a huge archive this way needs a lot of memory and
+delays the first output line. Without \fB\-\-sort\-by\fP, items are streamed and their
+order is undefined. If memory usage is a problem, consider
+\fBborg list \-\-format ... | sort\fP instead.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP, \fIborg\-info(1)\fP, \fIborg\-diff(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-repo\-list(1)\fP

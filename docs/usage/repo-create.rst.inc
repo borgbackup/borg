@@ -19,9 +19,9 @@ borg repo-create
     +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--from-borg1``                               | other repository is Borg 1.x                                                                                                                               |
     +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``-e ENCRYPTION``, ``--encryption ENCRYPTION`` | select cipher / AE algorithm: 'none', 'authenticated', 'aes256-ocb' or 'chacha20-poly1305' **(required)**                                                  |
+    |                                                       | ``-e ENCRYPTION``, ``--encryption ENCRYPTION`` | select the mode: 'aes256-ocb', 'chacha20-poly1305', 'authenticated-sha256', 'authenticated-blake3', 'none-sha256' or 'none-blake3' **(required)**          |
     +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``-i HASH``, ``--id-hash HASH``                | select the id hash function: 'sha256' (default) or 'blake3'. The 'none' encryption only supports 'sha256'.                                                 |
+    |                                                       | ``-i HASH``, ``--id-hash HASH``                | select the id hash function of the encrypted modes: 'sha256' or 'blake3'. The 'none-*' and 'authenticated-*' modes name their hash themselves.             |
     +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--key-location LOCATION``                    | where to store the key: 'repokey' (in the repository, default) or 'keyfile' (in the local keys directory). Ignored for the 'none' mode (which has no key). |
     +-------------------------------------------------------+------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -47,8 +47,8 @@ borg repo-create
     options
         --other-repo SRC_REPOSITORY    reuse the key material from the other repository
         --from-borg1                other repository is Borg 1.x
-        -e ENCRYPTION, --encryption ENCRYPTION    select cipher / AE algorithm: 'none', 'authenticated', 'aes256-ocb' or 'chacha20-poly1305' **(required)**
-        -i HASH, --id-hash HASH     select the id hash function: 'sha256' (default) or 'blake3'. The 'none' encryption only supports 'sha256'.
+        -e ENCRYPTION, --encryption ENCRYPTION    select the mode: 'aes256-ocb', 'chacha20-poly1305', 'authenticated-sha256', 'authenticated-blake3', 'none-sha256' or 'none-blake3' **(required)**
+        -i HASH, --id-hash HASH     select the id hash function of the encrypted modes: 'sha256' or 'blake3'. The 'none-*' and 'authenticated-*' modes name their hash themselves.
         --key-location LOCATION     where to store the key: 'repokey' (in the repository, default) or 'keyfile' (in the local keys directory). Ignored for the 'none' mode (which has no key).
         --copy-crypt-key            copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key).
 
@@ -124,21 +124,23 @@ Choosing a crypto suite
 Depending on your hardware, hashing and crypto performance may vary widely.
 The easiest way to find out what is fastest is to run ``borg benchmark cpu``.
 
-A crypto suite is selected by three orthogonal options:
-
-``--encryption`` (**required**) selects the cipher / authenticated-encryption algorithm:
+``--encryption`` (**required**) selects the mode:
 
 - ``aes256-ocb``: AES256 in OCB mode (encryption + authentication).
 - ``chacha20-poly1305``: ChaCha20 + Poly1305 (encryption + authentication).
-- ``authenticated``: no encryption, but still authenticates your data (tamper detection).
-- ``none``: no encryption and no authentication (see the warning below).
+- ``authenticated-sha256`` / ``authenticated-blake3``: no encryption, but authentication
+  (tamper detection) using HMAC-SHA-256 resp. keyed BLAKE3.
+- ``none-sha256`` / ``none-blake3``: neither encryption nor authentication, only
+  SHA-256 resp. BLAKE3 checksums (see below).
 
-``--id-hash`` selects the id hash function (used for chunk ids and authentication):
+``--id-hash`` selects the id hash function of the **encrypted** modes:
 
-- ``sha256`` (default): HMAC-SHA-256 (or plain SHA-256 for the ``none`` encryption).
+- ``sha256`` (default): HMAC-SHA-256.
 - ``blake3``: BLAKE3. Often faster on CPUs without SHA hardware acceleration.
 
-The ``none`` encryption has no key, so it only supports the ``sha256`` id hash.
+For the modes that do not encrypt, the hash is not just used for the chunk ids, it also is
+what protects your data - therefore it is part of the mode name there and ``--id-hash``
+does not apply to them.
 
 ``--key-location`` selects where the key is stored (orthogonal to the crypto suite):
 
@@ -148,20 +150,23 @@ The ``none`` encryption has no key, so it only supports the ``sha256`` id hash.
   this if you want "passphrase and having-the-key" security.
 
 You can move the key between these locations later with ``borg key change-location``.
-This also applies to the ``authenticated`` encryption: it does not encrypt your data, but it
-still has a key (used for the id hash and authentication), so ``--key-location`` selects
-where that key is stored, just like for the encrypted suites.
-``--key-location`` is only ignored for the ``none`` encryption, which has no key at all.
+This also applies to the ``authenticated-*`` modes: they do not encrypt your data, but they
+still have a key (used for the id hash and the authentication), so ``--key-location``
+selects where that key is stored, just like for the encrypted modes.
+``--key-location`` is only ignored for the ``none-*`` modes, which have no key at all.
 
-`none` encryption uses no encryption and no authentication. You are advised NOT to use this
-as it would expose you to a Denial-of-Service risk (due to how the :ref:`internals_hashindex`
-works) and other issues (confidentiality, tampering, ...) in case of malicious activity
-in the repository.
+The ``none-*`` modes use neither encryption nor authentication: everything in the
+repository is readable by anybody, and while every repository object carries a checksum
+(which detects accidental corruption, e.g. bad storage hardware), anybody who modifies an
+object can just recompute that checksum. You are advised NOT to use these modes: in case
+of malicious activity in the repository, they expose you to a Denial-of-Service risk (due
+to how the :ref:`internals_hashindex` works) and other issues (confidentiality,
+tampering, ...).
 
 If you do **not** want to encrypt the contents of your backups, but still want to detect
-malicious tampering, use ``--encryption authenticated``. It is like an encrypted suite
-minus the data encryption.
-To normally work with ``authenticated`` repositories, you will need the passphrase, but
+malicious tampering, use ``--encryption authenticated-sha256`` (or ``-blake3``). These
+modes are like an encrypted mode minus the data encryption.
+To normally work with ``authenticated-*`` repositories, you will need the passphrase, but
 there is an emergency workaround; see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 
 Creating a related repository

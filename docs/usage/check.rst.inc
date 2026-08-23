@@ -25,6 +25,8 @@ borg check
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--find-lost-archives``                     | attempt to find lost archives                                                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--max-age TIMESPAN``                       | reuse intact-pack check results younger than TIMESPAN, e.g. 4w or 12m                                                       |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--max-duration SECONDS``                   | perform only a partial repository check for at most SECONDS seconds (default: unlimited)                                    |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--format FORMAT``                          | specify format for the archive part (default: "{archive} {time} {id}")                                                      |
@@ -70,6 +72,7 @@ borg check
         --verify-data     perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)
         --repair          attempt to repair any inconsistencies found
         --find-lost-archives    attempt to find lost archives
+        --max-age TIMESPAN    reuse intact-pack check results younger than TIMESPAN, e.g. 4w or 12m
         --max-duration SECONDS    perform only a partial repository check for at most SECONDS seconds (default: unlimited)
         --format FORMAT    specify format for the archive part (default: "{archive} {time} {id}")
 
@@ -119,17 +122,29 @@ Both steps can also be run independently. Pass ``--repository-only`` to run the
 repository checks only, or pass ``--archives-only`` to run the archive checks
 only.
 
-The ``--max-duration`` option can be used to split a long-running repository
-check into multiple partial checks. After the given number of seconds, the check
-is interrupted. The next partial check will continue where the previous one
-stopped, until the full repository has been checked. Assuming a complete check
-would take 7 hours, then running a daily check with ``--max-duration=3600``
-(1 hour) would result in one full repository check per week. Doing a full
-repository check aborts any previous partial check; the next partial check will
-restart from the beginning. With partial repository checks you can run neither
-archive checks, nor enable repair mode. Consequently, if you want to use
-``--max-duration`` you must also pass ``--repository-only``, and must not pass
-``--archives-only``, nor ``--repair``.
+The ``--max-age`` option makes the check reuse the results of previous
+repository checks: packs whose intact result is younger than the given
+timespan (e.g. ``--max-age=4w`` or ``--max-age=12m``) are skipped, spreading
+the verification cost over repeated checks. The timespan uses the same markers
+as ``--older``/``--newer``: ``d``, ``w``, ``H``, ``M``, ``S`` are exact spans,
+while ``m`` and ``y`` are calendar units counted from now (so ``12m`` equals
+``1y``). Check results are recorded in any case; ``--max-age`` only controls
+their reuse. Packs recorded corrupt are always re-verified. ``--max-age``
+affects only the repository check and cannot be combined with
+``--archives-only`` or ``--repair``.
+
+The ``--max-duration`` option splits a long-running repository check into
+several partial checks. After the given number of seconds, the check is
+interrupted. A partial check verifies the least-recently-checked packs first,
+so repeated runs cover the whole repository. Add ``--max-age`` to also skip
+packs whose result is still younger than the given age: once every pack has a
+recent result, further runs re-check each pack at most once per ``--max-age``,
+and no faster than the per-run budget allows.
+Assuming a complete check would take 7 hours, running a daily check with
+``--max-duration=3600 --max-age=1w`` (1 hour) results in one full repository
+verification per week. Partial repository checks run neither archive checks
+nor repair mode, so ``--max-duration`` requires ``--repository-only`` and
+cannot be combined with ``--archives-only`` or ``--repair``.
 
 **Warning:** Please note that partial repository checks (i.e., running with
 ``--max-duration``) can only perform non-cryptographic checksum checks on the
@@ -161,6 +176,20 @@ You can influence how the archive part of the ``Analyzing archive ...`` output i
 formatted by giving a custom format using ``--format`` (see the ``borg repo-list``
 description for more details about the format string).
 
+If the ``borg check`` process receives a SIGINT signal (Ctrl-C), it stops at the
+next safe boundary, leaving the repository and its chunk index in a consistent state.
+The repository check stops after the current pack; ``--verify-data`` and
+``--find-lost-archives`` stop after the current chunk; a ``--repair`` archive check
+stops between whole archives. Results recorded before the interrupt are kept, so a later
+check does not re-verify those packs until they are due again. With ``--repair``, an
+interrupted archive check may leave some archives already repaired and others not yet
+processed, so run ``borg check --repair`` again to finish.
+
+During a ``--repair`` run, the archive check first rebuilds the chunk index from the
+packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
+respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
+effect until they finish.
+
 About repair mode
 +++++++++++++++++
 
@@ -191,8 +220,11 @@ by definition, a potentially lossy task.
 
 In practice, repair mode hooks into both the repository and archive checks:
 
-1. When checking the repository's consistency, repair mode removes corrupted
-   objects from the repository after it did a 2nd try to read them correctly.
+1. When checking the repository's consistency, repair mode rebuilds the repository
+   index from the packs if the index is corrupt, provided every pack is intact. If
+   any pack is corrupt, the repository check leaves the index and the packs untouched
+   and reports the corruption; salvaging a corrupt pack's still-intact objects is not
+   implemented yet (refs #8572).
 
 2. When checking the consistency and correctness of archives, repair mode might
    remove whole archives from the manifest if their archive metadata chunk is

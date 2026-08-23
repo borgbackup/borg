@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-umount" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-umount" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-umount \- Unmounts the FUSE filesystem.
 .SH SYNOPSIS
@@ -54,12 +54,20 @@ mountpoint of the filesystem to unmount
 .INDENT 3.5
 .sp
 .EX
-# Mounting the repository shows all archives.
+# Mounting the repository shows all archives (here: two archives of the series
+# \(dqroot\(dq, the short archive id is appended to make the directory names unique).
 # Archives are loaded lazily, expect some delay when navigating to an archive
 # for the first time.
 $ borg mount /tmp/mymountpoint
 $ ls /tmp/mymountpoint
-root\-2016\-02\-14 root\-2016\-02\-15
+root\-1f7b3c2a  root\-9e4d0b58
+$ borg umount /tmp/mymountpoint
+
+# BORG_MOUNT_ARCHIVE_DIR_FORMAT names the archive directories differently,
+# using the placeholders of \(dqborg repo\-list \-\-format\(dq:
+$ BORG_MOUNT_ARCHIVE_DIR_FORMAT=\(aq{name}\-{time:%Y\-%m\-%d}\(aq borg mount /tmp/mymountpoint
+$ ls /tmp/mymountpoint
+root\-2016\-02\-14  root\-2016\-02\-15
 $ borg umount /tmp/mymountpoint
 
 # The \(dqversions view\(dq merges all archives in the repository

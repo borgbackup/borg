@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-webdav" "1" "2026-07-23" "" "borg backup tool"
+.TH "borg-webdav" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-webdav \- Serve archive contents via a read-only WebDAV / HTTP server on localhost.
 .SH SYNOPSIS
@@ -65,9 +65,11 @@ authentication and no encryption \- anything that can connect to
 localhost TCP ports on the machine can read the served archive contents.
 .sp
 The top level lists the selected archives (use the archive filter options
-to select fewer archives); below that, the archive contents can be
-browsed like a directory tree. The directory tree of an archive is built
-in memory when it is first entered, so expect some delay for big archives.
+to select fewer archives), named as for \fBborg mount\fP (see the
+\fBBORG_MOUNT_ARCHIVE_DIR_FORMAT\fP environment variable there); below that,
+the archive contents can be browsed like a directory tree. The directory
+tree of an archive is built in memory when it is first entered, so expect
+some delay for big archives.
 .sp
 Any directory can be downloaded as a tar archive by appending \fB?tar\fP to its
 URL (the web browser listings show a download icon next to the heading for this).
@@ -163,6 +165,64 @@ $ borg webdav
 $ borg webdav \-\-port 8123 \-\-match\-archives my\-archive
 .EE
 .UNINDENT
+.UNINDENT
+.SS Client notes and known issues
+.sp
+WebDAV\(aqs rough edges are almost all on the client side, and a \fIread\-only\fP server
+(like this one) hits a specific subset of them. A plain web browser avoids most of
+these \- the notes below matter mainly when \fImounting\fP the server as a file system.
+.sp
+\fBWindows Explorer\fP (the \(dqWebClient\(dq / mini\-redirector)
+.INDENT 0.0
+.IP \(bu 2
+Downloads are limited to about 50 MB by default (the \fBFileSizeLimitInBytes\fP
+registry value). Bigger files fail when copied from a mapped drive \- use a web
+browser (including for the \fB?tar\fP directory download) or another WebDAV client.
+.IP \(bu 2
+The \fBWebClient\fP service must be running for \fBnet use\fP / \(dqMap network drive\(dq
+to work; if it is stopped, mounting silently fails.
+.UNINDENT
+.sp
+\fBmacOS Finder\fP (\fBmount_webdav\fP / WebDAVFS)
+.INDENT 0.0
+.IP \(bu 2
+Finder tries to write \fB\&.DS_Store\fP, \fB\&._*\fP (AppleDouble) and \fB\&.Trash\fP files
+into every folder it opens. On this read\-only server those writes are rejected
+(the file system is read\-only); Finder tolerates it but may occasionally show a
+spurious \(dqoperation could not be completed\(dq dialog. This is harmless.
+.IP \(bu 2
+WebDAVFS caches directory listings; a stale view usually clears on unmount and
+remount.
+.UNINDENT
+.sp
+\fBLinux davfs2\fP
+.INDENT 0.0
+.IP \(bu 2
+davfs2 uses WebDAV locking by default and will try to LOCK files it opens, which
+a read\-only server rejects. Set \fBuse_locks 0\fP in \fBdavfs2.conf\fP (or the
+per\-mount config) to avoid the failed lock attempts. davfs2 also caches whole
+files in a local cache directory.
+.IP \(bu 2
+The GNOME (gvfs) and KDE (KIO) DAV backends work without such tweaks.
+.UNINDENT
+.sp
+\fBProtocol\-level (any client)\fP
+.INDENT 0.0
+.IP \(bu 2
+\fBPROPFIND\fP with \fBDepth: infinity\fP (a recursive enumeration that can be very
+expensive) is refused with \fB403\fP, as permitted by RFC 4918. Well\-behaved
+clients use \fBDepth: 0\fP or \fB1\fP\&.
+.IP \(bu 2
+Collections must be addressed with a trailing slash; a request for \fB/dir\fP is
+redirected to \fB/dir/\fP\&.
+.IP \(bu 2
+Symbolic links and special files (devices, fifos, sockets) have no
+representation in WebDAV, so they are not visible in a mounted file system. They
+are shown in the web browser listings and are included in \fB?tar\fP downloads.
+.IP \(bu 2
+WebDAV transfers file contents plus modification time and size, but no owner,
+group, mode, xattrs or ACLs. Use the \fB?tar\fP directory download (or
+\fBborg extract\fP / \fBborg export\-tar\fP) when you need a full\-fidelity restore.
 .UNINDENT
 .SH SEE ALSO
 .sp

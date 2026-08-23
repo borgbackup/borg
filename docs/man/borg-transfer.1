@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-transfer" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-transfer" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -120,7 +120,7 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (faster: re\-uses compressed data chunks w/o change).If no MODE is given, \fIalways\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the chunker defaults. default: do not rechunk
+rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL) or \fIdefault\fP to use the chunker defaults. default: do not rechunk
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
@@ -212,7 +212,7 @@ $ borg transfer \-\-from\-borg1 \-\-dry\-run
 # The AEAD cipher does not matter (everything must be re\-encrypted and
 # re\-authenticated anyway); you could also choose \-e chacha20\-poly1305 \-i blake3.
 $ borg repo\-create \-e aes256\-ocb \-i blake3
-$ export CHUNKER_PARAMS=\(dqbuzhash64,19,23,21,4095,2\(dq
+$ export CHUNKER_PARAMS=\(dqfastcdc,19,23,21,2\(dq
 
 # 2. Check what and how much it would transfer:
 $ borg transfer \-\-from\-borg1 \-\-chunker\-params=$CHUNKER_PARAMS \-\-dry\-run

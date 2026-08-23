@@ -162,8 +162,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b23 (not released yet)
------------------------------------
+Version 2.0.0b23 (2026-08-23)
+-----------------------------
 
 New features:
 
@@ -201,6 +201,16 @@ New features:
     so the default is the best path the build and the CPU offer, #10160
   - zero-copy fill and lazy buffer compaction optimizations
   - log the chunker and its scan kernel at debug level
+- webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
+  replacement for ``borg mount`` in some use cases, #9942
+- mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
+- export-tar: support sparse files, #2562
+- find: search files across archives, #9974
+- analyze: report deduplicated size of a set of archives, #5741, #9992
+- compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.
+  They trade compression ratio for speed. Compatible with existing repositories.
+- create --encryption: new none-* and authenticated-* modes, #9104.
+  Uses either sha256 or blake3, improves authentication and checksumming capabilities.
 - create: --map and --reuse-from for efficient block device snapshot backups.
   Adds the lvm-thin-map.py script to generate input maps from thin_dump XML, see #4363.
 - create --dry-run --stats: count files, sum up sizes, #1648
@@ -211,8 +221,6 @@ New features:
   This uses an additional thread for bigger files, so it is cheap for fast hashes
   like blake3 or hw-accelerated sha256. It adds a little overhead, though, when processing
   lots of small files.
-- create --encryption: new none-* and authenticated-* modes, #9104.
-  Uses either sha256 or blake3, improves authentication and checksumming capabilities.
 - benchmark cpu:
 
   - add a throughput column (MB/s), #10049
@@ -222,10 +230,6 @@ New features:
     depending on data size)
   - use --chunking / --hashing / --encrypting / --compressing / --msgpacking
     to run only a subset of the benchmarks, #10050
-- export-tar: support sparse files, #2562
-- find: search files across archives, #9974
-- compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.
-  They trade compression ratio for speed. Compatible with existing repositories.
 - check:
 
   - keep pack check results, add --max-age to reuse them, #9696, #9925
@@ -233,11 +237,6 @@ New features:
   - report missing chunks grouped as chunk -> files -> archives, #9218, #9965
   - stream one line per missing chunk id, run report on abort, lower report caps, #9218
 - help environment: new help topic about environment variables, #10061
-- webdav: serve archives via WebDAV / HTTP, including PAX tar downloads - this is a nice
-  replacement for ``borg mount`` in some use cases, #9942
-- mount: expose POSIX ACLs on Linux mounts (not enforced), #1042
-- analyze: report deduplicated size of a set of archives, #5741
-- analyze: add --json output, #9992
 - repo-compress: was temporarily gone, now re-added with pack support, #9663
 - version: add --json output, #10004
 - completion: generate fish and tcsh completions, #9989, #9503
@@ -283,7 +282,7 @@ Fixes:
 Other changes:
 
 - support Python 3.15
-- support PyPy (nightly build or next release), #1755.
+- support PyPy (nightly build), #1755.
   Note: PyPy is slower than CPython due to the way it deals with C code.
 - chunkers/reader: limit the read size in the no-readv fallback (win32), see #1755
 - borgstore: require 0.6.x, with blake3 support
@@ -310,25 +309,31 @@ Other changes:
   - a chunk that is read to its end is no longer put into the data cache, so a
     full download does not evict the chunks that partial (range) reads need - this was
     the FUSE behavior, now webdav shares it.
+- extract: warn if file flags cannot be set, #1345
+- Location: reject UNC paths everywhere, #10164
+- mount: tell why FUSE support is unavailable, #8657
+- fslocking: fix broken exclusivity on Cygwin, #7218
+- platform: determine hostname / fqdn / hostid lazily, #9470
+- get rid of master/slave terminology for hard links, #5248
 - remove some global options (they were difficult to use and spammed the help output):
 
   - --remote-path -> BORG_REMOTE_PATH
   - --rsh -> BORG_RSH
   - --iec -> BORG_UNITS=iec
   - --debug-profile -> BORG_DEBUG_PROFILE
-  - --upload-ratelimit (needs to be reimplemented in borgstore)
+  - --upload-ratelimit (see borgstore)
   - --upload-buffer
 - docs:
 
   - update README
   - README: show the contributor chart in the "Helping" section
+  - FAME.md: update contributor statistics, #10022
   - new borg2 demo screencast (see www.borgbackup.org), #6303
   - fix/refactor return codes documentation, #9905
   - fix chunks index / memory usage internals documentation, #9937
   - update help for some commands, #9948
   - fix grammar/typos, #9972
   - add chunker guide (user-level and cryptographic)
-  - FAME.md: update contributor statistics, #10022
   - crypto: misc. improvements to code and docs, #6501, ...
   - GitHub issue #10000: "We Are Borg" joke collection
   - describe cross-platform behavior of file flags (bsdflags), #1345
@@ -358,12 +363,6 @@ Other changes:
   - enable POSIX.1e ACLs on the FreeBSD VM's root fs, #9144
   - misc. improvements to speed up coverage, #9470
   - conftest: fix rmtree cleanup crash on Linux (os.lchflags does not exist)
-- extract: warn if file flags cannot be set, #1345
-- Location: reject UNC paths everywhere, #10164
-- mount: tell why FUSE support is unavailable, #8657
-- fslocking: fix broken exclusivity on Cygwin, #7218
-- platform: determine hostname / fqdn / hostid lazily, #9470
-- get rid of master/slave terminology for hard links, #5248
 
 
 Version 2.0.0b22 (2026-07-22)

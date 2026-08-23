@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-environment" "1" "2026-08-14" "" "borg backup tool"
+.TH "borg-environment" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-environment \- Details regarding environment
 .SH DESCRIPTION
@@ -274,26 +274,38 @@ set it, and can optionally show a chart of the measurements in your browser
 .TP
 .B BORG_ZSTD_MT_WORKERS
 When set to a numeric value, use that many threads to zstd\-compress a single chunk
-(default: the cpu count). 0 or 1 means single\-threaded compression.
+(default: the cpu count, but at most 4). 0 or 1 means single\-threaded compression.
 Only relevant when compressing with \fBzstd\fP\&.
 Chunks below 768KiB are always compressed single\-threaded: libzstd will not use a
 compression job smaller than 512KiB, so a small chunk gets split very unevenly and
 multi\-threading it would be slower than not doing it at all.
+The default is capped at 4 because a chunk of the size the default chunker aims at
+(2MiB) splits into just 4 such jobs: threads beyond that get (nearly) no work, but
+the whole thread pool is created again for every chunk. Measured on a 12\-core
+machine, 4 threads beat 12 on every test corpus at the default \fBzstd,\-4\fP
+(+13% .. +37%). Raising the value only pays off if you configured the chunker
+for much bigger chunks. \fBborg export\-tar\fP compresses one long stream instead of
+separate chunks and always defaults to the cpu count.
 Multi\-threading trades a little compression ratio for speed (measured at \fBzstd,3\fP:
 +0.05% archive size for 1MiB chunks, +0.64% for 8MiB ones, more at higher levels), and
 it uses more cpu time in total to reduce the wallclock time. Set it to 1 if you would
 rather have the smaller archive, or if borg has to share the cpu with other work.
+Single\-threaded can even be faster on data zstd races through anyway, e.g.
+already\-compressed/incompressible data or long\-repeat data like VM images.
 .TP
 .B BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
-Select the scan kernel the \fBfastcdc\fP / \fBbuzhash64\fP chunker uses (default:
-\fBscalar\fP, the plain sequential loop). Accepted values are \fBavx512\fP, \fBavx2\fP,
-\fBneon\fP, \fBblockwise\fP and \fBscalar\fP\&.
+Select the scan kernel the \fBfastcdc\fP / \fBbuzhash64\fP chunker uses. Accepted values
+are \fBavx512\fP, \fBavx2\fP, \fBneon\fP, \fBblockwise\fP and \fBscalar\fP\&.
+The default is whichever benchmarked fastest for the architecture: \fBneon\fP on
+aarch64, and \fBscalar\fP (the plain sequential loop) on x86\-64, where the compiler
+folds the rolling hash update into a single instruction and thereby beats the vector
+kernels. Other architectures get \fBblockwise\fP, the portable multi\-lane C kernel.
 All kernels chunk identically \- same cut points, same chunk ids \- and differ only in
 speed, so this is safe to change at any time, also for an existing repository.
 Which kernel is fastest is not predictable from the instruction set: it depends on the
 cpu and on the compiler that built borg, and the sequential loop wins on some machines.
-Nothing is selected automatically, so measure on your own hardware with
-\fBborg benchmark cpu \-\-chunking\fP before setting these.
+Measure on your own hardware with \fBborg benchmark cpu \-\-chunking\fP before overriding
+the default.
 \fBavx512\fP and \fBavx2\fP exist only on x86\-64, \fBneon\fP only on aarch64, and only if the
 compiler that built borg supported them; \fBscalar\fP and \fBblockwise\fP are portable C
 and always available.
@@ -303,11 +315,14 @@ silent fallback, so a benchmark can not accidentally measure a different kernel.
 .TP
 .B BORG_AES_CHUNKER_KERNEL
 Select the scan kernel used by the AES based chunkers \- one variable for all three of
-\fBtoeplitz\-aes\fP, \fBrabin\-aes\fP and \fBgoldilocks\-aes\fP (default: \fBevp\fP, the portable
-OpenSSL path). Accepted values are \fBvaes\fP, \fBaes\-ni\fP, \fBaes\-arm64\fP and \fBevp\fP\&.
+\fBtoeplitz\-aes\fP, \fBrabin\-aes\fP and \fBgoldilocks\-aes\fP\&. Accepted values are \fBvaes\fP,
+\fBaes\-ni\fP, \fBaes\-arm64\fP and \fBevp\fP\&.
+Unlike the chunker kernels above, wider is simply faster here, so the default is the
+best path this build and cpu offer: \fBvaes\fP, else \fBaes\-ni\fP on x86\-64, \fBaes\-arm64\fP
+on aarch64, and \fBevp\fP (the portable OpenSSL path) where there is no AES hardware
+path.
 As with the chunker kernels above, all of them chunk identically and differ only in
-speed, nothing is selected automatically, and a kernel that can not run here is an
-error rather than a silent fallback.
+speed, and a kernel that can not run here is an error rather than a silent fallback.
 \fBvaes\fP and \fBaes\-ni\fP exist only on x86\-64, \fBaes\-arm64\fP only on aarch64.
 \fBvaes\fP additionally needs a compiler that knows it (gcc >= 11 / clang >= 14), so a
 cpu supporting VAES is not by itself enough to have that kernel available.
@@ -412,6 +427,9 @@ Now you can init a fresh repo. Make sure you do not use the workaround any more.
 .B BORG_CHECK_FORMAT
 Giving the default value for \fBborg check \-\-format=X\fP\&.
 .TP
+.B BORG_FIND_FORMAT
+Giving the default value for \fBborg find \-\-format=X\fP\&.
+.TP
 .B BORG_LIST_FORMAT
 Giving the default value for \fBborg list \-\-format=X\fP\&.
 .TP
@@ -420,6 +438,12 @@ Giving the default value for \fBborg repo\-list \-\-format=X\fP\&.
 .TP
 .B BORG_PRUNE_FORMAT
 Giving the default value for \fBborg prune \-\-format=X\fP\&.
+.TP
+.B BORG_MOUNT_ARCHIVE_DIR_FORMAT
+Giving the format of the archive directory names when \fBborg mount\fP or
+\fBborg webdav\fP show a whole repository, default: \fB{name}\fP\&. The placeholders
+are the ones of \fBborg repo\-list \-\-format\fP; names that are not unique get
+\fB\-{id:.8}\fP appended. See \fBborg mount \-\-help\fP\&.
 .UNINDENT
 .TP
 .B Some automatic \(dqanswerers\(dq (if set, they automatically answer confirmation questions):

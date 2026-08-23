@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-compress" "1" "2026-03-15" "" "borg backup tool"
+.TH "borg-repo-compress" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-repo-compress \- Repository (re-)compression.
 .SH SYNOPSIS
@@ -38,19 +38,26 @@ borg [common options] repo\-compress [options]
 .sp
 Repository (re\-)compression (and/or re\-obfuscation).
 .sp
-Reads all chunks in the repository and recompresses them if they are not already
-using the compression type/level and obfuscation level given via \fB\-\-compression\fP\&.
+Reads all repository objects and recompresses the ones that are not already using
+the compression type/level and obfuscation level given via \fB\-\-compression\fP\&.
 .sp
-If the outcome of the chunk processing indicates a change in compression
-type/level or obfuscation level, the processed chunk is written to the repository.
-Please note that the outcome might not always be the desired compression
-type/level \- if no compression gives a shorter output, that might be chosen.
+The repository is processed one pack file at a time: a pack is read as a whole and,
+if it holds objects that need recompression, rewritten as a whole \- objects already
+using the desired compression are copied into the rewritten pack unchanged. A pack
+whose objects all already use the desired compression is not touched at all.
+Please note that the outcome of recompressing a chunk might not always be the
+desired compression type/level \- if no compression gives a shorter output, that
+might be chosen; such chunks are kept as they are.
 .sp
-Please note that this command can not work in low (or zero) free disk space
-conditions.
+Rewriting a pack invalidates every client\(aqs cached chunk index, so the next borg
+operation of each client will re\-fetch the chunk index from the repository.
 .sp
-If the \fBborg repo\-compress\fP process receives a SIGINT signal (Ctrl\-C), the repo
-will be committed and compacted and borg will terminate cleanly afterwards.
+This command needs free space in the repository for the rewritten pack files
+(roughly one pack file size while running).
+.sp
+If the \fBborg repo\-compress\fP process receives a SIGINT signal (Ctrl\-C), it stops
+at the next pack boundary, leaving the repository and its chunk index in a
+consistent state; running it again later processes the remaining packs.
 .sp
 Both \fB\-\-progress\fP and \fB\-\-stats\fP are recommended when \fBborg repo\-compress\fP
 is used interactively.

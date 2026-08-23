@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-import-tar" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-import-tar" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -50,10 +50,14 @@ based on its file extension and pipe the file through an appropriate filter:
 .IP \(bu 2
 \&.tar.xz or .txz: xz \-d
 .IP \(bu 2
-\&.tar.zstd or .tar.zst: zstd \-d
+\&.tar.zstd, .tar.zst or .tzst: zstd (in\-process)
 .IP \(bu 2
 \&.tar.lz4: lz4 \-d
 .UNINDENT
+.sp
+For zstd, Borg decompresses in\-process using libzstd instead of piping through
+an external program. The other formats are piped through the respective
+external filter program.
 .sp
 Alternatively, a \-\-tar\-filter program may be explicitly specified. It should
 read compressed data from stdin and output an uncompressed tar stream on
@@ -62,7 +66,9 @@ stdout.
 Most documentation of borg create applies. Note that this command does not
 support excluding files.
 .sp
-A \fB\-\-sparse\fP option (as found in borg create) is not supported.
+A \fB\-\-sparse\fP option (as found in borg create) is not needed: sparse members in
+input tarballs (old GNU and PAX sparse formats) are read correctly and their
+holes are stored as deduplicated all\-zero chunks.
 .sp
 About tar formats and metadata conservation or loss, please see \fBborg export\-tar\fP\&.
 .sp
@@ -128,10 +134,13 @@ add a comment text to the archive
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
+specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: fastcdc,19,23,21,2
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+.TP
+.BI \-\-digests \ ALGOS
+compute these hash digests over the full content of each file and store them into the archive items. Comma\-separated list of hash algorithm names, e.g. \(dqblake3\(dq, or \(dqnone\(dq. default: none
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -158,6 +167,9 @@ $ borg export\-tar Monday \- | curl \-\-data\-binary @\- https://somewhere/to/PO
 
 # Remote extraction via \(aqtarpipe\(aq
 $ borg export\-tar Monday \- | ssh somewhere \(dqcd extracted; tar x\(dq
+
+# Export sparse files (e.g. disk images) as sparse tar members (GNU sparse format 1.0)
+$ borg export\-tar \-\-sparse disk\-images disk\-images.tar
 .EE
 .UNINDENT
 .UNINDENT
@@ -201,7 +213,8 @@ maybe add compression
 .IP \(bu 2
 pipe over ssh for remote transfer
 .IP \(bu 2
-no special sparse file support
+maybe add \fB\-\-sparse\fP to the export\-tar command, so runs of all\-zero chunks
+travel as a compact sparse map instead of literal zeros
 .UNINDENT
 .SH SEE ALSO
 .sp

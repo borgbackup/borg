@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-export-tar" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-export-tar" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-export-tar \- Export archive contents as a tarball
 .SH SYNOPSIS
@@ -52,10 +52,14 @@ before writing it to FILE:
 .IP \(bu 2
 \&.tar.xz or .txz: xz
 .IP \(bu 2
-\&.tar.zstd or .tar.zst: zstd
+\&.tar.zstd, .tar.zst or .tzst: zstd (in\-process, level 3)
 .IP \(bu 2
 \&.tar.lz4: lz4
 .UNINDENT
+.sp
+For zstd, Borg compresses in\-process using libzstd instead of piping through an
+external program (set BORG_ZSTD_MT_WORKERS to use multiple compression threads).
+The other formats are piped through the respective external filter program.
 .sp
 Alternatively, a \fB\-\-tar\-filter\fP program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered
@@ -100,7 +104,20 @@ no ACLs/xattrs/bsdflags
 T}
 .TE
 .sp
-A \fB\-\-sparse\fP option (as found in borg extract) is not supported.
+With \fB\-\-sparse\fP, files whose content contains runs of all\-zero chunks are written
+as sparse tar members (GNU sparse format 1.0, as GNU tar creates it in POSIX mode),
+storing only a hole map and the non\-zero data. This requires \fB\-\-tar\-format BORG\fP
+or \fBPAX\fP\&. Such tarballs can be much smaller for sparse files (e.g. disk images)
+and extract to sparse files again with GNU tar\(aqs or bsdtar\(aqs sparse support
+(as well as with \fBborg import\-tar\fP / \fBborg extract \-\-sparse\fP).
+Notes: hole detection works at the granularity of borg\(aqs content chunks (it does not
+depend on the original file having been a sparse file \- but some short or unaligned
+zero runs may be stored literally); sparse\-unaware tar implementations will extract
+a member as \fBGNUSparseFile.0/<name>\fP containing the raw hole map and data (the
+same caveat applies to tarballs created by GNU tar); for members needing >= 8 GiB
+of stored (non\-hole) data, the stored size is base\-256 encoded in the tar header
+(the GNU/star encoding of big numbers, understood by GNU tar, libarchive/bsdtar
+and python) \- logical file sizes are unlimited anyway.
 .sp
 By default the entire archive is extracted but a subset of files and directories
 can be selected by passing a list of \fBPATHs\fP as arguments.
@@ -136,6 +153,9 @@ output verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-tar\-format \ FMT
 select tar format: BORG, PAX or GNU
+.TP
+.B  \-\-sparse
+write sparse tar members (GNU sparse format 1.0) for files containing all\-zero chunks (BORG and PAX formats only)
 .UNINDENT
 .SS Include/Exclude options
 .INDENT 0.0

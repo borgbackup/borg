@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-analyze" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-analyze" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-analyze \- Analyzes archives.
 .SH SYNOPSIS
@@ -36,26 +36,93 @@ borg-analyze \- Analyzes archives.
 borg [common options] analyze [options]
 .SH DESCRIPTION
 .sp
-Analyze archives to find \(dqhot spots\(dq.
+Analyze the archives matching the usual archive selection options (e.g. \fB\-a series_name\fP).
 .sp
-\fBborg analyze\fP relies on the usual archive matching options to select the
-archives that should be considered for analysis (e.g. \fB\-a series_name\fP).
-Then it iterates over all matching archives, over all contained files, and
-collects information about chunks stored in all directories it encounters.
+\fBDeduplicated size of a set of archives\fP
 .sp
-It considers chunk IDs and their plaintext sizes (we do not have the compressed
-size in the repository easily available) and adds up the sizes of added and removed
-chunks per direct parent directory, and outputs a list of \(dqdirectory: size\(dq.
+For the considered (matching) set of archives, \fBborg analyze\fP reports the \fIsource\fP
+(uncompressed source data) and \fIstored\fP (compressed, as stored in the repository) size,
+plus the \fIcompression\fP factor relating the two (stored / source):
+.INDENT 0.0
+.IP \(bu 2
+the \fIdeduplicated size of the set\fP: the summed size of the union of chunks the
+considered archives reference (chunks shared \fIwithin\fP the set are counted once);
+.IP \(bu 2
+the \fIexclusive size of the set\fP: the summed size of chunks referenced \fIonly\fP by the
+considered set and by no other archive \- i.e. the space that deleting the whole set
+would free (assuming the other archives stay).
+.UNINDENT
 .sp
-You can use that list to find directories with a lot of \(dqactivity\(dq — maybe
-some of these are temporary or cache directories you forgot to exclude.
+Additionally, the \fIunreferenced chunks\fP are reported: chunks in the repository that no
+non\-deleted archive references, i.e. what \fBborg compact\fP could free in the current
+state of the repository. Only their stored size is known \- a chunk\(aqs source size is
+only recorded in the archives that reference it. Note that chunks belonging to
+soft\-deleted archives count as unreferenced here, although \fBborg compact\fP keeps them
+when the repository is damaged (so \fBborg undelete\fP stays possible).
 .sp
-To avoid including these unwanted directories in your backups, you can carefully
-exclude them in \fBborg create\fP (for future backups) or use \fBborg recreate\fP
-to recreate existing archives without them.
+If no archive filter is given, all archives are considered \- every referenced chunk is
+then trivially exclusive to them, so only the repository\-wide deduplicated size is shown.
+.sp
+The stored sizes come from the repository\(aqs chunk index; the chunk membership and the
+source sizes come from the per\-archive references cache that \fBborg compact\fP
+maintains, so unchanged archives usually do not need to be opened.
+.sp
+\fBDecomposition by archive name (\-\-by\-name)\fP
+.sp
+With \fB\-\-by\-name\fP, the whole repository is decomposed by archive name instead. Archives
+sharing a name form a series, so a name usually groups all backups of one source; for
+old\-style archives that do not form a series, each name is just one archive.
+.sp
+Every chunk is counted in exactly one row, so the rows add up to the repository\(aqs
+deduplicated size:
+.INDENT 0.0
+.IP \(bu 2
+one row per archive name, showing what is \fIexclusive\fP to it: no archive of another name
+references these chunks, so deleting all archives of that name would free them;
+.IP \(bu 2
+one row for the chunks shared by two or more names;
+.IP \(bu 2
+one row for the unreferenced chunks (see above).
+.UNINDENT
+.sp
+This answers \(dqwhich name costs how much, and what would I get back by dropping it\(dq for
+all names at once, in a single pass over the archives. As the shared and unreferenced
+rows can only be determined by looking at every archive, \fB\-\-by\-name\fP always covers the
+whole repository and cannot be combined with archive filters.
+.sp
+\fBHot spots\fP
+.sp
+If at least two archives match, \fBborg analyze\fP additionally iterates over all matching
+archives, over all contained files, and collects information about chunks stored in all
+directories it encounters. It considers chunk IDs and their plaintext sizes and adds up
+the sizes of added and removed chunks per direct parent directory, and outputs a list of
+\(dqdirectory: size\(dq.
+.sp
+You can use that list to find directories with a lot of \(dqactivity\(dq — maybe some of these
+are temporary or cache directories you forgot to exclude. To avoid including these unwanted
+directories in your backups, you can carefully exclude them in \fBborg create\fP (for future
+backups) or use \fBborg recreate\fP to recreate existing archives without them.
+.sp
+\fBJSON output\fP
+.sp
+With \fB\-\-json\fP, the same numbers are emitted as a single JSON object instead of the text
+report, with raw byte values rather than formatted sizes. The default mode fills the
+\fIdedup_size\fP and \fIhotspots\fP keys, \fB\-\-by\-name\fP fills the \fIby_name\fP key. The compression
+factor is not included: it is \fBstored_size / source_size\fP\&.
+.sp
+See \fIjson_output\fP for the object\(aqs structure.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.B  \-\-by\-name
+decompose the whole repository by archive name (not combinable with archive filters)
+.TP
+.B  \-\-json
+format output as JSON
+.UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP

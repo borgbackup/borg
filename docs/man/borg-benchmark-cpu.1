@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-benchmark-cpu" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-benchmark-cpu" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-benchmark-cpu \- Benchmark CPU-bound operations.
 .SH SYNOPSIS
@@ -46,6 +46,22 @@ an otherwise as idle as possible machine
 .IP \(bu 2
 enough free memory so there will be no slow down due to paging activity
 .UNINDENT
+.sp
+By default all benchmarks run. Give one or more of \-\-chunking, \-\-hashing,
+\-\-encrypting, \-\-compressing, \-\-msgpacking to run only those.
+.sp
+Some algorithms use multiple threads only above a size threshold, so the
+hashes and the compressors are measured at more than one buffer size: the
+hashes at 64MiB (a borg pack) and 2MiB (a typical borg chunk), both above
+blake3\(aqs threshold, the compressors at 2MiB and 128kiB, which is below
+zstd\(aqs. Within a section every row processes the same total number of
+bytes \- 1 GiB, or 10 MiB for the compressors \- so the throughput column is
+comparable between rows.
+.sp
+The compressors work on synthetic text\-like data that compresses about 4x
+at zstd,3. Random data would be the worst possible input: no codec can
+compress it, so all of them would take their incompressible fast path and
+the levels would barely differ.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -54,6 +70,21 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .TP
 .B  \-\-json
 format output as JSON
+.TP
+.B  \-\-chunking
+benchmark the chunkers
+.TP
+.B  \-\-hashing
+benchmark the hashes / MACs
+.TP
+.B  \-\-encrypting
+benchmark the encryption modes
+.TP
+.B  \-\-compressing
+benchmark the compressors
+.TP
+.B  \-\-msgpacking
+benchmark msgpack item packing
 .UNINDENT
 .SH SEE ALSO
 .sp

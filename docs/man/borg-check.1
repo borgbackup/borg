@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-check" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-check" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-check \- Checks repository consistency.
 .SH SYNOPSIS
@@ -66,17 +66,29 @@ Both steps can also be run independently. Pass \fB\-\-repository\-only\fP to run
 repository checks only, or pass \fB\-\-archives\-only\fP to run the archive checks
 only.
 .sp
-The \fB\-\-max\-duration\fP option can be used to split a long\-running repository
-check into multiple partial checks. After the given number of seconds, the check
-is interrupted. The next partial check will continue where the previous one
-stopped, until the full repository has been checked. Assuming a complete check
-would take 7 hours, then running a daily check with \fB\-\-max\-duration=3600\fP
-(1 hour) would result in one full repository check per week. Doing a full
-repository check aborts any previous partial check; the next partial check will
-restart from the beginning. With partial repository checks you can run neither
-archive checks, nor enable repair mode. Consequently, if you want to use
-\fB\-\-max\-duration\fP you must also pass \fB\-\-repository\-only\fP, and must not pass
-\fB\-\-archives\-only\fP, nor \fB\-\-repair\fP\&.
+The \fB\-\-max\-age\fP option makes the check reuse the results of previous
+repository checks: packs whose intact result is younger than the given
+timespan (e.g. \fB\-\-max\-age=4w\fP or \fB\-\-max\-age=12m\fP) are skipped, spreading
+the verification cost over repeated checks. The timespan uses the same markers
+as \fB\-\-older\fP/\fB\-\-newer\fP: \fBd\fP, \fBw\fP, \fBH\fP, \fBM\fP, \fBS\fP are exact spans,
+while \fBm\fP and \fBy\fP are calendar units counted from now (so \fB12m\fP equals
+\fB1y\fP). Check results are recorded in any case; \fB\-\-max\-age\fP only controls
+their reuse. Packs recorded corrupt are always re\-verified. \fB\-\-max\-age\fP
+affects only the repository check and cannot be combined with
+\fB\-\-archives\-only\fP or \fB\-\-repair\fP\&.
+.sp
+The \fB\-\-max\-duration\fP option splits a long\-running repository check into
+several partial checks. After the given number of seconds, the check is
+interrupted. A partial check verifies the least\-recently\-checked packs first,
+so repeated runs cover the whole repository. Add \fB\-\-max\-age\fP to also skip
+packs whose result is still younger than the given age: once every pack has a
+recent result, further runs re\-check each pack at most once per \fB\-\-max\-age\fP,
+and no faster than the per\-run budget allows.
+Assuming a complete check would take 7 hours, running a daily check with
+\fB\-\-max\-duration=3600 \-\-max\-age=1w\fP (1 hour) results in one full repository
+verification per week. Partial repository checks run neither archive checks
+nor repair mode, so \fB\-\-max\-duration\fP requires \fB\-\-repository\-only\fP and
+cannot be combined with \fB\-\-archives\-only\fP or \fB\-\-repair\fP\&.
 .sp
 \fBWarning:\fP Please note that partial repository checks (i.e., running with
 \fB\-\-max\-duration\fP) can only perform non\-cryptographic checksum checks on the
@@ -91,6 +103,10 @@ will detect any accidental and malicious corruption. Tamper\-resistance is only
 guaranteed for encrypted repositories against attackers without access to the keys.
 You cannot use \fB\-\-verify\-data\fP with \fB\-\-repository\-only\fP\&.
 .sp
+\fB\-\-verify\-data\fP also always verifies that each chunk\(aqs content matches its chunk id,
+which normal reads do not do by default (see \fBBORG_ASSERT_ID\fP). Running it periodically
+is therefore recommended.
+.sp
 The \fB\-\-find\-lost\-archives\fP option will also scan the whole repository, but
 tells Borg to search for lost archive metadata. If Borg encounters any archive
 metadata that does not match an archive directory entry (including
@@ -103,6 +119,20 @@ data from the repository and is thus very time\-consuming. You cannot use
 You can influence how the archive part of the \fBAnalyzing archive ...\fP output is
 formatted by giving a custom format using \fB\-\-format\fP (see the \fBborg repo\-list\fP
 description for more details about the format string).
+.sp
+If the \fBborg check\fP process receives a SIGINT signal (Ctrl\-C), it stops at the
+next safe boundary, leaving the repository and its chunk index in a consistent state.
+The repository check stops after the current pack; \fB\-\-verify\-data\fP and
+\fB\-\-find\-lost\-archives\fP stop after the current chunk; a \fB\-\-repair\fP archive check
+stops between whole archives. Results recorded before the interrupt are kept, so a later
+check does not re\-verify those packs until they are due again. With \fB\-\-repair\fP, an
+interrupted archive check may leave some archives already repaired and others not yet
+processed, so run \fBborg check \-\-repair\fP again to finish.
+.sp
+During a \fB\-\-repair\fP run, the archive check first rebuilds the chunk index from the
+packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
+respond to SIGINT, so on a large repository a Ctrl\-C during them may appear to have no
+effect until they finish.
 .SS About repair mode
 .sp
 The check command is a read\-only task by default. If any corruption is found,
@@ -136,8 +166,11 @@ by definition, a potentially lossy task.
 In practice, repair mode hooks into both the repository and archive checks:
 .INDENT 0.0
 .IP 1. 3
-When checking the repository\(aqs consistency, repair mode removes corrupted
-objects from the repository after it did a 2nd try to read them correctly.
+When checking the repository\(aqs consistency, repair mode rebuilds the repository
+index from the packs if the index is corrupt, provided every pack is intact. If
+any pack is corrupt, the repository check leaves the index and the packs untouched
+and reports the corruption; salvaging a corrupt pack\(aqs still\-intact objects is not
+implemented yet (refs #8572).
 .IP 2. 3
 When checking the consistency and correctness of archives, repair mode might
 remove whole archives from the manifest if their archive metadata chunk is
@@ -167,6 +200,9 @@ attempt to repair any inconsistencies found
 .TP
 .B  \-\-find\-lost\-archives
 attempt to find lost archives
+.TP
+.BI \-\-max\-age \ TIMESPAN
+reuse intact\-pack check results younger than TIMESPAN, e.g. 4w or 12m
 .TP
 .BI \-\-max\-duration \ SECONDS
 perform only a partial repository check for at most SECONDS seconds (default: unlimited)

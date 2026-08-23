@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-07-25" "" "borg backup tool"
+.TH "borg" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -210,6 +210,10 @@ expanded by your shell).
 .sp
 Note: You may also prepend \fBfile://\fP to a filesystem path to use URL style.
 .sp
+Note: UNC paths (\fB//server/share/path\fP, \fB\e\eserver\eshare\epath\fP) are not
+supported — mount the share (on Windows: map it to a drive letter, e.g.
+\fBnet use X: \e\eserver\eshare\fP) and use the mounted path instead.
+.sp
 \fBRemote repositories\fP accessed via SSH \%<user@\:host> (REST http over stdio):
 .sp
 \fBrest://user@host:port//abs/path/to/repo\fP — absolute path
@@ -340,41 +344,61 @@ _
 T{
 1
 T}	T{
-generic warning (operation reached its normal end, but there were warnings —
-you should check the log; logged as WARNING)
+generic warning (operation reached its normal end, but there
+were warnings \- you should check the log; logged as WARNING)
 T}
 _
 T{
 2
 T}	T{
-generic error (like a fatal error or a local/remote exception; the operation
-did not reach its normal end; logged as ERROR)
+generic error (such as a fatal error or a local/remote exception;
+the operation did not reach its normal end; logged as ERROR)
 T}
 _
 T{
 3..99
 T}	T{
-specific error (enabled by BORG_EXIT_CODES=modern)
+specific error (see below; logged as ERROR)
 T}
 _
 T{
 100..127
 T}	T{
-specific warning (enabled by BORG_EXIT_CODES=modern)
+specific warning (see below; logged as WARNING)
 T}
 _
 T{
 128+N
 T}	T{
-killed by signal N (e.g. 137 == kill \-9)
+terminated by signal N (e.g. 130 == SIGINT, Ctrl+C, or kill \-2;
+logged as ERROR)
 T}
 .TE
 .sp
 If you use \fB\-\-show\-rc\fP, the return code is also logged at the indicated
 level as the last log entry.
 .sp
-The modern exit codes (return codes, \(dqrc\(dq) are documented here: see \fImsgid\fP\&.
+Borg categorizes return codes into groups and exits with the more severe
+group: signals (rc 128+N) are more severe than errors (rc 2 and 3..99),
+which take precedence over warnings (rc 1 and 100..127), and lastly
+success (rc 0).
+.sp
+Within the signal and error groups, the first signal or error determines
+the final return code. Within the warning group, Borg returns the specific
+warning code (rc 100..127) if there were one or more warnings of the same
+kind. If warnings of different kinds occurred, Borg returns the generic
+warning code (rc 1) instead. All errors and warnings are still logged
+individually.
+.sp
+Borg 2 exits with specific error (rc 3..99) and warning (rc 100..127) codes
+by default. If you want Borg 2 to always exit with the generic error (rc 2)
+or generic warning (rc 1) code instead (like Borg 1 did), set the
+\fBBORG_EXIT_CODES=legacy\fP environment variable.
+.sp
+For a list of all specific error and warning codes, see \fImsgid\fP\&.
 .SS Environment Variables
+.\" IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
+.
 .sp
 Borg uses some environment variables for automation:
 .INDENT 0.0
@@ -452,7 +476,8 @@ You can set the default value for the \fB\-\-lock\-wait\fP option with this, so
 you do not need to give it as a command line option.
 .TP
 .B BORG_LOGGING_CONF
-When set, use the given filename as INI \%<https://\:docs\:.python\:.org/\:3/\:library/\:logging\:.config\:.html#\:configuration-file-format>\-style logging configuration.
+When set, use the given filename as INI\-style logging configuration (see
+\%<https://\:docs\:.python\:.org/\:3/\:library/\:logging\:.config\:.html#\:configuration-file-format>).
 A basic example conf can be found at \fBdocs/misc/logging.conf\fP\&.
 .TP
 .B BORG_RSH
@@ -465,10 +490,49 @@ borg also gives this to borgstore as \fBBORGSTORE_RSH\fP, except if that is alre
 When set, use the given path as borg executable on the remote (defaults to \(dqborg\(dq if unset).
 This is the replacement for the removed \fB\-\-remote\-path PATH\fP command line option.
 .TP
-.B BORG_IEC
-When set to \fByes\fP, format sizes using IEC units (1KiB = 1024B) instead of
-decimal units (1kB = 1000B).
-This is the replacement for the removed \fB\-\-iec\fP command line option.
+.B BORG_UNITS
+Determines how borg formats sizes in its human\-readable output:
+.INDENT 7.0
+.IP \(bu 2
+\fBsi\fP (default): decimal units, e.g. \fB1.23 MB\fP (1kB = 1000B)
+.IP \(bu 2
+\fBiec\fP: binary units, e.g. \fB1.18 MiB\fP (1KiB = 1024B)
+.IP \(bu 2
+\fBraw\fP: exact byte counts, e.g. \fB1234567 B\fP
+.UNINDENT
+.sp
+Use \fBraw\fP if you want to parse sizes with scripts (e.g. for monitoring),
+so you do not have to deal with scaled values and different units.
+Alternatively, use a command\(aqs \fB\-\-json\fP output or, for the commands
+supporting \fB\-\-format\fP, the size related format keys \- sizes are given
+as byte counts there anyway.
+.sp
+\fBBORG_UNITS=iec\fP is the replacement for the removed \fBBORG_IEC\fP environment
+variable (and for the \fB\-\-iec\fP command line option removed before that).
+.TP
+.B BORG_PROGRESS_FPS
+How often the \fB\-\-progress\fP output is updated at most, in updates per
+second (default: 5). Fractional values are allowed, e.g.
+\fBBORG_PROGRESS_FPS=0.1\fP limits it to one update every 10 seconds.
+Lower values are useful when the output goes into a logfile rather than
+to an interactive terminal.
+.TP
+.B BORG_SPINNER
+Controls the spinner borg animates on a terminal while doing work of unknown
+duration:
+.INDENT 7.0
+.IP \(bu 2
+unset (default): animate, using Unicode frames if the terminal can display them
+.IP \(bu 2
+\fBascii\fP: animate, but only use ASCII frames (\fB|/\-\e\fP)
+.IP \(bu 2
+\fBoff\fP: do not animate, only output the messages next to the spinner
+.UNINDENT
+.sp
+The spinner is animated only on an interactive terminal anyway (and never
+with \fB\-\-log\-json\fP), and its colour follows the usual \fBNO_COLOR\fP and
+\fBCOLORTERM\fP conventions. See also \fBBORG_PROGRESS_FPS\fP: it also gives
+the spinner its frame rate.
 .TP
 .B BORG_DEBUG_PROFILE
 When set to a filename, write an execution profile in Borg format into that file
@@ -488,6 +552,147 @@ cache entries for backup sources other than the current sources.
 .B BORG_FILES_CACHE_TTL
 When set to a numeric value, this determines the maximum \(dqtime to live\(dq for the files cache
 entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
+.TP
+.B BORG_ASSERT_ID
+Comma\-separated list of the places where borg shall verify that a chunk\(aqs content matches
+its chunk id (\fBchunkid == id_hash(content)\fP) after decrypting and decompressing it.
+Verifying costs a full hash pass over everything that is read at such a place.
+.sp
+Default (variable not set):
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.EX
+BORG_ASSERT_ID=repair,transfer,rechunk
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+These are the place names that can be listed:
+.INDENT 7.0
+.TP
+.B read
+Every read that decompresses a chunk: \fBborg extract\fP, \fBborg mount\fP,
+\fBborg export\-tar\fP, \fBborg diff\fP, ... This is by far the most data borg reads, so
+this place is \fBnot\fP in the default, see the explanation below.
+.TP
+.B repair
+\fBborg check \-\-repair\fP\&. It rebuilds archives from the item metadata stream it reads,
+re\-packing it into new chunks with freshly computed ids, and it recreates manifest and
+archives directory entries from what it reads.
+.TP
+.B transfer
+\fBborg transfer\fP, for everything it reads from the source repository. Transferring
+re\-anchors the content in another repository, which is a trust boundary.
+.TP
+.B rechunk
+\fBborg recreate \-\-chunker\-params ...\fP, i.e. re\-chunking reads. Re\-chunking computes
+new chunk ids from the content it reads, so a violation would not be noticeable any
+more afterwards. (Re\-chunking in \fBborg transfer\fP is covered by \fBtransfer\fP\&.)
+.UNINDENT
+.sp
+An unknown place name is an error. An empty value (\fBBORG_ASSERT_ID=\fP) verifies at none of
+these places, but still where borg always verifies (see below).
+.sp
+Why \fBread\fP is not in the default: for encrypted repositories (all the AEAD ciphersuites),
+the chunk id is part of the AEAD additional authenticated data, so a successful decryption
+already proves that a holder of the repository key deliberately stored exactly this
+ciphertext for exactly this chunk id. A malicious or buggy \fBrepository\fP can therefore not
+swap, splice or substitute objects, whether the id is verified on read or not. What the id
+check adds is the detection of chunks whose content does not match their id, which only a
+malicious or compromised \fBborg client that had your borg key\fP could have written (e.g. to
+poison future deduplication). If that is in your threat model \- e.g. because some machines
+writing into the repository are not fully trusted \- add \fBread\fP to the list:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.EX
+BORG_ASSERT_ID=read,repair,transfer,rechunk
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+Otherwise, running \fBborg check \-\-verify\-data\fP periodically is recommended: it is the
+audit that re\-certifies the invariant for all chunks in the background, instead of on
+every read.
+.sp
+Independent of this variable, borg always verifies the chunk id:
+.INDENT 7.0
+.IP \(bu 2
+in \fBborg check \-\-verify\-data\fP\&. That audit is what makes not verifying elsewhere
+defensible, so it is not configurable (there is no \fBverify_data\fP place name).
+.IP \(bu 2
+for \fBauthenticated\fP and \fBnone\fP mode repositories: there is no AEAD there, so the id
+check \fIis\fP the read path\(aqs integrity check and switching it off would remove it
+completely. Same for reading borg 1.x repositories (\fBborg transfer\fP).
+.UNINDENT
+.TP
+.B BORG_BLAKE3_MT_THRESHOLD
+When set to a numeric value, chunks of at least that many KiB get their id computed by
+multi\-threaded BLAKE3, smaller ones single\-threaded (default: 256, i.e. 256KiB).
+Only relevant for repositories using \fB\-\-id\-hash blake3\fP\&.
+Multi\-threading only pays off for big enough chunks and the break\-even point depends on
+the machine\(aqs core count, so the default is deliberately conservative.
+Run \fBscripts/blake3\-optimize\-mt\-threshold.py\fP to measure the best value for your
+machine \- it sweeps input sizes, prints the recommended threshold and the command to
+set it, and can optionally show a chart of the measurements in your browser
+(\fB\-\-html \-\-open\fP).
+0 means \(dqalways multi\-threaded\(dq, a very large value effectively disables multi\-threading.
+.TP
+.B BORG_ZSTD_MT_WORKERS
+When set to a numeric value, use that many threads to zstd\-compress a single chunk
+(default: the cpu count, but at most 4). 0 or 1 means single\-threaded compression.
+Only relevant when compressing with \fBzstd\fP\&.
+Chunks below 768KiB are always compressed single\-threaded: libzstd will not use a
+compression job smaller than 512KiB, so a small chunk gets split very unevenly and
+multi\-threading it would be slower than not doing it at all.
+The default is capped at 4 because a chunk of the size the default chunker aims at
+(2MiB) splits into just 4 such jobs: threads beyond that get (nearly) no work, but
+the whole thread pool is created again for every chunk. Measured on a 12\-core
+machine, 4 threads beat 12 on every test corpus at the default \fBzstd,\-4\fP
+(+13% .. +37%). Raising the value only pays off if you configured the chunker
+for much bigger chunks. \fBborg export\-tar\fP compresses one long stream instead of
+separate chunks and always defaults to the cpu count.
+Multi\-threading trades a little compression ratio for speed (measured at \fBzstd,3\fP:
++0.05% archive size for 1MiB chunks, +0.64% for 8MiB ones, more at higher levels), and
+it uses more cpu time in total to reduce the wallclock time. Set it to 1 if you would
+rather have the smaller archive, or if borg has to share the cpu with other work.
+Single\-threaded can even be faster on data zstd races through anyway, e.g.
+already\-compressed/incompressible data or long\-repeat data like VM images.
+.TP
+.B BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
+Select the scan kernel the \fBfastcdc\fP / \fBbuzhash64\fP chunker uses. Accepted values
+are \fBavx512\fP, \fBavx2\fP, \fBneon\fP, \fBblockwise\fP and \fBscalar\fP\&.
+The default is whichever benchmarked fastest for the architecture: \fBneon\fP on
+aarch64, and \fBscalar\fP (the plain sequential loop) on x86\-64, where the compiler
+folds the rolling hash update into a single instruction and thereby beats the vector
+kernels. Other architectures get \fBblockwise\fP, the portable multi\-lane C kernel.
+All kernels chunk identically \- same cut points, same chunk ids \- and differ only in
+speed, so this is safe to change at any time, also for an existing repository.
+Which kernel is fastest is not predictable from the instruction set: it depends on the
+cpu and on the compiler that built borg, and the sequential loop wins on some machines.
+Measure on your own hardware with \fBborg benchmark cpu \-\-chunking\fP before overriding
+the default.
+\fBavx512\fP and \fBavx2\fP exist only on x86\-64, \fBneon\fP only on aarch64, and only if the
+compiler that built borg supported them; \fBscalar\fP and \fBblockwise\fP are portable C
+and always available.
+Requesting a kernel that this build or this cpu cannot run is an error rather than a
+silent fallback, so a benchmark can not accidentally measure a different kernel.
+\fBborg create \-\-debug\fP logs the chunker and the kernel it was created with.
+.TP
+.B BORG_AES_CHUNKER_KERNEL
+Select the scan kernel used by the AES based chunkers \- one variable for all three of
+\fBtoeplitz\-aes\fP, \fBrabin\-aes\fP and \fBgoldilocks\-aes\fP\&. Accepted values are \fBvaes\fP,
+\fBaes\-ni\fP, \fBaes\-arm64\fP and \fBevp\fP\&.
+Unlike the chunker kernels above, wider is simply faster here, so the default is the
+best path this build and cpu offer: \fBvaes\fP, else \fBaes\-ni\fP on x86\-64, \fBaes\-arm64\fP
+on aarch64, and \fBevp\fP (the portable OpenSSL path) where there is no AES hardware
+path.
+As with the chunker kernels above, all of them chunk identically and differ only in
+speed, and a kernel that can not run here is an error rather than a silent fallback.
+\fBvaes\fP and \fBaes\-ni\fP exist only on x86\-64, \fBaes\-arm64\fP only on aarch64.
+\fBvaes\fP additionally needs a compiler that knows it (gcc >= 11 / clang >= 14), so a
+cpu supporting VAES is not by itself enough to have that kernel available.
 .TP
 .B BORG_SHOW_SYSINFO
 When set to no (default: yes), system information (like OS, Python version, ...) in
@@ -548,9 +753,15 @@ caused EROFS. You will need this to make archives from volume shadow copies
 in WSL1 (Windows Subsystem for Linux 1).
 .TP
 .B authenticated_no_key
-Work around a lost passphrase or key for an \fBauthenticated\fP mode repository
+Work around a lost passphrase or key for an \fBauthenticated\-*\fP mode repository
 (these are only authenticated, but not encrypted).
 If the key is missing in the repository config, add \fBkey = anything\fP there.
+.sp
+Without the key, borg can not verify anything that needs it: neither the
+authentication tag of the repository objects nor the chunk ids. It therefore
+reads the repository \fBunverified\fP \- a corrupted or tampered repository will
+not be detected. (This only concerns the \fBauthenticated\-*\fP modes; the
+\fBnone\-*\fP modes need no key and keep verifying their checksums.)
 .sp
 This workaround is \fBonly\fP for emergencies and \fBonly\fP to extract data
 from an affected repository (read\-only access):
@@ -583,6 +794,9 @@ Now you can init a fresh repo. Make sure you do not use the workaround any more.
 .B BORG_CHECK_FORMAT
 Giving the default value for \fBborg check \-\-format=X\fP\&.
 .TP
+.B BORG_FIND_FORMAT
+Giving the default value for \fBborg find \-\-format=X\fP\&.
+.TP
 .B BORG_LIST_FORMAT
 Giving the default value for \fBborg list \-\-format=X\fP\&.
 .TP
@@ -591,6 +805,12 @@ Giving the default value for \fBborg repo\-list \-\-format=X\fP\&.
 .TP
 .B BORG_PRUNE_FORMAT
 Giving the default value for \fBborg prune \-\-format=X\fP\&.
+.TP
+.B BORG_MOUNT_ARCHIVE_DIR_FORMAT
+Giving the format of the archive directory names when \fBborg mount\fP or
+\fBborg webdav\fP show a whole repository, default: \fB{name}\fP\&. The placeholders
+are the ones of \fBborg repo\-list \-\-format\fP; names that are not unique get
+\fB\-{id:.8}\fP appended. See \fBborg mount \-\-help\fP\&.
 .UNINDENT
 .TP
 .B Some automatic \(dqanswerers\(dq (if set, they automatically answer confirmation questions):
@@ -612,110 +832,43 @@ For \(dqYou requested to DELETE the repository completely \fIincluding\fP all ar
 Note: answers are case sensitive. setting an invalid answer value might either give the default
 answer or ask you interactively, depending on whether retries are allowed (they by default are
 allowed). So please test your scripts interactively before making them a non\-interactive script.
-.UNINDENT
-.sp
-Directories and files:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-\fBNote:\fP
-.INDENT 0.0
-.INDENT 3.5
-Borg 2 uses the platformdirs \%<https://\:pypi\:.org/\:project/\:platformdirs/> library to determine
+.TP
+.B Directories and files:
+Borg 2 uses the platformdirs library (\%<https://\:pypi\:.org/\:project/\:platformdirs/>) to determine
 default directory locations. This means that default paths are \fBplatform\-specific\fP:
-.INDENT 0.0
+.INDENT 7.0
 .IP \(bu 2
-\fBLinux\fP: Uses XDG Base Directory Specification paths (e.g., \fB~/.config/borg\fP,
-\fB~/.cache/borg\fP, \fB~/.local/share/borg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are honoured.
+Linux: XDG Base Directory Specification paths are used (e.g. \fB~/.config/borg\fP,
+\fB~/.cache/borg\fP, \fB~/.local/share/borg\fP). \fBXDG_*\fP environment variables are
+honoured (see \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html>).
 .IP \(bu 2
-\fBmacOS\fP: Uses native macOS directories by default (e.g., \fB~/Library/Application Support/borg\fP,
-\fB~/Library/Caches/borg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are honoured if set.
+macOS: native macOS directories are used by default (e.g. \fB~/Library/Application Support/borg\fP,
+\fB~/Library/Caches/borg\fP). \fBXDG_*\fP environment variables are honoured if set.
 .IP \(bu 2
-\fBWindows\fP: Uses Windows AppData directories (e.g., \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\fP,
-\fBC:\eUsers\e<user>\eAppData\eLocal\eborg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are \fBnot\fP honoured.
+Windows: Windows AppData directories are used (e.g. \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\fP,
+\fBC:\eUsers\e<user>\eAppData\eLocal\eborg\fP). \fBXDG_*\fP environment variables are \fBnot\fP honoured.
 .UNINDENT
 .sp
 On all platforms, you can override each directory individually using the specific environment
 variables described below. You can also set \fBBORG_BASE_DIR\fP to force borg to use
 \fBBORG_BASE_DIR/.config/borg\fP, \fBBORG_BASE_DIR/.cache/borg\fP, etc., regardless of the platform.
-.UNINDENT
-.UNINDENT
 .sp
 Default directory locations by platform (when no \fBBORG_*\fP environment variables are set):
-.TS
-box center;
-l|l|l|l.
-T{
-Directory
-T}	T{
-Linux
-T}	T{
-macOS
-T}	T{
-Windows
-T}
-_
-T{
-Config
-T}	T{
-\fB~/.config/borg\fP
-T}	T{
-\fB~/Library/Application Support/borg\fP
-T}	T{
-\fB%APPDATA%\eborg\fP
-T}
-_
-T{
-Cache
-T}	T{
-\fB~/.cache/borg\fP
-T}	T{
-\fB~/Library/Caches/borg\fP
-T}	T{
-\fB%LOCALAPPDATA%\eborg\eCache\fP
-T}
-_
-T{
-Data
-T}	T{
-\fB~/.local/share/borg\fP
-T}	T{
-\fB~/Library/Application Support/borg\fP
-T}	T{
-\fB%LOCALAPPDATA%\eborg\fP
-T}
-_
-T{
-Runtime
-T}	T{
-\fB/run/user/<uid>/borg\fP
-T}	T{
-\fB~/Library/Caches/TemporaryItems/borg\fP
-T}	T{
-\fB%TEMP%\eborg\fP
-T}
-_
-T{
-Keys
-T}	T{
-\fB<config_dir>/keys\fP
-T}	T{
-\fB<config_dir>/keys\fP
-T}	T{
-\fB<config_dir>\ekeys\fP
-T}
-_
-T{
-Security
-T}	T{
-\fB<data_dir>/security\fP
-T}	T{
-\fB<data_dir>/security\fP
-T}	T{
-\fB<data_dir>\esecurity\fP
-T}
-.TE
-.INDENT 0.0
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.EX
+Directory  Linux                 macOS                                 Windows
+Config     ~/.config/borg        ~/Library/Application Support/borg    %APPDATA%\eborg
+Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\eborg\eCache
+Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\eborg
+Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %TEMP%\eborg
+Keys       <config_dir>/keys     <config_dir>/keys                     <config_dir>\ekeys
+Security   <data_dir>/security   <data_dir>/security                   <data_dir>\esecurity
+.EE
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
 .TP
 .B BORG_BASE_DIR
 Defaults to \fB$HOME\fP or \fB~$USER\fP or \fB~\fP (in that order).
@@ -726,7 +879,7 @@ to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt
 .B BORG_CACHE_DIR
 Defaults to the platform\-specific cache directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&.
-On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CACHE_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, \fBXDG_CACHE_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains the local cache and might need a lot
 of space for dealing with big repositories. Make sure you\(aqre aware of the associated
 security aspects of the cache location: \fIcache_security\fP
@@ -734,21 +887,21 @@ security aspects of the cache location: \fIcache_security\fP
 .B BORG_CONFIG_DIR
 Defaults to the platform\-specific config directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&.
-On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CONFIG_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, \fBXDG_CONFIG_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains all borg configuration directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
 .B BORG_DATA_DIR
 Defaults to the platform\-specific data directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.local/share/borg\fP\&.
-On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_DATA_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, \fBXDG_DATA_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains all borg data directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_data_borg\fP
 .TP
 .B BORG_RUNTIME_DIR
 Defaults to the platform\-specific runtime directory (see table above).
 If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&.
-On Linux and macOS, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_RUNTIME_DIR\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
+On Linux and macOS, \fBXDG_RUNTIME_DIR\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains borg runtime files, like e.g. the socket file.
 .TP
 .B BORG_SECURITY_DIR
@@ -781,11 +934,9 @@ you need to point to the correct key file matching the repository the command wi
 .TP
 .B TMPDIR
 This is where temporary files are stored (might need a lot of temporary space for some
-operations), see tempfile \%<https://\:docs\:.python\:.org/\:3/\:library/\:tempfile\:.html#\:tempfile\:.gettempdir> for details.
+operations), see \%<https://\:docs\:.python\:.org/\:3/\:library/\:tempfile\:.html#\:tempfile\:.gettempdir>
+for details.
 .UNINDENT
-.UNINDENT
-.UNINDENT
-.INDENT 0.0
 .TP
 .B Building:
 .INDENT 7.0
@@ -804,27 +955,17 @@ Borg will be linked against the system libacl instead of a bundled implementatio
 Adds given prefix directory to the default locations. If a \(aqinclude/lz4.h\(aq is found Borg
 will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
 .UNINDENT
-.UNINDENT
-.sp
-Please note:
-.INDENT 0.0
-.IP \(bu 2
-Be very careful when using the \(dqyes\(dq sayers, the warnings with prompt exist for your / your data\(aqs security/safety.
-.IP \(bu 2
-Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
-mode 600, root:root).
-.UNINDENT
-.SS Automatically generated Environment Variables (jsonargparse)
-.sp
-Borg uses jsonargparse \%<https://\:jsonargparse\:.readthedocs\:.io/> with \fBdefault_env=True\fP, which means that every
-command\-line option can also be set via an environment variable.
+.TP
+.B Automatic option environment variables:
+Borg uses jsonargparse (\%<https://\:jsonargparse\:.readthedocs\:.io/>) with \fBdefault_env=True\fP,
+which means that every command\-line option can also be set via an environment variable.
 .sp
 The environment variable name is derived from the program name (\fBborg\fP),
 the subcommand (if any), and the option name, all converted to uppercase
 with dashes replaced by underscores.
 .sp
 For \fBtop\-level options\fP (not specific to a subcommand), the pattern is:
-.INDENT 0.0
+.INDENT 7.0
 .INDENT 3.5
 .sp
 .EX
@@ -837,7 +978,7 @@ For example, \fB\-\-lock\-wait\fP can be set via \fBBORG_LOCK_WAIT\fP\&.
 .sp
 For \fBsubcommand options\fP, the subcommand and option are separated by a
 double underscore:
-.INDENT 0.0
+.INDENT 7.0
 .INDENT 3.5
 .sp
 .EX
@@ -847,6 +988,16 @@ BORG_<SUBCOMMAND>__<OPTION>
 .UNINDENT
 .sp
 For example, \fBborg create \-\-comment\fP can be set via \fBBORG_CREATE__COMMENT\fP\&.
+.UNINDENT
+.sp
+Please note:
+.INDENT 0.0
+.IP \(bu 2
+Be very careful when using the \(dqyes\(dq sayers, the warnings with prompt exist for your / your data\(aqs security/safety.
+.IP \(bu 2
+Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
+mode 600, root:root).
+.UNINDENT
 .SS File systems
 .sp
 We recommend using a reliable, scalable journaling filesystem for the
@@ -1053,13 +1204,13 @@ T{
 Platform
 T}	T{
 ACLs
-[5]
+[4]
 T}	T{
 xattr
-[6]
+[5]
 T}	T{
 Flags
-[7]
+[6]
 T}
 _
 T{
@@ -1107,7 +1258,7 @@ NetBSD
 T}	T{
 n/a
 T}	T{
-No [2]
+Yes
 T}	T{
 Yes (all)
 T}
@@ -1115,9 +1266,9 @@ _
 T{
 Solaris and derivatives
 T}	T{
-No [3]
+No [2]
 T}	T{
-No [3]
+Yes
 T}	T{
 n/a
 T}
@@ -1125,7 +1276,7 @@ _
 T{
 Windows (cygwin)
 T}	T{
-No [4]
+No [3]
 T}	T{
 No
 T}	T{
@@ -1141,18 +1292,16 @@ For example, ntfs\-3g on Linux is not able to convey NTFS ACLs.
 Only \(dqnodump\(dq, \(dqimmutable\(dq, \(dqcompressed\(dq and \(dqappend\(dq are supported.
 Feature request #618 for more flags.
 .IP [2] 5
-Feature request #1332
-.IP [3] 5
 Feature request #1337
-.IP [4] 5
+.IP [3] 5
 Cygwin tries to map NTFS ACLs to permissions with varying degrees of success.
-.IP [5] 5
+.IP [4] 5
 The native access control list mechanism of the OS. This normally limits access to
 non\-native ACLs. For example, NTFS ACLs are not completely accessible on Linux with ntfs\-3g.
-.IP [6] 5
+.IP [5] 5
 Extended attributes; key\-value pairs attached to a file, mainly used by the OS.
 This includes resource forks on macOS.
-.IP [7] 5
+.IP [6] 5
 Also known as \fIBSD flags\fP\&. The Linux set of flags [1] is portable across platforms.
 The BSDs define additional flags.
 .SH SEE ALSO
@@ -1165,7 +1314,7 @@ The BSDs define additional flags.
 \fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-compact(1)\fP,
 \fIborg\-recreate(1)\fP
 .sp
-\fIborg\-compression(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP
+\fIborg\-compression(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-environment(1)\fP
 .INDENT 0.0
 .IP \(bu 2
 Main web site \%<https://\:www\:.borgbackup\:.org/>

@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-create" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-repo-create" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-repo-create \- Creates a new, empty repository.
 .SH SYNOPSIS
@@ -110,29 +110,31 @@ the encryption/decryption key or other secrets.
 Depending on your hardware, hashing and crypto performance may vary widely.
 The easiest way to find out what is fastest is to run \fBborg benchmark cpu\fP\&.
 .sp
-A crypto suite is selected by three orthogonal options:
-.sp
-\fB\-\-encryption\fP (\fBrequired\fP) selects the cipher / authenticated\-encryption algorithm:
+\fB\-\-encryption\fP (\fBrequired\fP) selects the mode:
 .INDENT 0.0
 .IP \(bu 2
 \fBaes256\-ocb\fP: AES256 in OCB mode (encryption + authentication).
 .IP \(bu 2
 \fBchacha20\-poly1305\fP: ChaCha20 + Poly1305 (encryption + authentication).
 .IP \(bu 2
-\fBauthenticated\fP: no encryption, but still authenticates your data (tamper detection).
+\fBauthenticated\-sha256\fP / \fBauthenticated\-blake3\fP: no encryption, but authentication
+(tamper detection) using HMAC\-SHA\-256 resp. keyed BLAKE3.
 .IP \(bu 2
-\fBnone\fP: no encryption and no authentication (see the warning below).
+\fBnone\-sha256\fP / \fBnone\-blake3\fP: neither encryption nor authentication, only
+SHA\-256 resp. BLAKE3 checksums (see below).
 .UNINDENT
 .sp
-\fB\-\-id\-hash\fP selects the id hash function (used for chunk ids and authentication):
+\fB\-\-id\-hash\fP selects the id hash function of the \fBencrypted\fP modes:
 .INDENT 0.0
 .IP \(bu 2
-\fBsha256\fP (default): HMAC\-SHA\-256 (or plain SHA\-256 for the \fBnone\fP encryption).
+\fBsha256\fP (default): HMAC\-SHA\-256.
 .IP \(bu 2
 \fBblake3\fP: BLAKE3. Often faster on CPUs without SHA hardware acceleration.
 .UNINDENT
 .sp
-The \fBnone\fP encryption has no key, so it only supports the \fBsha256\fP id hash.
+For the modes that do not encrypt, the hash is not just used for the chunk ids, it also is
+what protects your data \- therefore it is part of the mode name there and \fB\-\-id\-hash\fP
+does not apply to them.
 .sp
 \fB\-\-key\-location\fP selects where the key is stored (orthogonal to the crypto suite):
 .INDENT 0.0
@@ -145,20 +147,23 @@ this if you want \(dqpassphrase and having\-the\-key\(dq security.
 .UNINDENT
 .sp
 You can move the key between these locations later with \fBborg key change\-location\fP\&.
-This also applies to the \fBauthenticated\fP encryption: it does not encrypt your data, but it
-still has a key (used for the id hash and authentication), so \fB\-\-key\-location\fP selects
-where that key is stored, just like for the encrypted suites.
-\fB\-\-key\-location\fP is only ignored for the \fBnone\fP encryption, which has no key at all.
+This also applies to the \fBauthenticated\-*\fP modes: they do not encrypt your data, but they
+still have a key (used for the id hash and the authentication), so \fB\-\-key\-location\fP
+selects where that key is stored, just like for the encrypted modes.
+\fB\-\-key\-location\fP is only ignored for the \fBnone\-*\fP modes, which have no key at all.
 .sp
-\fInone\fP encryption uses no encryption and no authentication. You are advised NOT to use this
-as it would expose you to a Denial\-of\-Service risk (due to how the \fIinternals_hashindex\fP
-works) and other issues (confidentiality, tampering, ...) in case of malicious activity
-in the repository.
+The \fBnone\-*\fP modes use neither encryption nor authentication: everything in the
+repository is readable by anybody, and while every repository object carries a checksum
+(which detects accidental corruption, e.g. bad storage hardware), anybody who modifies an
+object can just recompute that checksum. You are advised NOT to use these modes: in case
+of malicious activity in the repository, they expose you to a Denial\-of\-Service risk (due
+to how the \fIinternals_hashindex\fP works) and other issues (confidentiality,
+tampering, ...).
 .sp
 If you do \fBnot\fP want to encrypt the contents of your backups, but still want to detect
-malicious tampering, use \fB\-\-encryption authenticated\fP\&. It is like an encrypted suite
-minus the data encryption.
-To normally work with \fBauthenticated\fP repositories, you will need the passphrase, but
+malicious tampering, use \fB\-\-encryption authenticated\-sha256\fP (or \fB\-blake3\fP). These
+modes are like an encrypted mode minus the data encryption.
+To normally work with \fBauthenticated\-*\fP repositories, you will need the passphrase, but
 there is an emergency workaround; see \fBBORG_WORKAROUNDS=authenticated_no_key\fP docs.
 .SS Creating a related repository
 .sp
@@ -192,10 +197,10 @@ reuse the key material from the other repository
 other repository is Borg 1.x
 .TP
 .BI \-e \ ENCRYPTION\fR,\fB \ \-\-encryption \ ENCRYPTION
-select cipher / AE algorithm: \(aqnone\(aq, \(aqauthenticated\(aq, \(aqaes256\-ocb\(aq or \(aqchacha20\-poly1305\(aq \fB(required)\fP
+select the mode: \(aqaes256\-ocb\(aq, \(aqchacha20\-poly1305\(aq, \(aqauthenticated\-sha256\(aq, \(aqauthenticated\-blake3\(aq, \(aqnone\-sha256\(aq or \(aqnone\-blake3\(aq \fB(required)\fP
 .TP
 .BI \-i \ HASH\fR,\fB \ \-\-id\-hash \ HASH
-select the id hash function: \(aqsha256\(aq (default) or \(aqblake3\(aq. The \(aqnone\(aq encryption only supports \(aqsha256\(aq.
+select the id hash function of the encrypted modes: \(aqsha256\(aq or \(aqblake3\(aq. The \(aqnone\-\fI\(aq and \(aqauthenticated\-\fP\(aq modes name their hash themselves.
 .TP
 .BI \-\-key\-location \ LOCATION
 where to store the key: \(aqrepokey\(aq (in the repository, default) or \(aqkeyfile\(aq (in the local keys directory). Ignored for the \(aqnone\(aq mode (which has no key).

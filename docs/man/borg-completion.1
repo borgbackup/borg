@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-completion" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-completion" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-completion \- Output shell completion script for the given shell.
 .SH SYNOPSIS
@@ -42,6 +42,12 @@ Please note that for some dynamic completions (like archive IDs), the shell
 completion script will call borg to query the repository. This will work best
 if that call can be made without prompting for user input, so you may want to
 set BORG_REPO and BORG_PASSPHRASE environment variables.
+.sp
+In tcsh, completions for positional arguments are matched by word position, so
+e.g. an archive name is only completed if no options precede it \- one more
+reason to use BORG_REPO there rather than \-\-repo. Also, options are matched by
+name only, so \-\-sort\-by offers the union of the sort keys valid for list, diff
+and the commands filtering archives.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

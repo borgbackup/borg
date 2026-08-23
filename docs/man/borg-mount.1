@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-mount" "1" "2026-07-21" "" "borg backup tool"
+.TH "borg-mount" "1" "2026-08-23" "" "borg backup tool"
 .SH Name
 borg-mount \- Mounts an archive or an entire repository as a FUSE filesystem.
 .SH SYNOPSIS
@@ -40,11 +40,24 @@ This command mounts a repository or an archive as a FUSE filesystem.
 This can be useful for browsing or restoring individual files.
 .sp
 When restoring, take into account that the current FUSE implementation does
-not support special fs flags and ACLs.
+not support special fs flags. On Linux, POSIX ACLs of the archived fs objects
+are exposed (read\-only) via the \fBsystem.posix_acl_access\fP and
+\fBsystem.posix_acl_default\fP extended attributes, so tools like \fBgetfacl\fP or
+\fBrsync \-A\fP can read them from the mounted archive. Note that the mount does
+not enforce the ACLs for permission checks. On other platforms, ACLs are not
+supported.
 .sp
-When mounting a repository, the top directories will be named like the
-archives and the directory structure below these will be loaded on\-demand from
-the repository when entering these directories, so expect some delay.
+When mounting a repository, there is one top directory per archive and the
+directory structure below these will be loaded on\-demand from the repository
+when entering these directories, so expect some delay.
+.sp
+By default, these top directories are named like the archives; as the archives
+of a series all have the same name, \fB\-{id:.8}\fP (the first 8 hex digits of the
+archive id) is appended whenever a name is not unique. To name them differently,
+set the \fBBORG_MOUNT_ARCHIVE_DIR_FORMAT\fP environment variable to a format string
+using the placeholders of \fBborg repo\-list \-\-format\fP, e.g.
+\fB{name}\-{time:%Y\-%m\-%dT%H:%M:%S}\fP or \fB{hostname}\-{name}\fP; names that are
+still not unique get \fB\-{id:.8}\fP appended.
 .sp
 \fBNote:\fP
 .INDENT 0.0

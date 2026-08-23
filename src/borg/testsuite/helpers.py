@@ -1079,6 +1079,27 @@ def test_override_placeholders():
     assert replace_placeholders('{uuid4}', overrides={'uuid4': "overridden"}) == "overridden"
 
 
+def test_fqdn_placeholder_is_lazy(monkeypatch):
+    """the (potentially slow) DNS query must only happen if a fqdn placeholder is used, see #10181"""
+    from ..platform import base
+    base.get_fqdn.cache_clear()
+    calls = []
+
+    def spy(name):
+        calls.append(name)
+        return 'test.example.org'
+
+    monkeypatch.setattr(base, 'getfqdn', spy)
+    try:
+        assert replace_placeholders('{hostname}-{now:%Y}-{user}-{pid}')
+        assert calls == []
+        assert replace_placeholders('{fqdn}') == 'test.example.org'
+        assert replace_placeholders('{reverse-fqdn}') == 'org.example.test'
+        assert len(calls) == 1  # get_fqdn() is cached
+    finally:
+        base.get_fqdn.cache_clear()
+
+
 def working_swidth():
     return platform.swidth('선') == 2
 

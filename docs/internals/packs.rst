@@ -100,23 +100,27 @@ fails these checks means a corrupt pack, and ``IntegrityError`` is raised.
 
 The per-blob magic limits the blast radius of corrupted length fields. The
 repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``
-rebuilds the chunks index from the packs) scans forward for the next blob and
-resumes there, so the blobs after the damaged part of the pack are still found.
+rebuilds the chunks index from the packs) validates every header it walks,
+reading the metadata slot along with it: the slot's tag covers the header AAD
+described above and the slot itself, so a corrupted magic, version, chunk id or
+``meta_size`` fails it, and ``data_size`` - the one header field outside the
+tag - must equal ``csize`` (the data payload size recorded in the tagged
+metadata) plus the key's fixed envelope overhead. A header that fails makes the
+walk scan for the next blob that validates and resume there, so the blobs after
+the damaged one are still found; the damaged blob itself is dropped, it can not
+be read back.
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, and in the ``none-*`` and
 ``authenticated-*`` modes the payloads are user content stored as it is, so a
-backed up file can contain something shaped like a blob. A candidate is
-therefore accepted only when its metadata slot verifies against the header AAD
-described above; the header and that slot, a few hundred bytes, are what the
-scan reads. Verifying needs the key, so a repair that cannot read the manifest
-walks without scanning.
+backed up file can contain something shaped like a blob. The scan therefore
+accepts a candidate only when it validates like any walked header. Validating
+needs the key, so a repair that cannot read the manifest walks without it.
 
-In the ``none-*`` modes the tag is an unkeyed checksum, so the scan accepts any
-well-formed blob, including one a backed up file contains.
+In the ``none-*`` modes the tag is an unkeyed checksum, so the walk accepts any
+well-formed blob, including one a backed up file contains - but it only scans
+into a payload after the blob owning it failed to validate.
 
-``data_size`` is not part of the AAD, so accepting a candidate authenticates
-its chunk id, and its size only as far as the blob fits into the pack. Bit flips
-in the data are caught when the blob is read, on that blob alone.
+Bit flips in the data are caught when the blob is read, on that blob alone.
 
 Blobs follow one another contiguously with no padding::
 

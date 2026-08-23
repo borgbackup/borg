@@ -40,6 +40,9 @@ _valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
 
 # how much of a pack PackReader reads at once when searching for the next object header.
 RESYNC_WINDOW_SIZE = 1024 * 1024
+# how much PackReader reads per object when it validates the headers it walks: the header and,
+# for the usual metadata slot size, the slot as well, so validating needs no second read.
+VALIDATE_READ_SIZE = 1024
 
 
 def repo_lister(repository, *, limit=None):
@@ -374,12 +377,14 @@ class PackReader:
     def _parse_header(hdr_data, offset, pack_size):
         """Return the ObjHeader in hdr_data if it is a valid header at offset, None otherwise.
 
-        Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack.
+        Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack and is
+        at most MAX_DATA_SIZE bytes, the limit put() enforces on a whole object.
         """
         hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
         if hdr.magic != OBJ_MAGIC or hdr.version not in SUPPORTED_OBJ_VERSIONS:
             return None
-        if offset + RepoObj.obj_header.size + hdr.meta_size + hdr.data_size > pack_size:
+        obj_size = RepoObj.obj_header.size + hdr.meta_size + hdr.data_size
+        if obj_size > MAX_DATA_SIZE or offset + obj_size > pack_size:
             return None
         return hdr
 
@@ -403,16 +408,12 @@ class PackReader:
                     break  # not in this window, or a header overlapping its end: the next window has it
                 hdr = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
                 if hdr is not None:
-                    obj_size = hdr_size + hdr.meta_size + hdr.data_size
-                    # an object is at most MAX_DATA_SIZE bytes, so a bigger one is a false match on
-                    # OBJ_MAGIC inside a payload.
-                    if obj_size <= MAX_DATA_SIZE:
-                        size = hdr_size + hdr.meta_size  # the bytes validate looks at
-                        end = pos + size
-                        # the window holds these bytes, unless the candidate crosses its end.
-                        obj = buf[pos:end] if end <= len(buf) else self.read(offset + pos, size)
-                        if validate(hdr.chunk_id, obj):
-                            return offset + pos
+                    size = hdr_size + hdr.meta_size  # the bytes validate looks at
+                    end = pos + size
+                    # the window holds these bytes, unless the candidate crosses its end.
+                    obj = buf[pos:end] if end <= len(buf) else self.read(offset + pos, size)
+                    if validate(hdr.chunk_id, obj):
+                        return offset + pos
                 pos += 1
             # step by the window less one header, so a magic straddling the boundary is still found.
             offset += max(len(buf) - (hdr_size - 1), 1)
@@ -421,27 +422,34 @@ class PackReader:
     def iter_headers(self, validate=None):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
-        The walk reads a header per object: one short range read each (or a slice, for a pack in
-        memory), plus one store metadata lookup for the pack size.
+        The walk reads one range per object (or a slice, for a pack in memory), plus one store
+        metadata lookup for the pack size.
 
-        A header must have OBJ_MAGIC, a supported version and describe an object that fits into
-        the pack, otherwise the pack is corrupt and IntegrityError is raised. A read shorter than
-        a header ends the walk: that is the end of the pack.
+        A header that _parse_header does not accept means a corrupt pack and raises IntegrityError.
+        A read shorter than a header ends the walk: that is the end of the pack.
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
-        repo object with id chunk_id. Given one, a corrupt header makes the walk resync instead:
-        it scans for the next object validate accepts, logs how many bytes that skipped and
-        continues there.
+        repo object with id chunk_id. Given one, the walk validates every header, reading the
+        metadata slot along with it, and a header that fails makes the walk resync rather than
+        raise: it scans from just past that header for the next object validate accepts and
+        continues there. The object with the failed header is dropped - its id, its extent or its
+        metadata is wrong, so it can not be read back.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
         hdr_size = RepoObj.obj_header.size
+        read_size = VALIDATE_READ_SIZE if validate is not None else hdr_size
         offset = 0
         while True:
-            hdr_data = self.read(offset, hdr_size)
-            if len(hdr_data) < hdr_size:
+            buf = self.read(offset, read_size)
+            if len(buf) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
-            hdr = self._parse_header(hdr_data, offset, pack_size)
+            hdr = self._parse_header(buf[:hdr_size], offset, pack_size)
+            if hdr is not None and validate is not None:
+                size = hdr_size + hdr.meta_size  # the bytes validate looks at
+                obj = buf[:size] if size <= len(buf) else self.read(offset, size)
+                if not validate(hdr.chunk_id, obj):
+                    hdr = None
             if hdr is None:
                 if validate is None:
                     raise IntegrityError(
@@ -456,7 +464,7 @@ class PackReader:
                     break
                 logger.warning(
                     f"pack {pack_hex}: invalid object header at offset {offset}, "
-                    f"skipping {next_offset - offset} bytes to the next one."
+                    f"continuing at the object at offset {next_offset}."
                 )
                 offset = next_offset
                 continue

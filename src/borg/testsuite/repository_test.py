@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import struct
 import sys
 import time
 from collections import namedtuple
@@ -17,7 +18,7 @@ from .. import repository as repository_module
 from ..archive import resync_validator
 from ..compress import CNONE
 from ..constants import ROBJ_FILE_STREAM
-from ..crypto.key import CHPOKey, ChecksumKey
+from ..crypto.key import AESOCBKey, AuthenticatedKey, CHPOKey, ChecksumKey
 from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
 from ..repository import PackTracker
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
@@ -1894,7 +1895,7 @@ def test_pack_reader_resync_skips_to_next_object():
     assert list(reader.iter_headers(validate=accept_all)) == [(H(2), len(obj1), len(obj2))]
 
 
-def test_pack_reader_resync_recovers_from_corrupted_size():
+def test_pack_reader_resync_recovers_from_size_past_the_pack_end():
     # a header whose sizes point past the pack, so the next object is found by scanning.
     obj1 = bytearray(fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1)))
     obj2 = fchunk(b"payload-two", meta=b"meta2", chunk_id=H(2))
@@ -1906,6 +1907,120 @@ def test_pack_reader_resync_recovers_from_corrupted_size():
     reader = PackReader(pack_contents=pack)
     assert list(reader.iter_headers(validate=accept_all)) == [
         (H(2), len(obj1), len(obj2)),
+        (H(3), len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+def none_repo_objs():
+    # a RepoObj with a "none-*" key and no compression: it formats real objects (tagged metadata
+    # slot, csize) and stores their payload as it is.
+    repo_objs = RepoObj(ChecksumKey(None))
+    repo_objs.compressor = CNONE()
+    return repo_objs
+
+
+def real_chunk(repo_objs, data):
+    # (chunk_id, obj) of a real repo object storing data.
+    chunk_id = repo_objs.id_hash(data)
+    return chunk_id, repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
+
+
+@pytest.mark.parametrize("shape", ["into_obj3", "onto_obj3_header", "into_itself"])
+def test_pack_reader_resync_rejects_a_header_with_a_wrong_data_size(shape):
+    # data_size is the one header field no tag covers. A wrong one that keeps the object inside the
+    # pack leaves the header parseable, so the walk checks it against csize from the tagged metadata
+    # and drops obj1. The shapes are where the wrong size points: into obj3, exactly onto obj3's
+    # header, and back into obj1 itself.
+    repo_objs = none_repo_objs()
+    _, obj1 = real_chunk(repo_objs, b"A" * 100)
+    id2, obj2 = real_chunk(repo_objs, b"B" * 100)
+    id3, obj3 = real_chunk(repo_objs, b"C" * 100)
+    true_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj1[: RepoObj.obj_header.size])).data_size
+    bad_size = {
+        "into_obj3": true_size + len(obj2) + 60,
+        "onto_obj3_header": true_size + len(obj2),
+        "into_itself": true_size - 60,
+    }[shape]
+    obj1 = bytearray(obj1)
+    obj1[45:49] = struct.pack("<I", bad_size)  # the header's data_size field
+    reader = PackReader(pack_contents=bytes(obj1) + obj2 + obj3)
+    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [
+        (id2, len(obj1), len(obj2)),
+        (id3, len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+def test_pack_reader_resync_rejects_a_header_with_a_wrong_meta_size():
+    # the metadata slot's tag covers the slot, so a wrong meta_size fails it.
+    repo_objs = none_repo_objs()
+    _, obj1 = real_chunk(repo_objs, b"A" * 100)
+    id2, obj2 = real_chunk(repo_objs, b"B" * 100)
+    obj1 = bytearray(obj1)
+    obj1[41] ^= 0x01  # the header's meta_size field
+    reader = PackReader(pack_contents=bytes(obj1) + obj2)
+    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [(id2, len(obj1), len(obj2))]
+
+
+def test_pack_reader_resync_rejects_a_header_with_a_wrong_chunk_id():
+    # the chunk id is part of the AAD of the metadata slot's tag.
+    repo_objs = none_repo_objs()
+    _, obj1 = real_chunk(repo_objs, b"A" * 100)
+    id2, obj2 = real_chunk(repo_objs, b"B" * 100)
+    obj1 = bytearray(obj1)
+    obj1[9] ^= 0xFF  # the header's chunk_id field
+    reader = PackReader(pack_contents=bytes(obj1) + obj2)
+    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [(id2, len(obj1), len(obj2))]
+
+
+def test_pack_reader_resync_does_not_scan_into_a_validated_object():
+    # "none-*" mode, no compression: obj1's payload holds a complete, intact object - a user backed
+    # up such bytes. obj2's header is broken. The walk validated obj1, so the scan starts past it
+    # and never sees the decoy; obj1 is kept.
+    repo_objs = none_repo_objs()
+    _, decoy = real_chunk(repo_objs, b"decoy")
+    id1, obj1 = real_chunk(repo_objs, b"A" * 30 + decoy + b"A" * 30)
+    assert decoy in obj1  # the decoy is in the pack verbatim
+    _, obj2 = real_chunk(repo_objs, b"B" * 100)
+    id3, obj3 = real_chunk(repo_objs, b"C" * 100)
+    obj2 = bytearray(obj2)
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    reader = PackReader(pack_contents=obj1 + bytes(obj2) + obj3)
+    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [
+        (id1, 0, len(obj1)),
+        (id3, len(obj1) + len(obj2), len(obj3)),
+    ]
+
+
+@pytest.mark.parametrize("key_class", [ChecksumKey, AuthenticatedKey, CHPOKey, AESOCBKey])
+def test_resync_validator_checks_the_sizes_for_every_envelope(key_class):
+    # data_size == csize + the envelope overhead must hold for each key family; changing meta_size
+    # or data_size must fail validation.
+    key = key_class(None)
+    if hasattr(key, "init_from_random_data"):
+        key.init_from_random_data()
+        key.init_ciphers()
+    repo_objs = RepoObj(key)
+    chunk_id, obj = real_chunk(repo_objs, b"payload" * 100)
+    hdr_size = RepoObj.obj_header.size
+    meta_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).meta_size
+    head = obj[: hdr_size + meta_size]  # what the walk hands to validate
+    validate = resync_validator(repo_objs)
+    assert validate(chunk_id, head)
+    for field_offset in (41, 45):  # meta_size, data_size
+        bad = bytearray(head)
+        bad[field_offset] ^= 0x01
+        assert not validate(chunk_id, bytes(bad))
+
+
+def test_pack_reader_resync_keeps_the_object_before_a_corrupt_header():
+    # the object before the damage validated, so it is kept and the scan starts past it.
+    obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))
+    obj2 = bytearray(fchunk(b"payload-two", meta=b"meta2", chunk_id=H(2)))
+    obj3 = fchunk(b"payload-three", chunk_id=H(3))
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    reader = PackReader(pack_contents=obj1 + bytes(obj2) + obj3)
+    assert list(reader.iter_headers(validate=accept_all)) == [
+        (H(1), 0, len(obj1)),
         (H(3), len(obj1) + len(obj2), len(obj3)),
     ]
 

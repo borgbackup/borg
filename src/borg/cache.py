@@ -900,8 +900,8 @@ def build_chunkindex_from_repo(
 ):
     # fragments_only: build the index from the index/ fragments only, returning None if they cannot be
     # read completely, and never write to the repo.
-    # validate: handed to PackReader.iter_headers when rebuilding from the packs, making it resync
-    # past a corrupt object header rather than raise IntegrityError.
+    # validate: handed to PackReader.iter_headers when rebuilding from the packs, making it check
+    # every object header it walks and resync past the ones that fail rather than raise IntegrityError.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:

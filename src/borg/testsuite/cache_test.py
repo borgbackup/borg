@@ -26,8 +26,7 @@ from ..cache import (
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
-from ..helpers import bin_to_hex, safe_ns
-from ..helpers import IntegrityError
+from ..helpers import IntegrityError, bin_to_hex, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import Repository

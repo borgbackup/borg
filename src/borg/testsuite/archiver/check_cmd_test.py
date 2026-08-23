@@ -10,6 +10,7 @@ from ...archive import ArchiveChecker, ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
 from ...manifest import Archives, Manifest
+from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
@@ -718,11 +719,14 @@ def test_extra_chunks(archivers, request):
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
-def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request):
+@pytest.mark.parametrize("damaged_field", ["magic", "data_size"])
+def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, damaged_field):
     """--repair rebuilds the chunks index from a pack whose object header is damaged.
 
     A damaged header loses the object boundaries, so the rebuild scans for the next object that
     authenticates and continues there. Authenticating needs the key, which --repair reads first.
+    A damaged data_size leaves the header parseable, so the rebuild catches it against the csize
+    in the authenticated metadata.
     """
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() != "local":
@@ -736,13 +740,18 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request):
         for chunk_id, entry in repository.chunks.items():
             by_pack.setdefault(entry.pack_id, []).append((entry.obj_offset, chunk_id))
         pack_id, objs = next((p, sorted(o)) for p, o in by_pack.items() if len(o) > 2)
-        damaged_offset, _ = objs[1]
+        damaged_offset, damaged_id = objs[1]
+        next_offset, next_id = objs[2]
+        field_offset = {"magic": 0, "data_size": 45}[damaged_field]  # magic 8, version 1, chunk_id 32, meta_size 4
         key = "packs/" + bin_to_hex(pack_id)
-        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
+        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset + field_offset))
 
     output = cmd(archiver, "check", "--repair", "--debug", exit_code=0)
     assert f"invalid object header at offset {damaged_offset}" in output
-    assert "bytes to the next one" in output  # the rebuild resumed at the next object
+    assert f"continuing at the object at offset {next_offset}" in output  # the rebuild resumed at the next object
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert damaged_id not in repository.chunks  # the damaged object can not be read back, so it is not indexed
+        assert repository.chunks[next_id].obj_offset == next_offset  # the one after it is
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):
@@ -762,6 +771,7 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.repair = True
         checker.repository = repository
         checker.key = checker.make_key(repository)
+        checker.repo_objs = RepoObj(checker.key)
         checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
         # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
         checker.chunks_modified = True

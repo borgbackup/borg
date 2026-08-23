@@ -2131,19 +2131,25 @@ def resync_validator(repo_objs):
 
     obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
     computed over the header's magic, version and chunk id as well (AAD, additional authenticated
-    data: bytes the tag covers without being part of the ciphertext).
+    data: bytes the tag covers without being part of the ciphertext) and over the slot itself, so a
+    wrong meta_size fails it too. data_size, the one header field the tag does not cover, must
+    match csize - the data slot's payload size, recorded in the tagged metadata - plus the key's
+    fixed envelope overhead.
 
     In the "none-*" modes the tag is an unkeyed checksum, so validate accepts any well-formed
     object, including one that a backed up file contains.
     """
+    hdr_size = RepoObj.obj_header.size
+    overhead = repo_objs.key.PAYLOAD_OVERHEAD  # the envelope adds a fixed number of bytes to the payload
 
     def validate(chunk_id, obj):
         try:
-            repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
+            meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
         except Exception:
             # arbitrary bytes fail the tag, the msgpack unpacking or the length checks.
             return False
-        return True
+        data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
+        return data_size == meta["csize"] + overhead
 
     return validate
 
@@ -2746,7 +2752,12 @@ class ArchiveChecker:
                 # the packs changed, so the index no longer matches them: rebuild it from the packs
                 # and persist it.
                 logger.info("Rebuilding and writing the repository chunks index.")
-                build_chunkindex_from_repo(self.repository, slow_rebuild=True, write_immediately=True)
+                build_chunkindex_from_repo(
+                    self.repository,
+                    slow_rebuild=True,
+                    validate=resync_validator(self.repo_objs),
+                    write_immediately=True,
+                )
             else:
                 # the packs are unchanged, so the index still matches them: persist it as is.
                 logger.info("Writing the rebuilt repository chunks index.")

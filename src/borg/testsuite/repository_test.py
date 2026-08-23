@@ -20,7 +20,7 @@ from ..compress import CNONE
 from ..constants import ROBJ_FILE_STREAM
 from ..crypto.key import AESOCBKey, AuthenticatedKey, CHPOKey, ChecksumKey
 from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
-from ..repository import PackTracker
+from ..repository import PackTracker, MAX_VALIDATED_META_SIZE
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
 
@@ -1840,7 +1840,7 @@ def test_pack_reader_raises_on_bad_magic():
     obj2 = bytearray(fchunk(b"d2", meta=b"m2", chunk_id=H(2)))
     obj2[0] ^= 0xFF  # break the magic of the second object's header
     reader = PackReader(pack_contents=obj1 + bytes(obj2))
-    with pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError, match="no object header at offset"):
         list(reader.iter_headers())
 
 
@@ -1851,7 +1851,7 @@ def test_pack_reader_raises_on_bad_magic_through_store(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(pack_id), bytes(obj))
         reader = PackReader(repository.store, pack_id)
-        with pytest.raises(IntegrityError):
+        with pytest.raises(IntegrityError, match="no object header at offset"):
             list(reader.iter_headers())
 
 
@@ -1860,7 +1860,7 @@ def test_pack_reader_raises_on_object_past_end_of_pack():
     obj = fchunk(b"data", meta=b"meta", chunk_id=H(5))
     pack = obj[:-1]  # drop a byte, so the header's data_size no longer fits
     reader = PackReader(pack_contents=pack)
-    with pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError, match="object extends past end of file at offset"):
         list(reader.iter_headers())
 
 
@@ -1870,15 +1870,31 @@ def test_pack_reader_raises_on_object_past_end_of_pack_through_store(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(pack_id), obj[:-1])
         reader = PackReader(repository.store, pack_id)
-        with pytest.raises(IntegrityError):
+        with pytest.raises(IntegrityError, match="object extends past end of file at offset"):
             list(reader.iter_headers())
 
 
 def test_pack_reader_raises_on_unsupported_version():
     obj = bytearray(fchunk(b"data", chunk_id=H(7)))
     obj[len(OBJ_MAGIC)] = 0xEE  # version byte
-    with pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError, match="unsupported object version 238 at offset"):
         list(PackReader(pack_contents=bytes(obj)).iter_headers())
+
+
+def test_pack_reader_rejects_an_object_over_max_data_size():
+    # a header claiming more than put() would ever write, in a pack large enough to hold it.
+    hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, H(8), 0, MAX_DATA_SIZE)
+    parsed, problem = PackReader._parse_header(hdr, 0, 2 * MAX_DATA_SIZE)
+    assert parsed is None
+    assert "exceeds the maximum" in problem
+
+
+def test_pack_reader_does_not_fetch_an_oversized_metadata_slot():
+    # an oversized meta_size fails validation on the header alone, with no read of the slot.
+    hdr = RepoObj.ObjHeader(OBJ_MAGIC, OBJ_VERSION, H(9), MAX_VALIDATED_META_SIZE + 1, 0)
+    reader = PackReader(pack_contents=b"")
+    reader.read = lambda offset, size: pytest.fail("the slot was fetched")
+    assert not reader._validates(hdr, 0, b"", 0, lambda chunk_id, obj: pytest.fail("validate was called"))
 
 
 def accept_all(chunk_id, obj):

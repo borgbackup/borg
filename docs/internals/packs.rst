@@ -95,8 +95,9 @@ A reader locates the next blob by advancing::
     next_blob_offset = current_blob_offset + REPOOBJ_HEADER_SIZE + meta_size + data_size
 
 ``iter_headers()`` checks every header it walks: it must have ``OBJ_MAGIC``, a
-supported version, and sizes that keep the blob inside the pack. A header that
-fails these checks means a corrupt pack, and ``IntegrityError`` is raised.
+supported version, and sizes that keep the blob inside the pack and within
+``MAX_DATA_SIZE``. A header that fails these checks means a corrupt pack, and
+``IntegrityError`` is raised, naming which check it failed.
 
 The per-blob magic limits the blast radius of corrupted length fields. The
 repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``
@@ -117,8 +118,11 @@ accepts a candidate only when it validates like any walked header. Validating
 needs the key, so a repair that cannot read the manifest walks without it.
 
 In the ``none-*`` modes the tag is an unkeyed checksum, so the walk accepts any
-well-formed blob, including one a backed up file contains - but it only scans
-into a payload after the blob owning it failed to validate.
+well-formed blob, including one a backed up file contains. Such a blob carries
+its own chunk id and reads back as itself, so indexing it is harmless. Bytes
+crafted to pass the unkeyed checksum are not caught here - authenticating them
+is what these modes give up. The scan reaches a payload only after the blob
+owning it failed to validate.
 
 Bit flips in the data are caught when the blob is read, on that blob alone.
 

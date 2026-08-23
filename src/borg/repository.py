@@ -43,6 +43,9 @@ RESYNC_WINDOW_SIZE = 1024 * 1024
 # how much to read to get an object's header plus, at the usual metadata slot sizes, its metadata
 # slot in the same read.
 META_READ_SIZE = 1024
+# the largest metadata slot a validating read fetches. a slot holds a few compression fields,
+# packed and encrypted.
+MAX_VALIDATED_META_SIZE = 64 * 1024
 
 
 def repo_lister(repository, *, limit=None):
@@ -375,18 +378,37 @@ class PackReader:
 
     @staticmethod
     def _parse_header(hdr_data, offset, pack_size):
-        """Return the ObjHeader in hdr_data if it is a valid header at offset, None otherwise.
+        """Return (ObjHeader, None) for a valid header at offset, (None, problem) otherwise.
 
         Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack and is
-        at most MAX_DATA_SIZE bytes, the limit put() enforces on a whole object.
+        at most MAX_DATA_SIZE bytes, the limit put() enforces on a whole object. problem names
+        which of these failed.
         """
         hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
-        if hdr.magic != OBJ_MAGIC or hdr.version not in SUPPORTED_OBJ_VERSIONS:
-            return None
+        if hdr.magic != OBJ_MAGIC:
+            return None, "no object header"
+        if hdr.version not in SUPPORTED_OBJ_VERSIONS:
+            return None, f"unsupported object version {hdr.version}"
         obj_size = RepoObj.obj_header.size + hdr.meta_size + hdr.data_size
-        if obj_size > MAX_DATA_SIZE or offset + obj_size > pack_size:
-            return None
-        return hdr
+        if offset + obj_size > pack_size:
+            return None, "object extends past end of file"
+        if obj_size > MAX_DATA_SIZE:
+            return None, f"object of {obj_size} bytes exceeds the maximum of {MAX_DATA_SIZE}"
+        return hdr, None
+
+    def _validates(self, hdr, offset, buf, buf_offset, validate):
+        """Return whether validate accepts the object with header hdr at offset.
+
+        buf holds the pack bytes from buf_offset on; the metadata slot is read separately when buf
+        does not reach its end. A slot over MAX_VALIDATED_META_SIZE fails without that read.
+        """
+        if hdr.meta_size > MAX_VALIDATED_META_SIZE:
+            return False
+        size = RepoObj.obj_header.size + hdr.meta_size
+        start = offset - buf_offset
+        end = start + size
+        obj = buf[start:end] if end <= len(buf) else self.read(offset, size)
+        return validate(hdr.chunk_id, obj)
 
     def _find_header(self, offset, pack_size, validate):
         """Scan forward from offset for the next object validate accepts, return its offset or None.
@@ -406,14 +428,9 @@ class PackReader:
                 pos = buf.find(OBJ_MAGIC, pos)
                 if pos < 0 or pos + hdr_size > len(buf):
                     break  # not in this window, or a header overlapping its end: the next window has it
-                hdr = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
-                if hdr is not None:
-                    size = hdr_size + hdr.meta_size  # the bytes validate looks at
-                    end = pos + size
-                    # the window holds these bytes, unless the candidate crosses its end.
-                    obj = buf[pos:end] if end <= len(buf) else self.read(offset + pos, size)
-                    if validate(hdr.chunk_id, obj):
-                        return offset + pos
+                hdr, _ = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
+                if hdr is not None and self._validates(hdr, offset + pos, buf, offset, validate):
+                    return offset + pos
                 pos += 1
             # step by the window less one header, so a magic straddling the boundary is still found.
             offset += max(len(buf) - (hdr_size - 1), 1)
@@ -425,8 +442,8 @@ class PackReader:
         The walk reads one range per object (or a slice, for a pack in memory), plus one store
         metadata lookup for the pack size.
 
-        A header that _parse_header does not accept means a corrupt pack and raises IntegrityError.
-        A read shorter than a header ends the walk: that is the end of the pack.
+        A header that _parse_header does not accept means a corrupt pack: IntegrityError names what
+        is wrong with it. A read shorter than a header ends the walk: that is the end of the pack.
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
         repo object with id chunk_id. Given one, the walk validates every header, reading the
@@ -438,21 +455,18 @@ class PackReader:
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
         hdr_size = RepoObj.obj_header.size
+        # TODO: objects smaller than META_READ_SIZE make the validating walk read the pack several
+        # times over. Buffering a window, as _find_header scans with, would suit them; skipping a
+        # large object stays cheaper with a short read per header.
         read_size = META_READ_SIZE if validate is not None else hdr_size
         offset = 0
         while True:
             buf = self.read(offset, read_size)
             if len(buf) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
-            hdr = self._parse_header(buf[:hdr_size], offset, pack_size)
-            if hdr is None:
-                problem = "invalid object header"
-            elif validate is not None:
-                size = hdr_size + hdr.meta_size  # the bytes validate looks at
-                obj = buf[:size] if size <= len(buf) else self.read(offset, size)
-                problem = None if validate(hdr.chunk_id, obj) else "object does not authenticate"
-            else:
-                problem = None
+            hdr, problem = self._parse_header(buf[:hdr_size], offset, pack_size)
+            if hdr is not None and validate is not None and not self._validates(hdr, offset, buf, offset, validate):
+                problem = "object does not authenticate"
             if problem is not None:
                 if validate is None:
                     raise IntegrityError(

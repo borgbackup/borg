@@ -232,7 +232,9 @@ def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
         # tagged envelope modes (see MACKeyBase). The legacy key classes only exist to read borg
         # 1.x repositories (ro_cls is RepoObj1 then), e.g. for "borg transfer --from-borg1".
         raise UnsupportedPayloadError(manifest_data[0])
-    return key_cls.detect(repository, manifest_data, other=other)
+    key = key_cls.detect(repository, manifest_data, other=other)
+    key.stored_type = manifest_data[0]
+    return key
 
 
 def uses_same_chunker_secret(other_key, key):
@@ -270,6 +272,9 @@ class KeyBase:
     TYPE: int = None  # override in subclasses
     # set of key type IDs the class can handle as input
     TYPES_ACCEPTABLE: set[int] = None  # override in subclasses
+    # type ID this key was actually found with, None for a freshly created key. It can differ from
+    # TYPE: the borg 1.x keyfile/repokey classes are unified, so one class covers several IDs, #9767.
+    stored_type: int | None = None
 
     # The two orthogonal dimensions a creatable crypto suite is selected by on the command line:
     # ENC_NAME -> "borg repo-create --encryption" (cipher / AE algorithm)

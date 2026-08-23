@@ -508,16 +508,32 @@ def format_line(format, data):
         raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 
 
+class LazyValue:
+    """A placeholder value that is only computed if the placeholder is actually used."""
+
+    def __init__(self, fn):
+        self.fn = fn
+
+    def __format__(self, format_spec):
+        return format(self.fn(), format_spec)
+
+    def __str__(self):
+        return str(self.fn())
+
+    def __repr__(self):
+        return repr(self.fn())
+
+
 def _replace_placeholders(text, overrides={}):
     """Replace placeholders in text with their values."""
     from ..platform import get_fqdn, get_hostname, getosusername
 
-    fqdn = get_fqdn()
     current_time = datetime.now(UTC)
     data = {
         "pid": os.getpid(),
-        "fqdn": fqdn,
-        "reverse-fqdn": ".".join(reversed(fqdn.split("."))),
+        # lazy: get_fqdn() does a DNS query, which is slow if our own hostname does not resolve, see #10181
+        "fqdn": LazyValue(get_fqdn),
+        "reverse-fqdn": LazyValue(lambda: ".".join(reversed(get_fqdn().split(".")))),
         "hostname": os.environ.get("BORG_HOSTNAME") or get_hostname(),
         "now": DatetimeWrapper(current_time.astimezone()),
         "utcnow": DatetimeWrapper(current_time),

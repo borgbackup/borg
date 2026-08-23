@@ -40,9 +40,9 @@ _valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
 
 # how much of a pack PackReader reads at once when searching for the next object header.
 RESYNC_WINDOW_SIZE = 1024 * 1024
-# how much PackReader reads per object when it validates the headers it walks: the header and,
-# for the usual metadata slot size, the slot as well, so validating needs no second read.
-VALIDATE_READ_SIZE = 1024
+# how much to read to get an object's header plus, at the usual metadata slot sizes, its metadata
+# slot in the same read.
+META_READ_SIZE = 1024
 
 
 def repo_lister(repository, *, limit=None):
@@ -438,32 +438,35 @@ class PackReader:
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
         hdr_size = RepoObj.obj_header.size
-        read_size = VALIDATE_READ_SIZE if validate is not None else hdr_size
+        read_size = META_READ_SIZE if validate is not None else hdr_size
         offset = 0
         while True:
             buf = self.read(offset, read_size)
             if len(buf) < hdr_size:
                 break  # clean EOF, or trailing partial bytes
             hdr = self._parse_header(buf[:hdr_size], offset, pack_size)
-            if hdr is not None and validate is not None:
+            if hdr is None:
+                problem = "invalid object header"
+            elif validate is not None:
                 size = hdr_size + hdr.meta_size  # the bytes validate looks at
                 obj = buf[:size] if size <= len(buf) else self.read(offset, size)
-                if not validate(hdr.chunk_id, obj):
-                    hdr = None
-            if hdr is None:
+                problem = None if validate(hdr.chunk_id, obj) else "object does not authenticate"
+            else:
+                problem = None
+            if problem is not None:
                 if validate is None:
                     raise IntegrityError(
-                        f'pack {pack_hex}: invalid object header at offset {offset} (pack corruption), run "borg check"'
+                        f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
                     )
                 next_offset = self._find_header(offset + 1, pack_size, validate)
                 if next_offset is None:
                     logger.warning(
-                        f"pack {pack_hex}: invalid object header at offset {offset} and none after it, "
+                        f"pack {pack_hex}: {problem} at offset {offset} and no object after it, "
                         f"skipping the remaining {pack_size - offset} bytes."
                     )
                     break
                 logger.warning(
-                    f"pack {pack_hex}: invalid object header at offset {offset}, "
+                    f"pack {pack_hex}: {problem} at offset {offset}, "
                     f"continuing at the object at offset {next_offset}."
                 )
                 offset = next_offset
@@ -1391,7 +1394,7 @@ class Repository:
                 # RepoObj layout supports separately encrypted metadata and data.
                 # We return enough bytes so the client can decrypt the metadata.
                 hdr_size = RepoObj.obj_header.size
-                extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
+                extra_size = META_READ_SIZE - hdr_size
                 load_size = hdr_size + extra_size
                 # keep the read inside this object: a pack holds neighbouring objects, so don't pull
                 # bytes past obj_size into the next one. (an overshoot would be harmless -- parse_meta

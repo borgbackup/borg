@@ -15,7 +15,7 @@ from ..constants import MAX_CLOCK_SKEW
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex
 from .. import repository as repository_module
-from ..archive import resync_validator
+from ..archive import object_validator
 from ..compress import CNONE
 from ..constants import ROBJ_FILE_STREAM
 from ..crypto.key import AESOCBKey, AuthenticatedKey, CHPOKey, ChecksumKey
@@ -1944,7 +1944,7 @@ def test_pack_reader_resync_rejects_a_header_with_a_wrong_data_size(shape):
     obj1 = bytearray(obj1)
     obj1[45:49] = struct.pack("<I", bad_size)  # the header's data_size field
     reader = PackReader(pack_contents=bytes(obj1) + obj2 + obj3)
-    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [
+    assert list(reader.iter_headers(validate=object_validator(repo_objs))) == [
         (id2, len(obj1), len(obj2)),
         (id3, len(obj1) + len(obj2), len(obj3)),
     ]
@@ -1958,7 +1958,7 @@ def test_pack_reader_resync_rejects_a_header_with_a_wrong_meta_size():
     obj1 = bytearray(obj1)
     obj1[41] ^= 0x01  # the header's meta_size field
     reader = PackReader(pack_contents=bytes(obj1) + obj2)
-    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [(id2, len(obj1), len(obj2))]
+    assert list(reader.iter_headers(validate=object_validator(repo_objs))) == [(id2, len(obj1), len(obj2))]
 
 
 def test_pack_reader_resync_rejects_a_header_with_a_wrong_chunk_id():
@@ -1969,10 +1969,10 @@ def test_pack_reader_resync_rejects_a_header_with_a_wrong_chunk_id():
     obj1 = bytearray(obj1)
     obj1[9] ^= 0xFF  # the header's chunk_id field
     reader = PackReader(pack_contents=bytes(obj1) + obj2)
-    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [(id2, len(obj1), len(obj2))]
+    assert list(reader.iter_headers(validate=object_validator(repo_objs))) == [(id2, len(obj1), len(obj2))]
 
 
-def test_pack_reader_resync_does_not_scan_into_a_validated_object():
+def test_pack_reader_resync_starts_past_the_last_validated_object():
     # "none-*" mode, no compression: obj1's payload holds a complete, intact object - a user backed
     # up such bytes. obj2's header is broken. The walk validated obj1, so the scan starts past it
     # and never sees the decoy; obj1 is kept.
@@ -1985,14 +1985,14 @@ def test_pack_reader_resync_does_not_scan_into_a_validated_object():
     obj2 = bytearray(obj2)
     obj2[0] ^= 0xFF  # break the magic of the second object's header
     reader = PackReader(pack_contents=obj1 + bytes(obj2) + obj3)
-    assert list(reader.iter_headers(validate=resync_validator(repo_objs))) == [
+    assert list(reader.iter_headers(validate=object_validator(repo_objs))) == [
         (id1, 0, len(obj1)),
         (id3, len(obj1) + len(obj2), len(obj3)),
     ]
 
 
 @pytest.mark.parametrize("key_class", [ChecksumKey, AuthenticatedKey, CHPOKey, AESOCBKey])
-def test_resync_validator_checks_the_sizes_for_every_envelope(key_class):
+def test_object_validator_checks_the_sizes_for_every_envelope(key_class):
     # data_size == csize + the envelope overhead must hold for each key family; changing meta_size
     # or data_size must fail validation.
     key = key_class(None)
@@ -2004,7 +2004,7 @@ def test_resync_validator_checks_the_sizes_for_every_envelope(key_class):
     hdr_size = RepoObj.obj_header.size
     meta_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).meta_size
     head = obj[: hdr_size + meta_size]  # what the walk hands to validate
-    validate = resync_validator(repo_objs)
+    validate = object_validator(repo_objs)
     assert validate(chunk_id, head)
     for field_offset in (41, 45):  # meta_size, data_size
         bad = bytearray(head)
@@ -2073,7 +2073,7 @@ def test_pack_reader_resync_rejects_metadata_that_does_not_authenticate(tmp_path
     garbage = fchunk(b"payload", meta=b"not encrypted metadata", chunk_id=H(9))
     obj2 = repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM)
     reader = PackReader(pack_contents=bytes(obj1) + garbage + obj2)
-    headers = list(reader.iter_headers(validate=resync_validator(repo_objs)))
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
     assert headers == [(real_id, len(obj1) + len(garbage), len(obj2))]
 
 
@@ -2088,7 +2088,7 @@ def test_pack_reader_resync_accepts_an_object_with_corrupt_data(tmp_path):
     obj2 = bytearray(repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM))
     obj2[-1] ^= 0xFF  # damage the encrypted data, leaving the header and the metadata intact
     reader = PackReader(pack_contents=bytes(obj1) + bytes(obj2))
-    headers = list(reader.iter_headers(validate=resync_validator(repo_objs)))
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
     assert headers == [(real_id, len(obj1), len(obj2))]
     with pytest.raises(IntegrityError):
         repo_objs.parse(real_id, bytes(obj2), ro_type=ROBJ_FILE_STREAM)
@@ -2113,7 +2113,7 @@ def test_pack_reader_resync_rejects_damaged_user_content_without_a_key(tmp_path)
     real_id = repo_objs.id_hash(data)
     obj2 = repo_objs.format(real_id, {}, data, ro_type=ROBJ_FILE_STREAM)
     reader = PackReader(pack_contents=bytes(obj1) + obj2)
-    headers = list(reader.iter_headers(validate=resync_validator(repo_objs)))
+    headers = list(reader.iter_headers(validate=object_validator(repo_objs)))
     assert headers == [(real_id, len(obj1), len(obj2))]
 
 

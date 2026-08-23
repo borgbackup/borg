@@ -2126,7 +2126,7 @@ class RobustUnpacker:
             return next(self._unpacker)
 
 
-def resync_validator(repo_objs):
+def object_validator(repo_objs):
     """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
 
     obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
@@ -2145,11 +2145,11 @@ def resync_validator(repo_objs):
     def validate(chunk_id, obj):
         try:
             meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
+            data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
+            return data_size == meta["csize"] + overhead
         except Exception:
-            # arbitrary bytes fail the tag, the msgpack unpacking or the length checks.
+            # arbitrary bytes fail the tag, the msgpack unpacking, the length checks or the csize lookup.
             return False
-        data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
-        return data_size == meta["csize"] + overhead
 
     return validate
 
@@ -2216,7 +2216,7 @@ class ArchiveChecker:
                 self.key = self.make_key(repository, manifest_only=True)
             except IntegrityError as err:
                 logger.warning(f"{err}. Packs with a corrupt object header can not be repaired.")
-        validate = resync_validator(RepoObj(self.key)) if repair and self.key is not None else None
+        validate = object_validator(RepoObj(self.key)) if repair and self.key is not None else None
         self.chunks = build_chunkindex_from_repo(
             self.repository, slow_rebuild=repair, validate=validate, write_immediately=False
         )
@@ -2755,7 +2755,7 @@ class ArchiveChecker:
                 build_chunkindex_from_repo(
                     self.repository,
                     slow_rebuild=True,
-                    validate=resync_validator(self.repo_objs),
+                    validate=object_validator(self.repo_objs),
                     write_immediately=True,
                 )
             else:

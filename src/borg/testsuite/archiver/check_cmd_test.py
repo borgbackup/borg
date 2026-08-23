@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import re
 import shutil
+import struct
 from unittest.mock import patch
 
 import pytest
@@ -742,12 +743,21 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
         pack_id, objs = next((p, sorted(o)) for p, o in by_pack.items() if len(o) > 2)
         damaged_offset, damaged_id = objs[1]
         next_offset, next_id = objs[2]
-        field_offset = {"magic": 0, "data_size": 45}[damaged_field]  # magic 8, version 1, chunk_id 32, meta_size 4
         key = "packs/" + bin_to_hex(pack_id)
-        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset + field_offset))
+        pack = repository.store_load(key)
+        if damaged_field == "magic":
+            pack = corrupt(pack, damaged_offset)
+        else:
+            hdr_size = RepoObj.obj_header.size
+            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(pack[damaged_offset : damaged_offset + hdr_size]))
+            # a data_size that keeps the object inside the pack, so the header still parses.
+            pos = damaged_offset + 45  # magic 8, version 1, chunk_id 32, meta_size 4
+            pack = pack[:pos] + struct.pack("<I", hdr.data_size + 16) + pack[pos + 4 :]
+        repository.store_store(key, pack)
 
     output = cmd(archiver, "check", "--repair", "--debug", exit_code=0)
-    assert f"invalid object header at offset {damaged_offset}" in output
+    problem = {"magic": "invalid object header", "data_size": "object does not authenticate"}[damaged_field]
+    assert f"{problem} at offset {damaged_offset}" in output
     assert f"continuing at the object at offset {next_offset}" in output  # the rebuild resumed at the next object
     with Repository(archiver.repository_location, exclusive=True) as repository:
         assert damaged_id not in repository.chunks  # the damaged object can not be read back, so it is not indexed

@@ -23,6 +23,16 @@
 #define MAGIC "BORG_IDX"
 #define MAGIC_LEN 8
 
+/*
+ * Upper bound for the size of a single read()/write() call issued for the
+ * buckets, see #6140.  Must stay well below 2^31: some platforms (e.g. FreeBSD,
+ * where IOSIZE_MAX is SSIZE_MAX) will happily pass a multi-GB request straight
+ * through to one syscall, and such huge single transfers have been observed to
+ * return bogus results there.  256MiB keeps the number of syscalls negligible
+ * (17 for a 4.4GB index) while staying far away from that limit.
+ */
+#define HASHINDEX_MAX_IO (256 * 1024 * 1024)
+
 #define DEBUG 0
 
 #define debug_print(fmt, ...)                   \
@@ -304,6 +314,7 @@ hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int
     Py_ssize_t length, buckets_length, bytes_read;
     Py_buffer header_buffer;
     PyObject *header_bytes, *length_object, *bucket_bytes, *tmp;
+    char *bucket_ptr;
     HashHeader *header;
     HashIndex *index = NULL;
 
@@ -434,23 +445,53 @@ hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int
      * we have them backed by a Python bytes() object instead, and go through
      * Python I/O.
      *
-     * Note: Issuing read(buckets_length) is okay here, because buffered readers
-     * will issue multiple underlying reads if necessary. This supports indices
-     * >2 GB on Linux. We also compare lengths later.
+     * The buckets are read in slices of at most HASHINDEX_MAX_IO bytes, so that
+     * no single read() syscall ever asks for more than 2^31 bytes, see #6140.
+     * A big index would otherwise be requested in one call: on Linux the kernel
+     * caps every read at MAX_RW_COUNT (0x7ffff000) and the buffered reader just
+     * loops, but e.g. on FreeBSD IOSIZE_MAX is SSIZE_MAX, so the whole multi-GB
+     * request is issued as one syscall.
+     *
+     * The bytes() object is allocated once and filled slice by slice, because
+     * reading into a list and joining afterwards would double peak memory usage
+     * for an index that is several GB in size.
      */
-    bucket_bytes = PyObject_CallMethod(file_py, "read", "n", buckets_length);
+    bucket_bytes = PyBytes_FromStringAndSize(NULL, buckets_length);
     if(!bucket_bytes) {
         assert(PyErr_Occurred());
         goto fail_release_header_buffer;
     }
-    bytes_read = PyBytes_Size(bucket_bytes);
-    if(PyErr_Occurred()) {
-        /* TypeError, not a bytes() object */
-        goto fail_decref_buckets;
-    }
-    if(bytes_read != buckets_length) {
-        PyErr_Format(PyExc_ValueError, "Could not read buckets (expected %zd, got %zd)", buckets_length, bytes_read);
-        goto fail_decref_buckets;
+    bucket_ptr = PyBytes_AS_STRING(bucket_bytes);
+    bytes_read = 0;
+    while(bytes_read < buckets_length) {
+        Py_ssize_t chunk_length = buckets_length - bytes_read;
+        Py_ssize_t chunk_read;
+        PyObject *chunk_bytes;
+
+        if(chunk_length > HASHINDEX_MAX_IO) {
+            chunk_length = HASHINDEX_MAX_IO;
+        }
+        chunk_bytes = PyObject_CallMethod(file_py, "read", "n", chunk_length);
+        if(!chunk_bytes) {
+            assert(PyErr_Occurred());
+            goto fail_decref_buckets;
+        }
+        chunk_read = PyBytes_Size(chunk_bytes);
+        if(PyErr_Occurred()) {
+            /* TypeError, not a bytes() object */
+            Py_DECREF(chunk_bytes);
+            goto fail_decref_buckets;
+        }
+        if(chunk_read != chunk_length) {
+            /* Truncated file (or a short read we must not silently accept). */
+            PyErr_Format(PyExc_ValueError, "Could not read buckets (expected %zd, got %zd)",
+                         buckets_length, bytes_read + chunk_read);
+            Py_DECREF(chunk_bytes);
+            goto fail_decref_buckets;
+        }
+        memcpy(bucket_ptr + bytes_read, PyBytes_AS_STRING(chunk_bytes), chunk_read);
+        bytes_read += chunk_read;
+        Py_DECREF(chunk_bytes);
     }
 
     PyObject_GetBuffer(bucket_bytes, &index->buckets_buffer, PyBUF_SIMPLE);
@@ -546,7 +587,7 @@ static void
 hashindex_write(HashIndex *index, PyObject *file_py)
 {
     PyObject *length_object, *buckets_view, *tmp;
-    Py_ssize_t length;
+    Py_ssize_t length, bytes_written;
     Py_ssize_t buckets_length = (Py_ssize_t)index->num_buckets * index->bucket_size;
     HashHeader header = {
         .magic = MAGIC,
@@ -584,25 +625,40 @@ hashindex_write(HashIndex *index, PyObject *file_py)
         }
     }
 
-    /* Note: explicitly construct view; BuildValue can convert (pointer, length) to Python objects, but copies them for doing so */
-    buckets_view = PyMemoryView_FromMemory((char*)index->buckets, buckets_length, PyBUF_READ);
-    if(!buckets_view) {
-        assert(PyErr_Occurred());
-        return;
-    }
-    length_object = PyObject_CallMethod(file_py, "write", "O", buckets_view);
-    Py_DECREF(buckets_view);
-    if(PyErr_Occurred()) {
-        return;
-    }
-    length = PyNumber_AsSsize_t(length_object, PyExc_OverflowError);
-    Py_DECREF(length_object);
-    if(PyErr_Occurred()) {
-        return;
-    }
-    if(length != buckets_length) {
-        PyErr_SetString(PyExc_ValueError, "Failed to write buckets");
-        return;
+    /*
+     * Write the buckets in slices of at most HASHINDEX_MAX_IO bytes, so that no
+     * single write() syscall ever gets more than 2^31 bytes, see #6140 (the same
+     * reasoning as for reading them back in hashindex_read).
+     *
+     * Note: explicitly construct view; BuildValue can convert (pointer, length) to Python objects, but copies them for doing so
+     */
+    bytes_written = 0;
+    while(bytes_written < buckets_length) {
+        Py_ssize_t chunk_length = buckets_length - bytes_written;
+
+        if(chunk_length > HASHINDEX_MAX_IO) {
+            chunk_length = HASHINDEX_MAX_IO;
+        }
+        buckets_view = PyMemoryView_FromMemory((char*)index->buckets + bytes_written, chunk_length, PyBUF_READ);
+        if(!buckets_view) {
+            assert(PyErr_Occurred());
+            return;
+        }
+        length_object = PyObject_CallMethod(file_py, "write", "O", buckets_view);
+        Py_DECREF(buckets_view);
+        if(PyErr_Occurred()) {
+            return;
+        }
+        length = PyNumber_AsSsize_t(length_object, PyExc_OverflowError);
+        Py_DECREF(length_object);
+        if(PyErr_Occurred()) {
+            return;
+        }
+        if(length != chunk_length) {
+            PyErr_SetString(PyExc_ValueError, "Failed to write buckets");
+            return;
+        }
+        bytes_written += chunk_length;
     }
 }
 #endif

@@ -2607,7 +2607,8 @@ class ArchiveChecker:
         verified = 0  # chunks actually verified
         defect_chunks = []
         archive_meta_ids = set()
-        untrusted_pack_ids = set()  # ids of the packs that are missing or hold a defect chunk
+        untrusted_pack_ids = set()  # ids of the packs that are missing, unreadable or hold a defect chunk
+        unreadable_chunks = 0  # chunks we could not even read, refs #3509
         pi = ProgressIndicatorPercent(
             total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
@@ -2652,6 +2653,21 @@ class ArchiveChecker:
                 for missing_id in chunk_ids:
                     logger.debug("chunk %s: pack %s is missing.", bin_to_hex(missing_id), bin_to_hex(pack_id))
                 pi.show(increase=lost)
+            except Repository.StoreReadError as err:
+                # the pack could not be read (I/O error), and like above, get_many() raises before any chunk
+                # of this pack was read. unreadable, not defect: we did not see the content, so we must not
+                # conclude it is bad and delete it - it may read fine once the hardware/fs problem is fixed,
+                # refs #3509.
+                self.error_found = True
+                untrusted_pack_ids.add(pack_id)  # like a missing pack: its objects may be unreadable
+                unreadable = len(chunk_ids)
+                errors += unreadable
+                unreadable_chunks += unreadable
+                verified += unreadable  # they are not read, but they are accounted for, like a failed read
+                logger.error("%s, %d chunks could not be verified.", err, unreadable)
+                for unreadable_id in chunk_ids:
+                    logger.debug("chunk %s: pack %s could not be read.", bin_to_hex(unreadable_id), bin_to_hex(pack_id))
+                pi.show(increase=unreadable)
             # this pack is done: drop it, the cache would else keep PACK_READER_CACHE_SIZE whole packs
             # of which none is read again, and the retries below must really re-read from the store.
             self.repository.clear_pack_cache()
@@ -2684,6 +2700,11 @@ class ArchiveChecker:
                             ro_type=ROBJ_DONTCARE,
                             assert_id_place="verify_data",
                         )
+                    except Repository.StoreReadError as err:
+                        # the retry did not fail on the content, it failed to read at all: keep the
+                        # chunk, the read may well succeed again later, refs #3509.
+                        unreadable_chunks += 1
+                        logger.error("chunk %s not deleted, could not be re-read: %s", bin_to_hex(defect_chunk), err)
                     except IntegrityErrorBase:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
                         # keeping the other chunks, and removes it from self.chunks, so rebuild_archives
@@ -2717,18 +2738,23 @@ class ArchiveChecker:
         if not sig_int:
             # the ids of an interrupted pass are incomplete.
             self.archive_meta_ids = archive_meta_ids
+        if unreadable_chunks:
+            logger.error(
+                "%d chunk(s) could not be read and were left untouched. This usually means a hardware, "
+                "filesystem or network problem - fix that first, then run the check again.",
+                unreadable_chunks,
+            )
         log = logger.error if errors else logger.info
         if sig_int:
             log(
-                "Interrupted cryptographic data integrity verification, "
-                "verified %d of %d chunks with %d integrity errors.",
+                "Interrupted cryptographic data integrity verification, verified %d of %d chunks with %d error(s).",
                 verified,
                 chunks_count,
                 errors,
             )
         else:
             log(
-                "Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.",
+                "Finished cryptographic data integrity verification, verified %d chunks with %d error(s).",
                 verified,
                 errors,
             )
@@ -3167,71 +3193,81 @@ class ArchiveChecker:
                 analyzed += 1
                 found_before, self.error_found = self.error_found, False
                 try:
-                    formatted = formatter.format_item(info, jsonline=False)
-                    # the formatter uses defaults for keys like {comment} if it has no archive metadata.
-                    metadata_missing = bool(formatter.used_call_keys) and formatter.archive is None
-                except (Repository.ObjectNotFound, IntegrityErrorBase):
-                    metadata_missing = True
-                if metadata_missing:
-                    # keys like {comment} need the archive metadata, which is damaged or missing here.
-                    # use the values from the archive directory entry, they are always available.
-                    formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
-                logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
-                if archive_id not in self.chunks:
-                    logger.error(f"Archive metadata block {archive_id_hex} is missing!")
+                    try:
+                        formatted = formatter.format_item(info, jsonline=False)
+                        # the formatter uses defaults for keys like {comment} if it has no archive metadata.
+                        metadata_missing = bool(formatter.used_call_keys) and formatter.archive is None
+                    except (Repository.ObjectNotFound, IntegrityErrorBase):
+                        metadata_missing = True
+                    if metadata_missing:
+                        # keys like {comment} need the archive metadata, which is damaged or missing here.
+                        # use the values from the archive directory entry, they are always available.
+                        formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
+                    logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")
+                    if archive_id not in self.chunks:
+                        logger.error(f"Archive metadata block {archive_id_hex} is missing!")
+                        self.error_found = True
+                        if self.repair:
+                            logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                            self.manifest.archives.delete_by_id(archive_id)
+                        else:
+                            logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                        record_result(archive_id, found_before)
+                        continue
+                    cdata = self.repository.get(archive_id)
+                    try:
+                        _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
+                    except IntegrityErrorBase as integrity_error:
+                        logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
+                        self.error_found = True
+                        if self.repair:
+                            logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                            self.manifest.archives.delete_by_id(archive_id)
+                        else:
+                            logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                        record_result(archive_id, found_before)
+                        continue
+                    archive = self.key.unpack_archive(data)
+                    archive = ArchiveItem(internal_dict=archive)
+                    if archive.version != 2:
+                        raise Exception("Unknown archive metadata version")
+                    items_buffer = ChunkBuffer(self.key)
+                    items_buffer.write_chunk = add_callback
+                    complete = False
+                    for item in robust_iterator(archive):
+                        if sig_int and not self.repair:
+                            # without --repair the archive is only read, so the check also stops within it.
+                            break
+                        if "chunks" in item:
+                            verify_file_chunks(info.name, item)
+                        items_buffer.add(item)
+                    else:
+                        complete = True
+                    items_buffer.flush(flush=True)
+                    if self.repair:
+                        archive.item_ptrs = archive_put_items(
+                            items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
+                        )
+                        data = self.key.pack_metadata(archive.as_dict())
+                        new_archive_id = self.key.id_hash(data)
+                        logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
+                        logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
+                        cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
+                        add_reference(new_archive_id, len(data), cdata)
+                        self.create_archive_entry(info.name, new_archive_id, info.ts)
+                        if archive_id != new_archive_id:
+                            self.manifest.archives.delete_by_id(archive_id)
+                            archive_id = new_archive_id
+                    record_result(archive_id, found_before, complete=complete)
+                except Repository.StoreReadError as err:
+                    # some object of this archive could not be read at all (I/O error, refs #3509).
+                    # we do not know what is in it, so we can not tell whether the archive is fine. no
+                    # result is recorded for it, so a later check verifies it again.
+                    logger.error(f"Archive {info.name} {archive_id_hex} could not be checked: {err}")
                     self.error_found = True
                     if self.repair:
-                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                        self.manifest.archives.delete_by_id(archive_id)
-                    else:
-                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                    record_result(archive_id, found_before)
-                    continue
-                cdata = self.repository.get(archive_id)
-                try:
-                    _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
-                except IntegrityErrorBase as integrity_error:
-                    logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
-                    self.error_found = True
-                    if self.repair:
-                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
-                        self.manifest.archives.delete_by_id(archive_id)
-                    else:
-                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
-                    record_result(archive_id, found_before)
-                    continue
-                archive = self.key.unpack_archive(data)
-                archive = ArchiveItem(internal_dict=archive)
-                if archive.version != 2:
-                    raise Exception("Unknown archive metadata version")
-                items_buffer = ChunkBuffer(self.key)
-                items_buffer.write_chunk = add_callback
-                complete = False
-                for item in robust_iterator(archive):
-                    if sig_int and not self.repair:
-                        # without --repair the archive is only read, so the check also stops within it.
-                        break
-                    if "chunks" in item:
-                        verify_file_chunks(info.name, item)
-                    items_buffer.add(item)
-                else:
-                    complete = True
-                items_buffer.flush(flush=True)
-                if self.repair:
-                    archive.item_ptrs = archive_put_items(
-                        items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
-                    )
-                    data = self.key.pack_metadata(archive.as_dict())
-                    new_archive_id = self.key.id_hash(data)
-                    logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
-                    logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
-                    cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
-                    add_reference(new_archive_id, len(data), cdata)
-                    self.create_archive_entry(info.name, new_archive_id, info.ts)
-                    if archive_id != new_archive_id:
-                        self.manifest.archives.delete_by_id(archive_id)
-                        archive_id = new_archive_id
-                record_result(archive_id, found_before, complete=complete)
+                        # rewriting the archive now would drop whatever we could not read from it.
+                        raise
         finally:
             pi.finish()
             report_missing_chunks()

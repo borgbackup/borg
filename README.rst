@@ -41,8 +41,8 @@ Main features
   and only chunks that have never been seen before are added to the repository.
 
   A chunk is considered duplicate if its id_hash value is identical.
-  A cryptographically strong hash or MAC function is used as id_hash, e.g.
-  (hmac-)sha256.
+  A cryptographically strong hash or MAC function is used as id_hash,
+  e.g. (hmac-)sha256 or (keyed) blake3.
 
   To deduplicate, all the chunks in the same repository are considered, no
   matter whether they come from different machines, from previous backups,
@@ -62,13 +62,16 @@ Main features
 
   Supported chunkers:
 
-  * buzhash (as in borg 1.x) / buzhash64 (improved)
-  * fastCDC
-  * fixed
+  * fastcdc (the default)
+  * buzhash64 (improved), buzhash (as in borg 1.x)
+  * toeplitz-aes / rabin-aes / goldilocks-aes (keyed, AES-based; they make
+    chunk-boundary fingerprinting attacks much harder)
+  * fixed (fixed blocksize, optionally with a differently sized header)
 
 **Speed**
   * performance-critical code (chunking, compression, encryption) is
-    implemented in C/Cython
+    implemented in C/Cython, using SIMD (NEON / AVX2 / AVX-512) where that
+    is a win - the scan kernel is picked per platform
   * local caching
   * quick detection of unmodified files
 
@@ -76,6 +79,10 @@ Main features
     All data can be protected client-side using 256-bit authenticated encryption
     (AES-OCB or chacha20-poly1305), ensuring data confidentiality, integrity and
     authenticity.
+
+    If you do not need confidentiality, there are also modes that only
+    authenticate (``authenticated-sha256`` / ``authenticated-blake3``) and
+    modes that do neither (``none-sha256`` / ``none-blake3``).
 
 **Hashing**
     You can choose between HMAC-SHA256 and Blake3.
@@ -96,12 +103,12 @@ Main features
 **Off-site backups**
     Borg can store data on any remote host accessible via misc. protocols:
 
-    * ssh (REST-http-over-stdio-over-ssh) and https (REST-http-over-tcp).
-      Significant performance gains can be achieved with this by having a
-      remote agent (borg must be installed on the repo server).
-    * sftp
-    * S3 / B2
-    * lots of protocols / providers supported by rclone
+    * ``rest://`` (REST-http-over-stdio-over-ssh) and ``http(s)://``
+      (REST-http-over-tcp). Significant performance gains can be achieved with
+      these by having a remote agent (borg must be installed on the repo server).
+    * ``sftp://``
+    * ``s3://`` / ``b2://``
+    * ``rclone:`` - lots of protocols / providers supported by rclone
 
 **Backups mountable as file systems**
     Backup archives are mountable as user-space file systems for easy interactive
@@ -111,12 +118,18 @@ Main features
     We offer single-file binaries that do not require installing anything -
     you can just run them on these platforms:
 
-    * Linux
-    * macOS
-    * FreeBSD
-    * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
-    * Cygwin (experimental, no binaries yet)
-    * Windows (MSYS2/MINGW borg.exe, experimental)
+    * Linux (x86_64, arm64)
+    * macOS (arm64, x86_64)
+    * FreeBSD (x86_64)
+    * Windows (x86_64, MSYS2/MINGW borg.exe, experimental)
+
+    Borg also runs on these platforms, but you need to install it from a
+    package or from source:
+
+    * NetBSD (xattrs, but no ACLs)
+    * OpenBSD (no xattrs/ACLs support)
+    * illumos / Solaris (xattrs, but no ACLs)
+    * Cygwin (experimental)
     * Windows Subsystem for Linux (WSL) on Windows 10/11 (experimental)
 
 **Free and Open Source Software**
@@ -142,15 +155,18 @@ Create a new backup archive::
 Now do another backup, just to show off the great deduplication::
 
     $ borg create -v --stats docs ~/Documents
+    Creating archive "docs" in repository /path/to/repo
     Repository: /path/to/repo
     Archive name: docs
     Archive fingerprint: 7714aef97c1a24539cc3dc73f79b060f14af04e2541da33d54c7ee8e81a00089
-    Time (start): Mon, 2022-10-03 19:57:35 +0200
-    Time (end):   Mon, 2022-10-03 19:57:35 +0200
+    Time (nominal): Mon, 2026-08-03 19:57:35 +0200
+    Time (start):   Mon, 2026-08-03 19:57:35 +0200
+    Time (end):     Mon, 2026-08-03 19:57:35 +0200
     Duration: 0.01 seconds
     Number of files: 24
     Original size: 29.73 MB
     Deduplicated size: 520 B
+    ...
 
 
 For demo videos, check out our homepage: https://www.borgbackup.org/#demo
@@ -217,8 +233,8 @@ see ``docs/support.rst`` in the source distribution).
         :alt: Test Coverage
         :target: https://codecov.io/github/borgbackup/borg?branch=master
 
-.. |bestpractices| image:: https://bestpractices.coreinfrastructure.org/projects/271/badge
+.. |bestpractices| image:: https://www.bestpractices.dev/projects/271/badge
         :alt: Best Practices Score
-        :target: https://bestpractices.coreinfrastructure.org/projects/271
+        :target: https://www.bestpractices.dev/projects/271
 
 .. end-badges

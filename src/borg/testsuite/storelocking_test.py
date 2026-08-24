@@ -62,6 +62,25 @@ class TestLock:
             with pytest.raises(LockTimeout):
                 Lock(lockstore, exclusive=True, id=ID2).acquire()
 
+    def test_lock_timeout_tells_who_holds_the_lock(self, lockstore):
+        # a client that does not get the lock shall learn who is blocking it, see #2261.
+        with Lock(lockstore, exclusive=True, id=ID1):
+            with pytest.raises(LockTimeout) as exc_info:
+                Lock(lockstore, exclusive=False, id=ID2).acquire()
+        message = exc_info.value.get_message()
+        assert "exclusive lock" in message
+        assert f"host {ID1[0]}" in message
+        assert f"pid {ID1[1]}" in message
+
+    def test_lock_timeout_tells_about_blocking_shared_locks(self, lockstore):
+        # same for an exclusive acquirer that waits in vain for shared lock(s) to go away.
+        with Lock(lockstore, exclusive=False, id=ID1):
+            with pytest.raises(LockTimeout) as exc_info:
+                Lock(lockstore, exclusive=True, id=ID2).acquire()
+        message = exc_info.value.get_message()
+        assert "shared lock" in message
+        assert f"host {ID1[0]}" in message
+
     def test_exclusive_lock_timeout_leaves_no_lock(self, lockstore):
         # When acquiring an exclusive lock times out because a non-exclusive lock does not go away,
         # the not-acquired exclusive lock must not stay behind in the store: it would block all

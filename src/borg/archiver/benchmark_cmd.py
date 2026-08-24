@@ -399,6 +399,7 @@ class BenchmarkMixIn:
                 number = max(3, comp_total // nbytes)  # a few reps even for the fast codecs
                 for spec in [
                     "lz4",
+                    "zstd,-4",
                     "zstd,1",
                     "zstd,3",
                     "zstd,5",

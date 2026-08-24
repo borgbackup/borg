@@ -94,7 +94,9 @@ class SecurityManager:
         try:
             with self.key_type_file.open() as fd:
                 type = fd.read()
-                return type == str(key.TYPE)
+                # accept every type byte the key class can read: the borg 1.x keyfile/repokey
+                # classes are unified, so one class covers several stored type bytes, see #9767.
+                return type in {str(t) for t in key.TYPES_ACCEPTABLE}
         except OSError as exc:
             logger.warning("Could not read/parse key type file: %s", exc)
 
@@ -102,12 +104,13 @@ class SecurityManager:
         logger.debug("security: saving state for %s to %s", self.repository.id_str, str(self.dir))
         current_location = self.repository._location.canonical_path()
         logger.debug("security: current location   %s", current_location)
-        logger.debug("security: key type           %s", str(key.TYPE))
+        key_type = key.TYPE if key.stored_type is None else key.stored_type
+        logger.debug("security: key type           %s", str(key_type))
         logger.debug("security: manifest timestamp %s", manifest.timestamp)
         with SaveFile(self.location_file) as fd:
             fd.write(current_location)
         with SaveFile(self.key_type_file) as fd:
-            fd.write(str(key.TYPE))
+            fd.write(str(key_type))
         with SaveFile(self.manifest_ts_file) as fd:
             fd.write(manifest.timestamp)
 

@@ -6,12 +6,14 @@ import random
 import re
 import stat
 import tarfile
+from configparser import ConfigParser
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import open_item, IntegrityError
+from ...helpers import open_item, IntegrityError, Location
 from ...helpers.time import parse_timestamp
 from ...helpers.parseformat import parse_file_size, ChunkerParams
 from ..platform.platform_test import is_win32
@@ -326,6 +328,72 @@ def test_transfer_from_borg1_ssh(archivers, request, monkeypatch):
         expected_names = sorted(a["name"] for a in json.load(f)["archives"])
     got_names = sorted(a["name"] for a in json.loads(cmd(archiver, "repo-list", "--json"))["archives"])
     assert got_names == expected_names
+
+
+def _setup_borg1_transfer(archiver, monkeypatch, tmp_path):
+    """Unpack the borg 1.2 testdata repo, isolate the security dir and return (src_repo, security_dir)."""
+    # borg 1.2 repo dir contents, created by: scripts/make-testdata/test_transfer_upgrade.sh
+    repo12_tar = os.path.join(os.path.dirname(__file__), "repo12.tar.gz")
+    original_location = archiver.repository_location
+    src_repo = f"{original_location}1"
+    os.makedirs(src_repo)
+    with tarfile.open(repo12_tar) as tf:
+        tf.extractall(src_repo)
+
+    # borg 1.x kept its security dir in the config dir; keep it out of the real one.
+    security_dir = tmp_path / "security"
+    monkeypatch.setenv("BORG_SECURITY_DIR", str(security_dir))
+    parser = ConfigParser(interpolation=None)
+    parser.read(os.path.join(src_repo, "config"))
+
+    archiver.repository_location = f"{original_location}2"
+    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
+    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "waytooeasyonlyfortests")
+    # must use the strong kdf here or borg2 can't decrypt the borg1 key
+    monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "0")
+    return src_repo, security_dir / parser["repository"]["id"]
+
+
+def test_transfer_from_borg1_known_repo(archivers, request, monkeypatch, tmp_path):
+    """A borg 1.x repokey repo the user already accessed with borg 1.x must not look like a swapped repo."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally")
+
+    src_repo, repo_security_dir = _setup_borg1_transfer(archiver, monkeypatch, tmp_path)
+
+    # Recreate what borg 1.x left behind: a security dir recording the KeyType.REPO type byte
+    # (the testdata repo was created with "borg init -e repokey").
+    repo_security_dir.mkdir(parents=True)
+    key_type_file = repo_security_dir / "key-type"
+    key_type_file.write_text(str(KeyType.REPO))
+    (repo_security_dir / "location").write_text(Location(Path(src_repo).absolute().as_uri()).canonical_path())
+    (repo_security_dir / "manifest-timestamp").write_text("1970-01-01T00:00:00.000000")
+
+    other_repo1 = f"--other-repo={src_repo}"
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")
+    cmd(archiver, "transfer", other_repo1, "--from-borg1")
+    cmd(archiver, "check")
+
+    assert key_type_file.read_text() == str(KeyType.REPO)
+
+
+def test_transfer_from_borg1_unknown_repo(archivers, request, monkeypatch, tmp_path):
+    """borg 2 remembering a borg 1.x repokey repo must not lock borg 1.x out of it afterwards."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally")
+
+    src_repo, repo_security_dir = _setup_borg1_transfer(archiver, monkeypatch, tmp_path)
+
+    other_repo1 = f"--other-repo={src_repo}"
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")
+    cmd(archiver, "transfer", other_repo1, "--from-borg1")
+    cmd(archiver, "check")
+
+    # borg 2 must record the type byte borg 1.x uses for a repokey repo, not the one its own
+    # (unified keyfile/repokey) key class defaults to.
+    assert (repo_security_dir / "key-type").read_text() == str(KeyType.REPO)
 
 
 @contextmanager

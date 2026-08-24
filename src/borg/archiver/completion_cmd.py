@@ -929,50 +929,6 @@ def _sortby_functions(shell, completers):
     )
 
 
-# in a `p@N@`...`@` rule, one `if (...) <action>` clause, e.g.
-# `if ( $#cmd >= 3 && ("$cmd[2]" == "key") && ("$cmd[3]" == "export") ) f`
-TCSH_CLAUSE_RE = re.compile(r"if \( \$#cmd >= \d+ && (?P<checks>.*?) \) (?P<action>.*)")
-TCSH_CHECK_RE = re.compile(r'\("\$cmd\[\d+\]" == "(?P<word>[^"]+)"\)')
-# a `p@N@` rule as a whole
-TCSH_RULE_RE = re.compile(r"^(?P<indent>\s*)'p@(?P<idx>\d+)@`(?P<setup>set cmd=[^;]+; )(?P<clauses>.*)`@' \\$")
-
-
-def _tcsh_anchor_positional_patterns(script):
-    """
-    Complete files/dirs for positionals of a subcommand, e.g. `borg umount <MOUNTPOINT>`.
-
-    shtab puts such completions into the `p@N@` rule of that positional, as a bare completion
-    pattern (`f`, `d`, ...) in an `if (...) <action>` clause. But tcsh runs these clauses as
-    commands and only uses their *output*, so a pattern there does nothing. tcsh can only apply
-    a pattern via a rule of its own, keyed off the preceding word - which works whenever the
-    positional directly follows its (sub)command.
-
-    TODO: remove this once we require a shtab release that includes tqdm/shtab#241 - with such
-    a shtab, no clause has a bare pattern as its action and this is a no-op.
-    """
-    lines = []
-    for line in script.splitlines():
-        rule = TCSH_RULE_RE.match(line)
-        if not rule:
-            lines.append(line)
-            continue
-        keep = []
-        for clause in rule["clauses"].split("; "):
-            match = TCSH_CLAUSE_RE.fullmatch(clause)
-            action = match["action"] if match else None
-            if action is None or action.startswith(("echo ", "eval ")):
-                keep.append(clause)  # not a pattern, tcsh can run this
-                continue
-            words = TCSH_CHECK_RE.findall(match["checks"])
-            # the positional is at index `idx`, the (sub)command words are at 2..len(words) + 1
-            if words and int(rule["idx"]) == len(words) + 1:
-                lines.append(f"{rule['indent']}'n/{words[-1]}/{action}/' \\")
-            # else: the pattern is for a later positional, tcsh cannot express that - drop it
-        if keep:
-            lines.append(f"{rule['indent']}'p@{rule['idx']}@`{rule['setup']}{'; '.join(keep)}`@' \\")
-    return "\n".join(lines)
-
-
 def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict):
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
@@ -1151,10 +1107,7 @@ class CompletionMixIn:
         template = preamble_templates.get(args.shell)
         # Build the preamble using partial_format to avoid escaping braces etc.
         preambles = [partial_format(template, mapping)] if template else []
-        script = parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles)
-        if args.shell == "tcsh":
-            script = _tcsh_anchor_positional_patterns(script)
-        print(script)
+        print(parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles))
 
     def build_parser_completion(self, subparsers, common_parser, mid_common_parser):
         shells = tuple(shtab.SUPPORTED_SHELLS)

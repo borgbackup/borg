@@ -93,7 +93,11 @@ build-backend = "setuptools.build_meta"
 # https://github.com/borgbackup/borg/issues/6875
 write_to = "src/borg/_version.py"
 write_to_template = "__version__ = version = {version!r}\n"
-tag.strict = false
+# Do not add keys here that only exist in recent setuptools-scm (e.g. the "tag" table,
+# needing setuptools-scm >= 10.1): older versions pass this table as kwargs to their
+# Configuration class and hard-fail with TypeError on unknown keys, breaking builds
+# against the setuptools-scm versions shipped by distributions.
+# https://github.com/borgbackup/borg/issues/10193
 
 [tool.black]
 line-length = 120

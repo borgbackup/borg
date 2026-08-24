@@ -195,12 +195,29 @@ class Archives:
             info = ItemInfo(*info)  # RPC does not give us a NamedTuple
             yield hex_to_bin(info.name)
 
-    def _get_archive_meta(self, id: bytes) -> tuple[dict, ArchiveItem | None]:
+    def _get_archive_meta(self, id: bytes, *, tolerate_read_errors: bool = False) -> tuple[dict, ArchiveItem | None]:
         # get all metadata directly from the ArchiveItem in the repo, see _parse_archive_meta.
         from .repository import Repository
 
         try:
             cdata = self.repository.get(id)
+        except Repository.StoreReadError:
+            # the archive metadata could not be read at all (I/O error, refs #3509). only borg check
+            # opts into a placeholder here, so it can go on and check the other archives. everybody
+            # else must not act on a repository it can not fully read: the placeholder's 1970
+            # timestamp would e.g. make prune treat the archive as the oldest one.
+            if not tolerate_read_errors:
+                raise
+            metadata = dict(
+                id=id,
+                name="archive-metadata-could-not-be-read",
+                time="1970-01-01T00:00:00.000000",
+                exists=False,  # we have the pointer, but we could not read the archive item
+                username="",
+                hostname="",
+                tags=(),
+            )
+            return metadata, None
         except Repository.ObjectNotFound:
             cdata = None
         return self._parse_archive_meta(id, cdata)
@@ -253,15 +270,28 @@ class Archives:
                 )
         return metadata, archive_item
 
-    def _infos(self, *, deleted=False):
+    def _infos(self, *, deleted=False, tolerate_read_errors=False):
         # yield (info dict, ArchiveItem) of all archives, reading their metadata objects in batches
         # (see Repository.gather_many).
-        ids = list(self.ids(deleted=deleted))
-        for id, cdata in zip(ids, self.repository.gather_many(ids, raise_missing=False)):
-            yield self._parse_archive_meta(id, cdata)
+        from .repository import Repository
 
-    def _info_tuples(self, *, deleted=False):
-        for info, archive_item in self._infos(deleted=deleted):
+        ids = list(self.ids(deleted=deleted))
+        done = 0  # the number of ids yielded so far
+        try:
+            for id, cdata in zip(ids, self.repository.gather_many(ids, raise_missing=False)):
+                yield self._parse_archive_meta(id, cdata)
+                done += 1
+        except Repository.StoreReadError:
+            # an archive metadata object could not be read (I/O error, refs #3509), see _get_archive_meta.
+            if not tolerate_read_errors:
+                raise
+            # a batch fails as a whole, so read the remaining objects one by one: only the unreadable
+            # ones become placeholders.
+            for id in ids[done:]:
+                yield self._get_archive_meta(id, tolerate_read_errors=True)
+
+    def _info_tuples(self, *, deleted=False, tolerate_read_errors=False):
+        for info, archive_item in self._infos(deleted=deleted, tolerate_read_errors=tolerate_read_errors):
             yield ArchiveInfo(
                 name=info["name"],
                 id=info["id"],
@@ -272,8 +302,8 @@ class Archives:
                 metadata=archive_item,
             )
 
-    def _matching_info_tuples(self, match_patterns, match_end, *, deleted=False):
-        archive_infos = list(self._info_tuples(deleted=deleted))
+    def _matching_info_tuples(self, match_patterns, match_end, *, deleted=False, tolerate_read_errors=False):
+        archive_infos = list(self._info_tuples(deleted=deleted, tolerate_read_errors=tolerate_read_errors))
         if match_patterns:
             assert isinstance(match_patterns, list), f"match_pattern is a {type(match_patterns)}"
             for match in match_patterns:
@@ -433,6 +463,7 @@ class Archives:
         oldest=None,
         newest=None,
         deleted=False,
+        tolerate_read_errors=False,
     ):
         """
         Return list of ArchiveInfo instances according to the parameters.
@@ -454,7 +485,9 @@ class Archives:
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
 
-        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted)
+        archive_infos = self._matching_info_tuples(
+            match, match_end, deleted=deleted, tolerate_read_errors=tolerate_read_errors
+        )
 
         if any([oldest, newest, older, newer]):
             archive_infos = filter_archives_by_date(

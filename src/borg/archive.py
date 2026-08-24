@@ -2844,11 +2844,17 @@ class ArchiveChecker:
             """Load the archive metadata object chunk_id. If it has no archives directory entry, create one
             (with --repair) or log that it would create one.
             """
-            cdata = self.repository.get(chunk_id)
             try:
+                cdata = self.repository.get(chunk_id)
                 meta, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
             except IntegrityErrorBase as exc:
                 logger.error("Skipping corrupted chunk: %s", exc)
+                self.error_found = True
+                return
+            except Repository.StoreReadError as exc:
+                # unreadable, not corrupt: this scan only looks for archive metadata, so skipping
+                # such a chunk can at worst miss a lost archive - it never drops data, refs #3509.
+                logger.error("Skipping unreadable chunk: %s", exc)
                 self.error_found = True
                 return
             if meta["type"] != ROBJ_ARCHIVE_META:
@@ -2903,6 +2909,11 @@ class ArchiveChecker:
                     meta = self.repo_objs.parse_meta(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
                 except IntegrityErrorBase as exc:
                     logger.error("Skipping corrupted chunk: %s", exc)
+                    self.error_found = True
+                    continue
+                except Repository.StoreReadError as exc:
+                    # see check_archive_meta.
+                    logger.error("Skipping unreadable chunk: %s", exc)
                     self.error_found = True
                     continue
                 if meta["type"] != ROBJ_ARCHIVE_META:
@@ -3149,6 +3160,9 @@ class ArchiveChecker:
                 newest=newest,
                 older=older,
                 newer=newer,
+                # an archive whose metadata we can not read gets a placeholder entry here, so the
+                # other archives still get checked; the loop below reports it, refs #3509.
+                tolerate_read_errors=True,
             )
             if match and not archive_infos:
                 logger.warning("--match-archives %s does not match any archives", match)
@@ -3157,7 +3171,7 @@ class ArchiveChecker:
             if last and len(archive_infos) < last:
                 logger.warning("--last %d archives: only found %d archives", last, len(archive_infos))
         else:
-            archive_infos = self.manifest.archives.list(sort_by=sort_by)
+            archive_infos = self.manifest.archives.list(sort_by=sort_by, tolerate_read_errors=True)
         num_archives = len(archive_infos)
         if deadline is not None:
             # archives without an ok record first, then the least recently checked ones, so that
@@ -3197,10 +3211,11 @@ class ArchiveChecker:
                         formatted = formatter.format_item(info, jsonline=False)
                         # the formatter uses defaults for keys like {comment} if it has no archive metadata.
                         metadata_missing = bool(formatter.used_call_keys) and formatter.archive is None
-                    except (Repository.ObjectNotFound, IntegrityErrorBase):
+                    except (Repository.ObjectNotFound, IntegrityErrorBase, Repository.StoreReadError):
                         metadata_missing = True
                     if metadata_missing:
-                        # keys like {comment} need the archive metadata, which is damaged or missing here.
+                        # keys like {comment} need the archive metadata, which is damaged, missing or
+                        # unreadable here.
                         # use the values from the archive directory entry, they are always available.
                         formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"
                     logger.info(f"Analyzing archive {formatted} ({i + 1}/{num_archives})")

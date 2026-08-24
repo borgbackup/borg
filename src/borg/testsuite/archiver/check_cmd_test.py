@@ -935,6 +935,22 @@ def some_pack_name(archiver):
         return sorted(info.name for info in repository.store_list("packs"))[0]
 
 
+def pack_name_of(archiver, chunk_id):
+    """Return the name of the pack file holding chunk_id."""
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        return bin_to_hex(repository.chunks[chunk_id].pack_id)
+
+
+def file_content_chunk_id(archiver, archive_name="archive1"):
+    """Return the id of a file content chunk of the given archive."""
+    archive, repository = open_archive(archiver.repository_path, archive_name)
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith(src_file):
+                return item.chunks[-1].id
+    raise AssertionError(f"{src_file} not found in {archive_name}")
+
+
 def test_check_unreadable_pack(archivers, request, monkeypatch):
     # an I/O error while reading a pack must not crash the check with a traceback: it is reported,
     # the check goes on and fails at the end, refs #3509.
@@ -996,7 +1012,8 @@ def test_check_verify_data_unreadable_pack_keeps_chunks(archivers, request, monk
     if archiver.get_kind() != "local":
         pytest.skip("only works locally, patches objects")
     check_cmd_setup(archiver)
-    pack_name = some_pack_name(archiver)
+    # target the pack holding file content, so --verify-data is what reads it.
+    pack_name = pack_name_of(archiver, file_content_chunk_id(archiver))
     with Repository(archiver.repository_location, exclusive=True) as repository:
         chunks_before = sorted(chunk_id for chunk_id, _ in repository.chunks.iteritems())
     state = make_pack_unreadable(monkeypatch, pack_name)
@@ -1008,3 +1025,38 @@ def test_check_verify_data_unreadable_pack_keeps_chunks(archivers, request, monk
     with Repository(archiver.repository_location, exclusive=True) as repository:
         chunks_after = sorted(chunk_id for chunk_id, _ in repository.chunks.iteritems())
     assert chunks_after == chunks_before  # nothing was thrown away
+
+
+def test_check_unreadable_archive_metadata_pack(archivers, request, monkeypatch):
+    # the pack holding an archive's metadata is unreadable: listing the archives must not die, the
+    # affected archive is reported and the other archives still get checked, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        archive_id = archive.id
+    pack_name = pack_name_of(archiver, archive_id)
+    make_pack_unreadable(monkeypatch, pack_name)
+
+    output = cmd(archiver, "check", "--archives-only", exit_code=1)
+    assert "could not be checked" in output
+    assert "Input/output error" in output
+    assert "Archive consistency check complete, problems found." in output
+
+
+def test_unreadable_archive_metadata_pack_does_not_fake_an_archive(archivers, request, monkeypatch):
+    # outside of borg check, an unreadable archive metadata object must not turn into a placeholder
+    # entry: acting on a repository we can not fully read (e.g. prune, which would see the
+    # placeholder's 1970 timestamp) is how transient I/O errors become data loss, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        archive_id = archive.id
+    make_pack_unreadable(monkeypatch, pack_name_of(archiver, archive_id))
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "repo-list")

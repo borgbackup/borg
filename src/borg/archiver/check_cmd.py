@@ -218,6 +218,10 @@ class CheckMixIn:
         ``--verify-data`` leaves chunks it could not read in place instead of deleting them.
         Fix the storage hardware, filesystem or network first, then run the check again.
 
+        Only ``borg check`` goes on like this. Other commands stop with the read error rather
+        than work with a partially readable repository - e.g. ``borg prune`` would otherwise
+        see an archive whose metadata it could not read as undated and thus as the oldest one.
+
         About repair mode
         +++++++++++++++++
 

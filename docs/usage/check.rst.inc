@@ -98,12 +98,12 @@ The check command verifies the consistency of a repository and its archives.
 It consists of two major steps:
 
 1. Checking the consistency of the repository itself. The objects in the ``index/``
-   and ``packs/`` namespaces are named by the sha256 hash of their content, so such
+   and ``packs/`` namespaces are named by the store hash of their content, so such
    an object is intact if and only if the hash of its content still equals its name.
    The check verifies the (small) index objects first and, only if they are intact,
    all packs. It also cross-checks the chunk index against the packs present in the
    repository to detect referenced but missing packs. Bit rot and other types of
-   accidental damage can be detected this way, but as sha256 content-addressing is
+   accidental damage can be detected this way, but as content-addressing is
    not a MAC, this step does not detect tampering. Running the repository check can
    be split into multiple partial checks using ``--max-duration``.
    For rest:// repositories, the server computes the hashes, so the pack contents do
@@ -198,6 +198,20 @@ During a ``--repair`` run, the archive check first rebuilds the chunk index from
 packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
 respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
 effect until they finish.
+
+Unreadable repository objects
++++++++++++++++++++++++++++++
+
+A repository object that cannot be read at all (an I/O error from a failing disk, a
+flaky network filesystem, ...) is different from a corrupt one: Borg never saw its
+content, so it cannot tell whether the object is fine. Such an object is reported and
+the check continues, so one run lists everything that is affected; the check then
+fails. The object is not remembered as corrupt, so a later check verifies it again.
+
+Because the data may well be readable again once the underlying problem is fixed,
+``--repair`` refuses to repair while there are unreadable objects, and
+``--verify-data`` leaves chunks it could not read in place instead of deleting them.
+Fix the storage hardware, filesystem or network first, then run the check again.
 
 About repair mode
 +++++++++++++++++

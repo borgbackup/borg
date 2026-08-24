@@ -229,6 +229,20 @@ class CheckMixIn:
         packs the repair wrote, makes the chunk index match them and stores it; that always runs to
         completion, also after a Ctrl-C.
 
+        Unreadable repository objects
+        +++++++++++++++++++++++++++++
+
+        A repository object that cannot be read at all (an I/O error from a failing disk, a
+        flaky network filesystem, ...) is different from a corrupt one: Borg never saw its
+        content, so it cannot tell whether the object is fine. Such an object is reported and
+        the check continues, so one run lists everything that is affected; the check then
+        fails. The object is not remembered as corrupt, so a later check verifies it again.
+
+        Because the data may well be readable again once the underlying problem is fixed,
+        ``--repair`` refuses to repair while there are unreadable objects, and
+        ``--verify-data`` leaves chunks it could not read in place instead of deleting them.
+        Fix the storage hardware, filesystem or network first, then run the check again.
+
         About repair mode
         +++++++++++++++++
 

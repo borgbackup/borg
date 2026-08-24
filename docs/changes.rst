@@ -237,7 +237,8 @@ Fixes:
   is reported, the check continues and fails at the end. Such an object is not
   recorded as corrupt (a later check verifies it again), ``--repair`` refuses to
   repair around it and ``--verify-data`` no longer deletes chunks it could not
-  read, #3509
+  read. Other commands stop with the read error instead of working with a
+  partially readable repository, #3509
 
 Other changes:
 

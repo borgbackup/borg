@@ -53,18 +53,32 @@ The following argument types have intelligent, context-aware completion:
 
 11. File sizes (parse_file_size):
    - Suggests common file size values (500M, 1G, 10G, 100G, 1T, etc.)
+
+12. Repositories (location_validator):
+   - Completes directories for -r/--repo and --other-repo (a local repository is a
+     directory; remote locations like ssh://... just do not match one)
+
+13. Encryption modes (the --encryption choices):
+   - Completes the repo-create encryption modes, in zsh and fish with a short
+     description of what each mode does (bash and tcsh have no descriptions)
 """
 
+import os
 import re
+import shlex
+import sys
 
 import shtab
 
 from ._common import process_epilog
 from .diff_cmd import DIFF_SORT_KEYS, diff_sort_spec
 from .list_cmd import ITEM_SORT_KEYS, item_sort_spec
+from .repo_create_cmd import ENCRYPTION_DESCRIPTIONS
 from ..constants import *  # NOQA
+from ..crypto.key import encryption_argument_names
 from ..helpers import (
     archivename_validator,
+    location_validator,
     SortBySpec,
     FilesCacheMode,
     PathSpec,
@@ -116,9 +130,9 @@ _borg_complete_archive() {
     # ask borg for raw IDs; avoid prompts and suppress stderr
     local out
     if [[ -n "${repo_arg[*]}" ]]; then
-      out=$( borg repo-list "${repo_arg[@]}" --format '{id}{NL}' 2>/dev/null </dev/null )
+      out=$( {PROG} repo-list "${repo_arg[@]}" --format '{id}{NL}' 2>/dev/null </dev/null )
     else
-      out=$( borg repo-list --format '{id}{NL}' 2>/dev/null </dev/null )
+      out=$( {PROG} repo-list --format '{id}{NL}' 2>/dev/null </dev/null )
     fi
     [[ -z "$out" ]] && return 0
 
@@ -135,9 +149,9 @@ _borg_complete_archive() {
     # Complete archive names
     local out
     if [[ -n "${repo_arg[*]}" ]]; then
-      out=$( borg repo-list "${repo_arg[@]}" --format '{archive}{NL}' 2>/dev/null </dev/null )
+      out=$( {PROG} repo-list "${repo_arg[@]}" --format '{archive}{NL}' 2>/dev/null </dev/null )
     else
-      out=$( borg repo-list --format '{archive}{NL}' 2>/dev/null </dev/null )
+      out=$( {PROG} repo-list --format '{archive}{NL}' 2>/dev/null </dev/null )
     fi
     [[ -z "$out" ]] && return 0
 
@@ -165,6 +179,13 @@ _borg_complete_chunker_params() {
   compgen -W "${choices}" -- "$1"
 }
 
+# Complete encryption modes (bash has no completion descriptions, so just the mode names)
+_borg_complete_encryption() {
+  local choices="{ENCRYPTION_CHOICES}"
+  local IFS=$' \t\n'
+  compgen -W "${choices}" -- "$1"
+}
+
 # Complete tags from repository
 _borg_complete_tags() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
@@ -186,9 +207,9 @@ _borg_complete_tags() {
   # ask borg for tags; avoid prompts and suppress stderr
   local out
   if [[ -n "${repo_arg[*]}" ]]; then
-    out=$( borg repo-list "${repo_arg[@]}" --format '{tags}{NL}' 2>/dev/null </dev/null )
+    out=$( {PROG} repo-list "${repo_arg[@]}" --format '{tags}{NL}' 2>/dev/null </dev/null )
   else
-    out=$( borg repo-list --format '{tags}{NL}' 2>/dev/null </dev/null )
+    out=$( {PROG} repo-list --format '{tags}{NL}' 2>/dev/null </dev/null )
   fi
   [[ -z "$out" ]] && return 0
 
@@ -342,10 +363,10 @@ _borg_complete_archive() {
     # Use tab as delimiter to avoid issues with spaces in archive names
     local out
     if (( ${#repo_arg[@]} > 0 )); then
-      out=$( borg repo-list "${repo_arg[@]}" --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' \
+      out=$( {PROG} repo-list "${repo_arg[@]}" --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' \
              2>/dev/null </dev/null )
     else
-      out=$( borg repo-list --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' \
+      out=$( {PROG} repo-list --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' \
              2>/dev/null </dev/null )
     fi
     [[ -z "$out" ]] && return 0
@@ -370,9 +391,9 @@ _borg_complete_archive() {
     # Complete archive names
     local out
     if (( ${#repo_arg[@]} > 0 )); then
-      out=$( borg repo-list "${repo_arg[@]}" --format '{archive}{NL}' 2>/dev/null </dev/null )
+      out=$( {PROG} repo-list "${repo_arg[@]}" --format '{archive}{NL}' 2>/dev/null </dev/null )
     else
-      out=$( borg repo-list --format '{archive}{NL}' 2>/dev/null </dev/null )
+      out=$( {PROG} repo-list --format '{archive}{NL}' 2>/dev/null </dev/null )
     fi
     [[ -z "$out" ]] && return 0
 
@@ -404,6 +425,14 @@ _borg_complete_chunker_params() {
   compadd -V 'chunker params' -Q -a choices
 }
 
+# Complete encryption modes, with a short description of each mode
+_borg_complete_encryption() {
+  local choices=({ENCRYPTION_CHOICES})
+  local descriptions=({ENCRYPTION_DESCRIPTIONS})
+  # -V: preserve order (do not sort), -l: one per line, -d: descriptions
+  compadd -V 'encryption modes' -Q -l -d descriptions -a choices
+}
+
 # Complete tags from repository
 _borg_complete_tags() {
   local cur
@@ -426,9 +455,9 @@ _borg_complete_tags() {
   # ask borg for tags; avoid prompts and suppress stderr
   local out
   if (( ${#repo_arg[@]} > 0 )); then
-    out=$( borg repo-list "${repo_arg[@]}" --format '{tags}{NL}' 2>/dev/null </dev/null )
+    out=$( {PROG} repo-list "${repo_arg[@]}" --format '{tags}{NL}' 2>/dev/null </dev/null )
   else
-    out=$( borg repo-list --format '{tags}{NL}' 2>/dev/null </dev/null )
+    out=$( {PROG} repo-list --format '{tags}{NL}' 2>/dev/null </dev/null )
   fi
   [[ -z "$out" ]] && return 0
 
@@ -587,21 +616,21 @@ function _borg_complete_archive
             return
         end
         # ask borg for IDs with metadata; avoid prompts and suppress stderr
-        borg repo-list $repo_args --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' \
+        {PROG} repo-list $repo_args --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' \
             2>/dev/null </dev/null | while read -l -d \t id archive atime userhost
             test -z "$id"; and continue
             # Print only the first 8 hex digits of the ID, with metadata as description.
             printf 'aid:%s\t%s (%s %s)\n' (string sub -l 8 -- $id) $archive $atime $userhost
         end
     else
-        borg repo-list $repo_args --format '{archive}{NL}' 2>/dev/null </dev/null
+        {PROG} repo-list $repo_args --format '{archive}{NL}' 2>/dev/null </dev/null
     end
 end
 
 # Complete tags from the repository
 function _borg_complete_tags
     set -l repo_args (_borg_repo_args)
-    borg repo-list $repo_args --format '{tags}{NL}' 2>/dev/null </dev/null \
+    {PROG} repo-list $repo_args --format '{tags}{NL}' 2>/dev/null </dev/null \
         | string split ',' | string trim | string match -v '' | sort -u
 end
 
@@ -613,6 +642,11 @@ end
 # Complete chunker params options
 function _borg_complete_chunker_params
     printf '%s\n' {CHUNKER_PARAMS_CHOICES}
+end
+
+# Complete encryption modes, with a short description of each mode
+function _borg_complete_encryption
+    printf '%s\n' {ENCRYPTION_DESCRIPTIONS}
 end
 
 # Complete relative time markers
@@ -708,6 +742,8 @@ alias _borg_complete_filescachemode "echo {FCM_KEYS}"
 alias _borg_help_topics "echo {HELP_CHOICES}"
 alias _borg_complete_compression_spec "echo {COMP_SPEC_CHOICES}"
 alias _borg_complete_chunker_params "echo {CHUNKER_PARAMS_CHOICES}"
+# tcsh has no completion descriptions either, so just the mode names
+alias _borg_complete_encryption "echo {ENCRYPTION_CHOICES}"
 alias _borg_complete_relative_time "echo {RELATIVE_TIME_CHOICES}"
 alias _borg_complete_file_size "echo {FILE_SIZE_CHOICES}"
 
@@ -739,13 +775,13 @@ TCSH_SH_COMPLETE = (
     "cur=${line##* }; "
     # avoid prompts and suppress errors, the output is used as completion candidates
     "if [ $mode = tags ]; then "
-    'borg repo-list "$@" --format "{tags}{NL}" 2>/dev/null </dev/null'
+    '{PROG} repo-list "$@" --format "{tags}{NL}" 2>/dev/null </dev/null'
     ' | tr , "\\n" | sed "s/^ *//;s/ *$//" | grep . | sort -u; '
     'elif [ "${cur#aid:}" != "$cur" ]; then '
     # print only the first 8 hex digits of the ID, like the other shells do
-    'borg repo-list "$@" --format "aid:{id}{NL}" 2>/dev/null </dev/null | cut -c1-12; '
+    '{PROG} repo-list "$@" --format "aid:{id}{NL}" 2>/dev/null </dev/null | cut -c1-12; '
     "else "
-    'borg repo-list "$@" --format "{archive}{NL}" 2>/dev/null </dev/null; '
+    '{PROG} repo-list "$@" --format "{archive}{NL}" 2>/dev/null </dev/null; '
     "fi"
 )
 
@@ -893,50 +929,6 @@ def _sortby_functions(shell, completers):
     )
 
 
-# in a `p@N@`...`@` rule, one `if (...) <action>` clause, e.g.
-# `if ( $#cmd >= 3 && ("$cmd[2]" == "key") && ("$cmd[3]" == "export") ) f`
-TCSH_CLAUSE_RE = re.compile(r"if \( \$#cmd >= \d+ && (?P<checks>.*?) \) (?P<action>.*)")
-TCSH_CHECK_RE = re.compile(r'\("\$cmd\[\d+\]" == "(?P<word>[^"]+)"\)')
-# a `p@N@` rule as a whole
-TCSH_RULE_RE = re.compile(r"^(?P<indent>\s*)'p@(?P<idx>\d+)@`(?P<setup>set cmd=[^;]+; )(?P<clauses>.*)`@' \\$")
-
-
-def _tcsh_anchor_positional_patterns(script):
-    """
-    Complete files/dirs for positionals of a subcommand, e.g. `borg umount <MOUNTPOINT>`.
-
-    shtab puts such completions into the `p@N@` rule of that positional, as a bare completion
-    pattern (`f`, `d`, ...) in an `if (...) <action>` clause. But tcsh runs these clauses as
-    commands and only uses their *output*, so a pattern there does nothing. tcsh can only apply
-    a pattern via a rule of its own, keyed off the preceding word - which works whenever the
-    positional directly follows its (sub)command.
-
-    TODO: remove this once we require a shtab release that includes tqdm/shtab#241 - with such
-    a shtab, no clause has a bare pattern as its action and this is a no-op.
-    """
-    lines = []
-    for line in script.splitlines():
-        rule = TCSH_RULE_RE.match(line)
-        if not rule:
-            lines.append(line)
-            continue
-        keep = []
-        for clause in rule["clauses"].split("; "):
-            match = TCSH_CLAUSE_RE.fullmatch(clause)
-            action = match["action"] if match else None
-            if action is None or action.startswith(("echo ", "eval ")):
-                keep.append(clause)  # not a pattern, tcsh can run this
-                continue
-            words = TCSH_CHECK_RE.findall(match["checks"])
-            # the positional is at index `idx`, the (sub)command words are at 2..len(words) + 1
-            if words and int(rule["idx"]) == len(words) + 1:
-                lines.append(f"{rule['indent']}'n/{words[-1]}/{action}/' \\")
-            # else: the pattern is for a later positional, tcsh cannot express that - drop it
-        if keep:
-            lines.append(f"{rule['indent']}'p@{rule['idx']}@`{rule['setup']}{'; '.join(keep)}`@' \\")
-    return "\n".join(lines)
-
-
 def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict):
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
@@ -950,22 +942,35 @@ def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict
             action.complete = completion_dict  # type: ignore[attr-defined]
 
 
-def _attach_help_completion(parser: ArgumentParser, completion_dict: dict):
-    """Tag the 'topic' argument of the 'help' command with static completion choices."""
+def _attach_completion_by_dest(parser: ArgumentParser, dest: str, completion_dict: dict):
+    """Tag all arguments with destination `dest` with completion choices from `completion_dict`."""
+
     for action in parser._actions:
         if isinstance(action, ActionSubCommands):
             for sub in action.choices.values():
-                _attach_help_completion(sub, completion_dict)
+                _attach_completion_by_dest(sub, dest, completion_dict)
             continue
 
-        if action.dest == "topic":
+        if action.dest == dest:
             action.complete = completion_dict  # type: ignore[attr-defined]
 
 
-# File completion. shtab's fish variant calls __fish_complete_path without arguments,
-# which only completes paths relative to the cwd - pass the current token, so that
-# absolute paths (and paths in other directories) complete as well, see tqdm/shtab#245.
-FILE = {**shtab.FILE, "fish": "(__fish_complete_path (commandline -ct))"}
+# RST inline markup used in the help texts: ``literal`` and **bold**. The shells show the help
+# as the completion description, where the markup is just noise, see #3086.
+RST_MARKUP_RE = re.compile(r"``(?P<literal>.+?)``|\*\*(?P<bold>.+?)\*\*")
+
+
+def _strip_rst_markup(parser: ArgumentParser):
+    """Remove RST inline markup from all help texts, keeping the text they mark up."""
+
+    for action in parser._actions:
+        if isinstance(action, ActionSubCommands):
+            for sub in action.choices.values():
+                _strip_rst_markup(sub)
+            continue
+
+        if isinstance(action.help, str):
+            action.help = RST_MARKUP_RE.sub(lambda m: m["literal"] or m["bold"], action.help)
 
 
 class CompletionMixIn:
@@ -976,10 +981,17 @@ class CompletionMixIn:
         # arguments (identified by archivename_validator). It reuses `borg repo-list`
         # to enumerate archives and does not introduce any new commands or caching.
 
-        # The script shall always complete the "borg" command, no matter how borg was
-        # invoked while generating it (e.g. as "python -m borg", where prog would be
-        # "__main__.py" - the shells would then complete that instead of "borg").
-        prog, self.prog = self.prog, "borg"
+        # The script completes the command borg was invoked as - usually "borg", but e.g. "borg2"
+        # if borg was installed under that name to have it alongside a borg 1.x (#3086). The
+        # dynamic completions call that same command to query the repository, so they must not
+        # end up calling some other borg. Only names starting with "borg" are used: borg is also
+        # invoked in ways that do not give a usable command name (e.g. "python -m borg", where the
+        # name would be "__main__.py", or in-process from the test suite).
+        # self.prog is usually None, the parser then derives it from sys.argv[0], like argparse.
+        completion_prog = self.prog or os.path.basename(sys.argv[0])
+        if not completion_prog.startswith("borg"):
+            completion_prog = "borg"
+        prog, self.prog = self.prog, completion_prog
         try:
             parser = self.build_parser()
         finally:
@@ -993,12 +1005,16 @@ class CompletionMixIn:
             return {"bash": fn_name, "zsh": fn_name, "tcsh": f"`{tcsh_fn or fn_name}`", "fish": f"({fn_name})"}
 
         _attach_completion(parser, archivename_validator, for_all_shells("_borg_complete_archive"))
+        # -r/--repo and --other-repo: complete local repository directories (remote locations
+        # like ssh://... simply do not match anything then), see #3086.
+        _attach_completion(parser, location_validator(other=False), shtab.DIRECTORY)
+        _attach_completion(parser, location_validator(other=True), shtab.DIRECTORY)
         for sortby_type, sortby_fn, _ in SORTBY_COMPLETERS:
             _attach_completion(parser, sortby_type, for_all_shells(sortby_fn, tcsh_fn=TCSH_SORTBY_FN))
         _attach_completion(parser, FilesCacheMode, for_all_shells("_borg_complete_filescachemode"))
         _attach_completion(parser, CompressionSpec, for_all_shells("_borg_complete_compression_spec"))
         _attach_completion(parser, PathSpec, shtab.DIRECTORY)
-        _attach_completion(parser, FilesystemPathSpec, FILE)
+        _attach_completion(parser, FilesystemPathSpec, shtab.FILE)
         _attach_completion(parser, FilesystemDirSpec, shtab.DIRECTORY)
         _attach_completion(parser, ChunkerParams, for_all_shells("_borg_complete_chunker_params"))
         _attach_completion(parser, tag_validator, for_all_shells("_borg_complete_tags"))
@@ -1012,7 +1028,9 @@ class CompletionMixIn:
             if isinstance(action, ActionSubCommands):
                 help_choices.extend(action.choices.keys())
 
-        _attach_help_completion(parser, for_all_shells("_borg_help_topics"))
+        _attach_completion_by_dest(parser, "topic", for_all_shells("_borg_help_topics"))
+        _attach_completion_by_dest(parser, "encryption", for_all_shells("_borg_complete_encryption"))
+        _strip_rst_markup(parser)
 
         # Build preambles using partial_format to avoid escaping braces etc.
         fcm_keys = " ".join(["ctime", "mtime", "size", "inode", "rechunk", "disabled"])  # keep in sync with parser
@@ -1054,14 +1072,29 @@ class CompletionMixIn:
         file_size_choices = ["500M", "1G", "10G", "100G", "1T"]
         file_size_choices_str = " ".join(file_size_choices)
 
+        # encryption modes, and the same list with a short description appended to each mode
+        encryption_choices = encryption_argument_names()
+        encryption_descriptions = [
+            f"{name}\t{ENCRYPTION_DESCRIPTIONS[name]}" if name in ENCRYPTION_DESCRIPTIONS else name
+            for name in encryption_choices
+        ]
+        if args.shell == "zsh":  # zsh wants the mode name in the description, and shell-quoted items
+            encryption_descriptions = [shlex.quote(d.replace("\t", "  -- ")) for d in encryption_descriptions]
+        elif args.shell == "fish":  # fish reads "value<TAB>description" lines, printf gets one arg per line
+            encryption_descriptions = [shlex.quote(d) for d in encryption_descriptions]
+
         mapping = {
             "FCM_KEYS": fcm_keys,
+            "ENCRYPTION_CHOICES": " ".join(encryption_choices),
+            "ENCRYPTION_DESCRIPTIONS": " ".join(encryption_descriptions),
             "COMP_SPEC_CHOICES": comp_spec_choices_str,
             "CHUNKER_PARAMS_CHOICES": chunker_params_choices_str,
             "RELATIVE_TIME_CHOICES": relative_time_choices_str,
             "FILE_SIZE_CHOICES": file_size_choices_str,
             "HELP_CHOICES": help_choices,
             "SH_COMPLETE": TCSH_SH_COMPLETE,
+            # after SH_COMPLETE, so that the {PROG} in there is substituted as well
+            "PROG": completion_prog,
             # last, so that the rendered helpers are not scanned for the placeholders above
             "SORTBY_FUNCS": _sortby_functions(args.shell, SORTBY_COMPLETERS) if args.shell in SORTBY_FN_TMPLS else "",
         }
@@ -1074,10 +1107,7 @@ class CompletionMixIn:
         template = preamble_templates.get(args.shell)
         # Build the preamble using partial_format to avoid escaping braces etc.
         preambles = [partial_format(template, mapping)] if template else []
-        script = parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles)
-        if args.shell == "tcsh":
-            script = _tcsh_anchor_positional_patterns(script)
-        print(script)
+        print(parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles))
 
     def build_parser_completion(self, subparsers, common_parser, mid_common_parser):
         shells = tuple(shtab.SUPPORTED_SHELLS)

@@ -1110,7 +1110,7 @@ class ChecksumKeyBase(MACKeyBase):
     def create(cls, repository, args, **kw):
         logger.info(
             "Encryption NOT enabled.\n"
-            'Use "--encryption=repokey-aes-ocb" (or another encrypted mode) to enable encryption.'
+            'Use "--encryption=aes256-ocb" (or another encrypted mode) to enable encryption.'
         )
         return cls(repository)
 

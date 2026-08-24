@@ -94,6 +94,7 @@ the subcommand namespace and the outer (top-level) default flows through
 unchanged.
 """
 
+import re
 from typing import Any
 
 # here are the only imports from argparse and jsonargparse,
@@ -104,10 +105,46 @@ from jsonargparse import Namespace, ActionSubCommands, SUPPRESS, REMAINDER  # no
 from jsonargparse.typing import register_type, PositiveInt  # noqa: F401
 
 
+# jsonargparse reports a missing required argument by its config key (the dotted path it has in a
+# config file), e.g. "repo-create.encryption". On the command line that argument is "-e/--encryption"
+# though, so translate the message, see #3086. The wording changed in jsonargparse 4.51, which also
+# reports all missing arguments at once - match both.
+MISSING_REQUIRED_RES = (
+    re.compile(r"^the following arguments are required: (?P<keys>.+)$"),
+    re.compile(r"^Option '(?P<keys>[^']+)' is required but not provided or its value is None\.$"),
+)
+
+
 class ArgumentParser(_ArgumentParser):
     # the borg code always uses RawDescriptionHelpFormatter and add_help=False:
     def __init__(self, *args, formatter_class=RawDescriptionHelpFormatter, add_help=False, **kwargs):
         super().__init__(*args, formatter_class=formatter_class, add_help=add_help, **kwargs)
+
+    def _find_by_key(self, key):
+        """Resolve a jsonargparse config key to the (sub)parser it belongs to and its action."""
+        *subcommands, dest = key.split(".")
+        parser = self
+        for subcommand in subcommands:
+            action = next((a for a in parser._actions if isinstance(a, ActionSubCommands)), None)
+            if action is None or subcommand not in action.choices:
+                return None, None
+            parser = action.choices[subcommand]
+        return parser, next((a for a in parser._actions if a.dest == dest), None)
+
+    def error(self, message: str, ex=None):
+        match = next(filter(None, (regex.match(message) for regex in MISSING_REQUIRED_RES)), None)
+        if match:
+            names, parsers = [], []
+            for key in match["keys"].split(", "):
+                parser, action = self._find_by_key(key)
+                # name it as argparse does: all option strings for an option, the metavar otherwise
+                names.append("/".join(action.option_strings) or action.metavar or action.dest if action else key)
+                parsers.append(parser)
+            message = f"the following arguments are required: {', '.join(names)}"
+            if ex is not None and len(set(parsers)) == 1 and parsers[0] not in (None, self):
+                # all of them are in the same subcommand: point the usage/help hints at it
+                ex.subcommand_parser = parsers[0]
+        super().error(message, ex)
 
 
 def flatten_namespace(ns: Any) -> Namespace:

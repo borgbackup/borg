@@ -1790,6 +1790,33 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_archive = self.cmd('info', '--first', '1', self.repository_location)
         assert 'Archive name: test\n' in info_archive
 
+    def test_info_quick_stats(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        info_repo = self.cmd('info', '--quick-stats', self.repository_location)
+        assert 'Repository ID: ' in info_repo
+        assert 'All archives:' not in info_repo
+        assert 'Chunk index:' not in info_repo
+        info_archive = self.cmd('info', '--quick-stats', self.repository_location + '::test')
+        assert 'Archive name: test\n' in info_archive
+        assert 'This archive:' in info_archive
+        assert 'All archives:' not in info_archive
+        assert 'Chunk index:' not in info_archive
+
+    def test_info_quick_stats_json(self):
+        self.create_regular_file('file1', size=1024 * 80)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        info_repo = json.loads(self.cmd('info', '--json', '--quick-stats', self.repository_location))
+        assert len(info_repo['repository']['id']) == 64
+        assert 'cache' not in info_repo
+        info_archive = json.loads(self.cmd('info', '--json', '--quick-stats',
+                                           self.repository_location + '::test'))
+        assert info_archive['archives'][0]['name'] == 'test'
+        assert 'stats' in info_archive['archives'][0]
+        assert 'cache' not in info_archive
+
     def test_info_and_create_stats(self):
         # "This archive" deduplicated size should match between `borg info` and `borg create --stats`.
         # "All archives" deduplicated size should match between `borg info` and `borg create --stats`.

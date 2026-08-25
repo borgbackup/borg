@@ -1603,7 +1603,7 @@ class Archiver:
             else:
                 info['duration'] = format_timedelta(timedelta(seconds=info['duration']))
                 info['command_line'] = format_cmdline(info['command_line'])
-                print(textwrap.dedent("""
+                text = textwrap.dedent("""
                 Archive name: {name}
                 Archive fingerprint: {id}
                 Comment: {comment}
@@ -1619,18 +1619,22 @@ class Archiver:
                 ------------------------------------------------------------------------------
                                        Original size      Compressed size    Deduplicated size
                 This archive:   {stats[original_size]:>20s} {stats[compressed_size]:>20s} {stats[deduplicated_size]:>20s}
-                {cache}
-                """).strip().format(cache=cache, **info))
+                """).strip().format(**info)
+                if not args.quick_stats:
+                    # computing the repository-wide "All archives" statistics is expensive.
+                    text += '\n' + str(cache)
+                print(text)
             if not args.json and len(archive_names) - i:
                 print()
 
         if args.json:
-            json_print(basic_json_data(manifest, cache=cache, extra={
+            json_print(basic_json_data(manifest, cache=None if args.quick_stats else cache, extra={
                 'archives': output_data,
             }))
 
     def _info_repository(self, args, repository, manifest, key, cache):
-        info = basic_json_data(manifest, cache=cache, extra={
+        # computing the repository-wide statistics is expensive, --quick-stats omits them.
+        info = basic_json_data(manifest, cache=None if args.quick_stats else cache, extra={
             'security_dir': cache.security_manager.dir,
         })
 
@@ -1650,15 +1654,17 @@ class Archiver:
             Repository ID: {id}
             Location: {location}
             {encryption}
-            Cache: {cache.path}
+            Cache: {cache_path}
             Security dir: {security_dir}
             """).strip().format(
                 id=bin_to_hex(repository.id),
                 location=repository._location.canonical_path(),
+                cache_path=cache.path,
                 **info))
-            print(DASHES)
-            print(STATS_HEADER)
-            print(str(cache))
+            if not args.quick_stats:
+                print(DASHES)
+                print(STATS_HEADER)
+                print(str(cache))
 
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest, key):
@@ -4567,6 +4573,10 @@ class Archiver:
         The size of an archive relative to this limit depends on a number of factors,
         mainly the number of files, the lengths of paths and other metadata stored for files.
         This is shown as *utilization of maximum supported archive size*.
+
+        Computing the repository-wide "All archives" statistics is slow, because it needs to
+        read the metadata of all archives in the repository. If you do not need them, use
+        ``--quick-stats`` to skip them.
         """)
         subparser = subparsers.add_parser('info', parents=[common_parser], add_help=False,
                                           description=self.do_info.__doc__,
@@ -4579,6 +4589,8 @@ class Archiver:
                                help='repository or archive to display information about')
         subparser.add_argument('--json', action='store_true',
                                help='format output as JSON')
+        subparser.add_argument('--quick-stats', dest='quick_stats', action='store_true',
+                               help='skip the repository-wide "All archives" statistics')
         define_archive_filters_group(subparser)
 
         # borg version

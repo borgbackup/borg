@@ -1,5 +1,6 @@
 import base64
 import json
+import ntpath
 import os
 
 import re
@@ -9,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from ...constants import *  # NOQA
+from ...helpers import parseformat
 from ...helpers.argparsing import ArgumentTypeError
 from ...helpers.parseformat import (
     bin_to_hex,
@@ -210,6 +212,28 @@ class TestLocationWithoutEnv:
             repr(Location("rest:////absolute/path"))
             == "Location(proto='rest', user=None, pass=None, host=None, port=None, path='/absolute/path')"
         )
+
+    def test_server_side_path_is_posix(self, monkeypatch):
+        # ssh:// and rest:// paths live on the *server*, so they must be normalized as POSIX
+        # paths, no matter what the client runs on. A Windows client used to normalize them
+        # with ntpath, turning "/path/to/repo" into "\path\to\repo"; ssh passes the command
+        # through the remote shell, which ate the backslashes and left "pathtorepo", see #10199.
+        #
+        # The windows_tests CI job can not catch this: it runs in an msys2 shell, and MSYS2's
+        # mingw python switches ntpath.sep to "/" when MSYSTEM is set, so ntpath behaves like
+        # posixpath there. Users running borg.exe from cmd/PowerShell get the real ntpath.
+        # Faking a Windows client by swapping in ntpath tests this on any platform instead.
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        monkeypatch.setattr(parseformat.os, "path", ntpath)
+        for proto in ("ssh", "rest"):
+            assert Location(f"{proto}://user@host/relative/path").path == "relative/path"
+            assert Location(f"{proto}://user@host//absolute/path").path == "/absolute/path"
+            assert Location(f"{proto}://user@host:1234//absolute/path").path == "/absolute/path"
+            assert Location(f"{proto}://user@host//absolute/./x/../path").path == "/absolute/path"
+            assert (
+                Location(f"{proto}://user@host//absolute/path").canonical_path()
+                == f"{proto}://user@host//absolute/path"
+            )
 
     # For the protocols handled (parsed + validated) by borgstore itself, borg only detects
     # the scheme and passes the raw URL through; it no longer extracts user/host/port/path.

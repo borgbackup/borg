@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import os.path
+import posixpath
 import re
 import shlex
 import stat
@@ -827,7 +828,8 @@ class Location:
             self.user = m.group("user")
             self._host = m.group("host")
             self.port = m.group("port") and int(m.group("port")) or None
-            self.path = os.path.normpath(m.group("path"))
+            # remote path: normalize with posixpath, not with the client's os.path, see #10199.
+            self.path = posixpath.normpath(m.group("path"))
             return True
         m = self.rest_re.match(text)
         if m:
@@ -835,7 +837,8 @@ class Location:
             self.user = m.group("user")
             self._host = m.group("host")
             self.port = m.group("port") and int(m.group("port")) or None
-            self.path = os.path.normpath(m.group("path"))
+            # remote path: normalize with posixpath, not with the client's os.path, see #10199.
+            self.path = posixpath.normpath(m.group("path"))
             return True
         m = self.file_re.match(text)
         if m:

@@ -68,6 +68,9 @@ from repo1 to repo2 when done like that.
 An alternative is to use ``borg transfer`` to copy backup archives
 from repo1 to repo2. This is likely a bit more efficient and the archives would be identical,
 but it may suffer from potential error propagation.
+``borg transfer`` is incremental: it only copies the archives (and chunks) that repo2 does not
+have yet, so you can run it repeatedly (e.g. from a cron job) to keep repo2 up to date, see
+:ref:`borg_transfer`.
 
 Warning: Using Borg with multiple repositories that have identical repository IDs (such as
 creating 1:1 repository copies) is not supported and can lead to various issues,

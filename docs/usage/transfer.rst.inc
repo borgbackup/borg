@@ -109,6 +109,39 @@ You could use the misc. archive filter options to limit which archives it will
 transfer, e.g. using the ``-a`` option. This is recommended for big
 repositories with multiple data sets to keep the runtime per invocation lower.
 
+Incremental transfer
+++++++++++++++++++++
+
+Transfer only copies what is missing in the DST_REPO, so you can run the same command
+repeatedly (e.g. from a cron job) to keep DST_REPO up to date - each run will only
+transfer what was added to SRC_REPO since the previous run.
+
+This works on two levels:
+
+- archive level: if the DST_REPO already has an archive with the same name and timestamp
+  (or the same name and archive ID), that archive is skipped and borg prints
+  "archive is already present in destination repo, skipping.".
+- chunk level: for archives that are copied, only the chunks not yet present in the
+  DST_REPO are read from the SRC_REPO and stored - deduplication works against
+  everything transferred before.
+
+The archive filter options can be used as usual, so multiple invocations with different
+filters are fine, e.g.::
+
+    borg --repo=DST_REPO transfer --other-repo=SRC_REPO -a 'sh:daily-*'
+    borg --repo=DST_REPO transfer --other-repo=SRC_REPO -a 'sh:myserver-*'
+
+Some things to keep in mind:
+
+- Interrupting a transfer is safe: an archive only becomes visible in the DST_REPO after
+  it was copied completely, so an interrupted archive is simply transferred again by the
+  next run. The chunks stored by the interrupted run are reused, so the retry is cheap -
+  unless you run ``borg compact`` on the DST_REPO in between, which would remove the
+  chunks that are not (yet) referenced by an archive.
+- Transfer only adds archives, it never deletes any. If you want old archives to expire
+  in the DST_REPO, run ``borg prune`` (and ``borg compact``) against the DST_REPO
+  separately.
+
 General purpose archive transfer
 ++++++++++++++++++++++++++++++++
 

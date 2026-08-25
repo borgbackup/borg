@@ -26,6 +26,10 @@ requires that both sides cut the data into exactly the same chunks with exactly
 the same chunk IDs - if they did not, the archives would still be correct, but
 deduplication between machines of different endianness would silently not work.
 
+The labels are just names for the two sides, so the same script also drives the
+32-bit interoperability test (.github/workflows/32bit.yml), where the two sides
+are an emulated 32-bit machine and the 64-bit CI runner.
+
 The environment (BORG_REPO, BORG_PASSPHRASE, cache and config dir) is set up by
 this script; the borg to use can be given via the BORG environment variable.
 """

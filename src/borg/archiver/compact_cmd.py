@@ -125,7 +125,7 @@ class ArchiveGarbageCollector:
         content chunks of its items."""
         yield archive.id
         yield from archive.metadata.item_ptrs
-        yield from archive.metadata.items
+        yield from archive.item_ids
         for item in archive.iter_items():
             if "chunks" in item:
                 for id, _ in item.chunks:

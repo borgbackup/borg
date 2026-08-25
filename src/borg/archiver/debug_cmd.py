@@ -33,7 +33,7 @@ class DebugMixIn:
         repo_objs = manifest.repo_objs
         archive_info = manifest.archives.get_one([args.name])
         archive = Archive(manifest, archive_info.id)
-        for i, item_id in enumerate(archive.metadata.items):
+        for i, item_id in enumerate(archive.item_ids):
             _, data = repo_objs.parse(item_id, repository.get(item_id), ro_type=ROBJ_ARCHIVE_STREAM)
             filename = "%06d_%s.items" % (i, bin_to_hex(item_id))
             print("Dumping", filename)

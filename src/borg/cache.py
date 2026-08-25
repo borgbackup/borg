@@ -1060,7 +1060,7 @@ def scan_archive_references(manifest, archive_id: bytes):
     ids[archive.id] = ArchiveReferenceEntry(size=0)
     for id in archive.metadata.item_ptrs:
         ids[id] = ArchiveReferenceEntry(size=0)
-    for id in archive.metadata.items:
+    for id in archive.item_ids:
         ids[id] = ArchiveReferenceEntry(size=0)
     file_count, content_size = 0, 0
     for item in archive.iter_items():

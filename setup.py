@@ -61,7 +61,7 @@ def check_version_detectable():
     try:
         from setuptools_scm import get_version
     except ImportError:
-        return  # can not check. if the version is really needed, setup() will complain later.
+        return  # cannot check. if the version is really needed, setup() will complain later.
 
     here = os.path.dirname(os.path.abspath(__file__))
     found_tags = []

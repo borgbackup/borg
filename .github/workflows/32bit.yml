@@ -1,0 +1,216 @@
+# 32-bit test: build and test borg on armv7 (32-bit) under qemu user-mode
+# emulation, and check that a repository written on a 32-bit machine can be
+# read on a 64-bit one and the other way round.
+#
+# Why: all our other CI machines are 64-bit, so nothing ever exercises borg on a
+# platform where a pointer, size_t, Py_ssize_t and off_t are 32 bits wide - a
+# size computation that overflows there, a struct/msgpack format that assumes a
+# 64-bit word or an mmap that a 32-bit address space can not satisfy would only
+# be found by our users on such machines.
+#
+# Why armv7: 32-bit x86 desktops are basically gone, but 32-bit ARM is not - it
+# is what borg users on older Raspberry Pis (Pi 1/2/3, Zero) and on quite some
+# NAS / router / embedded boxes are running. It also has two properties x86 does
+# not have: it does not tolerate unaligned memory accesses everywhere, and plain
+# "char" is unsigned on ARM (it is signed on x86), which is a classic source of
+# portability bugs in C code. GitHub's arm64 runners can not execute 32-bit ARM
+# code natively, so this has to be emulated regardless.
+#
+# Why trixie: borg needs OpenSSL >= 3.2, so debian bookworm and its OpenSSL 3.0
+# are out - trixie has OpenSSL 3.5 (and python 3.13) for armhf.
+#
+# Everything inside the container is emulated instruction by instruction, so
+# this is slow. Therefore it does not run for every pull request, but only when
+# native code or format relevant code was touched (plus weekly and on demand).
+
+name: 32-bit
+
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+    - '**.pyx'
+    - '**.pxd'
+    - 'src/borg/**/*.c'
+    - 'src/borg/**/*.h'
+    - 'src/borg/chunkers/**'
+    - 'src/borg/crypto/**'
+    - 'src/borg/repository.py'
+    - 'src/borg/repoobj.py'
+    - 'src/borg/archive.py'
+    - 'src/borg/cache.py'
+    - 'scripts/endian_interop_test.py'
+    - '.github/workflows/32bit.yml'
+  schedule:
+    - cron: '43 6 * * 3'  # Wednesdays at 06:43 UTC
+  workflow_dispatch:      # Allow manual trigger
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  PY_COLORS: "1"
+
+jobs:
+  armv7:
+    name: armv7 (32-bit, emulated)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+
+    env:
+      # Debian trixie has python 3.13. Fewer of our dependencies ship armv7l
+      # wheels than s390x ones (blake3 does, the rest is pure python or is
+      # compiled from source, emulated), so the first, uncached run is slow.
+      IMAGE: docker.io/arm32v7/debian:trixie-slim
+      CONTAINER: borg-armv7
+      # both sides of the interoperability test share this directory:
+      INTEROP: ${{ github.workspace }}/.interop
+      # a hung emulated test must fail instead of eating the job timeout:
+      PYTEST_TIMEOUT: "600"
+      # The word size sensitive parts: the native code (chunkers, crypto,
+      # compression, hashindex, item) and the code that reads/writes the
+      # repository format and computes sizes and offsets. Extend this if
+      # it turns out to be too narrow.
+      PYTEST_TARGETS: >-
+        borg.testsuite.chunkers
+        borg.testsuite.crypto
+        borg.testsuite.compress_test
+        borg.testsuite.hashindex_test
+        borg.testsuite.item_test
+        borg.testsuite.repoobj_test
+        borg.testsuite.repository_test
+        borg.testsuite.archive_test
+        borg.testsuite.cache_test
+        borg.testsuite.digests_test
+        borg.testsuite.helpers.msgpack_test
+        borg.testsuite.helpers.time_test
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        # same python version as in the container, so both sides are comparable
+        python-version: '3.13'
+
+    # The wheels pip has to build from source inside the emulated container
+    # (msgpack, PyYAML, backports-zstd, borghash, borgstore) are the expensive
+    # part of the container setup, so keep them from run to run.
+    - name: Cache pip-built wheels (armv7)
+      uses: actions/cache@v6
+      with:
+        path: .pip-cache-armv7
+        key: armv7-pip-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          armv7-pip-
+
+    - name: Install Linux packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev
+
+    - name: Build borg (native, 64-bit)
+      run: |
+        set -euxo pipefail
+        # Note: a non-editable install on purpose - the armv7 build below uses
+        # the same source tree and an editable install would put the extension
+        # modules of one architecture in there for the other one to pick up.
+        python -m venv "$RUNNER_TEMP/venv-native"
+        "$RUNNER_TEMP/venv-native/bin/pip" install --upgrade pip wheel
+        # Note: no pytest and no other development dependencies in this venv on
+        # purpose - this is what a normal borg installation looks like.
+        "$RUNNER_TEMP/venv-native/bin/pip" install .
+        "$RUNNER_TEMP/venv-native/bin/borg" --version
+        "$RUNNER_TEMP/venv-native/bin/python" -c 'import sys; assert sys.maxsize == 2**63 - 1, sys.maxsize'
+        # the container has no git, so tell setuptools-scm the version we got here:
+        echo "BORG_VERSION=$("$RUNNER_TEMP/venv-native/bin/borg" --version | cut -d' ' -f2)" >> $GITHUB_ENV
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v4
+      with:
+        platforms: arm
+
+    - name: Start the armv7 container
+      run: |
+        set -euxo pipefail
+        mkdir -p .pip-cache-armv7
+        docker run -d --name "$CONTAINER" --platform linux/arm/v7 \
+          -v "${{ github.workspace }}:/borg" -w /borg \
+          -e PIP_CACHE_DIR=/borg/.pip-cache-armv7 \
+          -e SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BORGBACKUP="$BORG_VERSION" \
+          -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+          "$IMAGE" sleep infinity
+        # if this says anything but armv7l, the emulation did not kick in:
+        test "$(docker exec "$CONTAINER" uname -m)" = "armv7l"
+
+    - name: Build borg (armv7, 32-bit)
+      run: |
+        docker exec -i "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          python3 python3-dev python3-venv \
+          build-essential pkg-config libssl-dev libacl1-dev liblz4-dev
+        python3 -c 'import sys; assert sys.maxsize == 2**31 - 1, sys.maxsize; print("maxsize:", sys.maxsize)'
+        python3 -m venv /venv
+        /venv/bin/pip install --upgrade pip wheel
+        /venv/bin/pip install pytest pytest-xdist pytest-benchmark pytest-timeout
+        /venv/bin/pip install /borg
+        /venv/bin/borg --version
+        chown -R "$HOST_UID:$HOST_GID" /borg/.pip-cache-armv7
+        EOF
+
+    - name: Run the word size sensitive tests on armv7
+      run: |
+        docker exec -i \
+          -e PYTEST_TARGETS="$PYTEST_TARGETS" \
+          -e PYTEST_TIMEOUT="$PYTEST_TIMEOUT" \
+          -e PY_COLORS="$PY_COLORS" \
+          "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        # run against the installed borg, not against the source tree:
+        cd /tmp
+        /venv/bin/python -m pytest -v -n4 -rs --benchmark-skip --pyargs $PYTEST_TARGETS
+        EOF
+
+    - name: Write test data and a repository on armv7
+      run: |
+        set -euxo pipefail
+        "$RUNNER_TEMP/venv-native/bin/python" scripts/endian_interop_test.py testdata "$INTEROP"
+        docker exec -i -e INTEROP=/borg/.interop "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        BORG=/venv/bin/borg /venv/bin/python /borg/scripts/endian_interop_test.py write "$INTEROP" b32
+        chown -R "$HOST_UID:$HOST_GID" "$INTEROP"
+        EOF
+
+    - name: Read the armv7 repository on x86_64 (and write to it)
+      run: |
+        set -euxo pipefail
+        export BORG="$RUNNER_TEMP/venv-native/bin/borg"
+        PY="$RUNNER_TEMP/venv-native/bin/python"
+        $PY scripts/endian_interop_test.py verify "$INTEROP" b32 --as b64
+        $PY scripts/endian_interop_test.py write "$INTEROP" b64
+        $PY scripts/endian_interop_test.py compare "$INTEROP" b32 b64
+
+    - name: Read the x86_64 archives on armv7
+      run: |
+        docker exec -i -e INTEROP=/borg/.interop "$CONTAINER" bash -s <<'EOF'
+        set -euxo pipefail
+        BORG=/venv/bin/borg /venv/bin/python /borg/scripts/endian_interop_test.py verify "$INTEROP" b64 --as b32
+        chown -R "$HOST_UID:$HOST_GID" "$INTEROP"
+        EOF
+
+    - name: Stop the armv7 container
+      if: ${{ always() }}
+      run: docker rm -f "$CONTAINER" || true

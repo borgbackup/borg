@@ -12,6 +12,9 @@ from ..logger import create_logger
 
 logger = create_logger()
 
+# the default for "borg repo-list --format", also used to document the default in --format's help text.
+FORMAT_DEFAULT = "{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}{NL}"
+
 
 class RepoListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,), allow_v1=True)
@@ -22,10 +25,7 @@ class RepoListMixIn:
         elif args.short:
             format = "{id}{NL}"
         else:
-            format = os.environ.get(
-                "BORG_REPO_LIST_FORMAT",
-                "{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}{NL}",
-            )
+            format = os.environ.get("BORG_REPO_LIST_FORMAT", FORMAT_DEFAULT)
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, deleted=args.deleted)
 
         output_data = []
@@ -97,7 +97,7 @@ class RepoListMixIn:
             metavar="FORMAT",
             dest="format",
             action=Highlander,
-            help="specify format for archive listing " '(default: "{archive:<36} {time} [{id}]{NL}")',
+            help=f'specify format for archive listing (default: "{FORMAT_DEFAULT}")',
         )
         subparser.add_argument(
             "--json",

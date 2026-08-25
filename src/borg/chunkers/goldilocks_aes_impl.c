@@ -29,6 +29,41 @@ struct GL_CTX {
     uint64_t k2;              /* K^2 (stride-2 state multiplier) */
 };
 
+/* --- 64x64 -> 128 bit widening multiply ---------------------------------
+ *
+ * The field multiply needs the full 128-bit product. GCC and clang offer
+ * __uint128_t for that, but only on 64-bit targets - on 32-bit ones (armhf,
+ * i386, ...) the type does not exist and using it is a hard compile error,
+ * so there a portable fallback built from four 32x32 -> 64 multiplies is
+ * used instead. Both compute the same product, so this chunker's cut points
+ * are identical on all architectures; the fallback is just slower.
+ *
+ * Defining BORG_GL_NO_INT128 forces the fallback also where __uint128_t
+ * exists, so the 32-bit path can be tested on a 64-bit machine. */
+#if defined(__SIZEOF_INT128__) && !defined(BORG_GL_NO_INT128)
+
+static inline void gl_mul_wide(uint64_t a, uint64_t b, uint64_t *lo, uint64_t *hi)
+{
+    __uint128_t t = (__uint128_t)a * b;
+    *lo = (uint64_t)t;
+    *hi = (uint64_t)(t >> 64);
+}
+
+#else
+
+static inline void gl_mul_wide(uint64_t a, uint64_t b, uint64_t *lo, uint64_t *hi)
+{
+    uint64_t a0 = (uint32_t)a, a1 = a >> 32;
+    uint64_t b0 = (uint32_t)b, b1 = b >> 32;
+    uint64_t p00 = a0 * b0, p01 = a0 * b1, p10 = a1 * b0, p11 = a1 * b1;
+    /* the cross terms carry into the top half; neither sum can overflow */
+    uint64_t mid = p10 + (p00 >> 32) + (uint32_t)p01;
+    *lo = (mid << 32) | (uint32_t)p00;
+    *hi = p11 + (mid >> 32) + (p01 >> 32);
+}
+
+#endif
+
 /* --- Goldilocks field arithmetic ---------------------------------------
  *
  * Every digest the scan produces is canonical (< p): it is fed to AES
@@ -57,8 +92,8 @@ static inline uint64_t gl_add(uint64_t a, uint64_t b)
  * 2^64 = eps and 2^96 = -1 (mod p) give lo - hi_hi + hi_lo*eps. */
 static inline uint64_t gl_mul(uint64_t a, uint64_t b)
 {
-    __uint128_t t = (__uint128_t)a * b;
-    uint64_t lo = (uint64_t)t, hi = (uint64_t)(t >> 64);
+    uint64_t lo, hi;
+    gl_mul_wide(a, b, &lo, &hi);
     uint64_t hi_hi = hi >> 32, hi_lo = hi & GL_EPS;
     uint64_t t0, r, u;
     unsigned char borrow = __builtin_sub_overflow(lo, hi_hi, &t0);
@@ -82,8 +117,8 @@ static inline uint64_t gl_mul(uint64_t a, uint64_t b)
  * this kernel loses its trailing compare and select. */
 static inline uint64_t gl_mul_lazy(uint64_t a, uint64_t b)
 {
-    __uint128_t t = (__uint128_t)a * b;
-    uint64_t lo = (uint64_t)t, hi = (uint64_t)(t >> 64);
+    uint64_t lo, hi;
+    gl_mul_wide(a, b, &lo, &hi);
     uint64_t hi_hi = hi >> 32, hi_lo = hi & GL_EPS;
     uint64_t t0, r;
     unsigned char borrow = __builtin_sub_overflow(lo, hi_hi, &t0);

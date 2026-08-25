@@ -200,7 +200,12 @@ The three universal hashes
     8 bytes. All table indices are plaintext bytes (no secret-dependent
     loads); the rolling multiply keeps every state canonical since the state
     feeds AES verbatim. Verified bit-equivalent (states and ciphertexts) to
-    the authors' artifact implementation.
+    the authors' artifact implementation. The field multiply needs the full
+    128-bit product of two 64-bit values: on 64-bit platforms that is the
+    compiler's ``__uint128_t``, on 32-bit ones (armhf, i386, ...) a portable
+    fallback built from 32x32 -> 64 multiplies. Both compute the same
+    product, so cut points are identical everywhere - 32-bit platforms just
+    run this chunker (and only this one) slower.
 
 Constructions considered and rejected: Gear as the UHF (triangular aging
 gives ε ≈ 1/2 via the oldest byte), hardware CRC (fixed public polynomial,

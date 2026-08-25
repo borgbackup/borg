@@ -881,7 +881,9 @@ class Repository:
         self.id = hex_to_bin(self.store.load("config/id").decode(), length=32)
         # important: lock *after* making sure that there actually is an existing, supported repository.
         if lock:
-            self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
+            self.lock = Lock(
+                self.store, exclusive, timeout=lock_wait, repository=self._location.canonical_path()
+            ).acquire()
         self._chunks = None
         # pack-sizing overrides: BORG_PACK_MAX_COUNT sets the max object count per pack,
         # BORG_PACK_MAX_SIZE the max pack size in bytes. Default: size-bound only.
@@ -1733,7 +1735,7 @@ class Repository:
         return new_pack_id, len(pack_data)
 
     def break_lock(self):
-        Lock(self.store).break_lock()
+        Lock(self.store, repository=self._location.canonical_path()).break_lock()
 
     def migrate_lock(self, old_id, new_id):
         # note: only needed for local repos

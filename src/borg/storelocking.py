@@ -83,7 +83,7 @@ from borgstore.store import ObjectNotFound
 
 from . import platform
 from .constants import MAX_MUTUAL_CLOCK_SKEW
-from .helpers import Error, ErrorWithTraceback
+from .helpers import Error, ErrorWithTraceback, format_timedelta
 from .logger import create_logger
 
 logger = create_logger(__name__)
@@ -93,6 +93,31 @@ logger = create_logger(__name__)
 # lock listings, None until harvested), plus time.monotonic() at its creation. always replaced as a
 # whole, so concurrent readers (e.g. a LockRefresher thread) never see a torn mix of its fields.
 LockAnchor = namedtuple("LockAnchor", "key dt mtime monotonic")
+
+# why a refresh gives up: our own lock object is gone, see refresh().
+LOCK_KILLED_MSG = (
+    "Our lock was killed by another borg (it considered our lock stale, e.g. because this machine "
+    "was suspended or too slow to refresh the lock in time, or because someone ran break-lock) - "
+    "there is no safe way to continue."
+)
+
+
+def format_lock(lock):
+    """Return a human readable description of a lock object: what it is, who holds it, since when."""
+    kind = "exclusive" if lock["exclusive"] else "shared"
+    age = format_timedelta(datetime.datetime.now(datetime.UTC) - lock["dt"])
+    return f"{kind} lock on host {lock['hostid']}, pid {lock['processid']}, age {age}"
+
+
+def format_locks(locks, max_shown=3):
+    """Return a human readable description of the given lock objects (at most max_shown of them)."""
+    if not locks:
+        # e.g. all the locks that blocked us went away while we were retrying, but we ran out of time.
+        return "unknown (no blocking lock seen)"
+    descriptions = [format_lock(lock) for lock in locks[:max_shown]]
+    if len(locks) > max_shown:
+        descriptions.append(f"and {len(locks) - max_shown} more")
+    return "; ".join(descriptions)
 
 
 class LockError(Error):
@@ -114,7 +139,7 @@ class LockFailed(LockErrorT):
 
 
 class LockTimeout(LockError):
-    """Failed to create/acquire the lock {} (timeout)."""
+    """Failed to create/acquire the lock {} (timeout). {}"""
 
     exit_mcode = 73
 
@@ -148,8 +173,11 @@ class Lock:
     (e.g., if an exception occurs).
     """
 
-    def __init__(self, store, exclusive=False, sleep=None, timeout=1.0, stale=30 * 60, id=None):
+    def __init__(self, store, exclusive=False, sleep=None, timeout=1.0, stale=30 * 60, id=None, repository=None):
         self.store = store
+        # how to call the locked repository in messages to the user. the store's repr does not tell
+        # which repository it is, so the caller should give a (credentials-free) repository name.
+        self.repository = repository if repository is not None else str(store)
         self.is_exclusive = exclusive
         self.sleep = sleep
         self.timeout = timeout
@@ -167,6 +195,7 @@ class Lock:
         # it deliberately outlives its lock object: the calibration stays valid after deletion.
         self.my_lock_anchor = None
         self.prev_lock_anchor = None  # the anchor before the current one, see _check_store_clock_step()
+        self.blocking_locks_logged = False  # tell the user only once per Lock instance who blocks us
         self.skew_warned = False  # emit the clock-skew warning only once per Lock instance
         self.store_clock_step_warned = False  # emit the storage-clock-step warning only once per Lock instance
         self.id = id or platform.get_process_id()
@@ -416,6 +445,7 @@ class Lock:
         # for non-exclusive lock: there can be multiple n-e locks, but there must not exist an exclusive lock.
         logger.debug(f"LOCK-ACQUIRE: trying to acquire a lock. exclusive: {self.is_exclusive}.")
         started = time.monotonic()
+        blocking_locks = []  # the foreign lock(s) that most recently kept us from acquiring
         while time.monotonic() - started < self.timeout:
             exclusive_locks = self._find_locks(only_exclusive=True)
             if all(lock.get("maybe_stale") for lock in exclusive_locks):
@@ -438,6 +468,8 @@ class Lock:
                             if len(locks) == 1 and locks[0]["key"] == key:
                                 logger.debug("LOCK-ACQUIRE: success! no non-exclusive locks are left!")
                                 return self
+                            blocking_locks = [lock for lock in locks if lock["key"] != key]
+                            self._log_blocking_locks(blocking_locks)
                             time.sleep(self.other_locks_go_away_delay)
                         logger.debug("LOCK-ACQUIRE: timeout while waiting for non-exclusive locks to go away.")
                         # we won't get the exclusive lock, so do not leave our lock behind:
@@ -446,6 +478,7 @@ class Lock:
                         break  # timeout
                     else:
                         logger.debug("LOCK-ACQUIRE: someone else also created an exclusive lock, deleting ours.")
+                        blocking_locks = [lock for lock in exclusive_locks if lock["key"] != key]
                         self._delete_lock(key, ignore_not_found=True, update_last_refresh=True)
                 else:  # not is_exclusive
                     if len(exclusive_locks) == 0:
@@ -454,13 +487,24 @@ class Lock:
                         return self
                     else:
                         logger.debug("LOCK-ACQUIRE: exclusive locks detected, deleting our shared lock.")
+                        blocking_locks = [lock for lock in exclusive_locks if lock["key"] != key]
                         self._delete_lock(key, ignore_not_found=True, update_last_refresh=True)
+            else:
+                # there is at least one exclusive lock we can not consider stale - it blocks us.
+                blocking_locks = exclusive_locks
+            self._log_blocking_locks(blocking_locks)
             # wait a random bit before retrying
             time.sleep(
                 self.retry_delay_min + (self.retry_delay_max - self.retry_delay_min) * random.random()  # nosec B311
             )
         logger.debug("LOCK-ACQUIRE: timeout while trying to acquire a lock.")
-        raise LockTimeout(str(self.store))
+        raise LockTimeout(self.repository, f"Repository is locked by: {format_locks(blocking_locks)}.")
+
+    def _log_blocking_locks(self, locks):
+        """Tell the user (once) which foreign lock(s) we are waiting for."""
+        if locks and not self.blocking_locks_logged:
+            self.blocking_locks_logged = True
+            logger.info(f"Waiting for the lock. Repository is locked by: {format_locks(locks)}.")
 
     def release(self, *, ignore_not_found=False):
         self.last_refresh_dt = None
@@ -470,7 +514,7 @@ class Lock:
                 logger.debug("LOCK-RELEASE: trying to release the lock, but none was found.")
                 return
             else:
-                raise NotLocked(str(self.store))
+                raise NotLocked(self.repository)
         assert len(locks) == 1
         lock = locks[0]
         logger.debug(f"LOCK-RELEASE: releasing lock: {lock}.")
@@ -485,6 +529,7 @@ class Lock:
         logger.debug("LOCK-BREAK: break_lock() was called - deleting ALL locks!")
         locks = self._get_locks()
         for key in locks:
+            logger.info(f"Breaking {format_lock(locks[key])}.")
             self._delete_lock(key, ignore_not_found=True)
         self.last_refresh_dt = None
         self.my_lock_key = None
@@ -531,7 +576,7 @@ class Lock:
                     # clean up the new lock (so it does not needlessly block others until it expires).
                     logger.debug("LOCK-REFRESH: our lock was killed, there is no safe way to continue.")
                     self._delete_lock(new_key, ignore_not_found=True, update_last_refresh=True)
-                    raise LockTimeout(str(self.store))
+                    raise LockTimeout(self.repository, LOCK_KILLED_MSG)
                 try:
                     self._delete_lock(old_key, update_last_refresh=False)
                 except ObjectNotFound:
@@ -541,7 +586,7 @@ class Lock:
                     # new lock (so it does not needlessly block others until it expires) and abort.
                     logger.debug("LOCK-REFRESH: our lock was killed while refreshing it, no safe way to continue.")
                     self._delete_lock(new_key, ignore_not_found=True, update_last_refresh=True)
-                    raise LockTimeout(str(self.store))
+                    raise LockTimeout(self.repository, LOCK_KILLED_MSG)
             finally:
                 self.my_old_lock_key = None
 

@@ -1193,6 +1193,8 @@ Using that information, borg implements:
   cause one.
 - a warning if the clocks of concurrently active clients differ by more than
   a few minutes.
+- telling the user which lock blocks them (type, host, pid, age) while waiting
+  for it and in the error message if acquiring it times out.
 
 See the module docstring of ``src/borg/storelocking.py`` for the details
 (clock domains, how store "now" is derived, what happens without store-side

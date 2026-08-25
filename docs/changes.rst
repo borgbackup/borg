@@ -165,6 +165,12 @@ Change Log 2.x
 Version 2.0.0b24 (not released yet)
 -----------------------------------
 
+New features:
+
+- locking: tell who is holding a lock we wait for or time out on: lock type, host,
+  pid and age of that lock. Also name the repository in the message (instead of just
+  the storage backend) and log which locks ``borg break-lock`` breaks, #2261
+
 Fixes:
 
 - shell completions: complete local repository directories for ``-r`` / ``--repo``

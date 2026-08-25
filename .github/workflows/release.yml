@@ -83,6 +83,25 @@ jobs:
         twine check dist/*
         ls -l dist/
 
+    - name: Check that the sdist has the version of the tag
+      # If the checkout is modified, setuptools-scm does not use the tag as the
+      # version, but silently guesses the next one and appends .devN, see
+      # #10199. Such a release must not be uploaded to PyPI.
+      env:
+        TAG: ${{ github.ref_name }}
+      run: |
+        set -euxo pipefail
+        python - "$TAG" dist/borgbackup-*.tar.gz <<'EOF'
+        import sys
+        from packaging.utils import parse_sdist_filename
+        from packaging.version import Version
+        tag, sdist = sys.argv[1], sys.argv[2]
+        _, version = parse_sdist_filename(sdist.rpartition("/")[2])
+        if version != Version(tag):
+            raise SystemExit(f"sdist version {version} is not the tag version {tag} - modified checkout?")
+        print(f"sdist version {version} is the tag version.")
+        EOF
+
     - name: Check that the sdist is complete and installable
       # A release that cannot be installed from PyPI is the worst kind of
       # release, and nothing else in CI ever installs borg from a sdist or

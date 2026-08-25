@@ -597,6 +597,7 @@ class Archive:
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
         self.tags = None
+        self._item_ids = None  # see the item_ids property
         self.numeric_ids = numeric_ids
         self.noatime = noatime
         self.noctime = noctime
@@ -630,8 +631,6 @@ class Archive:
         metadata = ArchiveItem(internal_dict=archive)
         if metadata.version not in (1, 2):  # legacy: still need to read v1 archives
             raise Exception("Unknown archive metadata version")
-        # note: metadata.items must not get written to disk!
-        metadata.items = archive_get_items(metadata, repo_objs=self.repo_objs, repository=self.repository)
         return metadata
 
     def load(self, id):
@@ -640,6 +639,19 @@ class Archive:
         self.name = self.metadata.name
         self.comment = self.metadata.get("comment", "")
         self.tags = set(self.metadata.get("tags", []))
+        self._item_ids = None  # see the item_ids property
+
+    @property
+    def item_ids(self):
+        """The ids of this archive's item metadata stream chunks.
+
+        Resolved lazily and cached: for a v2 archive, getting them means reading the item_ptrs
+        chunks from the repository, so archive metadata consumers that do not iterate over the
+        items (e.g. "borg repo-list") must not pay for it.
+        """
+        if self._item_ids is None:
+            self._item_ids = archive_get_items(self.metadata, repo_objs=self.repo_objs, repository=self.repository)
+        return self._item_ids
 
     @property
     def ts(self):
@@ -731,7 +743,7 @@ Duration: {0.duration}
         return filter(item) if filter else True
 
     def iter_items(self, filter=None):
-        yield from self.pipeline.unpack_many(self.metadata.items, filter=lambda item: self.item_filter(item, filter))
+        yield from self.pipeline.unpack_many(self.item_ids, filter=lambda item: self.item_filter(item, filter))
 
     def add_item(self, item, show_progress=True, stats=None):
         if show_progress and self.show_progress:
@@ -1134,8 +1146,6 @@ Duration: {0.duration}
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)
         setattr(metadata, key, value)
-        if "items" in metadata:
-            del metadata.items
         data = self.key.pack_metadata(metadata.as_dict())
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, {}, data, stats=self.stats, ro_type=ROBJ_ARCHIVE_META)

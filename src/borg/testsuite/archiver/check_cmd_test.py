@@ -440,7 +440,7 @@ def test_missing_archive_item_chunk(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        repository.delete(archive.metadata.items[0])
+        repository.delete(archive.item_ids[0])
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -825,7 +825,7 @@ def test_repair_wrong_item_metadata_chunk_content(archivers, request, monkeypatc
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        chunk_id = archive.metadata.items[0]  # first chunk of the item metadata stream
+        chunk_id = archive.item_ids[0]  # first chunk of the item metadata stream
         data = read_chunk(archive, repository, chunk_id, ro_type=ROBJ_ARCHIVE_STREAM)
         # append a msgpack nil: the item stream still unpacks (so a read that does not check the id gets
         # away with it), but the content does not hash to the chunk id any more.

@@ -4,6 +4,7 @@ import os
 import pytest
 
 from ...constants import *  # NOQA
+from ...repository import Repository
 from . import cmd, checkts, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 from .prune_cmd_test import _create_archive_ts
 
@@ -40,6 +41,27 @@ def test_archives_format(archivers, request, backup_files):
     output = cmd(archiver, "repo-list", "--format", "{name} {comment}{NL}")
     assert "test-1 comment 1" + os.linesep in output
     assert "test-2 comment 2" + os.linesep in output
+
+
+def test_repo_list_does_not_read_item_metadata(archiver, monkeypatch):
+    # listing a repository only needs the archive metadata objects, never the item metadata
+    # streams the archives point to. reading those means reading the item_ptrs chunks, which
+    # sit in the (potentially large) data packs -- expensive for remote repositories, see #10204.
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "create", "test", "input")
+    get_many_calls = []
+    original_get_many = Repository.get_many
+
+    def get_many(self, ids, *args, **kwargs):
+        ids = list(ids)
+        get_many_calls.append(ids)
+        return original_get_many(self, ids, *args, **kwargs)
+
+    monkeypatch.setattr(Repository, "get_many", get_many)
+    output = cmd(archiver, "repo-list")
+    assert "test" in output
+    assert get_many_calls == []
 
 
 def test_size_nfiles(archivers, request):

@@ -74,7 +74,7 @@ def check_version_detectable():
 
     def fail(reason):
         raise SystemExit(
-            "Can not determine the borg version: %s\n"
+            "Cannot determine the borg version: %s\n"
             "\n"
             "The version is computed from git tags, so building here would silently produce a\n"
             "wrong version (like 0.1.dev1+gedcff4f). Use one of these:\n"

@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+import warnings
 from collections import defaultdict
 
 try:
@@ -44,6 +45,80 @@ cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing
 
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get("READTHEDOCS")
+
+
+def check_version_detectable():
+    """Fail before building anything if the borg version can not be determined.
+
+    The version is computed from git tags by setuptools_scm. In a shallow clone or a clone
+    without tags this does not fail, it just yields a wrong version like 0.1.dev1+gedcff4f -
+    and that is only noticed after cythonizing and compiling everything, see #7259.
+
+    We ask setuptools_scm itself instead of reimplementing its tag lookup here.
+    """
+    if on_rtd:
+        return  # building the docs does not need an exact version.
+    try:
+        from setuptools_scm import get_version
+    except ImportError:
+        return  # can not check. if the version is really needed, setup() will complain later.
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    found_tags = []
+
+    def capture_tag(scm_version):
+        # a custom version_scheme is only used to get at the tag setuptools_scm found,
+        # the version we return here is not used for anything.
+        found_tags.append(str(scm_version.tag))
+        return "0"
+
+    def fail(reason):
+        raise SystemExit(
+            "Can not determine the borg version: %s\n"
+            "\n"
+            "The version is computed from git tags, so building here would silently produce a\n"
+            "wrong version (like 0.1.dev1+gedcff4f). Use one of these:\n"
+            "\n"
+            "- clone the full repository (a shallow clone or a clone without tags will not work):\n"
+            "      git clone https://github.com/borgbackup/borg.git\n"
+            "- fetch what your existing clone is missing:\n"
+            "      git fetch --unshallow --tags\n"
+            "- or give the version explicitly, e.g. when building without git:\n"
+            "      SETUPTOOLS_SCM_PRETEND_VERSION=2.0.0b23 pip install -e ." % reason
+        )
+
+    def ask_setuptools_scm(**extra):
+        del found_tags[:]
+        with warnings.catch_warnings():
+            # the real build triggers the same warnings, we do not want to duplicate them.
+            warnings.simplefilter("ignore")
+            # raises LookupError (with its own helpful message) if there is no version source at all.
+            get_version(root=here, version_scheme=capture_tag, local_scheme=lambda scm_version: "", **extra)
+
+    try:
+        # let setuptools_scm fail on a shallow repository instead of computing a version from
+        # truncated history, see
+        # https://setuptools-scm.readthedocs.io/en/latest/integrations/#enforce-fail-on-shallow-repositories
+        # This is not in pyproject.toml on purpose: the "scm" table only exists in recent
+        # setuptools-scm and older ones hard-fail on unknown keys there, see #10193.
+        ask_setuptools_scm(scm={"git": {"pre_parse": "fail_on_shallow"}})
+    except TypeError:  # setuptools-scm too old for the "scm" config, check what we can without it.
+        ask_setuptools_scm()
+    except ValueError as err:  # that is how fail_on_shallow complains.
+        fail(str(err).splitlines()[0])
+
+    if not found_tags:
+        # no tag was looked at: the version came from SETUPTOOLS_SCM_PRETEND_VERSION or, when
+        # building from a sdist, from PKG-INFO. Nothing to check in that case.
+        return
+    if found_tags[0].startswith("0."):
+        # borg has no 0.x releases, so this is the fallback tag setuptools_scm uses when it does
+        # not find any tag at all. Note: a full clone without tags is not shallow, so
+        # fail_on_shallow does not catch this one.
+        fail("setuptools_scm did not find a borg release tag.")
+
+
+check_version_detectable()
 
 # Extra cflags for all extensions, usually just warnings we want to enable explicitly
 cflags = ["-Wall", "-Wextra", "-Wpointer-arith"]

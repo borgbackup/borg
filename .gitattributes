@@ -1,5 +1,14 @@
 borg/_version.py export-subst
 
+# Store text files with LF and check them out with LF everywhere, so that a
+# Windows checkout is not seen as modified by a git with a different
+# core.autocrlf setting - that made setuptools-scm build the Windows binaries
+# from a "dirty" checkout and give them a wrong version, see #10199.
+* text=auto eol=lf
+# git auto-detects binary content by looking for a NUL byte in the first 8000
+# bytes; logo.pdf is small enough to have none, so tell git explicitly.
+*.pdf -text
+
 *.py diff=python
 docs/usage/*.rst.inc merge=ours
 docs/man/* merge=ours

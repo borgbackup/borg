@@ -724,6 +724,16 @@ jobs:
         shell: msys2 {0}
 
     steps:
+      # actions/checkout runs Git for Windows, whose system config sets
+      # core.autocrlf=true, while the msys2 git the build steps below use does
+      # not: it would see every text file as modified, so setuptools-scm called
+      # the checkout dirty and gave the binaries a guessed-next .devN version
+      # instead of the tag version, see #10199.  .gitattributes takes care of
+      # this as well, this is here so that it also works for older tags.
+      - name: Do not convert line endings on checkout
+        shell: pwsh
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0

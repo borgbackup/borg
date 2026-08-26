@@ -1,8 +1,11 @@
 import getpass
+import signal
+
 import pytest
 
 from ...helpers.parseformat import bin_to_hex
 from ...helpers.passphrase import Passphrase, PasswordRetriesExceeded
+from ...helpers.process import SigIntManager, signal_handler
 
 
 class TestPassphrase:
@@ -83,3 +86,31 @@ class TestPassphrase:
         out, err = capsys.readouterr()
         assert passphrase in err
         assert hex_value in err
+
+
+def test_getpass_sigint_aborts(monkeypatch):
+    # borg's main() has a SIGINT handler that only sets a flag, so that a running operation can be
+    # finished in an orderly way. That must not swallow a Ctrl-C given while borg waits for a
+    # passphrase, see #8521.
+    def getpass_sending_sigint(prompt):
+        # raise_signal() sends the signal to *this* thread. os.kill() would send it to the process
+        # and some kernels (e.g. NetBSD) then deliver it to another thread if there is one - the
+        # main thread would only run the handler later, after the prompt restored the previous one.
+        signal.raise_signal(signal.SIGINT)
+        return "1234"  # not reached, the signal handler raises
+
+    monkeypatch.setattr(getpass, "getpass", getpass_sending_sigint)
+    with SigIntManager():  # this is what borg does while running a command
+        with pytest.raises(KeyboardInterrupt):
+            Passphrase.getpass("Enter passphrase: ")
+
+
+def test_getpass_restores_sigint_handler(monkeypatch):
+    # asking for a passphrase must not change the SIGINT handling of everything that comes after it.
+    def handler(sig_no, stack):  # never called, we just need an identifiable handler
+        pass
+
+    monkeypatch.setattr(getpass, "getpass", lambda prompt: "1234")
+    with signal_handler("SIGINT", handler):
+        assert Passphrase.getpass("Enter passphrase: ") == "1234"
+        assert signal.getsignal(signal.SIGINT) is handler

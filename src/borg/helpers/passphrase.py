@@ -9,6 +9,7 @@ from . import bin_to_hex
 from . import Error
 from . import yes
 from . import prepare_subprocess_env
+from . import signal_handler, raising_signal_handler
 
 from ..logger import create_logger
 
@@ -100,7 +101,11 @@ class Passphrase(str):
     @classmethod
     def getpass(cls, prompt):
         try:
-            pw = getpass.getpass(prompt)
+            # While a command runs, borg installs a SIGINT handler that only remembers that Ctrl-C
+            # was pressed. While we wait for a passphrase here, there is nothing to finish in an
+            # orderly way, so let Ctrl-C / SIGINT abort right away, same as for yes(), see #8521.
+            with signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)):
+                pw = getpass.getpass(prompt)
         except EOFError:
             if prompt:
                 print()  # avoid err msg appearing right of prompt

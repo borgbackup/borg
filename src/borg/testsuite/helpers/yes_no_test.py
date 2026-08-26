@@ -1,5 +1,8 @@
+import signal
+
 import pytest
 
+from ...helpers.process import SigIntManager, signal_handler
 from ...helpers.yes_no import yes, TRUISH, FALSISH, DEFAULTISH
 from .. import FakeInputs
 
@@ -13,6 +16,33 @@ def test_yes_input():
     fake_input = FakeInputs(inputs)
     while fake_input.available():
         assert not yes(input=fake_input)
+
+
+def test_yes_sigint_aborts():
+    # borg's main() has a SIGINT handler that only sets a flag, so that a running operation can
+    # be finished in an orderly way. That must not swallow a Ctrl-C given while borg waits for an
+    # answer to a y/n question, see #8521.
+    def input_sending_sigint():
+        # raise_signal() sends the signal to *this* thread. os.kill() would send it to the
+        # process and some kernels (e.g. NetBSD) then deliver it to another thread if there is
+        # one - the main thread would only run the handler later, after yes() has restored the
+        # previous one, and the test would flap.
+        signal.raise_signal(signal.SIGINT)
+        return "y"  # not reached, the signal handler raises
+
+    with SigIntManager():  # this is what borg does while running a command
+        with pytest.raises(KeyboardInterrupt):
+            yes(input=input_sending_sigint)
+
+
+def test_yes_restores_sigint_handler():
+    # asking a question must not change the SIGINT handling of everything that comes after it.
+    def handler(sig_no, stack):  # never called, we just need an identifiable handler
+        pass
+
+    with signal_handler("SIGINT", handler):
+        assert yes(input=lambda: "y")
+        assert signal.getsignal(signal.SIGINT) is handler
 
 
 def test_yes_input_defaults():

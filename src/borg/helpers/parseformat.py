@@ -738,10 +738,16 @@ class Location:
     # passes the raw URL through. covers both "scheme://..." and opaque "scheme:..." forms.
     BORGSTORE_SCHEMES = ("sftp", "http", "https", "s3", "b2", "rclone")
 
-    # path may contain any chars. to avoid ambiguities with other regexes, it must not start with
-    # a "scheme://" or one of the borgstore "scheme:" specifiers (all of which are matched
-    # before local_re in _parse). the borgstore scheme list is sourced from BORGSTORE_SCHEMES.
-    local_path_re = r"(?!((?:ssh|file)://|(?:" + "|".join(BORGSTORE_SCHEMES) + r"):))" r"(?P<path>.+)"
+    # locations that borg parses itself, see ssh_re / rest_re / file_re below.
+    BORG_SCHEMES = ("ssh", "rest", "file")
+
+    # path may contain any chars, but to avoid ambiguities with the other regexes it must not start
+    # with any of the scheme specifiers above (all of which are matched before local_re in _parse).
+    # Rejecting them here makes a malformed URL fail with a helpful error instead of being silently
+    # taken for a local path - e.g. "rest://host/" used to end up as the local directory
+    # "./rest:/host", see #10215. A local path that really starts with such a prefix can still be
+    # used by prefixing it with "./" (or by giving it as an absolute path).
+    local_path_re = r"(?!(?:" + "|".join(BORG_SCHEMES + BORGSTORE_SCHEMES) + r"):)" r"(?P<path>.+)"
 
     # abs_path must start with a slash (or drive letter on Windows).
     abs_path_re = r"(?P<path>[A-Za-z]:/.+)" if is_win32 else r"(?P<path>/.+)"
@@ -786,6 +792,15 @@ class Location:
 
     local_re = re.compile(local_path_re, re.VERBOSE)
 
+    # accepted forms per scheme borg parses itself, used to explain a URL we could not parse.
+    scheme_hints = {
+        "rest": "rest://[user@]host[:port]/path/to/repo (path relative to the remote directory ssh "
+        "logs into) or rest://[user@]host[:port]//path/to/repo (absolute path)",
+        "ssh": "ssh://[user@]host[:port]/path/to/repo (path relative to the remote directory ssh "
+        "logs into) or ssh://[user@]host[:port]//path/to/repo (absolute path)",
+        "file": "file:///C:/path/to/repo" if is_win32 else "file:///path/to/repo",
+    }
+
     def __init__(self, text="", overrides={}, other=False):
         if isinstance(text, Location):
             self.__dict__.update(text.__dict__)
@@ -812,7 +827,7 @@ class Location:
         self.raw = text  # as given by user, might contain placeholders
         self.processed = replace_placeholders(self.raw, overrides)  # after placeholder replacement
         if not self._parse(self.processed):
-            raise ValueError('Invalid location format: "%s"' % self.processed)
+            raise ValueError(self._invalid_location_msg(self.processed))
         if self.proto == "file" and self.path.startswith("//"):
             # UNC path (//server/share/..., \\server\share\...): not supported, fail early with a hint, see #10164.
             raise ValueError(
@@ -820,6 +835,12 @@ class Location:
                 "Mount the share (Windows: net use X: \\\\server\\share) and use the mounted path instead."
             )
         self.valid = True
+
+    def _invalid_location_msg(self, text):
+        msg = 'Invalid location format: "%s"' % text
+        m = self.scheme_re.match(text)
+        hint = self.scheme_hints.get(m.group("scheme")) if m else None
+        return f"{msg}. Expected: {hint}" if hint else msg
 
     def _parse(self, text):
         m = self.ssh_re.match(text)

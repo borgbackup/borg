@@ -173,6 +173,10 @@ New features:
 
 Fixes:
 
+- reject malformed ``rest://`` / ``ssh://`` / ``file://`` URLs instead of silently taking
+  them for a local path relative to the current directory. E.g. ``rest://host/`` (no repository
+  path) ended up as the local directory ``./rest:/host`` and then failed with a confusing
+  "does not exist" error. Such a URL is now rejected, telling the accepted forms, #10215
 - shell completions: complete local repository directories for ``-r`` / ``--repo``
   and ``--other-repo``, #3086
 - shell completions: use the command borg was invoked as, e.g. ``borg2``. A borg

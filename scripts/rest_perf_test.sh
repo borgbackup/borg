@@ -172,7 +172,7 @@ run_profile() {
     run_borg repo-delete --repo "$REPO_URL" >/dev/null 2>&1 || true
     # start each profile with a cold pack cache (only when the opt-in cache is enabled)
     if [ -n "${BORG_PACKCACHE_URL:-}" ]; then rm -rf "${BORG_PACKCACHE_URL#file://}"; fi
-    run_borg repo-create --encryption none --repo "$REPO_URL"
+    run_borg repo-create --encryption none-sha256 --repo "$REPO_URL"
 
     # backup 1 (cold)
     run_borg create --stats --json --repo "$REPO_URL" backup1 "$DATA_DIR"

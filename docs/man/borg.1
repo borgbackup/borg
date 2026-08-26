@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg" "1" "2026-08-26" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -61,7 +61,7 @@ Before a backup can be made, a repository has to be initialized:
 .INDENT 3.5
 .sp
 .EX
-$ borg \-r /path/to/repo repo\-create \-\-encryption=aes\-ocb
+$ borg \-r /path/to/repo repo\-create \-\-encryption=aes256\-ocb
 .EE
 .UNINDENT
 .UNINDENT

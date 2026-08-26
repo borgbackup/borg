@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-create" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-repo-create" "1" "2026-08-26" "" "borg backup tool"
 .SH Name
 borg-repo-create \- Creates a new, empty repository.
 .SH SYNOPSIS
@@ -203,7 +203,7 @@ select the mode: \(aqaes256\-ocb\(aq, \(aqchacha20\-poly1305\(aq, \(aqauthentica
 select the id hash function of the encrypted modes: \(aqsha256\(aq or \(aqblake3\(aq. The \(aqnone\-\fI\(aq and \(aqauthenticated\-\fP\(aq modes name their hash themselves.
 .TP
 .BI \-\-key\-location \ LOCATION
-where to store the key: \(aqrepokey\(aq (in the repository, default) or \(aqkeyfile\(aq (in the local keys directory). Ignored for the \(aqnone\(aq mode (which has no key).
+where to store the key: \(aqrepokey\(aq (in the repository, default) or \(aqkeyfile\(aq (in the local keys directory). Ignored for the \fBnone\-*\fP modes (which have no key).
 .TP
 .B  \-\-copy\-crypt\-key
 copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key).
@@ -219,16 +219,19 @@ $ export BORG_REPO=/path/to/repo
 $ borg repo\-create \-\-encryption=aes256\-ocb
 $ borg repo\-create \-\-encryption=chacha20\-poly1305
 # No encryption (not recommended)
-$ borg repo\-create \-\-encryption=authenticated
-$ borg repo\-create \-\-encryption=none
+$ borg repo\-create \-\-encryption=authenticated\-sha256
+$ borg repo\-create \-\-encryption=none\-sha256
 
-# \-\-encryption (the cipher / AE algorithm) and \-\-id\-hash (the id hash function) are
-# chosen independently. \-\-id\-hash defaults to sha256; use blake3 if it is faster on
-# your hardware (run \(aqborg benchmark cpu\(aq to find out). The \(aqnone\(aq encryption only
-# supports the sha256 id hash.
+# For the encrypted modes, \-\-encryption (the cipher / AE algorithm) and \-\-id\-hash
+# (the id hash function) are chosen independently. \-\-id\-hash defaults to sha256;
+# use blake3 if it is faster on your hardware (run \(aqborg benchmark cpu\(aq to find out).
 $ borg repo\-create \-\-encryption=aes256\-ocb \-\-id\-hash=blake3
 $ borg repo\-create \-\-encryption=chacha20\-poly1305 \-\-id\-hash=blake3
-$ borg repo\-create \-\-encryption=authenticated \-\-id\-hash=blake3
+
+# The \(aqauthenticated\-*\(aq and \(aqnone\-*\(aq modes name their id hash themselves, so they
+# do not take a separate \-\-id\-hash.
+$ borg repo\-create \-\-encryption=authenticated\-blake3
+$ borg repo\-create \-\-encryption=none\-blake3
 
 # Where the key is stored (\-\-key\-location) is also chosen independently.
 # \-\-key\-location defaults to repokey.

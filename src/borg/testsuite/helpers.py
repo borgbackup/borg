@@ -1,6 +1,7 @@
 import hashlib
 import os
 import shutil
+import signal
 import sys
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
@@ -20,6 +21,7 @@ from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_di
 from ..helpers import is_slow_msgpack
 from ..helpers import msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
+from ..helpers import sig_int, signal_handler
 from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
@@ -804,6 +806,33 @@ def test_yes_input():
     input = FakeInputs(inputs)
     while input.available():
         assert not yes(input=input)
+
+
+def test_yes_sigint_aborts():
+    # borg's main() has a SIGINT handler that only sets a flag, so that a running operation can
+    # be finished in an orderly way. That must not swallow a Ctrl-C given while borg waits for an
+    # answer to a y/n question, see #8521.
+    def input_sending_sigint():
+        # raise_signal() sends the signal to *this* thread. os.kill() would send it to the
+        # process and some kernels (e.g. NetBSD) then deliver it to another thread if there is
+        # one - the main thread would only run the handler later, after yes() has restored the
+        # previous one, and the test would flap.
+        signal.raise_signal(signal.SIGINT)
+        return 'y'  # not reached, the signal handler raises
+
+    with sig_int:  # this is what borg does while running a command
+        with pytest.raises(KeyboardInterrupt):
+            yes(input=input_sending_sigint)
+
+
+def test_yes_restores_sigint_handler():
+    # asking a question must not change the SIGINT handling of everything that comes after it.
+    def handler(sig_no, stack):  # never called, we just need an identifiable handler
+        pass
+
+    with signal_handler('SIGINT', handler):
+        assert yes(input=lambda: 'y')
+        assert signal.getsignal(signal.SIGINT) is handler
 
 
 def test_yes_input_defaults():

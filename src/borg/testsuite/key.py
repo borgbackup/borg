@@ -1,6 +1,7 @@
 import getpass
 import os.path
 import re
+import signal
 import tempfile
 
 import pytest
@@ -15,6 +16,7 @@ from ..crypto.key import identify_key
 from ..crypto.low_level import bytes_to_long
 from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 from ..helpers import IntegrityError
+from ..helpers import SigIntManager, signal_handler
 from ..helpers import Location
 from ..helpers import StableDict
 from ..helpers import get_security_dir
@@ -279,6 +281,32 @@ class TestKey:
 
 
 class TestPassphrase:
+    def test_getpass_sigint_aborts(self, monkeypatch):
+        # borg's main() has a SIGINT handler that only sets a flag, so that a running operation can
+        # be finished in an orderly way. That must not swallow a Ctrl-C given while borg waits for a
+        # passphrase, see #8521.
+        def getpass_sending_sigint(prompt):
+            # raise_signal() sends the signal to *this* thread. os.kill() would send it to the
+            # process and some kernels (e.g. NetBSD) then deliver it to another thread if there is
+            # one - the main thread would only run the handler after the prompt restored the old one.
+            signal.raise_signal(signal.SIGINT)
+            return '1234'  # not reached, the signal handler raises
+
+        monkeypatch.setattr(getpass, 'getpass', getpass_sending_sigint)
+        with SigIntManager():  # this is what borg does while running a command
+            with pytest.raises(KeyboardInterrupt):
+                Passphrase.getpass('Enter passphrase: ')
+
+    def test_getpass_restores_sigint_handler(self, monkeypatch):
+        # asking for a passphrase must not change the SIGINT handling of what comes after it.
+        def handler(sig_no, stack):  # never called, we just need an identifiable handler
+            pass
+
+        monkeypatch.setattr(getpass, 'getpass', lambda prompt: '1234')
+        with signal_handler('SIGINT', handler):
+            assert Passphrase.getpass('Enter passphrase: ') == '1234'
+            assert signal.getsignal(signal.SIGINT) is handler
+
     def test_passphrase_new_verification(self, capsys, monkeypatch):
         monkeypatch.setattr(getpass, 'getpass', lambda prompt: "12aöäü")
         monkeypatch.setenv('BORG_DISPLAY_PASSPHRASE', 'no')

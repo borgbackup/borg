@@ -4,6 +4,8 @@ import os
 import os.path
 import sys
 
+from .process import signal_handler, raising_signal_handler
+
 FALSISH = ('No', 'NO', 'no', 'N', 'n', '0', )
 TRUISH = ('Yes', 'YES', 'yes', 'Y', 'y', '1', )
 DEFAULTISH = ('Default', 'DEFAULT', 'default', 'D', 'd', '', )
@@ -80,7 +82,12 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
             if not prompt:
                 return default
             try:
-                answer = input()  # this may raise UnicodeDecodeError, #6984
+                # While a command runs, borg installs a SIGINT handler that only remembers that
+                # Ctrl-C was pressed, so that a running operation (e.g. borg create) can still be
+                # finished in an orderly way. While we wait for an answer here, there is nothing
+                # to finish, so let Ctrl-C / SIGINT abort right away, see #8521.
+                with signal_handler('SIGINT', raising_signal_handler(KeyboardInterrupt)):
+                    answer = input()  # this may raise UnicodeDecodeError, #6984
                 if answer == ERROR:  # for testing purposes
                     raise UnicodeDecodeError("?", b"?", 0, 1, "?")  # args don't matter
             except EOFError:

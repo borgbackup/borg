@@ -1877,12 +1877,14 @@ class TarfileObjectProcessors:
         log_json,
         file_status_printer=None,
         digest_algos=DIGEST_ALGOS_DEFAULT,
+        strip_components=0,
     ):
         self.cache = cache
         self.key = key
         self.add_item = add_item
         self.process_file_chunks = process_file_chunks
         self.show_progress = show_progress
+        self.strip_components = strip_components
         self.print_file_status = file_status_printer or (lambda *args: None)
 
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
@@ -1942,6 +1944,9 @@ class TarfileObjectProcessors:
                         item.acl_default = value.encode("utf-8", errors="surrogateescape")
                 if xattrs:
                     item.xattrs = xattrs
+        if self.strip_components:
+            # the caller already skips members with too few path components, so this never yields an empty path.
+            item.path = "/".join(item.path.split("/")[self.strip_components :])
         yield item, status
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
         self.add_item(item, stats=self.stats)
@@ -1969,6 +1974,9 @@ class TarfileObjectProcessors:
             # create a not hardlinked borg item, reusing the chunks, see HardLinkManager.__doc__
             normalized_path = posixpath.normpath(tarinfo.linkname)
             safe_path = make_path_safe(normalized_path)
+            if self.strip_components:
+                # strip the link target like the member paths, so it matches the stripped path remembered in hlm.
+                safe_path = "/".join(safe_path.split("/")[self.strip_components :])
             info = self.hlm.retrieve(safe_path)
             if info is not None:
                 chunks, digests = info

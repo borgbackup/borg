@@ -2,6 +2,7 @@ import base64
 import contextlib
 import logging
 import os
+import posixpath
 import stat
 import sys
 import tarfile
@@ -24,6 +25,7 @@ from ..helpers import ChunkIteratorFileWrapper
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CompressionSpec
 from ..helpers import DigestAlgos
 from ..helpers import FilesystemPathSpec
+from ..helpers import make_path_safe
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
@@ -31,7 +33,7 @@ from ..helpers import log_multi
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
-from ._common import with_repository, with_archive, Highlander, define_exclusion_group
+from ._common import with_repository, with_archive, Highlander, define_exclusion_group, define_strip_components
 from ._common import build_matcher, build_filter
 
 from ..logger import create_logger
@@ -553,6 +555,7 @@ class TarMixIn:
             start=t0,
             log_json=args.log_json,
         )
+        strip_components = args.strip_components
         cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)
         tfo = TarfileObjectProcessors(
             cache=cache,
@@ -564,11 +567,22 @@ class TarMixIn:
             show_progress=args.progress,
             log_json=args.log_json,
             file_status_printer=self.print_file_status,
+            strip_components=strip_components,
         )
+
+        def path_components(name):
+            # count the path components the same way TarfileObjectProcessors computes the stored path.
+            path = make_path_safe(posixpath.normpath(name))
+            return [] if path == "." else path.split("/")
 
         tar = tarfile.open(fileobj=tarstream, mode="r|", ignore_zeros=args.ignore_zeros)
 
         while tarinfo := tar.next():
+            if strip_components:
+                if len(path_components(tarinfo.name)) <= strip_components:
+                    continue  # too few path elements: silently skip this member
+                if tarinfo.islnk() and len(path_components(tarinfo.linkname)) <= strip_components:
+                    continue  # hard link pointing to a skipped member: skip it, too
             if tarinfo.isreg():
                 status = tfo.process_file(tarinfo=tarinfo, status="A", type=stat.S_IFREG, tar=tar)
             elif tarinfo.isdir():
@@ -735,6 +749,11 @@ class TarMixIn:
         Most documentation of borg create applies. Note that this command does not
         support excluding files.
 
+        ``--strip-components`` removes the specified number of leading path elements
+        from the tar member names when creating the archive items. Members whose path
+        has fewer or equally many elements are silently skipped. Hard link targets are
+        stripped accordingly, symbolic link targets are left unchanged.
+
         A ``--sparse`` option (as found in borg create) is not needed: sparse members in
         input tarballs (old GNU and PAX sparse formats) are read correctly and their
         holes are stored as deduplicated all-zero chunks.
@@ -795,6 +814,7 @@ class TarMixIn:
             action="store_true",
             help="ignore zero-filled blocks in the input tarball",
         )
+        define_strip_components(subparser.add_argument)
 
         archive_group = subparser.add_argument_group("Archive options")
         archive_group.add_argument(

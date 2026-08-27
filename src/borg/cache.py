@@ -801,7 +801,7 @@ class LocalCache(CacheStatsMixin):
 
         def read_archive_index(archive_id, archive_name):
             archive_chunk_idx_path = mkpath(archive_id)
-            logger.info("Reading cached archive chunk index for %s ...", archive_name)
+            logger.debug("Reading cached archive chunk index for %s ...", archive_name)
             try:
                 try:
                     # Attempt to load compact index first
@@ -869,14 +869,14 @@ class LocalCache(CacheStatsMixin):
                         if archive_id not in cached_ids:
                             # Do not make this an else branch; the FileIntegrityError exception handler
                             # above can remove *archive_id* from *cached_ids*.
-                            logger.info('Fetching and building archive index for %s ...', archive_name)
+                            logger.debug('Fetching and building archive index for %s ...', archive_name)
                             archive_chunk_idx = ChunkIndex()
                             fetch_and_build_idx(archive_id, decrypted_repository, archive_chunk_idx)
-                        logger.info("Merging into master chunks index ...")
+                        logger.debug("Merging into master chunks index ...")
                         chunk_idx.merge(archive_chunk_idx)
                     else:
                         chunk_idx = chunk_idx or ChunkIndex(usable=master_index_capacity)
-                        logger.info('Fetching archive index for %s ...', archive_name)
+                        logger.debug('Fetching archive index for %s ...', archive_name)
                         fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
                 if not self.do_cache:
                     fetch_missing_csize(chunk_idx)

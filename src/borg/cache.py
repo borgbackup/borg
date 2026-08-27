@@ -891,12 +891,17 @@ def build_chunkindex_from_repo(
                 break
             chunks = ChunkIndex()  # we'll merge all fragments into this
             complete = True
-            corrupt_fragment = None
+            unusable_fragment = None  # message about a fragment that is corrupt or could not be read
             for hash in hashes:
                 try:
                     chunks_to_merge = read_chunkindex_from_repo(repository, hash)
                 except CorruptChunkIndexFragment as err:
-                    corrupt_fragment = err
+                    unusable_fragment = f"{err} is corrupt"
+                    break
+                except Repository.StoreReadError as err:
+                    # the fragment could not be read (I/O error, refs #3509). retrying would just hit
+                    # the same error, so give up on the fragments and rebuild from the packs instead.
+                    unusable_fragment = f"chunk index fragment {hash} could not be read: {err}"
                     break
                 if chunks_to_merge is None:
                     logger.debug(f"chunk index fragment {hash} vanished, restarting the merge...")
@@ -906,13 +911,13 @@ def build_chunkindex_from_repo(
                 for k, v in chunks_to_merge.items():
                     chunks[k] = v
                 chunks_to_merge.clear()
-            if corrupt_fragment is not None:
-                # retrying would re-read the same corrupt fragment; rebuild the whole index from
+            if unusable_fragment is not None:
+                # retrying would re-read the same unusable fragment; rebuild the whole index from
                 # the packs instead (or return None in fragments_only mode).
                 chunks.clear()
                 if fragments_only:
                     return None
-                logger.warning(f"{corrupt_fragment} is corrupt, rebuilding the chunk index from the packs.")
+                logger.warning(f"{unusable_fragment}, rebuilding the chunk index from the packs.")
                 break
             if complete:
                 if len(hashes) > 1 and write_immediately:

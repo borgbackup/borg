@@ -204,6 +204,24 @@ class CheckMixIn:
         respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
         effect until they finish.
 
+        Unreadable repository objects
+        +++++++++++++++++++++++++++++
+
+        A repository object that cannot be read at all (an I/O error from a failing disk, a
+        flaky network filesystem, ...) is different from a corrupt one: Borg never saw its
+        content, so it cannot tell whether the object is fine. Such an object is reported and
+        the check continues, so one run lists everything that is affected; the check then
+        fails. The object is not remembered as corrupt, so a later check verifies it again.
+
+        Because the data may well be readable again once the underlying problem is fixed,
+        ``--repair`` refuses to repair while there are unreadable objects, and
+        ``--verify-data`` leaves chunks it could not read in place instead of deleting them.
+        Fix the storage hardware, filesystem or network first, then run the check again.
+
+        Only ``borg check`` goes on like this. Other commands stop with the read error rather
+        than work with a partially readable repository - e.g. ``borg prune`` would otherwise
+        see an archive whose metadata it could not read as undated and thus as the oldest one.
+
         About repair mode
         +++++++++++++++++
 

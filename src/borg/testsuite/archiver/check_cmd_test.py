@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+import errno
 from pathlib import Path
 import re
 import shutil
@@ -8,7 +9,7 @@ import pytest
 
 from ...archive import ArchiveChecker, ChunkBuffer
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
+from ...helpers import bin_to_hex, hex_to_bin, msgpack, CommandError, Error, IntegrityError, sig_int
 from ...manifest import Archives, Manifest
 from ...repository import PackTracker, Repository
 from ..repository_test import fchunk, corrupt_chunk_on_disk
@@ -894,3 +895,329 @@ def test_empty_repository(archivers, request):
         for info in repository.store_list("packs"):
             repository.store_delete("packs/" + info.name)
     cmd(archiver, "check", exit_code=1)
+
+
+def make_store_reads_fail(monkeypatch, should_fail, *, after=0):
+    """Make matching posixfs reads fail with an OSError, like failing storage does.
+
+    should_fail(name, offset, size) decides per read; offset/size are None for the operations that
+    do not take a range (hash, info, list). The first <after> matching reads still succeed, which
+    models storage that starts failing (or fails only sometimes) rather than being dead from the
+    start.
+
+    Patches the backend rather than using file permissions, so this also works when the tests run
+    as root and does not depend on the platform's permission semantics. Returns a dict whose
+    "failing" entry switches the failures off again (monkeypatch.undo() must not be used here, it
+    would also revert the autouse clean_env fixture).
+    """
+    from borgstore.backends.posixfs import PosixFS
+
+    state = {"failing": True, "hits": 0}
+    orig = {name: getattr(PosixFS, name) for name in ("hash", "load", "info", "list")}
+
+    def check(name, offset=None, size=None):
+        if not (state["failing"] and should_fail(name, offset, size)):
+            return
+        state["hits"] += 1
+        if state["hits"] > after:
+            raise OSError(errno.EIO, "Input/output error", name)
+
+    def failing_hash(self, name, algorithm="sha256"):
+        check(name)
+        return orig["hash"](self, name, algorithm=algorithm)
+
+    def failing_load(self, name, *, size=None, offset=0):
+        check(name, offset, size)
+        return orig["load"](self, name, size=size, offset=offset)
+
+    def failing_info(self, name):
+        check(name)
+        return orig["info"](self, name)
+
+    def failing_list(self, name):
+        check(name)
+        return orig["list"](self, name)
+
+    monkeypatch.setattr(PosixFS, "hash", failing_hash)
+    monkeypatch.setattr(PosixFS, "load", failing_load)
+    monkeypatch.setattr(PosixFS, "info", failing_info)
+    monkeypatch.setattr(PosixFS, "list", failing_list)
+    return state
+
+
+def object_name(name):
+    """Return the object's own name, without the nesting levels borgstore puts in front of it."""
+    # the backend gets the name including those levels, e.g. packs/d0/d0a6... for packs/d0a6...
+    return name.rsplit("/", 1)[-1]
+
+
+def make_pack_unreadable(monkeypatch, pack_name):
+    """Make every read of the pack packs/<pack_name> fail."""
+    return make_store_reads_fail(monkeypatch, lambda name, offset, size: object_name(name) == pack_name)
+
+
+def make_namespace_listing_fail(monkeypatch, namespace):
+    """Make listing the given store namespace fail."""
+    return make_store_reads_fail(monkeypatch, lambda name, offset, size: name.split("/")[0] == namespace)
+
+
+def some_pack_name(archiver):
+    """Return the name of one of the repository's pack files."""
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        return sorted(info.name for info in repository.store_list("packs"))[0]
+
+
+def pack_name_of(archiver, chunk_id):
+    """Return the name of the pack file holding chunk_id."""
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        return bin_to_hex(repository.chunks[chunk_id].pack_id)
+
+
+def file_content_chunk_id(archiver, archive_name="archive1"):
+    """Return the id of a file content chunk of the given archive."""
+    archive, repository = open_archive(archiver.repository_path, archive_name)
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith(src_file):
+                return item.chunks[-1].id
+    raise AssertionError(f"{src_file} not found in {archive_name}")
+
+
+def test_check_unreadable_pack(archivers, request, monkeypatch):
+    # an I/O error while reading a pack must not crash the check with a traceback: it is reported,
+    # the check goes on and fails at the end, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+    pack_name = some_pack_name(archiver)
+    make_pack_unreadable(monkeypatch, pack_name)
+
+    output = cmd(archiver, "check", "-v", "--repository-only", exit_code=1)
+    assert f"Store object packs/{pack_name} could not be read" in output
+    assert "Input/output error" in output
+    # the check did not stop at the unreadable pack ...
+    assert "Finished checking packs." in output
+    assert "store object(s) could not be read" in output
+    # ... and it did not claim the pack is corrupt (we never saw its content).
+    assert "is corrupted" not in output
+    assert "Corrupt pack" not in output
+
+
+def test_check_unreadable_pack_not_recorded(archivers, request, monkeypatch):
+    # a pack we could not read gets no result recorded, so a later check verifies it again instead
+    # of remembering it as corrupt, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    pack_name = some_pack_name(archiver)
+    state = make_pack_unreadable(monkeypatch, pack_name)
+    cmd(archiver, "check", "--repository-only", exit_code=1)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        tracker = PackTracker.load(repository.store)
+        assert tracker.get(hex_to_bin(pack_name)) is None
+        assert tracker.corrupt_ids() == []
+    # once the pack reads fine again, the check passes without any manual cleanup.
+    state["failing"] = False
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_check_repair_refuses_unreadable_pack(archivers, request, monkeypatch):
+    # --repair must not repair around an unreadable pack: its chunks may well be readable again
+    # once the underlying problem is fixed, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    pack_name = some_pack_name(archiver)
+    make_pack_unreadable(monkeypatch, pack_name)
+    with pytest.raises(Repository.RepairUnsafe):  # local (not forked): the Error propagates
+        cmd(archiver, "check", "--repair")
+
+
+def test_check_verify_data_unreadable_pack_keeps_chunks(archivers, request, monkeypatch):
+    # --verify-data deletes chunks whose content is defect, but must keep chunks it could not read
+    # at all, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    # target the pack holding file content, so --verify-data is what reads it.
+    pack_name = pack_name_of(archiver, file_content_chunk_id(archiver))
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        chunks_before = sorted(chunk_id for chunk_id, _ in repository.chunks.iteritems())
+    state = make_pack_unreadable(monkeypatch, pack_name)
+
+    output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
+    assert "could not be read and were left untouched" in output
+
+    state["failing"] = False
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        chunks_after = sorted(chunk_id for chunk_id, _ in repository.chunks.iteritems())
+    assert chunks_after == chunks_before  # nothing was thrown away
+
+
+def test_check_unreadable_archive_metadata_pack(archivers, request, monkeypatch):
+    # the pack holding an archive's metadata is unreadable: listing the archives must not die, the
+    # affected archive is reported and the other archives still get checked, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        archive_id = archive.id
+    pack_name = pack_name_of(archiver, archive_id)
+    make_pack_unreadable(monkeypatch, pack_name)
+
+    output = cmd(archiver, "check", "--archives-only", exit_code=1)
+    assert f"Archive metadata block {bin_to_hex(archive_id)} could not be read" in output
+    assert "Input/output error" in output
+    assert "Archive consistency check complete, problems found." in output
+
+
+def test_unreadable_archive_metadata_pack_does_not_fake_an_archive(archivers, request, monkeypatch):
+    # outside of borg check, an unreadable archive metadata object must not turn into a placeholder
+    # entry: acting on a repository we can not fully read (e.g. prune, which would see the
+    # placeholder's 1970 timestamp) is how transient I/O errors become data loss, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        archive_id = archive.id
+    make_pack_unreadable(monkeypatch, pack_name_of(archiver, archive_id))
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "repo-list")
+
+
+def test_check_unreadable_packs_listing(archivers, request, monkeypatch):
+    # without a listing we do not know what to check, so this one is fatal - but it must end the
+    # check with a clear message instead of a traceback, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    make_namespace_listing_fail(monkeypatch, "packs")
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "check", "--repository-only")
+
+
+def test_check_unreadable_index_object(archivers, request, monkeypatch):
+    # an unreadable index object is reported and the check goes on to the packs. the missing-pack
+    # cross-check needs the index too, so it is skipped rather than reporting bogus results, #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        index_name = sorted(info.name for info in repository.store_list("index"))[0]
+    make_store_reads_fail(monkeypatch, lambda name, offset, size: object_name(name) == index_name)
+
+    output = cmd(archiver, "check", "-v", "--repository-only", exit_code=1)
+    assert f"Store object index/{index_name} could not be read" in output
+    assert "skipping missing-pack detection" in output
+    assert "Finished checking packs." in output  # the packs were checked anyway
+    assert "store object(s) could not be read" in output
+
+
+def test_check_repair_unreadable_pack_aborts_index_rebuild(archivers, request, monkeypatch):
+    # --repair rebuilds the chunk index from the packs' object headers. an unreadable pack stops
+    # that with a clear error: an index rebuilt without its objects would drop them, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    make_pack_unreadable(monkeypatch, some_pack_name(archiver))
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "check", "--archives-only", "--repair")
+
+
+def test_verify_data_repair_keeps_a_chunk_that_fails_to_re_read(archivers, request, monkeypatch):
+    # --verify-data --repair deletes a chunk only after its content failed to verify twice. if the
+    # second read fails outright, we did not see the content again, so the chunk must stay: this is
+    # exactly how a flaky disk would otherwise talk borg into throwing data away, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    chunk_id = file_content_chunk_id(archiver)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        entry = repository.chunks[chunk_id]
+        corrupt_chunk_on_disk(repository, chunk_id)
+    pack_name = bin_to_hex(entry.pack_id)
+    # fail reads of exactly this object, and only from the second one on (a bad spot in the pack
+    # that the first read still got through): the first read returns the corrupted content, so the
+    # chunk lands in the defect list, and the re-read that would confirm it fails. matching on the
+    # object's full range leaves the pack's header scan (a short read at the same offset) working,
+    # so rebuilding the chunk index from the packs still succeeds.
+    make_store_reads_fail(
+        monkeypatch,
+        lambda name, offset, size: (
+            object_name(name) == pack_name and offset == entry.obj_offset and size == entry.obj_size
+        ),
+        after=1,
+    )
+
+    output = cmd(archiver, "check", "--repair", "--verify-data", "--archives-only", exit_code=0)
+    assert "not deleted, could not be re-read" in output
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert chunk_id in repository.chunks  # the chunk is still there
+
+
+def test_find_lost_archives_skips_unreadable_chunk(archivers, request, monkeypatch):
+    # the --find-lost-archives scan only looks for archive metadata, so skipping an unreadable
+    # chunk can at worst miss a lost archive - it never drops data, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    make_pack_unreadable(monkeypatch, pack_name_of(archiver, file_content_chunk_id(archiver)))
+
+    output = cmd(archiver, "check", "--archives-only", "--find-lost-archives", exit_code=1)
+    assert "Skipping unreadable chunk" in output
+
+
+def test_unreadable_archives_listing_is_not_an_empty_repository(archivers, request, monkeypatch):
+    # a namespace listing that fails must not look like "the namespace is empty" - that would make
+    # e.g. repo-list report a repository with no archives at all, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    make_namespace_listing_fail(monkeypatch, "archives")
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "repo-list")
+
+
+def test_check_repair_stops_at_unreadable_archive_metadata(archivers, request, monkeypatch):
+    # a bad spot inside an otherwise readable pack: the chunk index still rebuilds from the pack's
+    # headers, so --repair gets as far as the archive itself - and must stop there rather than
+    # rewrite the archive around metadata it never read, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        archive_id = archive.id
+        entry = repository.chunks[archive_id]
+    pack_name = bin_to_hex(entry.pack_id)
+    # fail reads of the archive metadata object only; the short header reads at the same offset
+    # (and every other object in the pack) keep working.
+    state = make_store_reads_fail(
+        monkeypatch,
+        lambda name, offset, size: (
+            object_name(name) == pack_name and offset == entry.obj_offset and size == entry.obj_size
+        ),
+    )
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "check", "--archives-only", "--repair")
+
+    # the archive is untouched: once it reads again, it is still there and still checks out.
+    state["failing"] = False
+    assert "archive1" in cmd(archiver, "repo-list")
+    cmd(archiver, "check", exit_code=0)

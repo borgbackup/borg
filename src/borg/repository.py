@@ -359,13 +359,22 @@ class PackReader:
         # in-memory pack: return a memoryview into pack_contents. store: range-read bytes.
         if self.pack_contents is not None:
             return memoryview(self.pack_contents)[offset : offset + size]
-        return self.store.load(self.key, offset=offset, size=size)
+        try:
+            return self.store.load(self.key, offset=offset, size=size)
+        except OSError as exc:
+            # the pack exists, but reading it failed (bad disk, flaky network fs, ...). that is
+            # neither "object missing" nor "content corrupt", so it gets its own error class:
+            # callers must not react to it by dropping data, refs #3509.
+            raise Repository.StoreReadError(f"pack {bin_to_hex(self.pack_id)}", exc) from exc
 
     def size(self):
         """Return the pack size in bytes; for a store-backed pack this is one metadata lookup."""
         if self.pack_contents is not None:
             return len(self.pack_contents)
-        return self.store.info(self.key).size
+        try:
+            return self.store.info(self.key).size
+        except OSError as exc:
+            raise Repository.StoreReadError(f"pack {bin_to_hex(self.pack_id)}", exc) from exc
 
     def iter_headers(self):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
@@ -655,6 +664,18 @@ class Repository:
         """Repository permission denied: {}"""
 
         exit_mcode = 24
+
+    class RepairUnsafe(Error):
+        """Not repairing: {} repository object(s) could not be read. Fix the underlying problem, then check again."""
+
+        exit_mcode = 26
+
+    class StoreReadError(Error):
+        """Error reading {} from the repository: {}. Check the storage hardware / filesystem."""
+
+        exit_mcode = 25
+
+        # the underlying I/O error (bad disk, flaky network fs, ...) is kept as __cause__, refs #3509.
 
     # Whole packs kept in memory for reads; the least recently used is evicted first.
     # Memory use is this count times the pack size.
@@ -1035,12 +1056,19 @@ class Repository:
         """
 
         def verify(namespace, name):
+            """Return True if the object is intact, False if it is corrupt, None if it could not be read."""
             # name is the sha256 of the object's content, so it is intact iff store.hash() matches.
             key = f"{namespace}/{name}"
             try:
                 ok = self.store.hash(key) == name
             except StoreObjectNotFound:
                 return True  # vanished since store.list(); not an error
+            except OSError as exc:
+                # reading failed (bad disk, flaky network fs, ...), so we do not know whether the
+                # object is intact. report it and go on: one unreadable object must not abort the
+                # whole check, and the result must not be recorded as "corrupt", refs #3509.
+                logger.error(f"Store object {key} could not be read: {exc}")
+                return None
             if not ok:
                 logger.error(f"Store object {key} is corrupted: content does not match its name (sha256).")
             return ok
@@ -1050,6 +1078,10 @@ class Repository:
                 return list(self.store.list(namespace))
             except StoreObjectNotFound:
                 return []  # namespace does not exist
+            except OSError as exc:
+                # without a listing we do not know what to check, so this one is fatal - but it
+                # ends the check with a clear message instead of a traceback, refs #3509.
+                raise self.StoreReadError(f"the {namespace}/ listing", exc) from exc
 
         partial = bool(max_duration)
         assert not (repair and partial)
@@ -1070,6 +1102,9 @@ class Repository:
         t_last_checkpoint = t_start
         index_files = index_errors = 0
         pack_files = pack_errors = pack_skipped = 0
+        # objects that could not be read at all (I/O errors, refs #3509) - counted apart from
+        # corruption: "unreadable" is a different diagnosis and is often transient/fixable.
+        read_errors = 0
         missing_pack_ids = []  # packs referenced by the index but absent from packs/ (refs #9898)
         index_repaired = False
         packs_scanned = False
@@ -1089,7 +1124,10 @@ class Repository:
             self._lock_refresh()
             index_pi.show(increase=1)
             index_files += 1
-            if not verify("index", info.name):
+            result = verify("index", info.name)
+            if result is None:
+                read_errors += 1
+            elif not result:
                 index_errors += 1
         if index_infos:
             index_pi.show(current=len(index_infos))  # finish at 100%
@@ -1175,9 +1213,14 @@ class Repository:
                         continue
                 pack_files += 1
                 ok = verify("packs", info.name)
-                if not ok:
-                    pack_errors += 1
-                tracker.record(pack_id, ok)
+                if ok is None:
+                    # unreadable: we did not learn anything about this pack, so do not record a
+                    # result for it - a later check re-verifies it (unrecorded packs come first).
+                    read_errors += 1
+                else:
+                    if not ok:
+                        pack_errors += 1
+                    tracker.record(pack_id, ok)
                 now = time.monotonic()
                 # a checkpoint rewrites the whole table (41 bytes per pack), so keep the interval long.
                 if now > t_last_checkpoint + 30 * 60:
@@ -1196,7 +1239,9 @@ class Repository:
             # rebuild only if the index was the sole problem and every pack was verified intact this
             # run: sig_int breaks the loop early, so "no pack errors" must be paired with "all packs
             # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs.
-            if index_errors and pack_errors == 0 and not sig_int and pack_files == len(pack_infos):
+            # read_errors == 0 for the same reason: an unreadable pack was not verified either, and
+            # rebuilding the index from packs we could not read would drop their chunks, refs #3509.
+            if index_errors and pack_errors == 0 and read_errors == 0 and not sig_int and pack_files == len(pack_infos):
                 # the exclusive check lock keeps the pack set fixed, so re-listing packs/ inside
                 # build_chunkindex_from_repo matches this verification. write_immediately persists the
                 # index and drops the corrupt fragments.
@@ -1213,6 +1258,13 @@ class Repository:
         if pack_skipped:
             summary += f" Reused {pack_skipped} recent pack check result(s)."
         logger.info(summary)
+        if read_errors:
+            logger.error(
+                f"{read_errors} store object(s) could not be read, so they could not be checked. "
+                "This usually means a hardware, filesystem or network problem - see the "
+                '"Data integrity" section of the docs. The repository was not modified; fix the '
+                "underlying problem, then run the check again."
+            )
         if missing_pack_ids:
             # one id per line (the list can be long).
             logger.error(f"{len(missing_pack_ids)} pack(s) referenced by the index are missing:")
@@ -1232,13 +1284,16 @@ class Repository:
             logger.error(f"Found {len(corrupt_ids)} corrupt pack(s):")
             for pack_id in corrupt_ids:
                 logger.error(f"Corrupt pack: {bin_to_hex(pack_id)}")
-        # fail if this run found errors, or any pack is recorded corrupt.
-        problems = objs_errors != 0 or bool(corrupt_ids)
+        # fail if this run found errors or could not read some objects, or any pack is recorded corrupt.
+        problems = objs_errors != 0 or read_errors != 0 or bool(corrupt_ids)
         # On Ctrl-C the check stopped early, so the summary only covers the packs seen so far.
         done, so_far = ("Interrupted", " so far") if sig_int else ("Finished", "")
         if not problems:
             logger.info(f"{done} {mode} repository check, no problems found{so_far}.")
         elif not repair:
+            logger.error(f"{done} {mode} repository check, errors found{so_far}.")
+        elif read_errors:
+            # repair mode, but unreadable objects stop us below - so report like a read-only check.
             logger.error(f"{done} {mode} repository check, errors found{so_far}.")
         elif index_repaired and not (pack_errors or corrupt_ids or missing_pack_ids):
             # the index was the only problem and it has been rebuilt from the packs.
@@ -1265,6 +1320,10 @@ class Repository:
         if repair:
             if index_errors and not index_repaired:
                 return False
+            if read_errors:
+                # we do not know what is in those objects, so repairing around them could throw away
+                # data that reads fine again once the underlying problem is fixed, refs #3509.
+                raise self.RepairUnsafe(read_errors)
             return not (repo_only and (pack_errors or corrupt_ids or missing_pack_ids))
         return not problems
 
@@ -1357,7 +1416,11 @@ class Repository:
         reader = self._pack_cache.get(pack_id)
         if reader is None:
             key = "packs/" + bin_to_hex(pack_id)
-            reader = PackReader(pack_id=pack_id, pack_contents=self.store.load(key))
+            try:
+                pack_contents = self.store.load(key)
+            except OSError as exc:
+                raise self.StoreReadError(f"pack {bin_to_hex(pack_id)}", exc) from exc
+            reader = PackReader(pack_id=pack_id, pack_contents=pack_contents)
             self._pack_cache[pack_id] = reader
         return reader
 
@@ -1382,6 +1445,7 @@ class Repository:
                     raise self.PackNotFound(id_, entry.pack_id, str(self._location)) from None
                 yield None
             else:
+                # the pack is in memory here, so read() only slices it and can not raise OSError.
                 yield reader.read(entry.obj_offset, entry.obj_size)
 
     def put(self, id, data):
@@ -1759,10 +1823,15 @@ class Repository:
             return list(self.store.list(name, deleted=deleted))
         except StoreObjectNotFound:
             return []
+        except OSError as exc:
+            raise self.StoreReadError(f"the {name}/ listing", exc) from exc
 
     def store_load(self, name, *, size=None, offset=0):
         self._lock_refresh()
-        return self.store.load(name, size=size, offset=offset)
+        try:
+            return self.store.load(name, size=size, offset=offset)
+        except OSError as exc:
+            raise self.StoreReadError(name, exc) from exc
 
     def store_store(self, name, value):
         self._lock_refresh()

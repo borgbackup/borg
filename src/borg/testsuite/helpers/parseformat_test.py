@@ -236,6 +236,41 @@ class TestLocationWithoutEnv:
                 == f"{proto}://user@host//absolute/path"
             )
 
+    @pytest.mark.parametrize(
+        "location",
+        [
+            "rest://host",  # no path
+            "rest://host/",  # empty path
+            "rest://user@host/",  # empty path
+            "rest://user@host:1234/",  # empty path
+            "rest://",  # nothing at all
+            "rest:/host/path",  # only one slash after the scheme
+            "rest:host/path",  # no slash after the scheme
+        ],
+    )
+    def test_rest_invalid(self, monkeypatch, location):
+        # a malformed rest:// URL must be rejected - it used to be taken for a local path
+        # (relative to the cwd) and then failed with a confusing error, see #10215.
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        with pytest.raises(ValueError, match="Invalid location format"):
+            Location(location)
+
+    def test_invalid_location_hint(self, monkeypatch):
+        # an unparsable URL of a scheme we parse ourselves tells the user the accepted forms.
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        for location, scheme in [("rest://host/", "rest"), ("ssh://host/", "ssh"), ("file://rel", "file")]:
+            with pytest.raises(ValueError, match=f"Expected: {scheme}:"):
+                Location(location)
+
+    @pytest.mark.skipif(is_win32, reason="Windows does not support colons in paths")
+    def test_local_path_with_scheme_prefix(self, monkeypatch):
+        # a local path starting with a scheme name is not mistaken for a URL if it is made
+        # unambiguous with "./" or by giving it as an absolute path.
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert Location("./rest:/host").proto == "file"
+        assert Location("./rest:/host").path == os.path.abspath("rest:/host")
+        assert Location("/abs/rest:/host").path == "/abs/rest:/host"
+
     # For the protocols handled (parsed + validated) by borgstore itself, borg only detects
     # the scheme and passes the raw URL through; it no longer extracts user/host/port/path.
 
@@ -360,6 +395,10 @@ class TestLocationWithoutEnv:
             "ssh://host/relative/path",
             "ssh://host//absolute/path",
             "ssh://user@host:1234/relative/path",
+            "rest://host/relative/path",
+            "rest://host//absolute/path",
+            "rest://user@host:1234/relative/path",
+            "rest:///relative/path",
             "sftp://host/relative/path",
             "sftp://host//absolute/path",
             "sftp://user@host:1234/relative/path",

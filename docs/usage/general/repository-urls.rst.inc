@@ -20,21 +20,25 @@ supported — mount the share (on Windows: map it to a drive letter, e.g.
 
 ``rest://user@host:port//abs/path/to/repo`` — absolute path
 
-``rest://user@host:port/rel/path/to/repo`` — path relative to the current directory
+``rest://user@host:port/rel/path/to/repo`` — path relative to the remote login directory
 
 **Remote repositories** accessed via SSH user@host (legacy borg RPC protocol):
 
 ``ssh://user@host:port//abs/path/to/repo`` — absolute path
 
-``ssh://user@host:port/rel/path/to/repo`` — path relative to the current directory
+``ssh://user@host:port/rel/path/to/repo`` — path relative to the remote login directory
 
 **Remote repositories** accessed via SFTP:
 
 ``sftp://user@host:port//abs/path/to/repo`` — absolute path
 
-``sftp://user@host:port/rel/path/to/repo`` — path relative to the current directory
+``sftp://user@host:port/rel/path/to/repo`` — path relative to the remote login directory
 
-For SSH and SFTP URLs, the ``user@`` and ``:port`` parts are optional.
+For REST, SSH and SFTP URLs, the ``user@`` and ``:port`` parts are optional, but the
+path is required: a URL without one, e.g. ``rest://host`` or ``rest://host/``, is
+rejected. Mind the difference between one and two slashes after the host: one slash
+means a path relative to the directory the remote login lands in (usually the remote
+user's home directory), two slashes mean an absolute path.
 
 **Remote repositories** accessed via rclone:
 

@@ -64,9 +64,9 @@ If you only back up your own files, run it as your normal user (i.e. not root).
 
 For a local repository always use the same user to invoke borg.
 
-For a remote repository: always use e.g., rest://borg@remote_host (Borg connects
-via ssh and runs ``borg serve --rest`` on the remote). You can use this
-from different local users; the remote user running borg and accessing the
+For a remote repository: always use e.g., rest://borg@remote_host/path/to/repo
+(Borg connects via ssh and runs ``borg serve --rest`` on the remote). You can use
+this from different local users; the remote user running borg and accessing the
 repo will always be `borg`.
 
 If you need to access a local repository from different users, you can use the

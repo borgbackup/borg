@@ -182,6 +182,7 @@ Fixes:
 
 Other changes:
 
+- msgpack: also allow 1.2.2
 - require shtab >= 1.11.0: it completes an argument via its ``.complete`` function
   rather than via its choices, which is what lets the encryption modes have a
   description each, and it completes paths outside the cwd in fish

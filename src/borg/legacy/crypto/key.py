@@ -5,8 +5,9 @@ from hashlib import pbkdf2_hmac, sha256
 from ...constants import *  # NOQA
 from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, hmac_sha256, blake2b_256
 from ...crypto.key import ID_HMAC_SHA_256, KeyBase, AESKeyBase, FlexiKey, UnsupportedKeyFormatError
-from ...crypto.key import AUTHENTICATED_NO_KEY
+from ...crypto.key import AUTHENTICATED_NO_KEY, RepoKeyNotFoundError
 from ...helpers import get_limited_unpacker, msgpack
+from ...helpers.passphrase import Passphrase
 from ...item import EncryptedKey
 from .low_level import AES
 
@@ -140,15 +141,37 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
     logically_encrypted = False
     encrypts = False
 
+    def _set_fake_key_material(self):
+        # fake key material for the authenticated_no_key workaround: all-zero and thus worthless,
+        # but this mode does not encrypt, so reading still works - decrypt() only strips the type
+        # byte and RepoObj1.parse skips the chunk id check.
+        NOPE = bytes(32)  # 256 bit all-zero
+        self.repository_id = NOPE
+        self.enc_key = NOPE
+        self.enc_hmac_key = NOPE
+        self.id_key = NOPE
+        self.chunk_seed = 0
+
+    @classmethod
+    def detect(cls, repository, manifest_data, *, other=False):
+        try:
+            return super().detect(repository, manifest_data, other=other)
+        except RepoKeyNotFoundError:
+            if not AUTHENTICATED_NO_KEY:
+                raise
+            # the borg key is not just locked by an unknown passphrase, it is completely gone.
+            # The workaround covers that too: proceed with fake key material, see
+            # _set_fake_key_material.
+            key = cls(repository)
+            key._set_fake_key_material()
+            key.init_ciphers(manifest_data)
+            key._passphrase = Passphrase()
+            return key
+
     def _load(self, key_data, passphrase):
         if AUTHENTICATED_NO_KEY:
-            # fake _load if we have no key or passphrase
-            NOPE = bytes(32)  # 256 bit all-zero
-            self.repository_id = NOPE
-            self.enc_key = NOPE
-            self.enc_hmac_key = NOPE
-            self.id_key = NOPE
-            self.chunk_seed = 0
+            # fake _load if we have no key or passphrase, see _set_fake_key_material.
+            self._set_fake_key_material()
             return True
         return super()._load(key_data, passphrase)
 

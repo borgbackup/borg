@@ -14,7 +14,7 @@ import pytest
 from ... import xattr, platform
 from ...constants import *  # NOQA
 from ...storelocking import Lock
-from ...helpers import flags_noatime, flags_normal
+from ...helpers import flags_noatime, flags_normal, Location
 from .. import has_lchflags, has_any_fuse, ENOATTR
 from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
@@ -504,7 +504,8 @@ def test_borgfs_mounts_repository_positional():
     args = archiver.parse_args(["/path/to/repo", "/mnt/point", "some/path"])
     assert args.func == archiver.do_mount
     # the REPOSITORY positional must end up where -r/--repo would have put it
-    assert args.location.path == "/path/to/repo"
+    # (compare against Location's canonicalization, e.g. Windows prepends the current drive)
+    assert args.location.path == Location("/path/to/repo").path
     assert args.mountpoint == "/mnt/point"
     assert args.paths == ["some/path"]
 
@@ -514,23 +515,67 @@ def test_borgfs_repository_positional_is_optional():
     archiver = Archiver(prog="borgfs")
     args = archiver.parse_args(["--repo", "/path/to/repo", "/mnt/point"])
     assert args.func == archiver.do_mount
-    assert args.location.path == "/path/to/repo"
+    assert args.location.path == Location("/path/to/repo").path
     assert args.mountpoint == "/mnt/point"
     assert args.paths == []
+
+
+def write_default_config(monkeypatch, tmp_path, content):
+    """Point BORG_CONFIG_DIR at a fresh config dir containing a default.yaml with *content*."""
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "default.yaml").write_text(content)
+    monkeypatch.setenv("BORG_CONFIG_DIR", str(config_dir))
 
 
 def test_borgfs_ignores_subcommand_sections_in_default_config(monkeypatch, tmp_path):
     # borgfs is a top-level parser, thus it reads the same default config file as borg does.
     # That file usually has per-subcommand sections, which borgfs has to ignore rather than reject.
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-    (config_dir / "default.yaml").write_text("log_level: info\ncreate:\n  output_filter: AME\n")
-    monkeypatch.setenv("BORG_CONFIG_DIR", str(config_dir))
+    write_default_config(monkeypatch, tmp_path, "log_level: info\ncreate:\n  output_filter: AME\n")
     archiver = Archiver(prog="borgfs")
     args = archiver.parse_args(["/path/to/repo", "/mnt/point"])
     assert args.func == archiver.do_mount
-    assert args.location.path == "/path/to/repo"
+    assert args.location.path == Location("/path/to/repo").path
     assert args.log_level == "info"  # top-level keys of the config file still apply
+
+
+def test_borgfs_adopts_mount_section_of_default_config(monkeypatch, tmp_path):
+    # borgfs *is* the mount command, so the "mount:" section applies to it, while the sections of
+    # the other subcommands are still ignored.
+    content = "log_level: info\nmount:\n  numeric_ids: true\ncreate:\n  output_filter: AME\n"
+    write_default_config(monkeypatch, tmp_path, content)
+    archiver = Archiver(prog="borgfs")
+    args = archiver.parse_args(["/path/to/repo", "/mnt/point"])
+    assert args.func == archiver.do_mount
+    assert args.numeric_ids is True
+    assert args.log_level == "info"
+
+
+def test_borgfs_mount_section_wins_over_top_level(monkeypatch, tmp_path):
+    # the more specific "mount:" key overrides the same key given at the top level
+    write_default_config(monkeypatch, tmp_path, "numeric_ids: false\nmount:\n  numeric_ids: true\n")
+    args = Archiver(prog="borgfs").parse_args(["/path/to/repo", "/mnt/point"])
+    assert args.numeric_ids is True
+
+
+def test_borg_applies_mount_section_to_mount_subcommand_only(monkeypatch, tmp_path):
+    # borg has subcommands, so nothing is adopted there: the "mount:" section applies to borg mount
+    # (as any subcommand section does) and to no other subcommand.
+    write_default_config(monkeypatch, tmp_path, "mount:\n  numeric_ids: true\n")
+    archiver = Archiver(prog="borg")
+    assert archiver.parse_args(["mount", "/mnt/point"]).numeric_ids is True
+    assert getattr(archiver.parse_args(["repo-list"]), "numeric_ids", None) is None
+
+
+def test_borg_rejects_unknown_config_keys(monkeypatch, tmp_path):
+    # only borgfs tolerates config keys it does not know - borg must still reject them
+    write_default_config(monkeypatch, tmp_path, "log_level: info\nnosuchoption: 1\n")
+    with pytest.raises(SystemExit):
+        Archiver(prog="borg").parse_args(["repo-list"])
+    archiver = Archiver(prog="borgfs")
+    args = archiver.parse_args(["/path/to/repo", "/mnt/point"])
+    assert args.func == archiver.do_mount
+    assert args.log_level == "info"
 
 
 def test_borg_mount_has_no_repository_positional():

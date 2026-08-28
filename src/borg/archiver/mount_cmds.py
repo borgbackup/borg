@@ -199,6 +199,9 @@ class MountMixIn:
         # borgfs is a top-level parser, thus it reads the same default config file as borg does,
         # but it has no subcommands - just ignore the per-subcommand sections of that config file.
         parser.ignore_unknown_config_keys = True
+        # borgfs *is* the mount command, so the "mount:" section applies to it: adopt its keys as
+        # top-level keys (they win over same-named top-level keys of the config file).
+        parser.adopt_config_sections = ("mount",)
         self._define_borg_mount(parser, borgfs=True)
         return parser
 

@@ -56,8 +56,10 @@ File format
     under a subcommand name (e.g. ``create:``) are only applied when that
     subcommand is invoked.
 
-    ``borgfs`` reads the same default config file, but as it has no subcommands,
-    it only uses the top-level keys and ignores all subcommand sections.
+    ``borgfs`` reads the same config files, but as it has no subcommands, it uses
+    the top-level keys and the keys of the ``mount:`` section (``borgfs`` is the
+    ``borg mount`` command, and its keys win over the top-level ones); all other
+    subcommand sections are ignored.
 
 .. note::
     ``--print_config`` shows the merged effective configuration and is a

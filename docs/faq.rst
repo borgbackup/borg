@@ -52,8 +52,8 @@ Can I copy or synchronize my repo to another location?
 If you want to have redundant backup repositories (preferably at separate
 locations), the recommended way to do that is like this:
 
-- ``borg repo-create repo1 --encryption=X``
-- ``borg repo-create repo2 --encryption=X --other-repo=repo1``
+- ``borg -r repo1 repo-create --encryption=aes256-ocb``
+- ``borg -r repo2 repo-create --encryption=aes256-ocb --other-repo=repo1``
 - Optionally, create a snapshot to have stable and identical input data for both borg create runs.
 - client machine ---borg create---> repo1
 - client machine ---borg create---> repo2
@@ -98,8 +98,8 @@ you could delete the manifest-timestamp and the local cache:
 
 ::
 
-  borg config id   # shows the REPO_ID
-  rm ~/.config/borg/security/REPO_ID/manifest-timestamp
+  borg repo-info   # shows the repository ID and the security directory path
+  rm SECURITY_DIRECTORY/manifest-timestamp
   borg repo-delete --cache-only
 
 This is an unsafe and unsupported way to use Borg. You have been warned.
@@ -286,17 +286,20 @@ Can Borg verify data integrity of a backup archive?
 ---------------------------------------------------
 
 Yes, if you want to detect accidental data damage (like bit rot), use the
-``check`` operation. It will notice corruption using CRCs and hashes.
+``check`` operation. It will notice corruption using the authentication tags
+(MACs) and the chunk ID hashes.
 If you want to be able to detect malicious tampering also, use an encrypted
-repo. It will then be able to check using CRCs and HMACs.
+repo. The MACs are keyed then, so an attacker without the key can not cover up
+a modification.
 
 Can a previous bad backup spoil future backups?
 -----------------------------------------------
 
-In general, no. If a backup was interrupted or failed for some reason, Borg's
-transactional nature and journaling system ensure that the repository remains
-consistent. Data that was successfully stored in a partial backup
-(checkpoints) will even be reused to speed up the next attempt.
+In general, no. If a backup was interrupted or failed for some reason, the
+archive is simply never committed, so it does not show up in the repository and
+can not spoil anything. The chunks that were already transferred do stay in the
+repository though, so the next attempt deduplicates against them and is faster
+(until a ``borg compact`` removes the chunks that no archive references).
 
 However, there is one specific case where a past "bad" backup can affect
 future ones due to how deduplication works:
@@ -312,7 +315,7 @@ This is not a Borg-specific issue, but a general property of deduplicating
 storage systems. To avoid or detect such issues, you should:
 
 - Use reliable hardware (ECC RAM is recommended).
-- Periodically run ``borg check --verify-data REPO`` to verify that the
+- Periodically run ``borg -r REPO check --verify-data`` to verify that the
   stored data still matches its checksums. Note that this cannot detect
   if the data was already "garbage" when it was first stored.
 
@@ -819,8 +822,9 @@ Please see the next question.
 Why does Borg disconnect or hang when backing up to a remote server?
 --------------------------------------------------------------------
 
-Communication with the remote server (using an ssh: repo URL) happens via an SSH
-connection. This can lead to some issues that would not occur during a local backup:
+Communication with the remote server (e.g. using a ``rest://user@host/path`` repo URL)
+is tunneled through an SSH connection. This can lead to some issues that would not
+occur during a local backup:
 
 - Since Borg does not send data all the time, the connection may get closed, leading
   to errors like "connection closed by remote".
@@ -837,7 +841,7 @@ How can I deal with my very unstable SSH connection?
 If you have issues with lost connections during long-running borg commands, you
 could try to work around:
 
-- Make partial extracts like ``borg extract PATTERN`` to do multiple
+- Make partial extracts like ``borg extract ARCHIVE PATTERN`` to do multiple
   smaller extraction runs that complete before your connection has issues.
 - Try using ``borg mount MOUNTPOINT`` and ``rsync -avH`` from
   ``MOUNTPOINT`` to your desired extraction directory. If the connection breaks
@@ -889,7 +893,7 @@ and disk space on subsequent runs. Here what Borg does when you run ``borg creat
 
 - Borg chunks the file (using content-defined chunking, which needs to look at every byte)
 - It then computes the "id" of the chunk (hmac-sha256 (slow, except
-  if your CPU has sha256 acceleration) or blake2b (fast, in software))
+  if your CPU has sha256 acceleration) or blake3 (fast, in software))
 - Then it checks whether this chunk is already in the repo (local hashtable lookup,
   fast). If so, the processing of the chunk is completed here. Otherwise it needs to
   process the chunk:
@@ -928,8 +932,9 @@ If you feel your Borg backup is too slow somehow, here is what you can do:
 
 - Make sure Borg has enough RAM (depends on how big your repo is / how many
   files you have)
-- Use one of the blake2 modes for --encryption except if you positively know
-  your CPU (and openssl) accelerates sha256 (then stay with hmac-sha256).
+- Use blake3 as chunk id hash when creating the repository (``--id-hash blake3``
+  for the encrypted modes, or one of the ``*-blake3`` modes) except if you
+  positively know your CPU (and openssl) accelerates sha256 (then stay with sha256).
 - Don't use any expensive compression. The default is lz4 and super fast.
   Uncompressed is often slower than lz4.
 - Just wait. You can also interrupt it and start it again as often as you like,
@@ -1266,7 +1271,7 @@ How do I rename a repository?
 
 There is nothing special that needs to be done, you can simply rename the
 directory that corresponds to the repository. However, the next time borg
-interacts with the repository (i.e, via ``borg list``), depending on the value
+interacts with the repository (e.g., via ``borg repo-list``), depending on the value
 of ``BORG_RELOCATED_REPO_ACCESS_IS_OK``, borg may warn you that the repository
 has been moved. You will be given a prompt to confirm you are OK with this.
 
@@ -1301,7 +1306,7 @@ https://github.com/macfuse/macfuse/wiki/Mount-options#local
 
 Read the above first and use this on your own risk::
 
-    borg mount -olocal REPO MOUNTPOINT
+    borg mount -olocal -r REPO MOUNTPOINT
 
 
 Requirements for the borg single-file binary, esp. (g)libc?

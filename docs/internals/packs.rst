@@ -34,7 +34,7 @@ Each blob is a self-contained unit::
     Offset (relative to blob start)  Size              Type     Field
     --------------------------------  ----------------  -------  -----
     0                                 len(OBJ_MAGIC)    bytes    OBJ_MAGIC = ASCII b"BORG_OBJ"
-    8                                 1                 uint8    Format version: 0x01
+    8                                 1                 uint8    Format version: 0x02 (0x01 still readable)
     9                                 32                bytes    chunk_id
     41                                4                 uint32le meta_size
     45                                4                 uint32le data_size
@@ -45,9 +45,12 @@ Each blob is a self-contained unit::
 Storing it in the unencrypted header lets a scanner rebuild the
 ``chunk_id → location`` index without decrypting any blob.
 
-``chunk_id`` is also written into ``encrypted_meta`` (the meta dict). The header
-copy enables key-free scanning and recovery; the meta copy lets future code read
-``chunk_id`` through the normal meta dict API without parsing the raw header layout.
+``chunk_id`` is *not* duplicated into ``encrypted_meta``: the header is its only
+place in the object. ``RepoObj.format()`` puts the object type and the compression
+bookkeeping into the meta dict (``type``, ``ctype``, ``clevel``, ``csize``, ``size``,
+plus ``psize``/``olevel`` when the ``obfuscate`` pseudo compressor is used), nothing
+else. What keeps the plaintext header copy honest is that it is bound into the
+authentication of both encrypted slots, see below.
 
 The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
 ``len(OBJ_MAGIC)`` + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
@@ -98,8 +101,8 @@ Once it finds the next ``OBJ_MAGIC`` sequence it resumes. Other corruption
 
 Blobs follow one another contiguously with no padding::
 
-    OBJ_MAGIC | version=0x01 | chunk_id_0 | meta_size_0 | data_size_0 | encrypted_meta_0 | encrypted_data_0
-    OBJ_MAGIC | version=0x01 | chunk_id_1 | meta_size_1 | data_size_1 | encrypted_meta_1 | encrypted_data_1
+    OBJ_MAGIC | version=0x02 | chunk_id_0 | meta_size_0 | data_size_0 | encrypted_meta_0 | encrypted_data_0
+    OBJ_MAGIC | version=0x02 | chunk_id_1 | meta_size_1 | data_size_1 | encrypted_meta_1 | encrypted_data_1
     ...
 
 .. figure:: pack-layout.png
@@ -166,6 +169,9 @@ entry carries the ``F_PENDING`` flag and its pack location is unresolved.
     crash before it leaves only unreferenced objects that ``borg compact``
     reclaims.
 
+.. TODO: the implementation currently writes the session's final index fragment at
+   cache close, i.e. after the archive pointer - see issue #10239.
+
 Pack data must be stored before any archive pointer references it.
 The required write order is:
 
@@ -186,10 +192,14 @@ archive pointer write is the commit point: archives are listed from the
 ``archives/`` namespace, so data not referenced by any archive pointer is
 unreachable and treated as garbage by ``borg compact``.
 
-Only ``borg compact`` and ``borg check --repair`` delete pack files. When compact
-determines via mark-and-sweep that none of a pack's blobs are referenced by any
-archive, it removes the whole file. Individual blobs cannot be removed without
-rewriting the entire pack, so deletion always operates at pack granularity.
+Pack files are removed by ``borg compact`` (dropping packs whose indexed objects are
+all unused, rewriting packs above ``--threshold`` and merging tiny packs),
+``borg check --repair`` (when it drops a defective object), ``borg repo-compress``
+(``Repository.transform_pack`` stores the re-compressed pack under its new
+content-addressed name and deletes the old one) and ``borg debug delete-obj``. A
+single blob cannot be removed from a pack in place: all of these paths write a new
+pack file without it and then delete the old one, so store-level deletion always
+operates at pack granularity.
 
 
 .. _pack-index-namespace:
@@ -197,35 +207,62 @@ rewriting the entire pack, so deletion always operates at pack granularity.
 Index Namespace
 ---------------
 
-Chunk-to-location mappings are stored as a separate set of encrypted partial index
-files under the ``index/`` namespace.
+Chunk-to-location mappings are stored as a separate set of objects under the
+``index/`` namespace, called *index fragments*.
 
-Each partial index file covers the packs written in one backup session. Its name is
-the SHA-256 digest of its own content. A first backup of a large dataset may produce
-a large partial index file; using the same medium-sized file writer as compact for
-``borg create`` would bound that. That is the intended direction.
-
-::
+A fragment is a serialized ``ChunkIndex`` (a ``borghash`` ``HashTableNT`` keyed on
+``chunk_id``) holding only the pack location; the ``flags`` and the plaintext ``size``
+of each entry are zeroed before serializing. Fragments are **not** encrypted: they map
+``chunk_id`` to ``(pack_id, obj_offset, obj_size)``, which anyone with access to the
+repository could equally well read out of the unencrypted blob headers (see
+:ref:`pack-recovery`). A fragment's name is the SHA-256 digest of its own content::
 
     index/
       <sha256_of_content_hex>
 
-Content-addressed naming makes each partial index file self-verifying and idempotent:
-writing the same index data twice produces the same filename, so a repeated write is
-a no-op.
+An ordinary backup writes only the entries that are new in that session; a full
+rewrite (e.g. by ``borg compact``) writes all of them. In both cases the write is
+split into fragments of at most ``CHUNKINDEX_FRAGMENT_ENTRIES_MAX`` (400000 entries,
+roughly 32MB), so no single fragment gets too large -- not even the one large write a
+first backup of a big dataset produces. The split selects and sorts the keys one
+leading-key-bits partition at a time, so the same set of entries always yields the
+same fragments, no matter in which order the entries were inserted.
 
-Partial index files are write-once. A session stores new partial index files via
-borgstore; existing files are never modified. On repository open all files under
-``index/`` are loaded via borgstore, decrypted, and merged into the in-memory ChunkIndex
-(a ``borghash`` ``HashTableNT`` keyed on ``chunk_id``). The merge is commutative and
-idempotent; order does not matter.
+Content-addressed naming makes each fragment self-verifying and idempotent: writing
+the same index data twice produces the same name, and such a write is skipped.
 
-``borg compact`` rewrites the ``index/`` namespace: it identifies live chunks via
-mark-and-sweep, consolidates the surviving mappings into medium-sized replacement
-files (targeting roughly 10–100 packs per file), and removes the files it supersedes.
-Medium-sized files keep the open-time merge cost bounded while avoiding the
-cache-invalidation traffic on other clients that a single all-in-one index would
-cause.
+Index fragments are write-once; an existing fragment is never modified. The in-memory
+ChunkIndex is built lazily, on the first access to ``Repository.chunks``: everything
+under ``index/`` is listed, loaded, checked against its content hash and merged
+(``build_chunkindex_from_repo``). The merge is commutative and idempotent; order does
+not matter. It has to succeed for *all* fragments or not at all, because a partially
+merged index would be missing chunks that do exist in the repository: a fragment that
+vanishes mid-merge (a concurrent consolidation replaced it) restarts the merge, and a
+persistently unreadable one falls back to the rebuild from the pack files.
+
+Because every backup appends a fragment, small fragments would pile up over time.
+``repack_chunkindex()`` (run at cache close, and by anything that loads the index and
+persists it, e.g. ``borg compact``) merges the fragments below
+``CHUNKINDEX_FRAGMENT_ENTRIES_MIN`` (100000 entries, roughly 8MB) into fragments of up
+to ``CHUNKINDEX_FRAGMENT_ENTRIES_MAX`` entries and deletes the small sources.
+Fragments already within that range are left untouched, so they stay immutable -- and,
+once ``index/`` is cache-backed, stay cached for every client, instead of being
+invalidated by an all-in-one consolidation. The merge is deferred until it can seal at
+least one full fragment, or until more than ``CHUNKINDEX_SMALL_FRAGMENT_CAP`` (15)
+small fragments have accumulated, so a slowly growing fragment is not rewritten on
+every backup.
+
+``borg compact`` rewrites the ``index/`` namespace as a whole: it determines the live
+chunks via mark-and-sweep, writes the complete surviving index as bounded fragments,
+and deletes all the fragments it supersedes.
+
+A deletion that could drop entries -- dropping the index entirely, or the full rewrite
+above -- is guarded by a marker object, ``cache/chunkindex-invalid``, written before
+the first deletion and removed after the last one. While the marker is present,
+leftover fragments could be an incomplete index, so they are not merged; the index is
+rebuilt from the pack files on the next load instead. A consolidation needs no marker:
+the entries of the small fragments it deletes are already contained in the merged
+fragments it wrote before deleting them.
 
 If the entire ``index/`` namespace is lost or corrupt, the ChunkIndex can be rebuilt
 by scanning pack files directly; see :ref:`pack-recovery`.
@@ -236,8 +273,11 @@ by scanning pack files directly; see :ref:`pack-recovery`.
 Recovery Path
 -------------
 
-When ``borg check --repair`` detects a missing or incomplete ChunkIndex it rebuilds
-it by forward-scanning all pack files in ``packs/``.
+The ChunkIndex can always be reconstructed by forward-scanning all pack files in
+``packs/``. The archives phase of ``borg check --repair`` does that unconditionally
+(it has to work from the real packs, so it can find archives referencing chunks whose
+pack has gone missing), and the same rebuild is the fallback whenever the ``index/``
+fragments cannot be loaded completely (see :ref:`pack-index-namespace`).
 
 Each blob's unencrypted header supplies the ``OBJ_MAGIC`` (for re-sync after
 corruption), the ``chunk_id``, and the size fields needed to locate the next blob.
@@ -247,31 +287,25 @@ without decrypting any blob and without the repository key.
 
 .. _pack-repo-version:
 
-Repository Version and Feature Flags
---------------------------------------
+Repository Version
+------------------
 
-Repositories using pack files require repository version **4**. Clients that only
-accept version 3 refuse to open a version 4 repository with an unsupported-version
-error before any data is read.
+Repositories using pack files require repository version **4**, and the version is the
+only gate for the pack format.
 
-In addition, the repository ``config.feature_flags`` must include ``pack_files`` in
-the mandatory set for all access modes:
+``Repository.create()`` stores ``4`` as the ``config/version`` store object.
+``Repository.open()`` reads it back and, if it is not in
+``Repository.acceptable_repo_versions`` (currently ``(4,)``), closes the store again
+and raises ``InvalidRepositoryConfig`` -- before any repository data is read. A borg
+version that only accepts version 3 rejects a version 4 repository the same way, so
+the version bump alone locks out every client that does not know about packs.
 
-.. code-block:: python
-
-    config = {
-        "feature_flags": {
-            "read":  {"mandatory": ["pack_files"]},
-            "write": {"mandatory": ["pack_files"]},
-            "check": {"mandatory": ["pack_files"]},
-        }
-    }
-
-A client that does not recognise the ``pack_files`` feature flag will refuse to open
-the repository with a ``MandatoryFeatureUnsupported`` error regardless of the version
-number. The two guards cover different failure modes: the version bump stops clients
-that predate feature-flag support entirely; the feature flag gives a clearer error
-message to clients that understand feature flags but don't know about packs yet.
+Borg does have a feature flag mechanism for locking out clients more selectively
+(``Manifest.check_repository_compatibility()``, fed from a ``feature_flags`` entry in
+the manifest ``config`` -- see :ref:`manifest`), but it currently defines no flags at
+all: ``Manifest.SUPPORTED_REPO_FEATURES`` is the empty set, and no borg code writes a
+``feature_flags`` entry. On a repository borg creates, the compatibility check is
+therefore a no-op; there is in particular no ``pack_files`` feature flag.
 
 There is no migration path from version 3 repositories to version 4. Users of the
 version 3 beta format must create a new repository with ``borg repo-create``.

@@ -964,8 +964,7 @@ class CreateMixIn:
         a non-zero exit code (usually 1 for warnings).
 
         **The archive is still saved even if warnings or errors occurred**, but it will
-        only contain the data borg was able to read successfully. It is like a
-        checkpoint (see below), but with a user-given name.
+        only contain the data borg was able to read successfully.
 
         You should always check the backup logs and the exit code of the borg command.
 

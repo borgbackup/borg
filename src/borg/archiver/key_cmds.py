@@ -218,14 +218,19 @@ class KeysMixIn:
         process in which each line is checked for plausibility before
         proceeding to the next line. For this format PATH must not be given.
 
-        For repositories using keyfile encryption, the key file which ``borg key
-        import`` writes to depends on several factors. If the ``BORG_KEY_FILE``
-        environment variable is set and non-empty, ``borg key import`` creates
-        or overwrites that file named by ``$BORG_KEY_FILE``. Otherwise, ``borg
-        key import`` searches in the ``$BORG_KEYS_DIR`` directory for a key file
-        associated with the repository. If a key file is found in
-        ``$BORG_KEYS_DIR``, ``borg key import`` overwrites it; otherwise, ``borg
-        key import`` creates a new key file in ``$BORG_KEYS_DIR``.
+        Where the imported key is stored is decided by ``--key-location``:
+
+        - ``repokey`` (the default): the key is stored **in the repository**, no local
+          key file is written.
+        - ``keyfile``: the key is stored in a local key file.
+
+        The key file that ``--key-location=keyfile`` writes to depends on several
+        factors. If the ``BORG_KEY_FILE`` environment variable is set and non-empty,
+        ``borg key import`` creates or overwrites the file named by ``$BORG_KEY_FILE``.
+        Otherwise, ``borg key import`` searches the ``$BORG_KEYS_DIR`` directory for a
+        key file associated with the repository. If one is found there, ``borg key
+        import`` overwrites it; otherwise it creates a new key file in
+        ``$BORG_KEYS_DIR``.
         """
         )
         subparser = ArgumentParser(

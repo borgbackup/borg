@@ -950,6 +950,7 @@ class CreateMixIn:
         - '+' = included, item would be backed up (if not in dry-run mode)
         - '-' = excluded, item would not be / was not backed up
         - 'i' = backup data was read from standard input (stdin)
+        - 'x' = skipped due to ``--exclude-dataless`` (file is flagged DATALESS)
         - '?' = missing status code (if you see this, please file a bug report!)
 
         Errors and (incomplete) archives

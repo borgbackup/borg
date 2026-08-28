@@ -175,8 +175,8 @@ class DiffMixIn:
         from ._common import process_epilog
         from ._common import define_exclusion_group
 
-        diff_epilog = (
-            process_epilog(
+        diff_epilog = process_epilog(
+            textwrap.dedent(
                 """
         This command finds differences (file contents, metadata) between ARCHIVE1 and ARCHIVE2.
 

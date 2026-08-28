@@ -117,7 +117,8 @@ class RepoDeleteMixIn:
             dest="forced",
             action="count",
             default=0,
-            help="force deletion of corrupted archives; use ``--force --force`` if a single ``--force`` does not work.",
+            help="do not ask for confirmation, just delete the repository. this also works if the "
+            "repository is damaged to a point where its archives can not be listed anymore.",
         )
         subparser.add_argument(
             "--cache-only",

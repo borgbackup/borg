@@ -91,8 +91,8 @@ class ListMixIn:
     def build_parser_list(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_exclusion_group
 
-        list_epilog = (
-            process_epilog(
+        list_epilog = process_epilog(
+            textwrap.dedent(
                 """
         This command lists the contents of an archive.
 

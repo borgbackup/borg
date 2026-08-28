@@ -409,7 +409,7 @@ class DebugMixIn:
             metavar="WANTED",
             type=str,
             action=Highlander,
-            help="term to search the repo for, either 0x1234abcd hex term or a string",
+            help="term to search the repo for: either ``hex:1234abcd`` (hex bytes) or ``str:foobar`` (text)",
         )
         debug_id_hash_epilog = process_epilog(
             """

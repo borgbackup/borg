@@ -51,8 +51,8 @@ class FindMixIn:
     def build_parser_find(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_exclusion_group
 
-        find_epilog = (
-            process_epilog(
+        find_epilog = process_epilog(
+            textwrap.dedent(
                 """
         This command finds files matching the given paths or patterns in the archives
         selected by the usual archive filter options (all archives, if no filters are

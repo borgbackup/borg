@@ -177,6 +177,9 @@ def setup_logging(
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
+            # the yes() prompt function reads this attribute to decide whether to emit
+            # question_* JSON objects or plain text, see helpers/yes_no.py.
+            logging.getLogger("borg").json = log_json
             logger.debug(f'using logging configuration read from "{conf_fname}"')
             warnings.showwarning = _log_warning
             return None
@@ -193,6 +196,10 @@ def setup_logging(
     logger = logging.getLogger()
     remove_handlers(logger)
     logger.setLevel(level)
+
+    # the yes() prompt function reads this attribute to decide whether to emit
+    # question_* JSON objects or plain text, see helpers/yes_no.py.
+    logging.getLogger("borg").json = log_json
 
     if logging_debugging_path is not None:
         # add an addtl. root handler for debugging purposes

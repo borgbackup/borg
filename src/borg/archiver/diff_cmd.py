@@ -225,24 +225,28 @@ class DiffMixIn:
 
         - Content changes: total added/removed bytes within files. If chunker parameters are comparable,
           Borg compares chunk IDs quickly; otherwise, it compares the content.
-        - Metadata changes: user, group, mode, and other metadata shown inline, like
-          "[old_mode -> new_mode]" for mode changes. Use ``--content-only`` to suppress metadata changes.
-        - Added/removed items: printed as "added SIZE path" or "removed SIZE path".
+        - Metadata changes: user, group, mode, and other metadata shown inline as "[old -> new]", like
+          "[-rw-r--r-- -> -rwxr-xr-x]" for a mode change. Use ``--content-only`` to suppress metadata changes.
+        - Added/removed items: printed as "added: SIZE path" or "removed: SIZE path".
 
         Output formats
         ++++++++++++++
         The default (text) output shows one line per changed path, e.g.::
 
-            +135 B    -252 B [ -rw-r--r-- -> -rwxr-xr-x ] path/to/file
+            modified:    +23 B     -5 B [-rwxr-xr-x -> -rw-r--r--] path/to/file
+            added:                  4 B path/to/added-file
+            removed:                5 B path/to/removed-file
 
-        JSON Lines output (``--json-lines``) prints one JSON object per changed path, e.g.::
+        JSON Lines output (``--json-lines``) prints one JSON object per changed path, with a list of
+        change objects. Each change object has a "type" plus type-specific data: content changes
+        ("added", "removed", "modified") carry "added"/"removed" byte counts; metadata changes
+        ("changed mode", "changed owner", "mtime", ...) carry the old and new values as "item1" and
+        "item2". Example::
 
-            {"path": "PATH", "changes": [
-                {"type": "modified", "added": BYTES, "removed": BYTES},
-                {"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"},
-                {"type": "added", "size": SIZE},
-                {"type": "removed", "size": SIZE}
-            ]}
+            {"changes": [{"added": 23, "removed": 5, "type": "modified"}], "path": "path/to/file"}
+            {"changes": [{"item1": "-rw-r--r--", "item2": "-rwxr-xr-x", "type": "changed mode"}], "path": "some/file"}
+            {"changes": [{"added": 4, "removed": 0, "type": "added"}], "path": "path/to/added-file"}
+            {"changes": [{"added": 0, "removed": 5, "type": "removed"}], "path": "path/to/removed-file"}
 
         Sorting
         ++++++++

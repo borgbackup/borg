@@ -2008,3 +2008,30 @@ def test_create_digests_invalid_algo(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "create", "--digests=nosuchhash", "test", "input", exit_code=2)
     assert "digests must be" in output and "blake3" in output  # the error lists the valid algorithms
+
+
+def test_chunkindex_covers_committed_archive(archiver, monkeypatch):
+    """The index fragments covering a session's chunks are written before the archive pointer (#10239).
+
+    Simulate borg dying right after the commit point (the archives/* pointer write): the close-time
+    index write does not happen then. As reads are routed through the chunk index, the committed
+    archive is only readable if index fragments covering all of its chunks were written before the
+    pointer.
+    """
+    from ...cache import ChunksMixin
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    orig_maybe_write = ChunksMixin._maybe_write_chunks_index
+
+    def no_close_time_write(self, now, force=False, clear=False):
+        if clear:
+            return  # skip the cache-close index write, like a crash right after committing
+        orig_maybe_write(self, now, force=force, clear=clear)
+
+    with monkeypatch.context() as m:
+        m.setattr(ChunksMixin, "_maybe_write_chunks_index", no_close_time_write)
+        cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    assert_dirs_equal("input", "output/input")

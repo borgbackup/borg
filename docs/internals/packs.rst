@@ -169,16 +169,15 @@ entry carries the ``F_PENDING`` flag and its pack location is unresolved.
     crash before it leaves only unreferenced objects that ``borg compact``
     reclaims.
 
-.. TODO: the implementation currently writes the session's final index fragment at
-   cache close, i.e. after the archive pointer - see issue #10239.
-
 Pack data must be stored before any archive pointer references it.
 The required write order is:
 
-1. Store the pack file to ``packs/<pack_id>`` via borgstore.
-2. Store the partial index file to ``index/<index_id>`` (see :ref:`pack-index-namespace`).
-3. Write the archive metadata object into a pack, then write the archive pointer
-   ``archives/<hex(archive_id)>``. This pointer write is the sole commit point.
+1. Store the pack files to ``packs/<pack_id>`` via borgstore. The archive metadata
+   object goes into a (usually tiny) pack of its own, stored last.
+2. Store index fragment(s) covering all objects the session stored -- the archive
+   metadata object included -- to ``index/<index_id>`` (see :ref:`pack-index-namespace`).
+3. Write the archive pointer ``archives/<hex(archive_id)>``. This pointer write is
+   the sole commit point.
 
 A crash between steps 1 and 2 leaves orphan pack files in ``packs/``. No archive
 references these chunks; ``borg compact`` removes them on the next run.

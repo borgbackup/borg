@@ -801,6 +801,11 @@ Duration: {0.duration}
                 raise Error("%s - archive too big (issue #1473)!" % err_msg)
             else:
                 raise
+        # the index fragment(s) covering this session's chunks must be stored before the archive
+        # pointer: the pointer write below is the commit point, and a committed archive must have
+        # complete index coverage. A crash before the pointer is written merely leaves an index
+        # fragment referencing uncommitted objects, which compact/rebuild prunes (#10239).
+        self.cache.write_chunks_index()
         self.manifest.archives.create(name, self.id, metadata.time)
         self.manifest.write()
         return metadata
@@ -1149,6 +1154,8 @@ Duration: {0.duration}
         data = self.key.pack_metadata(metadata.as_dict())
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, {}, data, stats=self.stats, ro_type=ROBJ_ARCHIVE_META)
+        # index coverage must be complete before the archive pointer is written, see save().
+        self.cache.write_chunks_index()
         self.manifest.archives.create(self.name, new_id, metadata.time, overwrite=True)
         self.id = new_id
 

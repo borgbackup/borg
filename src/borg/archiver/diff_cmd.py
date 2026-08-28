@@ -107,7 +107,7 @@ class DiffMixIn:
         matcher = build_matcher(args.patterns, args.paths)
 
         diffs_iter = Archive.compare_archives_iter(
-            archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids
+            archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, numeric_ids=args.numeric_ids
         )
         # Filter out equal items early (keep as generator; listify only if sorting)
         diffs = (diff for diff in diffs_iter if not diff.equal(args.content_only))

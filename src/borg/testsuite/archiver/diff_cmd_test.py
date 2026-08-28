@@ -6,7 +6,12 @@ import stat
 import time
 import pytest
 
+from ...archive import Archive
+from ...cache import Cache
 from ...constants import *  # NOQA
+from ...item import Item
+from ...manifest import Manifest
+from ...repository import Repository
 from .. import are_symlinks_supported, are_hardlinks_supported, granularity_sleep
 from ...platformflags import is_win32, is_freebsd, is_netbsd, is_openbsd
 from . import (
@@ -261,6 +266,62 @@ def test_basic_functionality(archivers, request):
 
     output = cmd(archiver, "diff", "test0", "test1a", "--json-lines", "--content-only")
     do_json_asserts(output, True, content_only=True)
+
+
+def _create_archive_with_items(archiver, name, items):
+    # Inject raw Items directly into an archive, bypassing "borg create", so the owner
+    # metadata (uid/gid/user/group) can be controlled exactly (without needing root).
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        with Cache(repository, manifest, archive_name=name) as cache:
+            archive = Archive(manifest, name, cache=cache, create=True)
+            for item in items:
+                archive.items_buffer.add(item)
+            archive.save(name=name)
+
+
+def test_numeric_ids(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("archives with crafted owner metadata need direct (local) repository access")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    def item(path, uid, gid, user, group):
+        return Item(
+            path=path, mode=stat.S_IFREG | 0o644, mtime=0, ctime=0, uid=uid, gid=gid, user=user, group=group, chunks=[]
+        )
+
+    _create_archive_with_items(
+        archiver,
+        "a1",
+        [item("names_changed", 1000, 1000, "alice", "alice"), item("ids_changed", 1000, 1000, "alice", "alice")],
+    )
+    _create_archive_with_items(
+        archiver,
+        "a2",
+        [
+            item("names_changed", 1000, 1000, "bob", "bob"),  # same uid/gid, different names
+            item("ids_changed", 2000, 2000, "alice", "alice"),  # different uid/gid, same names
+        ],
+    )
+
+    def changes_by_path(output):
+        return {j["path"]: j["changes"] for j in (json.loads(line) for line in output.splitlines() if line)}
+
+    # without --numeric-ids, the user/group names are compared and reported
+    changes = changes_by_path(cmd(archiver, "diff", "a1", "a2", "--json-lines"))
+    assert {"type": "changed owner", "item1": ["alice", "alice"], "item2": ["bob", "bob"]} in changes["names_changed"]
+    assert {"type": "changed user", "item1": "alice", "item2": "bob"} in changes["names_changed"]
+    assert {"type": "changed group", "item1": "alice", "item2": "bob"} in changes["names_changed"]
+    assert "ids_changed" not in changes  # names unchanged, so the item counts as equal
+
+    # with --numeric-ids, the numeric uid/gid are compared and reported instead
+    changes = changes_by_path(cmd(archiver, "diff", "a1", "a2", "--json-lines", "--numeric-ids"))
+    assert {"type": "changed owner", "item1": [1000, 1000], "item2": [2000, 2000]} in changes["ids_changed"]
+    assert {"type": "changed user", "item1": 1000, "item2": 2000} in changes["ids_changed"]
+    assert {"type": "changed group", "item1": 1000, "item2": 2000} in changes["ids_changed"]
+    assert "names_changed" not in changes  # uid/gid unchanged, so the item counts as equal
 
 
 def test_time_diffs(archivers, request):

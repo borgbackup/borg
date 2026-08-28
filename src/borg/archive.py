@@ -1193,13 +1193,14 @@ Duration: {0.duration}
 
     @staticmethod
     def compare_archives_iter(
-        archive1: "Archive", archive2: "Archive", matcher=None, can_compare_chunk_ids=False
+        archive1: "Archive", archive2: "Archive", matcher=None, can_compare_chunk_ids=False, numeric_ids=False
     ) -> Iterator[ItemDiff]:
         """
         Yields an ItemDiff instance describing changes/indicating equality.
 
         :param matcher: PatternMatcher class to restrict results to only matching paths.
         :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
+        :param numeric_ids: Whether to compare/report numeric uid/gid instead of user/group names.
         """
 
         def compare_items(path: str, item1: Item, item2: Item):
@@ -1209,6 +1210,7 @@ Duration: {0.duration}
                 item2,
                 archive1.pipeline.fetch_many(item1.get("chunks", []), ro_type=ROBJ_FILE_STREAM),
                 archive2.pipeline.fetch_many(item2.get("chunks", []), ro_type=ROBJ_FILE_STREAM),
+                numeric_ids=numeric_ids,
                 can_compare_chunk_ids=can_compare_chunk_ids,
             )
 

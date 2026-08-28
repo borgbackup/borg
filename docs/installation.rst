@@ -106,17 +106,19 @@ Standalone Binary
 .. note:: Releases are signed with an OpenPGP key, see
           :ref:`security-contact` for more instructions.
 
-Borg x86/x64 AMD/Intel compatible binaries (generated with `pyinstaller`_)
-are available on the releases_ page for the following platforms:
+Prebuilt binaries (generated with `pyinstaller`_) are available on the
+releases_ page for Linux and macOS (x86-64 and arm64) and for FreeBSD
+(x86-64). For each platform there is a single-file binary and, as a
+``.tgz``, the same thing as a single-directory bundle, which starts up
+faster.
 
-* **Linux**: glibc >= 2.28 (ok for most supported Linux releases).
-  Older glibc releases are untested and may not work.
-* **macOS**: 10.12 or newer (To avoid signing issues, download the file via
-  command line **or** remove the ``quarantine`` attribute after downloading:
-  ``$ xattr -dr com.apple.quarantine borg-macosx64.tgz``)
-* **FreeBSD**: 12.1 (unknown whether it works for older releases)
+See the ``00_README.txt`` file provided alongside the binaries on the
+releases_ page for the exact list of binaries, their platform
+requirements, and how to verify them.
 
-ARM binaries are built by Johann Bauer, see: https://borg.bauerj.eu/
+On macOS, if Gatekeeper blocks the downloaded binary, remove its
+quarantine attribute (``xattr -dr com.apple.quarantine``) before running
+it.
 
 .. note:: ``borg mount`` only works if the binary was built with FUSE support
           (third-party binaries might lack it) and your OS has FUSE installed

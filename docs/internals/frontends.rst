@@ -178,7 +178,7 @@ log_message
     :ref:`msgid <msgid>`
         Message ID, may be *null* or absent
 
-See Prompts_ for how borg asks questions.
+See Prompts_ for the types used by prompts.
 
 .. rubric:: Examples (reformatted, each object would be on exactly one line)
 .. highlight:: json
@@ -228,15 +228,54 @@ Prompts
 -------
 
 Borg asks a few yes/no questions interactively; the "Prompts" list at the end of `Message IDs`_
-enumerates them. Borg writes them directly to *stderr* as plain text and reads the answer
-verbatim from *stdin*. Prompts do not go through the logger, so they stay plain text even with
-``--log-json``.
+enumerates them. Answers are read verbatim from *stdin*. The questions and the messages about
+their processing are written to *stderr*: as plain text by default, or as JSON objects (one per
+line, like log messages) when ``--log-json`` is given.
 
-A frontend should therefore not try to answer these prompts interactively. Every prompt has an
+Prompts use the *question_prompt* and *question_prompt_retry* types for the prompt itself,
+and *question_invalid_answer*, *question_accepted_default*, *question_accepted_true*,
+*question_accepted_false* and *question_env_answer* types for information about
+prompt processing.
+
+The *message* property contains the same string displayed regularly in the same situation,
+while the *msgid* property contains a msgid_, the name of the environment variable that can
+be used to override the prompt. It is the same for all JSON messages pertaining to the same
+prompt. *question_env_answer* messages additionally have an *env_var* property with the name
+of the environment variable the answer was taken from.
+
+A frontend should not try to answer these prompts interactively. Every prompt has an
 environment variable that overrides it (the variable name is the prompt's msgid_): if it is set,
 its value is used as if it had been typed in, and borg never waits for input. For example, with
 ``BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO`` in the environment, ``borg check --repair`` prints the
 question, answers it with *NO* and fails with the *CancelledByUser* msgid_ (rc 3).
+
+.. rubric:: Examples (reformatted, each object would be on exactly one line)
+.. highlight:: none
+
+Providing an invalid answer::
+
+    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "This is a potentially dangerous function.\n... Type 'YES' if you understand this and want to continue: "}
+    incorrect answer  # input on stdin
+    {"type": "question_invalid_answer", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "Invalid answer, aborting."}
+
+Providing a false (negative) answer via the environment variable::
+
+    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "This is a potentially dangerous function.\n... Type 'YES' if you understand this and want to continue: "}
+    {"env_var": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING", "type": "question_env_answer",
+     "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "NO (from BORG_CHECK_I_KNOW_WHAT_I_AM_DOING)"}
+    {"type": "question_accepted_false", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "Aborting."}
+
+Providing a true (affirmative) answer::
+
+    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
+     "message": "This is a potentially dangerous function.\n... Type 'YES' if you understand this and want to continue: "}
+    YES  # input on stdin
+    # no further output, just like the prompt without --log-json
 
 Passphrase prompts
 ------------------

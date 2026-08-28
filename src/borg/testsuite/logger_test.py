@@ -38,6 +38,17 @@ def test_multiple_loggers(io_logger):
     assert io_logger.getvalue() == "borg.testsuite.logger_test: hello world 2\n"
 
 
+def test_setup_logging_json_attribute():
+    # the yes() prompt function decides between plain text and JSON output ("question_*"
+    # objects) by looking at the "json" attribute of the "borg" logger, so setup_logging()
+    # must set it according to log_json (i.e. whether --log-json was given).
+    # test True before False, so the logging configuration left behind matches
+    # what the other tests in this module leave behind.
+    for log_json in (True, False):
+        setup_logging(stream=StringIO(), env_var=None, log_json=log_json)
+        assert logging.getLogger("borg").json is log_json
+
+
 def test_parent_module():
     assert find_parent_module() == __name__
 

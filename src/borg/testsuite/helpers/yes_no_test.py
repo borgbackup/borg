@@ -1,3 +1,5 @@
+import json
+import logging
 import signal
 
 import pytest
@@ -132,3 +134,45 @@ def test_yes_env_output(capfd, monkeypatch):
     assert out == ""
     assert env_var in err
     assert "yes" in err
+
+
+def test_yes_json_output(capfd, monkeypatch):
+    # with --log-json, setup_logging() sets the "json" attribute on the "borg" logger
+    # and yes() then emits question_* JSON objects on stderr instead of plain text.
+    monkeypatch.setattr(logging.getLogger("borg"), "json", True, raising=False)
+    fake_input = FakeInputs(["invalid", "y"])
+    assert yes(
+        msg="intro-msg",
+        true_msg="true-msg",
+        false_msg="false-msg",
+        invalid_msg="invalid-msg",
+        retry_msg="retry-msg",
+        input=fake_input,
+        msgid="TEST_MSGID",
+    )
+    out, err = capfd.readouterr()
+    assert out == ""
+    objects = [json.loads(line) for line in err.splitlines()]
+    assert [o["type"] for o in objects] == [
+        "question_prompt",
+        "question_invalid_answer",
+        "question_prompt_retry",
+        "question_accepted_true",
+    ]
+    assert [o["message"] for o in objects] == ["intro-msg", "invalid-msg", "retry-msg", "true-msg"]
+    for o in objects:
+        assert o["msgid"] == "TEST_MSGID"
+
+
+def test_yes_env_json_output(capfd, monkeypatch):
+    monkeypatch.setattr(logging.getLogger("borg"), "json", True, raising=False)
+    env_var = "OVERRIDE_SOMETHING"
+    monkeypatch.setenv(env_var, "yes")
+    assert yes(env_var_override=env_var)
+    out, err = capfd.readouterr()
+    assert out == ""
+    (o,) = [json.loads(line) for line in err.splitlines()]
+    assert o["type"] == "question_env_answer"
+    assert o["msgid"] == env_var  # msgid defaults to env_var_override
+    assert o["env_var"] == env_var
+    assert o["message"] == f"yes (from {env_var})"

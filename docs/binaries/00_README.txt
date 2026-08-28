@@ -31,13 +31,15 @@ Download the correct files
 Binaries built on GitHub servers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-borg-linux-glibc235-x86_64-gh Linux AMD/Intel (built on Ubuntu 22.04 LTS with glibc 2.35)
-borg-linux-glibc235-arm64-gh  Linux ARM (built on Ubuntu 22.04 LTS with glibc 2.35)
+borg-linux-glibc243-x86_64-gh Linux AMD/Intel (built on Ubuntu 26.04 LTS with glibc 2.43)
+borg-linux-glibc243-arm64-gh  Linux ARM (built on Ubuntu 26.04 LTS with glibc 2.43)
 
 borg-macos-15-arm64-gh        macOS Apple Silicon (built on macOS 15 w/o FUSE support)
 borg-macos-15-x86_64-gh       macOS Intel (built on macOS 15 w/o FUSE support)
 
-borg-freebsd-14-x86_64-gh     FreeBSD AMD/Intel (built on FreeBSD 14)
+borg-freebsd-15-x86_64-gh     FreeBSD AMD/Intel (built on FreeBSD 15.1)
+
+borg-windows-x86_64-gh        Windows AMD/Intel (built using MINGW/MSYS2)
 
 Binaries built locally
 ~~~~~~~~~~~~~~~~~~~~~~

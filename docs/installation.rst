@@ -64,16 +64,16 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 ============ ============================================= =======
 
 .. _Alpine repository: https://pkgs.alpinelinux.org/packages?name=borgbackup
-.. _[extra]: https://www.archlinux.org/packages/?name=borg
+.. _[extra]: https://archlinux.org/packages/?name=borg
 .. _Debian packages: https://packages.debian.org/search?keywords=borgbackup&searchon=names&exact=1&suite=all&section=all
 .. _Fedora official repository: https://packages.fedoraproject.org/pkgs/borgbackup/borgbackup/
 .. _FreeBSD ports: https://www.freshports.org/archivers/py-borgbackup/
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
-.. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
+.. _GNU Guix: https://packages.guix.gnu.org/search/?query=borg
 .. _pkgsrc: https://pkgsrc.se/sysutils/py-borgbackup
 .. _cauldron: https://madb.mageia.org/package/show/application/0/release/cauldron/name/borgbackup
-.. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borgbackup/default.nix
-.. _OpenBSD ports: https://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
+.. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/bo/borgbackup/package.nix
+.. _OpenBSD ports: https://github.com/openbsd/ports/tree/master/sysutils/borgbackup
 .. _OpenIndiana hipster repository: https://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
 .. _openSUSE official repository: https://software.opensuse.org/package/borgbackup
 .. _Homebrew: https://formulae.brew.sh/formula/borgbackup
@@ -171,11 +171,12 @@ development header files (sometimes in a separate `-dev` or `-devel` package).
 * OpenSSL_ >= 3.2.0 (LibreSSL will not work)
 * libacl_ (which depends on libattr_)
 * liblz4_ >= 1.7.0 (r129)
-
 * pkg-config (cli tool) - Borg uses this to discover header and library
   locations automatically. Alternatively, you can also point to them via some
   environment variables, see setup.py.
 * Some other Python dependencies, pip will automatically install them for you.
+* A Rust toolchain, but only if pip has to build the Rust-based ``blake3``
+  Python package from source, because there is no binary wheel for your platform.
 * Optionally, if you wish to mount an archive as a FUSE filesystem, you need
   a FUSE implementation for Python:
 
@@ -185,9 +186,13 @@ development header files (sometimes in a separate `-dev` or `-devel` package).
   - Additionally, your OS will need to have FUSE support installed
     (e.g. a package `fuse` for fuse 2 or a package `fuse3` for fuse 3 support).
 * Optionally, if you wish to use S3/B2 Backend:
-  - borgstore[s3] ~= 0.3.0 (use `pip install borgbackup[s3]`)
+  - borgstore[rest,blake3,s3] ~= 0.6.1 (use `pip install borgbackup[s3]`)
 * Optionally, if you wish to use SFTP Backend:
-  - borgstore[sftp] ~= 0.3.0 (use `pip install borgbackup[sftp]`)
+  - borgstore[rest,blake3,sftp] ~= 0.6.1 (use `pip install borgbackup[sftp]`)
+* Optionally, if you wish to use rclone Backend:
+  - borgstore[rest,blake3,rclone] ~= 0.6.1 (use `pip install borgbackup[rclone]`)
+* Optionally, if you wish to use the TUI (``borg --cockpit``):
+  - textual >= 6.8.0 (use `pip install borgbackup[cockpit]`)
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below or the Vagrantfile in the git repository,
@@ -269,15 +274,20 @@ macOS
 When installing borgbackup via Homebrew_, the basic dependencies are installed automatically.
 
 For FUSE support to mount the backup archives, you need macFUSE, which is available
-via `github <https://github.com/osxfuse/osxfuse/releases/latest>`__, or Homebrew::
+via `github <https://github.com/macfuse/macfuse/releases/latest>`__, or Homebrew::
 
     brew install --cask macfuse
 
-When installing Borg via ``pip``, be sure to install the ``llfuse`` extra,
-since macFUSE only supports FUSE API v2. Also, since Homebrew won't link
-the installed ``openssl`` formula, point pkg-config to the correct path::
+When installing Borg via ``pip``, use the ``mfusepy`` extra (mfusepy supports the
+FUSE 2 and FUSE 3 APIs and is the first implementation tried by the default
+``BORG_FUSE_IMPL=mfusepy,pyfuse3,llfuse``); the ``llfuse`` extra also works.
+Also, since Homebrew won't link the installed ``openssl`` formula, point
+pkg-config to the correct path::
 
-    PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig" pip install borgbackup[llfuse]
+    PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig" pip install borgbackup[mfusepy]
+
+``brew --prefix openssl@3`` expands to ``/opt/homebrew/opt/openssl@3`` on Apple
+Silicon and to ``/usr/local/opt/openssl@3`` on Intel Macs.
 
 When working from a borg git repo workdir, you can install dependencies using the
 Brewfile::
@@ -372,10 +382,13 @@ Cygwin
 
 Use the Cygwin installer to install the dependencies::
 
-    python39 python39-devel
-    python39-setuptools python39-pip python39-wheel python39-virtualenv
+    python311 python311-devel
+    python311-setuptools python311-pip python311-wheel python311-virtualenv
     libssl-devel liblz4-devel
     binutils gcc-g++ git make openssh
+
+Borg requires Python >= 3.11, so use the ``python311`` package set or a newer
+``python3XX`` one, if Cygwin offers it.
 
 Make sure to use a virtual environment to avoid confusions with any Python installed on Windows.
 
@@ -429,13 +442,14 @@ This will use ``pip`` to install the latest release from PyPi::
     # install Borg + Python dependencies into virtualenv
     pip install borgbackup
     # or alternatively (if you want FUSE support):
-    pip install borgbackup[llfuse]  # to use llfuse
+    pip install borgbackup[mfusepy]  # to use mfusepy
     pip install borgbackup[pyfuse3]  # to use pyfuse3
+    pip install borgbackup[llfuse]  # to use llfuse
 
 To upgrade Borg to a new version later, run the following after
 activating your virtual environment::
 
-    pip install -U borgbackup  # or ... borgbackup[llfuse/pyfuse3]
+    pip install -U borgbackup  # or ... borgbackup[mfusepy/pyfuse3/llfuse]
 
 When doing manual pip installation, man pages are not automatically
 installed.  You can run these commands to install the man pages
@@ -483,6 +497,8 @@ manually using the ``SETUPTOOLS_SCM_PRETEND_VERSION`` environment variable.
 
     # install borg into virtualenv
     pip install -e .           # in-place editable mode
+    or
+    pip install -e .[mfusepy]  # in-place editable mode, use mfusepy
     or
     pip install -e .[pyfuse3]  # in-place editable mode, use pyfuse3
     or

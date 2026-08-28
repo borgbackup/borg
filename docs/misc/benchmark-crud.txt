@@ -3,11 +3,15 @@ borg benchmark crud
 
 Here is an example of borg benchmark crud output.
 
+Note: these measurements were made with borg 1.x and are kept for historical
+reference. The commands below are updated to borg 2 syntax, but the numbers
+were NOT re-measured with borg 2.
+
 I ran it on my laptop: Core i5-4200U, 8 GB RAM, SATA SSD, Linux, ext4 filesystem.
 "src" as well as repo is local, on this SSD.
 
-$ BORG_PASSPHRASE=secret borg init --encryption repokey-blake2 repo
-$ BORG_PASSPHRASE=secret borg benchmark crud repo src
+$ BORG_PASSPHRASE=secret borg -r repo repo-create --encryption aes256-ocb --id-hash blake3 --key-location repokey
+$ BORG_PASSPHRASE=secret borg -r repo benchmark crud src
 
 C-Z-BIG         116.06 MB/s (10 * 100.00 MB all-zero files: 8.62s)
 R-Z-BIG         197.00 MB/s (10 * 100.00 MB all-zero files: 5.08s)

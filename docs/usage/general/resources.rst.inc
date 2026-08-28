@@ -16,11 +16,19 @@ CPU client:
     - **chunks index rebuild:** quite heavy on CPU, doing lots of hash table operations
     - **borg extract:** decryption, decompression (medium to high CPU usage)
     - **borg prune/borg delete archive:** quick, low CPU usage
-    - **borg delete repo:** done on the server
+    - **borg repo-delete:** low CPU usage, it just removes the repository's objects
     - **borg compact:** medium CPU usage
     - **borg check:** medium CPU usage, but depends on options given
 
-    It will not use more than 100% of one CPU core as the code is currently single-threaded.
+    Most of Borg is single-threaded, but some parts do use more than one CPU core:
+
+    - zstd compresses a chunk multi-threaded by default (only for chunks of at
+      least 768 KiB, using at most 4 threads); see ``BORG_ZSTD_MT_WORKERS``.
+    - the BLAKE3 based id-hash / MAC modes hash multi-threaded for inputs from
+      256 KiB on; see ``BORG_BLAKE3_MT_THRESHOLD``.
+    - ``borg create`` hands each finished pack file to a background thread, so
+      hashing and storing a pack overlaps with processing the next one.
+
     Especially higher zlib and lzma compression levels use significant amounts
     of CPU cycles. Crypto might be cheap on the CPU (if hardware-accelerated) or
     expensive (if not).

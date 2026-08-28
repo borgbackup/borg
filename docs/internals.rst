@@ -20,8 +20,10 @@ Deduplication is performed globally across all data in the repository
 (multiple backups and even multiple hosts), both on data and file
 metadata, using :ref:`chunks` created by the chunker using a
 content-defined chunking algorithm - the Gear rolling hash of FastCDC_
-("fastcdc" chunker, the default) or Buzhash_ ("buzhash" and "buzhash64"
-chunker) - or a simpler fixed block size algorithm ("fixed" chunker).
+("fastcdc" chunker, the default), Buzhash_ ("buzhash" and "buzhash64"
+chunker) or a universal hash followed by an AES pseudo-random function
+("rabin-aes", "toeplitz-aes" and "goldilocks-aes" chunker) - or a simpler
+fixed block size algorithm ("fixed" chunker).
 
 To perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks index <index>`, which is a
@@ -33,9 +35,10 @@ hash table of all chunks that already exist.
 
     Layers in Borg. At the very top, commands are implemented, using
     a data access layer provided by the Archive and Item classes.
-    The "key" object provides both compression and authenticated
-    encryption used by the data access layer. The "key" object represents
-    the sole trust boundary in Borg.
+    Below that, the RepoObj class compresses the data (using a Compressor,
+    see class RepoObj in ``repoobj.py``) and then hands it to the "key"
+    object, which provides the authenticated encryption. The "key" object
+    represents the sole trust boundary in Borg.
     The lowest layer is the repository accessed via class Repository.
     Repository uses ``borgstore`` internally.
 

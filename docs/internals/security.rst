@@ -165,20 +165,31 @@ Session::
     sessionkey = sha256(crypt_key + sessionid + domain)
     message_iv = 0
 
+A repository object has two separately encrypted slots, the object metadata and the
+object data, and both are stored behind one unencrypted object header (magic, format
+version, chunk id, slot sizes - see :ref:`pack-format`). The header prefix and the
+slot a ciphertext belongs to are bound into its authentication tag as well:
+
 Encryption::
 
     id = MAC(id_key, data)
     compressed = compress(data)
 
+    # the unencrypted repo object header prefix (41 bytes) this ciphertext is stored
+    # behind, and which of the object's two slots it goes into:
+    obj_header_aad = OBJ_MAGIC || obj_version || id
+    slot_tag = "M" for the object metadata slot, "D" for the object data slot
+
     header = type-byte || 00h || message_iv || sessionid
-    aad = id || header
+    aad = obj_header_aad || slot_tag || id || header
     message_iv++
     encrypted, auth_tag = AEAD_encrypt(session_key, message_iv, compressed, aad)
     authenticated = header || auth_tag || encrypted
 
 Decryption::
 
-    # Given: input *authenticated* data and a *chunk-id* to assert
+    # Given: input *authenticated* data, a *chunk-id* to assert, and the object header
+    # prefix / slot the ciphertext was read from
     type-byte, past_message_iv, past_sessionid, auth_tag, encrypted = SPLIT(authenticated)
 
     ASSERT(type-byte is correct)
@@ -186,7 +197,9 @@ Decryption::
     domain = "borg-session-key-CIPHERNAME"
     past_key = sha256(crypt_key + past_sessionid + domain)
 
-    decrypted = AEAD_decrypt(past_key, past_message_iv, authenticated)
+    header = type-byte || 00h || past_message_iv || past_sessionid
+    aad = obj_header_aad || slot_tag || id || header
+    decrypted = AEAD_decrypt(past_key, past_message_iv, authenticated, aad)
 
     decompressed = decompress(decrypted)
 
@@ -198,10 +211,14 @@ Notable:
 - The session key is also changed within a borg invocation if we encrypted a lot of data
   with it (AES-OCB only, see :ref:`aead_usage_limits`). Reading is not affected by this,
   because the session id is part of every message.
-- The id is now also input into the authentication tag computation.
+- The id is also input into the authentication tag computation.
   This strongly associates the id with the written data (== associates the key with
   the value). When later reading the data for some id, authentication will only
-  succeed if what we get was really written by us for that id.
+  succeed if what we get was really written by us for that id. Since repo object
+  format version 2, the object header prefix (magic, format version and the chunk id
+  the header declares) and the slot tag are authenticated along with it, so a
+  ciphertext can neither be presented under a forged object header nor be swapped
+  between the metadata and the data slot of an object, see :ref:`pack-format`.
 - Because of that, additionally verifying ``id == MAC(id_key, decompressed)`` after
   decryption is optional for these modes: it is not what protects against a malicious
   repository (the authentication tag does that), it only detects chunks whose content
@@ -285,7 +302,7 @@ For offline storage of the encryption keys they are encrypted with a
 user-chosen passphrase.
 
 A 256 bit key encryption key (KEK) is derived from the passphrase
-using argon2_ with a random 256 bit salt. The KEK is then used
+using argon2_ (argon2id, ``ARGON2_ARGS``) with a random 128 bit salt. The KEK is then used
 to Encrypt-*then*-MAC a packed representation of the keys using the
 chacha20-poly1305 AEAD cipher and a constant IV == 0.
 The ciphertext is then converted to base64.
@@ -344,66 +361,138 @@ on widely used libraries providing them:
 .. _hmac: https://docs.python.org/3/library/hmac.html
 .. _os.urandom: https://docs.python.org/3/library/os.html#os.urandom
 
-Remote RPC protocol security
-============================
+.. _remote_access_security:
+
+Remote repository access security
+=================================
 
 .. note:: This section could be further expanded / detailed.
 
-The RPC protocol is fundamentally based on msgpack'd messages exchanged
-over an encrypted SSH channel (the system's SSH client is used for this
-by piping data from/to it).
+Borg 2 has no repository protocol of its own. A repository is a borgstore object
+store (see :ref:`internals`), and borgstore owns the client/server transport. The
+same set of named objects is what a remote end gets to see, whatever transport is
+used:
 
-This means that the authorization and transport security properties
-are inherited from SSH and the configuration of the SSH client and the
-SSH server -- Borg RPC does not contain *any* networking
-code. Networking is done by the SSH client running in a separate
-process, Borg only communicates over the standard pipes (stdout,
-stderr and stdin) with this process. This also means that Borg doesn't
-have to use a SSH client directly (or SSH at all). For example,
-``sudo`` or ``qrexec`` could be used as an intermediary.
+- ``packs/<hex(pack_id)>`` -- the pack files holding the repository objects. Each
+  object's metadata slot and data slot are encrypted and authenticated with the borg
+  key (see :ref:`security_encryption`); its per-object header is unencrypted and
+  carries the magic, the format version and the chunk id (see :ref:`pack-format`).
+- ``index/<sha256>`` -- the chunk id to pack location index. It is not encrypted,
+  but it only contains chunk ids and locations, which the pack headers expose anyway.
+- ``archives/<hex(archive_id)>`` -- one empty object per archive. The archive name,
+  its timestamps, the item metadata and the chunk lists all live inside encrypted
+  repository objects, so the pointer object itself only reveals the archive id (a MAC
+  over the archive metadata) plus whatever the store records about it, e.g. its
+  modification time.
+- ``config/manifest`` (an encrypted repository object), plus the plaintext
+  ``config/version``, ``config/id`` and ``config/readme``.
+- ``keys/<sha256>`` -- in ``repokey`` mode, the borg key(s), encrypted with the
+  passphrase-derived KEK (see :ref:`key_encryption`).
+- ``locks/*`` and ``cache/*``. Note that the per-archive reference caches
+  ``cache/referenced-by-archive.<hex(archive_id)>``, written by ``borg compact`` and
+  ``borg analyze``, are *not* encrypted: they list the object ids and plaintext sizes
+  an archive references.
 
-By using the system's SSH client and not implementing a
-(cryptographic) network protocol Borg sidesteps many security issues
-that would normally impact distributing statically linked / standalone
-binaries.
+Authorization and transport security come from the transport, not from borg.
 
-The remainder of this section will focus on the security of the RPC
-protocol within Borg.
+Remote repositories over SSH: ``rest://``
+-----------------------------------------
 
-The assumed worst-case a server can inflict to a client is a
-denial of repository service.
+For a ``rest://`` repository, borg runs ``borg serve --rest --backend FILE:<path>``
+on the remote machine and speaks HTTP to it over that process' *stdin/stdout* -- not
+over a socket. If the URL contains a host, the process is started through the
+system's SSH client (honouring ``BORG_RSH`` / ``BORGSTORE_RSH`` for the ssh command
+and ``BORG_REMOTE_PATH`` for the remote borg), so:
 
-The situation where a server can create a general DoS on the client
-should be avoided, but might be possible by e.g. forcing the client to
-allocate large amounts of memory to decode large messages (or messages
-that merely indicate a large amount of data follows). The RPC protocol
-code uses a limited msgpack Unpacker to prohibit this.
+- Authorization, confidentiality and integrity of the channel are entirely SSH's and
+  are determined by the SSH client and server configuration. Borg contains no
+  networking code on this path -- it only talks to a subprocess over pipes. That also
+  means borg does not have to use an SSH client (or SSH at all); ``sudo`` or
+  ``qrexec`` could be used as an intermediary.
+- The stdio REST server binds no port and does no authentication of its own: the
+  client has already authenticated to sshd, and sshd is what starts the server, as
+  that user.
 
-We believe that other kinds of attacks, especially critical vulnerabilities
-like remote code execution are inhibited by the design of the protocol:
+By using the system's SSH client instead of implementing a cryptographic network
+protocol, borg sidesteps many security issues that would otherwise impact
+distributing statically linked / standalone binaries.
 
-1. The server cannot send requests to the client on its own accord,
-   it only can send responses. This avoids "unexpected inversion of control"
-   issues.
-2. msgpack serialization does not allow embedding or referencing code that
-   is automatically executed. Incoming messages are unpacked by the msgpack
-   unpacker into native Python data structures (like tuples and dictionaries),
-   which are then passed to the rest of the program.
+Server-side restrictions are available and, being server-side, they also hold against
+a malicious client:
+
+- ``--restrict-to-path`` / ``--restrict-to-repository`` are checked against the
+  requested ``FILE:`` path before anything is served.
+- ``--permissions`` (or ``BORG_REPO_PERMISSIONS``) selects one of ``all``,
+  ``no-delete``, ``write-only`` or ``read-only``, which map to per-namespace
+  list/read/write/overwrite/delete permissions enforced by the borgstore backend.
+
+Other transports
+----------------
+
+The remaining transports are implemented inside the borg process by borgstore and
+its dependencies, so their security properties are those of the respective library:
+
+- ``sftp://`` speaks SFTP in-process via paramiko. Host keys are taken from the
+  user's ``known_hosts`` file and no missing-host-key policy is installed, so an
+  unknown host is rejected -- make the first connection with the ``ssh`` or ``sftp``
+  command line tool and verify the fingerprint there.
+- ``s3:``/``b2:`` use boto3, i.e. in-process HTTPS to the (S3-compatible) endpoint,
+  authenticated with the credentials from the URL, a named profile, or the usual
+  boto3 environment/configuration.
+- ``rclone:`` starts an ``rclone rcd`` process listening on ``127.0.0.1`` on a random
+  port with a random user/password and drives it over its rc API. Remote credentials
+  and transport security are rclone's.
+- ``http(s)://`` talks to a borgstore REST server over plain HTTP, authenticating
+  with HTTP Basic auth taken from the URL or from ``BORGSTORE_REST_USERNAME`` /
+  ``BORGSTORE_REST_PASSWORD``. Basic auth sends the credentials to the server on
+  every request, so use ``https`` if you use this at all. ``rest://`` over SSH needs
+  no such credentials.
+
+In every case the repository never receives the borg key or the passphrase, so a
+compromised or malicious repository server cannot read the backed up data. What it
+can do is deny service and return wrong or missing objects; the latter is detected
+client-side, see :ref:`attack_model` and :ref:`security_structural_auth`.
+
+Legacy borg 1.x RPC protocol
+----------------------------
+
+``borg serve`` *without* ``--rest`` still speaks the borg 1.x RPC protocol:
+msgpack'd messages exchanged over stdio (``borg.legacy.remote``). It exists only so
+that borg 2 can *read* a borg 1.x repository through an ``ssh://`` URL, e.g. for
+``borg transfer --from-borg1``; ``ssh://`` is rejected for current repositories, and
+this protocol cannot serve one. Its transport is the system's SSH client, so the same
+"authorization and transport security are SSH's" reasoning as for ``rest://``
+applies.
+
+Within that protocol, critical vulnerabilities such as remote code execution are
+inhibited by its design:
+
+1. The server cannot send requests to the client on its own accord, it only sends
+   log records and responses. This avoids "unexpected inversion of control" issues.
+2. msgpack serialization does not allow embedding or referencing code that is
+   automatically executed. Incoming messages are unpacked by the msgpack unpacker
+   into native Python data structures (like tuples and dictionaries), which are then
+   passed to the rest of the program.
 
    Additional verification of the correct form of the responses could be implemented.
-3. Remote errors are presented in two forms:
+3. Remote errors and log output reach the client in two forms:
 
-   1. A simple plain-text *stderr* channel. A prefix string indicates the kind of message
-      (e.g. WARNING, INFO, ERROR), which is used to suppress it according to the
-      log level selected in the client.
-
-      A server can send arbitrary log messages, which may confuse a user. However,
-      log messages are only processed when server requests are in progress, therefore
-      the server cannot interfere / confuse with security critical dialogue like
-      the password prompt.
+   1. Log records sent as msgpack messages on the main data channel and re-emitted
+      through the client's logging, using the logger name and level the server
+      supplied. A server can therefore send arbitrary log messages, which may confuse
+      a user. However, the client only reads from the connection while a request is in
+      progress, so the server cannot interfere with security critical dialogue like
+      the passphrase prompt. Anything the server (or the ssh process) writes to
+      *stderr* is logged verbatim as a client-side warning.
    2. Server-side exceptions passed over the main data channel. These follow the
       general pattern of server-sent responses and are sent instead of response data
       for a request.
+
+Note that the msgpack unpackers of the RPC data channel (``get_limited_unpacker()``
+kinds ``client`` and ``server``) are deliberately configured with the maximum buffer
+size, because whole repository objects are transferred through them. They therefore
+do not bound the memory a peer can make the other side allocate; the stricter limits
+of that helper apply to manifest, archive and key data.
 
 The msgpack implementation used (msgpack-python) has a good security track record,
 a large test suite and no issues found by fuzzing. It is based on the msgpack-c implementation,
@@ -411,7 +500,7 @@ sharing the unpacking engine and some support code. msgpack-c has a good track r
 Some issues [#]_ in the past were located in code not included in msgpack-python.
 Borg does not use msgpack-c.
 
-.. [#] - `MessagePack fuzzing <https://blog.gypsyengineer.com/fun/msgpack-fuzzing.html>`_
+.. [#] - `MessagePack fuzzing <https://web.archive.org/web/20171004004418/https://blog.gypsyengineer.com/fun/msgpack-fuzzing.html>`_
        - `Fixed integer overflow and EXT size problem <https://github.com/msgpack/msgpack-c/pull/547>`_
        - `Fixed array and map size overflow <https://github.com/msgpack/msgpack-c/pull/550>`_
 
@@ -427,9 +516,13 @@ however, it is important to note that Borg links against ``libcrypto`` **not** `
 libcrypto is the low-level cryptography part of OpenSSL,
 while libssl implements TLS and related protocols.
 
-The latter is not used by Borg (cf. `Remote RPC protocol security`_, Borg itself does not implement
-any network access) and historically contained most vulnerabilities, especially critical ones.
-The static binaries released by the project contain neither libssl nor the Python ssl/_ssl modules.
+The latter historically contained most vulnerabilities, especially critical ones, and Borg's own
+extension modules do not use it: they link ``libcrypto`` only. Note that libssl can still be
+reached through Python's ``ssl`` module by the transports that do networking inside the borg
+process, i.e. ``s3:``/``b2:`` and ``http(s)://`` (see :ref:`remote_access_security`); ``rest://``
+and the legacy ``ssh://`` protocol do not need it, as they only talk to a subprocess over pipes.
+Accordingly, the binaries released by the project do include Python's ``ssl``/``_ssl`` modules
+(they are needed by pyfuse3/trio as well).
 
 Compression and Encryption
 ==========================
@@ -534,7 +627,7 @@ fingerprinting is not useful for an attacker.
 
 But, when new files are close to each other (when looking at recursion /
 scanning order), the resulting chunks will be also stored close to each other
-in the resulting repository segment file(s).
+in the resulting repository pack file(s), see :ref:`packs`.
 
 This might leak additional information for the chunk size fingerprinting
 attack (see above).

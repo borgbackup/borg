@@ -57,10 +57,32 @@ using current (``rest://``) repositories.
 
 The ``--restrict-to-repository`` option permits access to exactly **one**
 repository. It can be given multiple times to permit access to more than
-one repository.
+one repository. Alternatively, ``--restrict-to-path`` permits access to every
+repository below a directory.
 
 The repository may not exist yet; it can be created by the user with
 ``borg repo-create``, which allows for encryption.
+
+The forced command does not name a repository - the client does. The client
+appends ``--backend FILE:<path>`` to the ``borg serve --rest`` command line it
+wants to run; sshd hands that command line to the server in the
+``SSH_ORIGINAL_COMMAND`` environment variable, and ``borg serve`` takes the
+requested backend path from there and checks it against
+``--restrict-to-repository`` and ``--restrict-to-path``. If the requested path
+is not allowed, the server terminates with exit code 83 (``PathNotAllowed``).
+Apart from the log level, the lock wait time and debug topics, everything else
+the client requests is ignored, so the serve mode and the restrictions always
+come from the forced command.
+
+The user therefore selects the repository through the path in the repository
+URL::
+
+  borg -r rest://<user>@<host>/repository repo-list
+
+A path with a single leading slash is relative to the directory ssh logs into
+(the user's home directory), so with the forced command shown above,
+``rest://<user>@<host>/repository`` and
+``rest://<user>@<host>//home/<user>/repository`` address the same repository.
 
 Refer to the `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 man page for more details on SSH options.

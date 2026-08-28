@@ -261,7 +261,7 @@ but directly output to stderr (not: stdout, it could be connected to a pipe).
 To control the amount and kinds of messages output emitted at info level, use
 flags like ``--stats`` or ``--list``, then create a topic logger for messages
 controlled by that flag.  See ``_setup_implied_logging()`` in
-``borg/archiver.py`` for the entry point to topic logging.
+``src/borg/archiver/__init__.py`` for the entry point to topic logging.
 
 Building a development environment
 ----------------------------------
@@ -295,20 +295,23 @@ To run the test suite use the following command::
 
 Some more advanced examples::
 
-  # verify a changed tox.ini (run this after any change to tox.ini):
+  # verify a changed pyproject.toml (run this after any change to the [tool.tox] section):
   fakeroot -u tox --recreate
 
   fakeroot -u tox -e py313  # run all tests, but only on python 3.13
 
-  fakeroot -u tox borg.testsuite.locking  # only run 1 test module
-
-  fakeroot -u tox borg.testsuite.locking -- -k '"not Timer"'  # exclude some tests
-
-  fakeroot -u tox borg.testsuite -- -v  # verbose py.test
+  fakeroot -u tox -- borg.testsuite.fslocking_test  # only run 1 test module
 
 Important notes:
 
-- When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
+- With tox 4, all positional arguments MUST be given after ``--``; tox rejects
+  them otherwise with an "unrecognized arguments" error.
+- Whatever follows ``--`` replaces the default ``borg.testsuite`` value of
+  pytest's ``--pyargs`` argument as a single value, so it can only be used to
+  select a different module or package to test, as in the example above.
+- It cannot be combined with extra pytest options such as ``-k`` or ``-v`` this
+  way; for that, run pytest directly (see below). Note that tox already runs
+  pytest with ``-v`` by default.
 
 Running pytest directly without tox:
 

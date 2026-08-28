@@ -167,40 +167,69 @@ Version 2.0.0b24 (not released yet)
 
 New features:
 
-- locking: tell who is holding a lock we wait for or time out on: lock type, host,
-  pid and age of that lock. Also name the repository in the message (instead of just
-  the storage backend) and log which locks ``borg break-lock`` breaks, #2261
-- new "borg copy OLDNAME NEWNAME" command: copy an archive to a new archive name, #2300.
-  Copying is cheap: no file content is read or written, only a new archive metadata
-  object is created, and the two archives share their data like any other deduplicated
-  archives do. The copy is an independent archive: deleting either of the two archives
-  keeps the other one intact.
+- copy: copy an archive to a new archive name (fast & cheap!), #2300
 
 Fixes:
 
-- reject malformed ``rest://`` / ``ssh://`` / ``file://`` URLs instead of silently taking
-  them for a local path relative to the current directory. E.g. ``rest://host/`` (no repository
-  path) ended up as the local directory ``./rest:/host`` and then failed with a confusing
-  "does not exist" error. Such a URL is now rejected, telling the accepted forms, #10215
-- shell completions: complete local repository directories for ``-r`` / ``--repo``
-  and ``--other-repo``, #3086
-- shell completions: use the command borg was invoked as, e.g. ``borg2``. A borg
-  installed under such a name next to a borg 1.x registered its completions for
-  ``borg`` and queried the repository via that other borg, #3086
-- shell completions: describe each ``borg repo-create --encryption`` mode instead
-  of repeating the list of modes for each of them (zsh and fish), #3086
-- shell completions: remove the RST markup from the descriptions, #3086
-- name the option, not the config key, if a required argument is missing, e.g.
-  "the following arguments are required: -e/--encryption", #3086
-- repo-create: fix outdated encryption mode names in the ``--key-location`` help
-  and in the "Encryption NOT enabled" hint
+- transfer --from-borg1: do not mistake a borg 1.x repokey repo for a repo whose
+  encryption method changed
+- don't mistake a malformed URL for a local path, #10215
+- BORG_WORKAROUNDS=authenticated_no_key: also work when the borg key is completely
+  lost, #10238
+- delete/undelete: fix dead "all archives" safety guard
+- delete/undelete: also accept date-based filters as archive selection
+- diff: fix --numeric-ids having no effect
+- log-json: emit question_* JSON objects for prompts again
+- version: add the --from-borg1 option, it was documented but never implemented
+- borgfs: fix breakage caused by the jsonargparse migration
+- borgfs: adopt the "mount:" config file section
+- let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
+- goldilocks-aes: fix build on 32-bit archs (no __uint128_t there)
+- repo-list: fix --format help, it did not show the actual default, #10204
+- windows: do not build the binaries from a "dirty" checkout, #10199
+- windows: normalize remote repo paths as POSIX paths, #10199
+- completions:
+
+  - fish: fix the completion and error message issues, #3086
+  - use invoked command name, #3086
+  - complete repo and encryption, #3086
+  - remove the RST markup from the descriptions, #3086
+- argparsing: name the option, not its config key, for a missing required argument, #3086
 
 Other changes:
 
-- msgpack: also allow 1.2.2
-- require shtab >= 1.11.0: it completes an argument via its ``.complete`` function
-  rather than via its choices, which is what lets the encryption modes have a
-  description each, and it completes paths outside the cwd in fish
+- require OpenSSL >= 3.2
+- use argon2 from OpenSSL, drop argon2-cffi, #7963
+- require shtab >= 1.11.0
+- support msgpack 1.2.2
+- setuptools-scm: drop tag.strict, #10193
+- diff: show timestamp changes with full nanosecond precision, #9147
+- benchmark cpu: also benchmark zstd,-4
+- archive: resolve the item metadata stream chunk ids lazily, big win for repo-list
+  on remote repos, #10204
+- lock exceptions: tell who holds the lock, #2261
+- CI:
+
+  - use ubuntu-26.04 runners
+  - add a 32-bit armv7 test runner
+- docs:
+
+  - README: update to reflect current borg2 master
+  - document that borg transfer is incremental, #9878
+  - archiver: fix wrong/stale epilog help texts, raw-RST rendering
+  - fix stale examples in the borg diff epilog
+  - help topics: fix wrong claims, document missing env vars and placeholders
+  - remove stale borg1 checkpoint reference from borg create help
+  - fix borg1-era content in quickstart, general includes and FAQ
+  - fix packs.rst and security.rst to match the implementation
+  - update internals/data-structures.rst and internals/frontends.rst
+  - update deployment docs to borg2 commands and REST protocol
+  - fix borgfs man page generation, drop the stale borgfs rst/html page
+  - fix broken examples and stale output samples in the usage docs
+  - fix outdated dependencies, paths and links in installation.rst
+  - fix outdated --encryption mode names in examples and help
+  - fix stale "borg repo-list" output in the rename example
+
 
 Version 2.0.0b23 (2026-08-23)
 -----------------------------

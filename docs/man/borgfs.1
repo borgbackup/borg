@@ -28,12 +28,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borgfs" "1" "2026-08-23" "" "borg backup tool"
+.TH "borgfs" "1" "2026-08-28" "" "borg backup tool"
 .SH Name
 borgfs \- Mounts an archive or an entire repository as a FUSE filesystem.
 .SH SYNOPSIS
 .sp
-borgfs [options] MOUNTPOINT [PATH...]
+borgfs [options] [REPOSITORY] MOUNTPOINT [PATH...]
 .SH DESCRIPTION
 .sp
 For more information, see borg mount \-\-help.
@@ -42,6 +42,9 @@ For more information, see borg mount \-\-help.
 See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS arguments
 .INDENT 0.0
+.TP
+.B REPOSITORY
+repository to mount (default: as given by \-r/\-\-repo or BORG_REPO)
 .TP
 .B MOUNTPOINT
 where to mount the filesystem
@@ -52,18 +55,18 @@ paths to extract; patterns are supported
 .SS options
 .INDENT 0.0
 .TP
-.B  \-\-config
-Path to a configuration file.
+.B  \-V\fP,\fB  \-\-version
+show version number and exit
+.TP
+.B  \-f\fP,\fB  \-\-foreground
+stay in foreground, do not daemonize
+.TP
+.B  \-o
+extra mount options
+.TP
+.B  \-\-numeric\-ids
+use numeric user and group identifiers from archives
 .UNINDENT
-.IP "System Message: WARNING/2 (docs/borgfs.rst:, line 51)"
-Option list ends without a blank line; unexpected unindent.
-.sp
-\-\-print_config [=flags]     Print the configuration after applying all other arguments and exit. The optional flags customizes the output and are one or more keywords separated by comma. The supported flags are: skip_default, skip_null.
-\-V, \-\-version     show version number and exit
-\-\-cockpit     Start the Borg TUI
-\-f, \-\-foreground     stay in foreground, do not daemonize
-\-o      extra mount options
-\-\-numeric\-ids     use numeric user and group identifiers from archives
 .SS Archive filters
 .INDENT 0.0
 .TP

@@ -23,6 +23,30 @@ def format_metavar(option):
         raise ValueError(f"Can't format metavar {option.metavar}, unknown nargs {option.nargs}!")
 
 
+# Options of the borgfs parser that must not show up in the borgfs docs. borgfs *is* the "borg mount"
+# command (it has no subcommands), so its parser is a top-level parser and therefore also carries
+# borg's top-level-only options. --cockpit starts the Borg TUI and has nothing to do with mounting.
+# -V/--version is not listed here: it works for borgfs and borg 1.x documented it here as well.
+BORGFS_UNDOCUMENTED_OPTIONS = ("--cockpit",)
+
+
+def build_borgfs_parser(Archiver):
+    r"""Build the borgfs parser with the options hidden that do not belong into the borgfs docs.
+
+    Besides borg's own top-level-only options (see BORGFS_UNDOCUMENTED_OPTIONS), jsonargparse injects
+    options of its own into every top-level parser (currently --config and --print_config). They are
+    not part of the mount command, and --print_config even uses a metavar ("\b[=flags]") that is not
+    valid rST option-list syntax and thus corrupts the generated man page. Hide all of them by
+    suppressing their help text - that is what the writers below use to skip an option.
+    """
+    parser = Archiver(prog="borgfs").build_parser()
+    for action in parser._actions:
+        injected_by_jsonargparse = type(action).__module__.partition(".")[0] == "jsonargparse"
+        if injected_by_jsonargparse or set(action.option_strings) & set(BORGFS_UNDOCUMENTED_OPTIONS):
+            action.help = argparse.SUPPRESS
+    return parser
+
+
 class BuildUsage:
     """generate usage docs for each command"""
 
@@ -36,9 +60,10 @@ class BuildUsage:
         from borg.archiver import Archiver
 
         parser = Archiver(prog="borg").build_parser()
-        # borgfs has a separate man page to satisfy debian's "every program from a package
-        # must have a man page" requirement, but it doesn't need a separate HTML docs page
-        # borgfs_parser = Archiver(prog='borgfs').build_parser()
+        # Note: borgfs has a separate man page to satisfy debian's "every program from a package
+        # must have a man page" requirement (see BuildMan), but it does not get an HTML docs page,
+        # #3404. The borgfs usage is documented on the "borg mount" page, so there is intentionally
+        # no docs/usage/borgfs.rst{,.inc} here.
 
         self.generate_level("", parser, Archiver)
         return 0
@@ -333,7 +358,7 @@ class BuildMan:
         from borg.archiver import Archiver
 
         parser = Archiver(prog="borg").build_parser()
-        borgfs_parser = Archiver(prog="borgfs").build_parser()
+        borgfs_parser = build_borgfs_parser(Archiver)
 
         self.generate_level("", parser, Archiver, {"borgfs": borgfs_parser})
         self.build_topic_pages(Archiver)
@@ -394,7 +419,10 @@ class BuildMan:
                 write()
                 self.write_options(write, parser)
 
-                self.write_examples(write, command)
+                if command != "borgfs":
+                    # borgfs has no HTML usage page (see BuildUsage) to take the examples from.
+                    # Its description points at "borg mount", whose page has the borgfs examples.
+                    self.write_examples(write, command)
 
             if notes:
                 self.write_heading(write, "NOTES")

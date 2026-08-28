@@ -4,6 +4,6 @@ Examples
 ~~~~~~~~
 ::
 
-    # Compact segments and free repository disk space
+    # Free repository disk space by deleting unused chunks (rewriting packs as needed)
     $ borg compact
 

@@ -13,34 +13,43 @@ Examples
     Initializing repository at "/path/to/repo"
     Enter new passphrase:
     Enter same passphrase again:
+    Do you want your passphrase to be displayed for verification? [yN]: n
     Remember your passphrase. Your data will be inaccessible without it.
-    Key in "/root/.config/borg/keys/mnt_backup" created.
+    Key in "/root/.config/borg/keys/f23b5f0703c06dc7d9d889b5867496d8cb8ef5b42a5005221d3c7373ec6d6353" created.
     Keep this key safe. Your data will be inaccessible without it.
-    Synchronizing index...
-    Archives: 0, w/ index: 0, w/ outdated index: 0, w/o index: 0.
-    Done.
+    ...
 
     # Change key file passphrase
     $ borg key change-passphrase -v
-    Enter passphrase for key /root/.config/borg/keys/mnt_backup:
+    Enter passphrase for key /root/.config/borg/keys/f23b5f0703c06dc7d9d889b5867496d8cb8ef5b42a5005221d3c7373ec6d6353:
     Enter new passphrase:
     Enter same passphrase again:
+    Do you want your passphrase to be displayed for verification? [yN]: n
     Remember your passphrase. Your data will be inaccessible without it.
     Key updated
+    Key location: /root/.config/borg/keys/4881c2f73d9f173bd4c4d30a9f397a596bc742bfa1f652fac3f83cee3f26cb00
 
 .. note::
 
+    Automatically placed key files are named after the SHA-256 hash of their own
+    contents, not after the repository directory name. Because changing the
+    passphrase re-encrypts the key, the key file is rewritten under a new name and
+    the previous one is removed — that is why the two paths above differ. Use
+    ``BORG_KEY_FILE`` if you want to choose the key file name yourself.
+
     The key file paths shown above are the defaults for Linux (``~/.config/borg/keys/``).
     On macOS, key files are stored in ``~/Library/Application Support/borg/keys/``.
-    On Windows, they are stored in ``C:\Users\<user>\AppData\Roaming\borg\keys\``.
+    On Windows, they are stored in ``C:\Users\<user>\AppData\Local\borg\borg\keys\``.
     See :ref:`env_vars` for details.
 
 ::
 
-    # Import a previously-exported key into the specified
-    # key file (creating or overwriting the output key)
-    # (keyfile repositories only)
-    $ BORG_KEY_FILE=/path/to/output-key borg key import /path/to/exported
+    # Import a previously-exported key into a key file, using BORG_KEY_FILE to
+    # choose the output key file (creating or overwriting it).
+    # --key-location=keyfile is required: "borg key import" defaults to
+    # --key-location=repokey, which stores the key in the repository and
+    # ignores BORG_KEY_FILE.
+    $ BORG_KEY_FILE=/path/to/output-key borg key import --key-location=keyfile /path/to/exported
 
 Fully automated using environment variables:
 

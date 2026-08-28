@@ -8,7 +8,9 @@ locations and passphrases first:
 
 ::
 
-    export BORG_REPO=ssh://borg2@borgbackup/./tests/b20
+    # The destination is a Borg 2 repository: use a rest:// (or local) location,
+    # ssh:// is only supported for the legacy Borg 1.x source repository.
+    export BORG_REPO=rest://borg2@borgbackup/tests/b20
     export BORG_PASSPHRASE='your-borg2-repo-passphrase'
     export BORG_OTHER_REPO=ssh://borg2@borgbackup/./tests/b1x
     export BORG_OTHER_PASSPHRASE='your-borg1-repo-passphrase'
@@ -27,7 +29,8 @@ locations and passphrases first:
     # between old archives (copied with borg transfer) and future ones.
     # The AEAD cipher does not matter (everything must be re-encrypted and
     # re-authenticated anyway); you could also choose chacha20-poly1305.
-    $ borg repo-create -e aes256-ocb
+    # --from-borg1 is required so the other repository is opened as a Borg 1.x repository.
+    $ borg repo-create --from-borg1 -e aes256-ocb
 
     # 2. Check what and how much it would transfer:
     $ borg transfer --from-borg1 --dry-run
@@ -54,7 +57,8 @@ locations and passphrases first:
     # use for all future Borg 2.0 archives.
     # The AEAD cipher does not matter (everything must be re-encrypted and
     # re-authenticated anyway); you could also choose -e chacha20-poly1305 -i blake3.
-    $ borg repo-create -e aes256-ocb -i blake3
+    # --from-borg1 is required so the other repository is opened as a Borg 1.x repository.
+    $ borg repo-create --from-borg1 -e aes256-ocb -i blake3
     $ export CHUNKER_PARAMS="fastcdc,19,23,21,2"
 
     # 2. Check what and how much it would transfer:
@@ -81,7 +85,7 @@ On **macOS**, Borg 1.x stored key files in ``~/.config/borg/keys/``,
 but Borg 2 defaults to ``~/Library/Application Support/borg/keys/``.
 
 On **Windows**, Borg 1.x used XDG-style paths (e.g. ``~/.config/borg/keys/``),
-while Borg 2 defaults to ``C:\Users\<user>\AppData\Roaming\borg\keys\``.
+while Borg 2 defaults to ``C:\Users\<user>\AppData\Local\borg\borg\keys\``.
 
 If Borg 2 cannot find your key file, you have several options:
 

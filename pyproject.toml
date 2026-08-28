@@ -59,6 +59,7 @@ s3 = ["borgstore[rest,blake3,s3] ~= 0.6.1"]
 sftp = ["borgstore[rest,blake3,sftp] ~= 0.6.1"]
 rclone = ["borgstore[rest,blake3,rclone] ~= 0.6.1"]
 cockpit = ["textual>=6.8.0"]  # might also work with older versions, untested
+fido2 = ["fido2 >= 0.9.1"]
 
 [project.urls]
 "Homepage" = "https://borgbackup.org/"

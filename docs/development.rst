@@ -261,7 +261,7 @@ but directly output to stderr (not: stdout, it could be connected to a pipe).
 To control the amount and kinds of messages output emitted at info level, use
 flags like ``--stats`` or ``--list``, then create a topic logger for messages
 controlled by that flag.  See ``_setup_implied_logging()`` in
-``borg/archiver.py`` for the entry point to topic logging.
+``src/borg/archiver/__init__.py`` for the entry point to topic logging.
 
 Building a development environment
 ----------------------------------
@@ -295,20 +295,23 @@ To run the test suite use the following command::
 
 Some more advanced examples::
 
-  # verify a changed tox.ini (run this after any change to tox.ini):
+  # verify a changed pyproject.toml (run this after any change to the [tool.tox] section):
   fakeroot -u tox --recreate
 
   fakeroot -u tox -e py313  # run all tests, but only on python 3.13
 
-  fakeroot -u tox borg.testsuite.locking  # only run 1 test module
-
-  fakeroot -u tox borg.testsuite.locking -- -k '"not Timer"'  # exclude some tests
-
-  fakeroot -u tox borg.testsuite -- -v  # verbose py.test
+  fakeroot -u tox -- borg.testsuite.fslocking_test  # only run 1 test module
 
 Important notes:
 
-- When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
+- With tox 4, all positional arguments MUST be given after ``--``; tox rejects
+  them otherwise with an "unrecognized arguments" error.
+- Whatever follows ``--`` replaces the default ``borg.testsuite`` value of
+  pytest's ``--pyargs`` argument as a single value, so it can only be used to
+  select a different module or package to test, as in the example above.
+- It cannot be combined with extra pytest options such as ``-k`` or ``-v`` this
+  way; for that, run pytest directly (see below). Note that tox already runs
+  pytest with ``-v`` by default.
 
 Running pytest directly without tox:
 
@@ -410,34 +413,6 @@ with the ``figure-padded`` class for consistent spacing::
 
         Caption text.
 
-Using Vagrant
--------------
-
-We use Vagrant for the automated creation of testing environments and borgbackup
-standalone binaries for various platforms.
-
-For better security, there is no automatic sync in the VM to host direction.
-The plugin `vagrant-scp` is useful to copy stuff from the VMs to the host.
-
-The "windows10" box requires the `reload` plugin (``vagrant plugin install vagrant-reload``).
-
-Usage::
-
-   # To create and provision the VM:
-   vagrant up OS
-   # same, but use 6 VM cpus and 12 workers for pytest:
-   VMCPUS=6 XDISTN=12 vagrant up OS
-   # To create an ssh session to the VM:
-   vagrant ssh OS
-   # To execute a command via ssh in the VM:
-   vagrant ssh OS -c "command args"
-   # To shut down the VM:
-   vagrant halt OS
-   # To shut down and destroy the VM:
-   vagrant destroy OS
-   # To copy files from the VM (in this case, the generated binary):
-   vagrant scp OS:/vagrant/borg/borg.exe .
-
 Using Podman
 ------------
 
@@ -526,11 +501,6 @@ Checklist:
 
   This makes sure no uncommitted files get into the release archive.
   It will also reveal uncommitted required files.
-  Moreover, it makes sure the vagrant machines only get committed files and
-  do a fresh start based on that.
-- Optional: run tox and/or binary builds on all supported platforms via vagrant,
-  check for test failures. This is now optional as we do platform testing and
-  binary building on GitHub.
 - When GitHub CI looks good on the release PR, merge it and push the release tag.
 
   Pushing the tag makes CI build the standalone binaries and then release:

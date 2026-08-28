@@ -1,0 +1,103 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-copy" "1" "2026-08-28" "" "borg backup tool"
+.SH Name
+borg-copy \- Copy an archive to a new archive name.
+.SH SYNOPSIS
+.sp
+borg [common options] copy [options] OLDNAME NEWNAME
+.SH DESCRIPTION
+.sp
+This command copies an existing archive to a new archive with a different name,
+keeping the existing archive.
+.sp
+Afterwards, the repository has two archives with the same contents, but with
+different names and different archive IDs. The copy is an independent archive:
+deleting either of the two archives keeps the other one intact, because
+\fBborg compact\fP only frees chunks that no remaining archive references.
+.sp
+Copying is cheap and fast: no file content is read or written, only a new archive
+metadata object is created. Like any deduplicated archives, the two archives share
+their data, so a copy needs almost no additional repository space.
+.sp
+Because archive names do not need to be unique, NEWNAME may also be the name of
+some \fIother\fP already existing archive \- the copy then just becomes another archive
+of that archive series.
+.sp
+NEWNAME must be different from the name of the archive that is copied, though: the
+copy would get identical metadata and thus the same archive ID as its source, so no
+second archive could be created.
+.sp
+OLDNAME must match precisely one archive: give an archive name (if it is unique) or
+an archive ID, like \fBaid:d34db33f\fP\&.
+.sp
+Note: to copy archives into a \fIdifferent\fP repository, use \fBborg transfer\fP\&.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS arguments
+.INDENT 0.0
+.TP
+.B OLDNAME
+specify the existing archive name or ID
+.TP
+.B NEWNAME
+specify the new archive name
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+# create an archive, then keep a copy of it under a stable name:
+$ borg create backup\-2016\-02\-15 ~
+$ borg copy backup\-2016\-02\-15 known\-good
+$ borg repo\-list
+e6a2b1c4  Mon, 2016\-02\-15 19:50:19 +0100  backup\-2016\-02\-15  tw          MacBook\-Pro
+9f3d0a77  Mon, 2016\-02\-15 19:50:19 +0100  known\-good         tw          MacBook\-Pro
+
+# the copy is an independent archive:
+# after deleting (and compacting away) the original, the copy is still complete.
+$ borg delete backup\-2016\-02\-15
+$ borg compact
+$ borg extract known\-good
+
+# if the archive name is not unique, address the archive by its ID:
+$ borg copy aid:e6a2b1c4 known\-good
+.EE
+.UNINDENT
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

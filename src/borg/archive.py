@@ -1158,6 +1158,33 @@ Duration: {0.duration}
         self.set_meta("name", name)
         self.manifest.archives.delete_by_id(old_id)
 
+    def copy(self, name):
+        """Copy this archive to a new archive with the given name, keeping this archive.
+
+        This is like .rename(), but the original archive entry is not removed, so afterwards the
+        repository has two archives with identical contents under two different names (and two
+        different archive IDs).
+
+        The copy is an independent archive: deleting either of the two archives does not affect
+        the other one, because "borg compact" only frees chunks that no remaining archive
+        references.
+
+        Copying is cheap: no file content is read or written, only a new archive metadata object
+        is created. The item metadata stream and the file content chunks are shared between the
+        two archives (like they are between any deduplicated archives).
+
+        The new name may be the name of some other existing archive (archive names do not need
+        to be unique), but it must be different from this archive's name, see below.
+
+        Afterwards, this Archive instance refers to the new archive (new name, new archive ID).
+        """
+        if name == self.name:
+            # the new metadata would be identical, thus have the same archive ID and just overwrite
+            # the existing archives directory entry - no second archive would be created.
+            raise Error(f"Archive {name} can not be copied to the same name.")
+        self.name = name
+        self.set_meta("name", name)
+
     def delete(self):
         # quick and dirty: we just nuke the archive from the archives list - that will
         # potentially orphan all chunks previously referenced by the archive, except the ones also

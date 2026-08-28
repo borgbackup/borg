@@ -55,6 +55,7 @@ Usage
    usage/find
    usage/tag
    usage/rename
+   usage/copy
    usage/diff
    usage/delete
    usage/prune

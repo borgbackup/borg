@@ -29,7 +29,7 @@ from .repository import LegacyRepository
 from ..repository import Repository, StoreObjectNotFound
 from ..version import parse_version, format_version
 from ..helpers.datastruct import EfficientCollectionQueue
-from ..platform import is_win32
+from ..platform import is_win32, is_haiku
 
 logger = create_logger(__name__)
 
@@ -249,7 +249,10 @@ class LegacyRemoteRepository:
             self.stdout_fd = self.p.stdout.fileno()
             self.stderr_fd = self.p.stderr.fileno()
             self.r_fds = [self.stdout_fd, self.stderr_fd]
-            self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
+            # haiku's select() reports pipes in the exceptional set although nothing is wrong,
+            # so do not watch for exceptional conditions there - a broken pipe still shows up
+            # as a read/write error below.
+            self.x_fds = [] if is_haiku else [self.stdin_fd, self.stdout_fd, self.stderr_fd]
         else:
             raise Error(f"Unsupported protocol {location.proto}")
 

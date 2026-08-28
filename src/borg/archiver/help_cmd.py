@@ -913,13 +913,12 @@ class HelpMixIn:
                     in WSL1 (Windows Subsystem for Linux 1).
 
                 authenticated_no_key
-                    Work around a lost passphrase for an ``authenticated-*`` mode repository
-                    (these are only authenticated, but not encrypted).
-                    Borg still has to find the repository's borg key - an object below ``keys/``
-                    in the repository (repokey) resp. a key file in the keys directory (keyfile) -
-                    but it does not unlock it any more, so the passphrase does not matter. If the
-                    borg key itself is gone, this workaround does not help: borg then fails with
-                    "No key entry found ...".
+                    Work around a lost passphrase or a lost borg key for an ``authenticated-*``
+                    mode repository (these are only authenticated, but not encrypted).
+                    If a borg key is found - an object below ``keys/`` in the repository (repokey)
+                    resp. a key file in the keys directory (keyfile) - it is not unlocked, so the
+                    passphrase does not matter. If no borg key is found at all, borg proceeds
+                    anyway, without any key material.
 
                     Without the key, borg can not verify anything that needs it: neither the
                     authentication tag of the repository objects nor the chunk ids. It therefore

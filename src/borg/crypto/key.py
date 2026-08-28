@@ -1200,15 +1200,35 @@ class AuthenticatedKeyBase(MACKeyBase, FlexiKey):
             self._tag_key = self.derive_key(salt=b"", domain=self.MAC_KEY_DOMAIN, size=32)
         return self._tag_key
 
+    def _set_fake_key_material(self):
+        # fake key material for the authenticated_no_key workaround: all-zero and thus worthless,
+        # but these modes do not encrypt, so reading still works - decrypt() skips the tag
+        # verification and RepoObj.parse skips the chunk id check.
+        self.repository_id = bytes(32)
+        self.crypt_key = bytes(64)
+        self.id_key = bytes(32)
+        self.chunk_seed = 0
+
+    @classmethod
+    def detect(cls, repository, manifest_data, *, other=False):
+        try:
+            return super().detect(repository, manifest_data, other=other)
+        except RepoKeyNotFoundError:
+            if not AUTHENTICATED_NO_KEY:
+                raise
+            # the borg key is not just locked by an unknown passphrase, it is completely gone
+            # (no repokey object, no keyfile). The workaround covers that too: proceed with
+            # fake key material, see _set_fake_key_material.
+            key = cls(repository)
+            key._set_fake_key_material()
+            key.init_ciphers(manifest_data)
+            key._passphrase = Passphrase()
+            return key
+
     def _load(self, key_data, passphrase):
         if AUTHENTICATED_NO_KEY:
-            # fake _load if we have no key or passphrase. The key material is all-zero and thus
-            # worthless, but these modes do not encrypt, so reading still works - decrypt() skips
-            # the tag verification and RepoObj.parse skips the chunk id check.
-            self.repository_id = bytes(32)
-            self.crypt_key = bytes(64)
-            self.id_key = bytes(32)
-            self.chunk_seed = 0
+            # fake _load if we have no key or passphrase, see _set_fake_key_material.
+            self._set_fake_key_material()
             return True
         return super()._load(key_data, passphrase)
 

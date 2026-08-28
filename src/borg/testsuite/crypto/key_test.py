@@ -15,6 +15,7 @@ from ...crypto.key import AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey
 from ...crypto.key import AES_OCB_MAX_SESSION_BLOCKS
 from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError, UnsupportedPayloadError
+from ...crypto.key import RepoKeyNotFoundError
 from ...crypto.key import identify_key
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
 from ...helpers import Error
@@ -530,6 +531,29 @@ class TestMACEnvelope:
         monkeypatch.setattr("borg.crypto.key.AUTHENTICATED_NO_KEY", True)
         assert key.decrypt(id, bytes(envelope), aad=b"aad") == payload
 
+    @pytest.mark.parametrize("cls", KEYED_CLASSES)
+    def test_authenticated_no_key_key_gone(self, cls, monkeypatch, tmp_path):
+        # a completely lost borg key (no repokey object, no keyfile) is also covered by the
+        # workaround: detect() proceeds with fake key material instead of failing, see #10238.
+        monkeypatch.setenv("BORG_KEYS_DIR", str(tmp_path))  # empty, i.e. no keyfile for this repo
+        monkeypatch.delenv("BORG_KEY_FILE", raising=False)
+        repository = MagicMock(id=bytes(32), version=3)
+        repository.load_key.return_value = None  # no repokey either
+        real_key = self.make_key(cls)
+        payload = b"payload"
+        id = real_key.id_hash(payload)
+        envelope = real_key.encrypt(id, payload, aad=b"aad")
+
+        with pytest.raises(RepoKeyNotFoundError):  # without the workaround: hard error
+            cls.detect(repository, envelope)
+
+        monkeypatch.setattr("borg.crypto.key.AUTHENTICATED_NO_KEY", True)
+        key = cls.detect(repository, envelope)
+        assert isinstance(key, cls)
+        # the fake key material can not verify the tag, but the payload is plaintext and
+        # decrypt() skips the verification, so reading works.
+        assert key.decrypt(id, envelope, aad=b"aad") == payload
+
     def test_unkeyed_modes_verify_despite_workaround(self, monkeypatch):
         # the unkeyed modes need no key material, so the workaround must not switch their
         # checksum verification off.
@@ -541,6 +565,26 @@ class TestMACEnvelope:
         envelope[5] ^= 1
         with pytest.raises(IntegrityError):
             key.decrypt(id, bytes(envelope), aad=b"aad")
+
+
+@pytest.mark.parametrize("cls", (LegacyAuthenticatedKey, Blake2AuthenticatedKey))
+def test_legacy_authenticated_no_key_key_gone(cls, monkeypatch, tmp_path):
+    # like TestMACEnvelope.test_authenticated_no_key_key_gone, but for the borg 1.x authenticated
+    # modes (read-only, e.g. accessed via borg transfer).
+    monkeypatch.setenv("BORG_KEYS_DIR", str(tmp_path))  # empty, i.e. no keyfile for this repo
+    monkeypatch.delenv("BORG_KEY_FILE", raising=False)
+    repository = MagicMock(id=bytes(32), version=1)
+    repository.load_key.return_value = None  # no repokey either
+    payload = b"payload"
+    envelope = bytes([cls.TYPE]) + payload  # borg 1.x authenticated envelope: type byte + plaintext
+
+    with pytest.raises(RepoKeyNotFoundError):  # without the workaround: hard error
+        cls.detect(repository, envelope)
+
+    monkeypatch.setattr("borg.legacy.crypto.key.AUTHENTICATED_NO_KEY", True)
+    key = cls.detect(repository, envelope)
+    assert isinstance(key, cls)
+    assert bytes(key.decrypt(None, envelope)) == payload
 
 
 def test_dropped_borg2_beta_key_types(tmpdir):

@@ -459,7 +459,8 @@ locally::
     git clone https://github.com/borgbackup/borg.git borg
 
     # Install the files with proper permissions
-    install -D -m 0644 borg/docs/man/borg*.1* $HOME/.local/share/man/man1/borg.1
+    mkdir -p $HOME/.local/share/man/man1
+    install -m 0644 borg/docs/man/borg*.1* $HOME/.local/share/man/man1/
 
     # Update the man page cache
     mandb

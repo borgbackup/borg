@@ -569,19 +569,32 @@ Note about creating multiple keyfile repositories at the same path
 
 If you create a new keyfile-encrypted repository at the same filesystem
 path multiple times (for example, when a previous repository at that path
-was moved away or unmounted), Borg will not overwrite or reuse the existing
-key file in your keys directory. Instead, it creates a new key file by
-appending a numeric suffix to the base name (e.g., .2, .3, ...).
+was moved away or unmounted), Borg will not overwrite or reuse an existing
+key file in your keys directory. Instead, each repository gets a key file
+of its own, named after the SHA-256 hash of the key file's own content --
+the header line naming the repository's ID, followed by the encrypted key
+material. Both the repository ID and the key material are freshly
+randomized when the repository is created, so two repositories, even ones
+created at the same path, always end up with different key file content
+and therefore different names.
 
-This means you may see multiple key files like (example paths for Linux):
+This means you may see multiple key files like (example paths for Linux,
+names shortened for readability):
 
-- ~/.config/borg/keys/home_user_backup
-- ~/.config/borg/keys/home_user_backup.2
-- ~/.config/borg/keys/home_user_backup.3
+- ~/.config/borg/keys/2385a3af9c1e...b9e114f9c1
+- ~/.config/borg/keys/7b410e8eab35...1c3c9802aa
+- ~/.config/borg/keys/c94fa0d1e2f7...9958a4773b
 
-Each of these corresponds to a distinct repository created at the same
-path at different times. This behavior avoids accidental key reuse or
-overwrite.
+Each belongs to a distinct repository, wherever it was created -- a name
+collision between different repositories would require an outright
+SHA-256 hash collision, not just an unlucky path reuse. Borg does not use
+the key file name to find the right key either: to open a repository, it
+scans all files in the keys directory (see :ref:`env_vars` for
+``BORG_KEYS_DIR``) and picks the one whose header names that repository's
+ID. Only byte-for-byte identical key content -- meaning it truly is the
+same key -- would ever produce the same name again; and on repository
+creation, Borg refuses to proceed if that name is already taken, rather
+than silently overwriting it.
 
 .. _home_data_borg:
 

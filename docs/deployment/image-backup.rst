@@ -78,7 +78,7 @@ Restoration is a similar process::
 
     borg extract --stdout --repo repo hostname-partinfo | dd of=$DISK && partprobe
     PARTITIONS=$(sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d')
-    borg list --format {archive}{NL} repo | grep 'part[0-9]*$' | while read x; do
+    borg repo-list --format '{archive}{NL}' -r repo | grep 'part[0-9]*$' | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
         PARTITION=$(echo "$PARTITIONS" | grep -E "$DISKp?$PARTNUM" | head -n1)
         if echo "$PARTITION" | cut -d' ' -f2- | grep -q NTFS; then
@@ -87,6 +87,15 @@ Restoration is a similar process::
             borg extract --stdout --repo repo $x | dd of=$(echo "$PARTITION" | cut -d' ' -f1)
         fi
     done
+
+.. note::
+
+   The archive names used above do not contain a timestamp, so repeated backup runs
+   add more archives with the same name to the same archive series. As ``borg extract``
+   requires the given name to match exactly one archive, select the archive by its ID
+   in that case: list the archives with
+   ``borg repo-list --format '{id}{TAB}{archive}{NL}' -r repo`` and extract with
+   ``borg extract --stdout --repo repo aid:<id>``.
 
 .. note::
 

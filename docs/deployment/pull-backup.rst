@@ -227,7 +227,7 @@ The program socat has to be available on the backup server and on the client
 to be backed up.
 
 When **pushing** a backup the borg client (holding the data to be backed up)
-connects to the backup server via ssh, starts ``borg serve`` on the backup
+connects to the backup server via ssh, starts ``borg serve --rest`` on the backup
 server and communicates via standard input and output (transported via SSH)
 with the process on the backup server.
 
@@ -244,7 +244,7 @@ accessible to the users that run the backup process. So on both systems,
    sudo mkdir -m 0700 /run/borg
 
 On *borg-server* the socket file is opened by the user running the ``borg
-serve`` process writing to the repository
+serve --rest`` process writing to the repository
 so the user has to have read and write permissions on ``/run/borg``::
 
    borg-server:~$ sudo chown borgs /run/borg
@@ -254,19 +254,30 @@ to *borg-client* has to have read and write permissions on ``/run/borg``::
 
    borg-client:~$ sudo chown borgc /run/borg
 
-On *borg-server*, we have to start the command ``borg serve`` and make its
+On *borg-server*, we have to start the command ``borg serve --rest`` and make its
 standard input and output available to a unix socket::
 
-   borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --restrict-to-path /path/to/repo"
+   borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --rest --backend FILE:/path/to/repo --restrict-to-path /path/to/repo"
 
 Socat will wait until a connection is opened. Then socat will execute the
-command given, redirecting Standard Input and Output to the unix socket. The
-optional arguments for ``borg serve`` are not necessary but a sane default.
+command given, redirecting Standard Input and Output to the unix socket.
+``--rest`` and ``--backend`` are required here: ``--rest`` serves a current
+repository (talking HTTP over stdio, the server side of a ``rest://`` repository
+URL), and ``--backend`` selects the repository to serve. ``--restrict-to-path``
+is not necessary but a sane default.
+
+.. note::
+   Because socat runs a fixed command, everything the borg client appends to it
+   (see ``BORG_RSH`` below) is discarded - including the ``--backend`` option the
+   client would normally use to tell the server which repository it wants. The
+   repository therefore is the one given by ``--backend`` in the socat command
+   above, no matter which path the client uses in its ``rest://`` URL. Use the
+   same path in both places to avoid confusion.
 
 .. note::
    When used in production you may also use systemd socket-based activation
-   instead of socat on the server side. You would wrap the ``borg serve`` command
-   in a `service unit`_ and configure a matching `socket unit`_
+   instead of socat on the server side. You would wrap the ``borg serve --rest``
+   command in a `service unit`_ and configure a matching `socket unit`_
    to start the service whenever a client connects to the socket.
 
    .. _service unit: https://www.freedesktop.org/software/systemd/man/systemd.service.html
@@ -290,28 +301,28 @@ forwarding can do this for us::
    When you are done, you have to remove the socket file manually, otherwise
    you may see an error like this when trying to execute borg commands::
 
-      Remote: YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/run/borg/reponame.sock", 13): Connection refused
-      Connection closed by remote host. Is borg working on the server?
+      YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/run/borg/reponame.sock", 13): Connection refused
+      BackendError: stdio server exited with code 1
 
 
 When a process opens the socket on *borg-client*, SSH will forward all
 data to the socket on *borg-server*.
 
 The next step is to tell borg on *borg-client* to use the unix socket to communicate with the
-``borg serve`` command on *borg-server* via the socat socket instead of SSH::
+``borg serve --rest`` command on *borg-server* via the socat socket instead of SSH::
 
    borg-client:~$ export BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'"
 
 The default value for ``BORG_RSH`` is ``ssh``. By default Borg uses SSH to create
 the connection to the backup server. Therefore Borg parses the repo URL
-and adds the server name (and other arguments) to the SSH command. Those
-arguments can not be handled by socat. We wrap the command with ``sh`` to
-ignore all arguments intended for the SSH command.
+and adds the server name (and the remote ``borg serve --rest ...`` command) to the
+SSH command. Those arguments can not be handled by socat. We wrap the command with
+``sh`` to ignore all arguments intended for the SSH command.
 
 All Borg commands can now be executed on *borg-client*. For example to create a
 backup execute the ``borg create`` command::
 
-   borg-client:~$ borg create --repo ssh://borg-server/path/to/repo archive /path_to_backup
+   borg-client:~$ borg create --repo rest://borg-server//path/to/repo archive /path_to_backup
 
 When automating backup creation, the
 interactive ssh session may seem inappropriate. An alternative way of creating
@@ -322,7 +333,7 @@ a backup may be the following command::
       borgc@borg-client \
       BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
       borg create \
-      --repo ssh://borg-server/path/to/repo archive /path_to_backup \
+      --repo rest://borg-server//path/to/repo archive /path_to_backup \
       ';' rm /run/borg/reponame.sock
 
 This command also automatically removes the socket file after the ``borg
@@ -336,7 +347,7 @@ agent connection.
 
 After that, it works similar to the push mode:
 *borg-client* initiates another SSH connection back to *borg-server* using the forwarded authentication agent
-connection to authenticate itself, starts ``borg serve`` and communicates with it.
+connection to authenticate itself, starts ``borg serve --rest`` and communicates with it.
 
 Using this method requires ssh access of user *borgs* to *borgc@borg-client*, where:
 
@@ -360,7 +371,7 @@ dedicated ssh key:
 
   borgs@borg-server$ install -m 700 -d ~/.ssh/
   borgs@borg-server$ ssh-keygen -N '' -t rsa -f ~/.ssh/borg-client_key
-  borgs@borg-server$ { echo -n 'command="borg serve --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
+  borgs@borg-server$ { echo -n 'command="borg serve --rest --restrict-to-repository ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
   borgs@borg-server$ chmod 600 ~/.ssh/authorized_keys
 
 ``install -m 700 -d ~/.ssh/``
@@ -375,10 +386,12 @@ dedicated ssh key:
   Another more complex approach is using a unique ssh key for each pull operation.
   This is more secure as it guarantees that the key will not be used for other purposes.
 
-``{ echo -n 'command="borg serve --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
+``{ echo -n 'command="borg serve --rest --restrict-to-repository ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
 
   Add borg-client's ssh public key to ~/.ssh/authorized_keys with forced command and restricted mode.
   The borg client is restricted to use one repo at the specified path.
+  ``--rest`` is required to serve a current repository; the client cannot supply that
+  option itself, it is pinned by the forced command.
 
 ``chmod 600 ~/.ssh/authorized_keys``
 
@@ -387,13 +400,13 @@ dedicated ssh key:
 Pull operation
 ~~~~~~~~~~~~~~
 
-Initiating borg command execution from *borg-server* (e.g. init)::
+Initiating borg command execution from *borg-server* (e.g. repo-create)::
 
   borgs@borg-server$ (
     eval $(ssh-agent) > /dev/null
     ssh-add -q ~/.ssh/borg-client_key
     echo 'your secure borg key passphrase' | \
-      ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg init --encryption repokey ssh://borgs@borg-server/~/repo"
+      ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg repo-create --encryption aes256-ocb --key-location repokey -r rest://borgs@borg-server/repo"
     kill "${SSH_AGENT_PID}"
   )
 
@@ -419,11 +432,16 @@ Parentheses are not needed when using a dedicated bash process.
   * The keys meant to be loaded into the agent must be specified explicitly, not from default locations.
   * The *borg-client*'s entry in *borgs@borg-server:~/.ssh/authorized_keys* must be as restrictive as possible.
 
-``echo 'your secure borg key passphrase' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg init --encryption repokey ssh://borgs@borg-server/~/repo"``
+``echo 'your secure borg key passphrase' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg repo-create --encryption aes256-ocb --key-location repokey -r rest://borgs@borg-server/repo"``
 
-  Run the *borg init* command on *borg-client*.
+  Run the *borg repo-create* command on *borg-client*.
 
-  *ssh://borgs@borg-server/~/repo* refers to the repository *repo* within borgs's home directory on *borg-server*.
+  *rest://borgs@borg-server/repo* refers to the repository *repo* within borgs's home directory on *borg-server*
+  (a path given with a single leading slash is relative to the directory ssh logs into; use
+  *rest://borgs@borg-server//path/to/repo* for an absolute path).
+
+  Borg on *borg-client* connects via ssh (using *BORG_RSH*) and runs ``borg serve --rest`` on
+  *borg-server*, which the forced command in *borgs@borg-server:~/.ssh/authorized_keys* pins down.
 
   *StrictHostKeyChecking=no* is used to add host keys automatically to *~/.ssh/known_hosts* without user intervention.
 
@@ -472,7 +490,7 @@ using ``localhost`` instead of ``mybackup``
 
 2. On machine ``myclient``
 
-``borg create -v --progress --stats ssh://backup@localhost:8022/home/backup/repos/myclient /``
+``borg create -v --progress --stats -r rest://backup@localhost:8022//home/backup/repos/myclient system /``
 
 Make sure to use port ``8022`` and ``localhost`` for the repository as this instructs borg on ``myclient`` to use the
 remote forwarded ssh connection.
@@ -497,7 +515,7 @@ path and client-fqdn:
 
 ::
 
-  command="cd /home/backup/repos/<client fqdn>;borg serve --restrict-to-path /home/backup/repos/<client fqdn>"
+  command="cd /home/backup/repos/<client fqdn>;borg serve --rest --restrict-to-path /home/backup/repos/<client fqdn>"
 
 
 All the additional security considerations for borg should be applied, see :ref:`central-backup-server` for some additional

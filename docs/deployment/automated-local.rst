@@ -123,17 +123,19 @@ modify it to suit your needs (e.g., more backup sets, dumping databases, etc.).
 
     # This is just an example, change it however you see fit
     borg create $BORG_OPTS \
+      --repo $TARGET \
       --exclude root/.cache \
       --exclude var/lib/docker/devicemapper \
-      $TARGET::$DATE-$$-system \
+      $DATE-$$-system \
       / /boot
 
     # /home is often a separate partition/filesystem.
     # Even if it is not (add --exclude /home above), it probably makes sense
     # to have /home in a separate archive.
     borg create $BORG_OPTS \
+      --repo $TARGET \
       --exclude 'sh:home/*/.cache' \
-      $TARGET::$DATE-$$-home \
+      $DATE-$$-home \
       /home/
 
     echo "Completed backup for $DATE"
@@ -181,9 +183,9 @@ Record the UUID in the ``/etc/backups/backup.disks`` file.
 
 Mount the drive at /mnt/backup.
 
-Initialize a Borg repository at the location indicated by ``TARGET``::
+Create a Borg repository at the location indicated by ``TARGET``::
 
-    borg init --encryption ... /mnt/backup/borg-backups/backup.borg
+    borg repo-create -r /mnt/backup/borg-backups/backup.borg --encryption ...
 
 Unmount and reconnect the drive, or manually start the ``automatic-backup`` service
 to start the first backup::

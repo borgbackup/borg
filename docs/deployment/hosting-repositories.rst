@@ -29,7 +29,7 @@ SSH access to safe operations only.
 
 ::
 
-  command="borg serve --restrict-to-repository /home/<user>/repository",restrict
+  command="borg serve --rest --restrict-to-repository /home/<user>/repository",restrict
   <key type> <key> <key host>
 
 .. note:: The text shown above needs to be written on a **single** line!
@@ -48,12 +48,19 @@ If any future restriction capabilities are added to authorized_keys
 files they will be included in this set.
 
 The ``command`` keyword forces execution of the specified command
-upon login. This must be ``borg serve``. The ``--restrict-to-repository``
-option permits access to exactly **one** repository. It can be given
-multiple times to permit access to more than one repository.
+upon login. This must be ``borg serve --rest``: ``--rest`` serves a current
+repository (the server side of a ``rest://`` repository URL), while ``borg serve``
+without it serves a legacy borg 1.x repository using the legacy RPC protocol.
+The client cannot supply ``--rest`` itself - the mode is deliberately pinned by
+the forced command - so a forced command without ``--rest`` locks out all clients
+using current (``rest://``) repositories.
 
-The repository may not exist yet; it can be initialized by the user,
-which allows for encryption.
+The ``--restrict-to-repository`` option permits access to exactly **one**
+repository. It can be given multiple times to permit access to more than
+one repository.
+
+The repository may not exist yet; it can be created by the user with
+``borg repo-create``, which allows for encryption.
 
 Refer to the `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 man page for more details on SSH options.

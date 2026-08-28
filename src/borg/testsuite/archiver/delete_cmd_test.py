@@ -1,4 +1,7 @@
+import pytest
+
 from ...constants import *  # NOQA
+from ...helpers import CommandError
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -32,6 +35,58 @@ def test_delete_multiple(archivers, request):
     cmd(archiver, "delete", "-a", "test1")
     cmd(archiver, "delete", "-a", "test2")
     assert not cmd(archiver, "repo-list")
+
+
+def test_delete_all_without_filter_aborts(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")
+    cmd(archiver, "create", "test2", "input")
+    cmd(archiver, "create", "test3", "input")
+    # Without NAME, -a / --match-archives, --first or --last, borg must refuse to delete everything.
+    # The guard triggers before any archive is considered, so it also applies to --dry-run.
+    msg = "if you really want to delete all archives"
+    for extra_args in ([], ["--dry-run", "--list"]):
+        if archiver.FORK_DEFAULT:
+            output = cmd(archiver, "delete", *extra_args, exit_code=CommandError().exit_code)
+            assert msg in output
+            assert "Would delete" not in output
+        else:
+            with pytest.raises(CommandError, match=msg):
+                cmd(archiver, "delete", *extra_args)
+    output = cmd(archiver, "repo-list")  # no archive was deleted
+    assert "test1" in output
+    assert "test2" in output
+    assert "test3" in output
+
+
+def test_delete_all_with_match_archives(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")
+    cmd(archiver, "create", "test2", "input")
+    cmd(archiver, "delete", "-a", "sh:*")  # explicitly asking for all archives is fine
+    assert cmd(archiver, "repo-list") == ""
+
+
+def test_delete_first_last(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")
+    cmd(archiver, "create", "test2", "input")
+    cmd(archiver, "create", "test3", "input")
+    cmd(archiver, "delete", "--first", "1", "--sort-by", "name")  # test1
+    output = cmd(archiver, "repo-list")
+    assert "test1" not in output
+    assert "test2" in output
+    assert "test3" in output
+    cmd(archiver, "delete", "--last", "1", "--sort-by", "name")  # test3
+    output = cmd(archiver, "repo-list")
+    assert "test2" in output
+    assert "test3" not in output
 
 
 def test_delete_ignore_protected(archivers, request):

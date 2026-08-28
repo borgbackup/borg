@@ -26,7 +26,8 @@ class DeleteMixIn:
         count = len(archive_infos)
         if count == 0:
             return
-        if not args.name and not args.match_archives and args.first == 0 and args.last == 0:
+        # --first / --last are PositiveInt and default to None, thus a falsy value means "not given".
+        if not args.name and not args.match_archives and not args.first and not args.last:
             raise CommandError(
                 "Aborting: if you really want to delete all archives, please use -a 'sh:*' "
                 "or just delete the whole repository (might be much faster)."

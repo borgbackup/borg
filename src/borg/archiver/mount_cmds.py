@@ -4,6 +4,7 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import RTError
 from ..helpers import PathSpec, FilesystemDirSpec
+from ..helpers import location_validator
 from ..helpers import umount
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
@@ -113,8 +114,10 @@ class MountMixIn:
         - Only mount a specific archive, not the whole repository.
         - Only mount specific paths in a specific archive, not the complete archive.
 
-        The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
-        used in fstab entries:
+        The command ``borgfs`` provides a wrapper for ``borg mount``. It is invoked as
+        ``borgfs [REPOSITORY] MOUNTPOINT [PATH...]``, taking the repository as its first
+        positional argument (if it is not given, ``-r`` / ``BORG_REPO`` is used). This can
+        also be used in fstab entries:
         ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
 
         To allow a regular user to use fstab entries, add the ``user`` option:
@@ -193,12 +196,32 @@ class MountMixIn:
         parser.description = self.do_mount.__doc__
         parser.epilog = "For more information, see borg mount --help."
         parser.help = "mount a repository"
-        self._define_borg_mount(parser)
+        # borgfs is a top-level parser, thus it reads the same default config file as borg does,
+        # but it has no subcommands - just ignore the per-subcommand sections of that config file.
+        parser.ignore_unknown_config_keys = True
+        # borgfs *is* the mount command, so the "mount:" section applies to it: adopt its keys as
+        # top-level keys (they win over same-named top-level keys of the config file).
+        parser.adopt_config_sections = ("mount",)
+        self._define_borg_mount(parser, borgfs=True)
         return parser
 
-    def _define_borg_mount(self, parser):
+    def _define_borg_mount(self, parser, borgfs=False):
         from ._common import define_exclusion_group, define_archive_filters_group
 
+        if borgfs:
+            # mount(8) / mount.fuse(8) invoke "borgfs <spec> <mountpoint> -o <options>", so for an
+            # /etc/fstab entry like "/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0" to work,
+            # borgfs must accept the repository as its first positional argument.
+            # It is optional: if it is not given, -r/--repo or BORG_REPO is used, like for borg mount.
+            # Archiver.parse_args() copies it to args.location, where -r/--repo would have put it.
+            parser.add_argument(
+                "repository",
+                metavar="REPOSITORY",
+                nargs="?",
+                type=location_validator(other=False),
+                default=None,
+                help="repository to mount (default: as given by -r/--repo or BORG_REPO)",
+            )
         parser.add_argument(
             "mountpoint", metavar="MOUNTPOINT", type=FilesystemDirSpec, help="where to mount the filesystem"
         )

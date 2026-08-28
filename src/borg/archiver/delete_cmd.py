@@ -82,7 +82,7 @@ class DeleteMixIn:
 
         You can delete multiple archives by specifying a match pattern using
         the ``--match-archives PATTERN`` option (for more information on these
-        patterns, see :ref:`borg_patterns`).
+        patterns, see "borg help match-archives").
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_delete.__doc__, epilog=delete_epilog)

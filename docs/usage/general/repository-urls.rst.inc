@@ -59,7 +59,7 @@ If you frequently need the same repository URL, it is a good idea to set the
 
 ::
 
-    export BORG_REPO='ssh://user@host:port/rel/path/to/repo'
+    export BORG_REPO='rest://user@host:port/rel/path/to/repo'
 
 Then simply omit the ``--repo`` option when you want
 to use the default — it will be read from BORG_REPO.

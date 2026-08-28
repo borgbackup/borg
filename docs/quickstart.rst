@@ -19,10 +19,11 @@ A *Borg archive* is the result of a single backup (``borg create``). An archive
 stores a snapshot of the data of the files "inside" it. One can later extract or
 mount an archive to restore from a backup.
 
-*Repositories* are filesystem directories acting as self-contained stores of archives.
-Repositories can be accessed locally via path or remotely via SSH. Under the hood,
-repositories contain data blocks and a manifest that tracks which blocks are in each
-archive. If some data hasn't changed between backups, Borg simply
+*Repositories* are self-contained stores of archives. A repository can be a local
+directory or remote storage (see :ref:`remote_repos`). Under the hood, a repository
+is a plain store of encrypted objects, keyed by object ID: it holds the data chunks,
+the archive metadata (which lists, per file, the IDs of the chunks it consists of)
+and the list of archives. If some data hasn't changed between backups, Borg simply
 references an already-uploaded data chunk (deduplication).
 
 .. _about_free_space:
@@ -118,15 +119,16 @@ Automating backups
 
 The following example script is meant to be run daily by the ``root`` user on
 different local machines. It backs up a machine's important files (but not the
-complete operating system) to a repository ``~/backup/main``  on a remote server.
+complete operating system) to a repository ``~/backup/main`` in the home directory
+of the login user on a remote server.
 Some files which aren't necessarily needed in this backup are excluded. See
 :ref:`borg_patterns` on how to add more exclude options.
 
 After the backup, this script also uses the :ref:`borg_prune` subcommand to keep
 a certain number of old archives and deletes the others.
 
-Finally, it uses the :ref:`borg_compact` subcommand to remove deleted objects
-from the segment files in the repository to free disk space.
+Finally, it uses the :ref:`borg_compact` subcommand to free disk space in the
+repository by removing objects that are not referenced by any archive any more.
 
 Before running, make sure that the repository is initialized as documented in
 :ref:`remote_repos` and that the script has the correct permissions to be executable
@@ -142,8 +144,10 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
 
     #!/bin/sh
 
-    # Setting this, so the repo does not need to be given on the commandline:
-    export BORG_REPO=rest://username@example.com:2022/path/to/backup/main
+    # Setting this, so the repo does not need to be given on the commandline.
+    # One slash after the host means: relative to the remote login directory,
+    # so this is ~/backup/main of the remote "username" user:
+    export BORG_REPO=rest://username@example.com:2022/backup/main
 
     # See the section "Passphrase notes" for more infos.
     export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
@@ -151,6 +155,20 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
     # some helpers and error handling:
     info() { printf "\n%s %s\n\n" "$( date )" "$*" >&2; }
     trap 'echo $( date ) Backup interrupted >&2; exit 2' INT TERM
+
+    # Classify a borg return code into a severity, so we can report the worst
+    # one at the end. Borg 2 uses specific return codes by default, see the
+    # "Return codes" section of the docs:
+    #   0 == success, 1 and 100..127 == warning,
+    #   2 and 3..99 == error, 128+N == killed by signal N.
+    severity() {
+        if   [ "$1" -eq 0   ]; then echo 0  # success
+        elif [ "$1" -eq 1   ]; then echo 1  # generic warning
+        elif [ "$1" -ge 128 ]; then echo 3  # killed by a signal
+        elif [ "$1" -ge 100 ]; then echo 1  # specific warning
+        else                        echo 2  # error
+        fi
+    }
 
     info "Starting backup"
 
@@ -193,7 +211,7 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
 
     prune_exit=$?
 
-    # actually free repo disk space by compacting segments
+    # actually free repo disk space by removing unreferenced objects
 
     info "Compacting repository"
 
@@ -201,16 +219,26 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
 
     compact_exit=$?
 
-    # use highest exit code as global exit code
-    global_exit=$(( backup_exit > prune_exit ? backup_exit : prune_exit ))
-    global_exit=$(( compact_exit > global_exit ? compact_exit : global_exit ))
+    # exit with the return code of the most severe outcome. Note that comparing
+    # the return codes numerically would be wrong: a specific warning (e.g. 107)
+    # is numerically larger, but less severe, than a specific error (e.g. 13).
 
-    if [ ${global_exit} -eq 0 ]; then
+    global_exit=0
+    global_severity=0
+    for rc in ${backup_exit} ${prune_exit} ${compact_exit}; do
+        rc_severity=$( severity ${rc} )
+        if [ ${rc_severity} -gt ${global_severity} ]; then
+            global_severity=${rc_severity}
+            global_exit=${rc}
+        fi
+    done
+
+    if [ ${global_severity} -eq 0 ]; then
         info "Backup, Prune, and Compact finished successfully"
-    elif [ ${global_exit} -eq 1 ]; then
-        info "Backup, Prune, and/or Compact finished with warnings"
+    elif [ ${global_severity} -eq 1 ]; then
+        info "Backup, Prune, and/or Compact finished with warnings (rc ${global_exit})"
     else
-        info "Backup, Prune, and/or Compact finished with errors"
+        info "Backup, Prune, and/or Compact finished with errors (rc ${global_exit})"
     fi
 
     exit ${global_exit}
@@ -307,7 +335,7 @@ compression::
 
     $ borg create --compression none arch ~
 
-You can also use zlib and lzma instead of zstd, although zstd usually provides the
+You can also use zlib and lzma instead of zstd, although zstd usually provides
 the best compression for a given resource consumption. Please see :ref:`borg_compression`
 for all options.
 
@@ -393,13 +421,18 @@ be acceptable for backup usage.
 Other kinds of repositories
 ---------------------------
 
-Due to using the `borgstore` project, borg now also supports other kinds of
-(remote) repositories besides `file:` and `ssh:`:
+Due to using the `borgstore` project, borg also supports other kinds of
+(remote) repositories besides `file:` and `rest:`:
 
 - sftp: the borg client will directly talk to an sftp server.
   This does not require borg being installed on the sftp server.
 - rclone: the borg client will talk via rclone to cloud storage.
+- s3 / b2: the borg client will directly talk to S3-compatible object storage
+  (e.g. Amazon S3, Backblaze B2).
 - Others may come in the future, adding backends to `borgstore` is rather simple.
+
+See the "Repository URLs" section in the usage chapter for the URL syntax of
+each of these backends.
 
 Restoring a backup
 ------------------
@@ -518,7 +551,7 @@ Example with **borg extract**:
     # now we find out the archive ID of the archive we want to extract:
     borg repo-list
 
-    # find out how the paths stored in the the archive look like:
+    # find out how the paths stored in the archive look like:
     borg list aid:d34db33f
 
     # we extract only some specific path (note: no leading / !):

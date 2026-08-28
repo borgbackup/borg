@@ -1,6 +1,16 @@
 About borg create --chunker-params
 ==================================
 
+NOTE: This document predates borg 2. It describes the buzhash chunker and its
+parameters, and all commands use borg 1.x syntax (e.g. "repo::archive" instead
+of "-r repo archive", "borg info" output with an "All archives" section).
+Borg 2 defaults to the fastcdc chunker, which takes different parameters, and
+its repository layout (pack files, a separate index namespace) differs from the
+borg 1.x segment files, so the repository/index size numbers below do not
+transfer to borg 2 either.
+The measurements are kept for their qualitative results: how the chunk size
+affects chunk count, index size, compression ratio and deduplication.
+
 --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
 
 CHUNK_MIN_EXP and CHUNK_MAX_EXP provide the exponent N for the 2^N minimum and

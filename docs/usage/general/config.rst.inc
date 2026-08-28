@@ -32,8 +32,10 @@ Default configuration file
     Print the current effective configuration (all options in YAML format) to
     stdout and exit. This reflects the merged result of the default config
     file, any ``--config`` file, environment variables, and command-line
-    arguments given before ``--print_config``. The output can be used as a
-    starting point for a config file.
+    arguments. The output can be used as a starting point for a config file.
+
+    ``--print_config`` is a common option, so it must be given *before* the
+    subcommand name — the subcommand's own options still show up in the output.
 
 File format
     Config files are YAML documents. Top-level keys are option names
@@ -66,4 +68,4 @@ File format
     convenient way to check what values Borg will actually use, and to
     generate contents for your borg config file(s)::
 
-        borg --repo /backup/main create --compression zstd,3 --print_config
+        borg --repo /backup/main --print_config create --compression zstd,3

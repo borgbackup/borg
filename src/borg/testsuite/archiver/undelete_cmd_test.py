@@ -24,6 +24,19 @@ def test_undelete_single(archivers, request):
     cmd(archiver, "check")
 
 
+def test_undelete_date_filters_are_a_selection(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "deleted1", "input")
+    cmd(archiver, "create", "deleted2", "input")
+    cmd(archiver, "delete", "deleted1")
+    cmd(archiver, "delete", "deleted2")
+    # a date-based filter is an explicit archive selection, so the undelete-all guard must not trigger
+    output = cmd(archiver, "undelete", "--dry-run", "--list", "--newest", "1d")
+    assert "Would undelete" in output
+
+
 def test_undelete_multiple_dryrun(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

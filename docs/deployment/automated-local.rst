@@ -72,7 +72,7 @@ modify it to suit your needs (e.g., more backup sets, dumping databases, etc.).
     # This is the location of the Borg repository
     TARGET=$MOUNTPOINT/borg-backups/backup.borg
 
-    # Archive name schema
+    # Timestamp for the log messages below
     DATE=$(date --iso-8601)-$(hostname)
 
     # This is the file that will later contain UUIDs of registered backup drives
@@ -121,21 +121,26 @@ modify it to suit your needs (e.g., more backup sets, dumping databases, etc.).
 
     echo "Starting backup for $DATE"
 
-    # This is just an example, change it however you see fit
+    # This is just an example, change it however you see fit.
+    # The archive name is fixed (no date or PID in it): every run adds an
+    # archive to the "system" series, letting Borg's files cache speed up
+    # unchanged files on the next run. Use "borg repo-list" to see each run's
+    # own archive ID and timestamp.
     borg create $BORG_OPTS \
       --repo $TARGET \
       --exclude root/.cache \
       --exclude var/lib/docker/devicemapper \
-      $DATE-$$-system \
+      system \
       / /boot
 
     # /home is often a separate partition/filesystem.
     # Even if it is not (add --exclude /home above), it probably makes sense
     # to have /home in a separate archive.
+    # As above, use a fixed archive name so all runs form one "home" series.
     borg create $BORG_OPTS \
       --repo $TARGET \
       --exclude 'sh:home/*/.cache' \
-      $DATE-$$-home \
+      home \
       /home/
 
     echo "Completed backup for $DATE"
@@ -195,6 +200,13 @@ to start the first backup::
 See backup logs using journalctl::
 
     journalctl -fu automatic-backup [-n number-of-lines]
+
+Each run adds one archive to the ``system`` series and one to the ``home``
+series (the archive name is the same on every run; see the script above).
+List the archives, including each one's archive ID and timestamp, using
+``borg repo-list`` (see :ref:`borg_repo-list`)::
+
+    borg repo-list -r /mnt/backup/borg-backups/backup.borg
 
 Security considerations
 -----------------------

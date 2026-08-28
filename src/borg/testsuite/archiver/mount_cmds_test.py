@@ -22,6 +22,7 @@ from ..platform.platform_test import fakeroot_detected, skipif_not_linux, skipif
 from ..platform.platform_test import skipif_acls_not_working
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
+from . import Archiver
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -490,3 +491,53 @@ def test_fuse_lock_refresh_calls_repository_info():
 
     assert held_while_calling and all(held_while_calling), "repository.info() must run while holding the lock"
     assert not lock.locked(), "lock must be released again after refreshing"
+
+
+# The borgfs tests below only exercise argument parsing and dispatch, so they do not need FUSE.
+# borgfs is the "borg mount" wrapper for /etc/fstab: mount(8) / mount.fuse(8) invoke it as
+# "borgfs <spec> <mountpoint> -o <options>". Its parser is a top-level parser without subcommands,
+# see MountMixIn.build_parser_borgfs and Archiver.get_func.
+
+
+def test_borgfs_mounts_repository_positional():
+    archiver = Archiver(prog="borgfs")
+    args = archiver.parse_args(["/path/to/repo", "/mnt/point", "some/path"])
+    assert args.func == archiver.do_mount
+    # the REPOSITORY positional must end up where -r/--repo would have put it
+    assert args.location.path == "/path/to/repo"
+    assert args.mountpoint == "/mnt/point"
+    assert args.paths == ["some/path"]
+
+
+def test_borgfs_repository_positional_is_optional():
+    # without REPOSITORY, the repository comes from -r/--repo (or BORG_REPO), like for borg mount
+    archiver = Archiver(prog="borgfs")
+    args = archiver.parse_args(["--repo", "/path/to/repo", "/mnt/point"])
+    assert args.func == archiver.do_mount
+    assert args.location.path == "/path/to/repo"
+    assert args.mountpoint == "/mnt/point"
+    assert args.paths == []
+
+
+def test_borgfs_ignores_subcommand_sections_in_default_config(monkeypatch, tmp_path):
+    # borgfs is a top-level parser, thus it reads the same default config file as borg does.
+    # That file usually has per-subcommand sections, which borgfs has to ignore rather than reject.
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "default.yaml").write_text("log_level: info\ncreate:\n  output_filter: AME\n")
+    monkeypatch.setenv("BORG_CONFIG_DIR", str(config_dir))
+    archiver = Archiver(prog="borgfs")
+    args = archiver.parse_args(["/path/to/repo", "/mnt/point"])
+    assert args.func == archiver.do_mount
+    assert args.location.path == "/path/to/repo"
+    assert args.log_level == "info"  # top-level keys of the config file still apply
+
+
+def test_borg_mount_has_no_repository_positional():
+    # borg mount is unchanged: MOUNTPOINT [PATH...], the repository only comes from -r/--repo.
+    archiver = Archiver(prog="borg")
+    args = archiver.parse_args(["mount", "/mnt/point", "some/path"])
+    assert args.func == archiver.do_mount
+    assert args.mountpoint == "/mnt/point"
+    assert args.paths == ["some/path"]
+    assert not args.location.valid

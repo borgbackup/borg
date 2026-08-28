@@ -384,6 +384,12 @@ class Archiver(
             if getattr(args, list_attr, None) is None:
                 setattr(args, list_attr, [])
 
+        # borgfs takes the repository as its first positional argument (fstab calling convention,
+        # see build_parser_borgfs). Put it where -r/--repo would have put it, so with_repository works.
+        repository = getattr(args, "repository", None)
+        if repository is not None:
+            args.location = repository
+
         func = self.get_func(args, parser)
         if func == self.do_create and args.paths and args.paths_from_stdin:
             parser.error("Must not pass PATH with --paths-from-stdin.")
@@ -416,6 +422,9 @@ class Archiver(
 
     def get_func(self, args, parser):
         if not getattr(args, "subcommand", None):
+            if parser.prog == "borgfs":
+                # the borgfs parser has no subcommands, it *is* the "borg mount" command
+                return self.do_mount
             return functools.partial(self.do_maincommand_help, parser)
 
         method_name = "do_" + args.subcommand.replace(" ", "_").replace("-", "_")

@@ -116,9 +116,24 @@ MISSING_REQUIRED_RES = (
 
 
 class ArgumentParser(_ArgumentParser):
+    # If True, keys of a config file (e.g. the default config file) that this parser does not know
+    # about are silently dropped instead of making the parser fail. This is needed for the "borgfs"
+    # parser: it is a top-level parser (so it reads the same default config file as "borg" does), but
+    # it has no subcommands, so the per-subcommand sections that config file usually has (e.g. a
+    # "create:" section) would otherwise be rejected as unknown options.
+    ignore_unknown_config_keys = False
+
     # the borg code always uses RawDescriptionHelpFormatter and add_help=False:
     def __init__(self, *args, formatter_class=RawDescriptionHelpFormatter, add_help=False, **kwargs):
         super().__init__(*args, formatter_class=formatter_class, add_help=add_help, **kwargs)
+
+    def _load_config_parser_mode(self, content, path="", ext_vars=None, prev_cfg=None):
+        """Load a config file into a namespace, optionally dropping keys this parser does not know."""
+        cfg = super()._load_config_parser_mode(content, path, ext_vars, prev_cfg)
+        if self.ignore_unknown_config_keys:
+            # strip_unknown() removes all keys that have no action in this parser.
+            cfg = self.strip_unknown(cfg)
+        return cfg
 
     def _find_by_key(self, key):
         """Resolve a jsonargparse config key to the (sub)parser it belongs to and its action."""

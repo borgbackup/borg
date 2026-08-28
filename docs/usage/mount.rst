@@ -27,9 +27,9 @@ Examples
     # and provides a versioned view on files.
     $ borg mount -o versions /tmp/mymountpoint
     $ ls -l /tmp/mymountpoint/home/user/doc.txt/
-    total 24
-    -rw-rw-r-- 1 user group 12357 Aug 26 21:19 doc.cda00bc9.txt
-    -rw-rw-r-- 1 user group 12204 Aug 26 21:04 doc.fa760f28.txt
+    total 47
+    -rw-r--r-- 1 user group 12167 Aug 28 23:14 doc.00001.txt
+    -rw-r--r-- 1 user group 11444 Aug 28 23:15 doc.00002.txt
     $ borg umount /tmp/mymountpoint
 
     # Archive filters are supported.

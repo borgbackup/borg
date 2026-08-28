@@ -15,6 +15,10 @@ General:
         When set, use the value to answer the passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
+        BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are mutually exclusive:
+        if more than one of them is set, borg refuses to guess and aborts with
+        "More than one passphrase environment variable is set". The same applies to the
+        ``BORG_OTHER_*`` variants (which are a separate, independent group).
         See also BORG_NEW_PASSPHRASE.
     BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
         When set, use the standard output of the command (trailing newlines are stripped) to answer the
@@ -22,7 +26,7 @@ General:
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo. Note that the command
         is executed without a shell. So variables, like ``$HOME`` will work, but ``~`` won't.
-        If BORG_PASSPHRASE is also set, it takes precedence.
+        Mutually exclusive with BORG_PASSPHRASE and BORG_PASSPHRASE_FD, see there.
         See also BORG_NEW_PASSPHRASE.
     BORG_PASSPHRASE_FD (and BORG_OTHER_PASSPHRASE_FD)
         When set, specifies a file descriptor to read a passphrase
@@ -30,11 +34,11 @@ General:
         and use it to pass a passphrase. This is safer than passing via
         BORG_PASSPHRASE, because on some systems (e.g. Linux) environment
         can be examined by other processes.
-        If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
+        Mutually exclusive with BORG_PASSPHRASE and BORG_PASSCOMMAND, see there.
     BORG_NEW_PASSPHRASE
         When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
-        This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
-        be checked.
+        This variable is checked first. If it is not set, BORG_PASSPHRASE, BORG_PASSCOMMAND and
+        BORG_PASSPHRASE_FD are checked (in that order).
         Main use case for this is to fully automate ``borg key change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
@@ -122,6 +126,36 @@ General:
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
+    BORG_STORE_CACHE
+        When set, borg keeps a local writethrough cache of the repository's ``packs/``
+        namespace: on a cache miss the whole pack is fetched once and later reads of the
+        objects inside that pack are served from the cache. Use this for slow or
+        high-latency repositories.
+        Set it to ``1`` to use ``$BORG_CACHE_DIR/storecache``, or to a directory path to
+        use that directory (it is created if it does not exist). Packs are named by
+        content hash, so one cache directory can safely hold packs of multiple repositories.
+        If it is not set, no such caching happens.
+    BORG_PACK_CACHE_SIZE
+        When set to a numeric value, limit the pack cache to that many bytes.
+        Only has an effect if BORG_STORE_CACHE is set.
+    BORG_PACK_MAX_SIZE
+        When set to a numeric value, cap packs (the repository objects that batch up many
+        chunks, see the internals documentation about pack files) at that many bytes
+        instead of the default of 50000000.
+        Smaller packs mean more (but smaller) repository objects and more
+        fine-grained uploads; bigger packs mean fewer objects and fewer stores.
+    BORG_PACK_MAX_COUNT
+        When set to a numeric value, cap packs at that many objects per pack.
+        If BORG_PACK_MAX_SIZE is not also set, packs are then bound by count only.
+    BORG_PACK_ASYNC
+        When set to ``no``, disable the background thread that stores a finished pack
+        while the next one is being assembled, and store packs synchronously instead.
+        This is mainly a debugging aid.
+    BORG_PACK_TRACE
+        When set to ``yes``, print one-character lifecycle markers of the background
+        pack store-thread to stderr (``<`` thread started, ``H`` hashing starts,
+        ``S`` storing starts, ``>`` thread finished). This is a debugging aid to
+        visualize how pack stores overlap with the assembly of the next pack.
     BORG_ASSERT_ID
         Comma-separated list of the places where borg shall verify that a chunk's content matches
         its chunk id (``chunkid == id_hash(content)``) after decrypting and decompressing it.
@@ -258,6 +292,12 @@ General:
         - ``pyfuse3``: only try to load pyfuse3
         - ``llfuse``: only try to load llfuse
         - ``none``: do not try to load an implementation
+    BORG_MOUNT_DATA_CACHE_ENTRIES
+        Number of decrypted file content chunks ``borg mount`` and ``borg webdav`` keep
+        in an in-memory cache, so that the many small, sequential reads a mounted file
+        system does for a big file do not re-fetch and re-decrypt the same chunk over and
+        over (default: the cpu count). Additional memory usage can be up to the chunk size
+        times this number.
     BORG_SELFTEST
         This can be used to influence borg's built-in self-tests. The default is to execute the tests
         at the beginning of each borg command invocation.
@@ -285,9 +325,13 @@ General:
             in WSL1 (Windows Subsystem for Linux 1).
 
         authenticated_no_key
-            Work around a lost passphrase or key for an ``authenticated-*`` mode repository
+            Work around a lost passphrase for an ``authenticated-*`` mode repository
             (these are only authenticated, but not encrypted).
-            If the key is missing in the repository config, add ``key = anything`` there.
+            Borg still has to find the repository's borg key - an object below ``keys/``
+            in the repository (repokey) resp. a key file in the keys directory (keyfile) -
+            but it does not unlock it any more, so the passphrase does not matter. If the
+            borg key itself is gone, this workaround does not help: borg then fails with
+            "No key entry found ...".
 
             Without the key, borg can not verify anything that needs it: neither the
             authentication tag of the repository objects nor the chunk ids. It therefore
@@ -302,13 +346,17 @@ General:
 
             After you have extracted all data you need, you MUST delete the repository::
 
-                BORG_WORKAROUNDS=authenticated_no_key borg delete repo
+                BORG_WORKAROUNDS=authenticated_no_key borg repo-delete --repo repo
 
-            Now you can init a fresh repo. Make sure you do not use the workaround any more.
+            Now you can create a fresh repository with ``borg repo-create``. Make sure you
+            do not use the workaround any more.
 
 Output formatting:
     BORG_CHECK_FORMAT
         Giving the default value for ``borg check --format=X``.
+    BORG_DIFF_FORMAT
+        Giving the default value for ``borg diff --format=X``.
+        Note: ``borg diff --content-only`` uses its own format and ignores this.
     BORG_FIND_FORMAT
         Giving the default value for ``borg find --format=X``.
     BORG_LIST_FORMAT
@@ -322,6 +370,11 @@ Output formatting:
         ``borg webdav`` show a whole repository, default: ``{name}``. The placeholders
         are the ones of ``borg repo-list --format``; names that are not unique get
         ``-{id:.8}`` appended. See ``borg mount --help``.
+    BORG_JSON_INDENT
+        Indentation of the ``--json`` output (default: ``4``).
+        A number gives that many spaces per nesting level (``0`` still puts every item on
+        its own line), ``none`` gives compact single-line JSON, and any other value is used
+        as the literal indent string (e.g. a tab or the empty string).
 
 Some automatic "answerers" (if set, they automatically answer confirmation questions):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
@@ -343,7 +396,7 @@ Directories and files:
 
     - Linux: XDG Base Directory Specification paths are used (e.g. ``~/.config/borg``,
       ``~/.cache/borg``, ``~/.local/share/borg``). ``XDG_*`` environment variables are
-      honoured (see https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html).
+      honoured (see https://specifications.freedesktop.org/basedir/latest/).
     - macOS: native macOS directories are used by default (e.g. ``~/Library/Application Support/borg``,
       ``~/Library/Caches/borg``). ``XDG_*`` environment variables are honoured if set.
     - Windows: Windows AppData directories are used (e.g. ``C:\Users\<user>\AppData\Roaming\borg``,
@@ -364,7 +417,8 @@ Directories and files:
         Security   <data_dir>/security   <data_dir>/security                   <data_dir>\security
 
     BORG_BASE_DIR
-        Defaults to ``$HOME`` or ``~$USER`` or ``~`` (in that order).
+        Not set by default - then the platform-specific directories shown in the table above
+        are used.
         If you want to move all borg-specific folders to a custom path at once, all you need to do is
         to modify ``BORG_BASE_DIR``: the other paths for cache, config etc. will adapt accordingly
         (assuming you didn't set them to a different custom value).
@@ -415,16 +469,25 @@ Directories and files:
         for details.
 
 Building:
-    BORG_OPENSSL_NAME
-        Defines the subdirectory name for OpenSSL (setup.py).
+    These are only read by ``setup.py`` while building borg's C extensions. Each
+    ``BORG_*_PREFIX`` variable names the install prefix of a library that borg links
+    against: if it is set, ``$PREFIX/include`` and ``$PREFIX/lib`` are used unconditionally.
+    If it is not set, the library is located via pkg-config, and if that does not find it
+    either, the build fails - there is no bundled fallback implementation.
+
     BORG_OPENSSL_PREFIX
-        Adds given OpenSSL header file directory to the default locations (setup.py).
-    BORG_LIBACL_PREFIX
-        Adds given prefix directory to the default locations. If an 'include/acl/libacl.h' is found
-        Borg will be linked against the system libacl instead of a bundled implementation. (setup.py)
+        Prefix of the OpenSSL installation to build libcrypto against.
+        On Windows, the libraries are expected in ``$PREFIX`` itself rather than in
+        ``$PREFIX/lib``. On OpenBSD, this defaults to ``/usr/local``, pkg-config is not
+        used and libcrypto is linked statically (borg needs AES-OCB via the EVP API, which
+        LibreSSL does not have).
+    BORG_OPENSSL_NAME
+        OpenBSD only: the OpenSSL flavour to use, i.e. the ``include/`` and ``lib/``
+        subdirectory name below ``BORG_OPENSSL_PREFIX`` (default: ``eopenssl35``).
     BORG_LIBLZ4_PREFIX
-        Adds given prefix directory to the default locations. If a 'include/lz4.h' is found Borg
-        will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
+        Prefix of the liblz4 installation to build against.
+    BORG_LIBACL_PREFIX
+        Linux only: prefix of the libacl installation to build against.
 
 Automatic option environment variables:
     Borg uses jsonargparse (https://jsonargparse.readthedocs.io/) with ``default_env=True``,

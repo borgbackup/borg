@@ -143,11 +143,11 @@ run ``borg create --list --dry-run ...``.
 
 Examples::
 
-    # Exclude a directory anywhere in the tree named ``steamapps/common``
+    # Exclude a directory anywhere in the tree named steamapps/common
     # (and everything below it), regardless of where it appears:
     $ borg create -e 'sh:**/steamapps/common/**' archive /
 
-    # Exclude the contents of ``/home/user/.cache``:
+    # Exclude the contents of /home/user/.cache:
     $ borg create -e 'sh:home/user/.cache/**' archive /home/user
     $ borg create -e home/user/.cache/ archive /home/user
 
@@ -198,12 +198,15 @@ Pattern style prefix ``P`` (only useful within patterns files)
 
 Exclude pattern prefix ``-``
     Use the prefix ``-``, followed by a pattern, to define an exclusion.
-    This has the same effect as the ``--exclude`` option.
+    Borg still recurses into a directory excluded this way, so a later
+    include pattern can still match files below it.
 
 Exclude no-recurse pattern prefix ``!``
     Use the prefix ``!``, followed by a pattern, to define an exclusion
     that does not recurse into subdirectories. This saves time, but
     prevents include patterns to match any files in subdirectories.
+    The ``--exclude`` option and the patterns in an ``--exclude-from``
+    file give this kind of exclusion, not the recursing one of ``-``.
 
 Include pattern prefix ``+``
     Use the prefix ``+``, followed by a pattern, to define inclusions.
@@ -248,9 +251,10 @@ character that indicates the action (e.g. 'x' for excluding, see
     directories are not. In that case, parent directories are not backed
     up and thus their user, group, permission, etc. cannot be restored.
 
-Patterns (``--pattern``) and excludes (``--exclude``) from the command line are
-considered first (in the order of appearance). Then patterns from ``--patterns-from``
-are added. Exclusion patterns from ``--exclude-from`` files are appended last.
+``--pattern``, ``--patterns-from``, ``--exclude`` and ``--exclude-from`` all feed the
+same single list of patterns, in the order in which they appear on the command line.
+The patterns of a pattern file resp. exclude file are inserted where the option naming
+that file stands, in the order of the lines in that file.
 
 Examples::
 
@@ -403,8 +407,9 @@ borg help placeholders
 ~~~~~~~~~~~~~~~~~~~~~~
 
 
-Repository URLs, ``--name``, ``-a`` / ``--match-archives``, ``--comment``
-and ``BORG_REMOTE_PATH`` values support these placeholders:
+Repository URLs, the archive name arguments (``NAME``, ``OLDNAME``, ``NEWNAME``,
+``ARCHIVE1``, ``ARCHIVE2``), ``-a`` / ``--match-archives``, ``--comment`` and
+``BORG_REMOTE_PATH`` values support these placeholders:
 
 {hostname}
     The (short) hostname of the machine.
@@ -423,11 +428,18 @@ and ``BORG_REMOTE_PATH`` values support these placeholders:
     The current UTC date and time, by default in ISO-8601 format.
     You can also supply your own `format string <https://docs.python.org/3.11/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
+{unixtime}
+    The current time as a UNIX timestamp, i.e. whole seconds since the epoch,
+    e.g.: 1735732800
+
 {user}
     The user name (or UID, if no name is available) of the user running borg.
 
 {pid}
     The current process ID.
+
+{uuid4}
+    A random UUID (version 4), freshly generated each time placeholders are replaced.
 
 {borgversion}
     The version of borg, e.g.: 1.0.8rc1

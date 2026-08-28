@@ -182,8 +182,8 @@ Encryption::
 
     header = type-byte || 00h || message_iv || sessionid
     aad = obj_header_aad || slot_tag || id || header
-    message_iv++
     encrypted, auth_tag = AEAD_encrypt(session_key, message_iv, compressed, aad)
+    message_iv++
     authenticated = header || auth_tag || encrypted
 
 Decryption::
@@ -343,7 +343,7 @@ Implementations used
 We do not implement cryptographic primitives ourselves, but rely
 on widely used libraries providing them:
 
-- AES-OCB and CHACHA20-POLY1305 from OpenSSL 1.1 are used,
+- AES-OCB and CHACHA20-POLY1305 from OpenSSL are used,
   which is also linked into the static binaries we provide.
   We think this is not an additional risk, since we don't ever
   use OpenSSL's networking, TLS or X.509 code, but only their
@@ -440,8 +440,8 @@ its dependencies, so their security properties are those of the respective libra
   authenticated with the credentials from the URL, a named profile, or the usual
   boto3 environment/configuration.
 - ``rclone:`` starts an ``rclone rcd`` process listening on ``127.0.0.1`` on a random
-  port with a random user/password and drives it over its rc API. Remote credentials
-  and transport security are rclone's.
+  port, authenticated with a fixed ``borg`` user and a random password, and drives
+  it over its rc API. Remote credentials and transport security are rclone's.
 - ``http(s)://`` talks to a borgstore REST server over plain HTTP, authenticating
   with HTTP Basic auth taken from the URL or from ``BORGSTORE_REST_USERNAME`` /
   ``BORGSTORE_REST_PASSWORD``. Basic auth sends the credentials to the server on

@@ -793,7 +793,7 @@ Errors
     NotABorgKeyFile rc: 43 traceback: no
         This file is not a Borg key backup, aborting.
     RepoKeyNotFoundError rc: 44 traceback: no
-        No key entry found in the config of repository {}.
+        No key found in repository {}.
     RepoIdMismatch rc: 45 traceback: no
         This key backup seems to be for a different backup repository, aborting.
     UnencryptedRepo rc: 46 traceback: no

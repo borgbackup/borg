@@ -152,7 +152,7 @@ class KeyfileMismatchError(Error):
 
 
 class RepoKeyNotFoundError(Error):
-    """No key entry found in the config of repository {}."""
+    """No key found in repository {}."""
 
     exit_mcode = 44
 

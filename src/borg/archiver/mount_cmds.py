@@ -98,8 +98,8 @@ class MountMixIn:
             On Linux, this can be prevented by remounting the mountpoint with the
             ``nosymfollow`` VFS mount option, for example:
 
-                borg mount <repo path> <mountpoint>
-                mount -o remount,nosymfollow <repo path> <mountpoint>
+                borg -r <repo path> mount <mountpoint>
+                mount -o remount,nosymfollow <mountpoint>
 
             Alternatively, access the mounted archive from an appropriately isolated
             environment (for example, a container or ``chroot``).

@@ -80,7 +80,9 @@ class ServeMixIn:
         repository via the `--repo` option or the `BORG_REPO` environment variable - it is the
         borg client that specifies the repository to use.
 
-        The --permissions option enforces repository permissions:
+        The --permissions option enforces repository permissions. It only applies to
+        ``--rest`` mode; in legacy mode it is ignored, because legacy (borg 1.x) repositories
+        have no permission system:
 
         - `all`: All permissions are granted. (Default; the permissions system is not used.)
         - `no-delete`: Allow reading and writing; disallow deleting and overwriting data.
@@ -134,5 +136,6 @@ class ServeMixIn:
             "--permissions",
             dest="permissions",
             choices=["all", "no-delete", "write-only", "read-only"],
-            help="Set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.",
+            help="(with --rest) set repository permission mode. "
+            "Overrides BORG_REPO_PERMISSIONS environment variable.",
         )

@@ -14,7 +14,7 @@ class VersionMixIn:
         from borg.version import parse_version, format_version
 
         client_version = parse_version(__version__)
-        if args.location.proto == "ssh" and getattr(args, "v1_legacy", False):
+        if args.location.proto == "ssh" and args.v1_legacy:
             from ..legacy.remote import LegacyRemoteRepository
 
             with LegacyRemoteRepository(args.location, lock=False, args=args) as repository:
@@ -45,13 +45,13 @@ class VersionMixIn:
 
         Examples::
 
-            # local repository (client uses 1.4.0 alpha version)
-            $ borg version /mnt/backup
-            1.4.0a / 1.4.0a
+            # local repository
+            $ borg -r /mnt/backup version
+            2.0.0 / 2.0.0
 
-            # legacy remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
-            $ borg version --from-borg1 ssh://borg@borgbackup:repo
-            1.4.0a / 1.2.7
+            # legacy remote repository (client uses 2.0.0, server uses 1.4.5 release)
+            $ borg -r ssh://borg@borgbackup/repo version --from-borg1
+            2.0.0 / 1.4.5
 
         Due to the version tuple format used in Borg client/server negotiation, only
         a simplified version is displayed (as provided by borg.version.format_version).
@@ -62,3 +62,4 @@ class VersionMixIn:
         subparser = ArgumentParser(parents=[common_parser], description=self.do_version.__doc__, epilog=version_epilog)
         subparsers.add_subcommand("version", subparser, help="display the Borg client and server versions")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")
+        subparser.add_argument("--from-borg1", dest="v1_legacy", action="store_true", help="repository is Borg 1.x")

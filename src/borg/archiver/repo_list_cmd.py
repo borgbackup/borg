@@ -42,8 +42,8 @@ class RepoListMixIn:
     def build_parser_repo_list(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group
 
-        repo_list_epilog = (
-            process_epilog(
+        repo_list_epilog = process_epilog(
+            textwrap.dedent(
                 """
         This command lists the archives contained in a repository.
 
@@ -65,8 +65,9 @@ class RepoListMixIn:
 
             # {VAR:NUMBER} - pad to NUMBER columns.
             # Strings are left-aligned, numbers are right-aligned.
-            # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
-            $ borg repo-list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+            # Note: the time keys (time, start, end) can not be padded - for them, the
+            # format spec is a strftime format string, e.g. {time:%Y-%m-%d}.
+            $ borg repo-list --format '{archive:36} {time} [{id}]{NL}'
             ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9...3b274]
             ...
 

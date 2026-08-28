@@ -294,7 +294,7 @@ class TransferMixIn:
         any case) and keep data compressed "as is" (saves time as no data compression is needed).
 
         If you want to globally change compression while transferring archives to the DST_REPO,
-        give ``--compress=WANTED_COMPRESSION --recompress=always``.
+        give ``--compression=WANTED_COMPRESSION --recompress=always``.
 
         The default is to transfer all archives.
 
@@ -359,11 +359,11 @@ class TransferMixIn:
 
             # to continue using lz4 compression as you did in SRC_REPO:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \\
-                 --compress=lz4 --recompress=never
+                 --compression=lz4 --recompress=never
 
             # alternatively, to recompress everything to zstd,3:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \\
-                 --compress=zstd,3 --recompress=always
+                 --compression=zstd,3 --recompress=always
 
             # to re-chunk using different chunker parameters:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO \\
@@ -433,9 +433,11 @@ class TransferMixIn:
             type=ChunkerParams,
             default=None,
             action=Highlander,
-            help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, NC_LEVEL) or `default` to use the chunker defaults. "
-            "default: do not rechunk",
+            help="rechunk using given chunker parameters: "
+            "buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or "
+            "buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or "
+            "fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or "
+            "`default` to use the chunker defaults. default: do not rechunk",
         )
 
         define_archive_filters_group(subparser)

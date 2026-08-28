@@ -823,8 +823,11 @@ class TarMixIn:
             default=CHUNKER_PARAMS,
             action=Highlander,
             metavar="PARAMS",
-            help="specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, NC_LEVEL). default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
+            help="specify the chunker parameters: "
+            "buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or "
+            "buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or "
+            "fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL. "
+            "default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
         )
         archive_group.add_argument(
             "-C",

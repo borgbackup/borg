@@ -75,8 +75,9 @@ class RecreateMixIn:
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (``--exclude``, ``--exclude-from``, PATHs).
 
-        ``--chunker-params`` will re-chunk all files in the archive, this can be
-        used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
+        ``--chunker-params`` will re-chunk all files in the archive. This can be used to
+        switch existing archives to different chunker parameters (or a different chunker
+        algorithm), so they deduplicate with archives created using these parameters.
 
         **USE WITH CAUTION.**
         Depending on the paths and patterns given, recreate can be used to
@@ -84,9 +85,10 @@ class RecreateMixIn:
         When in doubt, use ``--dry-run --verbose --list`` to see how patterns/paths are
         interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
-        The archive being recreated is only removed after the operation completes. The
-        archive that is built during the operation exists at the same time at
-        "<ARCHIVE>.recreate". The new archive will have a different archive ID.
+        The archive being recreated is only removed after the new archive has been saved
+        completely. The new archive is created under the same name as the original one, so
+        while the operation runs, both exist side by side; they are told apart by their
+        archive IDs, as the new archive gets a different archive ID.
 
         With ``--target`` the original archive is not replaced, instead a new archive is created.
 
@@ -127,7 +129,7 @@ class RecreateMixIn:
             default=None,
             type=archivename_validator,
             action=Highlander,
-            help="create a new archive with the name ARCHIVE, do not replace existing archive",
+            help="create a new archive with the name TARGET, do not replace existing archive",
         )
         archive_group.add_argument(
             "--comment",
@@ -165,9 +167,11 @@ class RecreateMixIn:
             type=ChunkerParams,
             default=None,
             action=Highlander,
-            help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, NC_LEVEL) or `default` to use the chunker defaults. "
-            "default: do not rechunk",
+            help="rechunk using given chunker parameters: "
+            "buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or "
+            "buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or "
+            "fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or "
+            "`default` to use the chunker defaults. default: do not rechunk",
         )
 
         subparser.add_argument(

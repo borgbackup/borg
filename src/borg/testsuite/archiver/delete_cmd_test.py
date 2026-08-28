@@ -26,6 +26,17 @@ def test_delete_options(archivers, request):
     assert output == ""  # no archives left!
 
 
+def test_delete_date_filters_are_a_selection(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")
+    cmd(archiver, "create", "test2", "input")
+    # a date-based filter is an explicit archive selection, so the delete-all guard must not trigger
+    output = cmd(archiver, "delete", "--dry-run", "--list", "--newest", "1d")
+    assert "Would delete" in output
+
+
 def test_delete_multiple(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

@@ -26,8 +26,12 @@ class UnDeleteMixIn:
         count = len(archive_infos)
         if count == 0:
             return
-        # --first / --last are PositiveInt and default to None, thus a falsy value means "not given".
-        if not args.name and not args.match_archives and not args.first and not args.last:
+        # any explicitly given archive filter counts as a deliberate selection;
+        # all these args are falsy when not given (--first / --last are PositiveInt, defaulting to None).
+        any_filters_given = any(
+            (args.name, args.match_archives, args.first, args.last, args.oldest, args.newest, args.older, args.newer)
+        )
+        if not any_filters_given:
             raise CommandError("Aborting: if you really want to undelete all archives, please use -a 'sh:*'.")
 
         undeleted = False

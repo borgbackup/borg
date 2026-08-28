@@ -413,34 +413,6 @@ with the ``figure-padded`` class for consistent spacing::
 
         Caption text.
 
-Using Vagrant
--------------
-
-We use Vagrant for the automated creation of testing environments and borgbackup
-standalone binaries for various platforms.
-
-For better security, there is no automatic sync in the VM to host direction.
-The plugin `vagrant-scp` is useful to copy stuff from the VMs to the host.
-
-The "windows10" box requires the `reload` plugin (``vagrant plugin install vagrant-reload``).
-
-Usage::
-
-   # To create and provision the VM:
-   vagrant up OS
-   # same, but use 6 VM cpus and 12 workers for pytest:
-   VMCPUS=6 XDISTN=12 vagrant up OS
-   # To create an ssh session to the VM:
-   vagrant ssh OS
-   # To execute a command via ssh in the VM:
-   vagrant ssh OS -c "command args"
-   # To shut down the VM:
-   vagrant halt OS
-   # To shut down and destroy the VM:
-   vagrant destroy OS
-   # To copy files from the VM (in this case, the generated binary):
-   vagrant scp OS:/vagrant/borg/borg.exe .
-
 Using Podman
 ------------
 
@@ -529,11 +501,6 @@ Checklist:
 
   This makes sure no uncommitted files get into the release archive.
   It will also reveal uncommitted required files.
-  Moreover, it makes sure the vagrant machines only get committed files and
-  do a fresh start based on that.
-- Optional: run tox and/or binary builds on all supported platforms via vagrant,
-  check for test failures. This is now optional as we do platform testing and
-  binary building on GitHub.
 - When GitHub CI looks good on the release PR, merge it and push the release tag.
 
   Pushing the tag makes CI build the standalone binaries and then release:

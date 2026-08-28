@@ -8,7 +8,7 @@ All about JSON: How to develop frontends
 
 Borg does not have a public API on the Python level. That does not keep you from writing :code:`import borg`,
 but does mean that there are no release-to-release guarantees on what you might find in that package, not
-even for point releases (1.1.x), and there is no documentation beyond the code and the internals documents.
+even for point releases (2.0.x), and there is no documentation beyond the code and the internals documents.
 
 Borg does on the other hand provide an API on a command-line level. In other words, a frontend should
 (for example) create a backup archive by invoking :ref:`borg_create`, provide command-line parameters/options
@@ -88,24 +88,32 @@ The following types are in use. Progress information is governed by the usual ru
 it is not produced unless ``--progress`` is specified.
 
 archive_progress
-    Output during operations creating archives (:ref:`borg_create` and :ref:`borg_recreate`).
+    Output during operations creating archives (:ref:`borg_create`, :ref:`borg_import-tar`,
+    :ref:`borg_recreate` and :ref:`borg_transfer`).
     The following keys exist, each represents the current progress.
 
     original_size
-        Original size of data processed so far (before compression and deduplication, may be empty/absent)
-    compressed_size
-        Compressed size (may be empty/absent)
-    deduplicated_size
-        Deduplicated size (may be empty/absent)
+        Original size of the data processed so far (before compression and deduplication)
     nfiles
-        Number of (regular) files processed so far (may be empty/absent)
+        Number of (regular) files processed so far
+    hashing_time
+        Seconds spent hashing file contents so far (float)
+    chunking_time
+        Seconds spent chunking file contents so far (float)
+    files_stats
+        Object mapping the single-character file status (as used by ``--list``) to the number of
+        files that got that status so far, e.g. ``{"A": 3, "d": 3}``
+    store_stats
+        Object with the storage backend statistics. It is empty here, it is only filled in for the
+        final :ref:`borg_create` ``--json`` output on *stdout*, see `Archive formats`_.
     path
-        Current path (may be empty/absent)
+        Current path (absent if there is no current item)
     time
         Unix timestamp (float)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
-        can have this property set to *true*.
+        can have this property set to *true*. That last object has no keys besides *time*, *type*
+        and *finished*.
 
 progress_message
     A message-based progress information with no concrete progress information, just a message
@@ -119,7 +127,7 @@ progress_message
         boolean indicating whether the operation has finished, only the last object for an *operation*
         can have this property set to *true*.
     message
-        current progress message (may be empty/absent)
+        current progress message (empty string for finished == true)
     time
         Unix timestamp (float)
 
@@ -135,9 +143,9 @@ progress_percent
         can have this property set to *true*.
     message
         A formatted progress message, this will include the percentage and perhaps other information
-        (absent for finished == true)
+        (empty string for finished == true)
     current
-        Current value (always less-or-equal to *total*, absent for finished == true)
+        Current value (usually less-or-equal to *total*, absent for finished == true)
     info
         Array that describes the current item, may be *null*, contents depend on *msgid*
         (absent for finished == true)
@@ -147,8 +155,9 @@ progress_percent
         Unix timestamp (float)
 
 file_status
-    This is only output by :ref:`borg_create` and :ref:`borg_recreate` if ``--list`` is specified. The usual
-    rules for the file listing applies, including the ``--filter`` option.
+    This is only output by :ref:`borg_create`, :ref:`borg_import-tar` and :ref:`borg_recreate` if
+    ``--list`` is specified. The usual rules for the file listing applies, including the
+    ``--filter`` option.
 
     status
         Single-character status as for regular list output
@@ -169,84 +178,65 @@ log_message
     :ref:`msgid <msgid>`
         Message ID, may be *null* or absent
 
-See Prompts_ for the types used by prompts.
+See Prompts_ for how borg asks questions.
 
 .. rubric:: Examples (reformatted, each object would be on exactly one line)
 .. highlight:: json
 
 :ref:`borg_extract` progress::
 
-    {"message": "100.0% Extracting: src/borgbackup.egg-info/entry_points.txt",
-     "current": 13000228, "total": 13004993, "info": ["src/borgbackup.egg-info/entry_points.txt"],
-     "operation": 1, "msgid": "extract", "type": "progress_percent", "finished": false}
-    {"message": "100.0% Extracting: src/borgbackup.egg-info/SOURCES.txt",
-     "current": 13004993, "total": 13004993, "info": ["src/borgbackup.egg-info/SOURCES.txt"],
-     "operation": 1, "msgid": "extract", "type": "progress_percent", "finished": false}
-    {"operation": 1, "msgid": "extract", "type": "progress_percent", "finished": true}
+    {"message": " 20.0% Extracting: src/linux/baz/file3", "current": 50012, "total": 250012,
+     "info": ["src/linux/baz/file3"], "operation": 1, "msgid": "extract",
+     "type": "progress_percent", "finished": false, "time": 1787900399.5558112}
+    {"message": " 20.0% Extracting: src/linux/file1", "current": 250012, "total": 250012,
+     "info": ["src/linux/file1"], "operation": 1, "msgid": "extract",
+     "type": "progress_percent", "finished": false, "time": 1787900399.5561972}
+    {"message": "", "operation": 1, "msgid": "extract", "type": "progress_percent",
+     "finished": true, "time": 1787900399.556339}
 
 :ref:`borg_create` file listing with progress::
 
-    {"original_size": 0, "compressed_size": 0, "deduplicated_size": 0, "nfiles": 0, "type": "archive_progress", "path": "src"}
-    {"type": "file_status", "status": "U", "path": "src/borgbackup.egg-info/entry_points.txt"}
-    {"type": "file_status", "status": "U", "path": "src/borgbackup.egg-info/SOURCES.txt"}
-    {"type": "file_status", "status": "d", "path": "src/borgbackup.egg-info"}
+    {"original_size": 0, "nfiles": 0, "hashing_time": 0.0, "chunking_time": 0.0, "files_stats": {},
+     "store_stats": {}, "path": "src", "time": 1787900398.684961, "type": "archive_progress", "finished": false}
+    {"type": "file_status", "status": "A", "path": "src/linux/baz/file2"}
+    {"type": "file_status", "status": "A", "path": "src/linux/baz/file3"}
+    {"type": "file_status", "status": "d", "path": "src/linux/baz"}
+    {"type": "file_status", "status": "A", "path": "src/linux/file1"}
+    {"type": "file_status", "status": "d", "path": "src/linux"}
     {"type": "file_status", "status": "d", "path": "src"}
-    {"original_size": 13176040, "compressed_size": 11386863, "deduplicated_size": 503, "nfiles": 277, "type": "archive_progress", "path": ""}
+    {"time": 1787900398.686938, "type": "archive_progress", "finished": true}
 
-Internal transaction progress::
+Saving the local cache at the end of :ref:`borg_create`::
 
-    {"message": "Saving files cache", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
-    {"message": "Saving cache config", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
-    {"message": "Saving index", "operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": false}
-    {"operation": 2, "msgid": "cache.commit", "type": "progress_message", "finished": true}
+    {"message": "Saving files cache", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": false, "time": 1787900398.719723}
+    {"message": "Saving index", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": false, "time": 1787900398.728792}
+    {"message": "Saving cache config", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": false, "time": 1787900398.7294679}
+    {"message": "", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": true, "time": 1787900398.739775}
 
 A debug log message::
 
-    {"message": "35 self tests completed in 0.08 seconds",
-     "type": "log_message", "created": 1488278449.5575905, "levelname": "DEBUG", "name": "borg.archiver"}
+    {"type": "log_message", "time": 1787900399.0667, "message": "19 self-tests completed in 0.02 seconds",
+     "levelname": "DEBUG", "name": "borg.archiver"}
+
+An error log message, carrying a msgid_::
+
+    {"type": "log_message", "time": 1787900383.5105972,
+     "message": "Repository proto='file', ... does not exist.",
+     "levelname": "ERROR", "name": "borg.archiver", "msgid": "Repository.DoesNotExist"}
 
 Prompts
 -------
 
-Prompts assume a JSON form as well when the ``--log-json`` option is specified. Responses
-are still read verbatim from *stdin*, while prompts are JSON messages printed to *stderr*,
-just like log messages.
+Borg asks a few yes/no questions interactively; the "Prompts" list at the end of `Message IDs`_
+enumerates them. Borg writes them directly to *stderr* as plain text and reads the answer
+verbatim from *stdin*. Prompts do not go through the logger, so they stay plain text even with
+``--log-json``.
 
-Prompts use the *question_prompt* and *question_prompt_retry* types for the prompt itself,
-and *question_invalid_answer*, *question_accepted_default*, *question_accepted_true*,
-*question_accepted_false* and *question_env_answer* types for information about
-prompt processing.
-
-The *message* property contains the same string displayed regularly in the same situation,
-while the *msgid* property may contain a msgid_, typically the name of the
-environment variable that can be used to override the prompt. It is the same for all JSON
-messages pertaining to the same prompt.
-
-.. rubric:: Examples (reformatted, each object would be on exactly one line)
-.. highlight:: none
-
-Providing an invalid answer::
-
-    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
-     "message": "... Type 'YES' if you understand this and want to continue: "}
-    incorrect answer  # input on stdin
-    {"type": "question_invalid_answer", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING", "is_prompt": false,
-     "message": "Invalid answer, aborting."}
-
-Providing a false (negative) answer::
-
-    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
-     "message": "... Type 'YES' if you understand this and want to continue: "}
-    NO  # input on stdin
-    {"type": "question_accepted_false", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
-     "message": "Aborting.", "is_prompt": false}
-
-Providing a true (affirmative) answer::
-
-    {"type": "question_prompt", "msgid": "BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
-     "message": "... Type 'YES' if you understand this and want to continue: "}
-    YES  # input on stdin
-    # no further output, just like the prompt without --log-json
+A frontend should therefore not try to answer these prompts interactively. Every prompt has an
+environment variable that overrides it (the variable name is the prompt's msgid_): if it is set,
+its value is used as if it had been typed in, and borg never waits for input. For example, with
+``BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO`` in the environment, ``borg check --repair`` prints the
+question, answers it with *NO* and fails with the *CancelledByUser* msgid_ (rc 3).
 
 Passphrase prompts
 ------------------
@@ -264,7 +254,7 @@ the repository is encrypted, the following algorithm can be followed to detect e
 
 1. Set *BORG_PASSPHRASE* to gibberish (for example a freshly generated UUID4, which cannot
    possibly be the passphrase)
-2. Invoke ``borg list repository ...``
+2. Invoke ``borg repo-list -r repository ...``
 3. If this fails, due the repository being encrypted and the passphrase obviously being
    wrong, you'll get an error with the *PassphraseWrong* msgid.
 
@@ -275,17 +265,20 @@ the repository is encrypted, the following algorithm can be followed to detect e
 Standard output
 ---------------
 
-*stdout* is different and more command-dependent than logging. Commands like :ref:`borg_info`, :ref:`borg_create`
-and :ref:`borg_list` implement a ``--json`` option which turns their regular output into a single JSON object.
+*stdout* is different and more command-dependent than logging. Commands like :ref:`borg_repo-info`,
+:ref:`borg_repo-list`, :ref:`borg_info`, :ref:`borg_create` and :ref:`borg_analyze` implement a
+``--json`` option which turns their regular output into a single JSON object.
 
 Some commands, like :ref:`borg_list` and :ref:`borg_diff`, can produce *a lot* of JSON. Since many JSON implementations
 don't support a streaming mode of operation, which is pretty much required to deal with this amount of JSON, these
 commands implement a ``--json-lines`` option which generates output in the `JSON lines <https://jsonlines.org/>`_ format,
 which is simply a number of JSON objects separated by new lines.
 
-Dates are formatted according to ISO 8601 in local time. No explicit time zone is specified *at this time*
-(subject to change). The equivalent strftime format string is '%Y-%m-%dT%H:%M:%S.%f',
-e.g. ``2017-08-07T12:27:20.123456``.
+Dates are formatted according to ISO 8601 in the local time zone of the borg client, including the
+UTC offset, e.g. ``2026-08-28T08:59:56.761172+02:00``. Repository and archive timestamps and the
+item timestamps of :ref:`borg_list` have microsecond precision (6 fraction digits). The item
+timestamps of :ref:`borg_diff` have nanosecond precision (9 fraction digits), because that is how
+borg stores them.
 
 The root object of '--json' output will contain at least a *repository* key with an object containing:
 
@@ -309,83 +302,83 @@ The *cache* key, if present, contains:
 
 path
     Path to the local repository cache
-stats
-    Object containing cache stats:
 
-    total_chunks
-        Number of chunks
-    total_unique_chunks
-        Number of unique chunks
-    total_size
-        Total uncompressed size of all chunks multiplied with their reference counts
-    unique_size
-        Uncompressed size of all chunks
+:ref:`borg_repo-info` additionally emits a *security_dir* key with the path of the local security
+directory of the repository.
 
 .. highlight: json
 
-Example *borg info* output::
+Example ``borg repo-info --json`` output::
 
     {
         "cache": {
-            "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "stats": {
-                "total_chunks": 511533,
-                "total_size": 22635749792,
-                "total_unique_chunks": 54892,
-                "unique_size": 2449675468
-            }
+            "path": "/home/user/.cache/borg/65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94"
         },
         "encryption": {
             "encryption": "aes256-ocb",
             "id_hash": "sha256"
         },
         "repository": {
-            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "last_modified": "2017-08-07T12:27:20.789123",
-            "location": "/home/user/testrepo"
+            "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
+            "last_modified": "2026-08-28T08:59:55.908686+02:00",
+            "location": "/home/user/repository"
         },
-        "security_dir": "/home/user/.config/borg/security/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-        "archives": []
+        "security_dir": "/home/user/.local/share/borg/security/65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94"
     }
 
 Archive formats
 +++++++++++++++
 
 :ref:`borg_info` uses an extended format for archives, which is more expensive to retrieve, while
-:ref:`borg_list` uses a simpler format that is faster to retrieve. Either return archives in an
-array under the *archives* key, while :ref:`borg_create` returns a single archive object under the
-*archive* key.
+:ref:`borg_repo-list` uses a simpler format that is faster to retrieve. Either return archives in an
+array under the *archives* key, while :ref:`borg_create` and :ref:`borg_import-tar` return a single
+archive object under the *archive* key.
 
 :ref:`borg_create` with ``--dry-run`` does not create an archive, so there is no *archive* key.
 Instead, it returns *dry_run* (true) and a reduced *stats* object with *nfiles* and *original_size*,
 both computed from file system metadata without reading the file contents.
 
-Both formats contain a *name* key with the archive name, the *id* key with the hexadecimal archive ID,
-and the *start* key with the start timestamp.
+Both formats always contain a *name* key with the archive name, the *id* key with the hexadecimal
+archive ID and the *time* key with the nominal archive timestamp. The *borg repo-list* format
+additionally always has an *archive* key, an alias of *name*.
 
-*borg info* and *borg create* further have:
+*borg info*, *borg create* and *borg import-tar* further have:
 
+start
+    Start timestamp of the archive creation
 end
-    End timestamp
+    End timestamp of the archive creation
 duration
-    Duration in seconds between start and end in seconds (float)
-stats
-    Archive statistics (freshly calculated, this is what makes "info" more expensive)
-
-    original_size
-        Size of files and metadata before compression
-    compressed_size
-        Size after compression
-    deduplicated_size
-        Deduplicated size (against the current repository, not when the archive was created)
-    nfiles
-        Number of regular files in the archive
+    Duration in seconds between start and end (float)
 command_line
-    Array of strings of the command line that created the archive
+    The command line that created the archive, as one shell-quoted string.
 
     The note about paths from above applies here as well.
-chunker_params
-    The chunker parameters the archive has been created with.
+stats
+    Archive statistics:
+
+    original_size
+        Size of the file contents and the metadata in this archive, before compression and
+        deduplication
+    nfiles
+        Number of regular files in the archive
+    hashing_time
+        Seconds spent hashing file contents (float)
+    chunking_time
+        Seconds spent chunking file contents (float)
+    files_stats
+        Object mapping the single-character file status to the number of files with that status
+    store_stats
+        Object with the statistics of the storage backend (call counts, transferred volumes,
+        times, cache hits/misses, ...)
+
+    *borg create* fills all of these in for the archive it has just created. *borg info* only reads
+    *original_size* and *nfiles* from the archive metadata; *hashing_time*, *chunking_time*,
+    *files_stats* and *store_stats* are 0 or empty there.
+
+    Compressed and deduplicated sizes are not given: computing them per archive is expensive.
+    Use :ref:`borg_analyze` for the deduplicated size of a set of archives and
+    ``borg compact --stats`` for the repository-wide numbers.
 
 :ref:`borg_info` further has:
 
@@ -393,27 +386,38 @@ hostname
     Hostname of the creating host
 username
     Name of the creating user
+cwd
+    Working directory the archive was created in
 comment
     Archive comment, if any
+tags
+    Array of the archive's tags
+chunker_params
+    The chunker parameters the archive has been created with.
 
-Some keys/values are more expensive to compute than others (e.g. because it requires opening the archive,
-not just the manifest). To optimize for speed, `borg list repo` does not determine these values except
-when they are requested. The `--format` option is used for that (for normal mode as well as for `--json`
-mode), so, to have the comment included in the json output, you will need:
+Some keys/values are more expensive to compute than others (e.g. because it requires opening the
+archive, not just the archives directory). To optimize for speed, `borg repo-list` does not determine
+these values except when they are requested. The `--format` option is used for that (for normal mode
+as well as for `--json` mode), so, to have the comment included in the json output, you will need:
 
-::
+.. code-block:: none
 
-    borg list repo --format "{name}{comment}" --json`
+    borg repo-list --format "{name}{comment}" --json
+
+Note that the default `--format` of `borg repo-list` already requests *tags*, *username*, *hostname*
+and *comment*, so these show up unless you give a `--format` without them.
 
 
-Example of a simple archive listing (``borg list --last 1 --json``)::
+Example of a simple archive listing (``borg repo-list --format "{name}{comment}" --json``)::
 
     {
         "archives": [
             {
-                "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
-                "name": "host-system-backup-2017-02-27",
-                "start": "2017-08-07T12:27:20.789123"
+                "archive": "src-2026-08-28",
+                "comment": "",
+                "id": "b0f88c1245506d1f8ba283908c2d7d42d50bb7c7e4120134eafe16c5f0cde192",
+                "name": "src-2026-08-28",
+                "time": "2026-08-28T08:59:56.761172+02:00"
             }
         ],
         "encryption": {
@@ -421,8 +425,8 @@ Example of a simple archive listing (``borg list --last 1 --json``)::
             "id_hash": "sha256"
         },
         "repository": {
-            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "last_modified": "2017-08-07T12:27:20.789123",
+            "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
+            "last_modified": "2026-08-28T08:59:56.764587+02:00",
             "location": "/home/user/repository"
         }
     }
@@ -433,53 +437,101 @@ The same archive with more information (``borg info --last 1 --json``)::
         "archives": [
             {
                 "chunker_params": [
-                    "buzhash",
-                    13,
+                    "fastcdc",
+                    19,
                     23,
-                    16,
-                    4095
+                    21,
+                    2
                 ],
-                "command_line": [
-                    "/home/user/.local/bin/borg",
-                    "create",
-                    "/home/user/repository",
-                    "..."
-                ],
+                "command_line": "/home/user/.local/bin/borg create --json src-2026-08-28 src",
                 "comment": "",
-                "duration": 5.641542,
-                "end": "2017-02-27T12:27:20.789123",
+                "cwd": "/home/user",
+                "duration": 0.002238,
+                "end": "2026-08-28T08:59:56.763410+02:00",
                 "hostname": "host",
-                "id": "80cd07219ad725b3c5f665c1dcf119435c4dee1647a560ecac30f8d40221a46a",
-                "name": "host-system-backup-2017-02-27",
-                "start": "2017-02-27T12:27:20.789123",
+                "id": "b0f88c1245506d1f8ba283908c2d7d42d50bb7c7e4120134eafe16c5f0cde192",
+                "name": "src-2026-08-28",
+                "start": "2026-08-28T08:59:56.761172+02:00",
                 "stats": {
-                    "compressed_size": 1880961894,
-                    "deduplicated_size": 2791,
-                    "nfiles": 53669,
-                    "original_size": 2400471280
+                    "chunking_time": 0.0,
+                    "files_stats": {},
+                    "hashing_time": 0.0,
+                    "nfiles": 3,
+                    "original_size": 250047,
+                    "store_stats": {}
                 },
+                "tags": [],
+                "time": "2026-08-28T08:59:56.761172+02:00",
                 "username": "user"
             }
         ],
         "cache": {
-            "path": "/home/user/.cache/borg/0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "stats": {
-                "total_chunks": 511533,
-                "total_size": 22635749792,
-                "total_unique_chunks": 54892,
-                "unique_size": 2449675468
-            }
+            "path": "/home/user/.cache/borg/65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94"
         },
         "encryption": {
             "encryption": "aes256-ocb",
             "id_hash": "sha256"
         },
         "repository": {
-            "id": "0cbe6166b46627fd26b97f8831e2ca97584280a46714ef84d2b668daf8271a23",
-            "last_modified": "2017-08-07T12:27:20.789123",
+            "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
+            "last_modified": "2026-08-28T08:59:56.764587+02:00",
             "location": "/home/user/repository"
         }
     }
+
+The archive :ref:`borg_create` has just created (``borg create --json``), with the statistics it
+collected while running::
+
+    {
+        "archive": {
+            "command_line": "/home/user/.local/bin/borg create --json src-2026-08-28 src",
+            "duration": 0.002238,
+            "end": "2026-08-28T08:59:56.763410+02:00",
+            "id": "b0f88c1245506d1f8ba283908c2d7d42d50bb7c7e4120134eafe16c5f0cde192",
+            "name": "src-2026-08-28",
+            "start": "2026-08-28T08:59:56.761172+02:00",
+            "stats": {
+                "chunking_time": 7.81649723649025e-05,
+                "files_stats": {
+                    "A": 3,
+                    "d": 3
+                },
+                "hashing_time": 0.00010525097604840994,
+                "nfiles": 3,
+                "original_size": 250510,
+                "store_stats": {
+                    "backend_load_calls": 8,
+                    "backend_load_volume": 2298,
+                    "backend_store_calls": 6,
+                    "backend_store_volume": 253555,
+                    "load_calls": 8,
+                    "load_throughput": 8997087.104958186,
+                    "load_time": 0.000255416,
+                    "load_volume": 2298,
+                    "store_calls": 6,
+                    "store_throughput": 120882023.28345428,
+                    "store_time": 0.002097541,
+                    "store_volume": 253555
+                }
+            },
+            "time": "2026-08-28T08:59:56.761172+02:00"
+        },
+        "cache": {
+            "path": "/home/user/.cache/borg/65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94"
+        },
+        "encryption": {
+            "encryption": "aes256-ocb",
+            "id_hash": "sha256"
+        },
+        "repository": {
+            "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
+            "last_modified": "2026-08-28T08:59:56.764587+02:00",
+            "location": "/home/user/repository"
+        }
+    }
+
+The *store_stats* object above is shortened; borg reports more keys there, e.g. the counters and
+times of the other storage operations and of the pack cache.
 
 File listings
 +++++++++++++
@@ -487,10 +539,15 @@ File listings
 Each archive item (file, directory, ...) is described by one object in the :ref:`borg_list` output.
 Refer to the *borg list* documentation for the available keys and their meaning.
 
+The keys *path*, *target*, *hlid*, *type*, *mode*, *uid*, *gid*, *user*, *group*, *flags* and
+*inode* are always present; *flags* and *inode* are *null* if the source file system did not
+provide them. The keys used in ``--format`` are added to that; the default format contributes
+*size* and *mtime*.
+
 Example (excerpt) of ``borg list --json-lines``::
 
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.023407", "size": 0}
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.585407", "size": 0}
+    {"flags": 0, "gid": 0, "group": "wheel", "hlid": "", "inode": 714338381, "mode": "drwxr-xr-x", "mtime": "2026-08-28T08:59:55.543471+02:00", "path": "src/linux/baz", "size": 0, "target": "", "type": "d", "uid": 501, "user": "user"}
+    {"flags": 0, "gid": 0, "group": "wheel", "hlid": "", "inode": 714338384, "mode": "-rw-r--r--", "mtime": "2026-08-28T08:59:55.543551+02:00", "path": "src/linux/baz/file3", "size": 12, "target": "", "type": "-", "uid": 501, "user": "user"}
 
 
 Archive Differencing
@@ -513,56 +570,63 @@ The possible properties of a *Change* object are:
 type:
   The **type** property is always present. It identifies the type of change and will be one of these values:
 
-  - *modified* - file contents changed.
+  - *modified* - the file contents changed.
   - *added* - the file was added.
   - *removed* - the file was removed.
-  - *added directory* - the directory was added.
-  - *removed directory* - the directory was removed.
-  - *added link* - the symlink was added.
-  - *removed link* - the symlink was removed.
+  - *added directory* / *removed directory* - the directory was added / removed.
+  - *added link* / *removed link* - the symlink was added / removed.
   - *changed link* - the symlink target was changed.
-  - *mode* - the file/directory/link mode was changed. Note - this could indicate a change from a
-    file/directory/link type to a different type (file/directory/link), such as -- a file is deleted and replaced
-    with a directory of the same name.
-  - *owner* - user and/or group ownership changed.
-
-size:
-    If **type** == '*added*' or '*removed*', then **size** provides the size of the added or removed file.
+  - *added blkdev* / *removed blkdev* - the block device was added / removed.
+  - *added chrdev* / *removed chrdev* - the character device was added / removed.
+  - *added fifo* / *removed fifo* - the fifo was added / removed.
+  - *changed mode* - the mode (file type and permission bits) was changed.
+  - *changed type* - the file type was changed, e.g. a file was replaced by a directory of the
+    same name. This always comes together with a *changed mode* change.
+  - *changed owner* - user and/or group ownership changed.
+  - *changed user* - user ownership changed. Only emitted together with *changed owner*.
+  - *changed group* - group ownership changed. Only emitted together with *changed owner*.
+  - *ctime* - the ctime of the item changed.
+  - *mtime* - the mtime of the item changed.
 
 added:
-    If **type** == '*modified*' and chunk ids can be compared, then **added** and **removed** indicate the amount
-    of data 'added' and 'removed'. If chunk ids can not be compared, then **added** and **removed** properties are
-    not provided and the only information available is that the file contents were modified.
+    If **type** is '*modified*', '*added*' or '*removed*', **added** and **removed** give the
+    amount of data (in bytes) added and removed. For '*added*', **removed** is 0; for '*removed*',
+    **added** is 0. If the chunk ids can not be compared (the archives were created with different
+    ``--chunker-params``), a '*modified*' change has neither property and the only information
+    available is that the file contents were modified.
 
 removed:
     See **added** property.
 
-old_mode:
-    If **type** == '*mode*', then **old_mode** and **new_mode** provide the mode and permissions changes.
+item1:
+    The value in ARCHIVE1. It is present for '*changed mode*', '*changed type*',
+    '*changed owner*', '*changed user*', '*changed group*', '*ctime*' and '*mtime*':
 
-new_mode:
-    See **old_mode** property.
+    - for '*changed mode*' the mode string as ``ls -l`` prints it,
+    - for '*changed type*' the first character of that mode string,
+    - for '*changed owner*' a two-element array of user and group,
+    - for '*changed user*' / '*changed group*' the user / the group,
+    - for '*ctime*' / '*mtime*' an ISO 8601 timestamp.
 
-old_user:
-    If **type** == '*owner*', then **old_user**, **new_user**, **old_group** and **new_group** provide the user
-    and group ownership changes.
+item2:
+    The corresponding value in ARCHIVE2, see **item1**.
 
-old_group:
-    See **old_user** property.
-
-new_user:
-    See **old_user** property.
-
-new_group:
-    See **old_user** property.
+``--content-only`` suppresses the metadata changes, i.e. the *changed mode*, *changed type*,
+*changed owner*, *changed user*, *changed group*, *ctime* and *mtime* changes. Items that have
+only such changes are then not printed at all.
 
 
-Example (excerpt) of ``borg diff --json-lines``::
+Example of ``borg diff --json-lines --sort-by path ARCHIVE1 ARCHIVE2``::
 
-    {"path": "file1", "changes": [{"path": "file1", "changes": [{"type": "modified", "added": 17, "removed": 5}, {"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"}]}]}
-    {"path": "file2", "changes": [{"type": "modified", "added": 135, "removed": 252}]}
-    {"path": "file4", "changes": [{"type": "added", "size": 0}]}
-    {"path": "file3", "changes": [{"type": "removed", "size": 0}]}
+    {"changes": [{"item1": "2026-08-28T09:00:12.822775921+02:00", "item2": "2026-08-28T09:00:14.334539472+02:00", "type": "ctime"}, {"item1": "2026-08-28T09:00:12.822775921+02:00", "item2": "2026-08-28T09:00:14.334539472+02:00", "type": "mtime"}], "path": "data"}
+    {"changes": [{"type": "removed directory"}], "path": "data/dir1"}
+    {"changes": [{"type": "added directory"}], "path": "data/dir2"}
+    {"changes": [{"type": "removed fifo"}], "path": "data/fifo1"}
+    {"changes": [{"item1": ["user", "staff"], "item2": ["user", "admin"], "type": "changed owner"}, {"item1": "staff", "item2": "admin", "type": "changed group"}, {"item1": "-rwxr-xr-x", "item2": "-rw-r--r--", "type": "changed mode"}, {"item1": "2026-08-28T09:00:12.829163282+02:00", "item2": "2026-08-28T09:00:14.321948295+02:00", "type": "ctime"}], "path": "data/file1"}
+    {"changes": [{"added": 0, "removed": 4, "type": "removed"}], "path": "data/file2"}
+    {"changes": [{"added": 8, "removed": 0, "type": "added"}], "path": "data/file3"}
+    {"changes": [{"added": 8, "removed": 4, "type": "modified"}, {"item1": "2026-08-28T09:00:12.816498270+02:00", "item2": "2026-08-28T09:00:14.334788977+02:00", "type": "ctime"}, {"item1": "2026-08-28T09:00:12.816498270+02:00", "item2": "2026-08-28T09:00:14.334788977+02:00", "type": "mtime"}], "path": "data/file5"}
+    {"changes": [{"type": "changed link"}, {"item1": "2026-08-28T09:00:12.820243127+02:00", "item2": "2026-08-28T09:00:14.332850526+02:00", "type": "ctime"}, {"item1": "2026-08-28T09:00:12.820210210+02:00", "item2": "2026-08-28T09:00:14.332821942+02:00", "type": "mtime"}], "path": "data/link1"}
 
 
 Archive Analysis
@@ -665,15 +729,15 @@ Errors
     Buffer.MemoryLimitExceeded rc: 2 traceback: no
         Requested buffer size {} is above the limit of {}.
     EfficientCollectionQueue.SizeUnderflow rc: 2 traceback: no
-        Could not pop_front first {} elements, collection only has {} elements..
+        Could not pop the first {} elements; collection only has {} elements.
     RTError rc: 2 traceback: no
-        Runtime Error: {}
+        Runtime error: {}
 
     CancelledByUser rc: 3 traceback: no
         Cancelled by user.
 
     CommandError rc: 4 traceback: no
-        Command Error: {}
+        Command error: {}
     PlaceholderError rc: 5 traceback: no
         Formatting Error: "{}".format({}): {}({})
     InvalidPlaceholder rc: 6 traceback: no
@@ -686,22 +750,28 @@ Errors
     Repository.DoesNotExist rc: 13 traceback: no
         Repository {} does not exist.
     Repository.InsufficientFreeSpaceError rc: 14 traceback: no
-        Insufficient free space to complete transaction (required: {}, available: {}).
+        Insufficient free space to complete the transaction (required: {}, available: {}).
     Repository.InvalidRepository rc: 15 traceback: no
-        {} is not a valid repository. Check repo config.
+        {} is not a valid repository. Check the repository config.
     Repository.InvalidRepositoryConfig rc: 16 traceback: no
-        {} does not have a valid configuration. Check repo config [{}].
+        {} does not have a valid config. Check the repository config [{}].
     Repository.ObjectNotFound rc: 17 traceback: yes
         Object with key {} not found in repository {}.
     Repository.ParentPathDoesNotExist rc: 18 traceback: no
-        The parent path of the repo directory [{}] does not exist.
+        The parent path of the repository directory [{}] does not exist.
     Repository.PathAlreadyExists rc: 19 traceback: no
         There is already something at {}.
     Repository.PathPermissionDenied rc: 21 traceback: no
         Permission denied to {}.
+    Repository.PackLocationUnknown rc: 22 traceback: yes
+        Object with key {} is indexed but its pack location is unresolved in repository {}.
+    Repository.PackNotFound rc: 23 traceback: yes
+        Object with key {} is indexed to pack {}, but that whole pack is missing from repository {}.
+    Repository.PermissionDenied rc: 24 traceback: no
+        Repository permission denied: {}
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
-        Unsupported repository feature(s) {}. A newer version of borg is required to access this repository.
+        Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.
     NoManifestError rc: 26 traceback: no
         Repository has no manifest.
     UnsupportedManifestError rc: 27 traceback: no
@@ -721,7 +791,7 @@ Errors
     KeyfileNotFoundError rc: 42 traceback: no
         No key file for repository {} found in {}.
     NotABorgKeyFile rc: 43 traceback: no
-        This file is not a borg key backup, aborting.
+        This file is not a Borg key backup, aborting.
     RepoKeyNotFoundError rc: 44 traceback: no
         No key entry found in the config of repository {}.
     RepoIdMismatch rc: 45 traceback: no
@@ -732,28 +802,28 @@ Errors
         Key type {0} is unknown.
     UnsupportedPayloadError rc: 48 traceback: no
         Unsupported payload type {}. A newer version is required to access this repository.
-    UnsupportedKeyFormatError rc: 49 traceback:no
-        Your borg key is stored in an unsupported format. Try using a newer version of borg.
+    UnsupportedKeyFormatError rc: 49 traceback: no
+        Your Borg key is stored in an unsupported format. Try using a newer version of Borg.
 
 
     NoPassphraseFailure rc: 50 traceback: no
-        can not acquire a passphrase: {}
+        Cannot acquire a passphrase: {}.
     PasscommandFailure rc: 51 traceback: no
-        passcommand supplied in BORG_PASSCOMMAND failed: {}
+        Passcommand supplied in BORG_PASSCOMMAND failed: {}.
     PassphraseWrong rc: 52 traceback: no
-        passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect.
+        Passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect.
     PasswordRetriesExceeded rc: 53 traceback: no
-        exceeded the maximum password retries
+        Exceeded the maximum password retries.
 
-    Cache.CacheInitAbortedError rc: 60 traceback: no
+    CacheInitAbortedError rc: 60 traceback: no
         Cache initialization aborted
-    Cache.EncryptionMethodMismatch rc: 61 traceback: no
+    EncryptionMethodMismatch rc: 61 traceback: no
         Repository encryption method changed since last access, refusing to continue
-    Cache.RepositoryAccessAborted rc: 62 traceback: no
+    RepositoryAccessAborted rc: 62 traceback: no
         Repository access aborted
-    Cache.RepositoryIDNotUnique rc: 63 traceback: no
+    RepositoryIDNotUnique rc: 63 traceback: no
         Cache is newer than repository - do you have multiple, independently updated repos with same ID?
-    Cache.RepositoryReplay rc: 64 traceback: no
+    RepositoryReplay rc: 64 traceback: no
         Cache, or information obtained from the security directory is newer than repository - this is either an attack or unsafe (multiple repos with same ID)
 
     LockError rc: 70 traceback: no
@@ -763,21 +833,25 @@ Errors
     LockFailed rc: 72 traceback: yes
         Failed to create/acquire the lock {} ({}).
     LockTimeout rc: 73 traceback: no
-        Failed to create/acquire the lock {} (timeout).
+        Failed to create/acquire the lock {} (timeout). {}
     NotLocked rc: 74 traceback: yes
         Failed to release the lock {} (was not locked).
     NotMyLock rc: 75 traceback: yes
         Failed to release the lock {} (was/is locked, but not by me).
 
+    These six msgids are shared by the repository lock (``storelocking``) and the local cache lock
+    (``fslocking``). The messages are the same except for *LockTimeout*, which the cache lock emits
+    without the trailing hint.
+
     ConnectionClosed rc: 80 traceback: no
-        Connection closed by remote host
+        Connection closed by remote host.
     ConnectionClosedWithHint rc: 81 traceback: no
         Connection closed by remote host. {}
     InvalidRPCMethod rc: 82 traceback: no
-        RPC method {} is not valid
+        RPC method {} is not valid.
     PathNotAllowed rc: 83 traceback: no
-        Repository path not allowed: {}
-    RemoteRepository.RPCServerOutdated rc: 84 traceback: no
+        Repository path not allowed: {}.
+    LegacyRemoteRepository.RPCServerOutdated rc: 84 traceback: no
         Borg server is too old for {}. Required version {}
     UnexpectedRPCDataFormatFromClient rc: 85 traceback: no
         Borg {}: Got unexpected RPC data format from client.
@@ -794,6 +868,9 @@ Errors
     DecompressionError rc: 92 traceback: yes
         Decompression error: {}
 
+    Reading a legacy borg 1.x repository (e.g. ``borg transfer --from-borg1``) raises the
+    ``LegacyRepository.*`` and ``LegacyRemoteRepository.*`` variants of the repository and RPC
+    errors above. They use the same RCs as their non-legacy counterparts.
 
 Warnings
     BorgWarning rc: 1
@@ -802,7 +879,7 @@ Warnings
         {}: {}
 
     FileChangedWarning rc: 100
-        {}: file changed while we backed it up
+        {}: file changed while we backed it up.
     IncludePatternNeverMatchedWarning rc: 101
         Include pattern '{}' never matched.
     BackupError rc: 102
@@ -817,39 +894,46 @@ Warnings
         {}: {}
     BackupFileNotFoundError rc: 107
         {}: {}
+    BackupSymlinkParentError rc: 108
+        {}: not extracted, a parent directory is a symlink (malicious or corrupted archive)
+    BackupPathTraversalError rc: 109
+        {}: not extracted, path contains "../" (malicious or corrupted archive)
+    BackupHardlinkSourceError rc: 110
+        {}: not extracted, hardlink source path is unsafe (malicious or corrupted archive)
     BackupTimeoutError rc: 111
         {}: {}
     BackupBrokenSymlinkError rc: 112
         {}: {}
 
 Operations
-    - cache.begin_transaction
-    - cache.download_chunks, appears with ``borg create --no-cache-sync``
-    - cache.commit
-    - cache.sync
+    - cache.close
 
-      *info* is one string element, the name of the archive currently synced.
-    - repository.compact_segments
-    - repository.replay_segments
-    - repository.check
+      Saving the local cache (files cache, chunks index, cache config) at the end of a command.
+    - check.index
+    - check.packs
     - check.verify_data
-    - check.rebuild_manifest
-    - check.rebuild_refcounts
+    - check.rebuild_archives
+    - check.rebuild_archives_directory
+    - repository.merge_packs
+    - compact.analyze_archives
+    - compact.compact_packs
+    - repo_compress.recompress
+    - analyze.dedup_size
+    - analyze.analyze_archives
     - extract
 
-      *info* is one string element, the name of the path currently extracted.
+      Used by :ref:`borg_extract` and :ref:`borg_export-tar`. *info* is one string element,
+      the name of the path currently extracted.
     - extract.permissions
-    - archive.delete
-    - archive.calc_stats
     - prune
-    - upgrade.convert_segments
 
 Prompts
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK
-        For "Warning: Attempting to access a previously unknown unencrypted repository"
+        For "Warning: Attempting to access a previously unknown unencrypted repository!"
     BORG_RELOCATED_REPO_ACCESS_IS_OK
         For "Warning: The repository at location ... was previously located at ..."
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
         For "This is a potentially dangerous function..." (check --repair)
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
-        For "You requested to DELETE the repository completely *including* all archives it contains:"
+        For "You requested to DELETE the following repository completely *including* ... archives
+        it contains:" (repo-delete)

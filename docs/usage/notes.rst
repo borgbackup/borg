@@ -14,7 +14,7 @@ resource usage (RAM and disk space) as the amount of resources needed is
 (also) determined by the total number of chunks in the repository (see
 :ref:`cache-memory-usage` for details).
 
-``--chunker-params=fastcdc,10,23,16,2`` results in a fine-grained deduplication|
+``--chunker-params=fastcdc,10,23,16,2`` results in a fine-grained deduplication
 and creates a large number of chunks and thus uses a lot of resources to manage
 them. This is good for relatively small data volumes and if the machine has a
 good amount of free RAM and disk space.
@@ -60,19 +60,20 @@ a new repository when changing chunker parameters.
 For more details, see :ref:`chunker_details`.
 
 
-``--noatime / --noctime``
-~~~~~~~~~~~~~~~~~~~~~~~~~
+``--atime / --noctime / --nobirthtime``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use these ``borg create`` options to not store the respective timestamp
-into the archive, in case you do not really need it.
+``borg create`` does not store atime by default — use ``--atime`` if you do
+need it. ctime and birthtime are stored by default and can be omitted with
+``--noctime`` and ``--nobirthtime``.
 
-Besides saving a little space by omitting the timestamp, it might also
-affect metadata stream deduplication: if only this timestamp changes between
-backups and is stored into the metadata stream, the metadata stream chunks
-will not deduplicate just because of that.
+Besides saving a little space by omitting a timestamp, storing fewer timestamps
+might also help metadata stream deduplication: if only such a timestamp changes
+between backups and is stored into the metadata stream, the metadata stream
+chunks will not deduplicate just because of that.
 
-``--nobsdflags / --noflags``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``--noflags``
+~~~~~~~~~~~~~
 
 You can use this to avoid querying and storing (or extracting and setting) flags — in case
 you don't need them or if they are broken for your filesystem.

@@ -39,7 +39,7 @@ Examples
 
     # Exclusion options are supported.
     # These can speed up mounting and lower memory needs significantly.
-    $ borg mount /path/to/repo /tmp/mymountpoint only/that/path
+    $ borg mount -r /path/to/repo /tmp/mymountpoint only/that/path
     $ borg mount --exclude '...' /tmp/mymountpoint
 
 

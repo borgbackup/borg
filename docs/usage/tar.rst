@@ -33,14 +33,16 @@ Examples
 Archives transfer script
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Outputs a script that copies all archives from repo1 to repo2:
+Outputs a script that copies all archives from repo1 to repo2
+(``bash``, because it uses process substitution). Remove the ``echo`` to
+actually run the commands instead of just printing them:
 
 ::
 
-    for N I T in `borg list --format='{archive} {id} {time:%Y-%m-%dT%H:%M:%S}{NL}'`
+    while read -r N I T
     do
       echo "borg -r repo1 export-tar --tar-format=BORG aid:$I - | borg -r repo2 import-tar --timestamp=$T $N -"
-    done
+    done < <(borg -r repo1 repo-list --format='{name} {id} {time:%Y-%m-%dT%H:%M:%S}{NL}')
 
 Kept:
 

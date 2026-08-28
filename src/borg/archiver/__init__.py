@@ -69,6 +69,7 @@ from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
 from .compact_cmd import CompactMixIn
 from .completion_cmd import CompletionMixIn
+from .copy_cmd import CopyMixIn
 from .create_cmd import CreateMixIn
 from .debug_cmd import DebugMixIn
 from .delete_cmd import DeleteMixIn
@@ -105,6 +106,7 @@ class Archiver(
     CheckMixIn,
     CompactMixIn,
     CompletionMixIn,
+    CopyMixIn,
     CreateMixIn,
     DebugMixIn,
     DeleteMixIn,
@@ -298,6 +300,7 @@ class Archiver(
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)
         self.build_parser_completion(subparsers, common_parser, mid_common_parser)
+        self.build_parser_copy(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
         self.build_parser_debug(subparsers, common_parser, mid_common_parser)
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)

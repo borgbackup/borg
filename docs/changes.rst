@@ -170,6 +170,11 @@ New features:
 - locking: tell who is holding a lock we wait for or time out on: lock type, host,
   pid and age of that lock. Also name the repository in the message (instead of just
   the storage backend) and log which locks ``borg break-lock`` breaks, #2261
+- new "borg copy OLDNAME NEWNAME" command: copy an archive to a new archive name, #2300.
+  Copying is cheap: no file content is read or written, only a new archive metadata
+  object is created, and the two archives share their data like any other deduplicated
+  archives do. The copy is an independent archive: deleting either of the two archives
+  keeps the other one intact.
 
 Fixes:
 

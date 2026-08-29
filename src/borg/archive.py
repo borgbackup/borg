@@ -2130,11 +2130,13 @@ def object_validator(repo_objs):
     """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
 
     obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
-    computed over the header's magic, version and chunk id as well (AAD, additional authenticated
-    data: bytes the tag covers without being part of the ciphertext) and over the slot itself, so a
-    wrong meta_size fails it too. data_size, the one header field the tag does not cover, must
-    match csize - the data slot's payload size, recorded in the tagged metadata - plus the key's
-    fixed envelope overhead.
+    computed over the slot itself and over the chunk id, so a wrong meta_size or chunk id fails it.
+    At object version OBJ_VERSION_HEADER_AAD the magic and the version are covered as well (as AAD,
+    additional authenticated data: bytes the tag covers without being part of the ciphertext); at
+    OBJ_VERSION_NO_HEADER_AAD they are not: a wrong magic fails the explicit magic check, and a
+    wrong version fails because the version selects the AAD the slot is parsed with. data_size, the
+    one header field outside the tag at either version, must match csize - the data slot's payload
+    size, recorded in the tagged metadata - plus the key's fixed envelope overhead.
 
     In the "none-*" modes the tag is an unkeyed checksum, so validate accepts any well-formed
     object, including one that a backed up file contains. The tag binds an object to its chunk id
@@ -2149,8 +2151,12 @@ def object_validator(repo_objs):
             meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
             data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
             return data_size == meta["csize"] + overhead
-        except Exception:
+        except (IntegrityErrorBase, msgpack.UnpackException, KeyError, TypeError, IndexError):
             # arbitrary bytes fail the tag, the msgpack unpacking, the length checks or the csize lookup.
+            return False
+        except Exception as err:
+            # anything else is a bug: log it and take the object as invalid.
+            logger.debug(f"validating an object raised {err!r}, treating it as invalid.")
             return False
 
     return validate
@@ -2752,7 +2758,8 @@ class ArchiveChecker:
             self.repository.flush()
             if self.chunks_modified:
                 # the packs changed, so the index no longer matches them: rebuild it from the packs
-                # and persist it.
+                # and persist it: deleting a defect chunk rewrites its pack and repoints that
+                # pack's other objects in the repository's index, so our offsets for them are stale.
                 logger.info("Rebuilding and writing the repository chunks index.")
                 build_chunkindex_from_repo(
                     self.repository,

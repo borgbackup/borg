@@ -13,7 +13,7 @@ from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError,
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
-from ..repository_test import fchunk, corrupt_chunk_on_disk
+from ..repository_test import DATA_SIZE_OFFSET, fchunk, corrupt_chunk_on_disk
 from . import (
     cmd,
     src_file,
@@ -751,7 +751,7 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
             hdr_size = RepoObj.obj_header.size
             hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(pack[damaged_offset : damaged_offset + hdr_size]))
             # a data_size that keeps the object inside the pack, so the header still parses.
-            pos = damaged_offset + 45  # magic 8, version 1, chunk_id 32, meta_size 4
+            pos = damaged_offset + DATA_SIZE_OFFSET
             pack = pack[:pos] + struct.pack("<I", hdr.data_size + 16) + pack[pos + 4 :]
         repository.store_store(key, pack)
 
@@ -762,6 +762,14 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
     with Repository(archiver.repository_location, exclusive=True) as repository:
         assert damaged_id not in repository.chunks  # the damaged object can not be read back, so it is not indexed
         assert repository.chunks[next_id].obj_offset == next_offset  # the one after it is
+        # the damaged object is the only one of its pack the rebuild lost.
+        for _, chunk_id in objs:
+            assert (chunk_id in repository.chunks) == (chunk_id != damaged_id)
+    cmd(archiver, "list", "archive1", exit_code=0)  # the archives are readable
+    # the pack still holds the damaged bytes, so it keeps failing the store-level check: a pack is
+    # named by the sha256 of its content. Repairing that is repository-level repair (#10026).
+    output = cmd(archiver, "check", "--repository-only", exit_code=1)
+    assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):

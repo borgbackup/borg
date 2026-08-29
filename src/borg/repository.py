@@ -396,22 +396,26 @@ class PackReader:
             return None, f"object of {obj_size} bytes exceeds the maximum of {MAX_DATA_SIZE}"
         return hdr, None
 
-    def _validates(self, hdr, offset, buf, buf_offset, validate):
-        """Return whether validate accepts the object with header hdr at offset.
+    def _validation_problem(self, hdr, offset, buf, buf_offset, validate):
+        """Return None if validate accepts the object with header hdr at offset, else the problem.
 
         buf holds the pack bytes from buf_offset on; the metadata slot is read separately when buf
-        does not reach its end. A slot over MAX_VALIDATED_META_SIZE fails without that read.
+        does not reach its end. A slot over MAX_VALIDATED_META_SIZE is rejected without that read.
         """
         if hdr.meta_size > MAX_VALIDATED_META_SIZE:
-            return False
+            return f"metadata slot of {hdr.meta_size} bytes exceeds the maximum of {MAX_VALIDATED_META_SIZE}"
         size = RepoObj.obj_header.size + hdr.meta_size
         start = offset - buf_offset
         end = start + size
         obj = buf[start:end] if end <= len(buf) else self.read(offset, size)
-        return validate(hdr.chunk_id, obj)
+        if not validate(hdr.chunk_id, obj):
+            return "object does not authenticate"
+        return None
 
     def _find_header(self, offset, pack_size, validate):
-        """Scan forward from offset for the next object validate accepts, return its offset or None.
+        """Scan forward from offset for the next object validate accepts, return (offset, header).
+
+        Returns None if the pack holds no such object from offset on.
 
         A pack has no framing besides the object headers, so this searches for OBJ_MAGIC. That byte
         sequence also occurs inside payloads, so a candidate is accepted only when its header parses
@@ -429,8 +433,8 @@ class PackReader:
                 if pos < 0 or pos + hdr_size > len(buf):
                     break  # not in this window, or a header overlapping its end: the next window has it
                 hdr, _ = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
-                if hdr is not None and self._validates(hdr, offset + pos, buf, offset, validate):
-                    return offset + pos
+                if hdr is not None and self._validation_problem(hdr, offset + pos, buf, offset, validate) is None:
+                    return offset + pos, hdr
                 pos += 1
             # step by the window less one header, so a magic straddling the boundary is still found.
             offset += max(len(buf) - (hdr_size - 1), 1)
@@ -451,7 +455,7 @@ class PackReader:
         metadata slot along with it, and a header that fails makes the walk resync rather than
         raise: it scans from just past that header for the next object validate accepts and
         continues there. The object with the failed header is dropped - its id, its extent or its
-        metadata is wrong, so it can not be read back.
+        metadata is wrong, so it can not be read back. The pack keeps the dropped object's bytes.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
@@ -466,26 +470,26 @@ class PackReader:
             if len(buf) < hdr_size:
                 break  # trailing partial bytes
             hdr, problem = self._parse_header(buf[:hdr_size], offset, pack_size)
-            if hdr is not None and validate is not None and not self._validates(hdr, offset, buf, offset, validate):
-                problem = "object does not authenticate"
+            if hdr is not None and validate is not None:
+                problem = self._validation_problem(hdr, offset, buf, offset, validate)
             if problem is not None:
                 if validate is None:
                     raise IntegrityError(
                         f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
                     )
-                next_offset = self._find_header(offset + 1, pack_size, validate)
-                if next_offset is None:
+                found = self._find_header(offset + 1, pack_size, validate)
+                if found is None:
                     logger.warning(
                         f"pack {pack_hex}: {problem} at offset {offset} and no object after it, "
                         f"skipping the remaining {pack_size - offset} bytes."
                     )
                     break
+                next_offset, hdr = found  # _find_header validated it, so yield it without re-reading
                 logger.warning(
                     f"pack {pack_hex}: {problem} at offset {offset}, "
                     f"continuing at the object at offset {next_offset}."
                 )
                 offset = next_offset
-                continue
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
             yield hdr.chunk_id, offset, obj_size
             offset += obj_size
@@ -1287,6 +1291,10 @@ class Repository:
                 # the exclusive check lock keeps the pack set fixed, so re-listing packs/ inside
                 # build_chunkindex_from_repo matches this verification. write_immediately persists the
                 # index and drops the corrupt fragments.
+                # the walk gets no validator: validating needs the key, which a Repository does not
+                # have. A pack is named by the sha256 of its content, so a pack damaged in the store
+                # fails verify() above and pack_errors > 0 keeps it out of here. A pack that matches
+                # its name and still has a bad object header makes iter_headers raise, see #10026.
                 build_chunkindex_from_repo(self, slow_rebuild=True, write_immediately=True)
                 self.invalidate_chunk_index()  # the rebuilt index is persisted; drop the in-memory copy
                 index_repaired = True

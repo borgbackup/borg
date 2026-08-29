@@ -43,6 +43,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
     - uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89  # v4.1.0
 
   security:
@@ -52,6 +54,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
@@ -76,6 +80,7 @@ jobs:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
         fetch-tags: true
+        persist-credentials: false
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
@@ -190,6 +195,7 @@ jobs:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
         fetch-tags: true
+        persist-credentials: false
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
@@ -457,6 +463,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
 
       # .pip-cache lives inside the workspace, which cross-platform-actions
       # rsyncs into the VM and back, so wheels built from sdists in one run
@@ -737,6 +744,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # MSYS2's mingw Python cannot use PyPI's win_amd64 wheels, so pip builds
       # all compiled deps from source - incl. building maturin via cargo, just

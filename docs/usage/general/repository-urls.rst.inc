@@ -10,7 +10,9 @@ Repository URLs
 Also, paths like ``~/path/to/repo`` or ``~other/path/to/repo`` work (this is
 expanded by your shell).
 
-Note: You may also prepend ``file://`` to a filesystem path to use URL style.
+Note: You may also prepend ``file://`` to an absolute filesystem path to use URL
+style, e.g. ``file:///abs/path/to/repo``. This only works for absolute paths —
+``file://rel/path`` is rejected; use a plain relative path (see above) instead.
 
 Note: UNC paths (``//server/share/path``, ``\\server\share\path``) are not
 supported — mount the share (on Windows: map it to a drive letter, e.g.
@@ -28,6 +30,11 @@ supported — mount the share (on Windows: map it to a drive letter, e.g.
 
 ``ssh://user@host:port/rel/path/to/repo`` — path relative to the remote login directory
 
+For current (non-legacy) repositories, ``ssh://`` is rejected; use ``rest://``
+instead, which can also tunnel over ssh (see above). ``ssh://`` remains available
+only for legacy borg 1.x repositories, e.g. via
+``borg transfer --from-borg1 --other-repo ssh://...``.
+
 **Remote repositories** accessed via SFTP:
 
 ``sftp://user@host:port//abs/path/to/repo`` — absolute path
@@ -39,6 +46,22 @@ path is required: a URL without one, e.g. ``rest://host`` or ``rest://host/``, i
 rejected. Mind the difference between one and two slashes after the host: one slash
 means a path relative to the directory the remote login lands in (usually the remote
 user's home directory), two slashes mean an absolute path.
+
+**Remote repositories** accessed directly via HTTP(S), talking to a borgstore REST
+server:
+
+``http://host:port`` — plain HTTP
+
+``https://user:password@host:port`` — HTTPS, optionally with credentials embedded in the URL
+
+For ``http://`` and ``https://`` URLs, ``user:password@`` and ``:port`` are optional.
+Authentication is HTTP Basic auth: credentials come from the URL if given, otherwise
+from the ``BORGSTORE_REST_USERNAME`` / ``BORGSTORE_REST_PASSWORD`` environment
+variables; prefer ``https://`` over ``http://`` whenever credentials are used, since
+Basic auth sends them on every request. A URL path after the host is optional and,
+unlike ``rest://``, is not a remote filesystem path — it does not follow the
+one-vs-two-slash rule above and is only needed to reach the server through a reverse
+proxy mounted below a sub-path.
 
 **Remote repositories** accessed via rclone:
 

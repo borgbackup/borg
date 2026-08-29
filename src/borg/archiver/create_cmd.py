@@ -771,8 +771,8 @@ class CreateMixIn:
 
         When specifying '-' as a path, borg will read data from standard input and create a
         file named 'stdin' in the created archive from that data. In some cases, it is more
-        appropriate to use --content-from-command. See the section *Reading from stdin*
-        below for details.
+        appropriate to use --content-from-command. See the section
+        *Reading backup data from stdin* below for details.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
@@ -1123,7 +1123,8 @@ class CreateMixIn:
         subparser.add_argument(
             "--content-from-command",
             action="store_true",
-            help="interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.",
+            help="interpret PATH as a command and store its stdout. See also the section "
+            "'Reading backup data from stdin' below.",
         )
         subparser.add_argument(
             "--paths-from-stdin",
@@ -1145,7 +1146,8 @@ class CreateMixIn:
             "--paths-delimiter",
             action=Highlander,
             metavar="DELIM",
-            help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
+            help="set path delimiter for ``--paths-from-stdin``, ``--paths-from-command`` and "
+            "``--paths-from-shell-command`` (default: ``\\n``) ",
         )
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)

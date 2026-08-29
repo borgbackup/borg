@@ -224,7 +224,9 @@ class DiffMixIn:
         For each matching item in both archives, Borg reports:
 
         - Content changes: total added/removed bytes within files. If chunker parameters are comparable,
-          Borg compares chunk IDs quickly; otherwise, it compares the content.
+          Borg compares chunk IDs quickly; otherwise, it compares the content. In the latter case, borg
+          can only tell that a file was modified, not by how much: no byte counts are given for it, the
+          text output shows "modified:  (can't get size)" instead.
         - Metadata changes: user, group, mode, and other metadata shown inline as "[old -> new]", like
           "[-rw-r--r-- -> -rwxr-xr-x]" for a mode change. Use ``--content-only`` to suppress metadata changes.
         - Added/removed items: printed as "added: SIZE path" or "removed: SIZE path".
@@ -239,11 +241,13 @@ class DiffMixIn:
 
         JSON Lines output (``--json-lines``) prints one JSON object per changed path, with a list of
         change objects. Each change object has a "type" plus type-specific data: content changes
-        ("added", "removed", "modified") carry "added"/"removed" byte counts; metadata changes
-        ("changed mode", "changed owner", "mtime", ...) carry the old and new values as "item1" and
-        "item2". Example::
+        ("added", "removed", "modified") carry "added"/"removed" byte counts - except for a
+        "modified" that was determined by comparing the content, which carries no counts at all;
+        metadata changes ("changed mode", "changed owner", "mtime", ...) carry the old and new
+        values as "item1" and "item2". Example::
 
             {"changes": [{"added": 23, "removed": 5, "type": "modified"}], "path": "path/to/file"}
+            {"changes": [{"type": "modified"}], "path": "path/to/other-file"}
             {"changes": [{"item1": "-rw-r--r--", "item2": "-rwxr-xr-x", "type": "changed mode"}], "path": "some/file"}
             {"changes": [{"added": 4, "removed": 0, "type": "added"}], "path": "path/to/added-file"}
             {"changes": [{"added": 0, "removed": 5, "type": "removed"}], "path": "path/to/removed-file"}

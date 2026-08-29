@@ -175,10 +175,10 @@ class BenchmarkMixIn:
 
         # Buffer sizes matter where an algorithm switches to multiple threads:
         # blake3 and zstd do so above a threshold, so a buffer below it and one
-        # above it behave quite differently. The hashes are measured at pack and
-        # chunk size (both above blake3's threshold), the compressors at chunk
-        # size and below zstd's threshold. Within a section every row processes
-        # the same total, so the throughput column stays comparable across sizes.
+        # above it behave quite differently. The hashes are measured at a roughly
+        # pack-sized buffer and at chunk size (both above blake3's threshold), the
+        # compressors at chunk size and below zstd's threshold. Within a section every
+        # row processes the same total, so the throughput column stays comparable across sizes.
         # All powers of two, so that total is exactly 1 GiB (or 10 MiB for the
         # compressors) rather than an awkward fraction of it.
         SMALL, CHUNK, PACK = ("128kiB", 128 * KIB), ("2MiB", 2 * MIB), ("64MiB", 64 * MIB)
@@ -186,7 +186,7 @@ class BenchmarkMixIn:
             hash_sizes = comp_sizes = one_size = [SMALL]
             hash_total = comp_total = SMALL[1]
         else:
-            # blake3: a borg pack, then a borg chunk - both above its MT threshold
+            # blake3: a roughly pack-sized buffer, then a borg chunk - both above its MT threshold
             hash_sizes = [PACK, CHUNK]
             comp_sizes = [SMALL, CHUNK]
             one_size = [CHUNK]  # for algorithms where the buffer size does not change behaviour
@@ -526,7 +526,7 @@ class BenchmarkMixIn:
 
         Some algorithms use multiple threads only above a size threshold, so the
         hashes and the compressors are measured at more than one buffer size: the
-        hashes at 64MiB (a borg pack) and 2MiB (a typical borg chunk), both above
+        hashes at 64MiB (roughly pack-sized) and 2MiB (a typical borg chunk), both above
         blake3's threshold, the compressors at 2MiB and 128kiB, which is below
         zstd's. Within a section every row processes the same total number of
         bytes - 1 GiB, or 10 MiB for the compressors - so the throughput column is

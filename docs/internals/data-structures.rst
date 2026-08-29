@@ -343,7 +343,7 @@ found in the manifest. If any unsupported flags are found (i.e. the mandatory se
 not a subset of the features supported by the Borg client used), the operation
 is aborted with a *MandatoryFeatureUnsupported* error:
 
-    Unsupported repository feature(s) {'some_feature'}. A newer version of borg is required to access this repository.
+    Unsupported repository feature(s) {'some_feature'}. A newer version of Borg is required to access this repository.
 
 Older Borg releases do not have this concept and do not perform feature flags checks.
 These are locked out with manifest version 2, which is what Borg 2 always writes:

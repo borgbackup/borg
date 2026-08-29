@@ -128,7 +128,7 @@ def transfer_chunks(
 
 
 class TransferMixIn:
-    @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
+    @with_other_repository(manifest=True, required=True, compatibility=(Manifest.Operation.READ,))
     @with_repository(manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_transfer(self, args, *, repository, manifest, cache, other_repository=None, other_manifest=None):
         """archives transfer from other repository, optionally upgrade data format"""

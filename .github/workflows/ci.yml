@@ -203,16 +203,21 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      # Not on tags: that is when the release binaries are built and attested,
+      # and they should not be able to pick up a poisoned cache entry.
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
         restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-pip-
-            ${{ runner.os }}-${{ runner.arch }}-
 
     - name: Cache tox environments
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      # Not on tags: that is when the release binaries are built and attested,
+      # and they should not be able to pick up a poisoned cache entry.
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
       with:
         path: .tox
         key: ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.lock.txt', 'pyproject.toml') }}
@@ -469,7 +474,10 @@ jobs:
       # rsyncs into the VM and back, so wheels built from sdists in one run
       # (most of the VM setup time) are reused by the next one.
       - name: Cache pip-built wheels
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        # Not on tags: that is when the release binaries are built and attested,
+        # and they should not be able to pick up a poisoned cache entry.
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
         with:
           path: .pip-cache
           key: ${{ matrix.os }}-${{ matrix.version }}-py${{ matrix.pyver }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
@@ -750,7 +758,10 @@ jobs:
       # all compiled deps from source - incl. building maturin via cargo, just
       # to build the blake3 wheel. Persist the wheels pip builds.
       - name: Cache pip-built wheels
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        # Not on tags: that is when the release binaries are built and attested,
+        # and they should not be able to pick up a poisoned cache entry.
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
         with:
           path: .pip-cache
           key: windows-msys2-pip-${{ hashFiles('pyproject.toml', 'requirements.d/pyinstaller.txt') }}

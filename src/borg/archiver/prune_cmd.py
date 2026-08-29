@@ -557,7 +557,7 @@ class PruneMixIn:
             action=Highlander,
             help="number or time interval of yearly archives to keep",
         )
-        define_archive_filters_group(subparser, sort_by=False, first_last=False)
+        define_archive_filters_group(subparser, sort_by=False, first_last=False, oldest_newest=False, older_newer=False)
         subparser.add_argument(
             "name", metavar="NAME", nargs="?", type=archivename_validator, help="specify the archive name"
         )

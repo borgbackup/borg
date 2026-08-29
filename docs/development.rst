@@ -357,8 +357,8 @@ Generated files
 Usage documentation (found in ``docs/usage/``) and man pages
 (``docs/man/``) are generated automatically from the command line
 parsers declared in the program and their documentation, which is
-embedded in the program (see archiver.py). These are committed to git
-for easier use by packagers downstream.
+embedded in the program (see the ``src/borg/archiver/`` package).
+These are committed to git for easier use by packagers downstream.
 
 When a command is added, a command line flag changed, added or removed,
 the usage docs need to be rebuilt as well::

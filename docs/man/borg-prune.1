@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-prune" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-prune" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-prune \- Prune archives according to specified rules.
 .SH SYNOPSIS
@@ -217,18 +217,6 @@ number or time interval of yearly archives to keep
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
 only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
-.TP
-.BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
-.TP
-.BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
-.TP
-.BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
-.TP
-.BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH EXAMPLES
 .sp

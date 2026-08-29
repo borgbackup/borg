@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-mount" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-mount" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-mount \- Mounts an archive or an entire repository as a FUSE filesystem.
 .SH SYNOPSIS
@@ -76,8 +76,8 @@ On Linux, this can be prevented by remounting the mountpoint with the
 \fBnosymfollow\fP VFS mount option, for example:
 .INDENT 0.0
 .INDENT 3.5
-borg mount <repo path> <mountpoint>
-mount \-o remount,nosymfollow <repo path> <mountpoint>
+borg \-r <repo path> mount <mountpoint>
+mount \-o remount,nosymfollow <mountpoint>
 .UNINDENT
 .UNINDENT
 .sp
@@ -100,8 +100,10 @@ Only mount a specific archive, not the whole repository.
 Only mount specific paths in a specific archive, not the complete archive.
 .UNINDENT
 .sp
-The command \fBborgfs\fP provides a wrapper for \fBborg mount\fP\&. This can also be
-used in fstab entries:
+The command \fBborgfs\fP provides a wrapper for \fBborg mount\fP\&. It is invoked as
+\fBborgfs [REPOSITORY] MOUNTPOINT [PATH...]\fP, taking the repository as its first
+positional argument (if it is not given, \fB\-r\fP / \fBBORG_REPO\fP is used). This can
+also be used in fstab entries:
 \fB/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0\fP
 .sp
 To allow a regular user to use fstab entries, add the \fBuser\fP option:

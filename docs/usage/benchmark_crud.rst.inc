@@ -52,15 +52,16 @@ Description
 
 This command benchmarks borg CRUD (create, read, update, delete) operations.
 
-It creates input data below the given PATH and backs up this data into the given REPO.
-The REPO must already exist (it could be a fresh empty repo or an existing repo, the
+It creates input data below the given PATH and backs up this data into the repository
+given via -r/--repo (or the BORG_REPO environment variable).
+The repository must already exist (it could be a fresh empty repo or an existing repo, the
 command will create / read / update / delete some archives named borg-benchmark-crud\* there.
 
 Make sure you have free space there; you will need about 1 GB each (+ overhead).
 
 If your repository is encrypted and borg needs a passphrase to unlock the key, use::
 
-    BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
+    BORG_PASSPHRASE=mysecret borg -r REPO benchmark crud PATH
 
 Measurements are done with different input file sizes and counts.
 The file contents are very artificial (either all zero or all random),
@@ -81,9 +82,11 @@ U- == borg create (2nd archive creation of unchanged input files, measure files 
       U-Z- == needs to check the 2 all-zero chunks' existence in the repo.
       U-R- == needs to check existence of a lot of different chunks in the repo.
 
-D- == borg delete archive (delete last remaining archive, measure deletion + compaction)
-      D-Z- == few chunks to delete / few segments to compact/remove.
-      D-R- == many chunks to delete / many segments to compact/remove.
+D- == borg delete archive (soft-delete the last remaining archive, measure deletion)
+      Deletion only removes the archive from the archives list, it does not free any
+      repository space - that is what borg compact does (not measured here).
+      D-Z- == all-zero files archive.
+      D-R- == random files archive.
 
 Please note that there might be quite some variance in these measurements.
 Try multiple measurements and having a otherwise idle machine (and network, if you use it).

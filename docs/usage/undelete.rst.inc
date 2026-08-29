@@ -94,4 +94,4 @@ undeleted.
 
 You can undelete multiple archives by specifying a match pattern using
 the ``--match-archives PATTERN`` option (for more information on these
-patterns, see :ref:`borg_patterns`).
+patterns, see "borg help match-archives").

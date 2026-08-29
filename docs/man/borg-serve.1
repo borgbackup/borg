@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-serve" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-serve" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-serve \- Starts in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -56,7 +56,9 @@ Please note that, in legacy mode, \fIborg serve\fP does not support providing a 
 repository via the \fI\-\-repo\fP option or the \fIBORG_REPO\fP environment variable \- it is the
 borg client that specifies the repository to use.
 .sp
-The \-\-permissions option enforces repository permissions:
+The \-\-permissions option enforces repository permissions. It only applies to
+\fB\-\-rest\fP mode; in legacy mode it is ignored, because legacy (borg 1.x) repositories
+have no permission system:
 .INDENT 0.0
 .IP \(bu 2
 \fIall\fP: All permissions are granted. (Default; the permissions system is not used.)
@@ -91,7 +93,7 @@ Restrict repository access to PATH. Can be specified multiple times to allow the
 Restrict repository access. Only the repository located at PATH (no subdirectories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP, subdirectories are not accessible; PATH must point directly to a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
 .TP
 .B  \-\-permissions
-Set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.
+(with \-\-rest) set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.
 .UNINDENT
 .SH EXAMPLES
 .sp
@@ -107,7 +109,17 @@ such as \fB\-\-verbose\fP, \fB\-\-info\fP, \fB\-\-debug\fP, \fB\-\-debug\-topic\
 .IP \(bu 2
 \fB\-\-lock\-wait\fP to allow the client to control how long to wait before
 giving up and aborting the operation when another process is holding a lock.
+.IP \(bu 2
+\fB\-\-backend\fP to allow the client to choose \fIwhich\fP repository it wants to
+use (see \fBborg serve \-\-rest\fP). The forced command keeps pinning the
+restrictions: the client\-given backend is validated against
+\fB\-\-restrict\-to\-path\fP / \fB\-\-restrict\-to\-repository\fP\&.
 .UNINDENT
+.sp
+Notably, \fB\-\-rest\fP is \fInot\fP in the allowlist, so the forced command pins the
+mode (current \fBrest://\fP repositories vs. legacy Borg 1.x repositories), and
+neither are \fB\-\-restrict\-to\-path\fP, \fB\-\-restrict\-to\-repository\fP, \fB\-\-umask\fP
+and \fB\-\-permissions\fP\&.
 .sp
 Environment variables (such as BORG_XXX) contained in the original
 command sent by the client are \fInot\fP interpreted, but ignored. If BORG_XXX environment
@@ -120,12 +132,15 @@ locations like \fB/etc/environment\fP or in the forced command itself (example b
 # Allow an SSH keypair to run only borg, and only have access to /path/to/repo.
 # Use key options to disable unneeded and potentially dangerous SSH functionality.
 # This will help to secure an automated remote backup system.
+# \-\-rest serves a current (rest://) repository; without it, a legacy Borg 1.x
+# repository would be served. The client supplies \-\-backend FILE:<path>,
+# which is validated against \-\-restrict\-to\-path.
 $ cat ~/.ssh/authorized_keys
-command=\(dqborg serve \-\-restrict\-to\-path /path/to/repo\(dq,restrict ssh\-rsa AAAAB3[...]
+command=\(dqborg serve \-\-rest \-\-restrict\-to\-path /path/to/repo\(dq,restrict ssh\-rsa AAAAB3[...]
 
 # Specify repository permissions for an SSH keypair.
 $ cat ~/.ssh/authorized_keys
-command=\(dqborg serve \-\-permissions=read\-only\(dq,restrict ssh\-rsa AAAAB3[...]
+command=\(dqborg serve \-\-rest \-\-permissions=read\-only\(dq,restrict ssh\-rsa AAAAB3[...]
 
 # Set a BORG_XXX environment variable on the \(dqborg serve\(dq side
 $ cat ~/.ssh/authorized_keys

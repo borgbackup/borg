@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-create" "1" "2026-08-26" "" "borg backup tool"
+.TH "borg-repo-create" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-repo-create \- Creates a new, empty repository.
 .SH SYNOPSIS
@@ -68,8 +68,8 @@ Derive a \(dqkey encryption key\(dq from your passphrase
 .IP 4. 3
 Encrypt and sign the key with the key encryption key
 .IP 5. 3
-Store the encrypted borg key inside the repository directory (in the repo config).
-This is why it is essential to use a secure passphrase.
+Store the encrypted borg key in the repository (as an object in the \fBkeys/\fP
+namespace of the store). This is why it is essential to use a secure passphrase.
 .IP 6. 3
 Encrypt and sign your backups to prevent anyone from reading or forging them unless they
 have the key and know the passphrase. Make sure to keep a backup of

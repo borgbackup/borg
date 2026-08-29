@@ -95,4 +95,4 @@ When in doubt, use ``--dry-run --list`` to see what would be deleted.
 
 You can delete multiple archives by specifying a match pattern using
 the ``--match-archives PATTERN`` option (for more information on these
-patterns, see :ref:`borg_patterns`).
+patterns, see "borg help match-archives").

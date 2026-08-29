@@ -97,13 +97,18 @@ Description
 The check command verifies the consistency of a repository and its archives.
 It consists of two major steps:
 
-1. Checking the consistency of the repository itself. This includes checking
-   the file magic headers, and both the metadata and data of all objects in
-   the repository. The read data is checked by size and hash. Bit rot and other
-   types of accidental damage can be detected this way. Running the repository
-   check can be split into multiple partial checks using ``--max-duration``.
-   When checking an ssh:// remote repository, please note that the checks run on
-   the server and do not cause significant network traffic.
+1. Checking the consistency of the repository itself. The objects in the ``index/``
+   and ``packs/`` namespaces are named by the sha256 hash of their content, so such
+   an object is intact if and only if the hash of its content still equals its name.
+   The check verifies the (small) index objects first and, only if they are intact,
+   all packs. It also cross-checks the chunk index against the packs present in the
+   repository to detect referenced but missing packs. Bit rot and other types of
+   accidental damage can be detected this way, but as sha256 content-addressing is
+   not a MAC, this step does not detect tampering. Running the repository check can
+   be split into multiple partial checks using ``--max-duration``.
+   For rest:// repositories, the server computes the hashes, so the pack contents do
+   not have to travel over the network. For other remote backends, borg usually has
+   to read (download) the objects to hash them.
 
 2. Checking consistency and correctness of the archive metadata and optionally
    archive data (requires ``--verify-data``). This includes ensuring that the
@@ -111,7 +116,9 @@ It consists of two major steps:
    all chunks referencing files (items) in the archive exist. This requires
    reading archive and file metadata, but not data. To scan for archives whose
    entries were lost from the archive directory, pass ``--find-lost-archives``.
-   It requires reading all data and is hence very time-consuming.
+   It has to look at the metadata of every object in the repository (only for the
+   archive metadata objects it finds that way, it also reads the object data), so
+   it is very time-consuming for big repositories.
    To additionally cryptographically verify the file (content) data integrity,
    pass ``--verify-data``, which is even more time-consuming.
 
@@ -146,11 +153,13 @@ verification per week. Partial repository checks run neither archive checks
 nor repair mode, so ``--max-duration`` requires ``--repository-only`` and
 cannot be combined with ``--archives-only`` or ``--repair``.
 
-**Warning:** Please note that partial repository checks (i.e., running with
-``--max-duration``) can only perform non-cryptographic checksum checks on the
-repository files. Enabling partial repository checks excludes archive checks
-for the same reason. Therefore, partial checks may be useful only with very large
-repositories where a full check would take too long.
+**Note:** A partial repository check verifies the repository files in exactly the
+same way as a full repository check does - the difference is only how many of them
+one run gets to. What a partial run does not do are the archive checks: because
+``--max-duration`` requires ``--repository-only``, neither the archive metadata
+checks nor the cryptographic data verification of ``--verify-data`` run. Partial
+checks are therefore mostly useful for very large repositories where a full check
+would take too long.
 
 The ``--verify-data`` option will perform a full integrity verification of data,
 which means reading the data from the repository, decrypting and decompressing it.
@@ -168,8 +177,8 @@ tells Borg to search for lost archive metadata. If Borg encounters any archive
 metadata that does not match an archive directory entry (including
 soft-deleted archives), it means that an entry was lost.
 Unless ``borg compact`` is called, these archives can be fully restored with
-``--repair``. Please note that ``--find-lost-archives`` must read a lot of
-data from the repository and is thus very time-consuming. You cannot use
+``--repair``. Please note that ``--find-lost-archives`` must look at every
+object in the repository and is thus very time-consuming. You cannot use
 ``--find-lost-archives`` with ``--repository-only``.
 
 You can influence how the archive part of the ``Analyzing archive ...`` output is

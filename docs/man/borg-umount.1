@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-umount" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-umount" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-umount \- Unmounts the FUSE filesystem.
 .SH SYNOPSIS
@@ -74,9 +74,9 @@ $ borg umount /tmp/mymountpoint
 # and provides a versioned view on files.
 $ borg mount \-o versions /tmp/mymountpoint
 $ ls \-l /tmp/mymountpoint/home/user/doc.txt/
-total 24
-\-rw\-rw\-r\-\- 1 user group 12357 Aug 26 21:19 doc.cda00bc9.txt
-\-rw\-rw\-r\-\- 1 user group 12204 Aug 26 21:04 doc.fa760f28.txt
+total 47
+\-rw\-r\-\-r\-\- 1 user group 12167 Aug 28 23:14 doc.00001.txt
+\-rw\-r\-\-r\-\- 1 user group 11444 Aug 28 23:15 doc.00002.txt
 $ borg umount /tmp/mymountpoint
 
 # Archive filters are supported.
@@ -86,7 +86,7 @@ $ borg mount \-o versions \-\-match\-archives \(aqsh:*\-my\-home\(aq \-\-last 10
 
 # Exclusion options are supported.
 # These can speed up mounting and lower memory needs significantly.
-$ borg mount /path/to/repo /tmp/mymountpoint only/that/path
+$ borg mount \-r /path/to/repo /tmp/mymountpoint only/that/path
 $ borg mount \-\-exclude \(aq...\(aq /tmp/mymountpoint
 .EE
 .UNINDENT

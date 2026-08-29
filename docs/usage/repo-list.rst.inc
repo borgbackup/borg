@@ -105,12 +105,14 @@ Examples:
 
     # {VAR:NUMBER} - pad to NUMBER columns.
     # Strings are left-aligned, numbers are right-aligned.
-    # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
-    $ borg repo-list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+    # Note: the time keys (time, start, end) can not be padded - for them, the
+    # format spec is a strftime format string, e.g. {time:%Y-%m-%d}.
+    $ borg repo-list --format '{archive:36} {time} [{id}]{NL}'
     ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9...3b274]
     ...
 
 The following keys are always available:
+
 - NEWLINE: OS dependent line separator
 - NL: alias of NEWLINE
 - NUL: NUL character for creating print0 / xargs -0 like output

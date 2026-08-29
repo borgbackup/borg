@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-benchmark-crud" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-benchmark-crud" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-benchmark-crud \- Benchmark Create, Read, Update, Delete for archives.
 .SH SYNOPSIS
@@ -38,8 +38,9 @@ borg [common options] benchmark crud [options] PATH
 .sp
 This command benchmarks borg CRUD (create, read, update, delete) operations.
 .sp
-It creates input data below the given PATH and backs up this data into the given REPO.
-The REPO must already exist (it could be a fresh empty repo or an existing repo, the
+It creates input data below the given PATH and backs up this data into the repository
+given via \-r/\-\-repo (or the BORG_REPO environment variable).
+The repository must already exist (it could be a fresh empty repo or an existing repo, the
 command will create / read / update / delete some archives named borg\-benchmark\-crud* there.
 .sp
 Make sure you have free space there; you will need about 1 GB each (+ overhead).
@@ -49,7 +50,7 @@ If your repository is encrypted and borg needs a passphrase to unlock the key, u
 .INDENT 3.5
 .sp
 .EX
-BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
+BORG_PASSPHRASE=mysecret borg \-r REPO benchmark crud PATH
 .EE
 .UNINDENT
 .UNINDENT
@@ -74,9 +75,11 @@ The throughput value is kind of virtual here, it does not actually read the file
 U\-Z\- == needs to check the 2 all\-zero chunks\(aq existence in the repo.
 U\-R\- == needs to check existence of a lot of different chunks in the repo.
 .TP
-.B D\- == borg delete archive (delete last remaining archive, measure deletion + compaction)
-D\-Z\- == few chunks to delete / few segments to compact/remove.
-D\-R\- == many chunks to delete / many segments to compact/remove.
+.B D\- == borg delete archive (soft\-delete the last remaining archive, measure deletion)
+Deletion only removes the archive from the archives list, it does not free any
+repository space \- that is what borg compact does (not measured here).
+D\-Z\- == all\-zero files archive.
+D\-R\- == random files archive.
 .UNINDENT
 .sp
 Please note that there might be quite some variance in these measurements.

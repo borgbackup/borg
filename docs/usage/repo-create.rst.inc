@@ -84,8 +84,8 @@ Borg will:
 2. Create a borg key (which contains some random secrets. See :ref:`key_files`).
 3. Derive a "key encryption key" from your passphrase
 4. Encrypt and sign the key with the key encryption key
-5. Store the encrypted borg key inside the repository directory (in the repo config).
-   This is why it is essential to use a secure passphrase.
+5. Store the encrypted borg key in the repository (as an object in the ``keys/``
+   namespace of the store). This is why it is essential to use a secure passphrase.
 6. Encrypt and sign your backups to prevent anyone from reading or forging them unless they
    have the key and know the passphrase. Make sure to keep a backup of
    your key **outside** the repository - do not lock yourself out by

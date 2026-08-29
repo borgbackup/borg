@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-patterns" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-patterns" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -197,11 +197,11 @@ Examples:
 .INDENT 3.5
 .sp
 .EX
-# Exclude a directory anywhere in the tree named \(ga\(gasteamapps/common\(ga\(ga
+# Exclude a directory anywhere in the tree named steamapps/common
 # (and everything below it), regardless of where it appears:
 $ borg create \-e \(aqsh:**/steamapps/common/**\(aq archive /
 
-# Exclude the contents of \(ga\(ga/home/user/.cache\(ga\(ga:
+# Exclude the contents of /home/user/.cache:
 $ borg create \-e \(aqsh:home/user/.cache/**\(aq archive /home/user
 $ borg create \-e home/user/.cache/ archive /home/user
 
@@ -256,12 +256,15 @@ reset.
 .TP
 .B Exclude pattern prefix \fB\-\fP
 Use the prefix \fB\-\fP, followed by a pattern, to define an exclusion.
-This has the same effect as the \fB\-\-exclude\fP option.
+Borg still recurses into a directory excluded this way, so a later
+include pattern can still match files below it.
 .TP
 .B Exclude no\-recurse pattern prefix \fB!\fP
 Use the prefix \fB!\fP, followed by a pattern, to define an exclusion
 that does not recurse into subdirectories. This saves time, but
 prevents include patterns to match any files in subdirectories.
+The \fB\-\-exclude\fP option and the patterns in an \fB\-\-exclude\-from\fP
+file give this kind of exclusion, not the recursing one of \fB\-\fP\&.
 .TP
 .B Include pattern prefix \fB+\fP
 Use the prefix \fB+\fP, followed by a pattern, to define inclusions.
@@ -322,9 +325,10 @@ up and thus their user, group, permission, etc. cannot be restored.
 .UNINDENT
 .UNINDENT
 .sp
-Patterns (\fB\-\-pattern\fP) and excludes (\fB\-\-exclude\fP) from the command line are
-considered first (in the order of appearance). Then patterns from \fB\-\-patterns\-from\fP
-are added. Exclusion patterns from \fB\-\-exclude\-from\fP files are appended last.
+\fB\-\-pattern\fP, \fB\-\-patterns\-from\fP, \fB\-\-exclude\fP and \fB\-\-exclude\-from\fP all feed the
+same single list of patterns, in the order in which they appear on the command line.
+The patterns of a pattern file resp. exclude file are inserted where the option naming
+that file stands, in the order of the lines in that file.
 .sp
 Examples:
 .INDENT 0.0

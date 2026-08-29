@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-rename" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-rename" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-rename \- Rename an existing archive.
 .SH SYNOPSIS
@@ -58,11 +58,12 @@ specify the new archive name
 .EX
 $ borg create archivename ~
 $ borg repo\-list
-archivename                          Mon, 2016\-02\-15 19:50:19
+516c2a16  Sat, 2026\-08\-29 14:39:58 +0200  archivename                  tw          MacBook\-Pro
 
+# renaming rewrites the archive metadata, so the archive ID changes:
 $ borg rename archivename newname
 $ borg repo\-list
-newname                              Mon, 2016\-02\-15 19:50:19
+3aaef11e  Sat, 2026\-08\-29 14:39:58 +0200  newname                      tw          MacBook\-Pro
 .EE
 .UNINDENT
 .UNINDENT

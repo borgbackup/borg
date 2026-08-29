@@ -147,8 +147,8 @@ still not unique get ``-{id:.8}`` appended.
     On Linux, this can be prevented by remounting the mountpoint with the
     ``nosymfollow`` VFS mount option, for example:
 
-        borg mount <repo path> <mountpoint>
-        mount -o remount,nosymfollow <repo path> <mountpoint>
+        borg -r <repo path> mount <mountpoint>
+        mount -o remount,nosymfollow <mountpoint>
 
     Alternatively, access the mounted archive from an appropriately isolated
     environment (for example, a container or ``chroot``).
@@ -163,8 +163,10 @@ Performance tips:
 - Only mount a specific archive, not the whole repository.
 - Only mount specific paths in a specific archive, not the complete archive.
 
-The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
-used in fstab entries:
+The command ``borgfs`` provides a wrapper for ``borg mount``. It is invoked as
+``borgfs [REPOSITORY] MOUNTPOINT [PATH...]``, taking the repository as its first
+positional argument (if it is not given, ``-r`` / ``BORG_REPO`` is used). This can
+also be used in fstab entries:
 ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto 0 0``
 
 To allow a regular user to use fstab entries, add the ``user`` option:

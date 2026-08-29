@@ -1,0 +1,33 @@
+# Configuration for zizmor (https://docs.zizmor.sh/), the GitHub Actions
+# static analyser.  Run it over this repository with:
+#
+#   zizmor .
+#
+# The findings listed here are the ones that were looked at and accepted.  The
+# reasoning lives next to the code it is about, in the workflow files - this
+# file only says "yes, we know".  Ignores are deliberately kept as whole-file
+# entries rather than file:line, so that they do not silently stop matching
+# whenever the surrounding workflow shifts by a line.
+
+rules:
+  artipacked:
+    ignore:
+      # backport.yml is the one workflow that must keep the credentials
+      # actions/checkout leaves behind: korthout/backport-action pushes the
+      # backport branch with a plain `git push`.
+      - backport.yml
+
+  dangerous-triggers:
+    ignore:
+      # backport.yml needs pull_request_target for a writable token, and never
+      # checks out or runs pull request code.  See the comment in the workflow.
+      - backport.yml
+
+  cache-poisoning:
+    ignore:
+      # The cache steps in ci.yml are skipped on tag pushes, which is when the
+      # release binaries are built and attested - see the `if:` on each of them.
+      # zizmor flags any actions/cache in a tag-triggered workflow regardless.
+      # A new cache step in ci.yml needs that same `if:`; this ignore will not
+      # tell you about it.
+      - ci.yml

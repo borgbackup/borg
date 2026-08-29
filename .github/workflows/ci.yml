@@ -206,7 +206,7 @@ jobs:
       # Not on tags: that is when the release binaries are built and attested,
       # and they should not be able to pick up a poisoned cache entry.
       if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
@@ -217,7 +217,7 @@ jobs:
       # Not on tags: that is when the release binaries are built and attested,
       # and they should not be able to pick up a poisoned cache entry.
       if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: .tox
         key: ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.lock.txt', 'pyproject.toml') }}
@@ -479,7 +479,7 @@ jobs:
         # Not on tags: that is when the release binaries are built and attested,
         # and they should not be able to pick up a poisoned cache entry.
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: .pip-cache
           key: ${{ matrix.os }}-${{ matrix.version }}-py${{ matrix.pyver }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
@@ -763,7 +763,7 @@ jobs:
         # Not on tags: that is when the release binaries are built and attested,
         # and they should not be able to pick up a poisoned cache entry.
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0  # zizmor: ignore[cache-poisoning]
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: .pip-cache
           key: windows-msys2-pip-${{ hashFiles('pyproject.toml', 'requirements.d/pyinstaller.txt') }}

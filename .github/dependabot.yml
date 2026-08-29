@@ -7,8 +7,8 @@ updates:
     cooldown:
       # default-days also covers patch releases and actions not using semver.
       default-days: 14
-      semver-major-days: 90
       semver-minor-days: 30
+      semver-major-days: 90
     groups:
       actions:
         patterns:
@@ -20,8 +20,10 @@ updates:
     schedule:
       interval: "weekly"
     cooldown:
-      semver-major-days: 90
+      # default-days also covers patch releases and packages not using semver.
+      default-days: 14
       semver-minor-days: 30
+      semver-major-days: 90
     groups:
       pip-dependencies:
         patterns:

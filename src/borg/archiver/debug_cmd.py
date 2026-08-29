@@ -434,7 +434,9 @@ class DebugMixIn:
             parents=[mid_common_parser], description=self.do_debug_parse_obj.__doc__, epilog=debug_parse_obj_epilog
         )
         debug_parsers.add_subcommand("parse-obj", subparser, help="parse borg object file into meta dict and data")
-        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
+        subparser.add_argument(
+            "id", metavar="ID", type=str, help="hex object ID the object file has (needed to decrypt and verify it)"
+        )
         subparser.add_argument(
             "object_path",
             metavar="OBJECT_PATH",
@@ -464,7 +466,12 @@ class DebugMixIn:
             parents=[mid_common_parser], description=self.do_debug_format_obj.__doc__, epilog=debug_format_obj_epilog
         )
         debug_parsers.add_subcommand("format-obj", subparser, help="format file and metadata into a Borg object file")
-        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
+        subparser.add_argument(
+            "id",
+            metavar="ID",
+            type=str,
+            help="hex object ID the object shall have (used to encrypt and authenticate it)",
+        )
         subparser.add_argument(
             "binary_path",
             metavar="BINARY_PATH",

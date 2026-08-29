@@ -130,7 +130,9 @@ class CheckMixIn:
            all chunks referencing files (items) in the archive exist. This requires
            reading archive and file metadata, but not data. To scan for archives whose
            entries were lost from the archive directory, pass ``--find-lost-archives``.
-           It requires reading all data and is hence very time-consuming.
+           It has to look at the metadata of every object in the repository (only for the
+           archive metadata objects it finds that way, it also reads the object data), so
+           it is very time-consuming for big repositories.
            To additionally cryptographically verify the file (content) data integrity,
            pass ``--verify-data``, which is even more time-consuming.
 
@@ -189,8 +191,8 @@ class CheckMixIn:
         metadata that does not match an archive directory entry (including
         soft-deleted archives), it means that an entry was lost.
         Unless ``borg compact`` is called, these archives can be fully restored with
-        ``--repair``. Please note that ``--find-lost-archives`` must read a lot of
-        data from the repository and is thus very time-consuming. You cannot use
+        ``--repair``. Please note that ``--find-lost-archives`` must look at every
+        object in the repository and is thus very time-consuming. You cannot use
         ``--find-lost-archives`` with ``--repository-only``.
 
         You can influence how the archive part of the ``Analyzing archive ...`` output is

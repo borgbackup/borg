@@ -84,15 +84,30 @@ def webdav_server(archiver):
             thread.join(timeout=10)
 
 
+def urlopen(request, attempts=10):
+    """urllib.request.urlopen, but retry a connect that fails with EWOULDBLOCK.
+
+    haiku fails connecting to a listening localhost socket with EWOULDBLOCK (rather than
+    waiting for the server to accept) when the server does not accept immediately.
+    """
+    for attempt in range(attempts):
+        try:
+            return urllib.request.urlopen(request)
+        except urllib.error.URLError as err:
+            if not isinstance(err.reason, BlockingIOError) or attempt == attempts - 1:
+                raise
+            time.sleep(0.1)
+
+
 def get(url, headers=None):
     request = urllib.request.Request(url, headers=headers or {})
-    with urllib.request.urlopen(request) as response:
+    with urlopen(request) as response:
         return response.status, dict(response.headers), response.read()
 
 
 def http_request(url, method, headers=None, body=None):
     req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
-    with urllib.request.urlopen(req) as response:
+    with urlopen(req) as response:
         return response.status, dict(response.headers), response.read()
 
 
@@ -300,7 +315,7 @@ def test_webdav_errors(archivers, request):
             get(base_url + "/test/input/../input/file1")
         assert exc_info.value.code == 404
         with pytest.raises(urllib.error.HTTPError) as exc_info:
-            urllib.request.urlopen(urllib.request.Request(base_url + "/", method="POST"))
+            urlopen(urllib.request.Request(base_url + "/", method="POST"))
         assert exc_info.value.code == 405
         # writing/locking WebDAV methods are rejected, too
         for method in "PUT", "MKCOL", "LOCK", "PROPPATCH":

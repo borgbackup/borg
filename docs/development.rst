@@ -519,10 +519,7 @@ Checklist:
 
   Note: the signature is not uploaded to PyPi any more, but we upload it to
   github releases.
-- Download the binaries from the drafted release and test them. For macOS
-  binaries **with** FUSE support, document the macFUSE version in the release
-  notes: macFUSE uses a kernel extension that needs to be compatible with the
-  code contained in the binary.
+- Download the binaries from the drafted release and test them.
 - Review the release notes and publish the drafted GitHub release.
 
 - Close the release milestone on GitHub.

@@ -162,8 +162,8 @@ jobs:
         and, as a \`.tgz\`, the same thing as a directory (\`borg-dir/borg.exe\`), which
         starts up faster.
 
-        The macOS binaries are built **with** FUSE support: \`borg mount\` needs a macFUSE
-        version that is compatible with the one they were built against.
+        The macOS binaries are built **without** FUSE support, so \`borg mount\` does
+        not work with them; install via \`pip\` instead if you need FUSE support.
 
         All release assets have a [build provenance attestation](https://github.com/borgbackup/borg/attestations),
         verifiable with \`gh attestation verify --owner borgbackup <file>\`.

@@ -118,11 +118,23 @@ accepts a candidate only when it validates like any walked header. Validating
 needs the key, so a repair that cannot read the manifest walks without it.
 
 In the ``none-*`` modes the tag is an unkeyed checksum, so the walk accepts any
-well-formed blob, including one a backed up file contains. Such a blob carries
-its own chunk id and reads back as itself, so indexing it is harmless. Bytes
-crafted to pass the unkeyed checksum are not caught here - authenticating them
-is what these modes give up. The scan reaches a payload only after the blob
-owning it failed to validate.
+well-formed blob, including one a backed up file contains. The
+``authenticated-*`` modes accept a blob written with the key the repository
+uses: their tag is deterministic and binds a blob to its chunk id alone, so a
+blob copied verbatim out of a repository sharing that key validates at any
+offset in any pack. Backing up such a repository puts its blobs into the
+payloads, as long as compression leaves them as they are - lz4 stores data it
+cannot shrink unchanged.
+
+A blob that arrives this way carries its own chunk id and reads back as itself,
+so indexing it adds a chunk nothing references. Its ``data_size`` describes the
+blob as it was written, though, and chunking cuts a payload where the content
+dictates: a blob whose header and metadata slot fall inside the payload and
+whose data is cut off still validates, and the extent it claims covers the blobs
+that follow it, which the walk then skips. Bytes crafted to pass an unkeyed
+checksum claim an extent the same way - authenticating them is what the
+``none-*`` modes give up. The scan reaches a payload only after the blob owning
+it failed to validate, so a corrupt header is what makes any of this reachable.
 
 Bit flips in the data are caught when the blob is read, on that blob alone.
 

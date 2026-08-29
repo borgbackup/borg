@@ -443,7 +443,8 @@ class PackReader:
         metadata lookup for the pack size.
 
         A header that _parse_header does not accept means a corrupt pack: IntegrityError names what
-        is wrong with it. A read shorter than a header ends the walk: that is the end of the pack.
+        is wrong with it. Fewer than a header's bytes left ends the walk: that is the end of the
+        pack.
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
         repo object with id chunk_id. Given one, the walk validates every header, reading the
@@ -460,10 +461,10 @@ class PackReader:
         # large object stays cheaper with a short read per header.
         read_size = META_READ_SIZE if validate is not None else hdr_size
         offset = 0
-        while True:
-            buf = self.read(offset, read_size)
+        while offset + hdr_size <= pack_size:
+            buf = self.read(offset, min(read_size, pack_size - offset))
             if len(buf) < hdr_size:
-                break  # clean EOF, or trailing partial bytes
+                break  # trailing partial bytes
             hdr, problem = self._parse_header(buf[:hdr_size], offset, pack_size)
             if hdr is not None and validate is not None and not self._validates(hdr, offset, buf, offset, validate):
                 problem = "object does not authenticate"

@@ -2137,7 +2137,9 @@ def object_validator(repo_objs):
     fixed envelope overhead.
 
     In the "none-*" modes the tag is an unkeyed checksum, so validate accepts any well-formed
-    object, including one that a backed up file contains.
+    object, including one that a backed up file contains. The tag binds an object to its chunk id
+    alone, so the "authenticated-*" modes likewise accept an object copied verbatim from a
+    repository sharing their key, at any offset in any pack.
     """
     hdr_size = RepoObj.obj_header.size
     overhead = repo_objs.key.PAYLOAD_OVERHEAD  # the envelope adds a fixed number of bytes to the payload

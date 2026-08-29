@@ -1941,6 +1941,26 @@ def real_chunk(repo_objs, data):
     return chunk_id, repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
 
 
+def test_pack_reader_reads_no_further_than_the_pack_end():
+    # the walk asks for META_READ_SIZE bytes per header, so the last objects of a pack have fewer
+    # bytes left than that. Every read stays inside the pack and asks for at least a header.
+    repo_objs = none_repo_objs()
+    id1, obj1 = real_chunk(repo_objs, b"payload-one")
+    id2, obj2 = real_chunk(repo_objs, b"payload-two")
+    pack = bytes(obj1) + bytes(obj2)
+    reader = PackReader(pack_contents=pack)
+    reads = []
+    read = reader.read
+    reader.read = lambda offset, size: (reads.append((offset, size)), read(offset, size))[1]
+    assert list(reader.iter_headers(validate=object_validator(repo_objs))) == [
+        (id1, 0, len(obj1)),
+        (id2, len(obj1), len(obj2)),
+    ]
+    assert reads, "the walk did not read anything"
+    assert all(offset + size <= len(pack) for offset, size in reads), reads
+    assert all(size > 0 for offset, size in reads), reads
+
+
 @pytest.mark.parametrize("shape", ["into_obj3", "onto_obj3_header", "into_itself"])
 def test_pack_reader_resync_rejects_a_header_with_a_wrong_data_size(shape):
     # data_size is the one header field no tag covers. A wrong one that keeps the object inside the

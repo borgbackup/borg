@@ -20,6 +20,8 @@ updates:
     schedule:
       interval: "weekly"
     cooldown:
+      # default-days also covers patch releases and packages not using semver.
+      default-days: 14
       semver-major-days: 90
       semver-minor-days: 30
     groups:

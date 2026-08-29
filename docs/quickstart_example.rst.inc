@@ -47,8 +47,8 @@
 5. List the contents of the first archive::
 
     $ borg -r /path/to/repo list aid:3affe017
-    drwxr-xr-x user   group          0 Mon, 2016-02-15 18:22:30 home/user/Documents
-    -rw-r--r-- user   group       7961 Mon, 2016-02-15 18:22:30 home/user/Documents/Important.doc
+    drwxr-xr-x user   group         0 Fri, 2026-08-28 12:22:30 +0200 home/user/Documents
+    -rw-r--r-- user   group      7961 Fri, 2026-08-28 12:22:30 +0200 home/user/Documents/Important.doc
     ...
 
 6. Restore the first archive by extracting the files relative to the current directory::
@@ -59,8 +59,9 @@
 
     $ borg -r /path/to/repo delete aid:3affe017
 
-   Be careful if you use an archive NAME (and not an archive ID), as it might match multiple archives.
-   Always use ``--dry-run`` and ``--list`` first!
+   If you use an archive NAME (and not an archive ID), Borg will abort if the name matches multiple
+   archives (as with the two *docs* archives here); use ``aid:<archive-id>`` to delete one specific
+   archive, or ``-a PATTERN`` to delete multiple archives. Always use ``--dry-run`` and ``--list`` first!
 
 8. Recover disk space by removing objects that are not referenced by any
    archive any more::

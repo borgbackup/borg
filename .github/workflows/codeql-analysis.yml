@@ -27,6 +27,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# The analyze job below raises this to what CodeQL needs.
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze

@@ -13,14 +13,17 @@ on:
     types: [created]
 
 permissions:
-  contents: write # so it can comment
-  pull-requests: write # so it can create pull requests
+  contents: read
 
 jobs:
   backport:
     name: Backport pull request
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+
+    permissions:
+      contents: write       # backport-action pushes the backport branch
+      pull-requests: write  # ... and opens the pull request and comments on it
 
     # Only run when pull request is merged
     # or when a comment starting with `/backport` is created by someone other than the

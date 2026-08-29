@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-delete" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-repo-delete" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-repo-delete \- Deletes a repository.
 .SH SYNOPSIS
@@ -57,7 +57,7 @@ do not change the repository
 output a verbose list of archives
 .TP
 .B  \-\-force
-force deletion of corrupted archives; use \fB\-\-force \-\-force\fP if a single \fB\-\-force\fP does not work.
+do not ask for confirmation, just delete the repository. this also works if the repository is damaged to a point where its archives can not be listed anymore.
 .TP
 .B  \-\-cache\-only
 delete only the local cache for the given repository
@@ -72,10 +72,11 @@ keep the local security info when deleting a repository
 .EX
 # delete the whole repository and the related local cache:
 $ borg repo\-delete
-You requested to DELETE the repository completely *including* all archives it contains:
-repo                                 Mon, 2016\-02\-15 19:26:54
-root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
-newname                              Mon, 2016\-02\-15 19:50:19
+You requested to DELETE the following repository completely *including* 2 archives it contains:
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+Repository ID: e7046adda9b2a76bb4fac8d707ab7dc12a836391c8c3612cc12d461e713c5bc1
+Location: /path/to/repo
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
 Type \(aqYES\(aq if you understand this and want to continue: YES
 .EE
 .UNINDENT

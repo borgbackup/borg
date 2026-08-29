@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-key-import" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-key-import" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-key-import \- Imports the repository key from backup.
 .SH SYNOPSIS
@@ -42,14 +42,22 @@ If the \fB\-\-paper\fP option is given, the import will be an interactive
 process in which each line is checked for plausibility before
 proceeding to the next line. For this format PATH must not be given.
 .sp
-For repositories using keyfile encryption, the key file which \fBborg key
-import\fP writes to depends on several factors. If the \fBBORG_KEY_FILE\fP
-environment variable is set and non\-empty, \fBborg key import\fP creates
-or overwrites that file named by \fB$BORG_KEY_FILE\fP\&. Otherwise, \fBborg
-key import\fP searches in the \fB$BORG_KEYS_DIR\fP directory for a key file
-associated with the repository. If a key file is found in
-\fB$BORG_KEYS_DIR\fP, \fBborg key import\fP overwrites it; otherwise, \fBborg
-key import\fP creates a new key file in \fB$BORG_KEYS_DIR\fP\&.
+Where the imported key is stored is decided by \fB\-\-key\-location\fP:
+.INDENT 0.0
+.IP \(bu 2
+\fBrepokey\fP (the default): the key is stored \fBin the repository\fP, no local
+key file is written.
+.IP \(bu 2
+\fBkeyfile\fP: the key is stored in a local key file.
+.UNINDENT
+.sp
+The key file that \fB\-\-key\-location=keyfile\fP writes to depends on several
+factors. If the \fBBORG_KEY_FILE\fP environment variable is set and non\-empty,
+\fBborg key import\fP creates or overwrites the file named by \fB$BORG_KEY_FILE\fP\&.
+Otherwise, \fBborg key import\fP searches the \fB$BORG_KEYS_DIR\fP directory for a
+key file associated with the repository. If one is found there, \fBborg key
+import\fP overwrites it; otherwise it creates a new key file in
+\fB$BORG_KEYS_DIR\fP\&.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

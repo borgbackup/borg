@@ -141,6 +141,7 @@ Examples:
 {archivename} the archive name (the archives of a series all share the name).
 
 The following keys are always available:
+
 - NEWLINE: OS dependent line separator
 - NL: alias of NEWLINE
 - NUL: NUL character for creating print0 / xargs -0 like output

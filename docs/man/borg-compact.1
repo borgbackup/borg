@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-compact" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-compact" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-compact \- Collects garbage in the repository.
 .SH SYNOPSIS
@@ -113,7 +113,7 @@ rewrite a pack when at least PERCENT of its bytes are unused; also gates whether
 .INDENT 3.5
 .sp
 .EX
-# Compact segments and free repository disk space
+# Free repository disk space by deleting unused chunks (rewriting packs as needed)
 $ borg compact
 .EE
 .UNINDENT

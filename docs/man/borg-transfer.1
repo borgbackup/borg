@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-transfer" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-transfer" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -46,13 +46,56 @@ the same COMPRESSION mode as in the SRC_REPO \- borg will use that COMPRESSION f
 any case) and keep data compressed \(dqas is\(dq (saves time as no data compression is needed).
 .sp
 If you want to globally change compression while transferring archives to the DST_REPO,
-give \fB\-\-compress=WANTED_COMPRESSION \-\-recompress=always\fP\&.
+give \fB\-\-compression=WANTED_COMPRESSION \-\-recompress=always\fP\&.
 .sp
 The default is to transfer all archives.
 .sp
 You could use the misc. archive filter options to limit which archives it will
 transfer, e.g. using the \fB\-a\fP option. This is recommended for big
 repositories with multiple data sets to keep the runtime per invocation lower.
+.SS Incremental transfer
+.sp
+Transfer only copies what is missing in the DST_REPO, so you can run the same command
+repeatedly (e.g. from a cron job) to keep DST_REPO up to date \- each run will only
+transfer what was added to SRC_REPO since the previous run.
+.sp
+This works on two levels:
+.INDENT 0.0
+.IP \(bu 2
+archive level: if the DST_REPO already has an archive with the same name and timestamp
+(or the same name and archive ID), that archive is skipped and borg prints
+\(dqarchive is already present in destination repo, skipping.\(dq.
+.IP \(bu 2
+chunk level: for archives that are copied, only the chunks not yet present in the
+DST_REPO are read from the SRC_REPO and stored \- deduplication works against
+everything transferred before.
+.UNINDENT
+.sp
+The archive filter options can be used as usual, so multiple invocations with different
+filters are fine, e.g.:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-a \(aqsh:daily\-*\(aq
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-a \(aqsh:myserver\-*\(aq
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+Some things to keep in mind:
+.INDENT 0.0
+.IP \(bu 2
+Interrupting a transfer is safe: an archive only becomes visible in the DST_REPO after
+it was copied completely, so an interrupted archive is simply transferred again by the
+next run. The chunks stored by the interrupted run are reused, so the retry is cheap \-
+unless you run \fBborg compact\fP on the DST_REPO in between, which would remove the
+chunks that are not (yet) referenced by an archive.
+.IP \(bu 2
+Transfer only adds archives, it never deletes any. If you want old archives to expire
+in the DST_REPO, run \fBborg prune\fP (and \fBborg compact\fP) against the DST_REPO
+separately.
+.UNINDENT
 .SS General purpose archive transfer
 .sp
 Transfer borg2 archives into a related other borg2 repository:
@@ -83,11 +126,11 @@ borg \-\-repo=DST_REPO repo\-create \-\-encryption=DST_ENC \-\-other\-repo=SRC_R
 
 # to continue using lz4 compression as you did in SRC_REPO:
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
-     \-\-compress=lz4 \-\-recompress=never
+     \-\-compression=lz4 \-\-recompress=never
 
 # alternatively, to recompress everything to zstd,3:
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
-     \-\-compress=zstd,3 \-\-recompress=always
+     \-\-compression=zstd,3 \-\-recompress=always
 
 # to re\-chunk using different chunker parameters:
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \e
@@ -120,7 +163,7 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (faster: re\-uses compressed data chunks w/o change).If no MODE is given, \fIalways\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL) or \fIdefault\fP to use the chunker defaults. default: do not rechunk
+rechunk using given chunker parameters: buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or \fIdefault\fP to use the chunker defaults. default: do not rechunk
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
@@ -157,7 +200,9 @@ locations and passphrases first:
 .INDENT 3.5
 .sp
 .EX
-export BORG_REPO=ssh://borg2@borgbackup/./tests/b20
+# The destination is a Borg 2 repository: use a rest:// (or local) location,
+# ssh:// is only supported for the legacy Borg 1.x source repository.
+export BORG_REPO=rest://borg2@borgbackup/tests/b20
 export BORG_PASSPHRASE=\(aqyour\-borg2\-repo\-passphrase\(aq
 export BORG_OTHER_REPO=ssh://borg2@borgbackup/./tests/b1x
 export BORG_OTHER_PASSPHRASE=\(aqyour\-borg1\-repo\-passphrase\(aq
@@ -180,7 +225,8 @@ export BORG_OTHER_PASSPHRASE=\(aqyour\-borg1\-repo\-passphrase\(aq
 # between old archives (copied with borg transfer) and future ones.
 # The AEAD cipher does not matter (everything must be re\-encrypted and
 # re\-authenticated anyway); you could also choose chacha20\-poly1305.
-$ borg repo\-create \-e aes256\-ocb
+# \-\-from\-borg1 is required so the other repository is opened as a Borg 1.x repository.
+$ borg repo\-create \-\-from\-borg1 \-e aes256\-ocb
 
 # 2. Check what and how much it would transfer:
 $ borg transfer \-\-from\-borg1 \-\-dry\-run
@@ -211,7 +257,8 @@ $ borg transfer \-\-from\-borg1 \-\-dry\-run
 # use for all future Borg 2.0 archives.
 # The AEAD cipher does not matter (everything must be re\-encrypted and
 # re\-authenticated anyway); you could also choose \-e chacha20\-poly1305 \-i blake3.
-$ borg repo\-create \-e aes256\-ocb \-i blake3
+# \-\-from\-borg1 is required so the other repository is opened as a Borg 1.x repository.
+$ borg repo\-create \-\-from\-borg1 \-e aes256\-ocb \-i blake3
 $ export CHUNKER_PARAMS=\(dqfastcdc,19,23,21,2\(dq
 
 # 2. Check what and how much it would transfer:
@@ -239,7 +286,7 @@ On \fBmacOS\fP, Borg 1.x stored key files in \fB~/.config/borg/keys/\fP,
 but Borg 2 defaults to \fB~/Library/Application Support/borg/keys/\fP\&.
 .sp
 On \fBWindows\fP, Borg 1.x used XDG\-style paths (e.g. \fB~/.config/borg/keys/\fP),
-while Borg 2 defaults to \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\ekeys\e\fP\&.
+while Borg 2 defaults to \fBC:\eUsers\e<user>\eAppData\eLocal\eborg\eborg\ekeys\e\fP\&.
 .sp
 If Borg 2 cannot find your key file, you have several options:
 .INDENT 0.0

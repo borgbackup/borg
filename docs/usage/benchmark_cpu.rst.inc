@@ -72,7 +72,7 @@ By default all benchmarks run. Give one or more of --chunking, --hashing,
 
 Some algorithms use multiple threads only above a size threshold, so the
 hashes and the compressors are measured at more than one buffer size: the
-hashes at 64MiB (a borg pack) and 2MiB (a typical borg chunk), both above
+hashes at 64MiB (roughly pack-sized) and 2MiB (a typical borg chunk), both above
 blake3's threshold, the compressors at 2MiB and 128kiB, which is below
 zstd's. Within a section every row processes the same total number of
 bytes - 1 GiB, or 10 MiB for the compressors - so the throughput column is

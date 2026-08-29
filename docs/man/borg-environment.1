@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-environment" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-environment" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-environment \- Details regarding environment
 .SH DESCRIPTION
@@ -50,6 +50,10 @@ Similar to BORG_REPO, but gives the default for \fB\-\-other\-repo\fP\&.
 When set, use the value to answer the passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo.
+BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are mutually exclusive:
+if more than one of them is set, borg refuses to guess and aborts with
+\(dqMore than one passphrase environment variable is set\(dq. The same applies to the
+\fBBORG_OTHER_*\fP variants (which are a separate, independent group).
 See also BORG_NEW_PASSPHRASE.
 .TP
 .B BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
@@ -58,7 +62,7 @@ passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo. Note that the command
 is executed without a shell. So variables, like \fB$HOME\fP will work, but \fB~\fP won\(aqt.
-If BORG_PASSPHRASE is also set, it takes precedence.
+Mutually exclusive with BORG_PASSPHRASE and BORG_PASSPHRASE_FD, see there.
 See also BORG_NEW_PASSPHRASE.
 .TP
 .B BORG_PASSPHRASE_FD (and BORG_OTHER_PASSPHRASE_FD)
@@ -67,12 +71,12 @@ from. Programs starting borg may choose to open an anonymous pipe
 and use it to pass a passphrase. This is safer than passing via
 BORG_PASSPHRASE, because on some systems (e.g. Linux) environment
 can be examined by other processes.
-If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
+Mutually exclusive with BORG_PASSPHRASE and BORG_PASSCOMMAND, see there.
 .TP
 .B BORG_NEW_PASSPHRASE
 When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
-This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
-be checked.
+This variable is checked first. If it is not set, BORG_PASSPHRASE, BORG_PASSCOMMAND and
+BORG_PASSPHRASE_FD are checked (in that order).
 Main use case for this is to fully automate \fBborg key change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
@@ -186,6 +190,42 @@ cache entries for backup sources other than the current sources.
 When set to a numeric value, this determines the maximum \(dqtime to live\(dq for the files cache
 entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
 .TP
+.B BORG_STORE_CACHE
+When set, borg keeps a local writethrough cache of the repository\(aqs \fBpacks/\fP
+namespace: on a cache miss the whole pack is fetched once and later reads of the
+objects inside that pack are served from the cache. Use this for slow or
+high\-latency repositories.
+Set it to \fB1\fP to use \fB$BORG_CACHE_DIR/storecache\fP, or to a directory path to
+use that directory (it is created if it does not exist). Packs are named by
+content hash, so one cache directory can safely hold packs of multiple repositories.
+If it is not set, no such caching happens.
+.TP
+.B BORG_PACK_CACHE_SIZE
+When set to a numeric value, limit the pack cache to that many bytes.
+Only has an effect if BORG_STORE_CACHE is set.
+.TP
+.B BORG_PACK_MAX_SIZE
+When set to a numeric value, cap packs (the repository objects that batch up many
+chunks, see the internals documentation about pack files) at that many bytes
+instead of the default of 50000000.
+Smaller packs mean more (but smaller) repository objects and more
+fine\-grained uploads; bigger packs mean fewer objects and fewer stores.
+.TP
+.B BORG_PACK_MAX_COUNT
+When set to a numeric value, cap packs at that many objects per pack.
+If BORG_PACK_MAX_SIZE is not also set, packs are then bound by count only.
+.TP
+.B BORG_PACK_ASYNC
+When set to \fBno\fP, disable the background thread that stores a finished pack
+while the next one is being assembled, and store packs synchronously instead.
+This is mainly a debugging aid.
+.TP
+.B BORG_PACK_TRACE
+When set to \fByes\fP, print one\-character lifecycle markers of the background
+pack store\-thread to stderr (\fB<\fP thread started, \fBH\fP hashing starts,
+\fBS\fP storing starts, \fB>\fP thread finished). This is a debugging aid to
+visualize how pack stores overlap with the assembly of the next pack.
+.TP
 .B BORG_ASSERT_ID
 Comma\-separated list of the places where borg shall verify that a chunk\(aqs content matches
 its chunk id (\fBchunkid == id_hash(content)\fP) after decrypting and decompressing it.
@@ -227,15 +267,17 @@ more afterwards. (Re\-chunking in \fBborg transfer\fP is covered by \fBtransfer\
 An unknown place name is an error. An empty value (\fBBORG_ASSERT_ID=\fP) verifies at none of
 these places, but still where borg always verifies (see below).
 .sp
-Why \fBread\fP is not in the default: for encrypted repositories (all the AEAD ciphersuites),
-the chunk id is part of the AEAD additional authenticated data, so a successful decryption
-already proves that a holder of the repository key deliberately stored exactly this
-ciphertext for exactly this chunk id. A malicious or buggy \fBrepository\fP can therefore not
-swap, splice or substitute objects, whether the id is verified on read or not. What the id
-check adds is the detection of chunks whose content does not match their id, which only a
-malicious or compromised \fBborg client that had your borg key\fP could have written (e.g. to
-poison future deduplication). If that is in your threat model \- e.g. because some machines
-writing into the repository are not fully trusted \- add \fBread\fP to the list:
+Why \fBread\fP is not in the default: in the keyed modes, the envelope already authenticates
+every read \- the AEAD tag for the encrypted ciphersuites, the MAC for the (unencrypted)
+\fBauthenticated\-*\fP modes \- and the chunk id is part of what that tag is computed over. So
+a successful decryption resp. tag check already proves that a holder of the borg key
+deliberately stored exactly this payload for exactly this chunk id, and a malicious or
+buggy \fBrepository\fP can not swap, splice or substitute objects, whether the id is
+verified on read or not. What the id check adds is the detection of chunks whose content
+does not match their id, which only a malicious or compromised \fBborg client that had
+your borg key\fP could have written (e.g. to poison future deduplication). If that is in
+your threat model \- e.g. because some machines writing into the repository are not fully
+trusted \- add \fBread\fP to the list:
 .INDENT 7.0
 .INDENT 3.5
 .sp
@@ -255,9 +297,10 @@ Independent of this variable, borg always verifies the chunk id:
 in \fBborg check \-\-verify\-data\fP\&. That audit is what makes not verifying elsewhere
 defensible, so it is not configurable (there is no \fBverify_data\fP place name).
 .IP \(bu 2
-for \fBauthenticated\fP and \fBnone\fP mode repositories: there is no AEAD there, so the id
-check \fIis\fP the read path\(aqs integrity check and switching it off would remove it
-completely. Same for reading borg 1.x repositories (\fBborg transfer\fP).
+for \fBnone\-*\fP mode repositories: they have no key, so nothing authenticates a read
+there and their unkeyed checksums only detect accidental corruption. The id check is
+therefore not optional there: it happens at every place, whatever this variable says.
+Same for reading borg 1.x repositories (\fBborg transfer\fP).
 .UNINDENT
 .TP
 .B BORG_BLAKE3_MT_THRESHOLD
@@ -357,6 +400,13 @@ given order, e.g.:
 \fBnone\fP: do not try to load an implementation
 .UNINDENT
 .TP
+.B BORG_MOUNT_DATA_CACHE_ENTRIES
+Number of decrypted file content chunks \fBborg mount\fP and \fBborg webdav\fP keep
+in an in\-memory cache, so that the many small, sequential reads a mounted file
+system does for a big file do not re\-fetch and re\-decrypt the same chunk over and
+over (default: the cpu count). Additional memory usage can be up to the chunk size
+times this number.
+.TP
 .B BORG_SELFTEST
 This can be used to influence borg\(aqs built\-in self\-tests. The default is to execute the tests
 at the beginning of each borg command invocation.
@@ -386,9 +436,12 @@ caused EROFS. You will need this to make archives from volume shadow copies
 in WSL1 (Windows Subsystem for Linux 1).
 .TP
 .B authenticated_no_key
-Work around a lost passphrase or key for an \fBauthenticated\-*\fP mode repository
-(these are only authenticated, but not encrypted).
-If the key is missing in the repository config, add \fBkey = anything\fP there.
+Work around a lost passphrase or a lost borg key for an \fBauthenticated\-*\fP
+mode repository (these are only authenticated, but not encrypted).
+If a borg key is found \- an object below \fBkeys/\fP in the repository (repokey)
+resp. a key file in the keys directory (keyfile) \- it is not unlocked, so the
+passphrase does not matter. If no borg key is found at all, borg proceeds
+anyway, without any key material.
 .sp
 Without the key, borg can not verify anything that needs it: neither the
 authentication tag of the repository objects nor the chunk ids. It therefore
@@ -412,12 +465,13 @@ After you have extracted all data you need, you MUST delete the repository:
 .INDENT 3.5
 .sp
 .EX
-BORG_WORKAROUNDS=authenticated_no_key borg delete repo
+BORG_WORKAROUNDS=authenticated_no_key borg repo\-delete \-\-repo repo
 .EE
 .UNINDENT
 .UNINDENT
 .sp
-Now you can init a fresh repo. Make sure you do not use the workaround any more.
+Now you can create a fresh repository with \fBborg repo\-create\fP\&. Make sure you
+do not use the workaround any more.
 .UNINDENT
 .UNINDENT
 .TP
@@ -426,6 +480,10 @@ Now you can init a fresh repo. Make sure you do not use the workaround any more.
 .TP
 .B BORG_CHECK_FORMAT
 Giving the default value for \fBborg check \-\-format=X\fP\&.
+.TP
+.B BORG_DIFF_FORMAT
+Giving the default value for \fBborg diff \-\-format=X\fP\&.
+Note: \fBborg diff \-\-content\-only\fP uses its own format and ignores this.
 .TP
 .B BORG_FIND_FORMAT
 Giving the default value for \fBborg find \-\-format=X\fP\&.
@@ -444,6 +502,12 @@ Giving the format of the archive directory names when \fBborg mount\fP or
 \fBborg webdav\fP show a whole repository, default: \fB{name}\fP\&. The placeholders
 are the ones of \fBborg repo\-list \-\-format\fP; names that are not unique get
 \fB\-{id:.8}\fP appended. See \fBborg mount \-\-help\fP\&.
+.TP
+.B BORG_JSON_INDENT
+Indentation of the \fB\-\-json\fP output (default: \fB4\fP).
+A number gives that many spaces per nesting level (\fB0\fP still puts every item on
+its own line), \fBnone\fP gives compact single\-line JSON, and any other value is used
+as the literal indent string (e.g. a tab or the empty string).
 .UNINDENT
 .TP
 .B Some automatic \(dqanswerers\(dq (if set, they automatically answer confirmation questions):
@@ -473,13 +537,15 @@ default directory locations. This means that default paths are \fBplatform\-spec
 .IP \(bu 2
 Linux: XDG Base Directory Specification paths are used (e.g. \fB~/.config/borg\fP,
 \fB~/.cache/borg\fP, \fB~/.local/share/borg\fP). \fBXDG_*\fP environment variables are
-honoured (see \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html>).
+honoured (see \%<https://\:specifications\:.freedesktop\:.org/\:basedir/\:latest/>).
 .IP \(bu 2
 macOS: native macOS directories are used by default (e.g. \fB~/Library/Application Support/borg\fP,
 \fB~/Library/Caches/borg\fP). \fBXDG_*\fP environment variables are honoured if set.
 .IP \(bu 2
-Windows: Windows AppData directories are used (e.g. \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\fP,
-\fBC:\eUsers\e<user>\eAppData\eLocal\eborg\fP). \fBXDG_*\fP environment variables are \fBnot\fP honoured.
+Windows: local (not roaming) Windows AppData directories are used, e.g.
+\fBC:\eUsers\e<user>\eAppData\eLocal\eborg\eborg\fP\&. \fBborg\fP appears twice in that path because
+borg does not give platformdirs a separate \(dqapp author\(dq name, so it defaults to the app name.
+\fBXDG_*\fP environment variables are \fBnot\fP honoured.
 .UNINDENT
 .sp
 On all platforms, you can override each directory individually using the specific environment
@@ -492,10 +558,10 @@ Default directory locations by platform (when no \fBBORG_*\fP environment variab
 .sp
 .EX
 Directory  Linux                 macOS                                 Windows
-Config     ~/.config/borg        ~/Library/Application Support/borg    %APPDATA%\eborg
-Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\eborg\eCache
-Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\eborg
-Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %TEMP%\eborg
+Config     ~/.config/borg        ~/Library/Application Support/borg    %LOCALAPPDATA%\eborg\eborg
+Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\eborg\eborg\eCache
+Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\eborg\eborg
+Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %LOCALAPPDATA%\eTemp\eborg\eborg
 Keys       <config_dir>/keys     <config_dir>/keys                     <config_dir>\ekeys
 Security   <data_dir>/security   <data_dir>/security                   <data_dir>\esecurity
 .EE
@@ -504,7 +570,8 @@ Security   <data_dir>/security   <data_dir>/security                   <data_dir
 .INDENT 7.0
 .TP
 .B BORG_BASE_DIR
-Defaults to \fB$HOME\fP or \fB~$USER\fP or \fB~\fP (in that order).
+Not set by default \- then the platform\-specific directories shown in the table above
+are used.
 If you want to move all borg\-specific folders to a custom path at once, all you need to do is
 to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt accordingly
 (assuming you didn\(aqt set them to a different custom value).
@@ -572,21 +639,29 @@ for details.
 .UNINDENT
 .TP
 .B Building:
+These are only read by \fBsetup.py\fP while building borg\(aqs C extensions. Each
+\fBBORG_*_PREFIX\fP variable names the install prefix of a library that borg links
+against: if it is set, \fB$PREFIX/include\fP and \fB$PREFIX/lib\fP are used unconditionally.
+If it is not set, the library is located via pkg\-config, and if that does not find it
+either, the build fails \- there is no bundled fallback implementation.
 .INDENT 7.0
 .TP
-.B BORG_OPENSSL_NAME
-Defines the subdirectory name for OpenSSL (setup.py).
-.TP
 .B BORG_OPENSSL_PREFIX
-Adds given OpenSSL header file directory to the default locations (setup.py).
+Prefix of the OpenSSL installation to build libcrypto against.
+On Windows, the libraries are expected in \fB$PREFIX\fP itself rather than in
+\fB$PREFIX/lib\fP\&. On OpenBSD, this defaults to \fB/usr/local\fP, pkg\-config is not
+used and libcrypto is linked statically (borg needs AES\-OCB via the EVP API, which
+LibreSSL does not have).
 .TP
-.B BORG_LIBACL_PREFIX
-Adds given prefix directory to the default locations. If an \(aqinclude/acl/libacl.h\(aq is found
-Borg will be linked against the system libacl instead of a bundled implementation. (setup.py)
+.B BORG_OPENSSL_NAME
+OpenBSD only: the OpenSSL flavour to use, i.e. the \fBinclude/\fP and \fBlib/\fP
+subdirectory name below \fBBORG_OPENSSL_PREFIX\fP (default: \fBeopenssl35\fP).
 .TP
 .B BORG_LIBLZ4_PREFIX
-Adds given prefix directory to the default locations. If a \(aqinclude/lz4.h\(aq is found Borg
-will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
+Prefix of the liblz4 installation to build against.
+.TP
+.B BORG_LIBACL_PREFIX
+Linux only: prefix of the libacl installation to build against.
 .UNINDENT
 .TP
 .B Automatic option environment variables:

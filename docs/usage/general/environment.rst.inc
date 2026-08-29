@@ -186,15 +186,17 @@ General:
         An unknown place name is an error. An empty value (``BORG_ASSERT_ID=``) verifies at none of
         these places, but still where borg always verifies (see below).
 
-        Why ``read`` is not in the default: for encrypted repositories (all the AEAD ciphersuites),
-        the chunk id is part of the AEAD additional authenticated data, so a successful decryption
-        already proves that a holder of the repository key deliberately stored exactly this
-        ciphertext for exactly this chunk id. A malicious or buggy **repository** can therefore not
-        swap, splice or substitute objects, whether the id is verified on read or not. What the id
-        check adds is the detection of chunks whose content does not match their id, which only a
-        malicious or compromised **borg client that had your borg key** could have written (e.g. to
-        poison future deduplication). If that is in your threat model - e.g. because some machines
-        writing into the repository are not fully trusted - add ``read`` to the list::
+        Why ``read`` is not in the default: in the keyed modes, the envelope already authenticates
+        every read - the AEAD tag for the encrypted ciphersuites, the MAC for the (unencrypted)
+        ``authenticated-*`` modes - and the chunk id is part of what that tag is computed over. So
+        a successful decryption resp. tag check already proves that a holder of the borg key
+        deliberately stored exactly this payload for exactly this chunk id, and a malicious or
+        buggy **repository** can not swap, splice or substitute objects, whether the id is
+        verified on read or not. What the id check adds is the detection of chunks whose content
+        does not match their id, which only a malicious or compromised **borg client that had
+        your borg key** could have written (e.g. to poison future deduplication). If that is in
+        your threat model - e.g. because some machines writing into the repository are not fully
+        trusted - add ``read`` to the list::
 
             BORG_ASSERT_ID=read,repair,transfer,rechunk
 
@@ -206,9 +208,10 @@ General:
 
         - in ``borg check --verify-data``. That audit is what makes not verifying elsewhere
           defensible, so it is not configurable (there is no ``verify_data`` place name).
-        - for ``authenticated`` and ``none`` mode repositories: there is no AEAD there, so the id
-          check *is* the read path's integrity check and switching it off would remove it
-          completely. Same for reading borg 1.x repositories (``borg transfer``).
+        - for ``none-*`` mode repositories: they have no key, so nothing authenticates a read
+          there and their unkeyed checksums only detect accidental corruption. The id check is
+          therefore not optional there: it happens at every place, whatever this variable says.
+          Same for reading borg 1.x repositories (``borg transfer``).
     BORG_BLAKE3_MT_THRESHOLD
         When set to a numeric value, chunks of at least that many KiB get their id computed by
         multi-threaded BLAKE3, smaller ones single-threaded (default: 256, i.e. 256KiB).
@@ -325,13 +328,12 @@ General:
             in WSL1 (Windows Subsystem for Linux 1).
 
         authenticated_no_key
-            Work around a lost passphrase for an ``authenticated-*`` mode repository
-            (these are only authenticated, but not encrypted).
-            Borg still has to find the repository's borg key - an object below ``keys/``
-            in the repository (repokey) resp. a key file in the keys directory (keyfile) -
-            but it does not unlock it any more, so the passphrase does not matter. If the
-            borg key itself is gone, this workaround does not help: borg then fails with
-            "No key entry found ...".
+            Work around a lost passphrase or a lost borg key for an ``authenticated-*``
+            mode repository (these are only authenticated, but not encrypted).
+            If a borg key is found - an object below ``keys/`` in the repository (repokey)
+            resp. a key file in the keys directory (keyfile) - it is not unlocked, so the
+            passphrase does not matter. If no borg key is found at all, borg proceeds
+            anyway, without any key material.
 
             Without the key, borg can not verify anything that needs it: neither the
             authentication tag of the repository objects nor the chunk ids. It therefore
@@ -399,8 +401,10 @@ Directories and files:
       honoured (see https://specifications.freedesktop.org/basedir/latest/).
     - macOS: native macOS directories are used by default (e.g. ``~/Library/Application Support/borg``,
       ``~/Library/Caches/borg``). ``XDG_*`` environment variables are honoured if set.
-    - Windows: Windows AppData directories are used (e.g. ``C:\Users\<user>\AppData\Roaming\borg``,
-      ``C:\Users\<user>\AppData\Local\borg``). ``XDG_*`` environment variables are **not** honoured.
+    - Windows: local (not roaming) Windows AppData directories are used, e.g.
+      ``C:\Users\<user>\AppData\Local\borg\borg``. ``borg`` appears twice in that path because
+      borg does not give platformdirs a separate "app author" name, so it defaults to the app name.
+      ``XDG_*`` environment variables are **not** honoured.
 
     On all platforms, you can override each directory individually using the specific environment
     variables described below. You can also set ``BORG_BASE_DIR`` to force borg to use
@@ -409,10 +413,10 @@ Directories and files:
     Default directory locations by platform (when no ``BORG_*`` environment variables are set)::
 
         Directory  Linux                 macOS                                 Windows
-        Config     ~/.config/borg        ~/Library/Application Support/borg    %APPDATA%\borg
-        Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\borg\Cache
-        Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\borg
-        Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %TEMP%\borg
+        Config     ~/.config/borg        ~/Library/Application Support/borg    %LOCALAPPDATA%\borg\borg
+        Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\borg\borg\Cache
+        Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\borg\borg
+        Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %LOCALAPPDATA%\Temp\borg\borg
         Keys       <config_dir>/keys     <config_dir>/keys                     <config_dir>\keys
         Security   <data_dir>/security   <data_dir>/security                   <data_dir>\security
 

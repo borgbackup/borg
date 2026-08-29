@@ -39,7 +39,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-mode M``                                | set mode to M in archive for stdin data (default: 0660)                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--content-from-command``                        | interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.                                                                                                                                             |
+    |                                                       | ``--content-from-command``                        | interpret PATH as a command and store its stdout. See also the section 'Reading backup data from stdin' below.                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to back up from stdin. All control is external: it will back up all files given - no more, no less.                                                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -47,7 +47,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-from-shell-command``                    | interpret PATH as shell command and treat its output as ``--paths-from-stdin``                                                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--paths-delimiter DELIM``                       | set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\n``)                                                                                                                                                   |
+    |                                                       | ``--paths-delimiter DELIM``                       | set path delimiter for ``--paths-from-stdin``, ``--paths-from-command`` and ``--paths-from-shell-command`` (default: ``\n``)                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                                             |
     |                                                                                                                                                                                                                                                                                                                                                            |
@@ -146,11 +146,11 @@ borg create
         --stdin-user USER    set user USER in archive for stdin data (default: do not store user/uid)
         --stdin-group GROUP    set group GROUP in archive for stdin data (default: do not store group/gid)
         --stdin-mode M    set mode to M in archive for stdin data (default: 0660)
-        --content-from-command    interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.
+        --content-from-command    interpret PATH as a command and store its stdout. See also the section 'Reading backup data from stdin' below.
         --paths-from-stdin    read DELIM-separated list of paths to back up from stdin. All control is external: it will back up all files given - no more, no less.
         --paths-from-command    interpret PATH as command and treat its output as ``--paths-from-stdin``
         --paths-from-shell-command    interpret PATH as shell command and treat its output as ``--paths-from-stdin``
-        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\n``) 
+        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin``, ``--paths-from-command`` and ``--paths-from-shell-command`` (default: ``\n``) 
 
 
     :ref:`common_options`
@@ -227,8 +227,8 @@ objects only once, under the path given first (like for any other root given twi
 
 When specifying '-' as a path, borg will read data from standard input and create a
 file named 'stdin' in the created archive from that data. In some cases, it is more
-appropriate to use --content-from-command. See the section *Reading from stdin*
-below for details.
+appropriate to use --content-from-command. See the section
+*Reading backup data from stdin* below for details.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -406,6 +406,7 @@ Other flags used include:
 - '+' = included, item would be backed up (if not in dry-run mode)
 - '-' = excluded, item would not be / was not backed up
 - 'i' = backup data was read from standard input (stdin)
+- 'x' = skipped due to ``--exclude-dataless`` (file is flagged DATALESS)
 - '?' = missing status code (if you see this, please file a bug report!)
 
 Errors and (incomplete) archives
@@ -419,8 +420,7 @@ At the end of the backup, if there were any such issues, borg will exit with
 a non-zero exit code (usually 1 for warnings).
 
 **The archive is still saved even if warnings or errors occurred**, but it will
-only contain the data borg was able to read successfully. It is like a
-checkpoint (see below), but with a user-given name.
+only contain the data borg was able to read successfully.
 
 You should always check the backup logs and the exit code of the borg command.
 

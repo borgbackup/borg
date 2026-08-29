@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-version" "1" "2026-08-23" "" "borg backup tool"
+.TH "borg-version" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-version \- Displays the Borg client and server versions.
 .SH SYNOPSIS
@@ -49,13 +49,13 @@ Examples:
 .INDENT 3.5
 .sp
 .EX
-# local repository (client uses 1.4.0 alpha version)
-$ borg version /mnt/backup
-1.4.0a / 1.4.0a
+# local repository
+$ borg \-r /mnt/backup version
+2.0.0 / 2.0.0
 
-# legacy remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
-$ borg version \-\-from\-borg1 ssh://borg@borgbackup:repo
-1.4.0a / 1.2.7
+# legacy remote repository (client uses 2.0.0, server uses 1.4.5 release)
+$ borg \-r ssh://borg@borgbackup/repo version \-\-from\-borg1
+2.0.0 / 1.4.5
 .EE
 .UNINDENT
 .UNINDENT
@@ -72,6 +72,9 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .TP
 .B  \-\-json
 format output as JSON
+.TP
+.B  \-\-from\-borg1
+repository is Borg 1.x
 .UNINDENT
 .SH SEE ALSO
 .sp

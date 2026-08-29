@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-key-change-passphrase" "1" "2026-08-26" "" "borg backup tool"
+.TH "borg-key-change-passphrase" "1" "2026-08-29" "" "borg backup tool"
 .SH Name
 borg-key-change-passphrase \- Changes the repository key file passphrase.
 .SH SYNOPSIS
@@ -56,20 +56,21 @@ $ borg repo\-create \-\-encryption=aes256\-ocb \-\-key\-location=keyfile \-v
 Initializing repository at \(dq/path/to/repo\(dq
 Enter new passphrase:
 Enter same passphrase again:
+Do you want your passphrase to be displayed for verification? [yN]: n
 Remember your passphrase. Your data will be inaccessible without it.
-Key in \(dq/root/.config/borg/keys/mnt_backup\(dq created.
+Key in \(dq/root/.config/borg/keys/f23b5f0703c06dc7d9d889b5867496d8cb8ef5b42a5005221d3c7373ec6d6353\(dq created.
 Keep this key safe. Your data will be inaccessible without it.
-Synchronizing index...
-Archives: 0, w/ index: 0, w/ outdated index: 0, w/o index: 0.
-Done.
+\&...
 
 # Change key file passphrase
 $ borg key change\-passphrase \-v
-Enter passphrase for key /root/.config/borg/keys/mnt_backup:
+Enter passphrase for key /root/.config/borg/keys/f23b5f0703c06dc7d9d889b5867496d8cb8ef5b42a5005221d3c7373ec6d6353:
 Enter new passphrase:
 Enter same passphrase again:
+Do you want your passphrase to be displayed for verification? [yN]: n
 Remember your passphrase. Your data will be inaccessible without it.
 Key updated
+Key location: /root/.config/borg/keys/4881c2f73d9f173bd4c4d30a9f397a596bc742bfa1f652fac3f83cee3f26cb00
 .EE
 .UNINDENT
 .UNINDENT
@@ -77,9 +78,15 @@ Key updated
 \fBNote:\fP
 .INDENT 0.0
 .INDENT 3.5
+Automatically placed key files are named after the SHA\-256 hash of their own
+contents, not after the repository directory name. Because changing the
+passphrase re\-encrypts the key, the key file is rewritten under a new name and
+the previous one is removed — that is why the two paths above differ. Use
+\fBBORG_KEY_FILE\fP if you want to choose the key file name yourself.
+.sp
 The key file paths shown above are the defaults for Linux (\fB~/.config/borg/keys/\fP).
 On macOS, key files are stored in \fB~/Library/Application Support/borg/keys/\fP\&.
-On Windows, they are stored in \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\ekeys\e\fP\&.
+On Windows, they are stored in \fBC:\eUsers\e<user>\eAppData\eLocal\eborg\eborg\ekeys\e\fP\&.
 See \fIenv_vars\fP for details.
 .UNINDENT
 .UNINDENT
@@ -87,10 +94,12 @@ See \fIenv_vars\fP for details.
 .INDENT 3.5
 .sp
 .EX
-# Import a previously\-exported key into the specified
-# key file (creating or overwriting the output key)
-# (keyfile repositories only)
-$ BORG_KEY_FILE=/path/to/output\-key borg key import /path/to/exported
+# Import a previously\-exported key into a key file, using BORG_KEY_FILE to
+# choose the output key file (creating or overwriting it).
+# \-\-key\-location=keyfile is required: \(dqborg key import\(dq defaults to
+# \-\-key\-location=repokey, which stores the key in the repository and
+# ignores BORG_KEY_FILE.
+$ BORG_KEY_FILE=/path/to/output\-key borg key import \-\-key\-location=keyfile /path/to/exported
 .EE
 .UNINDENT
 .UNINDENT

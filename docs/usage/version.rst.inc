@@ -12,15 +12,17 @@ borg version
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+------------+-----------------------+
-    | **options**                                                                                |
-    +-------------------------------------------------------+------------+-----------------------+
-    |                                                       | ``--json`` | format output as JSON |
-    +-------------------------------------------------------+------------+-----------------------+
-    | .. class:: borg-common-opt-ref                                                             |
-    |                                                                                            |
-    | :ref:`common_options`                                                                      |
-    +-------------------------------------------------------+------------+-----------------------+
+    +-------------------------------------------------------+------------------+------------------------+
+    | **options**                                                                                       |
+    +-------------------------------------------------------+------------------+------------------------+
+    |                                                       | ``--json``       | format output as JSON  |
+    +-------------------------------------------------------+------------------+------------------------+
+    |                                                       | ``--from-borg1`` | repository is Borg 1.x |
+    +-------------------------------------------------------+------------------+------------------------+
+    | .. class:: borg-common-opt-ref                                                                    |
+    |                                                                                                   |
+    | :ref:`common_options`                                                                             |
+    +-------------------------------------------------------+------------------+------------------------+
 
     .. raw:: html
 
@@ -36,6 +38,7 @@ borg version
 
     options
         --json     format output as JSON
+        --from-borg1    repository is Borg 1.x
 
 
     :ref:`common_options`
@@ -54,13 +57,13 @@ the remote Borg is queried, and its version is displayed as the server version.
 
 Examples::
 
-    # local repository (client uses 1.4.0 alpha version)
-    $ borg version /mnt/backup
-    1.4.0a / 1.4.0a
+    # local repository
+    $ borg -r /mnt/backup version
+    2.0.0 / 2.0.0
 
-    # legacy remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
-    $ borg version --from-borg1 ssh://borg@borgbackup:repo
-    1.4.0a / 1.2.7
+    # legacy remote repository (client uses 2.0.0, server uses 1.4.5 release)
+    $ borg -r ssh://borg@borgbackup/repo version --from-borg1
+    2.0.0 / 1.4.5
 
 Due to the version tuple format used in Borg client/server negotiation, only
 a simplified version is displayed (as provided by borg.version.format_version).

@@ -1169,6 +1169,15 @@ class ChunksMixin:
                 write_chunkindex_to_repo(self.repository, self._chunks, clear=clear)
             self.chunks_index_last_write = now
 
+    def write_chunks_index(self):
+        """Flush the pack writer and persist the session's new chunks as index fragment(s) now.
+
+        Called before an archive pointer is written (the commit point), so that a committed
+        archive always has complete index coverage, see #10239. Also resets the periodic index
+        write timer.
+        """
+        self._maybe_write_chunks_index(datetime.now(UTC), force=True)
+
     def refresh_lock(self, now):
         if now > self.last_refresh_dt + self.refresh_td:
             # the repository lock needs to get refreshed regularly, or it will be killed as stale.

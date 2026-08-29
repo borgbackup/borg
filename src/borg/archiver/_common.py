@@ -6,7 +6,7 @@ import borg
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
-from ..helpers import Error
+from ..helpers import CommandError, Error
 from ..helpers import SortBySpec, location_validator, Location, relative_time_marker_validator
 from ..helpers import FilesystemPathSpec
 from ..helpers import Highlander, octal_int
@@ -177,11 +177,13 @@ def with_repository(
     return decorator
 
 
-def with_other_repository(manifest=False, cache=False, compatibility=None):
+def with_other_repository(manifest=False, cache=False, compatibility=None, required=False):
     """
     this is a simplified version of "with_repository", just for the "other location".
 
     the repository at the "other location" is intended to get used as a **source** (== read operations).
+
+    :param required: the command can not work without the other repository, refuse to run if it is not given.
     """
 
     compatibility = compat_check(
@@ -197,8 +199,10 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
         @functools.wraps(method)
         def wrapper(self, args, **kwargs):
             location = getattr(args, "other_location")
-            if not location.valid:  # nothing to do
-                return method(self, args, **kwargs)
+            if not location.valid:
+                if required:
+                    raise CommandError("missing other repository, please use --other-repo or BORG_OTHER_REPO env var!")
+                return method(self, args, **kwargs)  # nothing to do
 
             v1_legacy = getattr(args, "v1_legacy", False)
 

@@ -358,13 +358,15 @@ jobs:
 
     - name: Prepare binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      env:
+        BINARY: ${{ matrix.binary }}
       run: |
         mkdir -p artifacts
         if [ -f dist/binary/borg.exe ]; then
-          cp dist/binary/borg.exe artifacts/${{ matrix.binary }}
+          cp dist/binary/borg.exe "artifacts/$BINARY"
         fi
         if [ -f dist/binary/borg.tgz ]; then
-          cp dist/binary/borg.tgz artifacts/${{ matrix.binary }}.tgz
+          cp dist/binary/borg.tgz "artifacts/$BINARY.tgz"
         fi
         echo "binary files"
         ls -l artifacts/

@@ -43,8 +43,9 @@ RESYNC_WINDOW_SIZE = 1024 * 1024
 # how much to read to get an object's header plus, at the usual metadata slot sizes, its metadata
 # slot in the same read.
 META_READ_SIZE = 1024
-# the largest metadata slot a validating read fetches. a slot holds a few compression fields,
-# packed and encrypted.
+# the largest metadata slot a validating read fetches. a slot holds a few compression fields, packed
+# and encrypted, i.e. some tens of bytes. MAX_DATA_SIZE bounds a slot already; this caps what a
+# corrupt meta_size can make the read fetch to far less than that.
 MAX_VALIDATED_META_SIZE = 64 * 1024
 
 

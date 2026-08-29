@@ -10,19 +10,18 @@ from hashlib import sha256
 import pytest
 from borghash import HashTableNT
 
-from ..cache import write_chunkindex_invalid
-from ..constants import MAX_CLOCK_SKEW
-from ..helpers import CompressionSpec, IntegrityError, Location, bin_to_hex
-from ..hashindex import ChunkIndex
 from .. import repository as repository_module
-from ..archive import object_validator
+from ..cache import write_chunkindex_invalid
 from ..compress import CNONE
-from ..constants import ROBJ_FILE_STREAM
-from ..crypto.key import AESOCBKey, AuthenticatedKey, CHPOKey, ChecksumKey
-from ..repository import Repository, MAX_DATA_SIZE, propagate_rsh, rest_serve_command, PackWriter, PackReader
-from ..repository import PackTracker, MAX_VALIDATED_META_SIZE
-from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, REPOOBJ_HEADER_AAD_SIZE
+from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
+from ..crypto.key import CHPOKey, ChecksumKey
+from ..helpers import IntegrityError, Location, bin_to_hex
+from ..hashindex import ChunkIndex
+from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
+from ..repository import PackWriter, PackReader, PackTracker
+from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
 from .hashindex_test import H
+from .repoobj_test import DATA_SIZE_OFFSET, META_SIZE_OFFSET
 
 
 def test_rest_serve_command_local():
@@ -85,11 +84,6 @@ def reopen(repository, exclusive: bool | None = True, create=False):
         return Repository(repository._location, exclusive=exclusive, create=create)
 
     raise TypeError(f"Invalid argument type. Expected 'Repository', received '{type(repository).__name__}'.")
-
-
-# offsets of the object header's size fields, for the tests that damage one of them.
-META_SIZE_OFFSET = REPOOBJ_HEADER_AAD_SIZE  # magic, version and chunk id precede it
-DATA_SIZE_OFFSET = META_SIZE_OFFSET + 4
 
 
 def fchunk(data, meta=b"", chunk_id=b"\x00" * 32):
@@ -1889,9 +1883,10 @@ def test_pack_reader_raises_on_unsupported_version():
 def test_pack_reader_rejects_an_object_over_max_data_size():
     # a header claiming more than put() would ever write, in a pack large enough to hold it.
     hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, H(8), 0, MAX_DATA_SIZE)
-    parsed, problem = PackReader._parse_header(hdr, 0, 2 * MAX_DATA_SIZE)
-    assert parsed is None
-    assert "exceeds the maximum" in problem
+    reader = PackReader(pack_contents=hdr)
+    reader.size = lambda: 2 * MAX_DATA_SIZE  # the object fits the pack, so only the limit rejects it
+    with pytest.raises(IntegrityError, match="exceeds the maximum"):
+        list(reader.iter_headers())
 
 
 def test_pack_reader_does_not_fetch_an_oversized_metadata_slot():
@@ -1906,7 +1901,7 @@ def test_pack_reader_does_not_fetch_an_oversized_metadata_slot():
     )
 
 
-def test_pack_reader_resync_validates_the_object_it_resumes_at_once(monkeypatch):
+def test_pack_reader_resync_validates_the_object_it_resumes_at_once():
     # the scan validated the header it found, so the walk yields it without validating it again.
     obj1 = bytearray(fchunk(b"payload-one", chunk_id=H(1)))
     obj2 = fchunk(b"payload-two", chunk_id=H(2))
@@ -2049,40 +2044,6 @@ def test_pack_reader_resync_starts_past_the_last_validated_object():
         (id1, 0, len(obj1)),
         (id3, len(obj1) + len(obj2), len(obj3)),
     ]
-
-
-@pytest.mark.parametrize("key_class", [ChecksumKey, AuthenticatedKey, CHPOKey, AESOCBKey])
-def test_object_validator_checks_the_sizes_for_every_envelope(key_class):
-    # data_size == csize + the envelope overhead must hold for each key family; changing meta_size
-    # or data_size must fail validation.
-    key = key_class(None)
-    if hasattr(key, "init_from_random_data"):
-        key.init_from_random_data()
-        key.init_ciphers()
-    repo_objs = RepoObj(key)
-    chunk_id, obj = real_chunk(repo_objs, b"payload" * 100)
-    hdr_size = RepoObj.obj_header.size
-    meta_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).meta_size
-    head = obj[: hdr_size + meta_size]  # what the walk hands to validate
-    validate = object_validator(repo_objs)
-    assert validate(chunk_id, head)
-    for field_offset in (META_SIZE_OFFSET, DATA_SIZE_OFFSET):
-        bad = bytearray(head)
-        bad[field_offset] ^= 0x01
-        assert not validate(chunk_id, bytes(bad))
-
-
-@pytest.mark.parametrize("compression", ["none", "lz4", "zstd,3", "obfuscate,2,lz4"])
-def test_object_validator_accepts_every_compression(compression):
-    # data_size == csize + the envelope overhead is what pins data_size, so every compressor must
-    # record the whole payload it produced as csize. The obfuscating one pads the payload and
-    # records the padded size.
-    repo_objs = RepoObj(ChecksumKey(None))
-    repo_objs.compressor = CompressionSpec(compression).compressor
-    chunk_id, obj = real_chunk(repo_objs, b"payload" * 100)
-    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[: RepoObj.obj_header.size]))
-    head = obj[: RepoObj.obj_header.size + hdr.meta_size]  # what the walk hands to validate
-    assert object_validator(repo_objs)(chunk_id, head)
 
 
 def test_pack_reader_resync_keeps_the_object_before_a_corrupt_header():

@@ -1,8 +1,8 @@
 import pytest
 
 from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
-from ..crypto.key import ChecksumKey, AuthenticatedKey, CHPOKey, LegacyPlaintextKey
-from ..helpers import msgpack
+from ..crypto.key import AESOCBKey, ChecksumKey, AuthenticatedKey, CHPOKey, LegacyPlaintextKey
+from ..helpers import CompressionSpec, msgpack
 from ..helpers.errors import Error, IntegrityError
 from ..repository import Repository
 from ..repoobj import (
@@ -14,9 +14,14 @@ from ..repoobj import (
     OBJ_VERSION_NO_HEADER_AAD,
     REPOOBJ_HEADER_SIZE,
     RepoObj,
+    object_validator,
 )
 from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
+
+# offsets of the size fields in the object header.
+META_SIZE_OFFSET = len(OBJ_MAGIC) + 1 + 32  # the magic, the version byte and the chunk id precede it
+DATA_SIZE_OFFSET = META_SIZE_OFFSET + 4
 
 
 @pytest.fixture
@@ -500,3 +505,42 @@ def test_version1_object_without_header_aad_still_readable(aead_key):
     assert got_meta["type"] == ROBJ_FILE_STREAM
     got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
     assert got_data == data
+
+
+def validator_input(repo_objs, data):
+    # (chunk_id, head) of a real repo object storing data: head is its object header plus its
+    # metadata slot, which is what validate takes.
+    chunk_id = repo_objs.id_hash(data)
+    obj = repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
+    hdr_size = RepoObj.obj_header.size
+    meta_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).meta_size
+    return chunk_id, obj[: hdr_size + meta_size]
+
+
+@pytest.mark.parametrize("key_class", [ChecksumKey, AuthenticatedKey, CHPOKey, AESOCBKey])
+def test_object_validator_checks_the_sizes_for_every_envelope(key_class):
+    # data_size == csize + the envelope overhead must hold for each key family; changing meta_size
+    # or data_size must fail validation.
+    key = key_class(None)
+    if hasattr(key, "init_from_random_data"):
+        key.init_from_random_data()
+        key.init_ciphers()
+    repo_objs = RepoObj(key)
+    chunk_id, head = validator_input(repo_objs, b"payload" * 100)
+    validate = object_validator(repo_objs)
+    assert validate(chunk_id, head)
+    for field_offset in (META_SIZE_OFFSET, DATA_SIZE_OFFSET):
+        bad = bytearray(head)
+        bad[field_offset] ^= 0x01
+        assert not validate(chunk_id, bytes(bad))
+
+
+@pytest.mark.parametrize("compression", ["none", "lz4", "zstd,3", "obfuscate,2,lz4"])
+def test_object_validator_accepts_every_compression(compression):
+    # data_size == csize + the envelope overhead is what pins data_size, so every compressor must
+    # record the whole payload it produced as csize. The obfuscating one pads the payload and
+    # records the padded size.
+    repo_objs = RepoObj(ChecksumKey(None))
+    repo_objs.compressor = CompressionSpec(compression).compressor
+    chunk_id, head = validator_input(repo_objs, b"payload" * 100)
+    assert object_validator(repo_objs)(chunk_id, head)

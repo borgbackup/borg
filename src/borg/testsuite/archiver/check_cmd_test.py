@@ -7,13 +7,15 @@ from unittest.mock import patch
 
 import pytest
 
+from ... import archive as archive_module
 from ...archive import ArchiveChecker, ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
-from ..repository_test import DATA_SIZE_OFFSET, fchunk, corrupt_chunk_on_disk
+from ..repoobj_test import DATA_SIZE_OFFSET
+from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
     cmd,
     src_file,
@@ -770,6 +772,39 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
     # named by the sha256 of its content. Repairing that is repository-level repair (#10026).
     output = cmd(archiver, "check", "--repository-only", exit_code=1)
     assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
+
+
+def test_repair_without_the_key_rebuilds_without_validating(archivers, request, monkeypatch):
+    """--repair that can not read the key says so and rebuilds the chunks index without validating.
+
+    make_key gives up with an IntegrityError when the manifest yields no key, which a badly damaged
+    repository can do. The rebuild then walks the object headers alone, so a pack with a corrupt
+    object header keeps its damage.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("patches in-process archive internals")
+    check_cmd_setup(archiver)
+    real_make_key = ArchiveChecker.make_key
+
+    def make_key(self, repository, manifest_only=False):
+        if manifest_only:  # the read that yields the validator's key; the later full read succeeds
+            raise IntegrityError("no key")
+        return real_make_key(self, repository, manifest_only=manifest_only)
+
+    real_build = archive_module.build_chunkindex_from_repo
+    validators = []
+
+    def build_chunkindex_from_repo(repository, **kwargs):
+        validators.append(kwargs.get("validate"))
+        return real_build(repository, **kwargs)
+
+    monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
+    monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert "Could not read the key (" in output
+    assert validators[0] is None  # the rebuild got no validator, so it walked the headers alone
+    cmd(archiver, "list", "archive1", exit_code=0)  # the archives are still readable
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):

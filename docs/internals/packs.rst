@@ -62,10 +62,12 @@ Format version ``0x02`` (``OBJ_VERSION_HEADER_AAD``) binds the header's first 41
 authenticated together with the ciphertext, but not itself encrypted). This applies to all borg 2
 modes: the AEAD encryption modes (AES-256-OCB, ChaCha20-Poly1305) authenticate it with their AEAD
 tag, the ``authenticated-*`` modes with their MAC and the ``none-*`` modes with their (unkeyed)
-checksum, see :ref:`tagged_envelope`. ``meta_size`` and ``data_size`` are excluded from
-the AAD; tampering with either still fails the check, because it changes the length of the
-slice being read. A forged ``chunk_id``, version, or magic byte therefore fails
-authentication in ``RepoObj.parse()``/``parse_meta()``.
+checksum, see :ref:`tagged_envelope`. ``meta_size`` and ``data_size`` are excluded from the AAD.
+``RepoObj.parse()`` reads both slots, so tampering with either size still fails the check, by
+changing the length of the slice being read. ``parse_meta()`` reads the metadata slot alone: it
+catches a changed ``meta_size`` the same way, but not a changed ``data_size``, which the repair
+walk described below pins separately. A forged ``chunk_id``, version, or magic byte fails
+authentication in both.
 
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
 AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data`` -- binding each ciphertext to
@@ -121,30 +123,20 @@ store-level check that ``borg check`` runs over ``packs/``: that check keeps
 reporting the pack after ``borg check --repair`` has rebuilt the index from it.
 Rewriting such a pack is repository-level repair, see :issue:`10026`.
 
-``OBJ_MAGIC`` occurs inside the payloads as well, and in the ``none-*`` and
-``authenticated-*`` modes the payloads are user content stored as it is, so a
-backed up file can contain something shaped like a blob. The scan therefore
-accepts a candidate only when it validates like any walked header. Validating
-needs the key, so a repair that cannot read the manifest walks without it.
+``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
+only when it validates like any walked header. Validating needs the key, so a
+repair that cannot read the manifest walks without it.
 
-In the ``none-*`` modes the tag is an unkeyed checksum, so the walk accepts any
-well-formed blob, including one a backed up file contains. The
-``authenticated-*`` modes accept a blob written with the key the repository
-uses: their tag is deterministic and binds a blob to its chunk id alone, so a
-blob copied verbatim out of a repository sharing that key validates at any
-offset in any pack. Backing up such a repository puts its blobs into the
-payloads, as long as compression leaves them as they are - lz4 stores data it
-cannot shrink unchanged.
-
-A blob that arrives this way carries its own chunk id and reads back as itself,
-so indexing it adds a chunk nothing references. Its ``data_size`` describes the
-blob as it was written, though, and chunking cuts a payload where the content
-dictates: a blob whose header and metadata slot fall inside the payload and
-whose data is cut off still validates, and the extent it claims covers the blobs
-that follow it, which the walk then skips. Bytes crafted to pass an unkeyed
-checksum claim an extent the same way - authenticating them is what the
-``none-*`` modes give up. The scan reaches a payload only after the blob owning
-it failed to validate, so a corrupt header is what makes any of this reachable.
+In the ``none-*`` modes the tag is an unkeyed checksum, and in the
+``authenticated-*`` modes it binds a blob to its chunk id and nothing else (see
+:ref:`security_structural_auth`), so validating does not establish there that
+this repository wrote the blob. Both modes also store payloads as they are, so a
+backed up file can contain something that validates - the blobs of a repository
+sharing the key, for instance. Such a blob reads back as itself, adding a chunk
+nothing references, but the extent its ``data_size`` claims covers whatever
+follows it at that offset, which the walk then skips. The scan reaches a payload
+only after the blob owning it failed to validate, so a corrupt header is what
+makes this reachable.
 
 Bit flips in the data are caught when the blob is read, on that blob alone.
 

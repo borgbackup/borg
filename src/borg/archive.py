@@ -53,7 +53,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
 from .repository import Repository, NoManifestError
-from .repoobj import RepoObj
+from .repoobj import RepoObj, object_validator
 
 # macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
 # Reading such files triggers downloading their content. stat.SF_DATALESS is only available
@@ -2126,42 +2126,6 @@ class RobustUnpacker:
             return next(self._unpacker)
 
 
-def object_validator(repo_objs):
-    """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
-
-    obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
-    computed over the slot itself and over the chunk id, so a wrong meta_size or chunk id fails it.
-    At object version OBJ_VERSION_HEADER_AAD the magic and the version are covered as well (as AAD,
-    additional authenticated data: bytes the tag covers without being part of the ciphertext); at
-    OBJ_VERSION_NO_HEADER_AAD they are not: a wrong magic fails the explicit magic check, and a
-    wrong version fails because the version selects the AAD the slot is parsed with. data_size, the
-    one header field outside the tag at either version, must match csize - the data slot's payload
-    size, recorded in the tagged metadata - plus the key's fixed envelope overhead.
-
-    In the "none-*" modes the tag is an unkeyed checksum, so validate accepts any well-formed
-    object, including one that a backed up file contains. The tag binds an object to its chunk id
-    alone, so the "authenticated-*" modes likewise accept an object copied verbatim from a
-    repository sharing their key, at any offset in any pack.
-    """
-    hdr_size = RepoObj.obj_header.size
-    overhead = repo_objs.key.PAYLOAD_OVERHEAD  # the envelope adds a fixed number of bytes to the payload
-
-    def validate(chunk_id, obj):
-        try:
-            meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
-            data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
-            return data_size == meta["csize"] + overhead
-        except (IntegrityErrorBase, msgpack.UnpackException, KeyError, TypeError, IndexError):
-            # arbitrary bytes fail the tag, the msgpack unpacking, the length checks or the csize lookup.
-            return False
-        except Exception as err:
-            # anything else is a bug: log it and take the object as invalid.
-            logger.debug(f"validating an object raised {err!r}, treating it as invalid.")
-            return False
-
-    return validate
-
-
 class ArchiveChecker:
     # Bound how many missing file chunks rebuild_archives buffers for its end-of-run report,
     # so checking a badly damaged repo with very many missing chunks can not exhaust memory.
@@ -2217,13 +2181,17 @@ class ArchiveChecker:
         # --repair does rebuild from the packs (slow_rebuild=repair), working from the real packs so it
         # can detect and fix archives that reference chunks whose pack has gone missing.
         # --repair also passes validate, which makes the rebuild resync past a corrupt object header.
+        # Every object header is validated, since a corrupt data_size parses and points the walk into
+        # the middle of the pack. Cost: one metadata slot read and one decryption per object.
         # Validating needs the key, so read it here. manifest_only=True, because the other source
         # make_key reads keys from is self.chunks, which is only built below.
         if repair and self.key is None:
             try:
                 self.key = self.make_key(repository, manifest_only=True)
             except IntegrityError as err:
-                logger.warning(f"{err}. Packs with a corrupt object header can not be repaired.")
+                logger.warning(
+                    f"Could not read the key ({err}), so a pack with a corrupt object header stays as it is."
+                )
         validate = object_validator(RepoObj(self.key)) if repair and self.key is not None else None
         self.chunks = build_chunkindex_from_repo(
             self.repository, slow_rebuild=repair, validate=validate, write_immediately=False

@@ -26,7 +26,7 @@ try:
     import signal
     from datetime import UTC, datetime
 
-    from ..logger import create_logger, setup_logging
+    from ..logger import create_logger, setup_logging, flush_serve_log_queue
 
     logger = create_logger()
 
@@ -481,10 +481,16 @@ class Archiver(
         func = args.func
         # do not use loggers before this!
         is_serve = func == self.do_serve
+        # Only the legacy RPC mode of "borg serve" has an in-band log channel (its serve loop
+        # forwards queued log records to the client), so only it may route log output into the
+        # serve log queue. "borg serve --rest" logs to stderr like any other command: SSH
+        # forwards stderr to the client side, where borgstore surfaces it as error detail
+        # when the server fails.
+        is_serve_legacy = is_serve and not getattr(args, "rest", False)
         self.log_json = args.log_json and not is_serve
         func_name = getattr(func, "__name__", "none")
-        setup_logging(level=args.log_level, is_serve=is_serve, log_json=self.log_json, func=func_name)
-        args.progress |= is_serve
+        setup_logging(level=args.log_level, is_serve=is_serve_legacy, log_json=self.log_json, func=func_name)
+        args.progress |= is_serve_legacy  # the legacy serve loop forwards progress output to the client
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
         # extract --dry-run reads, decrypts and decompresses every object, so its store stats are accurate.
@@ -702,6 +708,7 @@ def main():  # pragma: no cover
             from ..helpers import do_show_rc
 
             do_show_rc(exit_code)
+        flush_serve_log_queue()
         sys.exit(exit_code)
 
 

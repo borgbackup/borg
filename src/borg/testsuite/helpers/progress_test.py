@@ -109,6 +109,7 @@ def tty(monkeypatch, progress_logger):
     monkeypatch.setenv("TERM", "xterm")
     monkeypatch.setenv("COLUMNS", "80")  # make the terminal width deterministic
     monkeypatch.setenv("NO_COLOR", "1")  # ... and the escape sequences short
+    monkeypatch.delenv("COLORTERM", raising=False)  # the real terminal's value must not leak in
     monkeypatch.delenv("BORG_SPINNER", raising=False)
     return FakeTTY()
 

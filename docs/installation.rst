@@ -521,7 +521,7 @@ If you need to use a different version of Python you can install this using ``py
     pyenv install 3.11.0  # minimum, preferably use something more recent!
     pyenv global 3.11.0
     pyenv local 3.11.0
-    virtualenv --python=${pyenv which python} borg-env
+    virtualenv --python=$(pyenv which python) borg-env
     source borg-env/bin/activate   # always before using!
     ...
 

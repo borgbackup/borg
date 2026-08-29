@@ -7,7 +7,6 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers.errors import CommandError
-from ...platform import is_win32
 from . import cmd, create_src_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -282,7 +281,7 @@ LOCAL_TZ_ARCHIVES = [
 ]
 
 
-@pytest.mark.skipif(is_win32, reason="time.tzset() is not available on Windows")
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="time.tzset() is not available on this platform")
 def test_match_bare_pattern_uses_local_timezone(archivers, request, set_timezone):
     """A pattern without a timezone suffix is interpreted in the local timezone."""
     set_timezone("America/New_York")

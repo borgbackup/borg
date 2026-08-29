@@ -8,7 +8,8 @@ import time
 from ..constants import *  # NOQA
 from ..helpers import format_file_size, CompressionSpec
 from ..helpers import sizeof_fmt_iec
-from ..helpers import FilesystemDirSpec
+from ..helpers import CommandError
+from ..helpers import FilesystemDirSpec, FilesystemPathSpec
 from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
@@ -236,6 +237,48 @@ class BenchmarkMixIn:
                 compressible[nbytes] = bytes(out[:nbytes])
             return compressible[nbytes]
 
+        def user_data(path):
+            """The --data input: the contents of the given file, or of all files below the given directory.
+
+            At most 1 GiB is read - far more than the benchmark samples from it, while bounding memory usage.
+            """
+            max_size = GIB
+            if os.path.isfile(path):
+                filenames = [path]
+            elif os.path.isdir(path):
+                filenames = []
+                for root, dirs, files in os.walk(path):
+                    dirs.sort()
+                    filenames += sorted(os.path.join(root, name) for name in files)
+            else:
+                raise CommandError(f"--data: '{path}' is not a file or directory.")
+            pieces = []
+            nbytes = 0
+            for filename in filenames:
+                if nbytes >= max_size:
+                    break
+                if not os.path.isfile(filename):  # skip special files and broken symlinks
+                    continue
+                try:
+                    with open(filename, "rb") as f:
+                        pieces.append(f.read(max_size - nbytes))
+                except OSError as e:
+                    raise CommandError(f"--data: could not read '{filename}': {e}")
+                nbytes += len(pieces[-1])
+            if nbytes == 0:
+                raise CommandError(f"--data: no data found at '{path}'.")
+            return b"".join(pieces)
+
+        def data_slices(data, nbytes, total):
+            """Up to *total* bytes of *nbytes*-sized buffers cut from *data*, evenly spread over it."""
+            if len(data) <= nbytes:
+                return [data]
+            count = max(1, min(total // nbytes, len(data) // nbytes))
+            if count == 1:
+                return [data[:nbytes]]
+            step = (len(data) - nbytes) // (count - 1)
+            return [data[i * step : i * step + nbytes] for i in range(count)]
+
         def data_size_str(size):
             """The benchmark's own data volumes, always in IEC units.
 
@@ -250,17 +293,21 @@ class BenchmarkMixIn:
             """Rate as MB/s, always - so numbers stay comparable between rows."""
             return f"{size / dt / 1e6:>8.1f} MB/s"
 
-        def report(section, spec, size, dt, **extra):
+        def report(section, spec, size, dt, ratio=None, **extra):
             if args.json:
                 result[section].append({"size": size, "time": dt, **extra})
             else:
-                print(f"{spec:<{WIDTH}} {data_size_str(size):<11} {dt:.3f}s  {throughput(size, dt)}")
+                line = f"{spec:<{WIDTH}} {data_size_str(size):<11} {dt:.3f}s  {throughput(size, dt)}"
+                if ratio is not None:
+                    line += f"  {ratio:6.2f}x"
+                print(line)
 
         def section_header(section, title):
             if args.json:
                 result[section] = []
             else:
-                print(f"{title} ".ljust(64, "="))
+                # wide enough to cover the longest rows (the compression ones, with their ratio column)
+                print(f"{title} ".ljust(70, "="))
 
         random_10M = buffer(chunk_data_size)
         key_256 = os.urandom(32)
@@ -391,12 +438,18 @@ class BenchmarkMixIn:
 
         if "compressing" in selected:
             section_header("compression", "Compression")
+            benchmark_data = user_data(args.data) if args.data is not None else None
             # grouped by buffer size rather than by codec, so the codecs can be
             # compared against each other at a glance; chunk-sized first, as
             # that is what borg actually compresses
             for label, nbytes in reversed(comp_sizes):
-                data = compressible_buffer(nbytes)
-                number = max(3, comp_total // nbytes)  # a few reps even for the fast codecs
+                if benchmark_data is not None:
+                    # distinct buffers cut from the user-provided data
+                    bufs = data_slices(benchmark_data, nbytes, comp_total)
+                else:
+                    # the same synthetic buffer over and over (a few reps even for the fast codecs)
+                    bufs = [compressible_buffer(nbytes)] * max(3, comp_total // nbytes)
+                total = sum(len(buf) for buf in bufs)
                 for spec in [
                     "lz4",
                     "zstd,-4",
@@ -414,16 +467,26 @@ class BenchmarkMixIn:
                     "lzma,9",
                 ]:
                     compressor = CompressionSpec(spec).compressor
-                    dt = timeit(lambda: compressor.compress({}, data), number=number)
+                    csize = 0
+
+                    def compress_all():
+                        # compute the compressed size inside the timed run, so the (slow,
+                        # for lzma / high zstd levels) compression only runs once
+                        nonlocal csize
+                        csize = sum(len(compressor.compress({}, buf)[1]) for buf in bufs)
+
+                    dt = timeit(compress_all, number=1)
                     algo, _, algo_params = spec.partition(",")
                     report(
                         "compression",
                         f"{spec} ({label})",
-                        nbytes * number,
+                        total,
                         dt,
+                        ratio=total / csize,
                         algo=algo,
                         algo_params=algo_params,
                         buffer_size=nbytes,
+                        csize=csize,
                     )
 
         if "msgpacking" in selected:
@@ -532,10 +595,22 @@ class BenchmarkMixIn:
         bytes - 1 GiB, or 10 MiB for the compressors - so the throughput column is
         comparable between rows.
 
-        The compressors work on synthetic text-like data that compresses about 4x
-        at zstd,3. Random data would be the worst possible input: no codec can
-        compress it, so all of them would take their incompressible fast path and
-        the levels would barely differ.
+        By default, the compressors work on synthetic text-like data that compresses
+        about 4x at zstd,3. Random data would be the worst possible input: no codec
+        can compress it, so all of them would take their incompressible fast path
+        and the levels would barely differ.
+
+        Synthetic data can still behave differently from your real data, so the
+        compression benchmarks can instead run on data you provide with
+        ``--data PATH``: PATH is a file or a directory (all files below it are
+        read and concatenated, up to 1 GiB). The measured buffers are cut from
+        that data, evenly spread over it, so all of it influences the result.
+        Public benchmark corpora, e.g. the Silesia corpus or the Canterbury
+        corpus, make good reproducible inputs that resemble real-world data
+        (download and unpack them first, then point ``--data`` at the result).
+
+        The compression rows also show the achieved compression ratio
+        (uncompressed size / compressed size, higher is better).
         """
         )
         subparser = ArgumentParser(
@@ -547,4 +622,10 @@ class BenchmarkMixIn:
         subparser.add_argument("--hashing", action="store_true", help="benchmark the hashes / MACs")
         subparser.add_argument("--encrypting", action="store_true", help="benchmark the encryption modes")
         subparser.add_argument("--compressing", action="store_true", help="benchmark the compressors")
+        subparser.add_argument(
+            "--data",
+            metavar="PATH",
+            type=FilesystemPathSpec,
+            help="benchmark the compressors with the data from this file or directory (default: synthetic data)",
+        )
         subparser.add_argument("--msgpacking", action="store_true", help="benchmark msgpack item packing")

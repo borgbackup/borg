@@ -38,8 +38,7 @@ pip install -e .  # builds Cython/C extensions in place
 Requires Python >=3.11, Cython >=3.0.3, pkgconfig, and dev headers for OpenSSL, lz4, zstd, xxhash.
 The `borgstore` package (repository backend) is pulled in as a normal dependency.
 
-Env vars to point the build at non-standard lib locations: `BORG_OPENSSL_PREFIX`, `BORG_LIBLZ4_PREFIX`,
-`BORG_LIBZSTD_PREFIX`, `BORG_LIBXXHASH_PREFIX`.
+Env vars to point the build at non-standard lib locations: `BORG_OPENSSL_PREFIX`, `BORG_LIBLZ4_PREFIX`.
 
 After editing any `.pyx`/`.c` file, rebuild the extensions:
 
@@ -93,8 +92,9 @@ fakeroot -u tox -e py311                         # one Python version only
 fakeroot -u tox -e py311 -- -k 'locking'        # select tests by keyword (posargs after --)
 ```
 
-Test env vars: `BORG_TESTS_IGNORE_MODES` (disable mode/permission tests), `BORG_FUSE_IMPL=llfuse|pyfuse3`
-(select FUSE implementation for mount tests).
+Test env vars:
+- `BORG_TESTS_IGNORE_MODES` (disable mode/permission tests)
+- `BORG_FUSE_IMPL=mfusepy|llfuse|pyfuse3` (select FUSE implementation for mount tests).
 
 Tests live in `src/borg/testsuite/`, see `python_files` in `pyproject.toml`.
 
@@ -187,3 +187,4 @@ Use the correct log level (debug only for debugging; info/warning/error/critical
 When directly prompting the user (e.g. Y/N confirmations), write straight to stderr, not through the
 logger and not to stdout (stdout may be piped). Info-level volume is controlled via flags like
 `--stats`/`--list` feeding topic loggers — see `_setup_implied_logging()` in `archiver/__init__.py`.
+

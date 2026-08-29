@@ -8,8 +8,8 @@ Examples
     $ borg create backup-2016-02-15 ~
     $ borg copy backup-2016-02-15 known-good
     $ borg repo-list
-    e6a2b1c4  Mon, 2016-02-15 19:50:19 +0100  backup-2016-02-15  tw          MacBook-Pro
-    9f3d0a77  Mon, 2016-02-15 19:50:19 +0100  known-good         tw          MacBook-Pro
+    d7b79fd3  Sat, 2026-08-29 14:39:27 +0200  backup-2016-02-15              tw          MacBook-Pro
+    f81040e3  Sat, 2026-08-29 14:39:27 +0200  known-good                   tw          MacBook-Pro
 
     # the copy is an independent archive:
     # after deleting (and compacting away) the original, the copy is still complete.
@@ -18,4 +18,4 @@ Examples
     $ borg extract known-good
 
     # if the archive name is not unique, address the archive by its ID:
-    $ borg copy aid:e6a2b1c4 known-good
+    $ borg copy aid:d7b79fd3 known-good

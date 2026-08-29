@@ -313,11 +313,17 @@ class KeyBase:
     id_key: bytes = None
 
     # Is assert_id() the read path's authentication mechanism for this key class?
-    # True (the default, e.g. for the "authenticated" and "none" modes): decrypt() verifies nothing, so the keyed
-    # id hash (resp. the plain sha256 for "none") *is* the only integrity/authenticity check a read has and thus
-    # must never be skipped - skipping would silently demote "authenticated" to "none".
-    # False (the AEAD key classes): every read is authenticated by the AEAD tag, with the chunk id in the AAD,
-    # independently of assert_id() - see AEADKeyBase.assert_id for what assert_id adds on top of that.
+    # True (the default): the envelope does not authenticate the payload as the one written for the requested
+    # chunk id (there is no keyed envelope tag covering the id), so the id check must never be skipped, see
+    # RepoObj.parse (RepoObj1.parse for the borg 1.x classes). In borg 2, this is only the "none-*" modes:
+    # their decrypt() verifies just the unkeyed envelope checksum, which detects accidental corruption but
+    # authenticates nothing, see ChecksumKeyBase. The read-only borg 1.x classes (borg.legacy.crypto.key)
+    # keep the default, too - no borg 1.x envelope covers the chunk id, and for borg 1.x "authenticated",
+    # the keyed id hash even is the only authentication a read has: skipping it would silently demote that
+    # mode to "none".
+    # False (the AEAD ciphersuites and the "authenticated-*" modes): every read is authenticated by the keyed
+    # envelope tag, which covers the chunk id (it is in the AAD), independently of assert_id() - see
+    # AEADKeyBase.assert_id for what assert_id adds on top of that.
     id_check_is_authentication: ClassVar[bool] = True
 
     # Does this mode encrypt the data at all? False for the modes that only tag it ("none-*",

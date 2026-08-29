@@ -1,5 +1,11 @@
 name: Backport pull request
 
+# pull_request_target is needed because the backport has to run with a token
+# that may write to this repository - a pull_request run from a fork does not
+# get one.  It is safe here because nothing from the pull request is checked
+# out or executed: the checkout below takes the base branch (no `ref:`), and
+# the only thing that touches pull request content is backport-action, which
+# just cherry-picks commits.
 on:
   pull_request_target:
     types: [closed]
@@ -7,14 +13,17 @@ on:
     types: [created]
 
 permissions:
-  contents: write # so it can comment
-  pull-requests: write # so it can create pull requests
+  contents: read
 
 jobs:
   backport:
     name: Backport pull request
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+
+    permissions:
+      contents: write       # backport-action pushes the backport branch
+      pull-requests: write  # ... and opens the pull request and comments on it
 
     # Only run when pull request is merged
     # or when a comment starting with `/backport` is created by someone other than the
@@ -31,6 +40,9 @@ jobs:
           startsWith(github.event.comment.body, '/backport')
         )
     steps:
+        # No persist-credentials: false here (unlike the other workflows):
+        # backport-action pushes the backport branch with a plain `git push`,
+        # so it needs the credentials that actions/checkout leaves behind.
         - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         - name: Create backport pull requests
           uses: korthout/backport-action@2e830a1d0b8269505846ddd407a70876913ad1f8  # v4.6.0

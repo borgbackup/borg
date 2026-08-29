@@ -90,14 +90,15 @@ jobs:
         borg.testsuite.helpers.time_test
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
         fetch-tags: true
+        persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@v7
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
         # same python version as in the container, so both sides are comparable
         python-version: '3.13'
@@ -106,7 +107,7 @@ jobs:
     # (msgpack, PyYAML, backports-zstd, borghash, borgstore) are the expensive
     # part of the container setup, so keep them from run to run.
     - name: Cache pip-built wheels (armv7)
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: .pip-cache-armv7
         key: armv7-pip-${{ hashFiles('pyproject.toml') }}
@@ -136,7 +137,7 @@ jobs:
         echo "BORG_VERSION=$("$RUNNER_TEMP/venv-native/bin/borg" --version | cut -d' ' -f2)" >> $GITHUB_ENV
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v4
+      uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
       with:
         platforms: arm
 

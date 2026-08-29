@@ -28,6 +28,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - uses: psf/black@87928e6d6761a4a6d22250e1fee5601b3998086e  # 26.5.1
         with:
             version: "~= 24.0"

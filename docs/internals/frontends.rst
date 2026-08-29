@@ -647,6 +647,9 @@ item1:
     - for '*changed user*' / '*changed group*' the user / the group,
     - for '*ctime*' / '*mtime*' an ISO 8601 timestamp.
 
+    User and group are given by name; with ``--numeric-ids``, the numeric uid and gid are given
+    instead (as JSON numbers instead of strings).
+
 item2:
     The corresponding value in ARCHIVE2, see **item1**.
 
@@ -878,9 +881,10 @@ Errors
     NotMyLock rc: 75 traceback: yes
         Failed to release the lock {} (was/is locked, but not by me).
 
-    These six msgids are shared by the repository lock (``storelocking``) and the local cache lock
-    (``fslocking``). The messages are the same except for *LockTimeout*, which the cache lock emits
-    without the trailing hint.
+    These six msgids are shared by the repository lock (``storelocking``) and the filesystem lock
+    (``fslocking``), which only the legacy borg 1.x repository code uses (e.g. during
+    ``borg transfer --from-borg1``). The messages are the same except for *LockTimeout*, which the
+    ``fslocking`` variant emits without the trailing hint.
 
     ConnectionClosed rc: 80 traceback: no
         Connection closed by remote host.
@@ -948,6 +952,11 @@ Operations
     - cache.close
 
       Saving the local cache (files cache, chunks index, cache config) at the end of a command.
+    - cache.build_chunkindex_from_repo
+
+      Rebuilding the chunk index by reading all pack file headers from the repository, e.g. when
+      it cannot be built from the stored index fragments or when ``borg check --repair`` rebuilds
+      a corrupt index.
     - check.index
     - check.packs
     - check.verify_data
@@ -976,3 +985,6 @@ Prompts
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
         For "You requested to DELETE the following repository completely *including* ... archives
         it contains:" (repo-delete)
+    BORG_DISPLAY_PASSPHRASE
+        For "Do you want your passphrase to be displayed for verification? [yN]:" (interactive
+        entry of a new passphrase)

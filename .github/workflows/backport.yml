@@ -1,6 +1,12 @@
 name: Backport pull request
 
-on:
+# pull_request_target is needed because the backport has to run with a token
+# that may write to this repository - a pull_request run from a fork does not
+# get one.  It is safe here because nothing from the pull request is checked
+# out or executed: the checkout below takes the base branch (no `ref:`), and
+# the only thing that touches pull request content is backport-action, which
+# just cherry-picks commits.
+on:  # zizmor: ignore[dangerous-triggers]
   pull_request_target:
     types: [closed]
   issue_comment:

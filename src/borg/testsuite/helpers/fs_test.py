@@ -50,7 +50,7 @@ def test_get_config_dir(monkeypatch):
     home_dir = os.path.expanduser("~")
     if is_win32:
         monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
-        assert get_config_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "borg", "borg")
+        assert get_config_dir(create=False) == os.path.join(home_dir, "AppData", "Roaming", "borg")
         monkeypatch.setenv("BORG_CONFIG_DIR", home_dir)
         assert get_config_dir(create=False) == home_dir
     elif is_darwin:
@@ -77,7 +77,7 @@ def test_get_cache_dir(monkeypatch):
     home_dir = os.path.expanduser("~")
     if is_win32:
         monkeypatch.delenv("BORG_CACHE_DIR", raising=False)
-        assert get_cache_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "borg", "borg", "Cache")
+        assert get_cache_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "borg", "Cache")
         monkeypatch.setenv("BORG_CACHE_DIR", home_dir)
         assert get_cache_dir(create=False) == home_dir
     elif is_darwin:
@@ -104,7 +104,7 @@ def test_get_keys_dir(monkeypatch):
     home_dir = os.path.expanduser("~")
     if is_win32:
         monkeypatch.delenv("BORG_KEYS_DIR", raising=False)
-        assert get_keys_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "borg", "borg", "keys")
+        assert get_keys_dir(create=False) == os.path.join(home_dir, "AppData", "Roaming", "borg", "keys")
         monkeypatch.setenv("BORG_KEYS_DIR", home_dir)
         assert get_keys_dir(create=False) == home_dir
     elif is_darwin:
@@ -131,9 +131,9 @@ def test_get_security_dir(monkeypatch):
     home_dir = os.path.expanduser("~")
     if is_win32:
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
-        assert get_security_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "borg", "borg", "security")
+        assert get_security_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "borg", "security")
         assert get_security_dir(repository_id="1234", create=False) == os.path.join(
-            home_dir, "AppData", "Local", "borg", "borg", "security", "1234"
+            home_dir, "AppData", "Local", "borg", "security", "1234"
         )
         monkeypatch.setenv("BORG_SECURITY_DIR", home_dir)
         assert get_security_dir(create=False) == home_dir
@@ -169,7 +169,7 @@ def test_get_runtime_dir(monkeypatch):
     home_dir = os.path.expanduser("~")
     if is_win32:
         monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
-        assert get_runtime_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "Temp", "borg", "borg")
+        assert get_runtime_dir(create=False) == os.path.join(home_dir, "AppData", "Local", "Temp", "borg")
         monkeypatch.setenv("BORG_RUNTIME_DIR", home_dir)
         assert get_runtime_dir(create=False) == home_dir
     elif is_darwin:

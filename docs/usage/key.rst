@@ -39,7 +39,7 @@ Examples
 
     The key file paths shown above are the defaults for Linux (``~/.config/borg/keys/``).
     On macOS, key files are stored in ``~/Library/Application Support/borg/keys/``.
-    On Windows, they are stored in ``C:\Users\<user>\AppData\Local\borg\borg\keys\``.
+    On Windows, they are stored in ``C:\Users\<user>\AppData\Roaming\borg\keys\``.
     See :ref:`env_vars` for details.
 
 ::

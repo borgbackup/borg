@@ -85,7 +85,7 @@ On **macOS**, Borg 1.x stored key files in ``~/.config/borg/keys/``,
 but Borg 2 defaults to ``~/Library/Application Support/borg/keys/``.
 
 On **Windows**, Borg 1.x used XDG-style paths (e.g. ``~/.config/borg/keys/``),
-while Borg 2 defaults to ``C:\Users\<user>\AppData\Local\borg\borg\keys\``.
+while Borg 2 defaults to ``C:\Users\<user>\AppData\Roaming\borg\keys\``.
 
 If Borg 2 cannot find your key file, you have several options:
 

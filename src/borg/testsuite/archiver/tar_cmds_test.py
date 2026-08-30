@@ -129,6 +129,39 @@ def test_import_tar(archivers, request, tar_format="PAX"):
     assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
 
 
+@requires_hardlinks
+@pytest.mark.parametrize("tar_format", ["BORG", "PAX"])
+def test_import_tar_hardlinks(archivers, request, tar_format):
+    # export-tar emits the 2nd and following members of a hard link group as tar LNKTYPE entries
+    # for every tar format, so import-tar always finds the content (it reuses the chunks).
+    # Whether the hard link *grouping* survives the round trip depends on the tar format:
+    # the BORG format transfers the item's hlid inside the BORG.item.meta pax header, so the
+    # imported items are hard links again. The other formats have no place for the hlid, so
+    # import-tar creates separate (but content-deduplicated) regular file items,
+    # see HardLinkManager.__doc__, case D.
+    hardlinked = tar_format == "BORG"
+    archiver = request.getfixturevalue(archivers)
+    _extract_hardlinks_setup(archiver)  # creates archive "test"
+    cmd(archiver, "export-tar", "test", "output.tar", f"--tar-format={tar_format}")
+    cmd(archiver, "import-tar", "dst", "output.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+        groups = [  # (content, paths of the hard link group), as created by _extract_hardlinks_setup
+            (b"123456", ["input/source", "input/abba", "input/dir1/hardlink", "input/dir1/subdir/hardlink"]),
+            (b"", ["input/dir1/source2", "input/dir1/aaaa"]),
+        ]
+        for content, group in groups:
+            for path in group:
+                assert os.stat(path).st_nlink == (len(group) if hardlinked else 1)
+                with open(path, "rb") as fd:  # either way, the content is there
+                    assert fd.read() == content
+            inodes = {os.stat(path).st_ino for path in group}
+            assert len(inodes) == (1 if hardlinked else len(group))
+    if hardlinked:
+        # full fidelity: same content, metadata and hard link structure as the input
+        assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
+
+
 def test_import_tar_nfiles(archivers, request):
     archiver = request.getfixturevalue(archivers)
     # Build a tar with 2 regular files, 1 hardlink, 1 directory and 1 symlink.

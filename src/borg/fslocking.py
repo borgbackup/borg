@@ -220,6 +220,11 @@ class ExclusiveLock:
             return False
         except PermissionError:  # win32 might throw this.
             return False
+        except OSError:
+            # we can not read the lock directory - e.g. haiku fails this with EBUSY or
+            # "bad data" while the directory is concurrently replaced via rename().
+            # Not being able to look at the lock means we can not call it stale, see by_me().
+            return False
         else:
             for name in names:
                 try:

@@ -137,9 +137,10 @@ Compatibility notes:
     cache: ``~/Library/Caches/borg/``,
     runtime: ``~/Library/Caches/TemporaryItems/borg/``.
   - on Windows, the default directories are:
-    config/data: ``C:\Users\<user>\AppData\Local\borg\borg``,
-    cache: ``C:\Users\<user>\AppData\Local\borg\borg\Cache``,
-    runtime: ``C:\Users\<user>\AppData\Local\Temp\borg\borg``.
+    config: ``C:\Users\<user>\AppData\Roaming\borg``,
+    data: ``C:\Users\<user>\AppData\Local\borg``,
+    cache: ``C:\Users\<user>\AppData\Local\borg\Cache``,
+    runtime: ``C:\Users\<user>\AppData\Local\Temp\borg``.
   - **keyfile users on macOS (and Windows)**: borg 2 will look for key files in the
     new platform-specific config directory instead of ``~/.config/borg/keys/`` where
     borg 1.x stored them. You can set ``BORG_KEYS_DIR`` to point to the old location,

@@ -92,8 +92,12 @@ def get_data_dir(*subdirs, create=True):
 
     Any additional path components are appended to the data directory.
     """
+    # appauthor=False (here and in the other platformdirs calls): without it, platformdirs defaults
+    # the appauthor to the appname, doubling "borg" in the Windows AppData paths, see #10237.
+    # The data dir (e.g. the security state) is machine-specific client state, so it stays in the
+    # non-roaming AppData on Windows.
     data_dir = os.environ.get(
-        "BORG_DATA_DIR", join_base_dir(".local", "share", "borg") or platformdirs.user_data_dir("borg")
+        "BORG_DATA_DIR", join_base_dir(".local", "share", "borg") or platformdirs.user_data_dir("borg", appauthor=False)
     )
     if subdirs:
         data_dir = str(Path(data_dir).joinpath(*subdirs))
@@ -108,7 +112,7 @@ def get_runtime_dir(*subdirs, create=True):
     Any additional path components are appended to the runtime directory.
     """
     runtime_dir = os.environ.get(
-        "BORG_RUNTIME_DIR", join_base_dir(".cache", "borg") or platformdirs.user_runtime_dir("borg")
+        "BORG_RUNTIME_DIR", join_base_dir(".cache", "borg") or platformdirs.user_runtime_dir("borg", appauthor=False)
     )
     if subdirs:
         runtime_dir = str(Path(runtime_dir).joinpath(*subdirs))
@@ -122,7 +126,11 @@ def get_cache_dir(*subdirs, create=True):
 
     Any additional path components are appended to the cache directory.
     """
-    cache_dir = os.environ.get("BORG_CACHE_DIR", join_base_dir(".cache", "borg") or platformdirs.user_cache_dir("borg"))
+    # Keep platformdirs' opinionated "Cache" subdir on Windows: it keeps the cache - and the
+    # CACHEDIR.TAG written into the cache root below - out of %LOCALAPPDATA%\borg, the data dir.
+    cache_dir = os.environ.get(
+        "BORG_CACHE_DIR", join_base_dir(".cache", "borg") or platformdirs.user_cache_dir("borg", appauthor=False)
+    )
     full_dir = str(Path(cache_dir).joinpath(*subdirs)) if subdirs else cache_dir
     if create:
         ensure_dir(full_dir)
@@ -151,8 +159,11 @@ def get_config_dir(*subdirs, create=True):
 
     Any additional path components are appended to the config directory.
     """
+    # roaming=True: on Windows, the configuration (including the keys dir) goes into the roaming
+    # profile (%APPDATA%), so it follows the user; machine-specific data/cache stay in %LOCALAPPDATA%.
     config_dir = os.environ.get(
-        "BORG_CONFIG_DIR", join_base_dir(".config", "borg") or platformdirs.user_config_dir("borg")
+        "BORG_CONFIG_DIR",
+        join_base_dir(".config", "borg") or platformdirs.user_config_dir("borg", appauthor=False, roaming=True),
     )
     if subdirs:
         config_dir = str(Path(config_dir).joinpath(*subdirs))

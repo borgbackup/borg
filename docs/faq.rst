@@ -548,7 +548,7 @@ How important is the borg config directory?
 
 The borg config directory (``~/.config/borg`` on Linux,
 ``~/Library/Application Support/borg`` on macOS,
-``C:\Users\<user>\AppData\Local\borg\borg`` on Windows -- see :ref:`env_vars`)
+``C:\Users\<user>\AppData\Roaming\borg`` on Windows -- see :ref:`env_vars`)
 has content that you should take care of:
 
 ``keys`` subdirectory
@@ -557,9 +557,8 @@ has content that you should take care of:
   to have an independent backup of the borg keys, see :ref:`borg_key_export` for
   more details.
 
-On Windows, the doubled ``borg\borg`` in the path above is what the platformdirs defaults
-produce; whether borg should use a different directory scheme there is under review,
-see :issue:`10237`.
+On Windows, the configuration is stored in the *roaming* AppData, so in domain
+environments it follows the user's profile (including onto the profile server).
 
 Make sure that only you have access to the borg config directory.
 
@@ -603,7 +602,7 @@ How important is the borg data directory?
 
 The borg data directory (``~/.local/share/borg`` on Linux,
 ``~/Library/Application Support/borg`` on macOS,
-``C:\Users\<user>\AppData\Local\borg\borg`` on Windows -- see :ref:`env_vars`)
+``C:\Users\<user>\AppData\Local\borg`` on Windows -- see :ref:`env_vars`)
 has content that you should take care of:
 
 ``security`` subdirectory
@@ -613,7 +612,7 @@ has content that you should take care of:
   or manipulate these files. However, apart from those warnings, a loss of these files can be
   recovered.
 
-On macOS and Windows, this resolves to the same directory as the borg config directory,
+On macOS, this resolves to the same directory as the borg config directory,
 so the ``security`` and ``keys`` subdirectories sit next to each other there.
 
 Make sure that only you have access to the Borg data directory.

@@ -989,9 +989,10 @@ class HelpMixIn:
               honoured (see https://specifications.freedesktop.org/basedir/latest/).
             - macOS: native macOS directories are used by default (e.g. ``~/Library/Application Support/borg``,
               ``~/Library/Caches/borg``). ``XDG_*`` environment variables are honoured if set.
-            - Windows: local (not roaming) Windows AppData directories are used, e.g.
-              ``C:\\Users\\<user>\\AppData\\Local\\borg\\borg``. ``borg`` appears twice in that path because
-              borg does not give platformdirs a separate "app author" name, so it defaults to the app name.
+            - Windows: native Windows AppData directories are used. The configuration (including
+              the keys) is stored in the roaming profile (``C:\\Users\\<user>\\AppData\\Roaming\\borg``),
+              so it follows the user in domain environments. Machine-specific data, cache and runtime
+              files stay in the local (non-roaming) AppData (``C:\\Users\\<user>\\AppData\\Local\\borg``).
               ``XDG_*`` environment variables are **not** honoured.
 
             On all platforms, you can override each directory individually using the specific environment
@@ -1001,10 +1002,10 @@ class HelpMixIn:
             Default directory locations by platform (when no ``BORG_*`` environment variables are set)::
 
                 Directory  Linux                 macOS                                 Windows
-                Config     ~/.config/borg        ~/Library/Application Support/borg    %LOCALAPPDATA%\\borg\\borg
-                Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\\borg\\borg\\Cache
-                Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\\borg\\borg
-                Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %LOCALAPPDATA%\\Temp\\borg\\borg
+                Config     ~/.config/borg        ~/Library/Application Support/borg    %APPDATA%\\borg
+                Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\\borg\\Cache
+                Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\\borg
+                Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %LOCALAPPDATA%\\Temp\\borg
                 Keys       <config_dir>/keys     <config_dir>/keys                     <config_dir>\\keys
                 Security   <data_dir>/security   <data_dir>/security                   <data_dir>\\security
 

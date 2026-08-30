@@ -169,12 +169,19 @@ Version 2.0.0b24 (not released yet)
 New features:
 
 - copy: copy an archive to a new archive name (fast & cheap!), #2300
+- benchmark cpu: add --data PATH option (testing with a given corpus), #10265
 
 Fixes:
 
+- write index fragment(s) before the archive pointer, #10239
 - transfer --from-borg1: do not mistake a borg 1.x repokey repo for a repo whose
   encryption method changed
+- transfer: clean error instead of crash when no other repo is given
 - don't mistake a malformed URL for a local path, #10215
+- serve: print startup errors to stderr, #10266
+- prune: remove the date-based archive filters, #10250.
+  --oldest/--newest/--older/--newer were accepted by the prune parser,
+  but never applied.
 - BORG_WORKAROUNDS=authenticated_no_key: also work when the borg key is completely
   lost, #10238
 - delete/undelete: fix dead "all archives" safety guard
@@ -187,8 +194,11 @@ Fixes:
 - let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
 - goldilocks-aes: fix build on 32-bit archs (no __uint128_t there)
 - repo-list: fix --format help, it did not show the actual default, #10204
-- windows: do not build the binaries from a "dirty" checkout, #10199
-- windows: normalize remote repo paths as POSIX paths, #10199
+- windows:
+
+  - do not build the binaries from a "dirty" checkout, #10199
+  - normalize remote repo paths as POSIX paths, #10199
+  - fix platformdirs directories, #10237
 - completions:
 
   - fish: fix the completion and error message issues, #3086
@@ -209,13 +219,25 @@ Other changes:
 - archive: resolve the item metadata stream chunk ids lazily, big win for repo-list
   on remote repos, #10204
 - lock exceptions: tell who holds the lock, #2261
+- id_check_is_authentication: fix stale class-attribute comment
+- dependabot: give pip patch releases a cooldown
 - CI:
 
+  - improve GitHub Actions security, address the zizmor audit findings
   - use ubuntu-26.04 runners
-  - add a 32-bit armv7 test runner
+  - add a 32-bit armv7 runner
+- tests:
+
+  - skip tz tests where time.tzset() is missing, not just on Windows
+  - do not let the terminal's COLORTERM leak into the spinner tests
 - docs:
 
   - README: update to reflect current borg2 master
+  - fix Windows directory paths to match actual behavior, #10237
+  - macOS binaries are built without FUSE support
+  - simplify the standalone binary section in installation.rst
+  - update binaries 00_README.txt: Linux binaries are now built on
+    Ubuntu 26.04 with glibc 2.43
   - document that borg transfer is incremental, #9878
   - archiver: fix wrong/stale epilog help texts, raw-RST rendering
   - fix stale examples in the borg diff epilog
@@ -223,13 +245,26 @@ Other changes:
   - remove stale borg1 checkpoint reference from borg create help
   - fix borg1-era content in quickstart, general includes and FAQ
   - fix packs.rst and security.rst to match the implementation
-  - update internals/data-structures.rst and internals/frontends.rst
+  - update frontends.rst and data-structures.rst, fix wrong claims in them
   - update deployment docs to borg2 commands and REST protocol
   - fix borgfs man page generation, drop the stale borgfs rst/html page
   - fix broken examples and stale output samples in the usage docs
   - fix outdated dependencies, paths and links in installation.rst
   - fix outdated --encryption mode names in examples and help
   - fix stale "borg repo-list" output in the rename example
+  - fix the quickstart example list sample and the delete caution
+  - update repo-list output samples to the current default format
+  - fix shell syntax in the pyenv virtualenv example
+  - complete and correct the repository URL reference
+  - explain how sshd forced commands interact with borg serve --rest
+  - use archive series names in the automated-local example
+  - fix tox examples and remove Vagrant references in development.rst
+  - update the FAQ keyfile-collision entry to borg2 naming
+  - fix OpenSSL, rclone and IV details in internals/security.rst
+  - update the mount -o versions example to the current naming
+  - fix the man page install command in installation.rst
+  - fix BORG_ASSERT_ID claims about authenticated-* and none-* modes
+  - point borg delete -a pattern help at the match-archives topic
 
 
 Version 2.0.0b23 (2026-08-23)

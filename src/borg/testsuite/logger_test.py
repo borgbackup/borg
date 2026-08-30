@@ -3,7 +3,7 @@ from io import StringIO
 
 import pytest
 
-from ..logger import find_parent_module, create_logger, setup_logging
+from ..logger import find_parent_module, create_logger, setup_logging, flush_serve_log_queue
 
 logger = create_logger()
 
@@ -47,6 +47,25 @@ def test_setup_logging_json_attribute():
     for log_json in (True, False):
         setup_logging(stream=StringIO(), env_var=None, log_json=log_json)
         assert logging.getLogger("borg").json is log_json
+
+
+def test_flush_serve_log_queue(capsys):
+    # "borg serve" (legacy RPC mode) routes log output into borg_serve_log_queue instead of a
+    # stream handler; whatever is still queued when the process exits (e.g. records logged while
+    # reporting a serve startup error) must be written to stderr by flush_serve_log_queue().
+    try:
+        setup_logging(env_var=None, is_serve=True)
+        flush_serve_log_queue()  # drain records possibly left behind by other tests
+        capsys.readouterr()  # discard output captured so far
+        logging.getLogger("borg.testsuite.logger_test").error("serve startup error")
+        assert capsys.readouterr().err == ""  # queued, not written to a stream
+        flush_serve_log_queue()
+        assert "serve startup error" in capsys.readouterr().err
+        flush_serve_log_queue()  # the queue is empty now
+        assert capsys.readouterr().err == ""
+    finally:
+        # restore a stream-based logging configuration, like the other tests here leave behind
+        setup_logging(stream=StringIO(), env_var=None)
 
 
 def test_parent_module():

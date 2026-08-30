@@ -31,13 +31,18 @@ Usage:
 
 Logging setup in Borg needs to work under various conditions:
 - Purely local, not client/server (easy).
-- Client/server: RemoteRepository ("borg serve" process) writes log records into a global
-  queue, which is then sent to the client side by the main serve loop (via the RPC protocol),
-  either over SSH stdout, more directly via process stdout without SSH (used in tests),
-  or via a socket. On the client side, the log records are fed into the client-side logging
-  system. When remote_repo.close() is called, the server side must send all queued log records
-  via the RPC channel before returning the close() call's return value (as the client will
-  then shut down the connection).
+- Client/server, legacy RPC mode: the "borg serve" process writes log records into a global
+  queue (borg_serve_log_queue), which is then sent to the client side by the main serve loop
+  (via the RPC protocol on stdout, usually through SSH). On the client side, the log records
+  are fed into the client-side logging system. When remote_repo.close() is called, the server
+  side must send all queued log records via the RPC channel before returning the close()
+  call's return value (as the client will then shut down the connection). Log records still
+  queued when the server process exits (e.g. logged while reporting a "borg serve" startup
+  error, before the serve loop was even reached) are written to stderr by
+  flush_serve_log_queue(), so SSH can forward them to the client.
+- Client/server, rest mode: "borg serve --rest" has no in-band log channel, it logs to
+  stderr like any other command (SSH forwards stderr to the client side, where borgstore
+  keeps the recent tail and surfaces it as error detail when the server fails).
 - Progress output is always given as JSON to the logger (including the plain text inside
   the JSON), but then formatted by the logging system's formatter as either plain text or
   JSON depending on the CLI args given (--log-json?).
@@ -149,6 +154,24 @@ def flush_logging():
             handler.flush()
 
 
+def flush_serve_log_queue():
+    """Write all log records still in borg_serve_log_queue to sys.stderr.
+
+    In legacy RPC mode, "borg serve" routes its log output into borg_serve_log_queue (see
+    setup_logging) and relies on the serve loop to forward the queued records in-band to the
+    client. Records still queued when the process is about to exit - e.g. logged while
+    reporting a "borg serve" startup error, before the serve loop was even reached - would
+    get lost silently, thus we write them to stderr, which SSH forwards to the client.
+    """
+    formatter = logging.Formatter("%(message)s")
+    while True:
+        try:
+            lr_dict = borg_serve_log_queue.get_nowait()  # lr_dict contents: see BorgQueueHandler
+        except queue.Empty:
+            break
+        print(formatter.format(logging.LogRecord(**lr_dict)), file=sys.stderr)
+
+
 def setup_logging(
     stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, log_json=False, func=None
 ):
@@ -160,7 +183,9 @@ def setup_logging(
     otherwise, set up a stream handler logger on stderr (by default, if no
     stream is provided).
 
-    is_serve: are we setting up the logging for "borg serve"?
+    is_serve: route log output into borg_serve_log_queue instead of using a stream handler
+    (used by the legacy RPC mode of "borg serve", whose serve loop sends the queued records
+    in-band to the client).
     """
     global configured
     err_msg = None

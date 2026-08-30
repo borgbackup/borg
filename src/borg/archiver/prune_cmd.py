@@ -5,7 +5,7 @@ import math
 from functools import wraps
 import os
 from itertools import count, combinations
-from ._common import with_repository, Highlander
+from ._common import with_repository, Highlander, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
@@ -175,7 +175,7 @@ class PruneMixIn:
         """Prune archives according to specified rules."""
         self._validate_prune_args(args)
 
-        match = [args.name] if args.name else args.match_archives
+        match = archive_match_patterns(args)
         archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
         archives = [ai for ai in archives if "@PROT" not in ai.tags]
 
@@ -358,9 +358,22 @@ class PruneMixIn:
         There is no automatic distinction between archives representing different
         contents. These need to be distinguished by specifying matching globs.
 
+        NAME is just another way of saying ``-a NAME``, so it can be combined with
+        --match-archives (-a). All given patterns must match (they are ANDed), thus giving
+        both narrows down the selection.
+
         If you have multiple series of archives with different data sets (e.g.
         from different machines) in one shared repository, use one prune call per
-        series.
+        series. In such a shared repository, the series name alone might not be
+        specific enough, because different machines or users may use the same series
+        name for their own, unrelated data. Additionally match on the archive metadata
+        that identifies the origin, e.g.::
+
+            borg prune home -a host:myhost --keep-daily 7 --keep-weekly 4
+
+        Note: the ``host:`` / ``user:`` metadata is what the client wrote into the
+        archive; it is not a permission mechanism. Any client with delete permission
+        for the repository can prune any archive in it.
 
         The ``--keep`` option is the simplest way to specify a basic retention
         policy. It accepts a count or a time interval for retention (e.g.

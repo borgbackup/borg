@@ -381,6 +381,24 @@ def define_exclusion_group(subparser, **kwargs):
     return exclude_group
 
 
+def archive_match_patterns(args):
+    """
+    Build the list of match patterns selecting archives from the NAME positional and -a / --match-archives.
+
+    A NAME given as positional argument is just another way of saying ``-a NAME``, so it is combined with
+    the patterns given via -a / --match-archives. As all patterns must match (they are ANDed), giving both
+    narrows down the selection rather than one of them overriding the other.
+
+    NAME is used as-is, so it supports the same selector prefixes as -a does, e.g. ``borg info aid:1234abcd``
+    (that is also what the shell completion offers for the NAME positional).
+    """
+    patterns = list(args.match_archives or [])
+    name = getattr(args, "name", None)
+    if name:
+        patterns.insert(0, name)
+    return patterns
+
+
 def define_archive_filters_group(
     subparser, *, sort_by=True, first_last=True, oldest_newest=True, older_newer=True, deleted=False
 ):

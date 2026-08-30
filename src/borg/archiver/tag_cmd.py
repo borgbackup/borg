@@ -1,4 +1,4 @@
-from ._common import with_repository, define_archive_filters_group
+from ._common import with_repository, define_archive_filters_group, archive_match_patterns
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, archivename_validator, tag_validator
@@ -16,7 +16,7 @@ class TagMixIn:
         """Manage tags."""
 
         if args.name:
-            archive_infos = [manifest.archives.get_one([args.name])]
+            archive_infos = [manifest.archives.get_one(archive_match_patterns(args))]
         else:
             archive_infos = manifest.archives.list_considering(args)
 

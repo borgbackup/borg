@@ -876,3 +876,19 @@ def test_prune_interval_rolling_schedule_oldest_retention():
 
     assert previous_archives[-1].ts.strftime("%m-%d") == "01-01"
     assert archives[-1].ts.strftime("%m-%d") == "01-31"
+
+
+def test_prune_name_and_match_archives_are_combined(archivers, request, backup_files, monkeypatch):
+    """In a shared repository, pruning a series must be restrictable to the archives of one host."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for host in ("host1", "host2"):
+        monkeypatch.setenv("BORG_HOSTNAME", host)
+        _create_archive_ts(archiver, backup_files, "home", 2024, 1, 1)
+        _create_archive_ts(archiver, backup_files, "home", 2024, 1, 2)
+    monkeypatch.delenv("BORG_HOSTNAME")
+    # NAME is ANDed with -a / --match-archives, so only host1's "home" archives are candidates.
+    cmd(archiver, "prune", "home", "-a", "host:host1", "--keep-daily=1")
+    output = cmd(archiver, "repo-list", "--format={hostname}{NL}")
+    assert output.count("host1") == 1  # only the most recent one is left
+    assert output.count("host2") == 2  # host2 was not touched at all

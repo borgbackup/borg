@@ -1,8 +1,10 @@
 import json
+import re
 
 import pytest
 
 from ...constants import *  # NOQA
+from ...helpers import CommandError
 from . import cmd, RK_ENCRYPTION
 
 
@@ -106,6 +108,63 @@ def test_benchmark_cpu_json(archiver, monkeypatch):
             assert isinstance(entry["algo"], str)
             assert isinstance(entry["count"], int)
             assert isinstance(entry["time"], float)
-    # compression has size field too
+    # compression also has the compressed size
     for entry in result["compression"]:
         assert isinstance(entry["size"], int)
+        assert isinstance(entry["csize"], int)
+        assert 0 < entry["csize"] <= entry["size"]
+
+
+def test_benchmark_cpu_data_file(archiver, monkeypatch, tmp_path):
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    data_file = tmp_path / "data.txt"
+    data_file.write_bytes(b"some quite compressible benchmark input data\n" * 10000)
+    output = cmd(archiver, "benchmark", "cpu", "--compressing", "--data", str(data_file))
+    assert "Compression" in output
+    assert "MB/s" in output
+    # the compression rows show the achieved compression ratio
+    assert re.search(r"\d+\.\d\dx", output)
+
+
+def test_benchmark_cpu_data_directory(archiver, monkeypatch, tmp_path):
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    data_dir = tmp_path / "corpus"
+    (data_dir / "sub").mkdir(parents=True)
+    (data_dir / "a.txt").write_bytes(b"first benchmark input file\n" * 5000)
+    (data_dir / "sub" / "b.txt").write_bytes(b"second benchmark input file\n" * 5000)
+    output = cmd(archiver, "benchmark", "cpu", "--compressing", "--data", str(data_dir))
+    assert "Compression" in output
+    assert re.search(r"\d+\.\d\dx", output)
+
+
+def test_benchmark_cpu_data_json(archiver, monkeypatch, tmp_path):
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    data_file = tmp_path / "data.txt"
+    data_file.write_bytes(b"some quite compressible benchmark input data\n" * 10000)
+    output = cmd(archiver, "benchmark", "cpu", "--compressing", "--json", "--data", str(data_file))
+    result = json.loads(output)
+    for entry in result["compression"]:
+        assert isinstance(entry["size"], int)
+        assert isinstance(entry["csize"], int)
+        assert 0 < entry["csize"] <= entry["size"]
+
+
+def test_benchmark_cpu_data_missing(archiver, monkeypatch, tmp_path):
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    missing = str(tmp_path / "nonexistent")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "benchmark", "cpu", "--compressing", "--data", missing, exit_code=CommandError().exit_code)
+    else:
+        with pytest.raises(CommandError, match="not a file or directory"):
+            cmd(archiver, "benchmark", "cpu", "--compressing", "--data", missing)
+
+
+def test_benchmark_cpu_data_empty(archiver, monkeypatch, tmp_path):
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    data_file = tmp_path / "empty"
+    data_file.write_bytes(b"")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "benchmark", "cpu", "--compressing", "--data", str(data_file), exit_code=CommandError().exit_code)
+    else:
+        with pytest.raises(CommandError, match="no data found"):
+            cmd(archiver, "benchmark", "cpu", "--compressing", "--data", str(data_file))

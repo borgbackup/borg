@@ -84,6 +84,10 @@ def clean_env(tmpdir_factory, monkeypatch):
     keys = [key for key in os.environ if key.startswith("BORG_") and key not in ("BORG_FUSE_IMPL",)]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
+    # a "borg serve" started by a test must not mistake the ssh forced command of the session
+    # the tests happen to run in (e.g. a CI runner driven over ssh) for the command line of a
+    # borg client - it would fail to parse it and exit before serving anything.
+    monkeypatch.delenv("SSH_ORIGINAL_COMMAND", raising=False)
     # avoid that we access / modify the user's normal .config / .cache directory:
     base_dir = tmpdir_factory.mktemp("borg-base-dir")
     monkeypatch.setenv("BORG_BASE_DIR", str(base_dir))

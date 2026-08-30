@@ -16,7 +16,7 @@ import platformdirs
 from .errors import Error
 
 from .process import prepare_subprocess_env
-from ..platformflags import is_win32
+from ..platformflags import is_win32, is_haiku
 
 from ..constants import *  # NOQA
 
@@ -625,6 +625,13 @@ class SpecialFileReader:
                 data = os.read(self.fd, remaining)
             except BlockingIOError:
                 data = None  # a writer is connected, but no data is available right now
+            except OSError as err:
+                if is_haiku and err.errno == errno.ENOMEM:
+                    # haiku fails a read from a fifo nobody has opened for writing with ENOMEM
+                    # instead of returning b"" - it means the same here: no writer (yet).
+                    data = b""
+                else:
+                    raise
             if data:
                 parts.append(data)
                 remaining -= len(data)

@@ -46,6 +46,8 @@ dependencies = [
   "blake3 >= 1.0; sys_platform != 'win32'",
   "blake3 >= 1.0,!=1.0.9; sys_platform == 'win32'",  # 1.0.9 does not build on windows/msys2/mingw
   "tzdata; sys_platform == 'win32'",  # zoneinfo has no system tz database on Windows (date: named zones)
+  # same on haiku (sys.platform is 'haiku1' on pythons older than 3.13)
+  "tzdata; sys_platform == 'haiku' or sys_platform == 'haiku1'",
 ]
 
 [project.optional-dependencies]

@@ -168,3 +168,39 @@ def test_benchmark_cpu_data_empty(archiver, monkeypatch, tmp_path):
     else:
         with pytest.raises(CommandError, match="no data found"):
             cmd(archiver, "benchmark", "cpu", "--compressing", "--data", str(data_file))
+
+
+def test_benchmark_cpu_failing_test_does_not_abort(archiver, monkeypatch):
+    """A single failing test (e.g. a codec running out of memory) must not kill the whole run."""
+    import lzma
+
+    def out_of_memory(*args, **kwargs):
+        raise MemoryError
+
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    monkeypatch.setattr(lzma, "compress", out_of_memory)
+    # fork=False, so the monkeypatched lzma is the one the benchmark uses
+    output = cmd(archiver, "benchmark", "cpu", "--compressing", fork=False)
+    assert "lzma" in output
+    assert "failed: MemoryError" in output
+    # the codecs that do work are still measured
+    assert "lz4" in output
+    assert "MB/s" in output
+
+
+def test_benchmark_cpu_failing_test_json(archiver, monkeypatch):
+    import lzma
+
+    def out_of_memory(*args, **kwargs):
+        raise MemoryError
+
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
+    monkeypatch.setattr(lzma, "compress", out_of_memory)
+    output = cmd(archiver, "benchmark", "cpu", "--compressing", "--json", fork=False)
+    result = json.loads(output)
+    failed = [entry for entry in result["compression"] if "error" in entry]
+    assert failed  # the lzma tests failed and are reported as such
+    for entry in failed:
+        assert entry["spec"].startswith("lzma")
+        assert entry["error"] == "MemoryError"
+    assert [entry for entry in result["compression"] if "time" in entry]  # the other codecs still got measured

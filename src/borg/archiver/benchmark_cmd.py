@@ -240,7 +240,7 @@ class BenchmarkMixIn:
         def user_data(path):
             """The --data input: the contents of the given file, or of all files below the given directory.
 
-            At most 1 GiB is read - far more than the benchmark samples from it, while bounding memory usage.
+            At most 1 GiB is read, bounding memory usage and runtime (the complete data is compressed).
             """
             max_size = GIB
             if os.path.isfile(path):
@@ -269,15 +269,17 @@ class BenchmarkMixIn:
                 raise CommandError(f"--data: no data found at '{path}'.")
             return b"".join(pieces)
 
-        def data_slices(data, nbytes, total):
-            """Up to *total* bytes of *nbytes*-sized buffers cut from *data*, evenly spread over it."""
+        def data_slices(data, nbytes):
+            """All consecutive *nbytes*-sized buffers cut from *data*, a partial buffer at the end is skipped.
+
+            The complete data is used rather than a sample: real data is not uniform, so any sampling
+            could hit unrepresentative spots and skew both the throughput and the ratio.
+            Memoryviews avoid copying the data a second time.
+            """
             if len(data) <= nbytes:
                 return [data]
-            count = max(1, min(total // nbytes, len(data) // nbytes))
-            if count == 1:
-                return [data[:nbytes]]
-            step = (len(data) - nbytes) // (count - 1)
-            return [data[i * step : i * step + nbytes] for i in range(count)]
+            view = memoryview(data)
+            return [view[i : i + nbytes] for i in range(0, len(data) - nbytes + 1, nbytes)]
 
         def data_size_str(size):
             """The benchmark's own data volumes, always in IEC units.
@@ -444,8 +446,8 @@ class BenchmarkMixIn:
             # that is what borg actually compresses
             for label, nbytes in reversed(comp_sizes):
                 if benchmark_data is not None:
-                    # distinct buffers cut from the user-provided data
-                    bufs = data_slices(benchmark_data, nbytes, comp_total)
+                    # the complete user-provided data, cut into distinct buffers
+                    bufs = data_slices(benchmark_data, nbytes)
                 else:
                     # the same synthetic buffer over and over (a few reps even for the fast codecs)
                     bufs = [compressible_buffer(nbytes)] * max(3, comp_total // nbytes)
@@ -592,8 +594,8 @@ class BenchmarkMixIn:
         hashes at 64MiB (roughly pack-sized) and 2MiB (a typical borg chunk), both above
         blake3's threshold, the compressors at 2MiB and 128kiB, which is below
         zstd's. Within a section every row processes the same total number of
-        bytes - 1 GiB, or 10 MiB for the compressors - so the throughput column is
-        comparable between rows.
+        bytes - 1 GiB, or 10 MiB for the compressors (the complete given data
+        when using --data) - so the throughput column is comparable between rows.
 
         By default, the compressors work on synthetic text-like data that compresses
         about 4x at zstd,3. Random data would be the worst possible input: no codec
@@ -603,11 +605,13 @@ class BenchmarkMixIn:
         Synthetic data can still behave differently from your real data, so the
         compression benchmarks can instead run on data you provide with
         ``--data PATH``: PATH is a file or a directory (all files below it are
-        read and concatenated, up to 1 GiB). The measured buffers are cut from
-        that data, evenly spread over it, so all of it influences the result.
-        Public benchmark corpora, e.g. the Silesia corpus or the Canterbury
-        corpus, make good reproducible inputs that resemble real-world data
-        (download and unpack them first, then point ``--data`` at the result).
+        read and concatenated, up to 1 GiB). The complete data is compressed:
+        it is cut into consecutive buffers of the measured sizes (a partial
+        buffer at the end is skipped), so ratios and throughput reflect all of
+        it, and the runtime scales with its size. Public benchmark corpora,
+        e.g. the Silesia corpus or the Canterbury corpus, make good
+        reproducible inputs that resemble real-world data (download and unpack
+        them first, then point ``--data`` at the result).
 
         The compression rows also show the achieved compression ratio
         (uncompressed size / compressed size, higher is better).

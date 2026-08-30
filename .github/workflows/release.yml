@@ -116,9 +116,23 @@ jobs:
         "$RUNNER_TEMP/venv-sdist/bin/borg" --help > /dev/null
 
     - name: Attest the sdist provenance
+      id: attest-sdist
       uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
       with:
         subject-path: 'dist/*.tar.gz'
+
+    - name: Name the sigstore bundle after the sdist
+      # The attestation is also stored in the GitHub attestations API, but
+      # fetching it from there needs a recent gh and a GitHub token (see
+      # #10187) - so attach the sigstore bundle to the release as
+      # <sdist>.sigstore.jsonl, which allows offline/token-less verification
+      # with generic sigstore tooling (cosign, gh attestation verify --bundle).
+      env:
+        BUNDLE_PATH: ${{ steps.attest-sdist.outputs.bundle-path }}
+      run: |
+        set -euxo pipefail
+        sdist=$(basename dist/borgbackup-*.tar.gz)
+        cp "$BUNDLE_PATH" "dist/$sdist.sigstore.jsonl"
 
     - name: Download the binaries built for this tag
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
@@ -168,18 +182,29 @@ jobs:
 
         All release assets have a [build provenance attestation](https://github.com/borgbackup/borg/attestations),
         verifiable with \`gh attestation verify --owner borgbackup <file>\`.
+
+        The sdist's attestation is additionally attached as the [sigstore](https://www.sigstore.dev/)
+        bundle \`borgbackup-$TAG.tar.gz.sigstore.jsonl\`, so it can be verified offline and
+        without a GitHub token, e.g. with cosign:
+
+        \`\`\`
+        cosign verify-blob borgbackup-$TAG.tar.gz \\
+          --bundle borgbackup-$TAG.tar.gz.sigstore.jsonl \\
+          --certificate-identity https://github.com/borgbackup/borg/.github/workflows/release.yml@refs/tags/$TAG \\
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com
+        \`\`\`
         EOF
         mkdir -p assets  # there may not have been any artifact to download
         if gh release view "$TAG" > /dev/null 2>&1; then
           # a re-run of this job: keep the (possibly already edited) release and
           # just replace its assets.
-          gh release upload "$TAG" --clobber dist/*.tar.gz $(find assets -type f | sort)
+          gh release upload "$TAG" --clobber dist/*.tar.gz dist/*.sigstore.jsonl $(find assets -type f | sort)
         else
           gh release create "$TAG" \
             --draft $prerelease \
             --title "borg $TAG" \
             --notes-file release-notes.md \
-            dist/*.tar.gz $(find assets -type f | sort)
+            dist/*.tar.gz dist/*.sigstore.jsonl $(find assets -type f | sort)
         fi
         gh release view "$TAG" --json isDraft,isPrerelease,assets
 

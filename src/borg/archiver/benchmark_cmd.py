@@ -304,6 +304,23 @@ class BenchmarkMixIn:
                     line += f"  {ratio:6.2f}x"
                 print(line)
 
+        def measure(section, spec, func, number, setup="pass", globals=None):
+            """Time *func*, returning the elapsed time - or None if the test failed.
+
+            One test blowing up (e.g. a memory-hungry codec raising MemoryError on a
+            small machine) must not abort the whole benchmark run, so a failure is
+            reported like any other result and the remaining tests still run.
+            """
+            try:
+                return timeit(func, setup, number=number, globals=globals)
+            except Exception as exc:
+                error = type(exc).__name__ + (f": {exc}" if str(exc) else "")
+                if args.json:
+                    result[section].append({"spec": spec, "error": error})
+                else:
+                    print(f"{spec:<{WIDTH}} failed: {error}")
+                return None
+
         def section_header(section, title):
             if args.json:
                 result[section] = []
@@ -372,7 +389,9 @@ class BenchmarkMixIn:
                     locals(),
                 ),
             ]:
-                dt = timeit(func, setup, number=number_default, globals=vars)
+                dt = measure("chunkers", spec, func, number_default, setup=setup, globals=vars)
+                if dt is None:
+                    continue
                 algo, _, algo_params = spec.partition(",")
                 report("chunkers", spec, size, dt, algo=algo, algo_params=algo_params)
 
@@ -399,7 +418,9 @@ class BenchmarkMixIn:
                 for label, nbytes in sizes:
                     data = buffer(nbytes)
                     number = max(1, hash_total // nbytes)
-                    dt = timeit(lambda: func(data), number=number)
+                    dt = measure("hashes", f"{spec} ({label})", lambda: func(data), number)
+                    if dt is None:
+                        continue
                     report("hashes", f"{spec} ({label})", nbytes * number, dt, algo=spec, buffer_size=nbytes)
 
         if "encrypting" in selected:
@@ -435,7 +456,9 @@ class BenchmarkMixIn:
                 ),
             ]
             for spec, func in tests:
-                dt = timeit(func, number=number_default)
+                dt = measure("encryption", spec, func, number_default)
+                if dt is None:
+                    continue
                 report("encryption", spec, size, dt, algo=spec)
 
         if "compressing" in selected:
@@ -477,7 +500,9 @@ class BenchmarkMixIn:
                         nonlocal csize
                         csize = sum(len(compressor.compress({}, buf)[1]) for buf in bufs)
 
-                    dt = timeit(compress_all, number=1)
+                    dt = measure("compression", f"{spec} ({label})", compress_all, 1)
+                    if dt is None:
+                        continue
                     algo, _, algo_params = spec.partition(",")
                     report(
                         "compression",
@@ -497,13 +522,14 @@ class BenchmarkMixIn:
             items = [item.as_dict()] * 1000
             count = 1000 * number_default
             spec = "msgpack"
-            dt = timeit(lambda: msgpack.packb(items), number=number_default)
-            if args.json:
-                result["msgpack"].append({"algo": spec, "count": count, "time": dt})
-            else:
-                # this one packs items, not bytes, so it gets a rate in its own unit
-                size = "%dk Items" % (count // 1000)
-                print(f"{spec:<{WIDTH}} {size:<11} {dt:.3f}s  {count / dt / 1000:>8.1f} kItems/s")
+            dt = measure("msgpack", spec, lambda: msgpack.packb(items), number_default)
+            if dt is not None:
+                if args.json:
+                    result["msgpack"].append({"algo": spec, "count": count, "time": dt})
+                else:
+                    # this one packs items, not bytes, so it gets a rate in its own unit
+                    size = "%dk Items" % (count // 1000)
+                    print(f"{spec:<{WIDTH}} {size:<11} {dt:.3f}s  {count / dt / 1000:>8.1f} kItems/s")
 
         if args.json:
             json_print(result)

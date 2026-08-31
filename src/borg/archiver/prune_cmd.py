@@ -2,7 +2,7 @@ from typing import Callable, NamedTuple
 from datetime import datetime, timedelta
 import logging
 import math
-from functools import wraps
+from functools import partial, wraps
 import os
 from itertools import count, combinations
 from ._common import with_repository, Highlander, archive_match_patterns
@@ -18,9 +18,15 @@ from ..logger import create_logger
 logger = create_logger()
 
 
+PeriodFunc = Callable[[ArchiveInfo | datetime], str]
+
+
 class PruningRule(NamedTuple):
     key: str
-    period_func: Callable[[ArchiveInfo | datetime], str]
+    # Factory creating the period grouping function. prune() calls it once per invocation, so a
+    # period function may keep per-invocation state (see unique_period_func) without that state
+    # leaking into other prune() calls, e.g. when applying the rules to several archive groups.
+    make_period_func: Callable[[], PeriodFunc]
 
     def __str__(self):
         return self.key
@@ -52,9 +58,11 @@ def archive_datetime_dispatch(func: Callable[[datetime], str]) -> Callable[[Arch
     return wrapper
 
 
-# The *_period_func group of functions create period grouping keys to group
-# together archives falling within a certain period. Among archives in each of
-# these groups, only the latest (by creation timestamp) is kept.
+# The *_period_func group of functions create the period grouping functions, which compute the
+# period grouping key of an archive. Archives falling within the same period are grouped together
+# and among the archives in each of these groups, only the latest (by creation timestamp) is kept.
+#
+# Each of these is a factory: prune() asks for a fresh period grouping function per invocation.
 
 
 def unique_period_func():
@@ -64,7 +72,9 @@ def unique_period_func():
     @archive_datetime_dispatch
     def unique_values(_dt):
         """Group archives by an incrementing counter, practically making each archive a group of 1"""
-        # zfill ensures lexicographic ordering matches number ordering in case of comparisons
+        # zfill ensures lexicographic ordering matches number ordering in case of comparisons.
+        # the counter belongs to this factory call and prune() never sees more than MAX_ARCHIVES
+        # archives, so the counter can not outgrow the padding.
         return str(next(counter)).zfill(max_digits)
 
     return unique_values
@@ -80,35 +90,42 @@ def pattern_period_func(pattern):
     return inner
 
 
-@archive_datetime_dispatch
-def quarterly_13weekly_period_func(dt):
-    """Group archives by extracting the ISO-8601 13-week quarter from their creation timestamp"""
-    (year, week) = dt.astimezone().isocalendar()[:2]  # local time
-    return f"{year}-{min(max((week - 1) // 13, 0), 3):02}"
+def quarterly_13weekly_period_func():
+    @archive_datetime_dispatch
+    def inner(dt):
+        """Group archives by extracting the ISO-8601 13-week quarter from their creation timestamp"""
+        (year, week) = dt.astimezone().isocalendar()[:2]  # local time
+        return f"{year}-{min(max((week - 1) // 13, 0), 3):02}"
+
+    return inner
 
 
-@archive_datetime_dispatch
-def quarterly_3monthly_period_func(dt):
-    """Group archives by extracting the 3-month quarter from their creation timestamp"""
-    (year, month) = dt.astimezone().timetuple()[:2]  # local time
-    return f"{year}-{(month - 1) // 3:02}"
+def quarterly_3monthly_period_func():
+    @archive_datetime_dispatch
+    def inner(dt):
+        """Group archives by extracting the 3-month quarter from their creation timestamp"""
+        (year, month) = dt.astimezone().timetuple()[:2]  # local time
+        return f"{year}-{(month - 1) // 3:02}"
+
+    return inner
 
 
 # Each archive is considered for keeping
-PRUNE_KEEP = PruningRule("keep", unique_period_func())
+PRUNE_KEEP = PruningRule("keep", unique_period_func)
 # Last archive (by creation timestamp) within period group is considered for keeping
-PRUNE_SECONDLY = PruningRule("secondly", pattern_period_func("%Y-%m-%d %H:%M:%S"))
-PRUNE_MINUTELY = PruningRule("minutely", pattern_period_func("%Y-%m-%d %H:%M"))
-PRUNE_HOURLY = PruningRule("hourly", pattern_period_func("%Y-%m-%d %H"))
-PRUNE_DAILY = PruningRule("daily", pattern_period_func("%Y-%m-%d"))
-PRUNE_WEEKLY = PruningRule("weekly", pattern_period_func("%G-%V"))
-PRUNE_MONTHLY = PruningRule("monthly", pattern_period_func("%Y-%m"))
+PRUNE_SECONDLY = PruningRule("secondly", partial(pattern_period_func, "%Y-%m-%d %H:%M:%S"))
+PRUNE_MINUTELY = PruningRule("minutely", partial(pattern_period_func, "%Y-%m-%d %H:%M"))
+PRUNE_HOURLY = PruningRule("hourly", partial(pattern_period_func, "%Y-%m-%d %H"))
+PRUNE_DAILY = PruningRule("daily", partial(pattern_period_func, "%Y-%m-%d"))
+PRUNE_WEEKLY = PruningRule("weekly", partial(pattern_period_func, "%G-%V"))
+PRUNE_MONTHLY = PruningRule("monthly", partial(pattern_period_func, "%Y-%m"))
 PRUNE_QUARTERLY_13WEEKLY = PruningRule("quarterly_13weekly", quarterly_13weekly_period_func)
 PRUNE_QUARTERLY_3MONTHLY = PruningRule("quarterly_3monthly", quarterly_3monthly_period_func)
-PRUNE_YEARLY = PruningRule("yearly", pattern_period_func("%Y"))
+PRUNE_YEARLY = PruningRule("yearly", partial(pattern_period_func, "%Y"))
 
-# Fake rule used to indicate archives skipped by --from
-PRUNE_FROM = PruningRule("skip", unique_period_func())
+# Fake rule, only used as a label for archives skipped by --from. Its period grouping function
+# is never called, prune() does not process this rule.
+PRUNE_FROM = PruningRule("skip", unique_period_func)
 
 PRUNING_RULES = [
     PRUNE_KEEP,
@@ -150,11 +167,12 @@ def prune(
         else:
             return a.ts >= earliest_timestamp
 
+    period_func = rule.make_period_func()
     prev_period = None
     for archive in archives:
         if not can_retain(archive):
             break
-        period = rule.period_func(archive)
+        period = period_func(archive)
         if period != prev_period:
             prev_period = period
             if archive not in keep and archive not in previously_kept:

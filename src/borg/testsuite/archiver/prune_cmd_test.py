@@ -15,6 +15,7 @@ from ...archiver.prune_cmd import (
     PRUNE_SECONDLY,
     PRUNE_WEEKLY,
     PRUNE_YEARLY,
+    unique_period_func,
 )
 from ...helpers import CommandError
 from ...manifest import ArchiveInfo
@@ -892,3 +893,23 @@ def test_prune_name_and_match_archives_are_combined(archivers, request, backup_f
     output = cmd(archiver, "repo-list", "--format={hostname}{NL}")
     assert output.count("host1") == 1  # only the most recent one is left
     assert output.count("host2") == 2  # host2 was not touched at all
+
+
+@pytest.mark.parametrize("rule", PRUNING_RULES, ids=[rule.key for rule in PRUNING_RULES])
+def test_period_func_is_created_per_prune_invocation(rule):
+    """Period grouping functions are per prune() invocation, they must not share state."""
+    dt = datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+    first, second = rule.make_period_func(), rule.make_period_func()
+    assert first is not second
+    # a fresh period grouping function starts over, it does not continue where another one left off:
+    assert [first(dt) for _ in range(3)] == [second(dt) for _ in range(3)]
+
+
+def test_unique_period_values_are_padded_and_ordered():
+    """The counter of a single period grouping function stays within its zero padding."""
+    dt = datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+    period_func = unique_period_func()
+    values = [period_func(dt) for _ in range(1000)]
+    assert len(set(values)) == len(values)  # each archive lands in a period of its own
+    assert len({len(value) for value in values}) == 1  # uniform width, so ...
+    assert values == sorted(values)  # ... lexicographic ordering matches numeric ordering

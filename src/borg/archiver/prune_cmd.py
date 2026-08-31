@@ -1,3 +1,5 @@
+from collections import defaultdict
+from collections.abc import Sequence
 from typing import Callable, NamedTuple
 from datetime import datetime, timedelta
 import logging
@@ -9,9 +11,10 @@ from ._common import with_repository, Highlander, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
+from ..helpers import GroupBySpec
 from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import ArchiveInfo, Manifest
+from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, Manifest
 
 from ..logger import create_logger
 
@@ -187,6 +190,40 @@ def prune(
     return keep
 
 
+def archive_group_key(archive_info: ArchiveInfo, group_by: Sequence[str]) -> tuple[str, ...]:
+    """Compute the grouping key of *archive_info* for the given *group_by* archive attributes."""
+    key = []
+    for group_by_key in group_by:
+        if group_by_key == "tags":
+            # internal tags (e.g. @PROT) say nothing about what an archive contains or where it
+            # came from, so they must not put an archive into a group of its own.
+            value = ",".join(tag for tag in archive_info.tags if not tag.startswith("@"))
+        else:
+            # host and user are empty for archives that do not have this metadata, e.g. archives
+            # transferred from a borg 1.x repo. they form their own group then.
+            value = getattr(archive_info, group_by_key) or ""
+        key.append(value)
+    return tuple(key)
+
+
+def group_archives(archives: list[ArchiveInfo], group_by: Sequence[str]) -> dict[tuple[str, ...], list[ArchiveInfo]]:
+    """
+    Group *archives* by the given *group_by* archive attributes, keeping their relative order.
+
+    An empty *group_by* puts all archives into one group, so the retention rules are applied to
+    all given archives at once.
+    """
+    groups: dict[tuple[str, ...], list[ArchiveInfo]] = defaultdict(list)
+    for archive_info in archives:
+        groups[archive_group_key(archive_info, group_by)].append(archive_info)
+    return groups
+
+
+def format_group_key(key: tuple[str, ...], group_by: Sequence[str]) -> str:
+    """Format a grouping key for human consumption, e.g. \"name='home', host='myhost'\"."""
+    return ", ".join(f"{group_by_key}={value!r}" for group_by_key, value in zip(group_by, key))
+
+
 class PruneMixIn:
     @with_repository(compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest):
@@ -197,42 +234,25 @@ class PruneMixIn:
         archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
         archives = [ai for ai in archives if "@PROT" not in ai.tags]
 
+        # The retention rules are applied to each group of archives separately, so that unrelated
+        # backup sets (e.g. different archive series or different machines sharing a repository)
+        # do not compete for the same retention slots.
+        group_by = tuple(args.group_by.split(",")) if args.group_by else ()
+        groups = group_archives(archives, group_by)
+
+        # All groups use the same reference timestamp, so interval based rules do not drift apart.
+        from_timestamp = getattr(args, PRUNE_FROM.key)
+        base_timestamp = from_timestamp if from_timestamp is not None else datetime.now().astimezone()
+
         # Archives to keep along with the rule that ensured them being kept
         keep = {}
-
-        from_timestamp = getattr(args, PRUNE_FROM.key)
-        candidate_archives = archives
-
-        if from_timestamp is not None:
-            base_timestamp = from_timestamp
-
-            # `--from` is a prefilter: Archives made at or after this time are kept by default. They are not considered
-            # for pruning at all and thus won't falsely occupy an active retention period.
-            for archive in archives:
-                if archive.ts < from_timestamp:
-                    break
-                keep[archive] = KeepResult(rule=PRUNE_FROM, idx=len(keep))
-            candidate_archives = archives[len(keep) :]
-        else:
-            base_timestamp = datetime.now().astimezone()
-
-        # Apply each retention rule to all candidate archives. The
-        # `previously_kept` parameter prevents later (coarser-grained) rules
-        # from double-counting archives already retained by earlier rules.
-        active_rules = [
-            (rule, getattr(args, rule.key)) for rule in PRUNING_RULES if getattr(args, rule.key) is not None
-        ]
-        for rule, n_or_interval in active_rules:
-            keep |= prune(
-                archives=candidate_archives,
-                rule=rule,
-                n_or_interval=n_or_interval,
-                base_timestamp=base_timestamp,
-                keep_oldest=(
-                    rule == active_rules[-1][0]
-                ),  # Activate keep_oldest rule only for the largest active interval
-                previously_kept=frozenset(keep),
-            )
+        group_of = {}
+        group_summaries = []
+        for key, group in groups.items():
+            group_keep = self._compute_keep(group, args, base_timestamp)
+            keep |= group_keep
+            group_of.update(dict.fromkeys(group, key))
+            group_summaries.append((key, len(group), len(group_keep)))
 
         archives_to_prune = set(archives) - set(keep)
 
@@ -249,6 +269,16 @@ class PruneMixIn:
         else:
             logger.info("Repository contains %d archives.", manifest.archives.count())
             logger.info("Applying rules to the matching %d archives...", len(archives))
+            if len(group_summaries) > 1:
+                # with a single group, the totals below already say everything there is to say.
+                for key, group_total, group_kept in group_summaries:
+                    logger.info(
+                        "Group (%s): %d archives, keeping %d, pruning %d.",
+                        format_group_key(key, group_by),
+                        group_total,
+                        group_kept,
+                        group_total - group_kept,
+                    )
             logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(archives_to_prune))
 
         list_logger = logging.getLogger("borg.output.list")
@@ -262,6 +292,7 @@ class PruneMixIn:
             # so we must call it before deleting the archive.
             if args.json:
                 archive_data = formatter.get_item_data(archive_info, jsonline=True)
+                archive_data["group"] = dict(zip(group_by, group_of[archive_info]))
             else:
                 archive_formatted = formatter.format_item(archive_info, jsonline=False)
             if archive_info in archives_to_prune:
@@ -308,6 +339,46 @@ class PruneMixIn:
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")
+
+    def _compute_keep(self, archives, args, base_timestamp):
+        """
+        Apply the retention rules to *archives* (sorted by timestamp, newest first).
+
+        Return the archives to keep, mapped to the rule that ensured them being kept.
+        """
+        keep = {}
+
+        from_timestamp = getattr(args, PRUNE_FROM.key)
+        candidate_archives = archives
+
+        if from_timestamp is not None:
+            # `--from` is a prefilter: Archives made at or after this time are kept by default. They are not considered
+            # for pruning at all and thus won't falsely occupy an active retention period.
+            for archive in archives:
+                if archive.ts < from_timestamp:
+                    break
+                keep[archive] = KeepResult(rule=PRUNE_FROM, idx=len(keep))
+            candidate_archives = archives[len(keep) :]
+
+        # Apply each retention rule to all candidate archives. The
+        # `previously_kept` parameter prevents later (coarser-grained) rules
+        # from double-counting archives already retained by earlier rules.
+        active_rules = [
+            (rule, getattr(args, rule.key)) for rule in PRUNING_RULES if getattr(args, rule.key) is not None
+        ]
+        for rule, n_or_interval in active_rules:
+            keep |= prune(
+                archives=candidate_archives,
+                rule=rule,
+                n_or_interval=n_or_interval,
+                base_timestamp=base_timestamp,
+                keep_oldest=(
+                    rule == active_rules[-1][0]
+                ),  # Activate keep_oldest rule only for the largest active interval
+                previously_kept=frozenset(keep),
+            )
+
+        return keep
 
     def _validate_prune_args(self, args):
         keep_args = {rule.key: getattr(args, rule.key) for rule in PRUNING_RULES if getattr(args, rule.key) is not None}
@@ -367,31 +438,56 @@ class PruneMixIn:
         `GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
         (Grandfather-father-son) backup rotation scheme.
 
-        The recommended way to use prune is to give the archive series name to it via the
-        NAME argument (assuming you have the same name for all archives in a series).
-        Alternatively, you can also use --match-archives (-a), then only archives that
-        match the pattern are considered for deletion and only those archives count
-        towards the totals specified by the rules.
-        Otherwise, *all* archives in the repository are candidates for deletion!
-        There is no automatic distinction between archives representing different
-        contents. These need to be distinguished by specifying matching globs.
+        Two separate mechanisms decide what prune does: the archive *selection* determines
+        which archives are considered at all, and ``--group-by`` determines how the retention
+        rules subdivide the selected archives.
 
-        NAME is just another way of saying ``-a NAME``, so it can be combined with
+        Without NAME and without --match-archives (-a), *all* archives in the repository are
+        selected. Give the archive series name via the NAME argument (assuming you have the
+        same name for all archives in a series) or use --match-archives (-a) to only consider
+        a subset. NAME is just another way of saying ``-a NAME``, so it can be combined with
         --match-archives (-a). All given patterns must match (they are ANDed), thus giving
         both narrows down the selection.
 
-        If you have multiple series of archives with different data sets (e.g.
-        from different machines) in one shared repository, use one prune call per
-        series. In such a shared repository, the series name alone might not be
-        specific enough, because different machines or users may use the same series
-        name for their own, unrelated data. Additionally match on the archive metadata
-        that identifies the origin, e.g.::
+        The retention rules are applied to each group of selected archives separately, so
+        that unrelated backup sets do not compete for the same retention slots. By default,
+        archives are grouped by their series name and the host they were made on
+        (``--group-by name,host``): ``--keep-daily 7`` keeps 7 daily archives *per series and
+        host*. Archive series names are not unique in a repository shared by multiple machines
+        or users - different machines may well use the same series name for their own,
+        unrelated data - so grouping by the name alone would let one machine's archives push
+        another machine's archives out of the retention slots.
 
-            borg prune home -a host:myhost --keep-daily 7 --keep-weekly 4
+        ``--group-by`` accepts a comma-separated list of the archive attributes ``name``,
+        ``host``, ``user`` and ``tags``. Archives without ``host`` / ``user`` metadata (e.g.
+        archives transferred from a borg 1.x repository) form their own group. Borg's internal
+        tags (starting with ``@``) do not affect grouping. Give ``--group-by ""`` to not group
+        at all and apply the rules to all selected archives at once.
+
+        Use ``--group-by name`` if several machines back up the same data to the same archive
+        series on purpose and you want one retention policy for all of them. Add ``user`` if
+        one machine backs up the same series as different users and each of them should get
+        their own retention.
+
+        So, to prune every series of every host in one call, the default is all you need::
+
+            borg prune --keep-daily 7 --keep-weekly 4
+
+        To only consider your own archives, select them - the grouping then applies to the
+        selection only::
+
+            borg prune -a host:myhost --keep-daily 7 --keep-weekly 4
 
         Note: the ``host:`` / ``user:`` metadata is what the client wrote into the
         archive; it is not a permission mechanism. Any client with delete permission
         for the repository can prune any archive in it.
+
+        Beware of grouping by an attribute that is not stable over time: if e.g. the hostname
+        changes for every backup run (as it might for containers), each archive ends up in a
+        group of its own and the retention rules will keep all of them. Set ``BORG_HOSTNAME``
+        to a stable value in that case, or use ``--group-by name``. Running prune with
+        ``--info`` shows one summary line per group, which makes such a situation visible.
+
 
         The ``--keep`` option is the simplest way to specify a basic retention
         policy. It accepts a count or a time interval for retention (e.g.
@@ -513,6 +609,17 @@ class PruneMixIn:
             type=timestamp,
             action=Highlander,
             help="only consider archives older than this for pruning",
+        )
+        subparser.add_argument(
+            "--group-by",
+            metavar="KEYS",
+            dest="group_by",
+            type=GroupBySpec,
+            default="name,host",
+            action=Highlander,
+            help="comma-separated list of archive attributes to group the archives by before "
+            "applying the retention rules to each group separately; valid keys are: {}; "
+            'default is: name,host; use "" (or "none") to not group at all'.format(", ".join(AI_GROUP_BY_KEYS)),
         )
         subparser.add_argument(
             "--keep",

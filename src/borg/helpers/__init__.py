@@ -38,6 +38,7 @@ from .parseformat import (
     FilesystemPathSpec,
     FilesystemDirSpec,
     SortBySpec,
+    GroupBySpec,
     CompressionSpec,
     ChunkerParams,
     DigestAlgos,

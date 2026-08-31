@@ -19,12 +19,12 @@
 <text class="subtitle" x="14" y="44">top 20 of 373 by commits on the master branch</text>
 <text class="name" x="14" y="73">Thomas Waldmann</text>
 <rect class="bar" x="240" y="63" width="436" height="12" rx="2"/>
-<text class="count" x="746" y="73">7,338</text>
+<text class="count" x="746" y="73">7,525</text>
 <text class="name" x="14" y="95">Marian Beermann</text>
-<rect class="bar" x="240" y="85" width="68" height="12" rx="2"/>
+<rect class="bar" x="240" y="85" width="66" height="12" rx="2"/>
 <text class="count" x="746" y="95">1,140</text>
 <text class="name" x="14" y="117">Jonas Borgström</text>
-<rect class="bar" x="240" y="107" width="33" height="12" rx="2"/>
+<rect class="bar" x="240" y="107" width="32" height="12" rx="2"/>
 <text class="count" x="746" y="117">560</text>
 <text class="name" x="14" y="139">Antoine Beaupré</text>
 <rect class="bar" x="240" y="129" width="17" height="12" rx="2"/>

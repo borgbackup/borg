@@ -5,8 +5,9 @@ import sys
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
+from ..helpers import GroupBySpec
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
+from ..manifest import AI_GROUP_BY_KEYS, Manifest, format_group_key, group_archives
 
 from ..logger import create_logger
 
@@ -30,11 +31,23 @@ class RepoListMixIn:
 
         output_data = []
 
-        for archive_info in manifest.archives.list_considering(args):
-            if args.json:
-                output_data.append(formatter.get_item_data(archive_info, args.json))
-            else:
-                sys.stdout.write(formatter.format_item(archive_info, args.json))
+        archive_infos = manifest.archives.list_considering(args)
+        group_by = tuple(args.group_by.split(",")) if args.group_by else ()
+        # without grouping, all archives are listed as one group, exactly as before.
+        groups = group_archives(archive_infos, group_by) if group_by else {(): archive_infos}
+
+        for group_number, (key, group) in enumerate(groups.items()):
+            if group_by and not args.json:
+                separator = "" if group_number == 0 else "\n"
+                sys.stdout.write(f"{separator}Group ({format_group_key(key, group_by)}):\n")
+            for archive_info in group:
+                if args.json:
+                    item_data = formatter.get_item_data(archive_info, args.json)
+                    if group_by:
+                        item_data["group"] = dict(zip(group_by, key))
+                    output_data.append(item_data)
+                else:
+                    sys.stdout.write(formatter.format_item(archive_info, args.json))
 
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))
@@ -46,6 +59,31 @@ class RepoListMixIn:
             textwrap.dedent(
                 """
         This command lists the archives contained in a repository.
+
+        Grouping archives
+        +++++++++++++++++
+
+        ``--group-by`` lists the archives grouped by the given comma-separated archive
+        attributes, each group preceded by a header line naming it::
+
+            $ borg repo-list --group-by name,host --format '{archive} {time}{NL}'
+            Group (name='home', host='host1'):
+            home Thu, 2026-06-04 18:00:00 +0200
+            home Wed, 2026-06-03 18:00:00 +0200
+
+            Group (name='home', host='host2'):
+            home Thu, 2026-06-04 19:00:00 +0200
+
+        Valid keys are ``name``, ``host``, ``user`` and ``tags``; borg's internal tags (starting
+        with ``@``) do not affect grouping. Archives without ``host`` / ``user`` metadata (e.g.
+        archives transferred from a borg 1.x repository) form their own group.
+
+        These are the same keys and the same grouping that ``borg prune --group-by`` uses, so
+        this is a way to see which archives a prune run will consider together before running
+        it. Without ``--group-by``, archives are listed as before, ungrouped.
+
+        With ``--json``, no header lines are emitted; each archive gets a ``group`` object
+        instead.
 
         .. man NOTES
 
@@ -99,6 +137,16 @@ class RepoListMixIn:
             dest="format",
             action=Highlander,
             help=f'specify format for archive listing (default: "{FORMAT_DEFAULT}")',
+        )
+        subparser.add_argument(
+            "--group-by",
+            metavar="KEYS",
+            dest="group_by",
+            type=GroupBySpec,
+            default="",
+            action=Highlander,
+            help="comma-separated list of archive attributes to group the listed archives by; "
+            "valid keys are: {}; default is to not group".format(", ".join(AI_GROUP_BY_KEYS)),
         )
         subparser.add_argument(
             "--json",

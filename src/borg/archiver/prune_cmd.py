@@ -1,5 +1,3 @@
-from collections import defaultdict
-from collections.abc import Sequence
 from typing import Callable, NamedTuple
 from datetime import datetime, timedelta
 import logging
@@ -14,7 +12,7 @@ from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
 from ..helpers import GroupBySpec
 from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, Manifest
+from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, Manifest, format_group_key, group_archives
 
 from ..logger import create_logger
 
@@ -188,40 +186,6 @@ def prune(
             keep[oldest_archive] = KeepResult(rule=rule, idx=len(keep), oldest=True)
 
     return keep
-
-
-def archive_group_key(archive_info: ArchiveInfo, group_by: Sequence[str]) -> tuple[str, ...]:
-    """Compute the grouping key of *archive_info* for the given *group_by* archive attributes."""
-    key = []
-    for group_by_key in group_by:
-        if group_by_key == "tags":
-            # internal tags (e.g. @PROT) say nothing about what an archive contains or where it
-            # came from, so they must not put an archive into a group of its own.
-            value = ",".join(tag for tag in archive_info.tags if not tag.startswith("@"))
-        else:
-            # host and user are empty for archives that do not have this metadata, e.g. archives
-            # transferred from a borg 1.x repo. they form their own group then.
-            value = getattr(archive_info, group_by_key) or ""
-        key.append(value)
-    return tuple(key)
-
-
-def group_archives(archives: list[ArchiveInfo], group_by: Sequence[str]) -> dict[tuple[str, ...], list[ArchiveInfo]]:
-    """
-    Group *archives* by the given *group_by* archive attributes, keeping their relative order.
-
-    An empty *group_by* puts all archives into one group, so the retention rules are applied to
-    all given archives at once.
-    """
-    groups: dict[tuple[str, ...], list[ArchiveInfo]] = defaultdict(list)
-    for archive_info in archives:
-        groups[archive_group_key(archive_info, group_by)].append(archive_info)
-    return groups
-
-
-def format_group_key(key: tuple[str, ...], group_by: Sequence[str]) -> str:
-    """Format a grouping key for human consumption, e.g. \"name='home', host='myhost'\"."""
-    return ", ".join(f"{group_by_key}={value!r}" for group_by_key, value in zip(group_by, key))
 
 
 class PruneMixIn:

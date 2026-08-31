@@ -1,6 +1,6 @@
 import enum
 import re
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import UTC, datetime, timedelta
 from operator import attrgetter
 from collections.abc import Iterator, Sequence
@@ -50,6 +50,39 @@ AI_HUMAN_SORT_KEYS.remove("ts")
 # archive attributes describing what an archive contains and where it came from, usable to group
 # archives that belong together, e.g. for applying retention rules separately (see GroupBySpec).
 AI_GROUP_BY_KEYS = ["name", "host", "user", "tags"]
+
+
+def archive_group_key(archive_info: ArchiveInfo, group_by: Sequence[str]) -> tuple[str, ...]:
+    """Compute the grouping key of *archive_info* for the given *group_by* archive attributes."""
+    key = []
+    for group_by_key in group_by:
+        if group_by_key == "tags":
+            # internal tags (e.g. @PROT) say nothing about what an archive contains or where it
+            # came from, so they must not put an archive into a group of its own.
+            value = ",".join(tag for tag in archive_info.tags if not tag.startswith("@"))
+        else:
+            # host and user are empty for archives that do not have this metadata, e.g. archives
+            # transferred from a borg 1.x repo. they form their own group then.
+            value = getattr(archive_info, group_by_key) or ""
+        key.append(value)
+    return tuple(key)
+
+
+def group_archives(archives: list[ArchiveInfo], group_by: Sequence[str]) -> dict[tuple[str, ...], list[ArchiveInfo]]:
+    """
+    Group *archives* by the given *group_by* archive attributes, keeping their relative order.
+
+    An empty *group_by* puts all archives into one group.
+    """
+    groups: dict[tuple[str, ...], list[ArchiveInfo]] = defaultdict(list)
+    for archive_info in archives:
+        groups[archive_group_key(archive_info, group_by)].append(archive_info)
+    return groups
+
+
+def format_group_key(key: tuple[str, ...], group_by: Sequence[str]) -> str:
+    """Format a grouping key for human consumption, e.g. \"name='home', host='myhost'\"."""
+    return ", ".join(f"{group_by_key}={value!r}" for group_by_key, value in zip(group_by, key))
 
 
 def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newest=None):

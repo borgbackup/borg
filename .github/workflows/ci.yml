@@ -372,10 +372,31 @@ jobs:
         ls -l artifacts/
 
     - name: Attest binaries provenance (${{ matrix.binary }})
+      id: attest-binaries
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
       uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
       with:
         subject-path: 'artifacts/*'
+
+    - name: Name the sigstore bundle after the binaries (${{ matrix.binary }})
+      # The attestation is also stored in the GitHub attestations API, but
+      # fetching it from there needs a recent gh and a GitHub token (see
+      # #10187) - so the sigstore bundle rides along with the binaries and the
+      # release job attaches it to the release as <asset>.sigstore.jsonl, just
+      # like it does for the sdist, see .github/workflows/release.yml.
+      #
+      # One attestation covers both the single-file binary and the .tgz, so the
+      # same bundle is stored under both names - one for each asset.
+      if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      env:
+        BUNDLE_PATH: ${{ steps.attest-binaries.outputs.bundle-path }}
+      run: |
+        set -euxo pipefail
+        # the glob is expanded before the loop body creates any file:
+        for asset in artifacts/*; do
+          cp "$BUNDLE_PATH" "$asset.sigstore.jsonl"
+        done
+        ls -l artifacts/
 
     - name: Upload binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
@@ -708,6 +729,35 @@ jobs:
               ;;
           esac
 
+      - name: Attest provenance
+        id: attest-binaries
+        if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: 'artifacts/*'
+
+      - name: Name the sigstore bundle after the binaries
+        # The attestation is also stored in the GitHub attestations API, but
+        # fetching it from there needs a recent gh and a GitHub token (see
+        # #10187) - so the sigstore bundle rides along with the binaries and the
+        # release job attaches it to the release as <asset>.sigstore.jsonl, just
+        # like it does for the sdist, see .github/workflows/release.yml.
+        #
+        # One attestation covers both the single-file binary and the .tgz, so
+        # the same bundle is stored under both names - one for each asset.
+        # This is also why the attestation is made before the artifact is
+        # uploaded and not after it.
+        if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+        env:
+          BUNDLE_PATH: ${{ steps.attest-binaries.outputs.bundle-path }}
+        run: |
+          set -euxo pipefail
+          # the glob is expanded before the loop body creates any file:
+          for asset in artifacts/*; do
+            cp "$BUNDLE_PATH" "$asset.sigstore.jsonl"
+          done
+          ls -l artifacts/
+
       - name: Upload artifacts
         if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -715,12 +765,6 @@ jobs:
           name: ${{ matrix.artifact_prefix }}
           path: artifacts/*
           if-no-files-found: ignore
-
-      - name: Attest provenance
-        if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
-        with:
-          subject-path: 'artifacts/*'
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -842,10 +886,34 @@ jobs:
           ls -l artifacts/
 
       - name: Attest binaries provenance (borg-windows-x86_64-gh)
+        id: attest-binaries
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: 'artifacts/*'
+
+      - name: Name the sigstore bundle after the binaries (borg-windows-x86_64-gh)
+        # The attestation is also stored in the GitHub attestations API, but
+        # fetching it from there needs a recent gh and a GitHub token (see
+        # #10187) - so the sigstore bundle rides along with the binaries and the
+        # release job attaches it to the release as <asset>.sigstore.jsonl, just
+        # like it does for the sdist, see .github/workflows/release.yml.
+        #
+        # One attestation covers both the .exe and the .tgz, so the same bundle
+        # is stored under both names - one for each asset.
+        #
+        # pwsh, not the msys2 shell this job otherwise uses: bundle-path is a
+        # native Windows path and MSYS2_ARG_CONV_EXCL above keeps msys2 from
+        # converting it.
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        shell: pwsh
+        env:
+          BUNDLE_PATH: ${{ steps.attest-binaries.outputs.bundle-path }}
+        run: |
+          Get-ChildItem artifacts -File | ForEach-Object {
+            Copy-Item -Path $env:BUNDLE_PATH -Destination "$($_.FullName).sigstore.jsonl"
+          }
+          Get-ChildItem artifacts
 
       - name: Upload binaries (borg-windows-x86_64-gh)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

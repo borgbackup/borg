@@ -47,6 +47,10 @@ ArchiveInfo = namedtuple("ArchiveInfo", "name id ts tags host user", defaults=[(
 AI_HUMAN_SORT_KEYS = ["timestamp", "archive"] + list(ArchiveInfo._fields)
 AI_HUMAN_SORT_KEYS.remove("ts")
 
+# archive attributes describing what an archive contains and where it came from, usable to group
+# archives that belong together, e.g. for applying retention rules separately (see GroupBySpec).
+AI_GROUP_BY_KEYS = ["name", "host", "user", "tags"]
+
 
 def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newest=None):
     def get_first_and_last_archive_ts(archives_list):

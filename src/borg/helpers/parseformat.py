@@ -582,6 +582,24 @@ def SortBySpec(text):
     return text.replace("timestamp", "ts").replace("archive", "name")
 
 
+def GroupBySpec(text):
+    """Validate a comma-separated list of group-by keys. "" and "none" mean: do not group."""
+    from ..manifest import AI_GROUP_BY_KEYS
+
+    if text in ("", "none"):
+        return ""  # idempotency: the normalized value must pass validation again
+    seen = set()
+    for group_key in text.split(","):
+        if group_key not in AI_GROUP_BY_KEYS:
+            raise ArgumentTypeError(
+                "Invalid group-by key: %s (valid keys: %s)" % (group_key, ", ".join(AI_GROUP_BY_KEYS))
+            )
+        if group_key in seen:
+            raise ArgumentTypeError("Duplicate group-by key: %s" % group_key)
+        seen.add(group_key)
+    return text
+
+
 SIZE_UNITS = ("si", "iec", "raw")
 
 _warned_units: set[str] = set()  # invalid BORG_UNITS values already complained about

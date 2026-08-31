@@ -15,8 +15,14 @@ from ...archiver.prune_cmd import (
     PRUNE_SECONDLY,
     PRUNE_WEEKLY,
     PRUNE_YEARLY,
+    archive_group_key,
+    format_group_key,
+    group_archives,
     unique_period_func,
 )
+from ...helpers import GroupBySpec
+from argparse import ArgumentTypeError
+
 from ...helpers import CommandError
 from ...manifest import ArchiveInfo
 from . import cmd, RK_ENCRYPTION, generate_archiver_tests
@@ -34,19 +40,31 @@ def _create_archive_ts(archiver, backup_files, name, y, m, d, H=0, M=0, S=0, us=
     _create_archive_dt(archiver, backup_files, name, datetime(y, m, d, H, M, S, us, tzinfo=tzinfo))
 
 
+def prune_ungrouped(archiver, *args, **kwargs):
+    """
+    Run prune with grouping switched off.
+
+    The tests below give each archive an own name so they can be told apart in the prune output,
+    while testing the retention rules as if all of them belonged to one archive series. Grouping
+    by name (the default) would put each of these archives into a group of its own, so these
+    tests ask for a single group explicitly. Grouping itself is tested in test_prune_group_by_*.
+    """
+    return cmd(archiver, "prune", "--group-by", "", *args, **kwargs)
+
+
 def test_prune_repository(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", backup_files)
     cmd(archiver, "create", "test2", backup_files)
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep-daily=1")
     assert re.search(r"Would prune:\s+test1", output)
     # Must keep the latest archive:
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test2", output)
     output = cmd(archiver, "repo-list")
     assert "test1" in output
     assert "test2" in output
-    output = cmd(archiver, "prune", "--list", "--keep-daily=1")
+    output = prune_ungrouped(archiver, "--list", "--keep-daily=1")
     assert re.search(r"Pruning archive \(1/1\):\s+test1", output)
     output = cmd(archiver, "repo-list")
     assert "test1" not in output
@@ -90,7 +108,7 @@ def test_prune_repository_example(archivers, request, backup_files):
     _create_archive_ts(archiver, backup_files, "test23", 2015, 5, 31)
     # The next older daily backup
     _create_archive_ts(archiver, backup_files, "test24", 2015, 12, 16)
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
     # Prune second backup of the year
     assert re.search(r"Would prune:\s+test22", output)
     # Prune next older monthly and daily backups
@@ -107,7 +125,7 @@ def test_prune_repository_example(archivers, request, backup_files):
     # Nothing pruned after dry run
     for i in range(1, 25):
         assert "test%02d" % i in output
-    cmd(archiver, "prune", "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
+    prune_ungrouped(archiver, "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
     output = cmd(archiver, "repo-list")
     # All matching backups plus oldest kept
     for i in range(1, 22):
@@ -150,9 +168,8 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
     for (y, m, d), name in zip(archive_dates, names):
         _create_archive_ts(archiver, backup_files, name, y, m, d, H=16)
 
-    output = cmd(
+    output = prune_ungrouped(
         archiver,
-        "prune",
         "--list",
         "--dry-run",
         "--from=2026-06-04T16:00:00+00:00",
@@ -250,7 +267,7 @@ def test_prune_quarterly(archivers, request, backup_files):
         to_prune = list(set(test_dates) - set(to_keep))
 
         # Use 99 instead of -1 to test that oldest backup is kept.
-        output = cmd(archiver, "prune", "--list", "--dry-run", f"--keep-{strat}=99")
+        output = prune_ungrouped(archiver, "--list", "--dry-run", f"--keep-{strat}=99")
         for a in map(mk_name, to_prune):
             assert re.search(rf"Would prune:\s+{a}", output)
 
@@ -264,7 +281,7 @@ def test_prune_quarterly(archivers, request, backup_files):
         for a in map(mk_name, test_dates):
             assert a in output
 
-        cmd(archiver, "prune", f"--keep-{strat}=99")
+        prune_ungrouped(archiver, f"--keep-{strat}=99")
         output = cmd(archiver, "repo-list")
         # All matching backups plus oldest kept
         for a in map(mk_name, to_keep):
@@ -286,19 +303,19 @@ def test_prune_retain_and_expire_oldest(archivers, request, backup_files):
     # Archive and prune daily for 30 days
     for i in range(1, 31):
         _create_archive_ts(archiver, backup_files, "september%02d" % i, 2020, 9, i, 12)
-        cmd(archiver, "prune", "--keep-daily=7", "--keep-monthly=1")
+        prune_ungrouped(archiver, "--keep-daily=7", "--keep-monthly=1")
     # Archive and prune 6 days into the next month
     for i in range(1, 7):
         _create_archive_ts(archiver, backup_files, "october%02d" % i, 2020, 10, i, 12)
-        cmd(archiver, "prune", "--keep-daily=7", "--keep-monthly=1")
+        prune_ungrouped(archiver, "--keep-daily=7", "--keep-monthly=1")
     # Oldest backup is still retained
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1")
     assert re.search(r"Keeping archive \(rule: monthly\[oldest\] #1" + r"\):\s+original_archive", output)
     # Archive one more day and prune.
     _create_archive_ts(archiver, backup_files, "october07", 2020, 10, 7, 12)
-    cmd(archiver, "prune", "--keep-daily=7", "--keep-monthly=1")
+    prune_ungrouped(archiver, "--keep-daily=7", "--keep-monthly=1")
     # Last day of previous month is retained as monthly, and oldest is expired.
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1")
     assert re.search(r"Keeping archive \(rule: monthly #1\):\s+september30", output)
     assert "original_archive" not in output
 
@@ -310,7 +327,7 @@ def test_prune_repository_prefix(archivers, request, backup_files):
     cmd(archiver, "create", "foo-2015-08-12-20:00", backup_files)
     cmd(archiver, "create", "bar-2015-08-12-10:00", backup_files)
     cmd(archiver, "create", "bar-2015-08-12-20:00", backup_files)
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:foo-*")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:foo-*")
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00", output)
     assert re.search(r"Would prune:\s+foo-2015-08-12-10:00", output)
     output = cmd(archiver, "repo-list")
@@ -318,7 +335,7 @@ def test_prune_repository_prefix(archivers, request, backup_files):
     assert "foo-2015-08-12-20:00" in output
     assert "bar-2015-08-12-10:00" in output
     assert "bar-2015-08-12-20:00" in output
-    cmd(archiver, "prune", "--keep-daily=1", "--match-archives=sh:foo-*")
+    prune_ungrouped(archiver, "--keep-daily=1", "--match-archives=sh:foo-*")
     output = cmd(archiver, "repo-list")
     assert "foo-2015-08-12-10:00" not in output
     assert "foo-2015-08-12-20:00" in output
@@ -333,7 +350,7 @@ def test_prune_repository_glob(archivers, request, backup_files):
     cmd(archiver, "create", "2015-08-12-20:00-foo", backup_files)
     cmd(archiver, "create", "2015-08-12-10:00-bar", backup_files)
     cmd(archiver, "create", "2015-08-12-20:00-bar", backup_files)
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo", output)
     assert re.search(r"Would prune:\s+2015-08-12-10:00-foo", output)
     output = cmd(archiver, "repo-list")
@@ -341,7 +358,7 @@ def test_prune_repository_glob(archivers, request, backup_files):
     assert "2015-08-12-20:00-foo" in output
     assert "2015-08-12-10:00-bar" in output
     assert "2015-08-12-20:00-bar" in output
-    cmd(archiver, "prune", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
+    prune_ungrouped(archiver, "--keep-daily=1", "--match-archives=sh:2015-*-foo")
     output = cmd(archiver, "repo-list")
     assert "2015-08-12-10:00-foo" not in output
     assert "2015-08-12-20:00-foo" in output
@@ -356,7 +373,7 @@ def test_prune_ignore_protected(archivers, request):
     cmd(archiver, "tag", "--set=@PROT", "archive1")  # do not delete archive1!
     cmd(archiver, "create", "archive2", archiver.input_path)
     cmd(archiver, "create", "archive3", archiver.input_path)
-    output = cmd(archiver, "prune", "--list", "--keep=1", "--match-archives=sh:archive*")
+    output = prune_ungrouped(archiver, "--list", "--keep=1", "--match-archives=sh:archive*")
     assert "archive1" not in output  # @PROT archives are completely ignored.
     assert re.search(r"Keeping archive \(rule: keep #1\):\s+archive3", output)
     assert re.search(r"Pruning archive \(.*?\):\s+archive2", output)
@@ -465,7 +482,7 @@ def test_prune_list_with_metadata_format(archivers, request, backup_files):
     cmd(archiver, "create", "test2", backup_files)
     # {hostname} is a "call key" that triggers lazy loading of the archive from the repo.
     # With the buggy code this would raise Archive.DoesNotExist for the pruned archive.
-    output = cmd(archiver, "prune", "--list", "--keep-daily=1", "--format={name} {hostname}{NL}")
+    output = prune_ungrouped(archiver, "--list", "--keep-daily=1", "--format={name} {hostname}{NL}")
     assert "test1" in output
     assert "test2" in output
 
@@ -475,7 +492,7 @@ def test_prune_json(archivers, request, backup_files):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", backup_files)
     cmd(archiver, "create", "test2", backup_files)
-    prune_result = json.loads(cmd(archiver, "prune", "--json", "--dry-run", "--keep-daily=1"))
+    prune_result = json.loads(prune_ungrouped(archiver, "--json", "--dry-run", "--keep-daily=1"))
     assert "repository" in prune_result
     assert "encryption" in prune_result
     assert len(prune_result["repository"]["id"]) == 64
@@ -506,7 +523,7 @@ def test_prune_json_list_pruned(archivers, request, backup_files):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", backup_files)
     cmd(archiver, "create", "test2", backup_files)
-    prune_result = json.loads(cmd(archiver, "prune", "--json", "--dry-run", "--list-pruned", "--keep-daily=1"))
+    prune_result = json.loads(prune_ungrouped(archiver, "--json", "--dry-run", "--list-pruned", "--keep-daily=1"))
     archives = prune_result["archives"]
     assert len(archives) == 1
     assert archives[0]["name"] == "test1"
@@ -519,7 +536,7 @@ def test_prune_keep_same_second(archivers, request, backup_files):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", backup_files)
     cmd(archiver, "create", "test2", backup_files)
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep=2")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep=2")
     # Both archives are kept even though they have the same timestamp to the second. Would previously have failed with
     # old behavior of --keep-last. Archives sorted on seconds, order is undefined.
     assert re.search(r"Keeping archive \(rule: keep #\d\):\s+test1", output)
@@ -538,7 +555,7 @@ def test_prune_keep_int_or_interval(archivers, request, backup_files, keep_arg):
     )  # Would be pruned if `secondly`-rule was active.
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(seconds=1))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(seconds=1, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: skip #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: keep #1\):\s+test-2", output)
     assert re.search(r"Keeping archive \(rule: keep #2\):\s+test-3", output)
@@ -554,7 +571,7 @@ def test_prune_keep_secondly_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(seconds=1, microseconds=999999))
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(seconds=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(seconds=2, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: secondly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: secondly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -571,7 +588,7 @@ def test_prune_keep_minutely_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(minutes=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(minutes=3))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(minutes=3, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: minutely #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: minutely #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -589,7 +606,7 @@ def test_prune_keep_hourly_int_or_interval(archivers, request, backup_files, kee
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(hours=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(hours=3))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(hours=3, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: hourly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: hourly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -607,7 +624,7 @@ def test_prune_keep_daily_int_or_interval(archivers, request, backup_files, keep
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=2))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=3))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=3, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -625,7 +642,7 @@ def test_prune_keep_weekly_int_or_interval(archivers, request, backup_files, kee
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=14))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=21))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=21, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: weekly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: weekly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -643,7 +660,7 @@ def test_prune_keep_monthly_int_or_interval(archivers, request, backup_files, ke
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=62))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=93))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=93, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: monthly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: monthly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -662,7 +679,7 @@ def test_prune_keep_13weekly_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=182))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=273))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=273, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: quarterly_13weekly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: quarterly_13weekly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -681,7 +698,7 @@ def test_prune_keep_3monthly_int_or_interval(archivers, request, backup_files, k
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=275))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=275, microseconds=1))
     # 275d is the interval from dt to the oldest kept monthly archive
-    output = cmd(archiver, "prune", "--list", "--short", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--short", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: quarterly_3monthly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: quarterly_3monthly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -699,7 +716,7 @@ def test_prune_keep_yearly_int_or_interval(archivers, request, backup_files, kee
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=730))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=1095))
     _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=1095, microseconds=1))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: yearly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: yearly #2\):\s+test-2", output)
     assert re.search(r"Would prune:\s+test-3", output)
@@ -715,7 +732,7 @@ def test_prune_keep_daily_all(archivers, request, backup_files, keep_arg):
     _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=1))
     _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(days=2))
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: daily #2\):\s+test-2", output)
     assert re.search(r"Keeping archive \(rule: daily #3\):\s+test-3", output)
@@ -731,7 +748,7 @@ def test_prune_keep_flat_all(archivers, request, backup_files, keep_arg):
     _create_archive_dt(archiver, backup_files, "test-2", dt - timedelta(microseconds=2))
     _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=3))
     _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=3333))
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: keep #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: keep #2\):\s+test-2", output)
     assert re.search(r"Keeping archive \(rule: keep #3\):\s+test-3", output)
@@ -834,7 +851,7 @@ def test_prune_from_prefiltered_archives_ignored_in_pruning(archivers, request, 
     _create_archive_dt(archiver, backup_files, "test-b", dt - timedelta(hours=1))
     _create_archive_dt(archiver, backup_files, "test-c", dt - timedelta(days=1))
 
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--from", dt.isoformat(), "--keep-daily=1")
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), "--keep-daily=1")
 
     # 'test-b' is kept, meaning 'test-a' was entirely skipped for pruning consideration.
     # They would otherwise have occupied the same period.
@@ -913,3 +930,149 @@ def test_unique_period_values_are_padded_and_ordered():
     assert len(set(values)) == len(values)  # each archive lands in a period of its own
     assert len({len(value) for value in values}) == 1  # uniform width, so ...
     assert values == sorted(values)  # ... lexicographic ordering matches numeric ordering
+
+
+def _grouped_archive(name="home", host="myhost", user="myuser", tags=()):
+    return ArchiveInfo(name=name, id=b"", ts=datetime(2024, 1, 1, tzinfo=timezone.utc), tags=tags, host=host, user=user)
+
+
+def test_archive_group_key():
+    archive_info = _grouped_archive(name="home", host="myhost", user="myuser", tags=("b", "a"))
+    assert archive_group_key(archive_info, ()) == ()
+    assert archive_group_key(archive_info, ("name",)) == ("home",)
+    assert archive_group_key(archive_info, ("name", "host", "user")) == ("home", "myhost", "myuser")
+    assert archive_group_key(archive_info, ("host", "name")) == ("myhost", "home")  # order matters
+    assert archive_group_key(archive_info, ("tags",)) == ("b,a",)
+
+
+def test_archive_group_key_ignores_internal_tags():
+    """Internal tags say nothing about an archive's contents, they must not create their own group."""
+    tagged = _grouped_archive(tags=("@PROT", "important"))
+    untagged = _grouped_archive(tags=("important",))
+    assert archive_group_key(tagged, ("tags",)) == archive_group_key(untagged, ("tags",)) == ("important",)
+
+
+def test_archive_group_key_missing_metadata():
+    """Archives without host / user metadata (e.g. transferred from borg 1.x) form their own group."""
+    assert archive_group_key(_grouped_archive(host=None, user=None), ("host", "user")) == ("", "")
+    assert archive_group_key(_grouped_archive(host="", user=""), ("host", "user")) == ("", "")
+
+
+def test_group_archives():
+    home1, home2 = _grouped_archive(host="host1"), _grouped_archive(host="host2")
+    etc1 = _grouped_archive(name="etc", host="host1")
+    archives = [home1, etc1, home2]
+
+    assert group_archives(archives, ()) == {(): archives}  # no grouping: one group with all archives
+    assert group_archives(archives, ("name",)) == {("home",): [home1, home2], ("etc",): [etc1]}
+    assert group_archives(archives, ("name", "host")) == {
+        ("home", "host1"): [home1],
+        ("etc", "host1"): [etc1],
+        ("home", "host2"): [home2],
+    }
+
+
+def test_format_group_key():
+    assert format_group_key(("home", "host1"), ("name", "host")) == "name='home', host='host1'"
+
+
+def test_group_by_spec():
+    assert GroupBySpec("name") == "name"
+    assert GroupBySpec("name,host,user,tags") == "name,host,user,tags"
+    assert GroupBySpec("") == GroupBySpec("none") == ""
+    # the parsed value is fed through the spec again by the argument parser, so it must be stable:
+    assert GroupBySpec(GroupBySpec("name")) == GroupBySpec("name")
+    assert GroupBySpec(GroupBySpec("none")) == GroupBySpec("none")
+    with pytest.raises(ArgumentTypeError, match="Invalid group-by key: bogus"):
+        GroupBySpec("name,bogus")
+    with pytest.raises(ArgumentTypeError, match="Duplicate group-by key: name"):
+        GroupBySpec("name,name")
+
+
+def _create_series(archiver, backup_files, name, hour):
+    """Create a two archive series called *name*, one archive on 2024-01-01, one on 2024-01-02."""
+    _create_archive_ts(archiver, backup_files, name, 2024, 1, 1, H=hour)
+    _create_archive_ts(archiver, backup_files, name, 2024, 1, 2, H=hour)
+
+
+def _create_shared_repo_series(archiver, backup_files, monkeypatch):
+    """host1 has a "home" and an "etc" series, host2 has an own, unrelated "home" series."""
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    _create_series(archiver, backup_files, "home", hour=10)
+    _create_series(archiver, backup_files, "etc", hour=11)
+    monkeypatch.setenv("BORG_HOSTNAME", "host2")
+    _create_series(archiver, backup_files, "home", hour=12)
+    monkeypatch.delenv("BORG_HOSTNAME")
+
+
+def test_prune_groups_by_name_and_host_by_default(archivers, request, backup_files, monkeypatch):
+    """Unrelated backup sets must not compete for the same retention slots."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    _create_shared_repo_series(archiver, backup_files, monkeypatch)
+    # 3 groups: (home, host1), (etc, host1), (home, host2) - each keeps its own daily archive.
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1")
+    assert output.count("Would prune:") == 3
+
+
+def test_prune_group_by_name_only(archivers, request, backup_files, monkeypatch):
+    """--group-by name pools the same series name of different hosts into one retention pool."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    _create_shared_repo_series(archiver, backup_files, monkeypatch)
+    # 2 groups: "home" (of both hosts) and "etc".
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--group-by", "name", "--keep-daily=1")
+    assert output.count("Would prune:") == 4
+
+
+def test_prune_group_by_none(archivers, request, backup_files):
+    """--group-by "" applies the rules to all selected archives at once."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    _create_series(archiver, backup_files, "home", hour=10)
+    _create_series(archiver, backup_files, "etc", hour=11)
+    cmd(archiver, "prune", "--group-by", "", "--keep-daily=1")
+    output = cmd(archiver, "repo-list", "--format={name}{NL}")
+    assert output.split() == ["etc"]  # only the single newest archive of all 4 survives
+
+
+def test_prune_group_by_tags(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    _create_series(archiver, backup_files, "home", hour=10)
+    _create_series(archiver, backup_files, "etc", hour=11)
+    cmd(archiver, "tag", "--add=alice", "-a", "name:home")
+    cmd(archiver, "tag", "--add=bob", "-a", "name:etc")
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--group-by", "tags", "--keep-daily=1")
+    assert output.count("Would prune:") == 2  # one archive pruned per tag group
+
+
+def test_prune_group_by_logs_a_summary_per_group(archivers, request, backup_files, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    _create_shared_repo_series(archiver, backup_files, monkeypatch)
+    output = cmd(archiver, "prune", "--info", "--dry-run", "--keep-daily=1")
+    assert "Group (name='home', host='host1'): 2 archives, keeping 1, pruning 1." in output
+    assert "Group (name='etc', host='host1'): 2 archives, keeping 1, pruning 1." in output
+    assert "Group (name='home', host='host2'): 2 archives, keeping 1, pruning 1." in output
+
+
+def test_prune_group_by_json(archivers, request, backup_files, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for host, hour in (("host1", 10), ("host2", 11)):
+        monkeypatch.setenv("BORG_HOSTNAME", host)
+        _create_series(archiver, backup_files, "home", hour=hour)
+    monkeypatch.delenv("BORG_HOSTNAME")
+    prune_result = json.loads(
+        cmd(archiver, "prune", "--json", "--dry-run", "--group-by", "name,host", "--keep-daily=1")
+    )
+    groups = {tuple(sorted(archive["group"].items())) for archive in prune_result["archives"]}
+    assert groups == {(("host", "host1"), ("name", "home")), (("host", "host2"), ("name", "home"))}
+
+
+def test_prune_group_by_invalid_key(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "prune", "--group-by", "bogus", "--keep-daily=1", exit_code=2)
+    assert "Invalid group-by key: bogus" in output

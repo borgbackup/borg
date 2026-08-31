@@ -1,6 +1,6 @@
 import logging
 
-from ._common import with_repository
+from ._common import with_repository, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
 from ..helpers.argparsing import ArgumentParser
@@ -19,7 +19,7 @@ class UnDeleteMixIn:
         dry_run = args.dry_run
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
         if args.name:
-            archive_infos = [manifest.archives.get_one([args.name], deleted=True)]
+            archive_infos = [manifest.archives.get_one(archive_match_patterns(args), deleted=True)]
         else:
             args.deleted = True
             archive_infos = manifest.archives.list_considering(args)

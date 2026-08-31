@@ -59,3 +59,19 @@ def test_info_working_directory(archivers, request):
         cmd(archiver, "create", "test", ".")
     info_archive = cmd(archiver, "info", "-a", "test")
     assert f"Working Directory: {expected_cwd}" in info_archive
+
+
+def test_info_name_with_aid_prefix(archivers, request, monkeypatch):
+    """NAME is used as-is, so the aid: selector prefix works there and combines with -a."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    cmd(archiver, "create", "home", "input")
+    monkeypatch.delenv("BORG_HOSTNAME")
+    archive_id = json.loads(cmd(archiver, "repo-list", "--json"))["archives"][0]["id"]
+    info = json.loads(cmd(archiver, "info", "--json", f"aid:{archive_id[:8]}"))
+    assert info["archives"][0]["id"] == archive_id
+    # an aid: NAME is ANDed with -a like any other pattern:
+    info = json.loads(cmd(archiver, "info", "--json", f"aid:{archive_id[:8]}", "-a", "host:host1"))
+    assert info["archives"][0]["id"] == archive_id

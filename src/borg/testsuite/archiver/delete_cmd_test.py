@@ -114,3 +114,24 @@ def test_delete_ignore_protected(archivers, request):
     assert "@PROT" in output
     assert "test1" in output
     assert "test2" not in output
+
+
+def test_delete_name_and_match_archives_are_combined(archivers, request, monkeypatch):
+    """In a shared repository, different hosts may use the same archive name - NAME alone is ambiguous then."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for host in ("host1", "host2"):
+        monkeypatch.setenv("BORG_HOSTNAME", host)
+        cmd(archiver, "create", "home", "input")
+    monkeypatch.delenv("BORG_HOSTNAME")
+    msg = "needed to match precisely one archive"
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "delete", "home", exit_code=CommandError().exit_code)
+    else:
+        with pytest.raises(CommandError, match=msg):
+            cmd(archiver, "delete", "home")
+    # NAME is ANDed with -a / --match-archives, so this selects one specific host's archive:
+    cmd(archiver, "delete", "home", "-a", "host:host1")
+    output = cmd(archiver, "repo-list", "--format={hostname}{NL}")
+    assert output.strip() == "host2"

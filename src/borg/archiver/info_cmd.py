@@ -1,7 +1,7 @@
 import textwrap
 from datetime import timedelta
 
-from ._common import with_repository
+from ._common import with_repository, archive_match_patterns
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import format_timedelta, json_print, basic_json_data, archivename_validator
@@ -19,7 +19,7 @@ class InfoMixIn:
         """Show archive details such as disk space used"""
 
         if args.name:
-            archive_infos = [manifest.archives.get_one([args.name])]
+            archive_infos = [manifest.archives.get_one(archive_match_patterns(args))]
         else:
             archive_infos = manifest.archives.list_considering(args)
 

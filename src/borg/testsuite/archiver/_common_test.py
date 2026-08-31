@@ -28,3 +28,44 @@ def test_get_repository_local_v1_uses_legacy_repository(tmp_path):
         get_repository(location, create=False, exclusive=False, lock_wait=None, lock=True, args=None, v1_legacy=True)
 
     mock_cls.assert_called_once_with(str(tmp_path), create=False, exclusive=False, lock_wait=None, lock=True)
+
+
+def test_archive_match_patterns_combines_name_and_match_archives():
+    """A NAME positional is just another pattern, ANDed with the -a / --match-archives ones."""
+    from ...archiver._common import archive_match_patterns
+
+    args = MagicMock()
+    args.name = "home"
+    args.match_archives = ["host:myhost"]
+    assert archive_match_patterns(args) == ["home", "host:myhost"]
+
+
+def test_archive_match_patterns_name_keeps_selector_prefix():
+    """NAME is used as-is, so a prefixed NAME like aid:1234abcd keeps working."""
+    from ...archiver._common import archive_match_patterns
+
+    args = MagicMock()
+    args.name = "aid:1234abcd"
+    args.match_archives = None
+    assert archive_match_patterns(args) == ["aid:1234abcd"]
+
+
+def test_archive_match_patterns_without_name():
+    from ...archiver._common import archive_match_patterns
+
+    args = MagicMock()
+    args.name = None
+    args.match_archives = ["host:myhost"]
+    assert archive_match_patterns(args) == ["host:myhost"]
+
+    args.match_archives = None
+    assert archive_match_patterns(args) == []
+
+
+def test_archive_match_patterns_name_only():
+    from ...archiver._common import archive_match_patterns
+
+    args = MagicMock()
+    args.name = "home"
+    args.match_archives = None
+    assert archive_match_patterns(args) == ["home"]

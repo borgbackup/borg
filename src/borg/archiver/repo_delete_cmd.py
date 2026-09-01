@@ -23,7 +23,7 @@ class RepoDeleteMixIn:
         keep_security_info = args.keep_security_info
 
         if not args.cache_only:
-            if args.forced == 0:  # without --force, we let the user see the archives list and confirm.
+            if not args.forced:  # without --force, we let the user see the archives list and confirm.
                 id = bin_to_hex(repository.id)
                 location = repository._location.canonical_path()
                 msg = []
@@ -115,8 +115,7 @@ class RepoDeleteMixIn:
         subparser.add_argument(
             "--force",
             dest="forced",
-            action="count",
-            default=0,
+            action="store_true",
             help="do not ask for confirmation, just delete the repository. this also works if the "
             "repository is damaged to a point where its archives can not be listed anymore.",
         )

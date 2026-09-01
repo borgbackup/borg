@@ -28,3 +28,15 @@ def test_delete_repo(archivers, request):
     cmd(archiver, "repo-delete")
     # Make sure the repository is gone
     assert not os.path.exists(archiver.repository_path)
+
+
+def test_delete_repo_force(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    # with --force, no confirmation is asked for, not even the env var is considered.
+    os.environ["BORG_DELETE_I_KNOW_WHAT_I_AM_DOING"] = "no"
+    cmd(archiver, "repo-delete", "--force")
+    # Make sure the repository is gone
+    assert not os.path.exists(archiver.repository_path)

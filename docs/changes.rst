@@ -216,6 +216,8 @@ Other changes:
 - setuptools-scm: drop tag.strict, #10193
 - diff: show timestamp changes with full nanosecond precision, #9147
 - benchmark cpu: also benchmark zstd,-4
+- buzhash64: faster blockwise kernel (the hit test as a short-circuit chain) and make
+  it the aarch64 default, +24% over the NEON kernel on an Apple M3 Pro
 - archive: resolve the item metadata stream chunk ids lazily, big win for repo-list
   on remote repos, #10204
 - lock exceptions: tell who holds the lock, #2261

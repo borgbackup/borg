@@ -21,9 +21,10 @@
  * Trot[b] = ROTL(T[b], window_size % 64) is precomputed by the caller, which
  * also removes one rotate per byte from the sequential path.
  *
- * Kernel dispatch: AVX-512 or AVX2 on x86-64 (runtime-detected), blockwise
- * scalar everywhere else, including aarch64 by default - its NEON kernel is
- * selectable by name but not auto-selected, see the note above it.
+ * Which kernel runs is decided per platform by bz64_kernel_default(): the
+ * sequential loop on x86-64, blockwise everywhere else, including aarch64,
+ * where the NEON kernel is selectable by name but not auto-selected (see the
+ * note above it); BORG_BUZHASH64_KERNEL overrides that.
  * All kernels return bit-identical results. */
 
 #include <stdlib.h>
@@ -82,7 +83,7 @@ static inline void bz64_block_prefix(const uint64_t *T, const uint64_t *Trot,
     s[7] = s8;
 }
 
-/* --- blockwise scalar (the default kernel) --------------------------------- */
+/* --- blockwise scalar (the default kernel, except on x86-64) --------------- */
 
 static size_t bz64_scan_blockwise(const uint64_t *T, const uint64_t *Trot,
                                 const uint8_t *pr, const uint8_t *pa,
@@ -97,10 +98,16 @@ static size_t bz64_scan_blockwise(const uint64_t *T, const uint64_t *Trot,
     while (j + 8 <= n && (sum & mask) != 0) {
         bz64_block_prefix(T, Trot, pr + j, pa + j, s);
         uint64_t c = BZ_ROTL(sum, 8);
-        uint64_t hit = 0;
-        for (int k = 0; k < 8; k++)
-            hit |= (((c ^ s[k]) & M[k]) == 0);
-        if (hit) {
+        /* The hit test is a short-circuit chain on purpose: it compiles to
+         * eight test-and-branch pairs that leave the loop as soon as a lane
+         * hits. Written as a loop accumulating `hit |= ...`, clang lowers it
+         * into a chain of conditional increments (M3 Pro: 20% slower) and
+         * gcc >= 12 at -O2 vectorises it, reloading the eight 8-byte stores
+         * of s[] as 16-byte vectors - which fails store-to-load forwarding
+         * on every block (Zen 4: 2.2x slower). */
+        if (((c ^ s[0]) & M[0]) == 0 || ((c ^ s[1]) & M[1]) == 0 || ((c ^ s[2]) & M[2]) == 0 ||
+            ((c ^ s[3]) & M[3]) == 0 || ((c ^ s[4]) & M[4]) == 0 || ((c ^ s[5]) & M[5]) == 0 ||
+            ((c ^ s[6]) & M[6]) == 0 || ((c ^ s[7]) & M[7]) == 0) {
             size_t r = bz64_scan_seq(T, Trot, pr + j, pa + j, 8, &sum, mask); /* exact re-scan */
             *sum_io = sum;
             return j + r;
@@ -116,28 +123,26 @@ static size_t bz64_scan_blockwise(const uint64_t *T, const uint64_t *Trot,
 
 /* --- NEON (aarch64) ------------------------------------------------------
  *
- * Nothing selects this by default (the default is the sequential kernel
- * everywhere); BORG_BUZHASH64_KERNEL=neon selects it. On an Apple M3 Pro it
- * loses to the blockwise kernel - 2590 vs 2360 MB/s, the same ~9% gap at
- * every mask size from 17 to 23 bits - so it is not the one to reach for
- * there.
+ * Nothing selects this by default; BORG_BUZHASH64_KERNEL=neon does. On an
+ * Apple M3 Pro it loses to the blockwise kernel: 2370 vs 2950 MB/s of
+ * scanned data at the kernel level (Apple clang 17, -O3, same at every mask
+ * size from 19 to 23 bits).
  *
  * Why it loses there: the 16 table lookups per block have to happen in
  * general registers (NEON has no gather), so the vector form only ADDS the
  * move to the SIMD side plus a cross-lane reduce (umaxv) before the loop
- * branch can resolve - all it saves is the 8-lane test, three cheap ops per
- * lane, which Apple's very wide scalar ALUs retire at more than one lane per
- * cycle anyway. fastcdc keeps NEON as its default because its per-lane test
+ * branch can resolve - all it saves is the 8-lane test, which as a
+ * short-circuit chain of test-and-branch pairs is cheap on a wide core and
+ * exits early. fastcdc keeps NEON as its default because its per-lane test
  * work is larger (add plus per-lane shifted masks), enough to pay for the
  * trip; there it wins by 2x.
  *
  * It is kept because that reasoning is about core width, and the measurement
  * comes from the widest scalar ARM core there is. Neoverse (Graviton,
  * Ampere), Cortex-A7x and friends are 3-4 wide on the scalar side with
- * comparatively healthy NEON, which is exactly where this should get
- * competitive - on this machine's much narrower E-cores the 9% gap already
- * collapses into measurement noise. If you have such hardware, compare
- * BORG_BUZHASH64_KERNEL=neon against =blockwise and please report. */
+ * comparatively healthy NEON, which is where this might get competitive. If
+ * you have such hardware, compare BORG_BUZHASH64_KERNEL=neon against
+ * =blockwise and please report. */
 
 #if defined(__aarch64__)
 #define BZ_KIND "neon"
@@ -409,16 +414,15 @@ int bz64_kernel_select(const char *name, int *out_id)
 
 int bz64_kernel_default(void)
 {
-#if defined(__aarch64__)
-    /* Same picture as for fastcdc: NEON is baseline on aarch64 and wins, so
-     * this only falls back if the build lacks it. */
-    int kid;
-    if (bz64_kernel_select("neon", &kid) == BZ_KSEL_OK)
-        return kid;
-    return BZ_K_BLOCKWISE;
-#elif defined(__x86_64__) || defined(_M_X64)
+#if defined(__x86_64__) || defined(_M_X64)
+    /* The compiler keeps the sequential loop's update at rol + xor, a 2-cycle
+     * chain that the block kernels' 16 table lookups per 8 bytes do not beat
+     * (Zen 4, gcc -O2: scalar 2.1 cycles/byte, blockwise 2.95, avx2/avx512
+     * 3.9 - see the double-buffer note above). */
     return BZ_K_SCALAR;
 #else
+    /* Everywhere else, including aarch64: unlike fastcdc's, this NEON kernel
+     * loses to the blockwise one (see the note above it), so blockwise it is. */
     return BZ_K_BLOCKWISE;
 #endif
 }

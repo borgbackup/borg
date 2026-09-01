@@ -226,7 +226,8 @@ def test_fastcdc_portable_kernel_available(kernel, monkeypatch):
 # first: the first entry this build and CPU can actually run is the default.
 # Mirrors fc_kernel_default() / bz64_kernel_default() (fastcdc_impl.c,
 # buzhash64_impl.c) and phte_kernel_default() (phte_core.h).
-ROLLING_HASH_DEFAULTS = {"x86_64": ["scalar"], "aarch64": ["neon", "blockwise"]}
+FASTCDC_DEFAULTS = {"x86_64": ["scalar"], "aarch64": ["neon", "blockwise"]}
+BUZHASH64_DEFAULTS = {"x86_64": ["scalar"], "aarch64": ["blockwise"]}
 AES_DEFAULTS = {"x86_64": ["vaes", "aes-ni", "evp"], "aarch64": ["aes-arm64", "evp"]}
 
 
@@ -255,8 +256,10 @@ def expected_default_kernel(envvar, make, key, monkeypatch):
     machine = default_kernel_arch()
     if envvar == "BORG_AES_CHUNKER_KERNEL":
         preference = AES_DEFAULTS.get(machine, ["evp"])
+    elif envvar == "BORG_BUZHASH64_KERNEL":
+        preference = BUZHASH64_DEFAULTS.get(machine, ["blockwise"])
     else:
-        preference = ROLLING_HASH_DEFAULTS.get(machine, ["blockwise"])
+        preference = FASTCDC_DEFAULTS.get(machine, ["blockwise"])
     for kernel in preference:
         monkeypatch.setenv(envvar, kernel)
         try:

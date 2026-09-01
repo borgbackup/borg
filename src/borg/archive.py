@@ -10,7 +10,6 @@ from collections import Counter, defaultdict
 from contextlib import contextmanager
 from datetime import timedelta
 from functools import partial
-from getpass import getuser
 from io import BytesIO
 from itertools import groupby, zip_longest
 from collections.abc import Iterator
@@ -32,6 +31,7 @@ from .helpers import BackupError, BackupRaceConditionError, BackupItemExcluded
 from .helpers import BackupSymlinkParentError, BackupPathTraversalError
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError, BackupTimeoutError
 from .helpers import HardLinkManager
+from .helpers import archive_hostname, archive_username
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec, sig_int
 from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
@@ -51,7 +51,6 @@ from .helpers.lrucache import LRUCache
 from .manifest import Manifest
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
-from . import platform
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
 from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
@@ -770,8 +769,8 @@ Duration: {0.duration}
             "item_ptrs": item_ptrs,  # see #1473
             "command_line": join_cmd(sys.argv),
             "cwd": self.cwd,
-            "hostname": os.environ.get("BORG_HOSTNAME") or platform.get_hostname(),
-            "username": os.environ.get("BORG_USERNAME") or getuser(),
+            "hostname": archive_hostname(),
+            "username": archive_username(),
             "time": nominal.isoformat(timespec="microseconds"),
             "start": start.isoformat(timespec="microseconds"),
             "end": end.isoformat(timespec="microseconds"),

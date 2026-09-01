@@ -26,6 +26,7 @@ from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTR
 from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS, CHUNKINDEX_INVALID_SENTINEL
 from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
 from .helpers import get_cache_dir
+from .helpers import archive_hostname, archive_username
 from .helpers import chunkit
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size, safe_encode
@@ -56,6 +57,27 @@ def files_cache_name(archive_name, files_cache_name="files"):
         # avoid issues with too complex or long archive_name by hashing it:
         suffix = hashlib.sha256(archive_name.encode()).hexdigest()
     return files_cache_name + "." + suffix
+
+
+def archive_group_patterns(archive_name, group_by):
+    """
+    Build the match patterns selecting the archives belonging to the same group as a new archive.
+
+    The new archive is named *archive_name* and gets stamped with this host and this user, so the
+    patterns describe the archives it continues, e.g. ["name:home", "host:myhost"] for the default
+    grouping. See "borg help match-archives" for the pattern syntax.
+    """
+    patterns = []
+    for group_by_key in group_by:
+        if group_by_key == "name":
+            patterns.append(f"name:{archive_name}")
+        elif group_by_key == "host":
+            patterns.append(f"host:{archive_hostname()}")
+        elif group_by_key == "user":
+            patterns.append(f"user:{archive_username()}")
+        else:
+            raise ValueError(f"invalid group-by key: {group_by_key}")
+    return patterns
 
 
 def discover_files_cache_names(path, files_cache_name="files"):
@@ -200,6 +222,7 @@ class Cache:
         progress=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
         archive_name=None,
+        archive_group_by=(),
         start_backup=None,
     ):
         return AdHocWithFilesCache(
@@ -209,6 +232,7 @@ class Cache:
             progress=progress,
             cache_mode=cache_mode,
             archive_name=archive_name,
+            archive_group_by=archive_group_by,
             start_backup=start_backup,
         )
 
@@ -225,8 +249,9 @@ class FilesCacheMixin:
 
     FILES_CACHE_NAME = "files"
 
-    def __init__(self, cache_mode, archive_name=None, start_backup=None):
+    def __init__(self, cache_mode, archive_name=None, archive_group_by=(), start_backup=None):
         self.archive_name = archive_name  # ideally a SERIES name
+        self.archive_group_by = archive_group_by  # archive attributes identifying the previous archive
         assert not ("c" in cache_mode and "m" in cache_mode)
         assert "d" in cache_mode or "c" in cache_mode or "m" in cache_mode
         self.cache_mode = cache_mode
@@ -294,9 +319,13 @@ class FilesCacheMixin:
 
         from .archive import Archive
 
-        # get the latest archive with the IDENTICAL name, supporting archive series:
+        # Get the latest archive of the same group, supporting archive series. Matching the name
+        # alone is not enough in a repository shared by multiple hosts or users, because they may
+        # use the same series name for their own, unrelated data - we would then build our files
+        # cache from a foreign archive, which just wastes time as almost nothing would match.
+        match = archive_group_patterns(self.archive_name, self.archive_group_by)
         try:
-            archives = self.manifest.archives.list(match=[self.archive_name], sort_by=["ts"], last=1)
+            archives = self.manifest.archives.list(match=match, sort_by=["ts"], last=1)
         except PermissionDenied:  # maybe repo is in write-only mode?
             archives = None
         if not archives:
@@ -1207,13 +1236,14 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         progress=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
         archive_name=None,
+        archive_group_by=(),
         start_backup=None,
     ):
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
-        FilesCacheMixin.__init__(self, cache_mode, archive_name, start_backup)
+        FilesCacheMixin.__init__(self, cache_mode, archive_name, archive_group_by, start_backup)
         ChunksMixin.__init__(self)
         assert isinstance(manifest, Manifest)
         self.manifest = manifest

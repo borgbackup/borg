@@ -582,22 +582,33 @@ def SortBySpec(text):
     return text.replace("timestamp", "ts").replace("archive", "name")
 
 
-def GroupBySpec(text):
+def GroupBySpec(text, valid_keys=None, allow_ungrouped=True):
     """Validate a comma-separated list of group-by keys. "" and "none" mean: do not group."""
     from ..manifest import AI_GROUP_BY_KEYS
 
+    valid_keys = AI_GROUP_BY_KEYS if valid_keys is None else valid_keys
     if text in ("", "none"):
+        if not allow_ungrouped:
+            raise ArgumentTypeError("At least one group-by key is required (valid keys: %s)" % ", ".join(valid_keys))
         return ""  # idempotency: the normalized value must pass validation again
     seen = set()
     for group_key in text.split(","):
-        if group_key not in AI_GROUP_BY_KEYS:
-            raise ArgumentTypeError(
-                "Invalid group-by key: %s (valid keys: %s)" % (group_key, ", ".join(AI_GROUP_BY_KEYS))
-            )
+        if group_key not in valid_keys:
+            raise ArgumentTypeError("Invalid group-by key: %s (valid keys: %s)" % (group_key, ", ".join(valid_keys)))
         if group_key in seen:
             raise ArgumentTypeError("Duplicate group-by key: %s" % group_key)
         seen.add(group_key)
     return text
+
+
+# A new archive is not known to belong to the tag group of an existing archive, and it must not
+# continue an arbitrary unrelated archive, so this grouping is more restricted than prune's.
+FILES_CACHE_GROUP_BY_KEYS = ["name", "host", "user"]
+
+
+def FilesCacheGroupBySpec(text):
+    """Validate the group-by keys usable for finding the archive a new archive continues."""
+    return GroupBySpec(text, valid_keys=FILES_CACHE_GROUP_BY_KEYS, allow_ungrouped=False)
 
 
 SIZE_UNITS = ("si", "iec", "raw")

@@ -4,6 +4,7 @@ import os
 import platform  # python stdlib import - if this fails, check that cwd != src/borg/
 import sys
 from collections import deque
+from getpass import getuser
 from itertools import islice
 
 from ..logger import create_logger
@@ -13,6 +14,18 @@ logger = create_logger()
 from . import msgpack
 from .. import __version__ as borg_version
 from ..constants import ROBJ_FILE_STREAM
+
+
+def archive_hostname():
+    """Return the hostname a new archive is stamped with."""
+    from ..platform import get_hostname
+
+    return os.environ.get("BORG_HOSTNAME") or get_hostname()
+
+
+def archive_username():
+    """Return the username a new archive is stamped with."""
+    return os.environ.get("BORG_USERNAME") or getuser()
 
 
 def sysinfo():

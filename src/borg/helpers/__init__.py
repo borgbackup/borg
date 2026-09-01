@@ -28,7 +28,7 @@ from .fs import MAP_DATA, MAP_ZERO, MAP_SAME, read_input_map, input_map_check_si
 from .fs import O_, flags_dir, flags_dir_follow, flags_special_follow, flags_special
 from .fs import flags_base, flags_normal, flags_normal_follow, flags_noatime
 from .fs import HardLinkManager
-from .misc import sysinfo, log_multi, consume
+from .misc import sysinfo, log_multi, consume, archive_hostname, archive_username
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
 from .parseformat import octal_int, bin_to_hex, hex_to_bin, safe_encode, safe_decode
 from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_cmd
@@ -39,6 +39,7 @@ from .parseformat import (
     FilesystemDirSpec,
     SortBySpec,
     GroupBySpec,
+    FilesCacheGroupBySpec,
     CompressionSpec,
     ChunkerParams,
     DigestAlgos,

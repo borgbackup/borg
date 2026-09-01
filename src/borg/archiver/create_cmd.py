@@ -17,6 +17,8 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
 from ..helpers import archivename_validator, DigestAlgos, FilesCacheMode, files_cache_mode_no_ctime
+from ..helpers import FilesCacheGroupBySpec
+from ..helpers.parseformat import FILES_CACHE_GROUP_BY_KEYS
 from ..helpers import octal_int, nonnegative_seconds
 from ..helpers import read_input_map
 from ..helpers import eval_escapes
@@ -313,7 +315,12 @@ class CreateMixIn:
         logger.info('Creating archive "%s" in repository %s' % (args.name, args.location.processed))
         if not dry_run:
             with Cache(
-                repository, manifest, progress=args.progress, cache_mode=args.files_cache_mode, archive_name=args.name
+                repository,
+                manifest,
+                progress=args.progress,
+                cache_mode=args.files_cache_mode,
+                archive_name=args.name,
+                archive_group_by=tuple(args.group_by.split(",")),
             ) as cache:
                 archive = Archive(
                     manifest,
@@ -791,6 +798,21 @@ class CreateMixIn:
         done by comparing multiple file metadata values with previous values kept in
         the files cache.
 
+        The files cache is kept locally, one per archive series. If it is missing (e.g. on a
+        fresh machine or after the local cache was removed), borg rebuilds it by reading the
+        archive this one continues from the repository. That archive is the newest one having
+        the same archive attributes as given by ``--group-by``, by default the same series
+        name and the same host. Matching the series name alone would be wrong in a repository
+        shared by multiple machines or users, because they may use the same series name for
+        their own, unrelated data - borg would then rebuild the files cache from a foreign
+        archive, where almost nothing matches, and read and chunk everything again.
+
+        Give ``--group-by name`` if the same series is written by different hosts on purpose
+        and they see the same files, or add ``user`` if one host backs up the same series as
+        different users. Beware of grouping by an attribute that is not stable over time: if
+        e.g. the hostname changes for every backup run (as it might for containers), borg will
+        never find an archive to rebuild the files cache from.
+
         This comparison can operate in different modes as given by ``--files-cache``:
 
         - ctime,size,inode (default on POSIX systems)
@@ -1220,6 +1242,18 @@ class CreateMixIn:
             default=FILES_CACHE_MODE_UI_DEFAULT_WIN32 if is_win32 else FILES_CACHE_MODE_UI_DEFAULT_POSIX,
             help="operate files cache in MODE. default: %s (on Windows: %s, because ctime is "
             "file creation time there)." % (FILES_CACHE_MODE_UI_DEFAULT_POSIX, FILES_CACHE_MODE_UI_DEFAULT_WIN32),
+        )
+        fs_group.add_argument(
+            "--group-by",
+            metavar="KEYS",
+            dest="group_by",
+            action=Highlander,
+            type=FilesCacheGroupBySpec,
+            default="name,host",
+            help="comma-separated list of archive attributes identifying the archives this archive "
+            "belongs to; the newest of them is the archive the files cache is rebuilt from, if the "
+            "local files cache is missing. valid keys are: {}; default is: "
+            "name,host".format(", ".join(FILES_CACHE_GROUP_BY_KEYS)),
         )
         fs_group.add_argument(
             "--files-changed",

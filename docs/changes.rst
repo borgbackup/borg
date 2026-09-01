@@ -193,6 +193,11 @@ Fixes:
 - borgfs: adopt the "mount:" config file section
 - let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
 - goldilocks-aes: fix build on 32-bit archs (no __uint128_t there)
+- toeplitz-aes, rabin-aes, goldilocks-aes: use the AES instructions on Linux and
+  FreeBSD arm64. The hardware scan path was only built when the compiler targeted
+  the crypto extension as a whole (Apple's default does, a Linux/BSD python
+  extension build does not), so those builds silently ran the 1.5-1.9x slower
+  portable OpenSSL path and rejected BORG_AES_CHUNKER_KERNEL=aes-arm64.
 - repo-list: fix --format help, it did not show the actual default, #10204
 - windows:
 

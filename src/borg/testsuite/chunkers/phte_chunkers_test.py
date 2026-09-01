@@ -10,6 +10,7 @@ individual <chunker>_test.py modules.
 from hashlib import sha256
 from io import BytesIO
 import os
+import platform
 import random
 
 import pytest
@@ -73,6 +74,34 @@ def test_evp_kernel_available(chunker_spec, monkeypatch):
     cls, algo, params = chunker_spec
     monkeypatch.setenv(KERNEL_ENV, "evp")
     assert cls(key0, 10, 16, 14, 2).kernel == "evp"
+
+
+def aarch64_cpu_has_aes():
+    """Whether this aarch64 CPU has the AES instructions, or None if there is no way to tell here."""
+    system = platform.system()
+    if system == "Darwin":
+        return True  # every Apple Silicon CPU has the crypto extension
+    if system == "Linux":
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.startswith("Features"):
+                    return "aes" in line.split(":", 1)[1].split()
+    return None
+
+
+@pytest.mark.skipif(platform.machine() not in ("aarch64", "arm64"), reason="aarch64 only")
+def test_aarch64_hw_kernel_is_default(chunker_spec, monkeypatch):
+    # The hardware path must be part of every aarch64 build, not only of those
+    # whose compiler targets +crypto as a whole (Apple's default target does, a
+    # Linux/BSD python extension build does not), and it must be the default
+    # wherever the CPU has the AES instructions. Regression test: Linux arm64
+    # builds used to run the portable EVP path silently.
+    cls, algo, params = chunker_spec
+    has_aes = aarch64_cpu_has_aes()
+    if has_aes is None:
+        pytest.skip("cannot tell whether this CPU has the AES instructions")
+    monkeypatch.delenv(KERNEL_ENV, raising=False)
+    assert cls(key0, 10, 16, 14, 2).kernel == ("aes-arm64" if has_aes else "evp")
 
 
 def test_chunksize_distribution(chunker_spec):

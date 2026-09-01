@@ -86,28 +86,56 @@ static void phte_aes128_expand(const uint8_t key[16], uint8_t rk[11][16])
 
 /* --- hardware AES availability and single-block helpers ---------------- */
 
-#if defined(__aarch64__) && defined(__ARM_FEATURE_AES)
+/* aarch64: the AES intrinsics are only usable in a function compiled with the
+ * crypto extension enabled. Python extension builds get no -march flags, so on
+ * Linux and the BSDs they target the armv8-a baseline, which does not include
+ * it (__ARM_FEATURE_AES is undefined there); only Apple's default target has
+ * it. So the extension is enabled per function via a target attribute (gcc >=
+ * 6 / clang >= 14), the same way the x86-64 path uses target("aes,sse2"), and
+ * whether this CPU actually has the instructions is decided at run time by
+ * phte_hw_available(). A build that targets +crypto as a whole needs neither. */
+#if defined(__aarch64__) && \
+    (defined(__ARM_FEATURE_AES) || (defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 6) || \
+     (defined(__clang__) && __clang_major__ >= 14))
 #define PHTE_HAVE_HW 1
 #define PHTE_KIND_HW "aes-arm64"
 
 #include <arm_neon.h>
-#if defined(__linux__)
-#include <sys/auxv.h>
-#ifndef HWCAP_AES
+#if defined(__linux__) || defined(__FreeBSD__)
+#include <sys/auxv.h> /* getauxval resp. elf_aux_info; FreeBSD's also brings HWCAP_AES */
+#endif
+#if (defined(__linux__) || defined(__FreeBSD__)) && !defined(HWCAP_AES)
 #define HWCAP_AES (1 << 3)
 #endif
+
+#if defined(__ARM_FEATURE_AES)
+#define PHTE_HW_TARGET /* the whole build targets +crypto already */
+#else
+#define PHTE_HW_TARGET __attribute__((target("+crypto")))
 #endif
 
+/* Whether this CPU has the AES instructions. Where the OS cannot be asked,
+ * only a build that targets +crypto as a whole may assume so (it would not
+ * run on a lesser CPU anyway); everything else stays on the portable path.
+ * TODO: NetBSD (machdep.cpuN.cpu_id sysctl) and OpenBSD (elf_aux_info since
+ * 7.6) could be asked too. */
 static int phte_hw_available(void)
 {
-#if defined(__linux__)
+#if defined(__APPLE__)
+    return 1; /* every Apple Silicon CPU has the crypto extension */
+#elif defined(__linux__)
     return (getauxval(AT_HWCAP) & HWCAP_AES) != 0;
+#elif defined(__FreeBSD__)
+    unsigned long hwcap = 0;
+    return elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap)) == 0 && (hwcap & HWCAP_AES) != 0;
+#elif defined(__ARM_FEATURE_AES)
+    return 1;
 #else
-    return 1; /* compiler targeted +aes; on Apple Silicon it is always there */
+    return 0;
 #endif
 }
 
-static inline uint8x16_t phte_aes1_neon(const uint8x16_t k[11], uint8x16_t b)
+PHTE_HW_TARGET static inline uint8x16_t phte_aes1_neon(const uint8x16_t k[11], uint8x16_t b)
 {
     for (int r = 0; r < 9; r++)
         b = vaesmcq_u8(vaeseq_u8(b, k[r]));
@@ -186,6 +214,9 @@ int phte_kernel_select(const char *name, int *out_id)
         *out_id = PHTE_K_HW;
         return PHTE_KSEL_OK;
     }
+#elif defined(__aarch64__)
+    if (strcmp(name, "aes-arm64") == 0)
+        return PHTE_KSEL_NOTBUILT; /* compiler too old for the target attribute */
 #endif
 #if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
     if (strcmp(name, "vaes") == 0) {

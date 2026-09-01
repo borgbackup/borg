@@ -220,3 +220,74 @@ def test_repo_list_from_borg1(archivers, request, monkeypatch):
     output = cmd(archiver, "repo-list", "--from-borg1")
     assert "archive1" in output
     assert "archive2" in output
+
+
+def _create_shared_repo_archives(archiver, backup_files, monkeypatch):
+    """host1 has a "home" and an "etc" archive, host2 has an own, unrelated "home" archive."""
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    cmd(archiver, "create", "home", backup_files)
+    cmd(archiver, "create", "etc", backup_files)
+    monkeypatch.setenv("BORG_HOSTNAME", "host2")
+    cmd(archiver, "create", "home", backup_files)
+    monkeypatch.delenv("BORG_HOSTNAME")
+
+
+def test_repo_list_group_by(archivers, request, backup_files, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    _create_shared_repo_archives(archiver, backup_files, monkeypatch)
+    output = cmd(archiver, "repo-list", "--group-by", "name,host", "--format", "{archive} {hostname}{NL}")
+    assert output.splitlines() == [
+        "Group (name='home', host='host1'):",
+        "home host1",
+        "",
+        "Group (name='etc', host='host1'):",
+        "etc host1",
+        "",
+        "Group (name='home', host='host2'):",
+        "home host2",
+    ]
+
+
+def test_repo_list_group_by_single_key(archivers, request, backup_files, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    _create_shared_repo_archives(archiver, backup_files, monkeypatch)
+    output = cmd(archiver, "repo-list", "--group-by", "name", "--format", "{archive} {hostname}{NL}")
+    # both hosts' "home" archives are in one group now:
+    assert output.splitlines() == [
+        "Group (name='home'):",
+        "home host1",
+        "home host2",
+        "",
+        "Group (name='etc'):",
+        "etc host1",
+    ]
+
+
+def test_repo_list_without_group_by_is_unchanged(archivers, request, backup_files, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    _create_shared_repo_archives(archiver, backup_files, monkeypatch)
+    output = cmd(archiver, "repo-list", "--format", "{archive} {hostname}{NL}")
+    assert output.splitlines() == ["home host1", "etc host1", "home host2"]
+    assert "Group (" not in output
+
+
+def test_repo_list_group_by_json(archivers, request, backup_files, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    _create_shared_repo_archives(archiver, backup_files, monkeypatch)
+    archives = json.loads(cmd(archiver, "repo-list", "--group-by", "name,host", "--json"))["archives"]
+    assert [archive["group"] for archive in archives] == [
+        {"name": "home", "host": "host1"},
+        {"name": "etc", "host": "host1"},
+        {"name": "home", "host": "host2"},
+    ]
+    # no grouping requested, no group in the output:
+    archives = json.loads(cmd(archiver, "repo-list", "--json"))["archives"]
+    assert all("group" not in archive for archive in archives)
+
+
+def test_repo_list_group_by_invalid_key(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "repo-list", "--group-by", "bogus", exit_code=2)
+    assert "Invalid group-by key: bogus" in output

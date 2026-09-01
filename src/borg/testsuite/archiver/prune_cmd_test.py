@@ -15,12 +15,10 @@ from ...archiver.prune_cmd import (
     PRUNE_SECONDLY,
     PRUNE_WEEKLY,
     PRUNE_YEARLY,
-    archive_group_key,
-    format_group_key,
-    group_archives,
     unique_period_func,
 )
 from ...helpers import GroupBySpec
+from ...manifest import archive_group_key, format_group_key, group_archives
 from argparse import ArgumentTypeError
 
 from ...helpers import CommandError

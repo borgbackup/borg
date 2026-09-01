@@ -84,6 +84,19 @@ Practical example (Linux, 2.0.0b20 tag):
 If verification succeeds, gh prints a summary stating the subject (your file),
 that it was attested by GitHub Actions, and the job/workflow reference.
 
+The command above fetches the attestation from the GitHub attestations API,
+which needs a recent gh and a GitHub token. Every attestation is therefore also
+attached to the release itself, as a sigstore bundle named after the file it
+belongs to - "<FILE>.sigstore.jsonl", next to "<FILE>" on the release page - so
+you can also verify offline and without a token:
+
+    curl -LO https://github.com/borgbackup/borg/releases/download/<TAG>/<FILE>.sigstore.jsonl
+    gh attestation verify --repo borgbackup/borg --bundle <FILE>.sigstore.jsonl <FILE>
+
+Generic sigstore tooling works as well, e.g. cosign - the certificate identity
+is the workflow that built the file: .github/workflows/ci.yml for the binaries,
+.github/workflows/release.yml for the source distribution.
+
 
 Installing
 ----------

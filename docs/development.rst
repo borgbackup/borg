@@ -506,8 +506,10 @@ Checklist:
   Pushing the tag makes CI build the standalone binaries and then release:
   the ``release`` job (``.github/workflows/release.yml``) builds the sdist,
   checks that it can be installed, attests its provenance and drafts the GitHub
-  release with the sdist and all standalone binaries attached. The ``pypi`` job
-  then uploads the sdist to PyPI.
+  release with the sdist and all standalone binaries attached. Each of these
+  assets comes with the sigstore bundle of its provenance attestation, as
+  ``<asset>.sigstore.jsonl``, so that it can be verified offline. The ``pypi``
+  job then uploads the sdist to PyPI.
 
   If the ``pypi`` environment has required reviewers configured, the upload to
   PyPI waits for an approval - that is the last chance to stop it. Also watch

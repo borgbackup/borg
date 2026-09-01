@@ -226,6 +226,8 @@ Other changes:
   - improve GitHub Actions security, address the zizmor audit findings
   - use ubuntu-26.04 runners
   - add a 32-bit armv7 runner
+  - release: attach the sigstore bundle of the provenance attestation to every
+    release asset, so they can be verified offline, #10187
 - tests:
 
   - skip tz tests where time.tzset() is missing, not just on Windows

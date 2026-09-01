@@ -12,6 +12,12 @@
 #  - and the binaries should be tried out before the release becomes visible.
 # Publishing the draft is a single click in the GitHub UI.
 #
+# Every release asset has a build provenance attestation, and the sigstore bundle
+# of each attestation is attached to the release as <asset>.sigstore.jsonl, for
+# offline verification. The sdist is attested here, the binaries by the jobs in
+# ci.yml that build them - those hand their bundles over in the artifact that
+# carries the binaries.
+#
 # The upload to PyPI is *not* done here, but by the "pypi" job in ci.yml: PyPI
 # trusted publishing can not be used from a reusable workflow, see
 # https://docs.pypi.org/trusted-publishers/troubleshooting/ - so that job has to
@@ -183,9 +189,9 @@ jobs:
         All release assets have a [build provenance attestation](https://github.com/borgbackup/borg/attestations),
         verifiable with \`gh attestation verify --owner borgbackup <file>\`.
 
-        The sdist's attestation is additionally attached as the [sigstore](https://www.sigstore.dev/)
-        bundle \`borgbackup-$TAG.tar.gz.sigstore.jsonl\`, so it can be verified offline and
-        without a GitHub token, e.g. with cosign:
+        Every attestation is additionally attached as a [sigstore](https://www.sigstore.dev/)
+        bundle \`<asset>.sigstore.jsonl\`, so it can be verified offline and without a
+        GitHub token, e.g. with cosign:
 
         \`\`\`
         cosign verify-blob borgbackup-$TAG.tar.gz \\
@@ -193,6 +199,10 @@ jobs:
           --certificate-identity https://github.com/borgbackup/borg/.github/workflows/release.yml@refs/tags/$TAG \\
           --certificate-oidc-issuer https://token.actions.githubusercontent.com
         \`\`\`
+
+        The binaries are built by \`ci.yml\`, not by \`release.yml\`, so their
+        \`--certificate-identity\` is
+        \`https://github.com/borgbackup/borg/.github/workflows/ci.yml@refs/tags/$TAG\`.
         EOF
         mkdir -p assets  # there may not have been any artifact to download
         if gh release view "$TAG" > /dev/null 2>&1; then

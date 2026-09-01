@@ -107,8 +107,8 @@ def test_analyze_whole_repository(archivers, request):
     assert "Exclusive size" not in output
 
 
-def test_analyze_by_name(archivers, request):
-    """--by-name decomposes the repository into per-name exclusive, shared and unreferenced."""
+def test_analyze_group_by_name(archivers, request):
+    """--group-by decomposes the repository into per-group exclusive, shared and unreferenced."""
     archiver = request.getfixturevalue(archivers)
 
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -125,18 +125,18 @@ def test_analyze_by_name(archivers, request):
     (input_path / "b_only").write_text("b" * 1000)
     cmd(archiver, "create", "beta", archiver.input_path)
 
-    output = cmd(archiver, "analyze", "--by-name")
-    assert "3 archive(s) with 2 distinct name(s)" in output
-    # exclusive to each name is its own 1000 B file; "shared" is used by archives of both names
-    assert re.search(r"^alpha\s+2\s+1\.00 kB", output, re.MULTILINE)
-    assert re.search(r"^beta\s+1\s+1\.00 kB", output, re.MULTILINE)
-    assert re.search(r"\(shared by 2\+ names\)\s+1\.00 kB", output)
+    output = cmd(archiver, "analyze", "--group-by", "name")
+    assert "3 archive(s) in 2 group(s)" in output
+    # exclusive to each group is its own 1000 B file; "shared" is used by archives of both groups
+    assert re.search(r"^name='alpha'\s+2\s+1\.00 kB", output, re.MULTILINE)
+    assert re.search(r"^name='beta'\s+1\s+1\.00 kB", output, re.MULTILINE)
+    assert re.search(r"\(shared by 2\+ groups\)\s+1\.00 kB", output)
     # the rows add up: 1000 (alpha) + 1000 (beta) + 1000 (shared) = 3000 B
     assert re.search(r"total \(deduplicated\)\s+3\s+3\.00 kB", output)
 
 
-def test_analyze_by_name_rejects_filters(archivers, request):
-    """--by-name is repository-wide, so combining it with an archive filter is an error."""
+def test_analyze_group_by_rejects_filters(archivers, request):
+    """--group-by is repository-wide, so combining it with an archive filter is an error."""
     archiver = request.getfixturevalue(archivers)
 
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -145,7 +145,52 @@ def test_analyze_by_name_rejects_filters(archivers, request):
     cmd(archiver, "create", "one", archiver.input_path)
 
     with pytest.raises(Error, match="cannot be combined with archive filters"):
-        cmd(archiver, "analyze", "--by-name", "-a", "sh:one")
+        cmd(archiver, "analyze", "--group-by", "name", "-a", "sh:one")
+
+
+def test_analyze_group_by_needs_a_key(archivers, request):
+    """An empty --group-by has nothing to decompose by."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    input_path = pathlib.Path(archiver.input_path)
+    (input_path / "file1").write_text("x" * 1000)
+    cmd(archiver, "create", "one", archiver.input_path)
+
+    with pytest.raises(Error, match="needs at least one archive attribute"):
+        cmd(archiver, "analyze", "--group-by", "")
+
+
+def test_analyze_group_by_name_and_host(archivers, request, monkeypatch):
+    """Grouping by name,host separates the same series name of different hosts."""
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    input_path = pathlib.Path(archiver.input_path)
+    (input_path / "shared").write_text("s" * 1000)
+
+    # both hosts back up a "home" series, each with an own file besides the shared one
+    (input_path / "a_only").write_text("a" * 1000)
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    cmd(archiver, "create", "home", archiver.input_path)
+
+    (input_path / "a_only").unlink()
+    (input_path / "b_only").write_text("b" * 1000)
+    monkeypatch.setenv("BORG_HOSTNAME", "host2")
+    cmd(archiver, "create", "home", archiver.input_path)
+    monkeypatch.delenv("BORG_HOSTNAME")
+
+    # grouping by name only, both hosts are one group, so everything is exclusive to it:
+    output = cmd(archiver, "analyze", "--group-by", "name")
+    assert "2 archive(s) in 1 group(s)" in output
+    assert re.search(r"^name='home'\s+2\s+3\.00 kB", output, re.MULTILINE)
+
+    # grouping by name,host separates them and moves the common file into the shared row:
+    output = cmd(archiver, "analyze", "--group-by", "name,host")
+    assert "2 archive(s) in 2 group(s)" in output
+    assert re.search(r"^name='home', host='host1'\s+1\s+1\.00 kB", output, re.MULTILINE)
+    assert re.search(r"^name='home', host='host2'\s+1\s+1\.00 kB", output, re.MULTILINE)
+    assert re.search(r"\(shared by 2\+ groups\)\s+1\.00 kB", output)
 
 
 def test_analyze_unreferenced_chunks(archivers, request):
@@ -284,14 +329,14 @@ def test_analyze_json_hotspots(archivers, request):
     assert [hotspot["size"] for hotspot in hotspots] == sorted((hotspot["size"] for hotspot in hotspots), reverse=True)
 
 
-def test_analyze_json_by_name(archivers, request):
-    """--by-name --json decomposes the repository into per-name exclusive, shared and unreferenced."""
+def test_analyze_json_group_by(archivers, request):
+    """--group-by --json decomposes the repository into per-group exclusive, shared and unreferenced."""
     archiver = request.getfixturevalue(archivers)
 
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     input_path = pathlib.Path(archiver.input_path)
 
-    # same layout as test_analyze_by_name
+    # same layout as test_analyze_group_by_name
     (input_path / "shared").write_text("s" * 1000)
     (input_path / "a_only").write_text("a" * 1000)
     cmd(archiver, "create", "alpha", archiver.input_path)
@@ -301,23 +346,25 @@ def test_analyze_json_by_name(archivers, request):
     (input_path / "b_only").write_text("b" * 1000)
     cmd(archiver, "create", "beta", archiver.input_path)
 
-    result = json.loads(cmd(archiver, "analyze", "--by-name", "--json"))
+    result = json.loads(cmd(archiver, "analyze", "--group-by", "name", "--json"))
     assert "dedup_size" not in result and "hotspots" not in result
-    by_name = result["by_name"]
+    by_group = result["by_group"]
 
-    assert by_name["archives"] == 3
-    assert {entry["name"]: entry["archives"] for entry in by_name["names"]} == {"alpha": 2, "beta": 1}
-    assert {entry["name"]: entry["source_size"] for entry in by_name["names"]} == {"alpha": 1000, "beta": 1000}
-    assert by_name["shared"]["source_size"] == 1000
-    assert by_name["total"]["archives"] == 3
-    assert by_name["total"]["source_size"] == 3000  # 1000 alpha + 1000 beta + 1000 shared
-    assert by_name["total"]["stored_size"] > 0
-    assert by_name["missing_chunks"] == 0
+    assert by_group["archives"] == 3
+    assert by_group["group_by"] == ["name"]
+    groups = by_group["groups"]
+    assert {entry["group"]["name"]: entry["archives"] for entry in groups} == {"alpha": 2, "beta": 1}
+    assert {entry["group"]["name"]: entry["source_size"] for entry in groups} == {"alpha": 1000, "beta": 1000}
+    assert by_group["shared"]["source_size"] == 1000
+    assert by_group["total"]["archives"] == 3
+    assert by_group["total"]["source_size"] == 3000  # 1000 alpha + 1000 beta + 1000 shared
+    assert by_group["total"]["stored_size"] > 0
+    assert by_group["missing_chunks"] == 0
 
     # every chunk is counted in exactly one row, so the rows add up to the total
     for size in ("source_size", "stored_size"):
-        assert sum(entry[size] for entry in by_name["names"]) + by_name["shared"][size] == by_name["total"][size]
+        assert sum(entry[size] for entry in groups) + by_group["shared"][size] == by_group["total"][size]
     # biggest exclusive consumer first
-    assert [entry["stored_size"] for entry in by_name["names"]] == sorted(
-        (entry["stored_size"] for entry in by_name["names"]), reverse=True
+    assert [entry["stored_size"] for entry in groups] == sorted(
+        (entry["stored_size"] for entry in groups), reverse=True
     )

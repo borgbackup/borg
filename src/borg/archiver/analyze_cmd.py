@@ -1,14 +1,15 @@
 from collections import defaultdict
 import os
 
-from ._common import with_repository, define_archive_filters_group
+from ._common import with_repository, define_archive_filters_group, Highlander
 from ..archive import Archive
 from ..cache import get_archive_references, list_archive_reference_caches
 from ..constants import *  # NOQA
 from ..helpers import basic_json_data, bin_to_hex, Error, format_file_size, json_print
 from ..helpers import ProgressIndicatorPercent
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
+from ..helpers import GroupBySpec
+from ..manifest import AI_GROUP_BY_KEYS, Manifest, archive_group_key, format_group_key
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -23,13 +24,14 @@ logger = create_logger()
 # ThomasWaldmann's proposal there).
 F_CONSIDERED = 2**3
 F_REST = 2**4
-# By-name mode: bits 5..22 hold the owning archive name (as index + 1, so 0 means "referenced by no
-# archive"), bit 23 marks a chunk referenced by more than one name. This decomposes the repository
-# in a single pass: each chunk is either exclusive to one name, shared, or unreferenced.
+# Decomposition mode (--group-by): bits 5..22 hold the owning archive group (as index + 1, so 0
+# means "referenced by no archive"), bit 23 marks a chunk referenced by more than one group. This
+# decomposes the repository in a single pass: each chunk is either exclusive to one group, shared,
+# or unreferenced.
 OWNER_SHIFT = 5
 OWNER_MASK = 2**18 - 1  # bits 5..22
 F_MULTI = 2**23
-MAX_NAMES = OWNER_MASK - 1  # owner values are name index + 1
+MAX_GROUPS = OWNER_MASK - 1  # owner values are group index + 1
 
 
 class ArchiveAnalyzer:
@@ -43,17 +45,22 @@ class ArchiveAnalyzer:
     def analyze(self):
         logger.info("Starting archives analysis...")
         json_data = {} if self.args.json else None
-        if self.args.by_name:
+        if self.args.group_by is not None:
+            group_by = tuple(self.args.group_by.split(",")) if self.args.group_by else ()
+            if not group_by:
+                raise Error(
+                    "--group-by needs at least one archive attribute to decompose by, e.g. --group-by name,host."
+                )
             # the decomposition is inherently repository-wide: "shared" and "unreferenced" can only
             # be determined by looking at every archive, so archive filters must not be applied.
             filters = ["match_archives", "first", "last", "older", "newer", "oldest", "newest"]
             if any(getattr(self.args, name, None) for name in filters):
-                raise Error("--by-name analyzes the whole repository and cannot be combined with archive filters.")
-            by_name = self.analyze_by_name()
+                raise Error("--group-by analyzes the whole repository and cannot be combined with archive filters.")
+            by_group = self.analyze_by_group(group_by)
             if json_data is None:
-                self.report_by_name(by_name)
+                self.report_by_group(by_group)
             else:
-                json_data["by_name"] = by_name
+                json_data["by_group"] = by_group
         else:
             considered_infos = self.manifest.archives.list_considering(self.args)
             if not considered_infos:
@@ -118,36 +125,38 @@ class ArchiveAnalyzer:
         pi.finish()
         return missing
 
-    def analyze_by_name(self) -> dict:
-        """Decompose the whole repository by archive name.
+    def analyze_by_group(self, group_by) -> dict:
+        """Decompose the whole repository by groups of archives, see *group_by* (--group-by).
 
-        Archives sharing a name form a series, so a name usually groups all backups of one source;
-        for old-style archives that do not form a series, each name is just one archive.
+        Archives sharing a name form a series, so grouping by name usually groups all backups of one
+        source. In a repository shared by multiple machines or users the name alone is not specific
+        enough, as they may use the same series name for their own, unrelated data - grouping by
+        e.g. name,host separates those.
 
-        Every chunk falls into exactly one bucket: exclusive to a single name (no archive of another
-        name references it, so deleting all archives of that name would free it), shared by two or
-        more names, or referenced by no non-deleted archive at all (reclaimable by borg compact).
+        Every chunk falls into exactly one bucket: exclusive to a single group (no archive of another
+        group references it, so deleting all archives of that group would free it), shared by two or
+        more groups, or referenced by no non-deleted archive at all (reclaimable by borg compact).
         The buckets add up to the repository's deduplicated size.
 
-        This needs only a single pass over all archives: each chunk records the name that first
-        referenced it, and a reference from a different name sets the F_MULTI bit.
+        This needs only a single pass over all archives: each chunk records the group that first
+        referenced it, and a reference from a different group sets the F_MULTI bit.
 
-        Returns the decomposition as raw byte values, for report_by_name() or --json.
+        Returns the decomposition as raw byte values, for report_by_group() or --json.
         """
         all_infos = self.manifest.archives.list()  # non-deleted archives
         if not all_infos:
             raise Error("The repository does not contain any archives.")
-        archives_per_name: dict[str, int] = defaultdict(int)
+        archives_per_group: dict[tuple[str, ...], int] = defaultdict(int)
         for info in all_infos:
-            archives_per_name[info.name] += 1
-        names = sorted(archives_per_name)
-        if len(names) > MAX_NAMES:
-            raise Error(f"Too many distinct archive names ({len(names)}) to decompose, limit is {MAX_NAMES}.")
-        owner_of = {name: i + 1 for i, name in enumerate(names)}  # 0 means "unreferenced"
+            archives_per_group[archive_group_key(info, group_by)] += 1
+        groups = sorted(archives_per_group)
+        if len(groups) > MAX_GROUPS:
+            raise Error(f"Too many distinct archive groups ({len(groups)}) to decompose, limit is {MAX_GROUPS}.")
+        owner_of = {group: i + 1 for i, group in enumerate(groups)}  # 0 means "unreferenced"
 
         missing = 0
         for info in all_infos:
-            owner = owner_of[info.name]
+            owner = owner_of[archive_group_key(info, group_by)]
 
             def update_flags(flags, owner=owner):
                 previous = (flags >> OWNER_SHIFT) & OWNER_MASK
@@ -159,7 +168,7 @@ class ArchiveAnalyzer:
 
             missing += self.mark_references([info], update_flags)
 
-        exclusive = {name: [0, 0] for name in names}  # archive name -> [source size, stored size]
+        exclusive = {group: [0, 0] for group in groups}  # archive group -> [source size, stored size]
         shared = [0, 0]
         unref_count = unref_stored = total_count = 0
         for id, entry in self.repository.chunks.iteritems():
@@ -169,7 +178,7 @@ class ArchiveAnalyzer:
                 unref_count += 1
                 unref_stored += entry.obj_size
                 continue
-            bucket = shared if entry.flags & F_MULTI else exclusive[names[owner - 1]]
+            bucket = shared if entry.flags & F_MULTI else exclusive[groups[owner - 1]]
             bucket[0] += entry.size
             bucket[1] += entry.obj_size
 
@@ -181,15 +190,16 @@ class ArchiveAnalyzer:
 
         return {
             "archives": len(all_infos),
+            "group_by": list(group_by),
             # biggest exclusive consumer first - that is what one would act on
-            "names": [
+            "groups": [
                 {
-                    "name": name,
-                    "archives": archives_per_name[name],
-                    "source_size": exclusive[name][0],
-                    "stored_size": exclusive[name][1],
+                    "group": dict(zip(group_by, group)),
+                    "archives": archives_per_group[group],
+                    "source_size": exclusive[group][0],
+                    "stored_size": exclusive[group][1],
                 }
-                for name in sorted(names, key=lambda n: exclusive[n][1], reverse=True)
+                for group in sorted(groups, key=lambda g: exclusive[g][1], reverse=True)
             ],
             "shared": {"source_size": shared[0], "stored_size": shared[1]},
             "unreferenced": {"stored_size": unref_stored, "chunks": unref_count},
@@ -198,10 +208,11 @@ class ArchiveAnalyzer:
             "missing_chunks": missing,
         }
 
-    def report_by_name(self, data) -> None:
-        """Print the --by-name decomposition computed by analyze_by_name()."""
-        names = [entry["name"] for entry in data["names"]]
-        width = min(max([30] + [len(name) for name in names]), 60)
+    def report_by_group(self, data) -> None:
+        """Print the --group-by decomposition computed by analyze_by_group()."""
+        group_by = data["group_by"]
+        labels = [format_group_key(tuple(entry["group"].values()), group_by) for entry in data["groups"]]
+        width = min(max([30] + [len(label) for label in labels]), 60)
 
         def row(label, archives, source, stored, *, source_known=True):
             sizes = f"{self.fmt(source) if source_known else 'n/a':>14}{self.fmt(stored):>14}"
@@ -209,14 +220,14 @@ class ArchiveAnalyzer:
             print(f"{label:<{width}}{archives:>10}{sizes}{ratio:>13}")
 
         print()
-        print("Repository decomposition by archive name")
+        print(f"Repository decomposition by {','.join(group_by)}")
         print("=" * (width + 51))
-        print(f"{data['archives']} archive(s) with {len(names)} distinct name(s)")
+        print(f"{data['archives']} archive(s) in {len(labels)} group(s)")
         print()
-        print(f"{'name':<{width}}{'archives':>10}{'source':>14}{'stored':>14}{'compression':>13}")
-        for entry in data["names"]:
-            row(entry["name"], entry["archives"], entry["source_size"], entry["stored_size"])
-        row("(shared by 2+ names)", "", data["shared"]["source_size"], data["shared"]["stored_size"])
+        print(f"{'group':<{width}}{'archives':>10}{'source':>14}{'stored':>14}{'compression':>13}")
+        for label, entry in zip(labels, data["groups"]):
+            row(label, entry["archives"], entry["source_size"], entry["stored_size"])
+        row("(shared by 2+ groups)", "", data["shared"]["source_size"], data["shared"]["stored_size"])
         row("(unreferenced)", "", 0, data["unreferenced"]["stored_size"], source_known=False)
         print("-" * (width + 51))
         row(
@@ -231,9 +242,9 @@ class ArchiveAnalyzer:
         )
         print()
         print("Each chunk is counted in exactly one row, so the rows add up to the total.")
-        print("A name row shows what is exclusive to it: no archive of another name references these")
-        print("chunks, so deleting all archives of that name would free them. Chunks used by several")
-        print("names are counted in the shared row, not against any single name.")
+        print("A group row shows what is exclusive to it: no archive of another group references these")
+        print("chunks, so deleting all archives of that group would free them. Chunks used by several")
+        print("groups are counted in the shared row, not against any single group.")
         print()
         print(f"{'source':<12} = uncompressed source data size (each chunk counted once)")
         print(f"{'stored':<12} = deduplicated size as stored in the repository (compressed)")
@@ -444,7 +455,8 @@ class AnalyzeMixIn:
 
         analyze_epilog = process_epilog(
             """
-            Analyze the archives matching the usual archive selection options (e.g. ``-a series_name``).
+            Analyze the archives matching the usual archive selection options (e.g. ``-a series_name``),
+            or decompose the whole repository into groups of archives, see ``--group-by``.
 
             **Deduplicated size of a set of archives**
 
@@ -472,24 +484,35 @@ class AnalyzeMixIn:
             source sizes come from the per-archive references cache that ``borg compact``
             maintains, so unchanged archives usually do not need to be opened.
 
-            **Decomposition by archive name (--by-name)**
+            **Decomposition by group of archives (--group-by)**
 
-            With ``--by-name``, the whole repository is decomposed by archive name instead. Archives
-            sharing a name form a series, so a name usually groups all backups of one source; for
-            old-style archives that do not form a series, each name is just one archive.
+            With ``--group-by``, the whole repository is decomposed into groups of archives instead.
+            The groups are formed by the given comma-separated archive attributes ``name``, ``host``,
+            ``user`` and ``tags`` - the same grouping ``borg prune --group-by`` uses, so the numbers
+            below relate to the same units that prune applies its retention rules to.
+
+            Archives sharing a name form a series, so ``--group-by name`` usually groups all backups
+            of one source. In a repository shared by multiple machines or users that is not specific
+            enough, because they may use the same series name for their own, unrelated data - use
+            ``--group-by name,host`` there.
 
             Every chunk is counted in exactly one row, so the rows add up to the repository's
             deduplicated size:
 
-            - one row per archive name, showing what is *exclusive* to it: no archive of another name
-              references these chunks, so deleting all archives of that name would free them;
-            - one row for the chunks shared by two or more names;
+            - one row per group, showing what is *exclusive* to it: no archive of another group
+              references these chunks, so deleting all archives of that group would free them;
+            - one row for the chunks shared by two or more groups;
             - one row for the unreferenced chunks (see above).
 
-            This answers "which name costs how much, and what would I get back by dropping it" for
-            all names at once, in a single pass over the archives. As the shared and unreferenced
-            rows can only be determined by looking at every archive, ``--by-name`` always covers the
+            This answers "which group costs how much, and what would I get back by dropping it" for
+            all groups at once, in a single pass over the archives. As the shared and unreferenced
+            rows can only be determined by looking at every archive, ``--group-by`` always covers the
             whole repository and cannot be combined with archive filters.
+
+            Grouping by more attributes moves chunks from the group rows into the shared row: if two
+            hosts back up identical content, ``--group-by name`` reports it as exclusive to that
+            name, while ``--group-by name,host`` correctly shows that deleting either host's
+            archives alone would not free it.
 
             **Hot spots**
 
@@ -508,8 +531,8 @@ class AnalyzeMixIn:
 
             With ``--json``, the same numbers are emitted as a single JSON object instead of the text
             report, with raw byte values rather than formatted sizes. The default mode fills the
-            *dedup_size* and *hotspots* keys, ``--by-name`` fills the *by_name* key. The compression
-            factor is not included: it is ``stored_size / source_size``.
+            *dedup_size* and *hotspots* keys, ``--group-by`` fills the *by_group* key. The
+            compression factor is not included: it is ``stored_size / source_size``.
 
             See :ref:`json_output` for the object's structure.
             """
@@ -517,10 +540,14 @@ class AnalyzeMixIn:
         subparser = ArgumentParser(parents=[common_parser], description=self.do_analyze.__doc__, epilog=analyze_epilog)
         subparsers.add_subcommand("analyze", subparser, help="analyze archives")
         subparser.add_argument(
-            "--by-name",
-            dest="by_name",
-            action="store_true",
-            help="decompose the whole repository by archive name (not combinable with archive filters)",
+            "--group-by",
+            metavar="KEYS",
+            dest="group_by",
+            type=GroupBySpec,
+            action=Highlander,
+            help="decompose the whole repository by groups of archives, grouped by the given "
+            "comma-separated archive attributes (not combinable with archive filters); "
+            "valid keys are: {}".format(", ".join(AI_GROUP_BY_KEYS)),
         )
         subparser.add_argument("--json", action="store_true", help="format output as JSON")
         define_archive_filters_group(subparser)

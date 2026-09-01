@@ -678,3 +678,34 @@ def test_files_cache_save_tolerates_missing_chunk(tmp_path, monkeypatch):
         finally:
             cache.close()
         repository.flush()
+
+
+def test_archive_group_patterns(monkeypatch):
+    from ..cache import archive_group_patterns
+
+    monkeypatch.setenv("BORG_HOSTNAME", "myhost")
+    monkeypatch.setenv("BORG_USERNAME", "myuser")
+    assert archive_group_patterns("home", ()) == []
+    assert archive_group_patterns("home", ("name",)) == ["name:home"]
+    assert archive_group_patterns("home", ("name", "host")) == ["name:home", "host:myhost"]
+    assert archive_group_patterns("home", ("name", "host", "user")) == ["name:home", "host:myhost", "user:myuser"]
+    with pytest.raises(ValueError, match="invalid group-by key: tags"):
+        archive_group_patterns("home", ("tags",))
+
+
+def test_files_cache_group_by_spec():
+    from argparse import ArgumentTypeError
+
+    from ..helpers import FilesCacheGroupBySpec
+
+    assert FilesCacheGroupBySpec("name,host") == "name,host"
+    assert FilesCacheGroupBySpec("name") == "name"
+    # the parsed value is fed through the spec again by the argument parser, so it must be stable:
+    assert FilesCacheGroupBySpec(FilesCacheGroupBySpec("name,host")) == FilesCacheGroupBySpec("name,host")
+    # tags are not usable here: a new archive is not known to belong to the tag group of an existing one.
+    with pytest.raises(ArgumentTypeError, match="Invalid group-by key: tags"):
+        FilesCacheGroupBySpec("name,tags")
+    # a new archive must not continue an arbitrary unrelated archive:
+    for text in ("", "none"):
+        with pytest.raises(ArgumentTypeError, match="At least one group-by key is required"):
+            FilesCacheGroupBySpec(text)

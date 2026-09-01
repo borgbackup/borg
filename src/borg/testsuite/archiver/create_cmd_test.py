@@ -2048,6 +2048,48 @@ def _remove_files_cache(archiver, archive_name):
     cache_file.unlink()
 
 
+def test_files_cache_rebuild_ignores_other_hosts(archivers, request, monkeypatch):
+    """The files cache must be rebuilt from an archive of the same host, not from a foreign one."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # host1 backs up its "home" series ...
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    cmd(archiver, "create", "home", "input")
+    host1_id = cmd(archiver, "repo-list", "--format={id}{NL}").strip()
+
+    # ... and afterwards host2 backs up its own, unrelated "home" series into the same repository,
+    # so the newest archive named "home" is not host1's any more.
+    monkeypatch.setenv("BORG_HOSTNAME", "host2")
+    cmd(archiver, "create", "home", "input")
+
+    # host1 lost its local files cache and has to rebuild it from the repository.
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    _remove_files_cache(archiver, "home")
+    output = cmd(archiver, "create", "--debug", "home", "input")
+    assert "Building files cache from" in output
+    assert host1_id in output  # host2's archive would be useless here
+
+
+def test_files_cache_rebuild_group_by_name_only(archivers, request, monkeypatch):
+    """--group-by name restores the previous behaviour of matching the series name only."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    cmd(archiver, "create", "home", "input")
+    monkeypatch.setenv("BORG_HOSTNAME", "host2")
+    cmd(archiver, "create", "home", "input")
+    host2_id = cmd(archiver, "repo-list", "--format={id}{NL}", "--last", "1").strip()
+
+    monkeypatch.setenv("BORG_HOSTNAME", "host1")
+    _remove_files_cache(archiver, "home")
+    output = cmd(archiver, "create", "--debug", "--group-by", "name", "home", "input")
+    assert host2_id in output  # the newest archive of the series, whatever host made it
+
+
 def test_files_cache_rebuild_without_ctime(archivers, request):
     """Rebuilding from an archive that has no ctime must work - --noctime, and always on Windows."""
     archiver = request.getfixturevalue(archivers)
@@ -2057,3 +2099,10 @@ def test_files_cache_rebuild_without_ctime(archivers, request):
     _remove_files_cache(archiver, "home")
     output = cmd(archiver, "create", "--noctime", "--debug", "home", "input")
     assert "Building files cache from" in output
+
+
+def test_files_cache_rebuild_group_by_invalid(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "create", "--group-by", "", "home", "input", exit_code=2)
+    assert "At least one group-by key is required" in output

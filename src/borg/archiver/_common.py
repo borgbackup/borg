@@ -414,6 +414,13 @@ def define_archive_filters_group(
         action="append",
         help='only consider archives matching all patterns. See "borg help match-archives".',
     )
+    filters_group.add_argument(
+        "--exclude-archives",
+        metavar="PATTERN",
+        dest="exclude_archives",
+        action="append",
+        help='do not consider archives matching any pattern. See "borg help match-archives".',
+    )
 
     if sort_by:
         sort_by_default = "timestamp"

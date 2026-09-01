@@ -7,6 +7,7 @@ import shutil
 import socket
 import stat
 import subprocess
+from pathlib import Path
 
 import pytest
 from blake3 import blake3
@@ -2035,3 +2036,24 @@ def test_chunkindex_covers_committed_archive(archiver, monkeypatch):
     with changedir("output"):
         cmd(archiver, "extract", "test")
     assert_dirs_equal("input", "output/input")
+
+
+def _remove_files_cache(archiver, archive_name):
+    """Remove the local files cache of an archive series, forcing a rebuild from the repository."""
+    from ...cache import files_cache_name
+    from ...helpers import get_cache_dir
+
+    repo_id = json.loads(cmd(archiver, "repo-info", "--json"))["repository"]["id"]
+    cache_file = Path(get_cache_dir(repo_id, create=False)) / files_cache_name(archive_name)
+    cache_file.unlink()
+
+
+def test_files_cache_rebuild_without_ctime(archivers, request):
+    """Rebuilding from an archive that has no ctime must work - --noctime, and always on Windows."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--noctime", "home", "input")
+    _remove_files_cache(archiver, "home")
+    output = cmd(archiver, "create", "--noctime", "--debug", "home", "input")
+    assert "Building files cache from" in output

@@ -314,26 +314,30 @@ class FilesCacheMixin:
             # only put regular files' infos into the files cache:
             if stat.S_ISREG(item.mode):
                 path_hash = self.key.id_hash(safe_encode(item.path))
+                # an item does not necessarily have all of these timestamps: --noctime omits ctime,
+                # on Windows ctime is never archived (it is the file creation time there, see #8730)
+                # and very old archives only have mtime.
+                ctime_ns = item.get("ctime")
+                mtime_ns = item.get("mtime")
                 # keep track of the key(s) for the most recent timestamp(s):
-                ctime_ns = item.ctime
-                if self._newest_cmtime is None or ctime_ns > self._newest_cmtime:
-                    self._newest_cmtime = ctime_ns
-                    self._newest_path_hashes = {path_hash}
-                elif ctime_ns == self._newest_cmtime:
-                    self._newest_path_hashes.add(path_hash)
-                mtime_ns = item.mtime
-                if self._newest_cmtime is None or mtime_ns > self._newest_cmtime:
-                    self._newest_cmtime = mtime_ns
-                    self._newest_path_hashes = {path_hash}
-                elif mtime_ns == self._newest_cmtime:
-                    self._newest_path_hashes.add(path_hash)
-                # add the file to the in-memory files cache
+                for timestamp_ns in (ctime_ns, mtime_ns):
+                    if timestamp_ns is None:
+                        continue
+                    if self._newest_cmtime is None or timestamp_ns > self._newest_cmtime:
+                        self._newest_cmtime = timestamp_ns
+                        self._newest_path_hashes = {path_hash}
+                    elif timestamp_ns == self._newest_cmtime:
+                        self._newest_path_hashes.add(path_hash)
+                # Add the file to the in-memory files cache. A timestamp the archive does not have
+                # is cached as 0, so it can not compare equal to the timestamp seen in the file
+                # system: if that timestamp is part of the files cache mode, the file is considered
+                # changed and gets chunked again, which is the safe outcome.
                 entry = FileCacheEntry(
                     age=0,
                     inode=item.get("inode", 0),
                     size=item.size,
-                    ctime=int_to_timestamp(ctime_ns),
-                    mtime=int_to_timestamp(mtime_ns),
+                    ctime=int_to_timestamp(0 if ctime_ns is None else ctime_ns),
+                    mtime=int_to_timestamp(0 if mtime_ns is None else mtime_ns),
                     chunks=item.chunks,
                     digests=item.get("digests"),
                 )

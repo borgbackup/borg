@@ -29,7 +29,8 @@ class RecreateMixIn:
             exclude_if_present=args.exclude_if_present,
             keep_exclude_tags=args.keep_exclude_tags,
             chunker_params=args.chunker_params,
-            compression=args.compression,
+            # args.compression is not passed here: the with_repository decorator has already
+            # set repo_objs.compressor from it, which compresses everything newly written.
             progress=args.progress,
             stats=args.stats,
             file_status_printer=self.print_file_status,
@@ -78,6 +79,11 @@ class RecreateMixIn:
         ``--chunker-params`` will re-chunk all files in the archive. This can be used to
         switch existing archives to different chunker parameters (or a different chunker
         algorithm), so they deduplicate with archives created using these parameters.
+
+        ``--compression`` only applies to data recreate newly writes, e.g. when re-chunking
+        with ``--chunker-params`` (and to the new archive metadata). Data chunks reused
+        as-is from the existing archive keep their current compression - to recompress
+        existing repository objects, use ``borg repo-compress``.
 
         **USE WITH CAUTION.**
         Depending on the paths and patterns given, recreate can be used to
@@ -158,7 +164,11 @@ class RecreateMixIn:
             type=CompressionSpec,
             default=CompressionSpec("lz4"),
             action=Highlander,
-            help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+            help="select compression algorithm, see the output of the "
+            '"borg help compression" command for details. '
+            "Only applies to newly written data, e.g. when re-chunking with --chunker-params "
+            "(and to the new archive metadata); data chunks reused from the existing archive "
+            "are not recompressed, use borg repo-compress for that.",
         )
         archive_group.add_argument(
             "--chunker-params",

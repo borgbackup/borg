@@ -35,7 +35,7 @@ from .helpers import archive_hostname, archive_username
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec, sig_int
 from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
-from .helpers import parse_timestamp, archive_ts_now, CompressionSpec
+from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import ArchiveFormatter
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
@@ -2744,7 +2744,6 @@ class ArchiveRecreater:
         exclude_if_present=None,
         keep_exclude_tags=False,
         chunker_params=None,
-        compression=None,
         dry_run=False,
         stats=False,
         progress=False,
@@ -2771,7 +2770,6 @@ class ArchiveRecreater:
             # invariant by default, like borg transfer does, see BORG_ASSERT_ID.
             self.repo_objs.set_assert_id_place("rechunk")
         self.chunker_params = chunker_params or CHUNKER_PARAMS
-        self.compression = compression or CompressionSpec("none")
         self.seen_chunks = set()
 
         self.timestamp = timestamp

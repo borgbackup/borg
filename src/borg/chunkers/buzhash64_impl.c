@@ -223,11 +223,14 @@ __attribute__((target("avx2"))) static inline __m256i bz64_rotl4(__m256i v, __m2
  * half (two vpermq+vpxor steps) plus a broadcast of the low half's total into
  * the high half.
  *
- * Only the 2x8 table lookups stay scalar, and they are done one block ahead
- * into a double buffer: a 32-byte vector load placed right after the eight
- * 8-byte scalar stores that filled it cannot use store-to-load forwarding and
- * stalls, twice per block. Loading block j+1 while block j is tested puts a
- * full loop body between the stores and the load, so the stall disappears. */
+ * Only the 2x8 table lookups stay scalar. They are done one block ahead into
+ * a double buffer, so that a whole loop body separates the eight 8-byte
+ * stores from the two 32-byte vector loads reading them back: wider than the
+ * stores, those loads cannot be store-forwarded and wait for the stores to
+ * commit. The distance hides most of that wait, not all of it - performance
+ * counters still show the loads as failed forwards (Zen 4: 4 per block) -
+ * which is part of why this kernel does not beat the sequential loop on
+ * x86-64, see bz64_kernel_default(). */
 __attribute__((target("avx2"))) static size_t
 bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
                const uint8_t *pr, const uint8_t *pa,

@@ -205,13 +205,14 @@ static inline void fc_block_gear(const uint64_t *gear, const uint8_t *p, uint64_
  * inclusive prefix sum inside each 4-lane half (two vpermq+vpaddq steps) plus
  * a broadcast of the low half's total into the high half.
  *
- * Only the 8 gear table lookups stay scalar, and they are done one block
- * ahead into a double buffer: a 32-byte vector load placed right after the
- * eight 8-byte scalar stores that filled it cannot use store-to-load
- * forwarding and stalls, twice per block. Loading block i+1 while block i is
- * tested puts a full loop body between the stores and the load, so the stores
- * have retired by then and the stall disappears. Before this, the stalls made
- * the AVX2 kernel slower than the blockwise scalar one. */
+ * Only the 8 gear table lookups stay scalar. They are done one block ahead
+ * into a double buffer, so that a whole loop body separates the eight 8-byte
+ * stores from the two 32-byte vector loads reading them back: wider than the
+ * stores, those loads cannot be store-forwarded and wait for the stores to
+ * commit. The distance hides most of that wait, not all of it - performance
+ * counters still show the loads as failed forwards (Zen 4: 4 per block) -
+ * which is part of why this kernel does not beat the sequential loop on
+ * x86-64, see fc_kernel_default(). */
 __attribute__((target("avx2"))) static int64_t
 fc_scan_simd(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {

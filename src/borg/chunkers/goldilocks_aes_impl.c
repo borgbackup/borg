@@ -76,8 +76,10 @@ static inline void gl_mul_wide(uint64_t a, uint64_t b, uint64_t *lo, uint64_t *h
  * measured), so they must not become branches. Writing them as if() or as a
  * ternary lets GCC emit real conditional jumps - the mispredicts alone cost
  * more than the arithmetic (gl_mul: 15.1 vs 4.4 cycles per call). The
- * __builtin_*_overflow forms keep the carry/borrow in the flags, so the
- * compiler settles on sbb/adc + mask instead. Results are unchanged: the
+ * __builtin_*_overflow forms keep the carry/borrow in the flags, so that the
+ * compiler can settle on sbb/adc + mask instead (gcc -O2 and clang do; gcc
+ * -O3 turns the final compare-and-select back into a conditional jump - TODO:
+ * find a form that stays branchless there too). Results are unchanged: the
  * value is still fully canonical, which matters because it is fed to AES. */
 static inline uint64_t gl_add(uint64_t a, uint64_t b)
 {

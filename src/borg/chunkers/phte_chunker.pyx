@@ -50,5 +50,5 @@ cdef class ChunkerPHTE(ChunkerBase):
 
     @property
     def kernel(self):
-        """Which scan kernel this chunker uses: 'aes-arm64', 'aes-ni' or 'evp'."""
+        """Which scan kernel this chunker uses: 'vaes', 'aes-ni', 'aes-arm64' or 'evp'."""
         return self.kernel_str

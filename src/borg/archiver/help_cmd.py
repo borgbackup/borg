@@ -840,10 +840,12 @@ class HelpMixIn:
             BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
                 Select the scan kernel the ``fastcdc`` / ``buzhash64`` chunker uses. Accepted values
                 are ``avx512``, ``avx2``, ``neon``, ``blockwise`` and ``scalar``.
-                The default is whichever benchmarked fastest for the architecture: ``neon`` on
-                aarch64, and ``scalar`` (the plain sequential loop) on x86-64, where the compiler
-                folds the rolling hash update into a single instruction and thereby beats the vector
-                kernels. Other architectures get ``blockwise``, the portable multi-lane C kernel.
+                The default is whichever benchmarked fastest for the architecture: ``scalar`` (the
+                plain sequential loop) on x86-64, where the compiler folds the rolling hash update
+                into one or two instructions and thereby beats the vector kernels; on aarch64
+                ``neon`` for ``fastcdc`` and ``blockwise`` for ``buzhash64``, whose NEON kernel
+                loses to the portable multi-lane C kernel there. Other architectures get
+                ``blockwise``.
                 All kernels chunk identically - same cut points, same chunk ids - and differ only in
                 speed, so this is safe to change at any time, also for an existing repository.
                 Which kernel is fastest is not predictable from the instruction set: it depends on the

@@ -437,12 +437,14 @@ size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
         return bz64_scan_seq(table, table_rot, p_rem, p_add, n, sum, mask);
     case BZ_K_BLOCKWISE:
         return bz64_scan_blockwise(table, table_rot, p_rem, p_add, n, sum, mask);
+    case BZ_K_VECTOR:
+        return bz64_scan_simd(table, table_rot, p_rem, p_add, n, sum, mask);
 #ifdef BZ_KIND_512
     case BZ_K_VECTOR512:
         return bz64_scan_simd512(table, table_rot, p_rem, p_add, n, sum, mask);
 #endif
-    default:
-        return bz64_scan_simd(table, table_rot, p_rem, p_add, n, sum, mask);
+    default: /* not an id of this build: the portable kernel, never one that could SIGILL */
+        return bz64_scan_blockwise(table, table_rot, p_rem, p_add, n, sum, mask);
     }
 }
 
@@ -453,11 +455,13 @@ const char *bz64_kernel_name(int kernel)
         return "scalar";
     case BZ_K_BLOCKWISE:
         return "blockwise";
+    case BZ_K_VECTOR:
+        return BZ_KIND;
 #ifdef BZ_KIND_512
     case BZ_K_VECTOR512:
         return BZ_KIND_512;
 #endif
     default:
-        return BZ_KIND;
+        return "blockwise"; /* what bz64_scan() runs for an unknown id */
     }
 }

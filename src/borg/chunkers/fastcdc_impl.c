@@ -429,12 +429,14 @@ int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, 
         return fc_scan_seq(gear, p, n, fp, mask);
     case FC_K_BLOCKWISE:
         return fc_scan_blockwise(gear, p, n, fp, mask);
+    case FC_K_VECTOR:
+        return fc_scan_simd(gear, p, n, fp, mask);
 #ifdef FC_KIND_512
     case FC_K_VECTOR512:
         return fc_scan_simd512(gear, p, n, fp, mask);
 #endif
-    default:
-        return fc_scan_simd(gear, p, n, fp, mask);
+    default: /* not an id of this build: the portable kernel, never one that could SIGILL */
+        return fc_scan_blockwise(gear, p, n, fp, mask);
     }
 }
 
@@ -445,11 +447,13 @@ const char *fc_kernel_name(int kernel)
         return "scalar";
     case FC_K_BLOCKWISE:
         return "blockwise";
+    case FC_K_VECTOR:
+        return FC_KIND;
 #ifdef FC_KIND_512
     case FC_K_VECTOR512:
         return FC_KIND_512;
 #endif
     default:
-        return FC_KIND;
+        return "blockwise"; /* what fc_scan() runs for an unknown id */
     }
 }

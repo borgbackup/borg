@@ -34,6 +34,16 @@
 
 #define BZ_ROTL(x, k) (((x) << ((k) & 63)) | ((x) >> ((64 - (k)) & 63)))
 
+/* Pin a value: the compiler must materialize it here and cannot re-associate
+ * expressions across it (an empty asm statement that "modifies" it). Only
+ * clang needs it (see bz64_scan_seq); gcc emits the wanted form by itself and
+ * is left alone, an asm statement can move its code around. */
+#if defined(__clang__)
+#define BZ_PIN(v) __asm__("" : "+r"(v))
+#else
+#define BZ_PIN(v) ((void)0)
+#endif
+
 /* --- sequential reference loop (also: block re-scan and tail) ----------- */
 
 static size_t bz64_scan_seq(const uint64_t *T, const uint64_t *Trot,
@@ -43,7 +53,14 @@ static size_t bz64_scan_seq(const uint64_t *T, const uint64_t *Trot,
     uint64_t sum = *sum_io;
     size_t j = 0;
     while (j < n && (sum & mask) != 0) {
-        sum = BZ_ROTL(sum, 1) ^ Trot[pr[j]] ^ T[pa[j]];
+        /* The two table values are combined off the chain and the result is
+         * pinned, so that the loop-carried dependency is exactly rotate + one
+         * xor (2 cycles per byte). Unpinned, clang re-associates the xors into
+         * the chain and makes it 3 cycles per byte - M3 Pro: 1210 vs 1780 MB/s
+         * of scanned data; gcc emits the 2-cycle form either way. */
+        uint64_t d = Trot[pr[j]] ^ T[pa[j]];
+        BZ_PIN(d);
+        sum = BZ_ROTL(sum, 1) ^ d;
         j++;
     }
     *sum_io = sum;

@@ -30,13 +30,30 @@
 
 #include "fastcdc_impl.h"
 
+/* Pin a value: the compiler must materialize it here and cannot re-associate
+ * expressions across it (an empty asm statement that "modifies" it). Only
+ * clang needs it (see fc_scan_seq); gcc emits the wanted form by itself and
+ * is left alone, an asm statement can move its code around. */
+#if defined(__clang__)
+#define FC_PIN(v) __asm__("" : "+r"(v))
+#else
+#define FC_PIN(v) ((void)0)
+#endif
+
 /* --- sequential reference loop (also: block recheck and tail) ----------- */
 
 static int64_t fc_scan_seq(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp_io, uint64_t mask)
 {
     uint64_t fp = *fp_io;
     for (size_t i = 0; i < n; i++) {
-        fp = (fp << 1) + gear[p[i]];
+        /* The table value is pinned so that the update stays one instruction
+         * on the loop-carried chain: on x86-64 a lea (table value + fp * 2),
+         * 1 cycle per byte, which gcc emits anyway but clang only with the
+         * pin (unpinned it emits add + add-from-memory, 2 cycles per byte);
+         * on aarch64 it is one shifted add either way. */
+        uint64_t g = gear[p[i]];
+        FC_PIN(g);
+        fp = (fp << 1) + g;
         if ((fp & mask) == 0) {
             *fp_io = fp;
             return (int64_t)i;

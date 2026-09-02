@@ -310,7 +310,13 @@ borg help match-archives
 
 
 The ``--match-archives`` option matches a given pattern against the list of all archives
-in the repository. It can be given multiple times.
+in the repository. It can be given multiple times; an archive is only considered if it
+matches all given patterns.
+
+Commands that also accept an archive NAME as a positional argument treat that NAME like
+an additional pattern, so NAME and ``--match-archives`` can be combined to narrow down the
+selection, e.g. ``borg prune home -a host:myhost``. NAME accepts the same prefixes as the
+patterns below, e.g. ``borg info aid:1234abcd``.
 
 The patterns can have a prefix of:
 

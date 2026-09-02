@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-create" "1" "2026-08-29" "" "borg backup tool"
+.TH "borg-create" "1" "2026-09-02" "" "borg backup tool"
 .SH Name
 borg-create \- Creates a new archive.
 .SH SYNOPSIS
@@ -84,6 +84,21 @@ Backup speed is increased by not reprocessing files that are already part of
 existing archives and were not modified. The detection of unmodified files is
 done by comparing multiple file metadata values with previous values kept in
 the files cache.
+.sp
+The files cache is kept locally, one per archive series. If it is missing (e.g. on a
+fresh machine or after the local cache was removed), borg rebuilds it by reading the
+archive this one continues from the repository. That archive is the newest one having
+the same archive attributes as given by \fB\-\-group\-by\fP, by default the same series
+name and the same host. Matching the series name alone would be wrong in a repository
+shared by multiple machines or users, because they may use the same series name for
+their own, unrelated data \- borg would then rebuild the files cache from a foreign
+archive, where almost nothing matches, and read and chunk everything again.
+.sp
+Give \fB\-\-group\-by name\fP if the same series is written by different hosts on purpose
+and they see the same files, or add \fBuser\fP if one host backs up the same series as
+different users. Beware of grouping by an attribute that is not stable over time: if
+e.g. the hostname changes for every backup run (as it might for containers), borg will
+never find an archive to rebuild the files cache from.
 .sp
 This comparison can operate in different modes as given by \fB\-\-files\-cache\fP:
 .INDENT 0.0
@@ -314,6 +329,9 @@ compute these hash digests over the full content of each file and store them int
 .TP
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode (on Windows: mtime,size,inode, because ctime is file creation time there).
+.TP
+.BI \-\-group\-by \ KEYS
+comma\-separated list of archive attributes identifying the archives this archive belongs to; the newest of them is the archive the files cache is rebuilt from, if the local files cache is missing. valid keys are: name, host, user; default is: name,host
 .TP
 .BI \-\-files\-changed \ MODE
 specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).

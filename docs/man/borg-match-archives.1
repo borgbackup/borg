@@ -28,13 +28,19 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-match-archives" "1" "2026-08-29" "" "borg backup tool"
+.TH "borg-match-archives" "1" "2026-09-02" "" "borg backup tool"
 .SH Name
 borg-match-archives \- Details regarding match-archives
 .SH DESCRIPTION
 .sp
 The \fB\-\-match\-archives\fP option matches a given pattern against the list of all archives
-in the repository. It can be given multiple times.
+in the repository. It can be given multiple times; an archive is only considered if it
+matches all given patterns.
+.sp
+Commands that also accept an archive NAME as a positional argument treat that NAME like
+an additional pattern, so NAME and \fB\-\-match\-archives\fP can be combined to narrow down the
+selection, e.g. \fBborg prune home \-a host:myhost\fP\&. NAME accepts the same prefixes as the
+patterns below, e.g. \fBborg info aid:1234abcd\fP\&.
 .sp
 The patterns can have a prefix of:
 .INDENT 0.0

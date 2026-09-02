@@ -21,6 +21,8 @@ borg repo-list
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--format FORMAT``                          | specify format for archive listing (default: "{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}{NL}")                                   |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--group-by KEYS``                          | comma-separated list of archive attributes to group the listed archives by; valid keys are: name, host, user, tags; default is to not group                                     |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--json``                                   | Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                               |
@@ -64,6 +66,7 @@ borg repo-list
         --short     only print the archive IDs, nothing else
         --from-borg1    repository is Borg 1.x
         --format FORMAT    specify format for archive listing (default: "{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}{NL}")
+        --group-by KEYS    comma-separated list of archive attributes to group the listed archives by; valid keys are: name, host, user, tags; default is to not group
         --json      Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
 
 
@@ -86,6 +89,31 @@ Description
 ~~~~~~~~~~~
 
 This command lists the archives contained in a repository.
+
+Grouping archives
++++++++++++++++++
+
+``--group-by`` lists the archives grouped by the given comma-separated archive
+attributes, each group preceded by a header line naming it::
+
+    $ borg repo-list --group-by name,host --format '{archive} {time}{NL}'
+    Group (name='home', host='host1'):
+    home Thu, 2026-06-04 18:00:00 +0200
+    home Wed, 2026-06-03 18:00:00 +0200
+
+    Group (name='home', host='host2'):
+    home Thu, 2026-06-04 19:00:00 +0200
+
+Valid keys are ``name``, ``host``, ``user`` and ``tags``; borg's internal tags (starting
+with ``@``) do not affect grouping. Archives without ``host`` / ``user`` metadata (e.g.
+archives transferred from a borg 1.x repository) form their own group.
+
+These are the same keys and the same grouping that ``borg prune --group-by`` uses, so
+this is a way to see which archives a prune run will consider together before running
+it. Without ``--group-by``, archives are listed as before, ungrouped.
+
+With ``--json``, no header lines are emitted; each archive gets a ``group`` object
+instead.
 
 .. man NOTES
 

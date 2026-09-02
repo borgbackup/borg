@@ -107,10 +107,15 @@ static int64_t fc_scan_blockwise(const uint64_t *gear, const uint8_t *p, size_t 
     for (; i + 8 <= n; i += 8) {
         fc_block_prefix(gear, p + i, s);
         uint64_t c = fp << 8;
-        uint64_t cand = 0;
-        for (int j = 0; j < 8; j++)
-            cand |= (((c + s[j]) & M[j]) == 0);
-        if (cand) {
+        /* The candidate test is a short-circuit chain on purpose: it compiles
+         * to eight test-and-branch pairs that leave the loop at the first
+         * candidate. Written as a loop accumulating `cand |= ...`, gcc >= 12
+         * at -O2 vectorises it, reloading the eight 8-byte stores of s[] as
+         * 16-byte vectors - which fails store-to-load forwarding on every
+         * block (Zen 4: 3.1x slower). */
+        if (((c + s[0]) & M[0]) == 0 || ((c + s[1]) & M[1]) == 0 || ((c + s[2]) & M[2]) == 0 ||
+            ((c + s[3]) & M[3]) == 0 || ((c + s[4]) & M[4]) == 0 || ((c + s[5]) & M[5]) == 0 ||
+            ((c + s[6]) & M[6]) == 0 || ((c + s[7]) & M[7]) == 0) {
             int64_t r = fc_scan_seq(gear, p + i, 8, &fp, mask); /* exact recheck */
             if (r >= 0) {
                 *fp_io = fp;

@@ -223,6 +223,9 @@ Other changes:
 - benchmark cpu: also benchmark zstd,-4
 - buzhash64: faster blockwise kernel (the hit test as a short-circuit chain) and make
   it the aarch64 default, +24% over the NEON kernel on an Apple M3 Pro
+- fastcdc: faster blockwise kernel (the candidate test as a short-circuit chain), 1.75x
+  on an Apple M3 Pro and 3x on a Zen 4 with gcc -O2; it is the default kernel on
+  platforms other than x86-64 and aarch64
 - archive: resolve the item metadata stream chunk ids lazily, big win for repo-list
   on remote repos, #10204
 - lock exceptions: tell who holds the lock, #2261

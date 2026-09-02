@@ -246,13 +246,27 @@ PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t
 
 #elif PHTE_HAVE_HW
 
-__attribute__((target("aes,sse2"))) static int64_t
+/* apply one AES round (or the last one) to the 8 blocks in flight */
+#define PH_R8(op, k) \
+    b0 = op(b0, k); b1 = op(b1, k); b2 = op(b2, k); b3 = op(b3, k); \
+    b4 = op(b4, k); b5 = op(b5, k); b6 = op(b6, k); b7 = op(b7, k)
+
+/* The AES rounds and the 8-way test are spelled out rather than looped:
+ * gcc at -O2 keeps such loops rolled (12 instructions per round, two
+ * branches per tested position) and clang serialises the early-exit test
+ * loop into 8 dependent chains; both cost about a fifth of the path's time
+ * on a Zen 4. The test is branch-free in the vector domain: the 8 low
+ * ciphertext qwords are packed pairwise (unpcklqdq), masked, compared to
+ * zero (pcmpeqq, SSE4.1 - every CPU with AES-NI has it), or-reduced, and
+ * only a hit enters the lane search. */
+__attribute__((target("aes,sse4.1"))) static int64_t
 PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
 {
     uint64_t d = *digest, da, db;
     const uint8_t *qo = p - 64;
     size_t i = 0;
     int lanes_live = 0;
+    const __m128i M = _mm_set1_epi64x((long long)mask), Z = _mm_setzero_si128();
 
     if (n >= 10) {
         db = PH_ROLL(c, d, qo[0], p[0]);               /* d_0 */
@@ -278,50 +292,38 @@ PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t
         /* 8 blocks in flight; round keys are re-loaded per round (they stay
          * hot in L1) to keep register pressure within the 16 XMM registers */
         kr = _mm_loadu_si128((const __m128i *)c->base.rk[0]);
-        b0 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[0]), kr);
-        b1 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[1]), kr);
-        b2 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[2]), kr);
-        b3 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[3]), kr);
-        b4 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[4]), kr);
-        b5 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[5]), kr);
-        b6 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[6]), kr);
-        b7 = _mm_xor_si128(_mm_set_epi64x(0, (long long)dg[7]), kr);
-        for (int r = 1; r < 10; r++) {
-            kr = _mm_loadu_si128((const __m128i *)c->base.rk[r]);
-            b0 = _mm_aesenc_si128(b0, kr);
-            b1 = _mm_aesenc_si128(b1, kr);
-            b2 = _mm_aesenc_si128(b2, kr);
-            b3 = _mm_aesenc_si128(b3, kr);
-            b4 = _mm_aesenc_si128(b4, kr);
-            b5 = _mm_aesenc_si128(b5, kr);
-            b6 = _mm_aesenc_si128(b6, kr);
-            b7 = _mm_aesenc_si128(b7, kr);
-        }
+        b0 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[0]), kr);
+        b1 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[1]), kr);
+        b2 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[2]), kr);
+        b3 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[3]), kr);
+        b4 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[4]), kr);
+        b5 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[5]), kr);
+        b6 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[6]), kr);
+        b7 = _mm_xor_si128(_mm_cvtsi64_si128((long long)dg[7]), kr);
+#define PH_ROUND(r) \
+        kr = _mm_loadu_si128((const __m128i *)c->base.rk[r]); \
+        PH_R8(_mm_aesenc_si128, kr)
+        PH_ROUND(1); PH_ROUND(2); PH_ROUND(3); PH_ROUND(4); PH_ROUND(5);
+        PH_ROUND(6); PH_ROUND(7); PH_ROUND(8); PH_ROUND(9);
+#undef PH_ROUND
         kr = _mm_loadu_si128((const __m128i *)c->base.rk[10]);
-        b0 = _mm_aesenclast_si128(b0, kr);
-        b1 = _mm_aesenclast_si128(b1, kr);
-        b2 = _mm_aesenclast_si128(b2, kr);
-        b3 = _mm_aesenclast_si128(b3, kr);
-        b4 = _mm_aesenclast_si128(b4, kr);
-        b5 = _mm_aesenclast_si128(b5, kr);
-        b6 = _mm_aesenclast_si128(b6, kr);
-        b7 = _mm_aesenclast_si128(b7, kr);
+        PH_R8(_mm_aesenclast_si128, kr);
 
         {
-            uint64_t cs[8];
-            cs[0] = (uint64_t)_mm_cvtsi128_si64(b0);
-            cs[1] = (uint64_t)_mm_cvtsi128_si64(b1);
-            cs[2] = (uint64_t)_mm_cvtsi128_si64(b2);
-            cs[3] = (uint64_t)_mm_cvtsi128_si64(b3);
-            cs[4] = (uint64_t)_mm_cvtsi128_si64(b4);
-            cs[5] = (uint64_t)_mm_cvtsi128_si64(b5);
-            cs[6] = (uint64_t)_mm_cvtsi128_si64(b6);
-            cs[7] = (uint64_t)_mm_cvtsi128_si64(b7);
-            for (int j = 0; j < 8; j++) {
-                if ((cs[j] & mask) == 0) {
-                    *digest = dg[j];
-                    return (int64_t)(i + j);
-                }
+            __m128i e01 = _mm_cmpeq_epi64(_mm_and_si128(_mm_unpacklo_epi64(b0, b1), M), Z);
+            __m128i e23 = _mm_cmpeq_epi64(_mm_and_si128(_mm_unpacklo_epi64(b2, b3), M), Z);
+            __m128i e45 = _mm_cmpeq_epi64(_mm_and_si128(_mm_unpacklo_epi64(b4, b5), M), Z);
+            __m128i e67 = _mm_cmpeq_epi64(_mm_and_si128(_mm_unpacklo_epi64(b6, b7), M), Z);
+            __m128i any = _mm_or_si128(_mm_or_si128(e01, e23), _mm_or_si128(e45, e67));
+            if (_mm_movemask_epi8(any)) {
+                /* bit j of hits = position i + j hit; the lowest one wins */
+                unsigned hits = (unsigned)_mm_movemask_pd(_mm_castsi128_pd(e01)) |
+                                ((unsigned)_mm_movemask_pd(_mm_castsi128_pd(e23)) << 2) |
+                                ((unsigned)_mm_movemask_pd(_mm_castsi128_pd(e45)) << 4) |
+                                ((unsigned)_mm_movemask_pd(_mm_castsi128_pd(e67)) << 6);
+                int j = __builtin_ctz(hits);
+                *digest = dg[j];
+                return (int64_t)(i + (size_t)j);
             }
         }
         i += 8;

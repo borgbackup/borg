@@ -163,15 +163,15 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b24 (not released yet)
------------------------------------
+Version 2.0.0b24 (2026-09-02)
+-----------------------------
 
 New features:
 
 - copy: copy an archive to a new archive name (fast & cheap!), #2300
 - benchmark cpu: add --data PATH option (testing with a given corpus), #10265
-- add --group-by to repo-list, prune and analyze to better support
-  multi-client archive series (potentially using the same name)
+- prune/repo-list/analyze: add --group-by to better support multi-client
+  archive series (potentially using the same name)
 
 Fixes:
 
@@ -184,23 +184,22 @@ Fixes:
 - repo-list: fix --format help, it did not show the actual default, #10204
 - do not ignore -a / --match-archives when an archive NAME is given
 - benchmark cpu: catch exceptions per test, do not abort the whole run
-- misc. fixes for Haiku
 - write index fragment(s) before the archive pointer, #10239
 - transfer --from-borg1: do not mistake a borg 1.x repokey repo for a repo whose
   encryption method changed
 - transfer: clean error instead of a crash when no other repo is given
-- don't mistake a malformed URL for a local path, #10215
 - serve: print startup errors to stderr, #10266
 - prune: remove the date-based archive filters, #10250.
   --oldest/--newest/--older/--newer were accepted by the prune parser
   but never applied.
-- BORG_WORKAROUNDS=authenticated_no_key: also work when the borg key is completely
-  lost, #10238
 - delete/undelete: fix dead "all archives" safety guard
 - delete/undelete: also accept date-based filters as archive selection
 - diff: fix --numeric-ids having no effect
-- log-json: emit question_* JSON objects for prompts again
 - version: add the --from-borg1 option, it was documented but never implemented
+- don't mistake a malformed URL for a local path, #10215
+- BORG_WORKAROUNDS=authenticated_no_key: also work when the borg key is completely
+  lost, #10238
+- log-json: emit question_* JSON objects for prompts again
 - borgfs: fix breakage caused by the jsonargparse migration
 - borgfs: adopt the "mount:" config file section
 - let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
@@ -208,11 +207,6 @@ Fixes:
 
   - goldilocks-aes: fix build on 32-bit archs (no __uint128_t there)
   - *-aes chunkers: use the aes-arm64 instructions on Linux and FreeBSD.
-- windows:
-
-  - do not build the binaries from a "dirty" checkout, #10199
-  - normalize remote repo paths as POSIX paths, #10199
-  - fix platformdirs directories, #10237
 - completions:
 
   - fish: fix the completion and error message issues, #3086
@@ -220,6 +214,12 @@ Fixes:
   - complete repo and encryption, #3086
   - remove the RST markup from the descriptions, #3086
 - argparsing: name the option, not its config key, for a missing required argument, #3086
+- misc. fixes for Haiku
+- windows:
+
+  - do not build the binaries from a "dirty" checkout, #10199
+  - normalize remote repo paths as POSIX paths, #10199
+  - fix platformdirs directories, #10237
 
 Other changes:
 

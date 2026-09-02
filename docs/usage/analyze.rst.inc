@@ -12,35 +12,35 @@ borg analyze
 
     .. class:: borg-options-table
 
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    | **options**                                                                                                                                                                                                                                              |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--by-name``                                | decompose the whole repository by archive name (not combinable with archive filters)                                        |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--json``                                   | format output as JSON                                                                                                       |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
-    |                                                                                                                                                                                                                                                          |
-    | :ref:`common_options`                                                                                                                                                                                                                                    |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                              |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. See "borg help match-archives".                                               |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--first N``                                | consider the first N archives after other filters are applied                                                               |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--last N``                                 | consider the last N archives after other filters are applied                                                                |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.                          |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.                          |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **options**                                                                                                                                                                                                                                                                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--group-by KEYS``                          | decompose the whole repository by groups of archives, grouped by the given comma-separated archive attributes (not combinable with archive filters); valid keys are: name, host, user, tags |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--json``                                   | format output as JSON                                                                                                                                                                       |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                           |
+    |                                                                                                                                                                                                                                                                                                                          |
+    | :ref:`common_options`                                                                                                                                                                                                                                                                                                    |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                                                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. See "borg help match-archives".                                                                                                               |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp                                                                 |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--first N``                                | consider the first N archives after other filters are applied                                                                                                                               |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--last N``                                 | consider the last N archives after other filters are applied                                                                                                                                |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.                                                                                          |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.                                                                                          |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g., 7d or 12m.                                                                                                                             |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.                                                                                                                             |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -55,7 +55,7 @@ borg analyze
 
 
     options
-        --by-name    decompose the whole repository by archive name (not combinable with archive filters)
+        --group-by KEYS    decompose the whole repository by groups of archives, grouped by the given comma-separated archive attributes (not combinable with archive filters); valid keys are: name, host, user, tags
         --json     format output as JSON
 
 
@@ -76,7 +76,8 @@ borg analyze
 Description
 ~~~~~~~~~~~
 
-Analyze the archives matching the usual archive selection options (e.g. ``-a series_name``).
+Analyze the archives matching the usual archive selection options (e.g. ``-a series_name``),
+or decompose the whole repository into groups of archives, see ``--group-by``.
 
 **Deduplicated size of a set of archives**
 
@@ -104,24 +105,35 @@ The stored sizes come from the repository's chunk index; the chunk membership an
 source sizes come from the per-archive references cache that ``borg compact``
 maintains, so unchanged archives usually do not need to be opened.
 
-**Decomposition by archive name (--by-name)**
+**Decomposition by group of archives (--group-by)**
 
-With ``--by-name``, the whole repository is decomposed by archive name instead. Archives
-sharing a name form a series, so a name usually groups all backups of one source; for
-old-style archives that do not form a series, each name is just one archive.
+With ``--group-by``, the whole repository is decomposed into groups of archives instead.
+The groups are formed by the given comma-separated archive attributes ``name``, ``host``,
+``user`` and ``tags`` - the same grouping ``borg prune --group-by`` uses, so the numbers
+below relate to the same units that prune applies its retention rules to.
+
+Archives sharing a name form a series, so ``--group-by name`` usually groups all backups
+of one source. In a repository shared by multiple machines or users that is not specific
+enough, because they may use the same series name for their own, unrelated data - use
+``--group-by name,host`` there.
 
 Every chunk is counted in exactly one row, so the rows add up to the repository's
 deduplicated size:
 
-- one row per archive name, showing what is *exclusive* to it: no archive of another name
-  references these chunks, so deleting all archives of that name would free them;
-- one row for the chunks shared by two or more names;
+- one row per group, showing what is *exclusive* to it: no archive of another group
+  references these chunks, so deleting all archives of that group would free them;
+- one row for the chunks shared by two or more groups;
 - one row for the unreferenced chunks (see above).
 
-This answers "which name costs how much, and what would I get back by dropping it" for
-all names at once, in a single pass over the archives. As the shared and unreferenced
-rows can only be determined by looking at every archive, ``--by-name`` always covers the
+This answers "which group costs how much, and what would I get back by dropping it" for
+all groups at once, in a single pass over the archives. As the shared and unreferenced
+rows can only be determined by looking at every archive, ``--group-by`` always covers the
 whole repository and cannot be combined with archive filters.
+
+Grouping by more attributes moves chunks from the group rows into the shared row: if two
+hosts back up identical content, ``--group-by name`` reports it as exclusive to that
+name, while ``--group-by name,host`` correctly shows that deleting either host's
+archives alone would not free it.
 
 **Hot spots**
 
@@ -140,7 +152,7 @@ backups) or use ``borg recreate`` to recreate existing archives without them.
 
 With ``--json``, the same numbers are emitted as a single JSON object instead of the text
 report, with raw byte values rather than formatted sizes. The default mode fills the
-*dedup_size* and *hotspots* keys, ``--by-name`` fills the *by_name* key. The compression
-factor is not included: it is ``stored_size / source_size``.
+*dedup_size* and *hotspots* keys, ``--group-by`` fills the *by_group* key. The
+compression factor is not included: it is ``stored_size / source_size``.
 
 See :ref:`json_output` for the object's structure.

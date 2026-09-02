@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-prune" "1" "2026-08-29" "" "borg backup tool"
+.TH "borg-prune" "1" "2026-09-02" "" "borg backup tool"
 .SH Name
 borg-prune \- Prune archives according to specified rules.
 .SH SYNOPSIS
@@ -54,18 +54,67 @@ certain number of historic backups. This retention policy is commonly referred t
 GFS \%<https://\:en\:.wikipedia\:.org/\:wiki/\:Backup_rotation_scheme#\:Grandfather-father-son>
 (Grandfather\-father\-son) backup rotation scheme.
 .sp
-The recommended way to use prune is to give the archive series name to it via the
-NAME argument (assuming you have the same name for all archives in a series).
-Alternatively, you can also use \-\-match\-archives (\-a), then only archives that
-match the pattern are considered for deletion and only those archives count
-towards the totals specified by the rules.
-Otherwise, \fIall\fP archives in the repository are candidates for deletion!
-There is no automatic distinction between archives representing different
-contents. These need to be distinguished by specifying matching globs.
+Two separate mechanisms decide what prune does: the archive \fIselection\fP determines
+which archives are considered at all, and \fB\-\-group\-by\fP determines how the retention
+rules subdivide the selected archives.
 .sp
-If you have multiple series of archives with different data sets (e.g.
-from different machines) in one shared repository, use one prune call per
-series.
+Without NAME and without \-\-match\-archives (\-a), \fIall\fP archives in the repository are
+selected. Give the archive series name via the NAME argument (assuming you have the
+same name for all archives in a series) or use \-\-match\-archives (\-a) to only consider
+a subset. NAME is just another way of saying \fB\-a NAME\fP, so it can be combined with
+\-\-match\-archives (\-a). All given patterns must match (they are ANDed), thus giving
+both narrows down the selection.
+.sp
+The retention rules are applied to each group of selected archives separately, so
+that unrelated backup sets do not compete for the same retention slots. By default,
+archives are grouped by their series name and the host they were made on
+(\fB\-\-group\-by name,host\fP): \fB\-\-keep\-daily 7\fP keeps 7 daily archives \fIper series and
+host\fP\&. Archive series names are not unique in a repository shared by multiple machines
+or users \- different machines may well use the same series name for their own,
+unrelated data \- so grouping by the name alone would let one machine\(aqs archives push
+another machine\(aqs archives out of the retention slots.
+.sp
+\fB\-\-group\-by\fP accepts a comma\-separated list of the archive attributes \fBname\fP,
+\fBhost\fP, \fBuser\fP and \fBtags\fP\&. Archives without \fBhost\fP / \fBuser\fP metadata (e.g.
+archives transferred from a borg 1.x repository) form their own group. Borg\(aqs internal
+tags (starting with \fB@\fP) do not affect grouping. Give \fB\-\-group\-by \(dq\(dq\fP to not group
+at all and apply the rules to all selected archives at once.
+.sp
+Use \fB\-\-group\-by name\fP if several machines back up the same data to the same archive
+series on purpose and you want one retention policy for all of them. Add \fBuser\fP if
+one machine backs up the same series as different users and each of them should get
+their own retention.
+.sp
+So, to prune every series of every host in one call, the default is all you need:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+borg prune \-\-keep\-daily 7 \-\-keep\-weekly 4
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+To only consider your own archives, select them \- the grouping then applies to the
+selection only:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+borg prune \-a host:myhost \-\-keep\-daily 7 \-\-keep\-weekly 4
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+Note: the \fBhost:\fP / \fBuser:\fP metadata is what the client wrote into the
+archive; it is not a permission mechanism. Any client with delete permission
+for the repository can prune any archive in it.
+.sp
+Beware of grouping by an attribute that is not stable over time: if e.g. the hostname
+changes for every backup run (as it might for containers), each archive ends up in a
+group of its own and the retention rules will keep all of them. Set \fBBORG_HOSTNAME\fP
+to a stable value in that case, or use \fB\-\-group\-by name\fP\&. Running prune with
+\fB\-\-info\fP shows one summary line per group, which makes such a situation visible.
 .sp
 The \fB\-\-keep\fP option is the simplest way to specify a basic retention
 policy. It accepts a count or a time interval for retention (e.g.
@@ -181,6 +230,9 @@ Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in
 .TP
 .BI \-\-from \ TIMESTAMP
 only consider archives older than this for pruning
+.TP
+.BI \-\-group\-by \ KEYS
+comma\-separated list of archive attributes to group the archives by before applying the retention rules to each group separately; valid keys are: name, host, user, tags; default is: name,host; use \(dq\(dq (or \(dqnone\(dq) to not group at all
 .TP
 .B  \-\-keep
 number or time interval of archives to keep

@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-08-29" "" "borg backup tool"
+.TH "borg" "1" "2026-09-02" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -885,10 +885,12 @@ already\-compressed/incompressible data or long\-repeat data like VM images.
 .B BORG_FASTCDC_KERNEL / BORG_BUZHASH64_KERNEL
 Select the scan kernel the \fBfastcdc\fP / \fBbuzhash64\fP chunker uses. Accepted values
 are \fBavx512\fP, \fBavx2\fP, \fBneon\fP, \fBblockwise\fP and \fBscalar\fP\&.
-The default is whichever benchmarked fastest for the architecture: \fBneon\fP on
-aarch64, and \fBscalar\fP (the plain sequential loop) on x86\-64, where the compiler
-folds the rolling hash update into a single instruction and thereby beats the vector
-kernels. Other architectures get \fBblockwise\fP, the portable multi\-lane C kernel.
+The default is whichever benchmarked fastest for the architecture: \fBscalar\fP (the
+plain sequential loop) on x86\-64, where the compiler folds the rolling hash update
+into one or two instructions and thereby beats the vector kernels; on aarch64
+\fBneon\fP for \fBfastcdc\fP and \fBblockwise\fP for \fBbuzhash64\fP, whose NEON kernel
+loses to the portable multi\-lane C kernel there. Other architectures get
+\fBblockwise\fP\&.
 All kernels chunk identically \- same cut points, same chunk ids \- and differ only in
 speed, so this is safe to change at any time, also for an existing repository.
 Which kernel is fastest is not predictable from the instruction set: it depends on the
@@ -1088,9 +1090,10 @@ honoured (see \%<https://\:specifications\:.freedesktop\:.org/\:basedir/\:latest
 macOS: native macOS directories are used by default (e.g. \fB~/Library/Application Support/borg\fP,
 \fB~/Library/Caches/borg\fP). \fBXDG_*\fP environment variables are honoured if set.
 .IP \(bu 2
-Windows: local (not roaming) Windows AppData directories are used, e.g.
-\fBC:\eUsers\e<user>\eAppData\eLocal\eborg\eborg\fP\&. \fBborg\fP appears twice in that path because
-borg does not give platformdirs a separate \(dqapp author\(dq name, so it defaults to the app name.
+Windows: native Windows AppData directories are used. The configuration (including
+the keys) is stored in the roaming profile (\fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\fP),
+so it follows the user in domain environments. Machine\-specific data, cache and runtime
+files stay in the local (non\-roaming) AppData (\fBC:\eUsers\e<user>\eAppData\eLocal\eborg\fP).
 \fBXDG_*\fP environment variables are \fBnot\fP honoured.
 .UNINDENT
 .sp
@@ -1104,10 +1107,10 @@ Default directory locations by platform (when no \fBBORG_*\fP environment variab
 .sp
 .EX
 Directory  Linux                 macOS                                 Windows
-Config     ~/.config/borg        ~/Library/Application Support/borg    %LOCALAPPDATA%\eborg\eborg
-Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\eborg\eborg\eCache
-Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\eborg\eborg
-Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %LOCALAPPDATA%\eTemp\eborg\eborg
+Config     ~/.config/borg        ~/Library/Application Support/borg    %APPDATA%\eborg
+Cache      ~/.cache/borg         ~/Library/Caches/borg                 %LOCALAPPDATA%\eborg\eCache
+Data       ~/.local/share/borg   ~/Library/Application Support/borg    %LOCALAPPDATA%\eborg
+Runtime    /run/user/<uid>/borg  ~/Library/Caches/TemporaryItems/borg  %LOCALAPPDATA%\eTemp\eborg
 Keys       <config_dir>/keys     <config_dir>/keys                     <config_dir>\ekeys
 Security   <data_dir>/security   <data_dir>/security                   <data_dir>\esecurity
 .EE

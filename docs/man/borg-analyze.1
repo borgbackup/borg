@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-analyze" "1" "2026-08-29" "" "borg backup tool"
+.TH "borg-analyze" "1" "2026-09-02" "" "borg backup tool"
 .SH Name
 borg-analyze \- Analyzes archives.
 .SH SYNOPSIS
@@ -36,7 +36,8 @@ borg-analyze \- Analyzes archives.
 borg [common options] analyze [options]
 .SH DESCRIPTION
 .sp
-Analyze the archives matching the usual archive selection options (e.g. \fB\-a series_name\fP).
+Analyze the archives matching the usual archive selection options (e.g. \fB\-a series_name\fP),
+or decompose the whole repository into groups of archives, see \fB\-\-group\-by\fP\&.
 .sp
 \fBDeduplicated size of a set of archives\fP
 .sp
@@ -67,28 +68,39 @@ The stored sizes come from the repository\(aqs chunk index; the chunk membership
 source sizes come from the per\-archive references cache that \fBborg compact\fP
 maintains, so unchanged archives usually do not need to be opened.
 .sp
-\fBDecomposition by archive name (\-\-by\-name)\fP
+\fBDecomposition by group of archives (\-\-group\-by)\fP
 .sp
-With \fB\-\-by\-name\fP, the whole repository is decomposed by archive name instead. Archives
-sharing a name form a series, so a name usually groups all backups of one source; for
-old\-style archives that do not form a series, each name is just one archive.
+With \fB\-\-group\-by\fP, the whole repository is decomposed into groups of archives instead.
+The groups are formed by the given comma\-separated archive attributes \fBname\fP, \fBhost\fP,
+\fBuser\fP and \fBtags\fP \- the same grouping \fBborg prune \-\-group\-by\fP uses, so the numbers
+below relate to the same units that prune applies its retention rules to.
+.sp
+Archives sharing a name form a series, so \fB\-\-group\-by name\fP usually groups all backups
+of one source. In a repository shared by multiple machines or users that is not specific
+enough, because they may use the same series name for their own, unrelated data \- use
+\fB\-\-group\-by name,host\fP there.
 .sp
 Every chunk is counted in exactly one row, so the rows add up to the repository\(aqs
 deduplicated size:
 .INDENT 0.0
 .IP \(bu 2
-one row per archive name, showing what is \fIexclusive\fP to it: no archive of another name
-references these chunks, so deleting all archives of that name would free them;
+one row per group, showing what is \fIexclusive\fP to it: no archive of another group
+references these chunks, so deleting all archives of that group would free them;
 .IP \(bu 2
-one row for the chunks shared by two or more names;
+one row for the chunks shared by two or more groups;
 .IP \(bu 2
 one row for the unreferenced chunks (see above).
 .UNINDENT
 .sp
-This answers \(dqwhich name costs how much, and what would I get back by dropping it\(dq for
-all names at once, in a single pass over the archives. As the shared and unreferenced
-rows can only be determined by looking at every archive, \fB\-\-by\-name\fP always covers the
+This answers \(dqwhich group costs how much, and what would I get back by dropping it\(dq for
+all groups at once, in a single pass over the archives. As the shared and unreferenced
+rows can only be determined by looking at every archive, \fB\-\-group\-by\fP always covers the
 whole repository and cannot be combined with archive filters.
+.sp
+Grouping by more attributes moves chunks from the group rows into the shared row: if two
+hosts back up identical content, \fB\-\-group\-by name\fP reports it as exclusive to that
+name, while \fB\-\-group\-by name,host\fP correctly shows that deleting either host\(aqs
+archives alone would not free it.
 .sp
 \fBHot spots\fP
 .sp
@@ -107,8 +119,8 @@ backups) or use \fBborg recreate\fP to recreate existing archives without them.
 .sp
 With \fB\-\-json\fP, the same numbers are emitted as a single JSON object instead of the text
 report, with raw byte values rather than formatted sizes. The default mode fills the
-\fIdedup_size\fP and \fIhotspots\fP keys, \fB\-\-by\-name\fP fills the \fIby_name\fP key. The compression
-factor is not included: it is \fBstored_size / source_size\fP\&.
+\fIdedup_size\fP and \fIhotspots\fP keys, \fB\-\-group\-by\fP fills the \fIby_group\fP key. The
+compression factor is not included: it is \fBstored_size / source_size\fP\&.
 .sp
 See \fIjson_output\fP for the object\(aqs structure.
 .SH OPTIONS
@@ -117,8 +129,8 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .SS options
 .INDENT 0.0
 .TP
-.B  \-\-by\-name
-decompose the whole repository by archive name (not combinable with archive filters)
+.BI \-\-group\-by \ KEYS
+decompose the whole repository by groups of archives, grouped by the given comma\-separated archive attributes (not combinable with archive filters); valid keys are: name, host, user, tags
 .TP
 .B  \-\-json
 format output as JSON

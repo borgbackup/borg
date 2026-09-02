@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-list" "1" "2026-08-29" "" "borg backup tool"
+.TH "borg-repo-list" "1" "2026-09-02" "" "borg backup tool"
 .SH Name
 borg-repo-list \- List the archives contained in a repository.
 .SH SYNOPSIS
@@ -37,6 +37,35 @@ borg [common options] repo\-list [options]
 .SH DESCRIPTION
 .sp
 This command lists the archives contained in a repository.
+.SS Grouping archives
+.sp
+\fB\-\-group\-by\fP lists the archives grouped by the given comma\-separated archive
+attributes, each group preceded by a header line naming it:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+$ borg repo\-list \-\-group\-by name,host \-\-format \(aq{archive} {time}{NL}\(aq
+Group (name=\(aqhome\(aq, host=\(aqhost1\(aq):
+home Thu, 2026\-06\-04 18:00:00 +0200
+home Wed, 2026\-06\-03 18:00:00 +0200
+
+Group (name=\(aqhome\(aq, host=\(aqhost2\(aq):
+home Thu, 2026\-06\-04 19:00:00 +0200
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+Valid keys are \fBname\fP, \fBhost\fP, \fBuser\fP and \fBtags\fP; borg\(aqs internal tags (starting
+with \fB@\fP) do not affect grouping. Archives without \fBhost\fP / \fBuser\fP metadata (e.g.
+archives transferred from a borg 1.x repository) form their own group.
+.sp
+These are the same keys and the same grouping that \fBborg prune \-\-group\-by\fP uses, so
+this is a way to see which archives a prune run will consider together before running
+it. Without \fB\-\-group\-by\fP, archives are listed as before, ungrouped.
+.sp
+With \fB\-\-json\fP, no header lines are emitted; each archive gets a \fBgroup\fP object
+instead.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -51,6 +80,9 @@ repository is Borg 1.x
 .TP
 .BI \-\-format \ FORMAT
 specify format for archive listing (default: \(dq{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}{NL}\(dq)
+.TP
+.BI \-\-group\-by \ KEYS
+comma\-separated list of archive attributes to group the listed archives by; valid keys are: name, host, user, tags; default is to not group
 .TP
 .B  \-\-json
 Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.

@@ -913,6 +913,8 @@ Errors
         File failed integrity check: {}
     DecompressionError rc: 92 traceback: yes
         Decompression error: {}
+    CorruptPack rc: 93 traceback: no
+        {}. Run "borg check --repair" to recover the objects that are still readable.
 
     Reading a legacy borg 1.x repository (e.g. ``borg transfer --from-borg1``) raises the
     ``LegacyRepository.*`` and ``LegacyRemoteRepository.*`` variants of the repository and RPC

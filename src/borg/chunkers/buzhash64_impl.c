@@ -44,6 +44,15 @@
 #define BZ_PIN(v) ((void)0)
 #endif
 
+/* The per-block table lookup helpers must be inlined into the scan loops:
+ * gcc at -O2 (Debian's python flags) leaves them as calls otherwise, one per
+ * 8-byte block, and passes their 64-byte result through the stack. */
+#if defined(__GNUC__)
+#define BZ_ALWAYS_INLINE static inline __attribute__((always_inline))
+#else
+#define BZ_ALWAYS_INLINE static inline
+#endif
+
 /* --- sequential reference loop (also: block re-scan and tail) ----------- */
 
 static size_t bz64_scan_seq(const uint64_t *T, const uint64_t *Trot,
@@ -70,7 +79,7 @@ static size_t bz64_scan_seq(const uint64_t *T, const uint64_t *Trot,
 /* Load the block's 8 out/in byte pairs (via two 8-byte data loads) and
  * compute the aligned-domain prefix XORs s[0..7] with a depth-3 tree.
  * Endianness-independent: bytes are extracted by shifting. */
-static inline void bz64_block_prefix(const uint64_t *T, const uint64_t *Trot,
+BZ_ALWAYS_INLINE void bz64_block_prefix(const uint64_t *T, const uint64_t *Trot,
                                      const uint8_t *pr, const uint8_t *pa, uint64_t s[8])
 {
     uint64_t wr, wa;
@@ -212,7 +221,7 @@ static size_t bz64_scan_simd(const uint64_t *T, const uint64_t *Trot,
 /* Load the block's 8 per-byte deltas D_t = Trot[out_t] ^ T[in_t] (via two
  * 8-byte data loads), without the rotations and the prefix XOR: the vector
  * kernels do those in the vector domain. Endianness-independent. */
-static inline void bz64_block_delta(const uint64_t *T, const uint64_t *Trot,
+BZ_ALWAYS_INLINE void bz64_block_delta(const uint64_t *T, const uint64_t *Trot,
                                     const uint8_t *pr, const uint8_t *pa, uint64_t d[8])
 {
     uint64_t wr, wa;

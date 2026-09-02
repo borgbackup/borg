@@ -226,6 +226,9 @@ Other changes:
 - fastcdc: faster blockwise kernel (the candidate test as a short-circuit chain), 1.75x
   on an Apple M3 Pro and 3x on a Zen 4 with gcc -O2; it is the default kernel on
   platforms other than x86-64 and aarch64
+- toeplitz-aes, rabin-aes, goldilocks-aes: faster x86-64 scan paths, the AES rounds
+  and roll steps are unrolled and the lane test is branch-free; on a Zen 4 with gcc -O2
+  aes-ni +7..+30%, vaes +5..+10%
 - archive: resolve the item metadata stream chunk ids lazily, big win for repo-list
   on remote repos, #10204
 - lock exceptions: tell who holds the lock, #2261

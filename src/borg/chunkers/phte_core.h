@@ -150,7 +150,8 @@ PHTE_HW_TARGET static inline uint8x16_t phte_aes1_neon(const uint8x16_t k[11], u
 
 static int phte_hw_available(void)
 {
-    return __builtin_cpu_supports("aes") && __builtin_cpu_supports("sse2");
+    /* SSE4.1 for the scan's pcmpeqq; every CPU with AES-NI has it */
+    return __builtin_cpu_supports("aes") && __builtin_cpu_supports("sse4.1");
 }
 
 __attribute__((target("aes,sse2"))) static inline __m128i

@@ -400,38 +400,35 @@ PH_FN(scan_hw512)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint6
         __m512i b0, b1, b2, b3, b4, b5, b6, b7;
         __mmask8 h0, h1, h2, h3, h4, h5, h6, h7;
 
+        /* The 15 stride-2 roll steps and the 9 AES rounds are spelled out by
+         * macro: gcc at -O2 keeps them as loops, which for the rounds means
+         * 72 zmm register copies per group and for the rolls an index chain
+         * (Zen 4, toeplitz-aes: 7.06 -> 6.40 cycles per byte unrolled). */
         dgs[0] = db;
         dgs[2] = da;
-        for (int j = 2; j < 32; j += 2) {
-            db = PH_ROLL2(c, db, qo[i + j - 1], qo[i + j], p[i + j - 1], p[i + j]);
-            dgs[2 * j] = db;
-            da = PH_ROLL2(c, da, qo[i + j], qo[i + j + 1], p[i + j], p[i + j + 1]);
-            dgs[2 * j + 2] = da;
-        }
+#define PH_STEP(j) \
+        db = PH_ROLL2(c, db, qo[i + (j) - 1], qo[i + (j)], p[i + (j) - 1], p[i + (j)]); dgs[2 * (j)] = db; \
+        da = PH_ROLL2(c, da, qo[i + (j)], qo[i + (j) + 1], p[i + (j)], p[i + (j) + 1]); dgs[2 * (j) + 2] = da
+        PH_STEP(2); PH_STEP(4); PH_STEP(6); PH_STEP(8); PH_STEP(10); PH_STEP(12); PH_STEP(14); PH_STEP(16);
+        PH_STEP(18); PH_STEP(20); PH_STEP(22); PH_STEP(24); PH_STEP(26); PH_STEP(28); PH_STEP(30);
+#undef PH_STEP
         /* prepare the next group's invariant (digests at i+32, i+33) */
         db = PH_ROLL2(c, db, qo[i + 31], qo[i + 32], p[i + 31], p[i + 32]);
         da = PH_ROLL2(c, da, qo[i + 32], qo[i + 33], p[i + 32], p[i + 33]);
 
         /* each vector's 4 blocks are already laid out in dgs (digest in the
          * low qword of every block, zero in the high one) */
-        b0 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 0)), k[0]);
-        b1 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 8)), k[0]);
-        b2 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 16)), k[0]);
-        b3 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 24)), k[0]);
-        b4 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 32)), k[0]);
-        b5 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 40)), k[0]);
-        b6 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 48)), k[0]);
-        b7 = _mm512_xor_si512(_mm512_loadu_si512((const void *)(dgs + 56)), k[0]);
-        for (int r = 1; r < 10; r++) {
-            b0 = _mm512_aesenc_epi128(b0, k[r]);
-            b1 = _mm512_aesenc_epi128(b1, k[r]);
-            b2 = _mm512_aesenc_epi128(b2, k[r]);
-            b3 = _mm512_aesenc_epi128(b3, k[r]);
-            b4 = _mm512_aesenc_epi128(b4, k[r]);
-            b5 = _mm512_aesenc_epi128(b5, k[r]);
-            b6 = _mm512_aesenc_epi128(b6, k[r]);
-            b7 = _mm512_aesenc_epi128(b7, k[r]);
-        }
+        b0 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 0)), k[0]);
+        b1 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 8)), k[0]);
+        b2 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 16)), k[0]);
+        b3 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 24)), k[0]);
+        b4 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 32)), k[0]);
+        b5 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 40)), k[0]);
+        b6 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 48)), k[0]);
+        b7 = _mm512_xor_si512(_mm512_load_si512((const void *)(dgs + 56)), k[0]);
+        PH_R8(_mm512_aesenc_epi128, k[1]); PH_R8(_mm512_aesenc_epi128, k[2]); PH_R8(_mm512_aesenc_epi128, k[3]);
+        PH_R8(_mm512_aesenc_epi128, k[4]); PH_R8(_mm512_aesenc_epi128, k[5]); PH_R8(_mm512_aesenc_epi128, k[6]);
+        PH_R8(_mm512_aesenc_epi128, k[7]); PH_R8(_mm512_aesenc_epi128, k[8]); PH_R8(_mm512_aesenc_epi128, k[9]);
         h0 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b0, k[10]), M);
         h1 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b1, k[10]), M);
         h2 = _mm512_mask_testn_epi64_mask(0x55, _mm512_aesenclast_epi128(b2, k[10]), M);

@@ -93,8 +93,11 @@ static int64_t PH_FN(scan_evp)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *
             return -2; /* OpenSSL failure; caller raises */
         for (size_t i = 0; i < m; i++) {
             if ((phte_load_le64(outb + i * 16) & mask) == 0) {
-                /* recompute the digest at the cut position (cheaper than
-                 * storing all digests: one 64-byte warm-up per chunk) */
+                /* The chunker does not use the digest at a cut (it warms up
+                 * afresh for the next chunk), but keep the out-parameter
+                 * exact like the hardware paths do: recomputing it costs one
+                 * 64-byte warm-up per chunk, storing all digests would cost
+                 * more. */
                 *digest = PH_DIGEST64(c, q + i - 63);
                 return (int64_t)(base + i);
             }

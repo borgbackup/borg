@@ -16,9 +16,10 @@ logger = _logger.create_logger()
 def _made(algo, chunker):
     """Log which chunker was constructed and which scan kernel it ended up with.
 
-    The kernel is worth seeing because it is not implied by the platform: it
-    defaults to the simplest implementation and is only changed by the
-    BORG_*_KERNEL env vars (see kernel_env.py).
+    The kernel is worth seeing because it is not implied by the platform: the
+    default is chosen per platform by the *_kernel_default() functions of the C
+    kernels, from benchmarks rather than from the instruction set, and the
+    BORG_*_KERNEL env vars can override it (see kernel_env.py).
 
     Chunkers that have nothing to select - buzhash and fixed have exactly one
     implementation each - say so rather than omitting the field, so that a

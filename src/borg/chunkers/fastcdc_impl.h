@@ -50,8 +50,8 @@ int fc_kernel_default(void);
  * Returns the first i that matched (fp is left at position i), or -1 if none
  * matched (fp is left at position n-1).
  * gear: the keyed 256-entry table. kernel is one of FC_K_*; callers are
- * expected to have validated it with fc_kernel_select(), an unrunnable one
- * falls back to the vector kernel rather than crashing.
+ * expected to have validated it with fc_kernel_select() - an id this build
+ * does not know runs the blockwise kernel.
  * All kernels return bit-identical results. */
 int64_t fc_scan(const uint64_t *gear, const uint8_t *p, size_t n, uint64_t *fp, uint64_t mask, int kernel);
 

@@ -677,7 +677,7 @@ Archive Analysis
 :ref:`borg_analyze` ``--json`` emits the numbers of its text report as one object. All sizes are
 byte values; the compression factor the text report shows is ``stored_size / source_size``.
 
-Without ``--by-name``, the *dedup_size* and *hotspots* keys are present.
+Without ``--group-by``, the *dedup_size* and *hotspots* keys are present.
 
 *dedup_size* describes the considered set of archives:
 
@@ -708,21 +708,24 @@ missing_chunks
 removed in that directory between consecutive archives), busiest directory first. It is ``null``
 if fewer than two archives matched, as hot spots need at least two archives to compare.
 
-With ``--by-name``, the *by_name* key is present instead, decomposing the whole repository:
+With ``--group-by``, the *by_group* key is present instead, decomposing the whole repository:
 
 archives
     Number of non-deleted archives in the repository
-names
-    List of objects with *name*, *archives* (number of archives with that name), *source_size*
-    and *stored_size*. The sizes are what is exclusive to that name: no archive of another name
-    references those chunks. Biggest *stored_size* first.
+group_by
+    List of the archive attributes the archives were grouped by, as given to ``--group-by``
+groups
+    List of objects with *group*, *archives* (number of archives in that group), *source_size*
+    and *stored_size*. *group* is an object mapping each *group_by* attribute to this group's
+    value for it, e.g. ``{"name": "home", "host": "host1"}``. The sizes are what is exclusive to
+    that group: no archive of another group references those chunks. Biggest *stored_size* first.
 shared
-    Object with *source_size* and *stored_size*: the chunks referenced by two or more names
+    Object with *source_size* and *stored_size*: the chunks referenced by two or more groups
 unreferenced
     As above
 total
     Object with *archives*, *source_size* and *stored_size*. Each chunk is counted in exactly one
-    of *names*, *shared* and *unreferenced*, so the *names* and *shared* sizes add up to *total*.
+    of *groups*, *shared* and *unreferenced*, so the *groups* and *shared* sizes add up to *total*.
 total_chunks, missing_chunks
     As above
 

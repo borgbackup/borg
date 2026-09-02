@@ -170,17 +170,29 @@ New features:
 
 - copy: copy an archive to a new archive name (fast & cheap!), #2300
 - benchmark cpu: add --data PATH option (testing with a given corpus), #10265
+- add --group-by to repo-list, prune and analyze to better support
+  multi-client archive series (potentially using the same name)
 
 Fixes:
 
+- files cache:
+
+  - rebuild the files cache from an archive of the same group
+  - fix rebuild from an archive without ctime
+- recreate: also do the work if --timestamp is the only change requested
+- repo-delete: --force is a simple boolean flag now
+- repo-list: fix --format help, it did not show the actual default, #10204
+- do not ignore -a / --match-archives when an archive NAME is given
+- benchmark cpu: catch exceptions per test, do not abort the whole run
+- misc. fixes for Haiku
 - write index fragment(s) before the archive pointer, #10239
 - transfer --from-borg1: do not mistake a borg 1.x repokey repo for a repo whose
   encryption method changed
-- transfer: clean error instead of crash when no other repo is given
+- transfer: clean error instead of a crash when no other repo is given
 - don't mistake a malformed URL for a local path, #10215
 - serve: print startup errors to stderr, #10266
 - prune: remove the date-based archive filters, #10250.
-  --oldest/--newest/--older/--newer were accepted by the prune parser,
+  --oldest/--newest/--older/--newer were accepted by the prune parser
   but never applied.
 - BORG_WORKAROUNDS=authenticated_no_key: also work when the borg key is completely
   lost, #10238
@@ -192,13 +204,10 @@ Fixes:
 - borgfs: fix breakage caused by the jsonargparse migration
 - borgfs: adopt the "mount:" config file section
 - let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
-- goldilocks-aes: fix build on 32-bit archs (no __uint128_t there)
-- toeplitz-aes, rabin-aes, goldilocks-aes: use the AES instructions on Linux and
-  FreeBSD arm64. The hardware scan path was only built when the compiler targeted
-  the crypto extension as a whole (Apple's default does, a Linux/BSD python
-  extension build does not), so those builds silently ran the 1.5-1.9x slower
-  portable OpenSSL path and rejected BORG_AES_CHUNKER_KERNEL=aes-arm64.
-- repo-list: fix --format help, it did not show the actual default, #10204
+- chunkers:
+
+  - goldilocks-aes: fix build on 32-bit archs (no __uint128_t there)
+  - *-aes chunkers: use the aes-arm64 instructions on Linux and FreeBSD.
 - windows:
 
   - do not build the binaries from a "dirty" checkout, #10199
@@ -221,14 +230,14 @@ Other changes:
 - setuptools-scm: drop tag.strict, #10193
 - diff: show timestamp changes with full nanosecond precision, #9147
 - benchmark cpu: also benchmark zstd,-4
-- buzhash64: faster blockwise kernel (the hit test as a short-circuit chain) and make
-  it the aarch64 default, +24% over the NEON kernel on an Apple M3 Pro
-- fastcdc: faster blockwise kernel (the candidate test as a short-circuit chain), 1.75x
-  on an Apple M3 Pro and 3x on a Zen 4 with gcc -O2; it is the default kernel on
-  platforms other than x86-64 and aarch64
-- toeplitz-aes, rabin-aes, goldilocks-aes: faster x86-64 scan paths, the AES rounds
-  and roll steps are unrolled and the lane test is branch-free; on a Zen 4 with gcc -O2
-  aes-ni +7..+30%, vaes +5..+10%
+- chunkers:
+
+  - speed up the *-aes chunkers on x86-64
+  - speed up the buzhash64 kernel on arm64 / Apple Silicon, use the blockwise
+    kernel on aarch64 by default (now faster than NEON)
+  - speed up the fastcdc blockwise kernel (default kernel on platforms other
+    than x86-64 and aarch64)
+  - add kernel benchmark script
 - archive: resolve the item metadata stream chunk ids lazily, big win for repo-list
   on remote repos, #10204
 - lock exceptions: tell who holds the lock, #2261
@@ -239,11 +248,14 @@ Other changes:
   - improve GitHub Actions security, address the zizmor audit findings
   - use ubuntu-26.04 runners
   - add a 32-bit armv7 runner
+  - re-add Haiku (now r1beta6)
   - release: attach the sigstore bundle of the provenance attestation to every
     release asset, so they can be verified offline, #10187
 - tests:
 
+  - import-tar hard link round trip, BORG vs PAX tar format
   - skip tz tests where time.tzset() is missing, not just on Windows
+  - do not inherit the session's SSH_ORIGINAL_COMMAND
   - do not let the terminal's COLORTERM leak into the spinner tests
 - docs:
 
@@ -262,7 +274,7 @@ Other changes:
   - fix packs.rst and security.rst to match the implementation
   - update frontends.rst and data-structures.rst, fix wrong claims in them
   - update deployment docs to borg2 commands and REST protocol
-  - fix borgfs man page generation, drop the stale borgfs rst/html page
+  - fix borgfs man page generation, drop the stale borgfs RST/HTML page
   - fix broken examples and stale output samples in the usage docs
   - fix outdated dependencies, paths and links in installation.rst
   - fix outdated --encryption mode names in examples and help

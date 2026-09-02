@@ -121,7 +121,8 @@ static int64_t PH_FN(scan_evp)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *
 
 #if PHTE_HAVE_HW && defined(__aarch64__)
 
-static int64_t PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
+PHTE_HW_TARGET static int64_t
+PH_FN(scan_hw)(PH_CTX *c, const uint8_t *p, size_t n, uint64_t *digest, uint64_t mask)
 {
     uint8x16_t k[11];
     uint64_t d = *digest, da, db;

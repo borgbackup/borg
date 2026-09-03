@@ -206,7 +206,7 @@ Fixes:
 - chunkers:
 
   - goldilocks-aes: fix build on 32-bit archs (no __uint128_t there)
-  - *-aes chunkers: use the aes-arm64 instructions on Linux and FreeBSD.
+  - ``*-aes`` chunkers: use the aes-arm64 instructions on Linux and FreeBSD.
 - completions:
 
   - fish: fix the completion and error message issues, #3086
@@ -232,7 +232,7 @@ Other changes:
 - benchmark cpu: also benchmark zstd,-4
 - chunkers:
 
-  - speed up the *-aes chunkers on x86-64
+  - speed up the ``*-aes`` chunkers on x86-64
   - speed up the buzhash64 kernel on arm64 / Apple Silicon, use the blockwise
     kernel on aarch64 by default (now faster than NEON)
   - speed up the fastcdc blockwise kernel (default kernel on platforms other

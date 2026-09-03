@@ -1,5 +1,6 @@
 import textwrap
 import json
+import logging
 import sys
 import os
 
@@ -8,6 +9,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
+from ..helpers import format_file_size, log_multi
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.sorting import sort_spec_validator, sorted_by_spec
 from ..item import ItemDiff
@@ -35,6 +37,59 @@ DIFF_SORT_KEYS = (
 diff_sort_spec = sort_spec_validator(DIFF_SORT_KEYS, name="diff_sort_spec")
 
 
+class DiffStats:
+    """Aggregated statistics over all reported item diffs, for ``borg diff --stats``."""
+
+    def __init__(self):
+        self.added_items = 0  # items present in ARCHIVE2 only
+        self.removed_items = 0  # items present in ARCHIVE1 only
+        self.changed_items = 0  # items present in both archives, but not equal
+        self.added_chunk_volume = 0  # size of the content chunks added (by added and by changed items)
+        self.removed_chunk_volume = 0  # size of the content chunks removed (by removed and by changed items)
+        self.unknown_size_items = 0  # items whose content changed by an unknown amount
+
+    def add(self, diff: ItemDiff, changes: dict) -> None:
+        """Account for one item diff, using the already filtered/reported changes."""
+        content = changes.get("content")
+        if content is not None:
+            info = content.to_dict()
+            if "added" in info or "removed" in info:
+                self.added_chunk_volume += info.get("added", 0)
+                self.removed_chunk_volume += info.get("removed", 0)
+            else:
+                # a "modified" that was determined by comparing the content: no byte counts.
+                self.unknown_size_items += 1
+        if diff._item1.get("deleted"):
+            self.added_items += 1
+        elif diff._item2.get("deleted"):
+            self.removed_items += 1
+        else:
+            self.changed_items += 1
+
+    def as_dict(self) -> dict:
+        return {
+            "added_items": self.added_items,
+            "removed_items": self.removed_items,
+            "changed_items": self.changed_items,
+            "added_chunk_volume": self.added_chunk_volume,
+            "removed_chunk_volume": self.removed_chunk_volume,
+            "unknown_size_items": self.unknown_size_items,
+        }
+
+    def __str__(self) -> str:
+        lines = [
+            f"Added items: {self.added_items}",
+            f"Removed items: {self.removed_items}",
+            f"Changed items: {self.changed_items}",
+            f"Added chunk volume: {format_file_size(self.added_chunk_volume)}",
+            f"Removed chunk volume: {format_file_size(self.removed_chunk_volume)}",
+        ]
+        if self.unknown_size_items:
+            # these items are not accounted for in the added/removed data above, so say so.
+            lines.append(f"Items with unknown size changes: {self.unknown_size_items}")
+        return "\n".join(lines)
+
+
 class DiffMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_diff(self, args, repository, manifest):
@@ -52,29 +107,25 @@ class DiffMixIn:
                 # All other change types are indeed changes.
                 return True
 
-        def print_json_output(diff):
+        def reported_changes(diff):
+            """The changes of diff that are actually shown to the user."""
+            return {
+                name: change
+                for name, change in diff.changes().items()
+                if actual_change(change) and (not args.content_only or (name not in DiffFormatter.METADATA))
+            }
+
+        def print_json_output(diff, changes):
             print(
                 json.dumps(
-                    {
-                        "path": diff.path,
-                        "changes": [
-                            change.to_dict()
-                            for name, change in diff.changes().items()
-                            if actual_change(change) and (not args.content_only or (name not in DiffFormatter.METADATA))
-                        ],
-                    },
+                    {"path": diff.path, "changes": [change.to_dict() for change in changes.values()]},
                     sort_keys=True,
                     cls=BorgJsonEncoder,
                 )
             )
 
-        def print_text_output(diff, formatter):
-            actual_changes = {
-                name: change
-                for name, change in diff.changes().items()
-                if actual_change(change) and (not args.content_only or (name not in DiffFormatter.METADATA))
-            }
-            diff._changes = actual_changes
+        def print_text_output(diff, changes, formatter):
+            diff._changes = changes
             res: str = formatter.format_item(diff)
             if res.strip():
                 sys.stdout.write(res)
@@ -162,11 +213,23 @@ class DiffMixIn:
         diffs = sorted_by_spec(diffs, args.sort_by, key_for)
 
         formatter = DiffFormatter(format, args.content_only)
+        stats = DiffStats() if args.stats else None
         for diff in diffs:
+            changes = reported_changes(diff)
+            if stats is not None and changes:
+                # items without any reported change do not show up in the output, so don't count them.
+                stats.add(diff, changes)
             if args.json_lines:
-                print_json_output(diff)
+                print_json_output(diff, changes)
             else:
-                print_text_output(diff, formatter)
+                print_text_output(diff, changes, formatter)
+
+        if stats is not None:
+            if args.json_lines:
+                # a final line of a different shape than the per-path lines, so it is easy to tell apart.
+                print(json.dumps({"stats": stats.as_dict()}, sort_keys=True, cls=BorgJsonEncoder))
+            else:
+                log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
@@ -252,6 +315,29 @@ class DiffMixIn:
             {"changes": [{"added": 4, "removed": 0, "type": "added"}], "path": "path/to/added-file"}
             {"changes": [{"added": 0, "removed": 5, "type": "removed"}], "path": "path/to/removed-file"}
 
+        Statistics
+        ++++++++++
+        With ``--stats``, borg prints a summary of the differences after the per-path output::
+
+            Added items: 23
+            Removed items: 2
+            Changed items: 315
+            Added chunk volume: 53.70 MB
+            Removed chunk volume: 51.10 MB
+
+        "Added"/"Removed" items only exist in ARCHIVE2/ARCHIVE1, "changed" items exist in both
+        archives but differ. "Added chunk volume"/"Removed chunk volume" sum up the size of the
+        content chunks added/removed by all of these items. Items whose content borg could only
+        compare byte by byte (see "Performance considerations" below) contribute no byte counts;
+        if there are any, an additional "Items with unknown size changes" line reports how many.
+
+        Together with ``--json-lines``, the summary is emitted as a final JSON line of the shape
+        ``{"stats": {...}}`` instead, so it is easy to tell apart from the per-path lines
+        (wrapped here for readability, borg prints it as a single line)::
+
+            {"stats": {"added_chunk_volume": 53700000, "added_items": 23, "changed_items": 315,
+                       "removed_chunk_volume": 51100000, "removed_items": 2, "unknown_size_items": 0}}
+
         Sorting
         ++++++++
         Use ``--sort-by FIELDS`` where FIELDS is a comma-separated list of fields.
@@ -297,6 +383,9 @@ class DiffMixIn:
             help='specify format for differences between archives (default: "{change} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")
+        subparser.add_argument(
+            "-s", "--stats", dest="stats", action="store_true", help="print a summary of the differences at the end"
+        )
         subparser.add_argument(
             "--sort-by",
             dest="sort_by",

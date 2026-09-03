@@ -130,6 +130,72 @@ def get_buffer():
         buffer = _thread_local.buffer = Buffer(bytearray, size=0)
         return buffer
 
+
+_zstd_compressors_kept_after_fork = []
+
+
+def get_zstd_compressor(level, workers):
+    """Return this thread's zstd compressor for *level* / *workers*, creating it on first use.
+
+    Setting up a compression context is not free, and for a multithreaded one (workers > 1) it
+    is expensive: libzstd starts a worker pool then and stops it again when the context is
+    freed, so the one-shot zstd.compress() would start and stop *workers* threads for every
+    single chunk. Keeping the compressor - and with it its pool - alive between chunks avoids
+    that. Measured on the 2MiB chunks of the Silesia corpus with 4 workers on an M3 Pro: at
+    zstd,-4 +20% throughput (2345 -> 2815 MB/s), at zstd,3 +9% - the slower the level, the
+    less the pool setup weighs against the compression itself. Single-threaded compression goes through the same cache,
+    which gains next to nothing (0.98 .. 1.07x, measured for 16KiB .. 2MiB chunks at zstd,3 and
+    zstd,-4), but keeps this to one code path.
+
+    The price is that each thread holds on to the contexts it used, rather than freeing them
+    after every chunk: measured +1.6MB peak RSS for a single-threaded level 3 context, +8MB for
+    a 4 worker one (which also keeps its job buffers).
+
+    Compressors are stateful, so - like the scratch buffer, see get_buffer() - they must not be
+    shared between threads. The cache is keyed by level and worker count because one thread may
+    use more than one of them (e.g. a "borg recreate" recompressing to a different level).
+    """
+    workers = max(workers, 1)  # BORG_ZSTD_MT_WORKERS=0 and =1 both mean single-threaded
+    try:
+        compressors = _thread_local.zstd_compressors
+    except AttributeError:
+        compressors = _thread_local.zstd_compressors = {}
+    compressor = compressors.get((level, workers))
+    if compressor is None:
+        params = zstd.CompressionParameter
+        options = {params.compression_level: level}
+        if workers > 1:
+            # the smallest job libzstd accepts gives the most parallelism, see ZSTD._decide.
+            # note: nb_workers == 1 would mean one *asynchronous* worker, not single-threaded.
+            options[params.nb_workers] = workers
+            options[params.job_size] = ZSTD_JOB_SIZE_MIN
+        compressor = zstd.ZstdCompressor(options=options)
+        compressors[(level, workers)] = compressor
+    return compressor
+
+
+def forget_zstd_compressors(keep_alive=False):
+    """Drop this thread's cached zstd compressors, so that the next call builds fresh ones.
+
+    With *keep_alive*, the compressors are parked in a module-level list instead of being freed.
+    That is for the child of a fork: only the forking thread exists there, so the worker threads
+    of a cached multithreaded compressor are gone, while its libzstd context still believes it
+    has them - and freeing it would make libzstd wait for threads that do not exist. Leaking a
+    few contexts in a child (which usually execs or is short-lived anyway) is the cheaper
+    problem.
+    """
+    compressors = getattr(_thread_local, "zstd_compressors", None)
+    if not compressors:
+        return
+    if keep_alive:
+        _zstd_compressors_kept_after_fork.append(compressors)
+    _thread_local.zstd_compressors = {}
+
+
+if hasattr(os, "register_at_fork"):  # posix only
+    os.register_at_fork(after_in_child=lambda: forget_zstd_compressors(keep_alive=True))
+
+
 cdef class CompressorBase:
     """
     base class for all (de)compression classes,
@@ -442,24 +508,26 @@ class ZSTD(DecidingCompressor):
     def _decide(self, meta, data):
         # libzstd can compress a single chunk with a thread pool, but only if it is told to
         # split it into jobs: the default job size is derived from the window log and swallows
-        # any chunk borg produces whole, so the workers would never engage. We ask for the
-        # smallest job libzstd accepts, which gives the most parallelism (and, as a trade-off,
-        # the largest ratio loss). See ZSTD_MT_MIN_SIZE for why small chunks are excluded.
-        workers = get_zstd_mt_workers()
-        if workers > 1 and len(data) >= ZSTD_MT_MIN_SIZE:
-            params = zstd.CompressionParameter
-            zstd_data = zstd.compress(data, options={
-                params.compression_level: self.level,
-                params.nb_workers: workers,
-                params.job_size: ZSTD_JOB_SIZE_MIN,
-            })
-        else:
-            zstd_data = zstd.compress(data, self.level)
+        # any chunk borg produces whole, so the workers would never engage. get_zstd_compressor
+        # asks for the smallest job libzstd accepts, which gives the most parallelism (and, as a
+        # trade-off, the largest ratio loss). See ZSTD_MT_MIN_SIZE for why small chunks are
+        # compressed single-threaded. The compressor is this thread's, reused between chunks.
+        workers = get_zstd_mt_workers() if len(data) >= ZSTD_MT_MIN_SIZE else 1
+        compressor = get_zstd_compressor(self.level, workers)
+        try:
+            # we know the size, so the frame header gets it just like the one-shot API's does
+            compressor.set_pledged_input_size(len(data))
+            zstd_data = compressor.compress(data, mode=zstd.ZstdCompressor.FLUSH_FRAME)
+        except Exception:
+            # a failed call can leave the compressor inside a frame, and whatever it produced
+            # next would continue that frame - so this thread starts over with fresh ones.
+            forget_zstd_compressors()
+            raise
         if len(zstd_data) < len(data):
             return self, (meta, zstd_data)
         else:
             return NONE_COMPRESSOR, (meta, None)
-    
+
     def decompress(self, meta, data):
         meta, data = super().decompress(meta, data)
         try:

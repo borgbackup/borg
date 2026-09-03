@@ -6,7 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from ..compress import get_compressor, Compressor, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
-from ..compress import get_zstd_mt_workers
+from ..compress import get_zstd_mt_workers, get_zstd_compressor, forget_zstd_compressors
+from ..compress import ZSTD_JOB_SIZE_MIN, ZSTD_MT_MIN_SIZE
 from ..helpers import Error
 from ..helpers import CompressionSpec
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
@@ -359,3 +360,91 @@ def test_zstd_mt_workers_from_env(monkeypatch):
     for invalid in ["yes", "4x", "1.5", "-1"]:
         with pytest.raises(Error):
             workers_for(invalid)
+
+
+@pytest.fixture
+def zstd_mt(monkeypatch):
+    """Force the multithreaded zstd path on, whatever the machine's cpu count is."""
+    monkeypatch.setattr("borg.compress._zstd_mt_workers", (4, 4))
+    forget_zstd_compressors()  # do not inherit compressors cached by another test
+    yield 4
+    forget_zstd_compressors()
+
+
+def mt_data(size=ZSTD_MT_MIN_SIZE):
+    """Compressible data, big enough for the MT path to engage."""
+    rnd = random.Random(0)
+    words = [b"borg", b"backup", b"chunk", b"compress", b"zstd"]
+    out = bytearray()
+    while len(out) < size:
+        out += rnd.choice(words)
+    return bytes(out[:size])
+
+
+def test_zstd_compressor_is_cached_per_thread_and_level(zstd_mt):
+    workers = zstd_mt
+    compressor = get_zstd_compressor(3, workers)
+    assert get_zstd_compressor(3, workers) is compressor  # reused, that is the point
+    assert get_zstd_compressor(-4, workers) is not compressor  # but not across levels
+    assert get_zstd_compressor(3, workers + 1) is not compressor  # nor across worker counts
+    assert get_zstd_compressor(3, 0) is get_zstd_compressor(3, 1)  # 0 workers == 1 == no pool
+
+    forget_zstd_compressors()
+    assert get_zstd_compressor(3, workers) is not compressor  # dropped, so rebuilt
+
+    in_thread = ThreadPoolExecutor(max_workers=1).submit(get_zstd_compressor, 3, workers).result()
+    assert in_thread is not get_zstd_compressor(3, workers)  # each thread has its own
+
+
+def test_zstd_mt_reused_compressor_output(zstd_mt):
+    """Reusing the compressor must give the same bytes as a fresh one-shot compression."""
+    from borg.compress import zstd  # the stdlib module or its backport, whichever is in use
+
+    data = mt_data()
+    params = zstd.CompressionParameter
+    expected = zstd.compress(
+        data, options={params.compression_level: 3, params.nb_workers: zstd_mt, params.job_size: ZSTD_JOB_SIZE_MIN}
+    )
+    compressor = get_compressor(name="zstd", level=3)
+    meta, first = compressor.compress({}, data)
+    meta, second = compressor.compress({}, data)  # same compressor object, second frame
+    assert first == expected
+    assert second == expected  # no state carried over from the previous chunk
+
+
+def test_zstd_mt_roundtrip_concurrent(zstd_mt):
+    """Several threads compressing at once must not share a compressor (or corrupt each other)."""
+    chunks = [mt_data() + bytes([i]) * 1024 for i in range(8)]
+    compressor = get_compressor(name="zstd", level=3)  # one instance, shared by all threads
+
+    def roundtrip(data):
+        meta, cdata = compressor.compress({}, data)
+        meta, plain = compressor.decompress(dict(meta), cdata)
+        return plain
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        assert list(pool.map(roundtrip, chunks)) == chunks
+
+
+def test_zstd_below_threshold_is_single_threaded(zstd_mt):
+    """Small chunks are compressed single-threaded, by a compressor cached for one worker."""
+    from borg.compress import zstd, _thread_local
+
+    data = mt_data(ZSTD_MT_MIN_SIZE - 1)
+    compressor = get_compressor(name="zstd", level=3)
+    meta, cdata = compressor.compress({}, data)
+    assert cdata == zstd.compress(data, 3)  # same bytes as the one-shot single-threaded API
+    cached = _thread_local.zstd_compressors
+    assert list(cached) == [(3, 1)]  # one worker: no thread pool was set up for this chunk
+    assert cached[(3, 1)] is get_zstd_compressor(3, 1)
+
+
+def test_zstd_single_threaded_reused_compressor_output(zstd_mt):
+    """Reuse must not change the single-threaded output either, chunk after chunk."""
+    from borg.compress import zstd
+
+    data = mt_data(ZSTD_MT_MIN_SIZE - 1)
+    expected = zstd.compress(data, 3)
+    compressor = get_compressor(name="zstd", level=3)
+    assert compressor.compress({}, data)[1] == expected
+    assert compressor.compress({}, data)[1] == expected

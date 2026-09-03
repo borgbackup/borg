@@ -1,0 +1,93 @@
+# badge: https://github.com/borgbackup/borg/workflows/Docs/badge.svg?branch=master
+
+name: Docs
+
+# The main CI workflow deliberately does not run for docs-only changes (see the
+# paths filter in ci.yml), so the docs build lives in its own workflow. That way
+# a docs-only PR gets its markup checked without paying for the whole test
+# matrix, and a push to master is checked, too.
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+    - 'docs/**'
+    - 'pyproject.toml'
+    - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+    - 'docs/**'
+    - 'pyproject.toml'
+    - '.github/workflows/docs.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Force colored tox output even without a tty - the GitHub Actions log viewer
+  # renders ANSI colors.
+  TOX_COLORED: "yes"
+
+jobs:
+  docs:
+
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+
+    env:
+      TOXENV: docs
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version: "3.14"
+
+    - name: Cache pip
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
+        restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-pip-
+
+    - name: Cache tox environments
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      with:
+        path: .tox
+        # unlike the "py311-llfuse" style toxenv names, "docs" does not carry the
+        # python version, so it is part of the key: a python bump must not
+        # restore a venv built for the previous one.
+        key: ${{ runner.os }}-${{ runner.arch }}-tox-docs-py3.14-${{ hashFiles('requirements.d/development.lock.txt', 'pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-tox-docs-py3.14-
+
+    - name: Install Linux packages
+      # tox builds and installs borg into the docs env, because docs/conf.py
+      # imports borg to get the version.
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev
+
+    - name: Install Python requirements
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.d/development.lock.txt
+
+    - name: run tox env
+      # the docs env runs sphinx-build with -W, so any markup warning fails the
+      # build - see [tool.tox.env.docs] in pyproject.toml.
+      run: tox --skip-missing-interpreters

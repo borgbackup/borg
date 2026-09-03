@@ -159,7 +159,6 @@ jobs:
           github.event_name == 'pull_request' && '{
             "include": [
               {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "mypy"},
-              {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "docs"},
               {"os": "ubuntu-26.04", "python-version": "3.11", "toxenv": "py311-llfuse", "coverage": "1"},
               {"os": "ubuntu-26.04", "python-version": "3.12", "toxenv": "py312-pyfuse3", "store_cache": "1"},
               {"os": "ubuntu-26.04", "python-version": "3.14", "toxenv": "py314-mfusepy", "coverage": "1"},
@@ -251,7 +250,7 @@ jobs:
         echo "127.0.0.1 borg-ci-mac" | sudo tee -a /etc/hosts
 
     - name: Configure OpenSSH SFTP server (test only)
-      if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
+      if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') }}
       run: |
         sudo mkdir -p /run/sshd
         sudo useradd -m -s /bin/bash sftpuser || true
@@ -286,7 +285,7 @@ jobs:
         echo "BORG_TEST_REST_REPO=rest://sftpuser@localhost:22/borg/rest-repo" >> $GITHUB_ENV
 
     - name: Install and configure MinIO S3 server (test only)
-      if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
+      if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') }}
       run: |
         set -e
         arch=$(uname -m)
@@ -418,7 +417,7 @@ jobs:
         tox --skip-missing-interpreters
 
     - name: Upload test results to Codecov
-      if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
+      if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') }}
       uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
       env:
         OS: ${{ runner.os }}

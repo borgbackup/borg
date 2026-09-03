@@ -993,7 +993,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/project/borgbackup/
+      url: https://pypi.org/project/borgbackup/${{ github.ref_name }}
 
     permissions:
       contents: read

@@ -819,7 +819,8 @@ class HelpMixIn:
                 0 means "always multi-threaded", a very large value effectively disables multi-threading.
             BORG_ZSTD_MT_WORKERS
                 When set to a numeric value, use that many threads to zstd-compress a single chunk
-                (default: the cpu count, but at most 4). 0 or 1 means single-threaded compression.
+                (default: the cpu count, but at most 4). If it is unset or empty, the default is
+                used. 0 or 1 means single-threaded compression.
                 Only relevant when compressing with ``zstd``.
                 Chunks below 768KiB are always compressed single-threaded: libzstd will not use a
                 compression job smaller than 512KiB, so a small chunk gets split very unevenly and

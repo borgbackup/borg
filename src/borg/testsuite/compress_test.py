@@ -350,9 +350,12 @@ def test_zstd_mt_workers_from_env(monkeypatch):
     cpus = os.cpu_count() or 1
     assert workers_for(None) == min(cpus, 4)  # per-chunk default is capped
     assert workers_for(None, stream=True) == cpus  # stream default is not
+    for empty in ["", " "]:  # an empty value is treated like an unset one
+        assert workers_for(empty) == min(cpus, 4)
+        assert workers_for(empty, stream=True) == cpus
     for value, expected in [("0", 0), ("1", 1), ("4", 4), ("12", 12)]:
         assert workers_for(value) == expected  # the env var is not capped
         assert workers_for(value, stream=True) == expected
-    for invalid in ["", "yes", "4x", "1.5", "-1"]:
+    for invalid in ["yes", "4x", "1.5", "-1"]:
         with pytest.raises(Error):
             workers_for(invalid)

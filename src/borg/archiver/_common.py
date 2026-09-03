@@ -363,16 +363,20 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
         )
 
     if strip_components:
-        add_option(
-            "--strip-components",
-            metavar="NUMBER",
-            dest="strip_components",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="Remove the specified number of leading path elements. "
-            "Paths with fewer elements will be silently skipped.",
-        )
+        define_strip_components(add_option)
+
+
+def define_strip_components(add_option):
+    add_option(
+        "--strip-components",
+        metavar="NUMBER",
+        dest="strip_components",
+        type=int,
+        default=0,
+        action=Highlander,
+        help="Remove the specified number of leading path elements. "
+        "Paths with fewer elements will be silently skipped.",
+    )
 
 
 def define_exclusion_group(subparser, **kwargs):

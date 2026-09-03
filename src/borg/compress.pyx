@@ -59,7 +59,8 @@ _zstd_mt_workers = None  # cached (chunk workers, stream workers)
 def get_zstd_mt_workers(stream=False):
     """How many threads libzstd may use to compress a single chunk (or stream).
 
-    BORG_ZSTD_MT_WORKERS overrides the defaults below (for chunks and streams alike).
+    BORG_ZSTD_MT_WORKERS overrides the defaults below (for chunks and streams alike);
+    if it is unset or empty, the defaults are used.
     0 or 1 means single-threaded compression, which also avoids the small loss of
     compression ratio that splitting a chunk into jobs causes (measured at zstd,3:
     +0.05% for a 1MiB chunk, +0.64% for an 8MiB one; higher levels lose a bit more as
@@ -84,9 +85,9 @@ def get_zstd_mt_workers(stream=False):
     """
     global _zstd_mt_workers
     if _zstd_mt_workers is None:
-        value = os.environ.get("BORG_ZSTD_MT_WORKERS")
+        value = os.environ.get("BORG_ZSTD_MT_WORKERS", "").strip()
         cpus = os.cpu_count() or 1
-        if value is None:
+        if not value:  # unset or empty: use the defaults
             workers = (min(cpus, 4), cpus)
         else:
             try:

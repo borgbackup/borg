@@ -24,6 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Security :: Cryptography",
     "Topic :: System :: Archiving :: Backup",
 ]
@@ -174,7 +175,7 @@ min_version = "4.19"
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
 # Important: when adding/removing Python versions here,
 #            also update the section "Test environments with different FUSE implementations" accordingly.
-env_list = ["py{310,311,312,313,314}-{none,fuse2,fuse3}", "ruff"]
+env_list = ["py{310,311,312,313,314,315}-{none,fuse2,fuse3}", "ruff"]
 
 # Base configuration for test environments
 [tool.tox.env_run_base]
@@ -239,6 +240,16 @@ set_env = {BORG_FUSE_IMPL = "llfuse"}
 extras = ["llfuse"]
 
 [tool.tox.env.py314-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py315-none]
+
+[tool.tox.env.py315-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py315-fuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3"]
 

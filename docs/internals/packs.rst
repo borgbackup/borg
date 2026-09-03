@@ -157,6 +157,10 @@ The full ChunkIndex entry is ``(flags, size, pack_id, obj_offset, obj_size)``
 (``ChunkIndexEntry`` in ``borg.hashindex``), where ``size`` is the plaintext
 chunk size. While a chunk is buffered in the pack writer but not yet flushed, its
 entry carries the ``F_PENDING`` flag and its pack location is unresolved.
+When an operation aborts (an exception unwinds out of the repository context),
+chunks still buffered in the pack writer were never stored: they are discarded
+together with their pending index entries, while a pack already handed to the
+store is still recorded if its store succeeded.
 
 .. _pack-write-order:
 

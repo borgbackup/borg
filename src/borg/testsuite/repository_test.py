@@ -157,6 +157,109 @@ def test_chunk_index_persisted_on_close(tmp_path):
             assert pdchunk(repository.get(H(x))) == b"DATA"
 
 
+def test_exception_unwind_drops_buffered_chunks(tmp_path):
+    # An exception inside "with repository:" unwinds with chunks still buffered in the
+    # PackWriter (put() buffers until a pack fills or flush() is called).  __exit__ must
+    # drop the buffered chunks so that close() neither replaces the original exception
+    # with its "call flush() before close()" assertion nor persists F_PENDING index
+    # entries for chunks that were never stored.
+    location = os.fspath(tmp_path / "repo")
+    with pytest.raises(ValueError, match="original error"):
+        with Repository(location, exclusive=True, create=True) as repository:
+            repository.put(H(0), fchunk(b"DATA"))
+            assert repository._pack_writer._pieces  # still buffered: pack limits not reached
+            raise ValueError("original error")
+    with Repository(location, exclusive=True) as repository:
+        # the buffered chunk died with the aborted operation: not in the index, not readable
+        assert H(0) not in repository.chunks
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(H(0))
+
+
+def test_exception_unwind_records_inflight_pack_drops_buffer(tmp_path):
+    # An exception unwinds while one pack is still in flight in the store-thread and more
+    # chunks sit in the buffer.  __exit__ must join the in-flight store first -- recording
+    # the stored pack's chunks in the index -- and only drop what never reached a pack.
+    # H(0) is in the stored pack AND buffered again: its entry must survive, the chunk is
+    # stored; dropping it would first make update_pack_info() fail on the missing entry and
+    # then leave F_PENDING leftovers for the close()-time index persist to trip over.
+    location = os.fspath(tmp_path / "repo")
+    with pytest.raises(ValueError, match="original error"):
+        with Repository(location, exclusive=True, create=True) as repository:
+            for x in range(3):  # BORG_PACK_MAX_COUNT chunks (see conftest) fill a pack -> handed off
+                repository.put(H(x), fchunk(b"DATA"))
+            repository.put(H(0), fchunk(b"DATA"))  # same id again: buffered
+            repository.put(H(3), fchunk(b"MORE"))  # buffered
+            assert repository._pack_writer._pieces
+            raise ValueError("original error")
+    with Repository(location, exclusive=True) as repository:
+        for x in range(3):  # the in-flight pack was stored: recorded in the index, readable
+            assert pdchunk(repository.get(H(x))) == b"DATA"
+        assert H(3) not in repository.chunks  # the buffered chunk died with the abort
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(H(3))
+
+
+def test_exception_unwind_survives_failing_index_persist(tmp_path, monkeypatch):
+    # close() persists the chunk index while unwinding an exception.  when the abort was
+    # caused by the store failing, that persist fails, too -- it must be logged, not raised,
+    # so it cannot replace the original exception, and the lock still gets released.
+    location = os.fspath(tmp_path / "repo")
+    with pytest.raises(ValueError, match="original error"):
+        with Repository(location, exclusive=True, create=True) as repository:
+            repository.put(H(0), fchunk(b"DATA"))
+            repository.flush()
+
+            def broken_store(name, value):
+                raise OSError("store is dead")
+
+            monkeypatch.setattr(repository.store, "store", broken_store)
+            raise ValueError("original error")
+    assert repository.lock is None  # close() finished its teardown despite the failing persist
+
+
+def test_exception_unwind_does_not_rebuild_dropped_chunk_index(tmp_path, monkeypatch):
+    # Dropping the buffer runs only while aborting, so it must never build the chunk index
+    # from the repo: that I/O can fail and mask the error being unwound.  With no in-memory
+    # index there is nothing to delete anyway: add() installs a chunk's index entry before
+    # buffering its piece, so pending entries never outlive a dropped index.
+    from .. import cache as cache_mod
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True):
+        pass
+
+    rebuilds = []
+
+    def must_not_rebuild(repository, *args, **kwargs):
+        rebuilds.append(1)
+        return ChunkIndex()
+
+    with pytest.raises(ValueError, match="original error"):
+        with Repository(location, exclusive=True) as repository:
+            repository.put(H(1), fchunk(b"MORE"))
+            assert repository._pack_writer._pieces  # still buffered: pack limits not reached
+            repository.invalidate_chunk_index()  # buffered chunks, no in-memory index
+            assert not repository.is_chunk_index_loaded
+            monkeypatch.setattr(cache_mod, "build_chunkindex_from_repo", must_not_rebuild)
+            raise ValueError("original error")
+    assert rebuilds == []
+    assert not repository.is_chunk_index_loaded  # the unwind never touched .chunks
+
+
+def test_close_with_unflushed_chunks_asserts(tmp_path):
+    # On a clean (non-exception) path, closing with buffered chunks is a caller bug:
+    # the assertion in close() still catches a forgotten flush().
+    location = os.fspath(tmp_path / "repo")
+    with pytest.raises(AssertionError, match="unflushed"):
+        with Repository(location, exclusive=True, create=True) as repository:
+            repository.put(H(0), fchunk(b"DATA"))
+    # close()'s teardown runs in a finally block: even the failing close released the lock
+    # and closed the store, so nothing is left behind to clean up here.
+    assert repository.lock is None
+    assert not repository.store_opened
+
+
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         meta, data = b"meta", b"data"

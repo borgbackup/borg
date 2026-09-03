@@ -299,7 +299,7 @@ class BenchmarkMixIn:
             if args.json:
                 result[section].append({"size": size, "time": dt, **extra})
             else:
-                line = f"{spec:<{WIDTH}} {data_size_str(size):<11} {dt:.3f}s  {throughput(size, dt)}"
+                line = f"{spec:<{WIDTH}} {data_size_str(size):<11} {dt:>7.3f}s  {throughput(size, dt)}"
                 if ratio is not None:
                     line += f"  {ratio:6.2f}x"
                 print(line)
@@ -326,7 +326,7 @@ class BenchmarkMixIn:
                 result[section] = []
             else:
                 # wide enough to cover the longest rows (the compression ones, with their ratio column)
-                print(f"{title} ".ljust(70, "="))
+                print(f"{title} ".ljust(71, "="))
 
         random_10M = buffer(chunk_data_size)
         key_256 = os.urandom(32)
@@ -529,7 +529,7 @@ class BenchmarkMixIn:
                 else:
                     # this one packs items, not bytes, so it gets a rate in its own unit
                     size = "%dk Items" % (count // 1000)
-                    print(f"{spec:<{WIDTH}} {size:<11} {dt:.3f}s  {count / dt / 1000:>8.1f} kItems/s")
+                    print(f"{spec:<{WIDTH}} {size:<11} {dt:>7.3f}s  {count / dt / 1000:>8.1f} kItems/s")
 
         if args.json:
             json_print(result)

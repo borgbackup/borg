@@ -905,7 +905,8 @@ def build_chunkindex_from_repo(
     # validate: a repo object validator, handed to PackReader.iter_headers so the rebuild skips the
     # objects that fail it.
     # on_drop: a callable, handed to PackReader.iter_headers, which calls it once per place where
-    # the walk skips content.
+    # the walk skips content. Without validate, giving it also makes a corrupt object header end
+    # that pack's walk: the pack is indexed up to that header, the rest of it is dropped.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
@@ -984,14 +985,17 @@ def build_chunkindex_from_repo(
     # Every caller passes a (modern) Repository; legacy borg 1.x repos never reach here (transfer reads
     # their archives directly and never builds a chunk index for them), so there is no legacy branch.
     assert isinstance(repository, Repository)
-    # Read each pack's object headers with borgstore range requests, fetching only the fixed-size
-    # headers and skipping the (much larger) encrypted payloads. Don't call Repository.list() here:
+    # Read each pack's object headers with borgstore range requests: one fixed-size header read per
+    # object, skipping the (much larger) encrypted payloads, or a META_READ_SIZE read per object
+    # with a validator, which needs the metadata slot along with the header. Don't call
+    # Repository.list() here:
     # it iterates this same index we are building, so it would recurse. The headers also give each
     # object's real (chunk_id, offset, size), so every object in a pack is indexed individually.
     pack_infos = repository.store_list("packs")
     pi = ProgressIndicatorPercent(
         total=len(pack_infos), msg="Rebuilding chunk index %3.0f%%", msgid="cache.build_chunkindex_from_repo"
     )
+    headers_parsed = 0
     for info in pack_infos:
         # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
         repository._lock_refresh()
@@ -1003,15 +1007,19 @@ def build_chunkindex_from_repo(
             chunks[chunk_id] = ChunkIndexEntry(
                 flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
             )
+        headers_parsed += reader.headers_parsed
     if pack_infos:
         pi.show(current=len(pack_infos))  # finish at 100%
     pi.finish()
-    if validate is not None and pack_infos and num_chunks == 0:
-        # no object of any pack validated: damage does not do that to a whole repository, a broken
-        # validator does. Returning this index would empty the chunk lists of all archives.
+    if validate is not None and headers_parsed and num_chunks == 0:
+        # the packs hold object headers, yet not one object validated: the key does not belong to
+        # these packs, or the validator is broken. Returning this index would empty the chunk lists
+        # of all archives. A pack overwritten with unrelated data holds no header and keeps
+        # headers_parsed at zero; the walk reports its content through on_drop.
         raise Error(
-            "Chunk index rebuild: no object of any pack passed validation, "
-            "refusing to return an index without a single chunk."
+            f"Chunk index rebuild: {headers_parsed} object headers parsed, but not one object passed "
+            "validation. The key does not match these packs, or the validator is broken. "
+            "Refusing to return an index without a single chunk."
         )
     duration = perf_counter() - t0 or 0.001
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.

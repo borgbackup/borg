@@ -364,6 +364,7 @@ class PackReader:
         self.pack_id = pack_id
         self.key = "packs/" + bin_to_hex(pack_id) if pack_id is not None else None
         self.pack_contents = pack_contents
+        self.headers_parsed = 0  # headers _parse_header accepted in the last iter_headers walk
 
     def read(self, offset, size):
         # in-memory pack: return a memoryview into pack_contents. store: range-read bytes.
@@ -434,8 +435,10 @@ class PackReader:
                 if pos < 0 or pos + hdr_size > len(buf):
                     break  # not in this window, or a header overlapping its end: the next window has it
                 hdr, _ = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
-                if hdr is not None and self._validation_problem(hdr, offset + pos, buf, offset, validate) is None:
-                    return offset + pos, hdr
+                if hdr is not None:
+                    self.headers_parsed += 1
+                    if self._validation_problem(hdr, offset + pos, buf, offset, validate) is None:
+                        return offset + pos, hdr
                 pos += 1
             # step by the window less one header, so a magic straddling the boundary is still found.
             offset += max(len(buf) - (hdr_size - 1), 1)
@@ -447,9 +450,10 @@ class PackReader:
         The walk reads one range per object (or a slice, for a pack in memory), plus one store
         metadata lookup for the pack size.
 
-        A header that _parse_header does not accept means a corrupt pack: IntegrityError names what
-        is wrong with it. Fewer than a header's bytes left ends the walk: that is the end of the
-        pack.
+        A header that _parse_header does not accept means a corrupt pack. Without a validator the
+        walk raises IntegrityError naming what is wrong with the header, or, given an on_drop, ends
+        the walk there (see below). Fewer than a header's bytes left ends the walk: that is the end
+        of the pack.
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
         repo object with id chunk_id. Given one, the walk validates every header, reading the
@@ -460,9 +464,15 @@ class PackReader:
 
         on_drop, if given, is called once per place where the walk discards content. One call
         covers the object with the failed header plus everything the scan skips before the object
-        it resumes at, and also the tail that is dropped when the scan finds no such object.
+        it resumes at, and also the tail that is dropped when the scan finds no such object. With
+        on_drop and no validator there is no scan, so a failed header ends the walk and that one
+        call covers the rest of the pack.
 
         If nothing in the pack validates, the walk yields nothing and raises nothing.
+
+        headers_parsed is set to the number of headers _parse_header accepted in this walk, the
+        candidates the resync scan tried included. A pack whose bytes hold no object header at all
+        leaves it at zero.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
@@ -471,19 +481,31 @@ class PackReader:
         # times over. Buffering a window, as _find_header scans with, would suit them; skipping a
         # large object stays cheaper with a short read per header.
         read_size = META_READ_SIZE if validate is not None else hdr_size
+        self.headers_parsed = 0
         offset = 0
         while offset + hdr_size <= pack_size:
             buf = self.read(offset, min(read_size, pack_size - offset))
             if len(buf) < hdr_size:
                 break  # trailing partial bytes
             hdr, problem = self._parse_header(buf[:hdr_size], offset, pack_size)
-            if hdr is not None and validate is not None:
-                problem = self._validation_problem(hdr, offset, buf, offset, validate)
+            if hdr is not None:
+                self.headers_parsed += 1
+                if validate is not None:
+                    problem = self._validation_problem(hdr, offset, buf, offset, validate)
             if problem is not None:
                 if validate is None:
-                    raise IntegrityError(
-                        f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
+                    if on_drop is None:
+                        raise IntegrityError(
+                            f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
+                        )
+                    # resyncing needs the validator to tell an object from payload bytes that
+                    # look like a header, so the walk ends here, dropping the rest of the pack.
+                    on_drop()
+                    logger.warning(
+                        f"pack {pack_hex}: {problem} at offset {offset}, no validator to resync with, "
+                        f"skipping the remaining {pack_size - offset} bytes."
                     )
+                    break
                 if on_drop is not None:
                     on_drop()  # content is discarded either way below: this object, or the tail.
                 found = self._find_header(offset + 1, pack_size, validate)

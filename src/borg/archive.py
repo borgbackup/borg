@@ -2195,7 +2195,9 @@ class ArchiveChecker:
                 self.key = self.make_key(repository, manifest_only=True)
             except IntegrityError as err:
                 logger.warning(
-                    f"Could not read the key ({err}), so a pack with a corrupt object header stays as it is."
+                    f"Could not read the key ({err}), so the rebuild can not validate object headers: "
+                    "a pack with a corrupt object header is indexed up to that header and the rest "
+                    "of it is dropped."
                 )
         if self.key is not None:
             # the validator decrypts metadata slots, so it needs a RepoObj built from the key.

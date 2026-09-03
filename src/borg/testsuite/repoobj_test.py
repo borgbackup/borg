@@ -535,6 +535,30 @@ def test_object_validator_checks_the_sizes_for_every_envelope(key_class):
         assert not validate(chunk_id, bytes(bad))
 
 
+@pytest.mark.parametrize("meta", [b"not a mapping", 42, [1, 2, 3], {}, {"csize": "17"}, {"csize": True}])
+def test_object_validator_rejects_metadata_without_a_usable_csize(monkeypatch, meta):
+    # in the modes that authenticate without a secret key the metadata slot can unpack to any
+    # value. Each of these must come back as "invalid", not as an exception out of the validator.
+    repo_objs = RepoObj(ChecksumKey(None))
+    chunk_id, head = validator_input(repo_objs, b"payload" * 100)
+    monkeypatch.setattr(repo_objs, "parse_meta", lambda *args, **kwargs: meta)
+    assert not object_validator(repo_objs)(chunk_id, head)
+
+
+def test_object_validator_propagates_an_unexpected_exception(monkeypatch):
+    # answering "invalid" for a bug would answer it for every object of every pack, so anything
+    # other than a failed authentication or unpacking reaches the caller.
+    repo_objs = RepoObj(ChecksumKey(None))
+    chunk_id, head = validator_input(repo_objs, b"payload" * 100)
+
+    def parse_meta_raising_valueerror(*args, **kwargs):
+        raise ValueError("not a failure to authenticate")
+
+    monkeypatch.setattr(repo_objs, "parse_meta", parse_meta_raising_valueerror)
+    with pytest.raises(ValueError):
+        object_validator(repo_objs)(chunk_id, head)
+
+
 @pytest.mark.parametrize("compression", ["none", "lz4", "zstd,3", "obfuscate,2,lz4"])
 def test_object_validator_accepts_every_compression(compression):
     # data_size == csize + the envelope overhead is what pins data_size, so every compressor must

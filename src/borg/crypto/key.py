@@ -1414,6 +1414,8 @@ class AEADKeyBase(KeyBase):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
         # note: we deliberately do not count the failed decryptions (forgery attempts) here, although
         # there is a limit for them also - see the "AEAD usage limits" docs and #6501 about why.
+        if len(data) < self.PAYLOAD_OVERHEAD:
+            raise IntegrityError(f"Chunk {bin_to_hex(id)}: truncated envelope")
         self.assert_type(data[0], id)
         iv_48bit = data[2:8]
         sessionid = bytes(data[8:32])

@@ -25,6 +25,7 @@ from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM
 from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
 from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS, CHUNKINDEX_INVALID_SENTINEL
 from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
+from .helpers import Error
 from .helpers import get_cache_dir
 from .helpers import archive_hostname, archive_username
 from .helpers import chunkit
@@ -1005,6 +1006,13 @@ def build_chunkindex_from_repo(
     if pack_infos:
         pi.show(current=len(pack_infos))  # finish at 100%
     pi.finish()
+    if validate is not None and pack_infos and num_chunks == 0:
+        # no object of any pack validated: damage does not do that to a whole repository, a broken
+        # validator does. Returning this index would empty the chunk lists of all archives.
+        raise Error(
+            "Chunk index rebuild: no object of any pack passed validation, "
+            "refusing to return an index without a single chunk."
+        )
     duration = perf_counter() - t0 or 0.001
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
     # Protocol overhead is neglected in this calculation.

@@ -26,7 +26,7 @@ from ..cache import (
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
-from ..helpers import IntegrityError, bin_to_hex, safe_ns
+from ..helpers import Error, IntegrityError, bin_to_hex, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import Repository
@@ -523,6 +523,35 @@ def test_build_chunkindex_repair_resyncs_after_corrupt_header(tmp_path):
         assert H(90) not in index  # its header is damaged, so its id is unknown
         assert index[H(91)].pack_id == pack_id
         assert index[H(91)].obj_offset == len(obj1)
+
+
+def test_build_chunkindex_aborts_when_nothing_validates(tmp_path):
+    """No object of any pack validating aborts the rebuild instead of returning an empty index."""
+    from .repository_test import fchunk
+
+    pack = fchunk(b"first", chunk_id=H(90)) + fchunk(b"second", chunk_id=H(91))
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(H(92)), pack)
+        with pytest.raises(Error, match="no object of any pack passed validation"):
+            build_chunkindex_from_repo(repository, slow_rebuild=True, validate=lambda chunk_id, obj: False)
+
+
+def test_build_chunkindex_drops_a_pack_that_validates_nothing_when_others_do(tmp_path):
+    """A single pack of which nothing validates is dropped, the objects of the other packs are indexed."""
+    from .repository_test import fchunk
+
+    good = fchunk(b"good", chunk_id=H(93))
+    bad = fchunk(b"bad", chunk_id=H(94))
+
+    def accept_good(chunk_id, obj):
+        return chunk_id == H(93)
+
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(H(95)), good)
+        repository.store_store("packs/" + bin_to_hex(H(96)), bad)
+        index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_good)
+        assert H(93) in index
+        assert H(94) not in index
 
 
 def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):

@@ -302,12 +302,20 @@ def object_validator(repo_objs):
     def validate(chunk_id, obj):
         try:
             meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
-            data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
-            return data_size == meta["csize"] + overhead
-        except (IntegrityErrorBase, msgpack.UnpackException, KeyError, TypeError, IndexError):
-            # arbitrary bytes fail the tag, the msgpack unpacking, the length checks or the csize lookup.
-            # Anything else is a bug and propagates: dropping an object over it would lose data.
+        except (IntegrityErrorBase, msgpack.UnpackException):
+            # arbitrary bytes fail the authentication, or the msgpack unpacking in the modes that
+            # authenticate without a secret key (none-*, authenticated-*) and thus accept them.
             return False
+        # in those modes the metadata slot can therefore unpack to any value. Inspect the value
+        # rather than catching what using it raises, so that only unusable metadata gives False
+        # and an unexpected exception still reaches the caller.
+        if not isinstance(meta, dict):
+            return False
+        csize = meta.get("csize")
+        if not isinstance(csize, int) or isinstance(csize, bool):  # msgpack unpacks true/false to bool
+            return False
+        data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
+        return data_size == csize + overhead
 
     return validate
 

@@ -10,6 +10,7 @@ from textual.widgets import Header, Footer
 from textual.containers import Horizontal, Container
 
 from .theme import theme
+from .translator import T, TRANSLATOR
 
 
 class BorgCockpitApp(App):
@@ -17,9 +18,9 @@ class BorgCockpitApp(App):
 
     from .. import __version__ as BORG_VERSION
 
-    TITLE = f"Cockpit for BorgBackup {BORG_VERSION}"
+    TITLE = T(f"Cockpit for BorgBackup {BORG_VERSION}")
     CSS_PATH = "cockpit.tcss"
-    BINDINGS = [("q", "quit", "Quit"), ("ctrl+c", "quit", "Quit"), ("t", "toggle_translator", "Toggle Translator")]
+    BINDINGS = [("q", "quit", T("Quit")), ("ctrl+c", "quit", T("Quit")), ("t", "toggle_translator", T("Toggle Translator"))]
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -105,8 +106,6 @@ class BorgCockpitApp(App):
 
     def action_toggle_translator(self) -> None:
         """Toggle the universal translator."""
-        from .translator import TRANSLATOR
-
         TRANSLATOR.toggle()
         # Refresh dynamic UI elements
         self.query_one("#status").refresh_ui_labels()

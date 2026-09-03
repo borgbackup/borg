@@ -107,7 +107,7 @@ class StatusPanel(Static):
             days, seconds = divmod(seconds, 86400)
             h, m, s = seconds // 3600, (seconds % 3600) // 60, seconds % 60
             msg = f"Elapsed: {days:02d}d {h:02d}:{m:02d}:{s:02d}"
-        self.query_one("#status-elapsed").update(msg)
+        self.query_one("#status-elapsed").update(T(msg))
 
     def refresh_ui_labels(self):
         """Update static UI labels with current translation."""

@@ -280,7 +280,7 @@ class LegacyArchives:
     def get_one(self, match, *, match_end=r"\Z", deleted=False):
         """Get exactly one archive matching <match>."""
         assert match is not None
-        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted, exclude_patterns=exclude)
+        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted)
         if len(archive_infos) != 1:
             raise CommandError(f"{match} needed to match precisely one archive, but matched {len(archive_infos)}.")
         return archive_infos[0]

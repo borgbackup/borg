@@ -868,17 +868,22 @@ Utilization of max. archive size: {csize_max:.0%}
         # overwrite files outside the extraction directory (e.g. /etc/passwd).
         self.safe_dirs.discard(path)  # path is about to be (re)created; never trust a stale entry for it
         self._check_safe_parent(item.path)
-        # Attempt to remove existing files, ignore errors on failure
-        try:
-            st = os.stat(path, follow_symlinks=False)
-            if stat.S_ISDIR(st.st_mode):
-                os.rmdir(path)
-            else:
-                os.unlink(path)
-        except UnicodeEncodeError:
-            raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
-        except OSError:
-            pass
+        # Attempt to remove existing files, ignore errors on failure.
+        # A trailing "." component means the extraction directory itself (the archive's
+        # "." item, as created by "borg create ARCHIVE ."). posix requires rmdir() to
+        # refuse such a path with EINVAL, but haiku strips the "." and would remove the
+        # extraction directory (if empty), so do not even try to remove it.
+        if os.path.basename(path) != '.':
+            try:
+                st = os.stat(path, follow_symlinks=False)
+                if stat.S_ISDIR(st.st_mode):
+                    os.rmdir(path)
+                else:
+                    os.unlink(path)
+            except UnicodeEncodeError:
+                raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
+            except OSError:
+                pass
 
         def make_parent(path):
             parent_dir = os.path.dirname(path)

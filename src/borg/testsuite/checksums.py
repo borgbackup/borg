@@ -8,6 +8,7 @@ import pytest
 
 from ..algorithms import checksums
 from ..helpers import bin_to_hex, hex_to_bin
+from ..platformflags import is_haiku
 
 crc32_implementations = [checksums.crc32_slice_by_8]
 if checksums.have_clmul:
@@ -118,6 +119,7 @@ for length in range(1, 16):
 
 @pytest.mark.skipif(not checksums.have_clmul, reason='needs CLMUL support')
 @pytest.mark.skipif(sys.platform == 'win32', reason='needs POSIX mmap/mprotect')
+@pytest.mark.skipif(is_haiku, reason='the overread check does not work on haiku')
 def test_crc32_clmul_no_overread():
     # crc32_clmul used to load 16 bytes unconditionally for inputs of 4..15 bytes,
     # reading up to 12 bytes past the end of the buffer. That is a SIGSEGV whenever

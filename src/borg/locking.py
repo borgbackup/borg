@@ -195,6 +195,11 @@ class ExclusiveLock:
             names = os.listdir(self.path)
         except FileNotFoundError:  # another process did our job in the meantime.
             pass
+        except OSError:
+            # we can not read the lock directory - e.g. haiku fails this with EBUSY or
+            # "bad data" while the directory is concurrently replaced via rename().
+            # Not being able to look at the lock means we can not call it stale.
+            return False
         else:
             for name in names:
                 try:

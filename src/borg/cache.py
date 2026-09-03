@@ -895,6 +895,7 @@ def build_chunkindex_from_repo(
     slow_rebuild=False,
     fragments_only=False,
     validate=None,
+    on_drop=None,
     write_immediately=False,
     init_flags=ChunkIndex.F_USED,
 ):
@@ -902,6 +903,8 @@ def build_chunkindex_from_repo(
     # read completely, and never write to the repo.
     # validate: a repo object validator, handed to PackReader.iter_headers so the rebuild skips the
     # objects that fail it.
+    # on_drop: a callable, handed to PackReader.iter_headers, which calls it once per place where
+    # the walk skips content.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
@@ -993,7 +996,8 @@ def build_chunkindex_from_repo(
         repository._lock_refresh()
         pi.show(increase=1)
         pack_id = hex_to_bin(info.name)
-        for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_id).iter_headers(validate=validate):
+        reader = PackReader(repository.store, pack_id)
+        for chunk_id, obj_offset, obj_size in reader.iter_headers(validate=validate, on_drop=on_drop):
             num_chunks += 1
             chunks[chunk_id] = ChunkIndexEntry(
                 flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size

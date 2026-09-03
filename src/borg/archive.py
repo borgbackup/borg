@@ -2139,6 +2139,11 @@ class ArchiveChecker:
         # longer matches the packs.
         self.chunks_modified = False
 
+    def note_dropped_objects(self):
+        # The chunk index rebuild skipped repository content to get past a corrupt object header.
+        # Record it as a finding: no later step of the check notices that the content is gone.
+        self.error_found = True
+
     def check(
         self,
         repository,
@@ -2192,13 +2197,22 @@ class ArchiveChecker:
                 logger.warning(
                     f"Could not read the key ({err}), so a pack with a corrupt object header stays as it is."
                 )
-        validate = object_validator(RepoObj(self.key)) if repair and self.key is not None else None
+        if self.key is not None:
+            # the validator decrypts metadata slots, so it needs a RepoObj built from the key.
+            self.repo_objs = RepoObj(self.key)
+            validate = object_validator(self.repo_objs)
+        else:
+            validate = None
         self.chunks = build_chunkindex_from_repo(
-            self.repository, slow_rebuild=repair, validate=validate, write_immediately=False
+            self.repository,
+            slow_rebuild=repair,
+            validate=validate,
+            on_drop=self.note_dropped_objects,
+            write_immediately=False,
         )
         if self.key is None:
             self.key = self.make_key(repository)
-        self.repo_objs = RepoObj(self.key)
+            self.repo_objs = RepoObj(self.key)
         if repair:
             # --repair re-anchors content: it re-packs the item metadata stream it reads into new chunks
             # with freshly computed ids (see add_callback in rebuild_archives) and it recreates archives
@@ -2733,6 +2747,7 @@ class ArchiveChecker:
                     self.repository,
                     slow_rebuild=True,
                     validate=object_validator(self.repo_objs),
+                    on_drop=self.note_dropped_objects,
                     write_immediately=True,
                 )
             else:

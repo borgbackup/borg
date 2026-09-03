@@ -441,7 +441,7 @@ class PackReader:
             offset += max(len(buf) - (hdr_size - 1), 1)
         return None
 
-    def iter_headers(self, validate=None):
+    def iter_headers(self, validate=None, on_drop=None):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
         The walk reads one range per object (or a slice, for a pack in memory), plus one store
@@ -457,6 +457,12 @@ class PackReader:
         raise: it scans from just past that header for the next object validate accepts and
         continues there. The object with the failed header is dropped - its id, its extent or its
         metadata is wrong, so it can not be read back. The pack keeps the dropped object's bytes.
+
+        on_drop, if given, is called once per place where the walk discards content. One call
+        covers the object with the failed header plus everything the scan skips before the object
+        it resumes at, and also the tail that is dropped when the scan finds no such object.
+
+        If nothing in the pack validates, the walk yields nothing and raises nothing.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
@@ -478,6 +484,8 @@ class PackReader:
                     raise IntegrityError(
                         f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
                     )
+                if on_drop is not None:
+                    on_drop()  # content is discarded either way below: this object, or the tail.
                 found = self._find_header(offset + 1, pack_size, validate)
                 if found is None:
                     logger.warning(

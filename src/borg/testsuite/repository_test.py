@@ -2151,6 +2151,41 @@ def test_pack_reader_resync_rejects_damaged_user_content_without_a_key(tmp_path)
     assert headers == [(real_id, len(obj1), len(obj2))]
 
 
+def test_pack_reader_yields_nothing_when_no_object_validates():
+    # a pack of which nothing validates comes out empty, with one drop reported and no exception.
+    pack = fchunk(b"data", chunk_id=H(1)) + fchunk(b"more", chunk_id=H(2))
+    drops = []
+    reader = PackReader(pack_contents=pack)
+    headers = list(reader.iter_headers(validate=lambda chunk_id, obj: False, on_drop=lambda: drops.append(1)))
+    assert headers == []
+    assert len(drops) == 1
+
+
+def test_pack_reader_reports_each_drop():
+    # obj1 and obj2 have broken headers, so one resync skips both and lands on obj3; the trailing
+    # garbage then ends the walk. Both places discard content, so both are reported, the first one
+    # with a single call for the two objects it skipped.
+    obj1 = bytearray(fchunk(b"data", chunk_id=H(1)))
+    obj2 = bytearray(fchunk(b"payload-two", chunk_id=H(2)))
+    obj3 = fchunk(b"payload-three", chunk_id=H(3))
+    obj1[0] ^= 0xFF
+    obj2[0] ^= 0xFF
+    pack = bytes(obj1) + bytes(obj2) + obj3 + b"\xaa" * 200
+    drops = []
+    reader = PackReader(pack_contents=pack)
+    headers = list(reader.iter_headers(validate=accept_all, on_drop=lambda: drops.append(1)))
+    assert headers == [(H(3), len(obj1) + len(obj2), len(obj3))]
+    assert len(drops) == 2
+
+
+def test_pack_reader_reports_no_drop_for_an_intact_pack():
+    pack = fchunk(b"data", chunk_id=H(1)) + fchunk(b"more", chunk_id=H(2))
+    drops = []
+    reader = PackReader(pack_contents=pack)
+    assert len(list(reader.iter_headers(validate=accept_all, on_drop=lambda: drops.append(1)))) == 2
+    assert drops == []
+
+
 def test_pack_reader_resync_through_store(tmp_path):
     obj1 = bytearray(fchunk(b"FIRST", chunk_id=H(47)))
     obj2 = fchunk(b"SECOND", chunk_id=H(48))

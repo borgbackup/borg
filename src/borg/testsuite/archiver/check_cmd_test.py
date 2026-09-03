@@ -761,6 +761,8 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
     problem = {"magic": "no object header", "data_size": "object does not authenticate"}[damaged_field]
     assert f"{problem} at offset {damaged_offset}" in output
     assert f"continuing at the object at offset {next_offset}" in output  # the rebuild resumed at the next object
+    # the resync dropped an object, so the summary reports a problem.
+    assert "Archive consistency check complete, problems found." in output
     with Repository(archiver.repository_location, exclusive=True) as repository:
         assert damaged_id not in repository.chunks  # the damaged object can not be read back, so it is not indexed
         assert repository.chunks[next_id].obj_offset == next_offset  # the one after it is

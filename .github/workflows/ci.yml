@@ -128,7 +128,8 @@ jobs:
           github.event_name == 'pull_request' && '{
             "include": [
               {"os": "ubuntu-24.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"}
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
+              {"os": "ubuntu-26.04", "python-version": "3.15-dev", "toxenv": "py315-fuse3", "allow-failure": true}
             ]
           }' || '{
             "include": [
@@ -139,7 +140,8 @@ jobs:
               {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-fuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
               {"os": "macos-15-intel", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-x86_64-gh"},
-              {"os": "macos-15", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-arm64-gh"}
+              {"os": "macos-15", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-arm64-gh"},
+              {"os": "ubuntu-26.04", "python-version": "3.15-dev", "toxenv": "py315-fuse3", "allow-failure": true}
             ]
           }'
         ) }}
@@ -148,6 +150,10 @@ jobs:
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
+    # Python 3.15 is not released yet, so do not fail the build if it (or a
+    # dependency not having wheels / not compiling for it yet) breaks.
+    # Remove the "allow-failure" matrix entries once 3.15 is final.
+    continue-on-error: ${{ matrix.allow-failure || false }}
     # macOS machines can be slow, if overloaded.
     timeout-minutes: 360
 

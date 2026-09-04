@@ -599,3 +599,95 @@ def test_hard_link_deletion_and_replacement(archivers, request):
     else:
         # But the b/hardlink file was not modified at all.
         assert_line_not_exists(lines, ".*input/b/hardlink")
+
+
+def _setup_stats_archives(archiver):
+    """Create two archives differing in one added, one removed and one changed file."""
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file_changed", contents=b"a" * 100)
+    create_regular_file(archiver.input_path, "file_removed", contents=b"b" * 5)
+    create_regular_file(archiver.input_path, "file_touched", contents=b"c" * 7)
+    cmd(archiver, "create", "test0", "input")
+    create_regular_file(archiver.input_path, "file_changed", contents=b"d" * 120)
+    os.unlink("input/file_removed")
+    create_regular_file(archiver.input_path, "file_added", contents=b"e" * 30)
+    # touch the mtime only: a metadata change that works on every platform
+    # (os.chmod only toggles the read-only bit on Windows).
+    os.utime("input/file_touched", (1000000000, 1000000000))
+    cmd(archiver, "create", "test1", "input")
+
+
+def test_stats(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    _setup_stats_archives(archiver)
+    output = cmd(archiver, "diff", "--stats", "--content-only", "test0", "test1")
+    lines = output.splitlines()
+    # only the content changes are considered, so file_touched (mtime only) is not counted.
+    assert "Added items: 1" in lines
+    assert "Removed items: 1" in lines
+    assert "Changed items: 1" in lines
+    # added: file_added (30) + the new content of file_changed (120)
+    assert_line_exists(lines, r"^Added chunk volume: 150 B$")
+    # removed: file_removed (5) + the old content of file_changed (100)
+    assert_line_exists(lines, r"^Removed chunk volume: 105 B$")
+    # all sizes are known, so this line is omitted
+    assert_line_not_exists(lines, r"^Items with unknown size changes:")
+
+
+def test_stats_counts_metadata_only_changes(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    _setup_stats_archives(archiver)
+    # without --content-only, file_touched (changed mtime) and the input directory
+    # (changed mtime, as items were added to / removed from it) are reported as
+    # changed items, too.
+    output = cmd(archiver, "diff", "--stats", "test0", "test1")
+    lines = output.splitlines()
+    assert "Added items: 1" in lines
+    assert "Removed items: 1" in lines
+    assert "Changed items: 3" in lines
+    assert_line_exists(lines, r"^Added chunk volume: 150 B$")
+    assert_line_exists(lines, r"^Removed chunk volume: 105 B$")
+
+
+def test_stats_json_lines(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    _setup_stats_archives(archiver)
+    output = cmd(archiver, "diff", "--stats", "--content-only", "--json-lines", "test0", "test1")
+    lines = [line for line in output.splitlines() if line.startswith("{")]
+    # the stats are the last line and have a shape of their own
+    assert all("stats" not in json.loads(line) for line in lines[:-1])
+    assert json.loads(lines[-1]) == {
+        "stats": {
+            "added_items": 1,
+            "removed_items": 1,
+            "changed_items": 1,
+            "added_chunk_volume": 150,
+            "removed_chunk_volume": 105,
+            "unknown_size_items": 0,
+        }
+    }
+
+
+def test_stats_unknown_sizes(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file_changed", contents=b"a" * 100)
+    cmd(archiver, "create", "test0", "input")
+    create_regular_file(archiver.input_path, "file_changed", contents=b"b" * 120)
+    # different chunker params: borg has to compare the content and can't tell sizes.
+    cmd(archiver, "create", "--chunker-params", "buzhash,10,23,16,4095", "test1", "input")
+    output = cmd(archiver, "diff", "--stats", "--content-only", "test0", "test1")
+    lines = output.splitlines()
+    assert "Changed items: 1" in lines
+    assert_line_exists(lines, r"^Added chunk volume: 0 B$")
+    assert_line_exists(lines, r"^Removed chunk volume: 0 B$")
+    assert "Items with unknown size changes: 1" in lines
+
+
+def test_no_stats_by_default(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    _setup_stats_archives(archiver)
+    output = cmd(archiver, "diff", "--content-only", "test0", "test1")
+    assert_line_not_exists(output.splitlines(), r"^Added items:")
+    output = cmd(archiver, "diff", "--content-only", "--json-lines", "test0", "test1")
+    assert all("stats" not in json.loads(line) for line in output.splitlines() if line.startswith("{"))

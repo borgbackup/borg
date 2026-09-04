@@ -15,6 +15,7 @@ from ..hashindex import ChunkIndex
 from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin, IntegrityError
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
+from ..repoobj import object_validator
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -407,12 +408,15 @@ class ArchiveGarbageCollector:
                 del self.chunks[id]
             progress += 1
             pi.show(progress)  # report after the work, so the final pack lands on 100%
+        validate = object_validator(self.manifest.repo_objs)
         for pid in rewrite_packs:
             if sig_int:
                 break
             # chunks=self.chunks: the index updates (repoint kept objects, remove dropped ones)
             # must land in the index that save_chunk_index() persists (#9850).
-            _, dropped = self.repository.compact_pack(pid, keep_ids=keep[pid], drop_ids=drop[pid], chunks=self.chunks)
+            _, dropped = self.repository.compact_pack(
+                pid, keep_ids=keep[pid], drop_ids=drop[pid], chunks=self.chunks, validate=validate
+            )
             freed += dropped  # unused indexed objects plus superseded duplicates
             progress += 1
             pi.show(progress)

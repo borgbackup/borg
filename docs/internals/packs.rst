@@ -67,6 +67,9 @@ the AAD; tampering with either still fails the check, because it changes the len
 slice being read. A forged ``chunk_id``, version, or magic byte therefore fails
 authentication in ``RepoObj.parse()``/``parse_meta()``.
 
+``parse_meta()`` reads the metadata slot only, so of the two length fields it covers
+``meta_size`` alone; ``data_size`` is covered by ``parse()``.
+
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
 AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data`` -- binding each ciphertext to
 its slot. This stops an attacker controlling repo storage from swapping the two ciphertexts (adjusting
@@ -94,10 +97,34 @@ A reader locates the next blob by advancing::
 
     next_blob_offset = current_blob_offset + REPOOBJ_HEADER_SIZE + meta_size + data_size
 
-The per-blob magic limits the blast radius of corrupted length fields: if
-``meta_size`` or ``data_size`` is damaged, the scanner loses at most one blob.
-Once it finds the next ``OBJ_MAGIC`` sequence it resumes. Other corruption
-(payload bit flips) is caught by AEAD on that blob without losing position.
+``iter_headers()`` checks every header it walks: it must have ``OBJ_MAGIC``, a
+supported version, and sizes that keep the blob inside the pack. A header that
+fails these checks means a corrupt pack, and ``IntegrityError`` is raised.
+
+The per-blob magic limits the blast radius of corrupted length fields. The
+repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``
+rebuilds the chunks index from the packs) scans for the next blob and resumes
+there, so the blobs after the damaged part of the pack are still found. The scan
+starts just past the last blob the walk accepted: a corrupted length field that
+keeps the blob inside the pack leaves the header valid, and is noticed only at
+the misaligned offset it points to. The blob carrying it is dropped when a
+recovered blob starts inside the extent it claims - its length field is wrong,
+so it can not be read back.
+
+``OBJ_MAGIC`` occurs inside the payloads as well, and in the ``none-*`` and
+``authenticated-*`` modes the payloads are user content stored as it is, so a
+backed up file can contain something shaped like a blob. A candidate is
+therefore accepted only when its metadata slot verifies against the header AAD
+described above; the header and that slot, a few hundred bytes, are what the
+scan reads. Verifying needs the key, so a repair that cannot read the manifest
+walks without scanning.
+
+In the ``none-*`` modes the tag is an unkeyed checksum, so the scan accepts any
+well-formed blob, including one a backed up file contains.
+
+``data_size`` is not part of the AAD, so accepting a candidate authenticates
+its chunk id, and its size only as far as the blob fits into the pack. Bit flips
+in the data are caught when the blob is read, on that blob alone.
 
 Blobs follow one another contiguously with no padding::
 
@@ -199,6 +226,28 @@ content-addressed name and deletes the old one) and ``borg debug delete-obj``. A
 single blob cannot be removed from a pack in place: all of these paths write a new
 pack file without it and then delete the old one, so store-level deletion always
 operates at pack granularity.
+
+Gap bytes
+~~~~~~~~~
+
+A pack can hold bytes that no chunks index entry covers -- its *gaps*: a copy of a chunk
+that was stored again elsewhere, or blobs from a backup that crashed before writing its
+index. Rewriting a pack (``compact_pack``, ``transform_pack``) walks the gaps and drops
+the blobs among them that are *superseded*: whose chunk id the index maps to a copy at
+another location, which by the id/content invariant holds the same plaintext.
+
+A gap blob is dropped only when both hold:
+
+* its header and metadata slot authenticate (``repoobj.object_validator``), verifying its
+  magic, version, chunk id and ``meta_size``. ``OBJ_MAGIC`` plus a well-formed header is
+  not evidence that bytes are a blob: in the ``none-*`` and ``authenticated-*`` modes the
+  payloads are user content stored as it is, so a backed up file can contain one.
+* its total size equals the index entry's ``obj_size``. ``data_size`` lies outside what
+  the authentication covers and sets how far the dropped range reaches, so the entry
+  serves as a second source for it.
+
+Anything else keeps its bytes, for ``borg check --repair`` to re-index. Authenticating
+needs the key, so a caller without one drops no gap bytes.
 
 
 .. _pack-index-namespace:

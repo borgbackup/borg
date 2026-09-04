@@ -611,7 +611,9 @@ def _setup_stats_archives(archiver):
     create_regular_file(archiver.input_path, "file_changed", contents=b"d" * 120)
     os.unlink("input/file_removed")
     create_regular_file(archiver.input_path, "file_added", contents=b"e" * 30)
-    os.chmod("input/file_touched", 0o700)
+    # touch the mtime only: a metadata change that works on every platform
+    # (os.chmod only toggles the read-only bit on Windows).
+    os.utime("input/file_touched", (1000000000, 1000000000))
     cmd(archiver, "create", "test1", "input")
 
 
@@ -620,7 +622,7 @@ def test_stats(archivers, request):
     _setup_stats_archives(archiver)
     output = cmd(archiver, "diff", "--stats", "--content-only", "test0", "test1")
     lines = output.splitlines()
-    # only the content changes are considered, so file_touched (mode only) is not counted.
+    # only the content changes are considered, so file_touched (mtime only) is not counted.
     assert "Added items: 1" in lines
     assert "Removed items: 1" in lines
     assert "Changed items: 1" in lines
@@ -635,8 +637,9 @@ def test_stats(archivers, request):
 def test_stats_counts_metadata_only_changes(archivers, request):
     archiver = request.getfixturevalue(archivers)
     _setup_stats_archives(archiver)
-    # without --content-only, file_touched (changed mode) and the input directory
-    # (changed mtime/ctime) are reported as changed items, too.
+    # without --content-only, file_touched (changed mtime) and the input directory
+    # (changed mtime, as items were added to / removed from it) are reported as
+    # changed items, too.
     output = cmd(archiver, "diff", "--stats", "test0", "test1")
     lines = output.splitlines()
     assert "Added items: 1" in lines

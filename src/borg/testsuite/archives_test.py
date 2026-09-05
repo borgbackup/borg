@@ -53,7 +53,9 @@ def _archiveinfo(name, id_, ts=TS, *, username="", hostname="", tags=()):
 
 def _stub_matching_info_tuples(infos):
     ar, _, _ = _archives()
-    ar._matching_info_tuples = Mock(side_effect=lambda match_patterns, match_end, deleted=False: list(infos))
+    ar._matching_info_tuples = Mock(
+        side_effect=lambda match_patterns, match_end, *, deleted=False, exclude_patterns=None: list(infos)
+    )
     return ar
 
 

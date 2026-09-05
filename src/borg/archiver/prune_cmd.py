@@ -195,7 +195,9 @@ class PruneMixIn:
         self._validate_prune_args(args)
 
         match = archive_match_patterns(args)
-        archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
+        archives = manifest.archives.list(
+            match=match, exclude=getattr(args, "exclude_archives", None), sort_by=["ts"], reverse=True
+        )
         archives = [ai for ai in archives if "@PROT" not in ai.tags]
 
         # The retention rules are applied to each group of archives separately, so that unrelated

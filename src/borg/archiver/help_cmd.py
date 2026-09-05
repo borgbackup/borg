@@ -318,6 +318,12 @@ class HelpMixIn:
         selection, e.g. ``borg prune home -a host:myhost``. NAME accepts the same prefixes as the
         patterns below, e.g. ``borg info aid:1234abcd``.
 
+        The ``--exclude-archives`` option is the inverse: it accepts the same patterns, can also be
+        given multiple times, and an archive is skipped if it matches any of them. An archive is
+        therefore considered if it matches all ``--match-archives`` patterns and none of the
+        ``--exclude-archives`` patterns, e.g.
+        ``borg repo-list -a 'sh:myhost-*' --exclude-archives tags:@PROT``.
+
         The patterns can have a prefix of:
 
         - name: pattern match on the archive name (default)

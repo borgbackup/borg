@@ -6,6 +6,7 @@ from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
 from .helpers.errors import Error, IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR
+from .crypto.low_level import IntegrityError as IntegrityErrorBase
 
 # Workaround for lost passphrase or key in the "authenticated-*" modes
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
@@ -75,7 +76,9 @@ REPOOBJ_HEADER_SIZE = 49
 # Size of the header prefix used as AEAD AAD (additional authenticated data: authenticated together
 # with the ciphertext, but not itself encrypted) for OBJ_VERSION_HEADER_AAD objects: magic(8) +
 # version(1) + chunk_id(32). meta_size and data_size are excluded, since they are only known after
-# encryption; a change to either still fails authentication, by changing the ciphertext slice length.
+# encryption. A change to either changes the ciphertext slice length, so parse(), which reads both
+# slots, fails authentication; parse_meta() reads the metadata slot alone and thus does not see a
+# changed data_size.
 REPOOBJ_HEADER_AAD_SIZE = len(OBJ_MAGIC) + 1 + 32
 
 META_AAD_TAG = b"M"
@@ -275,6 +278,45 @@ class RepoObj:
         else:
             meta, data = None, None
         return meta_compressed if want_compressed else meta, data_compressed if want_compressed else data
+
+
+def object_validator(repo_objs):
+    """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
+
+    obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
+    computed over the slot itself and over the chunk id, so a wrong meta_size or chunk id fails it.
+    At object version OBJ_VERSION_HEADER_AAD the magic and the version are covered as well (as AAD,
+    additional authenticated data: bytes the tag covers without being part of the ciphertext); at
+    OBJ_VERSION_NO_HEADER_AAD they are not: a wrong magic fails the explicit magic check, and a
+    wrong version fails because the version selects the AAD the slot is parsed with. data_size, the
+    one header field outside the tag at either version, must match csize - the data slot's payload
+    size, recorded in the tagged metadata - plus the key's fixed envelope overhead.
+
+    In the "none-*" modes the tag is an unkeyed checksum, and in the "authenticated-*" modes it is
+    deterministic and binds an object to its chunk id alone. Both therefore accept an object that a
+    backed up file contains, at any offset in any pack.
+    """
+    hdr_size = RepoObj.obj_header.size
+    overhead = repo_objs.key.PAYLOAD_OVERHEAD  # the envelope adds a fixed number of bytes to the payload
+
+    def validate(chunk_id, obj):
+        try:
+            meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
+        except (IntegrityErrorBase, msgpack.UnpackException):
+            # arbitrary bytes fail the authentication, or the msgpack unpacking in the modes that
+            # authenticate without a secret key (none-*, authenticated-*) and thus accept them.
+            return False
+        # in those modes the slot can unpack to any value, so check the value: only metadata that
+        # is unusable here gives False, any other exception propagates.
+        if not isinstance(meta, dict):
+            return False
+        csize = meta.get("csize")
+        if not isinstance(csize, int) or isinstance(csize, bool):  # msgpack unpacks true/false to bool
+            return False
+        data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
+        return data_size == csize + overhead
+
+    return validate
 
 
 # Backward compatibility: RepoObj1 has moved to borg.legacy.repoobj

@@ -26,7 +26,7 @@ from ..cache import (
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey
-from ..helpers import safe_ns
+from ..helpers import Error, IntegrityError, bin_to_hex, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import Repository
@@ -503,6 +503,101 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
         index = build_chunkindex_from_repo(repository)
         for cid in all_ids:
             assert cid in index
+
+
+def test_build_chunkindex_repair_resyncs_after_corrupt_header(tmp_path):
+    """A corrupt object header fails the rebuild; with validate, the objects after it are indexed."""
+    from .repository_test import accept_all, fchunk
+
+    obj1 = bytearray(fchunk(b"first", chunk_id=H(90)))
+    obj2 = fchunk(b"second", chunk_id=H(91))
+    obj1[0] ^= 0xFF  # break the magic of the first object's header
+    pack_id = H(92)
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), bytes(obj1) + obj2)
+        with pytest.raises(IntegrityError):
+            build_chunkindex_from_repo(repository, slow_rebuild=True)
+        # accept_all takes any candidate, so this covers the plumbing, not the authentication.
+        index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_all)
+        assert H(91) in index  # found by resyncing past the damaged header
+        assert H(90) not in index  # its header is damaged, so its id is unknown
+        assert index[H(91)].pack_id == pack_id
+        assert index[H(91)].obj_offset == len(obj1)
+
+
+def test_build_chunkindex_aborts_when_nothing_validates(tmp_path):
+    """The rebuild aborts when object headers parse but no object validates."""
+    from .repository_test import fchunk
+
+    pack = fchunk(b"first", chunk_id=H(90)) + fchunk(b"second", chunk_id=H(91))
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(H(92)), pack)
+        with pytest.raises(Error, match="not one object passed validation"):
+            build_chunkindex_from_repo(repository, slow_rebuild=True, validate=lambda chunk_id, obj: False)
+
+
+def test_build_chunkindex_reports_a_pack_without_any_object_header(tmp_path):
+    """A pack whose bytes hold no object header is reported through on_drop and yields no entries."""
+    drops = []
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(H(92)), b"x" * 512)  # the pack was overwritten
+        index = build_chunkindex_from_repo(
+            repository, slow_rebuild=True, validate=lambda chunk_id, obj: False, on_drop=lambda: drops.append(True)
+        )
+        assert len(index) == 0
+        assert len(drops) == 1
+
+
+def test_build_chunkindex_without_a_validator_drops_the_rest_of_a_damaged_pack(tmp_path):
+    """With drop_corrupt_tail and no validator, a corrupt object header ends the pack's walk."""
+    from .repository_test import fchunk
+
+    obj1 = fchunk(b"first", chunk_id=H(90))
+    obj2 = bytearray(fchunk(b"second", chunk_id=H(91)))
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    obj3 = fchunk(b"third", chunk_id=H(92))
+    drops = []
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(H(93)), obj1 + bytes(obj2) + obj3)
+        index = build_chunkindex_from_repo(
+            repository, slow_rebuild=True, on_drop=lambda: drops.append(True), drop_corrupt_tail=True
+        )
+        assert H(90) in index  # the pack is indexed up to the damaged header
+        assert H(91) not in index and H(92) not in index  # from there on the pack is dropped
+        assert len(drops) == 1
+
+
+def test_build_chunkindex_without_drop_corrupt_tail_raises_on_a_damaged_pack(tmp_path):
+    """on_drop alone does not let the rebuild past a corrupt object header, it only reports."""
+    from .repository_test import fchunk
+
+    obj1 = fchunk(b"first", chunk_id=H(90))
+    obj2 = bytearray(fchunk(b"second", chunk_id=H(91)))
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    drops = []
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(H(93)), obj1 + bytes(obj2))
+        with pytest.raises(IntegrityError, match="no object header at offset"):
+            build_chunkindex_from_repo(repository, slow_rebuild=True, on_drop=lambda: drops.append(True))
+        assert drops == []  # nothing was discarded: the walk did not get that far
+
+
+def test_build_chunkindex_drops_a_pack_that_validates_nothing_when_others_do(tmp_path):
+    """A single pack of which nothing validates is dropped, the objects of the other packs are indexed."""
+    from .repository_test import fchunk
+
+    good = fchunk(b"good", chunk_id=H(93))
+    bad = fchunk(b"bad", chunk_id=H(94))
+
+    def accept_good(chunk_id, obj):
+        return chunk_id == H(93)
+
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(H(95)), good)
+        repository.store_store("packs/" + bin_to_hex(H(96)), bad)
+        index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_good)
+        assert H(93) in index
+        assert H(94) not in index
 
 
 def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):

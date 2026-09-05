@@ -62,10 +62,12 @@ Format version ``0x02`` (``OBJ_VERSION_HEADER_AAD``) binds the header's first 41
 authenticated together with the ciphertext, but not itself encrypted). This applies to all borg 2
 modes: the AEAD encryption modes (AES-256-OCB, ChaCha20-Poly1305) authenticate it with their AEAD
 tag, the ``authenticated-*`` modes with their MAC and the ``none-*`` modes with their (unkeyed)
-checksum, see :ref:`tagged_envelope`. ``meta_size`` and ``data_size`` are excluded from
-the AAD; tampering with either still fails the check, because it changes the length of the
-slice being read. A forged ``chunk_id``, version, or magic byte therefore fails
-authentication in ``RepoObj.parse()``/``parse_meta()``.
+checksum, see :ref:`tagged_envelope`. ``meta_size`` and ``data_size`` are excluded from the AAD.
+``RepoObj.parse()`` reads both slots, so tampering with either size still fails the check, by
+changing the length of the slice being read. ``parse_meta()`` reads the metadata slot alone: it
+catches a changed ``meta_size`` the same way, but not a changed ``data_size``, which the repair
+walk described below pins separately. A forged ``chunk_id``, version, or magic byte fails
+authentication in both.
 
 ``encrypted_meta`` and ``encrypted_data`` each add a one-byte slot tag on top of the shared header
 AAD -- ``b"M"`` for ``encrypted_meta``, ``b"D"`` for ``encrypted_data`` -- binding each ciphertext to
@@ -78,7 +80,8 @@ Format version ``0x01`` (``OBJ_VERSION_NO_HEADER_AAD``) authenticates ``encrypte
 writes version ``0x02``; ``parse()``/``parse_meta()`` accept both versions.
 
 ``iter_headers()`` (used for pack recovery/compaction, see below) reads the header without
-decrypting, so it does not check header AAD authentication.
+decrypting, so it does not check header AAD authentication. The repair walk described below is the
+exception: given a validator it reads and decrypts each metadata slot, and thus does check it.
 
 .. figure:: pack-objheader.png
     :width: 100%
@@ -87,17 +90,55 @@ decrypting, so it does not check header AAD authentication.
 
     The fixed 49-byte blob header. ``meta_size`` and ``data_size`` drive
     traversal; integrity comes from the content-addressed pack name and the
-    per-blob tag, which authenticates magic/version/chunk_id as additional
-    authenticated data.
+    per-blob tag, which at version ``0x02`` authenticates magic/version/chunk_id
+    as additional authenticated data.
 
 A reader locates the next blob by advancing::
 
     next_blob_offset = current_blob_offset + REPOOBJ_HEADER_SIZE + meta_size + data_size
 
-The per-blob magic limits the blast radius of corrupted length fields: if
-``meta_size`` or ``data_size`` is damaged, the scanner loses at most one blob.
-Once it finds the next ``OBJ_MAGIC`` sequence it resumes. Other corruption
-(payload bit flips) is caught by AEAD on that blob without losing position.
+``iter_headers()`` checks every header it walks: it must have ``OBJ_MAGIC``, a
+supported version, and sizes that keep the blob inside the pack and within
+``MAX_DATA_SIZE``. A header that fails these checks means a corrupt pack, and
+``IntegrityError`` is raised, naming which check it failed.
+
+The per-blob magic limits the blast radius of corrupted length fields. The
+repair walk (``iter_headers(validate=...)``, used when ``borg check --repair``
+rebuilds the chunks index from the packs) validates every header it walks,
+reading the metadata slot along with it: the slot's tag covers the slot itself
+and the chunk id, and at version ``0x02`` the header AAD described above, so a
+corrupted chunk id or ``meta_size`` fails it; a corrupted magic fails the magic
+check, and a corrupted version fails because the version decides which AAD the
+slot is parsed with. ``data_size`` - the one header field outside the tag at
+either version - must equal ``csize`` (the data payload size recorded in the
+tagged metadata) plus the key's fixed envelope overhead. A header that fails
+makes the walk scan for the next blob that validates and resume there, so the
+blobs after the damaged one are still found; the damaged blob itself is dropped,
+it can not be read back.
+
+The walk rebuilds the index from the pack as it is: the damaged bytes stay where
+they are, as a gap no index entry covers. A pack is named by the sha256 of its
+content, so a pack damaged in the store keeps failing the store-level check that
+``borg check`` runs over ``packs/``, also after ``borg check --repair`` has
+rebuilt the index from it. Rewriting such a pack is repository-level repair, see
+:issue:`10026`.
+
+``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
+only when it validates like any walked header. Validating needs the key, so a
+repair that cannot read the manifest walks without it.
+
+In the ``none-*`` modes the tag is an unkeyed checksum, and in the
+``authenticated-*`` modes it binds a blob to its chunk id and nothing else (see
+:ref:`security_structural_auth`), so validating does not establish there that
+this repository wrote the blob. Both modes also store payloads as they are, so a
+backed up file can contain something that validates - the blobs of a repository
+sharing the key, for instance. Such a blob reads back as itself, adding a chunk
+nothing references, but the extent its ``data_size`` claims covers whatever
+follows it at that offset, which the walk then skips. The scan reaches a payload
+only after the blob owning it failed to validate, so a corrupt header is what
+makes this reachable.
+
+Bit flips in the data are caught when the blob is read, on that blob alone.
 
 Blobs follow one another contiguously with no padding::
 

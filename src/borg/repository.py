@@ -30,13 +30,23 @@ from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
-from .repoobj import RepoObj, OBJ_MAGIC
+from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
 from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
 
 # an object name is its sha256 as 64 lowercase hex digits.
 _valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
+
+# how much of a pack PackReader reads at once when searching for the next object header.
+RESYNC_WINDOW_SIZE = 1024 * 1024
+# how much to read to get an object's header plus, at the usual metadata slot sizes, its metadata
+# slot in the same read.
+META_READ_SIZE = 1024
+# the largest metadata slot a validating read fetches. a slot holds a few compression fields, packed
+# and encrypted, i.e. some tens of bytes, so this is a generous bound and it keeps a corrupt
+# meta_size, which only MAX_DATA_SIZE bounds, from triggering a large read.
+MAX_VALIDATED_META_SIZE = 64 * 1024
 
 
 def repo_lister(repository, *, limit=None):
@@ -354,6 +364,7 @@ class PackReader:
         self.pack_id = pack_id
         self.key = "packs/" + bin_to_hex(pack_id) if pack_id is not None else None
         self.pack_contents = pack_contents
+        self.headers_parsed = 0  # headers _parse_header accepted in the last iter_headers walk
 
     def read(self, offset, size):
         # in-memory pack: return a memoryview into pack_contents. store: range-read bytes.
@@ -362,44 +373,154 @@ class PackReader:
         return self.store.load(self.key, offset=offset, size=size)
 
     def size(self):
-        """Return the pack size in bytes; for a store-backed pack this is one metadata lookup."""
+        """Return the pack size in bytes (a store metadata lookup, unless the pack is in memory)."""
         if self.pack_contents is not None:
             return len(self.pack_contents)
         return self.store.info(self.key).size
 
-    def iter_headers(self):
+    @staticmethod
+    def _parse_header(hdr_data, offset, pack_size):
+        """Return (ObjHeader, None) for a valid header at offset, (None, problem) otherwise.
+
+        Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack and is
+        at most MAX_DATA_SIZE bytes, the limit put() enforces on a whole object. problem names
+        which of these failed.
+        """
+        hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
+        if hdr.magic != OBJ_MAGIC:
+            return None, "no object header"
+        if hdr.version not in SUPPORTED_OBJ_VERSIONS:
+            return None, f"unsupported object version {hdr.version}"
+        obj_size = RepoObj.obj_header.size + hdr.meta_size + hdr.data_size
+        if offset + obj_size > pack_size:
+            return None, "object extends past end of file"
+        if obj_size > MAX_DATA_SIZE:
+            return None, f"object of {obj_size} bytes exceeds the maximum of {MAX_DATA_SIZE}"
+        return hdr, None
+
+    def _validation_problem(self, hdr, offset, buf, buf_offset, validate):
+        """Return None if validate accepts the object with header hdr at offset, else the problem.
+
+        buf holds the pack bytes from buf_offset on; the metadata slot is read separately when buf
+        does not reach its end. A slot over MAX_VALIDATED_META_SIZE is rejected without that read.
+        """
+        if hdr.meta_size > MAX_VALIDATED_META_SIZE:
+            return f"metadata slot of {hdr.meta_size} bytes exceeds the maximum of {MAX_VALIDATED_META_SIZE}"
+        size = RepoObj.obj_header.size + hdr.meta_size
+        start = offset - buf_offset
+        end = start + size
+        obj = buf[start:end] if end <= len(buf) else self.read(offset, size)
+        if not validate(hdr.chunk_id, obj):
+            return "object does not authenticate"
+        return None
+
+    def _find_header(self, offset, pack_size, validate):
+        """Scan forward from offset for the next object validate accepts, return (offset, header).
+
+        Returns None if the pack holds no such object from offset on.
+
+        A pack has no framing besides the object headers, so this searches for OBJ_MAGIC. That byte
+        sequence also occurs inside payloads, so a candidate is accepted only when its header parses
+        and validate(chunk_id, obj) confirms the header and metadata slot at that position.
+        """
+        hdr_size = RepoObj.obj_header.size
+        while offset + hdr_size <= pack_size:
+            # a window at a time, so the scan costs one store request per RESYNC_WINDOW_SIZE bytes.
+            buf = bytes(self.read(offset, min(RESYNC_WINDOW_SIZE, pack_size - offset)))
+            if len(buf) < hdr_size:
+                break
+            pos = 0
+            while True:
+                pos = buf.find(OBJ_MAGIC, pos)
+                if pos < 0 or pos + hdr_size > len(buf):
+                    break  # not in this window, or a header overlapping its end: the next window has it
+                hdr, _ = self._parse_header(buf[pos : pos + hdr_size], offset + pos, pack_size)
+                if hdr is not None:
+                    self.headers_parsed += 1
+                    if self._validation_problem(hdr, offset + pos, buf, offset, validate) is None:
+                        return offset + pos, hdr
+                pos += 1
+            # step by the window less one header, so a magic straddling the boundary is still found.
+            offset += max(len(buf) - (hdr_size - 1), 1)
+        return None
+
+    def iter_headers(self, validate=None, on_drop=None, drop_corrupt_tail=False):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
-        Only the headers are read, not the payloads, so locating every object costs one short
-        range read per object (or just a slice, when the pack is already in memory), plus one
-        store metadata lookup for the pack size.
+        The walk reads one range per object (or a slice, for a pack in memory), plus one store
+        metadata lookup for the pack size. Fewer than a header's bytes left ends the walk: that is
+        the end of the pack.
 
-        Each full header must have OBJ_MAGIC and describe an object that fits into the pack,
-        otherwise the pack is corrupt and IntegrityError is raised. Ending the walk instead
-        would be worse than raising: the chunks index rebuilt from these headers would just be
-        missing the rest of the pack, and borg check --repair would then "fix" the archives by
-        dropping chunks that are there.
-        A trailing partial header is the clean end of the pack, not corruption.
+        validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
+        repo object with id chunk_id. Given one, the walk validates every header, reading the
+        metadata slot along with it, and a header that fails makes the walk resync: it scans from
+        just past that header for the next object validate accepts and continues there. The object
+        with the failed header is dropped - its id, its extent or its metadata is wrong, so it can
+        not be read back. The pack keeps the dropped object's bytes. If nothing in the pack
+        validates, the walk yields nothing and raises nothing.
+
+        Without a validator a resync is impossible, because payload bytes can look like a header.
+        A header that _parse_header rejects then raises IntegrityError naming what is wrong with
+        it, or, with drop_corrupt_tail, ends the walk there and drops the rest of the pack.
+
+        on_drop, if given, is called once per place where the walk discards content: once for the
+        object with the failed header plus whatever the resync scan skips before the object it
+        resumes at, once for a tail dropped because the scan found no such object or because there
+        was no validator to scan with. It only reports, it does not change what the walk does.
+
+        headers_parsed is set to the number of headers _parse_header accepted in this walk, the
+        candidates the resync scan tried included. A pack whose bytes hold no object header at all
+        leaves it at zero.
         """
         pack_hex = bin_to_hex(self.pack_id) if self.pack_id is not None else "<no id>"
         pack_size = self.size()
         hdr_size = RepoObj.obj_header.size
+        # TODO: objects smaller than META_READ_SIZE make the validating walk read the pack several
+        # times over. Buffering a window, as _find_header scans with, would suit them; skipping a
+        # large object stays cheaper with a short read per header.
+        read_size = META_READ_SIZE if validate is not None else hdr_size
+        self.headers_parsed = 0
         offset = 0
-        while True:
-            hdr_data = self.read(offset, hdr_size)
-            if len(hdr_data) < hdr_size:
-                break  # clean EOF, or trailing partial bytes
-            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
-            if hdr.magic != OBJ_MAGIC:
-                raise IntegrityError(
-                    f'pack {pack_hex}: no object header at offset {offset} (pack corruption), run "borg check"'
+        while offset + hdr_size <= pack_size:
+            buf = self.read(offset, min(read_size, pack_size - offset))
+            if len(buf) < hdr_size:
+                break  # trailing partial bytes
+            hdr, problem = self._parse_header(buf[:hdr_size], offset, pack_size)
+            if hdr is not None:
+                self.headers_parsed += 1
+                if validate is not None:
+                    problem = self._validation_problem(hdr, offset, buf, offset, validate)
+            if problem is not None:
+                if validate is None:
+                    # no validator, so payload bytes that look like a header can not be told from
+                    # an object: there is no way to resync past this header.
+                    if not drop_corrupt_tail:
+                        raise IntegrityError(
+                            f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
+                        )
+                    if on_drop is not None:
+                        on_drop()
+                    logger.warning(
+                        f"pack {pack_hex}: {problem} at offset {offset}, no validator to resync with, "
+                        f"skipping the remaining {pack_size - offset} bytes."
+                    )
+                    break
+                if on_drop is not None:
+                    on_drop()  # content is discarded either way below: this object, or the tail.
+                found = self._find_header(offset + 1, pack_size, validate)
+                if found is None:
+                    logger.warning(
+                        f"pack {pack_hex}: {problem} at offset {offset} and no object after it, "
+                        f"skipping the remaining {pack_size - offset} bytes."
+                    )
+                    break
+                next_offset, hdr = found  # _find_header validated it, so yield it without re-reading
+                logger.warning(
+                    f"pack {pack_hex}: {problem} at offset {offset}, "
+                    f"continuing at the object at offset {next_offset}."
                 )
+                offset = next_offset
             obj_size = hdr_size + hdr.meta_size + hdr.data_size
-            if offset + obj_size > pack_size:
-                raise IntegrityError(
-                    f"pack {pack_hex}: object extends past end of file at offset {offset} "
-                    f'(pack corruption), run "borg check"'
-                )
             yield hdr.chunk_id, offset, obj_size
             offset += obj_size
 
@@ -1200,6 +1321,10 @@ class Repository:
                 # the exclusive check lock keeps the pack set fixed, so re-listing packs/ inside
                 # build_chunkindex_from_repo matches this verification. write_immediately persists the
                 # index and drops the corrupt fragments.
+                # the walk gets no validator: validating needs the key, which a Repository does not
+                # have. A pack is named by the sha256 of its content, so a pack damaged in the store
+                # fails verify() above and pack_errors > 0 keeps it out of here. A pack that matches
+                # its name and still has a bad object header makes iter_headers raise, see #10026.
                 build_chunkindex_from_repo(self, slow_rebuild=True, write_immediately=True)
                 self.invalidate_chunk_index()  # the rebuilt index is persisted; drop the in-memory copy
                 index_repaired = True
@@ -1322,7 +1447,7 @@ class Repository:
                 # RepoObj layout supports separately encrypted metadata and data.
                 # We return enough bytes so the client can decrypt the metadata.
                 hdr_size = RepoObj.obj_header.size
-                extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
+                extra_size = META_READ_SIZE - hdr_size
                 load_size = hdr_size + extra_size
                 # keep the read inside this object: a pack holds neighbouring objects, so don't pull
                 # bytes past obj_size into the next one. (an overshoot would be harmless -- parse_meta

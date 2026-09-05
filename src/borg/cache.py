@@ -25,6 +25,7 @@ from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM
 from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
 from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS, CHUNKINDEX_INVALID_SENTINEL
 from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
+from .helpers import Error
 from .helpers import get_cache_dir
 from .helpers import archive_hostname, archive_username
 from .helpers import chunkit
@@ -890,10 +891,24 @@ def repack_chunkindex(repository):
 
 
 def build_chunkindex_from_repo(
-    repository, *, slow_rebuild=False, fragments_only=False, write_immediately=False, init_flags=ChunkIndex.F_USED
+    repository,
+    *,
+    slow_rebuild=False,
+    fragments_only=False,
+    validate=None,
+    on_drop=None,
+    drop_corrupt_tail=False,
+    write_immediately=False,
+    init_flags=ChunkIndex.F_USED,
 ):
     # fragments_only: build the index from the index/ fragments only, returning None if they cannot be
     # read completely, and never write to the repo.
+    # validate: a repo object validator, handed to PackReader.iter_headers so the rebuild skips the
+    # objects that fail it.
+    # on_drop: a callable, handed to PackReader.iter_headers, which calls it once per place where
+    # the walk skips content. It only reports, it does not change what the walk does.
+    # drop_corrupt_tail: without a validator, index a pack with a corrupt object header up to that
+    # header and drop the rest of it, instead of raising, see PackReader.iter_headers.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
@@ -972,27 +987,44 @@ def build_chunkindex_from_repo(
     # Every caller passes a (modern) Repository; legacy borg 1.x repos never reach here (transfer reads
     # their archives directly and never builds a chunk index for them), so there is no legacy branch.
     assert isinstance(repository, Repository)
-    # Read each pack's object headers with borgstore range requests, fetching only the fixed-size
-    # headers and skipping the (much larger) encrypted payloads. Don't call Repository.list() here:
+    # Read each pack's object headers with borgstore range requests: one fixed-size header read per
+    # object, skipping the (much larger) encrypted payloads, or a META_READ_SIZE read per object
+    # with a validator, which needs the metadata slot along with the header. Don't call
+    # Repository.list() here:
     # it iterates this same index we are building, so it would recurse. The headers also give each
     # object's real (chunk_id, offset, size), so every object in a pack is indexed individually.
     pack_infos = repository.store_list("packs")
     pi = ProgressIndicatorPercent(
         total=len(pack_infos), msg="Rebuilding chunk index %3.0f%%", msgid="cache.build_chunkindex_from_repo"
     )
+    headers_parsed = 0
     for info in pack_infos:
         # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
         repository._lock_refresh()
         pi.show(increase=1)
         pack_id = hex_to_bin(info.name)
-        for chunk_id, obj_offset, obj_size in PackReader(repository.store, pack_id).iter_headers():
+        reader = PackReader(repository.store, pack_id)
+        for chunk_id, obj_offset, obj_size in reader.iter_headers(
+            validate=validate, on_drop=on_drop, drop_corrupt_tail=drop_corrupt_tail
+        ):
             num_chunks += 1
             chunks[chunk_id] = ChunkIndexEntry(
                 flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
             )
+        headers_parsed += reader.headers_parsed
     if pack_infos:
         pi.show(current=len(pack_infos))  # finish at 100%
     pi.finish()
+    if validate is not None and headers_parsed and num_chunks == 0:
+        # the packs hold object headers, yet not one object validated: the key does not belong to
+        # these packs, or the validator is broken. Returning this index would empty the chunk lists
+        # of all archives. A pack overwritten with unrelated data holds no header and keeps
+        # headers_parsed at zero; the walk reports its content through on_drop.
+        raise Error(
+            f"Chunk index rebuild: {headers_parsed} object headers parsed, but not one object passed "
+            "validation. The key does not match these packs, or the validator is broken. "
+            "Refusing to return an index without a single chunk."
+        )
     duration = perf_counter() - t0 or 0.001
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
     # Protocol overhead is neglected in this calculation.

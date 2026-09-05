@@ -897,6 +897,7 @@ def build_chunkindex_from_repo(
     fragments_only=False,
     validate=None,
     on_drop=None,
+    drop_corrupt_tail=False,
     write_immediately=False,
     init_flags=ChunkIndex.F_USED,
 ):
@@ -905,8 +906,9 @@ def build_chunkindex_from_repo(
     # validate: a repo object validator, handed to PackReader.iter_headers so the rebuild skips the
     # objects that fail it.
     # on_drop: a callable, handed to PackReader.iter_headers, which calls it once per place where
-    # the walk skips content. Without validate, giving it also makes a corrupt object header end
-    # that pack's walk: the pack is indexed up to that header, the rest of it is dropped.
+    # the walk skips content. It only reports, it does not change what the walk does.
+    # drop_corrupt_tail: without a validator, index a pack with a corrupt object header up to that
+    # header and drop the rest of it, instead of raising, see PackReader.iter_headers.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
@@ -1002,7 +1004,9 @@ def build_chunkindex_from_repo(
         pi.show(increase=1)
         pack_id = hex_to_bin(info.name)
         reader = PackReader(repository.store, pack_id)
-        for chunk_id, obj_offset, obj_size in reader.iter_headers(validate=validate, on_drop=on_drop):
+        for chunk_id, obj_offset, obj_size in reader.iter_headers(
+            validate=validate, on_drop=on_drop, drop_corrupt_tail=drop_corrupt_tail
+        ):
             num_chunks += 1
             chunks[chunk_id] = ChunkIndexEntry(
                 flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size

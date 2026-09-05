@@ -2185,11 +2185,10 @@ class ArchiveChecker:
         # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
         # --repair does rebuild from the packs (slow_rebuild=repair), working from the real packs so it
         # can detect and fix archives that reference chunks whose pack has gone missing.
-        # --repair also passes validate, which makes the rebuild resync past a corrupt object header.
-        # Every object header is validated, since a corrupt data_size parses and points the walk into
-        # the middle of the pack. Cost: one metadata slot read and one decryption per object.
-        # Validating needs the key, so read it here. manifest_only=True, because the other source
-        # make_key reads keys from is self.chunks, which is only built below.
+        # The rebuild validates every object header it walks, because a corrupt data_size parses fine
+        # and points the walk into the middle of the pack. That costs one metadata slot read and one
+        # decryption per object and it needs the key, so read the key here if we do not have it yet.
+        # manifest_only=True: the other key source make_key uses is self.chunks, built just below.
         if repair and self.key is None:
             try:
                 self.key = self.make_key(repository, manifest_only=True)
@@ -2209,7 +2208,13 @@ class ArchiveChecker:
             self.repository,
             slow_rebuild=repair,
             validate=validate,
+            # dropped content is a check finding, with or without --repair.
             on_drop=self.note_dropped_objects,
+            # without a validator the rebuild can not resync past a corrupt object header. --repair
+            # drops the rest of that pack to get on with the repair; without --repair the rebuild
+            # raises, so an index missing objects that are still there can not make the check report
+            # them as gone.
+            drop_corrupt_tail=repair,
             write_immediately=False,
         )
         if self.key is None:

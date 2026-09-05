@@ -44,8 +44,8 @@ RESYNC_WINDOW_SIZE = 1024 * 1024
 # slot in the same read.
 META_READ_SIZE = 1024
 # the largest metadata slot a validating read fetches. a slot holds a few compression fields, packed
-# and encrypted, i.e. some tens of bytes. MAX_DATA_SIZE bounds a slot already; this caps what a
-# corrupt meta_size can make the read fetch to far less than that.
+# and encrypted, i.e. some tens of bytes, so this is a generous bound and it keeps a corrupt
+# meta_size, which only MAX_DATA_SIZE bounds, from triggering a large read.
 MAX_VALIDATED_META_SIZE = 64 * 1024
 
 
@@ -444,31 +444,29 @@ class PackReader:
             offset += max(len(buf) - (hdr_size - 1), 1)
         return None
 
-    def iter_headers(self, validate=None, on_drop=None):
+    def iter_headers(self, validate=None, on_drop=None, drop_corrupt_tail=False):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
         The walk reads one range per object (or a slice, for a pack in memory), plus one store
-        metadata lookup for the pack size.
-
-        A header that _parse_header does not accept means a corrupt pack. Without a validator the
-        walk raises IntegrityError naming what is wrong with the header, or, given an on_drop, ends
-        the walk there (see below). Fewer than a header's bytes left ends the walk: that is the end
-        of the pack.
+        metadata lookup for the pack size. Fewer than a header's bytes left ends the walk: that is
+        the end of the pack.
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
         repo object with id chunk_id. Given one, the walk validates every header, reading the
-        metadata slot along with it, and a header that fails makes the walk resync rather than
-        raise: it scans from just past that header for the next object validate accepts and
-        continues there. The object with the failed header is dropped - its id, its extent or its
-        metadata is wrong, so it can not be read back. The pack keeps the dropped object's bytes.
+        metadata slot along with it, and a header that fails makes the walk resync: it scans from
+        just past that header for the next object validate accepts and continues there. The object
+        with the failed header is dropped - its id, its extent or its metadata is wrong, so it can
+        not be read back. The pack keeps the dropped object's bytes. If nothing in the pack
+        validates, the walk yields nothing and raises nothing.
 
-        on_drop, if given, is called once per place where the walk discards content. One call
-        covers the object with the failed header plus everything the scan skips before the object
-        it resumes at, and also the tail that is dropped when the scan finds no such object. With
-        on_drop and no validator there is no scan, so a failed header ends the walk and that one
-        call covers the rest of the pack.
+        Without a validator a resync is impossible, because payload bytes can look like a header.
+        A header that _parse_header rejects then raises IntegrityError naming what is wrong with
+        it, or, with drop_corrupt_tail, ends the walk there and drops the rest of the pack.
 
-        If nothing in the pack validates, the walk yields nothing and raises nothing.
+        on_drop, if given, is called once per place where the walk discards content: once for the
+        object with the failed header plus whatever the resync scan skips before the object it
+        resumes at, once for a tail dropped because the scan found no such object or because there
+        was no validator to scan with. It only reports, it does not change what the walk does.
 
         headers_parsed is set to the number of headers _parse_header accepted in this walk, the
         candidates the resync scan tried included. A pack whose bytes hold no object header at all
@@ -494,13 +492,14 @@ class PackReader:
                     problem = self._validation_problem(hdr, offset, buf, offset, validate)
             if problem is not None:
                 if validate is None:
-                    if on_drop is None:
+                    # no validator, so payload bytes that look like a header can not be told from
+                    # an object: there is no way to resync past this header.
+                    if not drop_corrupt_tail:
                         raise IntegrityError(
                             f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
                         )
-                    # resyncing needs the validator to tell an object from payload bytes that
-                    # look like a header, so the walk ends here, dropping the rest of the pack.
-                    on_drop()
+                    if on_drop is not None:
+                        on_drop()
                     logger.warning(
                         f"pack {pack_hex}: {problem} at offset {offset}, no validator to resync with, "
                         f"skipping the remaining {pack_size - offset} bytes."

@@ -1843,6 +1843,43 @@ def test_pack_reader_raises_on_bad_magic():
         list(reader.iter_headers())
 
 
+def test_pack_reader_drops_a_corrupt_tail_only_when_asked():
+    # without a validator there is nothing to resync with, so the walk can not get past a corrupt
+    # header. drop_corrupt_tail alone decides what happens then; on_drop only reports it.
+    obj1 = fchunk(b"payload-one", chunk_id=H(1))
+    obj2 = bytearray(fchunk(b"payload-two", chunk_id=H(2)))
+    obj2[0] ^= 0xFF  # break the magic of the second object's header
+    pack = obj1 + bytes(obj2)
+    drops = []
+    reader = PackReader(pack_contents=pack)
+    with pytest.raises(IntegrityError, match="no object header at offset"):
+        list(reader.iter_headers(on_drop=lambda: drops.append(1)))
+    assert drops == []  # nothing was discarded: the walk raised instead
+    headers = list(reader.iter_headers(on_drop=lambda: drops.append(1), drop_corrupt_tail=True))
+    assert headers == [(H(1), 0, len(obj1))]  # up to the corrupt header, the rest of the pack is gone
+    assert len(drops) == 1
+
+
+def test_pack_reader_drops_a_corrupt_tail_without_an_on_drop():
+    # drop_corrupt_tail works without an on_drop to report the drop to.
+    obj1 = fchunk(b"payload-one", chunk_id=H(1))
+    obj2 = bytearray(fchunk(b"payload-two", chunk_id=H(2)))
+    obj2[0] ^= 0xFF
+    reader = PackReader(pack_contents=obj1 + bytes(obj2))
+    assert list(reader.iter_headers(drop_corrupt_tail=True)) == [(H(1), 0, len(obj1))]
+
+
+def test_pack_reader_drop_corrupt_tail_does_not_affect_a_validating_walk():
+    # with a validator the walk resyncs, so drop_corrupt_tail changes nothing.
+    obj1 = bytearray(fchunk(b"payload-one", chunk_id=H(1)))
+    obj2 = fchunk(b"payload-two", chunk_id=H(2))
+    obj1[0] ^= 0xFF
+    reader = PackReader(pack_contents=bytes(obj1) + obj2)
+    resynced = [(H(2), len(obj1), len(obj2))]
+    assert list(reader.iter_headers(validate=accept_all)) == resynced
+    assert list(reader.iter_headers(validate=accept_all, drop_corrupt_tail=True)) == resynced
+
+
 def test_pack_reader_raises_on_bad_magic_through_store(tmp_path):
     obj = bytearray(fchunk(b"FIRST", chunk_id=H(47)))
     obj[0] ^= 0xFF

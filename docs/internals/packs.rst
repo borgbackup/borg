@@ -116,12 +116,12 @@ makes the walk scan for the next blob that validates and resume there, so the
 blobs after the damaged one are still found; the damaged blob itself is dropped,
 it can not be read back.
 
-The walk rebuilds the index. The damaged bytes stay where they are, as a gap no
-index entry covers, and a pack is named by the
-sha256 of its content, so a pack damaged in the store keeps failing the
-store-level check that ``borg check`` runs over ``packs/``: that check keeps
-reporting the pack after ``borg check --repair`` has rebuilt the index from it.
-Rewriting such a pack is repository-level repair, see :issue:`10026`.
+The walk rebuilds the index from the pack as it is: the damaged bytes stay where
+they are, as a gap no index entry covers. A pack is named by the sha256 of its
+content, so a pack damaged in the store keeps failing the store-level check that
+``borg check`` runs over ``packs/``, also after ``borg check --repair`` has
+rebuilt the index from it. Rewriting such a pack is repository-level repair, see
+:issue:`10026`.
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
 only when it validates like any walked header. Validating needs the key, so a

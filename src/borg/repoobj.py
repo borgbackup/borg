@@ -306,9 +306,8 @@ def object_validator(repo_objs):
             # arbitrary bytes fail the authentication, or the msgpack unpacking in the modes that
             # authenticate without a secret key (none-*, authenticated-*) and thus accept them.
             return False
-        # in those modes the metadata slot can therefore unpack to any value. Inspect the value
-        # rather than catching what using it raises, so that only unusable metadata gives False
-        # and an unexpected exception still reaches the caller.
+        # in those modes the slot can unpack to any value, so check the value: only metadata that
+        # is unusable here gives False, any other exception propagates.
         if not isinstance(meta, dict):
             return False
         csize = meta.get("csize")

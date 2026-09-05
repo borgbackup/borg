@@ -224,6 +224,19 @@ class TestKey:
         with pytest.raises(IntegrityErrorBase):
             key.decrypt(b"", data)
 
+    @pytest.mark.parametrize("cls", (AESOCBKey, CHPOKey))
+    def test_truncated_aead_envelope_detected(self, cls, monkeypatch):
+        # the header and the tag are read by offset, so an envelope too short to hold them must
+        # come out as an IntegrityError and not as an IndexError from those reads.
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = cls.create(self.MockRepository(), self.MockArgs())
+        payload = b"payload"
+        id = key.id_hash(payload)
+        envelope = key.encrypt(id, payload)
+        for length in range(key.PAYLOAD_OVERHEAD):  # cut into the header/tag
+            with pytest.raises(IntegrityError):
+                key.decrypt(id, envelope[:length])
+
     def test_decrypt_integrity(self, monkeypatch, keys_dir):
         with keys_dir.join("keyfile").open("w") as fd:
             fd.write(self.keyfile2_key_file)

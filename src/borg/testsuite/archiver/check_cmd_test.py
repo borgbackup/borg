@@ -2,15 +2,20 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import re
 import shutil
+import struct
 from unittest.mock import patch
 
 import pytest
 
+from ... import archive as archive_module
 from ...archive import ArchiveChecker, ChunkBuffer
+from ...cache import delete_chunkindex_from_repo
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, Error, IntegrityError, sig_int
 from ...manifest import Archives, Manifest
+from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
+from ..repoobj_test import DATA_SIZE_OFFSET
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
     cmd,
@@ -718,6 +723,185 @@ def test_extra_chunks(archivers, request):
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
+@pytest.mark.parametrize("damaged_field", ["magic", "data_size"])
+def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, damaged_field):
+    """--repair rebuilds the chunks index from a pack whose object header is damaged.
+
+    A damaged header loses the object boundaries, so the rebuild scans for the next object that
+    authenticates and continues there. Authenticating needs the key, which --repair reads first.
+    A damaged data_size leaves the header parseable, so the rebuild catches it against the csize
+    in the authenticated metadata.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        # damage the header of the second object of a pack that holds more than two.
+        by_pack = {}
+        for chunk_id, entry in repository.chunks.items():
+            by_pack.setdefault(entry.pack_id, []).append((entry.obj_offset, chunk_id))
+        pack_id, objs = next((p, sorted(o)) for p, o in by_pack.items() if len(o) > 2)
+        damaged_offset, damaged_id = objs[1]
+        next_offset, next_id = objs[2]
+        key = "packs/" + bin_to_hex(pack_id)
+        pack = repository.store_load(key)
+        if damaged_field == "magic":
+            pack = corrupt(pack, damaged_offset)
+        else:
+            hdr_size = RepoObj.obj_header.size
+            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(pack[damaged_offset : damaged_offset + hdr_size]))
+            # a data_size that keeps the object inside the pack, so the header still parses.
+            pos = damaged_offset + DATA_SIZE_OFFSET
+            pack = pack[:pos] + struct.pack("<I", hdr.data_size + 16) + pack[pos + 4 :]
+        repository.store_store(key, pack)
+
+    output = cmd(archiver, "check", "--repair", "--debug", exit_code=0)
+    problem = {"magic": "no object header", "data_size": "object does not authenticate"}[damaged_field]
+    assert f"{problem} at offset {damaged_offset}" in output
+    assert f"continuing at the object at offset {next_offset}" in output  # the rebuild resumed at the next object
+    # the resync dropped an object, so the summary reports a problem.
+    assert "Archive consistency check complete, problems found." in output
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert damaged_id not in repository.chunks  # the damaged object can not be read back, so it is not indexed
+        assert repository.chunks[next_id].obj_offset == next_offset  # the one after it is
+        # the damaged object is the only one of its pack the rebuild lost.
+        for _, chunk_id in objs:
+            assert (chunk_id in repository.chunks) == (chunk_id != damaged_id)
+    cmd(archiver, "list", "archive1", exit_code=0)  # the archives are readable
+    # the pack still holds the damaged bytes, so it keeps failing the store-level check: a pack is
+    # named by the sha256 of its content. Repairing that is repository-level repair (#10026).
+    output = cmd(archiver, "check", "--repository-only", exit_code=1)
+    assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
+
+
+def test_repair_without_the_key_rebuilds_without_validating(archivers, request, monkeypatch):
+    """--repair that can not read the key says so and rebuilds the chunks index without validating.
+
+    make_key gives up with an IntegrityError when the manifest yields no key, which a badly damaged
+    repository can do. The rebuild then walks the object headers alone, and a pack with a corrupt
+    object header is indexed up to that header, the rest of it dropped.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("patches in-process archive internals")
+    check_cmd_setup(archiver)
+
+    # two objects no archive references: they go into a pack of their own, so the damage below
+    # stays out of the objects the check reads back.
+    kept_id = b"kept-chunk".ljust(32, b".")  # object ids are 32 bytes long
+    damaged_id = b"damaged-chunk".ljust(32, b".")
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        repository.put(kept_id, fchunk(b"kept", chunk_id=kept_id))
+        repository.put(damaged_id, fchunk(b"damaged", chunk_id=damaged_id))
+        repository.flush()
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        kept, damaged = repository.chunks[kept_id], repository.chunks[damaged_id]
+        assert kept.pack_id == damaged.pack_id and kept.obj_offset < damaged.obj_offset
+        damaged_offset = damaged.obj_offset
+        key = "packs/" + bin_to_hex(damaged.pack_id)
+        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
+
+    real_make_key = ArchiveChecker.make_key
+
+    def make_key(self, repository, manifest_only=False):
+        if manifest_only:  # the read that yields the validator's key; the later full read succeeds
+            raise IntegrityError("no key")
+        return real_make_key(self, repository, manifest_only=manifest_only)
+
+    real_build = archive_module.build_chunkindex_from_repo
+    validators = []
+    indexes = []
+
+    def build_chunkindex_from_repo(repository, **kwargs):
+        validators.append(kwargs.get("validate"))
+        index = real_build(repository, **kwargs)
+        indexes.append(index)
+        return index
+
+    monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
+    monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert "Could not read the key (" in output
+    assert validators[0] is None  # the rebuild got no validator, so it walked the headers alone
+    assert f"no object header at offset {damaged_offset}, no validator to resync with" in output
+    assert "Archive consistency check complete, problems found." in output  # the drop is a problem
+    # indexes[0] is the keyless rebuild: it indexed the pack up to the damaged header. The objects
+    # put above are not encrypted repo objects, so the validating rebuild in finish() drops them.
+    assert kept_id in indexes[0]
+    assert damaged_id not in indexes[0]
+    cmd(archiver, "list", "archive1", exit_code=0)  # the archives are still readable
+
+
+def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monkeypatch):
+    """A check without --repair reports a corrupt object header, it does not index the pack up to it.
+
+    Without a validator the walk can not resync past a corrupt object header. --repair passes
+    drop_corrupt_tail, so the rest of that pack is dropped and the repair gets on; a check without
+    --repair passes drop_corrupt_tail=False and the walk raises instead.
+
+    The rebuild only walks the packs when the chunk index fragments are unusable, and it only walks
+    without a validator when the key can not be read, so the test arranges both.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("patches in-process archive internals")
+    check_cmd_setup(archiver)
+
+    # two objects no archive references: they go into a pack of their own, so the damage below
+    # stays out of the objects the check reads back.
+    kept_id = b"kept-chunk".ljust(32, b".")  # object ids are 32 bytes long
+    damaged_id = b"damaged-chunk".ljust(32, b".")
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        repository.put(kept_id, fchunk(b"kept", chunk_id=kept_id))
+        repository.put(damaged_id, fchunk(b"damaged", chunk_id=damaged_id))
+        repository.flush()
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        kept, damaged = repository.chunks[kept_id], repository.chunks[damaged_id]
+        assert kept.pack_id == damaged.pack_id and kept.obj_offset < damaged.obj_offset
+        damaged_offset = damaged.obj_offset
+        key = "packs/" + bin_to_hex(damaged.pack_id)
+        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
+        # the fragments are the fast path: without them the rebuild falls through to the pack walk,
+        # which is the only place the corrupt header is seen at all.
+        delete_chunkindex_from_repo(repository)
+
+    real_make_key = ArchiveChecker.make_key
+
+    def make_key(self, repository, manifest_only=False):
+        # fail the manifest_only read, the one the rebuild's validator needs, as an unreadable key
+        # would. check_cmd already read the key before the check (#1931), hence the full read below.
+        if manifest_only:
+            raise IntegrityError("no key")
+        return real_make_key(self, repository, manifest_only=manifest_only)
+
+    real_build = archive_module.build_chunkindex_from_repo
+    rebuilds = []
+
+    def build_chunkindex_from_repo(repository, **kwargs):
+        try:
+            index = real_build(repository, **kwargs)
+        except Exception as err:
+            rebuilds.append((kwargs.get("drop_corrupt_tail"), err))
+            raise
+        rebuilds.append((kwargs.get("drop_corrupt_tail"), index))
+        return index
+
+    monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
+    monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
+    # --archives-only: the repository check would stop at the damaged pack (a pack is named by the
+    # sha256 of its content) before the archives check ever walks it.
+    with pytest.raises(IntegrityError) as excinfo:
+        cmd(archiver, "check", "--archives-only")
+    assert f"no object header at offset {damaged_offset} (pack corruption)" in str(excinfo.value)
+    drop_corrupt_tail, outcome = rebuilds[0]
+    # the rebuild raised, it did not return an index with the pack's tail missing
+    assert isinstance(outcome, IntegrityError)
+    assert drop_corrupt_tail is False  # a check that only diagnoses does not ask for the drop
+
+
 def test_repair_finish_flushes_pack_writer(archivers, request):
     """finish() stores chunks re-added during --repair before it (re)builds the index (#10055).
 
@@ -735,6 +919,7 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.repair = True
         checker.repository = repository
         checker.key = checker.make_key(repository)
+        checker.repo_objs = RepoObj(checker.key)
         checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
         # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
         checker.chunks_modified = True

@@ -1,4 +1,5 @@
 import errno
+import io
 import os
 from pathlib import Path
 import shutil
@@ -17,7 +18,8 @@ from ...constants import *  # NOQA
 from ...item import Item
 from ...manifest import Manifest
 from ...repository import Repository
-from ...helpers import EXIT_WARNING, BackupPermissionError, BackupSymlinkParentError, bin_to_hex
+from ...helpers import EXIT_WARNING, BackupIOError, BackupOSError, BackupPermissionError, BackupSymlinkParentError
+from ...helpers import bin_to_hex
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns, granularity_sleep
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
@@ -1081,3 +1083,65 @@ def test_extract_y2261(archivers, request):
         cmd(archiver, "extract", "test")
     sto = os.stat("output/input/file_y2261")
     assert same_ts_ns(sto.st_mtime_ns, time_y2261 * 10**9)
+
+
+def _extract_with_raw_file_class(archiver, raw_cls, expected_error):
+    """Extract the "test" archive into "output", with the destination files being raw_cls instances.
+
+    Like builtins.open(path, "wb"), the patched open() returns a buffered writer, so the content of a
+    small file only reaches the (raw) file when the buffer is flushed: at truncate/flush time and at close.
+    """
+    real_open = open
+
+    def open_with_raw_cls(path, mode="r", *args, **kwargs):
+        if mode == "wb":  # only the destination files, see Archive.extract_item.
+            return io.BufferedWriter(raw_cls(path, "wb"))
+        return real_open(path, mode, *args, **kwargs)
+
+    with changedir("output"):
+        with patch.object(archive_module, "open", open_with_raw_cls, create=True):
+            return cmd(archiver, "extract", "test", exit_code=expected_error.exit_mcode)
+
+
+def test_extract_write_error_at_flush_is_a_warning(archivers, request):
+    """A write error surfacing when the buffered data gets flushed must be a warning for that file.
+
+    The buffer is flushed at truncate/flush time and again at close: after a failed flush, the data is
+    still buffered, so close() fails with the same error. Both failures must be handled like any other
+    IO error of that file (a warning), so that the extraction goes on with the next file.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+
+    class NoSpaceRaw(io.FileIO):
+        def write(self, b):  # like a full disk
+            raise OSError(errno.ENOSPC, "No space left on device")
+
+    create_regular_file(archiver.input_path, "small1", size=1024)
+    create_regular_file(archiver.input_path, "small2", size=1024)
+    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "create", "test", "input")
+    out = _extract_with_raw_file_class(archiver, NoSpaceRaw, BackupOSError)
+    # both files got their warning, i.e. the extraction did not stop at the first one.
+    assert f"input/small1: truncate_and_attrs: [Errno {errno.ENOSPC}] No space left on device" in out
+    assert f"input/small2: truncate_and_attrs: [Errno {errno.ENOSPC}] No space left on device" in out
+
+
+def test_extract_close_error_is_a_warning(archivers, request):
+    """A failing close() of a completely written file is reported as a warning for that file."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+
+    class BadCloseRaw(io.FileIO):
+        def close(self):
+            super().close()  # really close the fd, then fail like e.g. a network filesystem might.
+            raise OSError(errno.EIO, "Input/output error")
+
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "create", "test", "input")
+    out = _extract_with_raw_file_class(archiver, BadCloseRaw, BackupIOError)
+    assert f"input/file1: close: [Errno {errno.EIO}] Input/output error" in out
+    assert os.path.getsize("output/input/file1") == 1024  # the content was written completely

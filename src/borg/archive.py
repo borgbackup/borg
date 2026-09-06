@@ -7,7 +7,7 @@ import stat
 import sys
 import time
 from collections import Counter, defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import timedelta
 from functools import partial
 from io import BytesIO
@@ -1007,7 +1007,7 @@ Duration: {0.duration}
                     return
                 with backup_io("open"):
                     fd = open(path, "wb")
-                with fd:
+                try:
                     trailing_hole = False
                     for data in self.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
                         if pi:
@@ -1031,6 +1031,21 @@ Duration: {0.duration}
                         fd.truncate(pos)
                         fd.flush()
                         self.restore_attrs(path, item, fd=fd.fileno())
+                except BaseException:
+                    # Something failed (usually a BackupOSError from above, which the caller reports as a
+                    # warning for this file). fd is a buffered writer, so close() flushes what is still
+                    # buffered - for a small file, that is its complete content - and if the write above
+                    # failed (e.g. disk full), it fails again here. Do not let that replace the exception
+                    # in flight: the file's failure is already reported by it, and a repository error or
+                    # a KeyboardInterrupt must not be turned into a per-file warning.
+                    with suppress(OSError):
+                        fd.close()
+                    raise
+                # close() can fail like a write does (it flushes buffered data, and close(2) itself can
+                # fail, e.g. on NFS), so it must be a backup_io error, i.e. a warning for this file - a
+                # plain OSError would abort the whole extraction.
+                with backup_io("close"):
+                    fd.close()
                 if "size" in item:
                     item_size = item.size
                     if item_size != item_chunks_size:

@@ -1710,6 +1710,57 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             flags = platform.get_flags(out_path, st2)
             assert (flags & stat.UF_APPEND) == stat.UF_APPEND
 
+    def _extract_with_raw_file_class(self, raw_cls):
+        """Extract the "test" archive into "output", with the destination files being raw_cls instances.
+
+        Like builtins.open(path, 'wb'), the patched open() returns a buffered writer, so the content of a
+        small file only reaches the (raw) file when the buffer is flushed: at truncate/flush time and at close.
+        """
+        real_open = open
+
+        def open_with_raw_cls(path, mode='r', *args, **kwargs):
+            if mode == 'wb':  # only the destination files, see Archive.extract_item.
+                return io.BufferedWriter(raw_cls(path, 'wb'))
+            return real_open(path, mode, *args, **kwargs)
+
+        with changedir('output'):
+            with patch('borg.archive.open', open_with_raw_cls, create=True):
+                return self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
+
+    def test_extract_write_error_at_flush_is_a_warning(self):
+        """A write error surfacing when the buffered data gets flushed must be a warning for that file.
+
+        The buffer is flushed at truncate/flush time and again at close: after a failed flush, the data is
+        still buffered, so close() fails with the same error. Both failures must be handled like any other
+        IO error of that file (a warning), so that the extraction goes on with the next file.
+        """
+        class NoSpaceRaw(io.FileIO):
+            def write(self, b):  # like a full disk
+                raise OSError(errno.ENOSPC, 'No space left on device')
+
+        self.create_regular_file('small1', size=1024)
+        self.create_regular_file('small2', size=1024)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        out = self._extract_with_raw_file_class(NoSpaceRaw)
+        # both files got their warning, i.e. the extraction did not stop at the first one.
+        assert f'input/small1: truncate_and_attrs: [Errno {errno.ENOSPC}] No space left on device' in out
+        assert f'input/small2: truncate_and_attrs: [Errno {errno.ENOSPC}] No space left on device' in out
+
+    def test_extract_close_error_is_a_warning(self):
+        """A failing close() of a completely written file is reported as a warning for that file."""
+        class BadCloseRaw(io.FileIO):
+            def close(self):
+                super().close()  # really close the fd, then fail like e.g. a network filesystem might.
+                raise OSError(errno.EIO, 'Input/output error')
+
+        self.create_regular_file('file1', size=1024)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        out = self._extract_with_raw_file_class(BadCloseRaw)
+        assert f'input/file1: close: [Errno {errno.EIO}] Input/output error' in out
+        assert os.path.getsize('output/input/file1') == 1024  # the content was written completely
+
     def test_path_normalization(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)
@@ -4594,6 +4645,14 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_extract_xattrs_errors(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_extract_write_error_at_flush_is_a_warning(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_extract_close_error_is_a_warning(self):
         pass
 
     @unittest.skip('patches objects')

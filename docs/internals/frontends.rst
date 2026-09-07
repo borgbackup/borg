@@ -94,6 +94,9 @@ archive_progress
 
     original_size
         Original size of the data processed so far (before compression and deduplication)
+    deduplicated_size
+        Deduplicated size of the data processed so far (before compression): the size of the
+        chunks that were new to the repository
     nfiles
         Number of (regular) files processed so far
     hashing_time
@@ -196,8 +199,9 @@ See Prompts_ for the types used by prompts.
 
 :ref:`borg_create` file listing with progress::
 
-    {"original_size": 0, "nfiles": 0, "hashing_time": 0.0, "chunking_time": 0.0, "files_stats": {},
-     "store_stats": {}, "path": "src", "time": 1787900398.684961, "type": "archive_progress", "finished": false}
+    {"original_size": 0, "deduplicated_size": 0, "nfiles": 0, "hashing_time": 0.0, "chunking_time": 0.0,
+     "files_stats": {}, "store_stats": {}, "path": "src", "time": 1787900398.684961, "type": "archive_progress",
+     "finished": false}
     {"type": "file_status", "status": "A", "path": "src/linux/baz/file2"}
     {"type": "file_status", "status": "A", "path": "src/linux/baz/file3"}
     {"type": "file_status", "status": "d", "path": "src/linux/baz"}
@@ -399,6 +403,10 @@ stats
     original_size
         Size of the file contents and the metadata in this archive, before compression and
         deduplication
+    deduplicated_size
+        Size of the file contents and the metadata in this archive that were new to the repository
+        when the archive was created (this archive's deduplicated size, before compression).
+        Only given by *borg create* and *borg import-tar*, see below.
     nfiles
         Number of regular files in the archive
     hashing_time
@@ -411,13 +419,14 @@ stats
         Object with the statistics of the storage backend (call counts, transferred volumes,
         times, cache hits/misses, ...)
 
-    *borg create* fills all of these in for the archive it has just created. *borg info* only reads
-    *original_size* and *nfiles* from the archive metadata; *hashing_time*, *chunking_time*,
-    *files_stats* and *store_stats* are 0 or empty there.
+    *borg create* and *borg import-tar* fill all of these in for the archive they have just created.
+    *borg info* only reads *original_size* and *nfiles* from the archive metadata; *hashing_time*,
+    *chunking_time*, *files_stats* and *store_stats* are 0 or empty there and *deduplicated_size*
+    is absent: computing the deduplicated size of an existing archive is expensive, so it is only
+    known while the archive is being created.
 
-    Compressed and deduplicated sizes are not given: computing them per archive is expensive.
-    Use :ref:`borg_analyze` for the deduplicated size of a set of archives and
-    ``borg compact --stats`` for the repository-wide numbers.
+    Compressed sizes are not given at all. Use :ref:`borg_analyze` for the deduplicated size of a
+    set of archives and ``borg compact --stats`` for the repository-wide numbers.
 
 :ref:`borg_info` further has:
 
@@ -531,6 +540,7 @@ collected while running::
             "start": "2026-08-28T08:59:56.761172+02:00",
             "stats": {
                 "chunking_time": 7.81649723649025e-05,
+                "deduplicated_size": 250510,
                 "files_stats": {
                     "A": 3,
                     "d": 3

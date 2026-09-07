@@ -35,6 +35,8 @@ def test_info_json(archivers, request):
     assert len(archive["id"]) == 64
     assert archive["tags"] == []
     assert "stats" in archive
+    # unknown for an existing archive (expensive to compute), so it is not reported, see #10335
+    assert "deduplicated_size" not in archive["stats"]
     checkts(archive["start"])
     checkts(archive["end"])
 

@@ -72,8 +72,9 @@ class InfoMixIn:
         (uncompressed, counting duplicate content per occurrence).
 
         Deduplicated sizes are not shown here (computing them per archive is expensive).
-        For the deduplicated size of a set of archives, use ``borg analyze``; for the
-        repository-wide deduplicated size, use ``borg compact --stats``.
+        ``borg create --stats`` (also with ``--json``) reports the deduplicated size of the
+        archive it has just created. For the deduplicated size of a set of archives, use
+        ``borg analyze``; for the repository-wide deduplicated size, use ``borg compact --stats``.
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_info.__doc__, epilog=info_epilog)

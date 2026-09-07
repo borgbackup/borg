@@ -109,6 +109,8 @@ def format_store_stats(stats):
 class Statistics:
     def __init__(self, output_json=False):
         self.output_json = output_json
+        # usize: size of the data that was new to the repository (the deduplicated size).
+        # None means unknown, see Archive.calc_stats().
         self.osize = self.usize = self.nfiles = 0
         self.last_progress = float("-inf")  # monotonic timestamp when progress was last shown, -inf: never
         self.files_stats = defaultdict(int)
@@ -169,14 +171,17 @@ Files changed while reading: {files_changed_while_reading}
         )
 
     def as_dict(self):
-        return {
-            "original_size": FileSize(self.osize),
+        d = {"original_size": FileSize(self.osize)}
+        if self.usize is not None:  # unknown for an existing archive, see Archive.calc_stats()
+            d["deduplicated_size"] = FileSize(self.usize)
+        d |= {
             "nfiles": self.nfiles,
             "hashing_time": self.hashing_time,
             "chunking_time": self.chunking_time,
             "files_stats": self.files_stats,
             "store_stats": self.store_stats,
         }
+        return d
 
     def as_raw_dict(self):
         return {"size": self.osize, "nfiles": self.nfiles}
@@ -811,7 +816,9 @@ Duration: {0.duration}
 
     def calc_stats(self, cache, want_unique=True):
         stats = Statistics()
-        stats.usize = 0  # this is expensive to compute
+        # The deduplicated size of an existing archive is unknown: computing it is expensive (see borg analyze),
+        # it is only known for the stats collected while creating an archive.
+        stats.usize = None
         stats.nfiles = self.metadata.nfiles
         stats.osize = self.metadata.size
         return stats

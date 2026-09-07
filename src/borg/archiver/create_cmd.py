@@ -874,9 +874,8 @@ class CreateMixIn:
         does not go to a terminal (e.g. into a logfile), the precise format is always used.
 
         When using ``--stats``, you will get some statistics about how much data was
-        added - the "This Archive" deduplicated size there is most interesting as that is
-        how much your repository will grow. Please note that the "All archives" stats refer to
-        the state after creation.
+        added - the deduplicated size there is most interesting as that is how much your
+        repository will grow. ``--json`` outputs the same statistics as JSON.
 
         When ``--stats`` is used together with ``--dry-run``, only the number of files and the
         original size are reported. They are computed from file system metadata, without reading

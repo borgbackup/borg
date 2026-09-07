@@ -189,6 +189,21 @@ def test_import_tar_nfiles(archivers, request):
     assert info["archives"][0]["stats"]["nfiles"] == 3
 
 
+def test_import_tar_json(archivers, request):
+    """import-tar --json reports the stats of the new archive like create --json does, see #10335."""
+    archiver = request.getfixturevalue(archivers)
+    data = os.urandom(1024 * 80)
+    with tarfile.open("input.tar", "w") as tar:
+        tarinfo = tarfile.TarInfo("dir/file1")
+        tarinfo.size = len(data)
+        tar.addfile(tarinfo, io.BytesIO(data))
+    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    stats = json.loads(cmd(archiver, "import-tar", "--json", "dst", "input.tar"))["archive"]["stats"]
+    assert stats["nfiles"] == 1
+    # fresh repository: all of the file content was new to the repository.
+    assert len(data) <= stats["deduplicated_size"] <= stats["original_size"]
+
+
 def tar_item_digests(archiver, archive):
     """{path: item.digests} as STORED in the items of an archive, see create_cmd_test.item_digests"""
     archive_obj, repository = open_archive(archiver.repository_path, archive)

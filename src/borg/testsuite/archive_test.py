@@ -161,6 +161,7 @@ def test_stats_progress_json(stats):
     assert result["finished"] is False
     assert result["path"] == "foo"
     assert result["original_size"] == 20
+    assert result["deduplicated_size"] == 20
     assert result["nfiles"] == 1
 
     out = StringIO()
@@ -172,6 +173,17 @@ def test_stats_progress_json(stats):
     assert "path" not in result
     assert "original_size" not in result
     assert "nfiles" not in result
+
+
+def test_stats_as_dict(stats):
+    # stats collected while creating an archive know the deduplicated size
+    result = stats.as_dict()
+    assert result["original_size"] == 20
+    assert result["deduplicated_size"] == 20
+    assert result["nfiles"] == 1
+    # the deduplicated size of an existing archive is unknown, so it is not reported (see Archive.calc_stats)
+    stats.usize = None
+    assert "deduplicated_size" not in stats.as_dict()
 
 
 @pytest.mark.parametrize(

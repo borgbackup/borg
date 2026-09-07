@@ -1,11 +1,11 @@
 # Contributors
 
-374 people have contributed to Borg, with 11,143 commits in total.
+375 people have contributed to Borg, with 11,212 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-08-31 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-09-07 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,16 +21,16 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,525 | 97,654 | 522 |
-| Marian Beermann | 1,140 | 7,759 | 156 |
-| Jonas Borgström | 560 | 970 | 38 |
+| Thomas Waldmann | 7,578 | 99,568 | 524 |
+| Marian Beermann | 1,140 | 7,756 | 156 |
+| Jonas Borgström | 560 | 969 | 38 |
 | Antoine Beaupré | 285 | 437 | 33 |
-| Mrityunjay Raj | 237 | 9,007 | 103 |
+| Mrityunjay Raj | 249 | 10,030 | 103 |
 | Andrey Bienkowski | 72 | 200 | 16 |
-| Ted Lawson | 71 | 4,578 | 39 |
+| Ted Lawson | 71 | 4,565 | 39 |
 | Thalian | 63 | 564 | 29 |
+| dependabot[bot] | 47 | 14 | 4 |
 | Martin Hostettler | 46 | 2,559 | 9 |
-| dependabot[bot] | 45 | 14 | 4 |
 | Milkey Mouse | 42 | 239 | 12 |
 | Dan Christensen | 40 | 5 | 2 |
 | Rayyan Ansari | 34 | 88 | 12 |
@@ -38,7 +38,7 @@ show up there, so the number understates early contributions.  Generated files
 | Manuel Riel | 28 | 86 | 6 |
 | Nehalenniæ Oudin | 26 | 47 | 11 |
 | anarcat | 24 | 33 | 4 |
-| Hugo Wallenburg | 23 | 1,154 | 11 |
+| Hugo Wallenburg | 23 | 1,102 | 11 |
 | Michael Hanselmann | 22 | 71 | 3 |
 | Björn Ketelaars | 17 | 28 | 4 |
 | SanskritFritz | 17 | 0 | 0 |
@@ -64,14 +64,14 @@ show up there, so the number understates early contributions.  Generated files
 | Gianfranco Costamagna | 7 | 9 | 6 |
 | Frank Sachsenheim | 7 | 2 | 1 |
 | Hartmut Goebel | 7 | 0 | 0 |
-| William D. Jones | 6 | 248 | 6 |
+| William D. Jones | 6 | 246 | 6 |
+| ThomasWaldmann | 6 | 178 | 1 |
 | Michael Deyaso | 6 | 165 | 14 |
 | Peter Gerber | 6 | 102 | 9 |
 | Alf Mikula | 6 | 19 | 1 |
 | Felix Schwarz | 6 | 4 | 2 |
 | Alexander-N | 6 | 0 | 0 |
 | Paul D | 5 | 178 | 42 |
-| ThomasWaldmann | 5 | 162 | 1 |
 | Simon Frei | 5 | 132 | 3 |
 | Dominik Stadler | 5 | 75 | 1 |
 | elandorr | 5 | 39 | 3 |
@@ -82,10 +82,10 @@ show up there, so the number understates early contributions.  Generated files
 | step21 | 5 | 1 | 1 |
 | Radu Ciorba | 5 | 0 | 0 |
 | Charlie Herz | 4 | 626 | 5 |
-| Ebuzer Celil Durmaz | 4 | 80 | 5 |
+| Ebuzer Celil Durmaz | 4 | 78 | 5 |
 | Robert Blenis | 4 | 51 | 4 |
 | Franco Ayala | 4 | 39 | 6 |
-| Suryansh Pal | 4 | 35 | 8 |
+| Suryansh Pal | 4 | 34 | 8 |
 | 8bit | 4 | 29 | 5 |
 | Steve Groesz | 4 | 22 | 1 |
 | Ryan Polley | 4 | 12 | 4 |
@@ -95,7 +95,7 @@ show up there, so the number understates early contributions.  Generated files
 | Narendra Vardi | 4 | 3 | 1 |
 | Alexander Pyhalov | 4 | 0 | 0 |
 | oxiedi | 4 | 0 | 0 |
-| Parman Mohammadalizadeh | 3 | 343 | 5 |
+| Parman Mohammadalizadeh | 3 | 293 | 5 |
 | Stephan Herbers | 3 | 49 | 2 |
 | Charmi Kadi | 3 | 46 | 2 |
 | Martin Richtarsky | 3 | 31 | 4 |
@@ -191,7 +191,7 @@ show up there, so the number understates early contributions.  Generated files
 | motwok | 2 | 0 | 0 |
 | sven | 2 | 0 | 0 |
 | user062 | 2 | 0 | 0 |
-| Tarrailt | 1 | 365 | 8 |
+| Tarrailt | 1 | 363 | 7 |
 | axapaxa | 1 | 105 | 2 |
 | Benedikt Seidl | 1 | 103 | 1 |
 | Aleksey Korol | 1 | 91 | 1 |
@@ -270,6 +270,7 @@ show up there, so the number understates early contributions.  Generated files
 | Vagrant Cascadian | 1 | 1 | 1 |
 | targhs | 1 | 1 | 1 |
 | tree-wall | 1 | 1 | 1 |
+| 🇺🇦 Sviatoslav Sydorenko (Святослав Сидоренко) | 1 | 1 | 1 |
 | Adam Kouse | 1 | 0 | 0 |
 | Aidan Woods | 1 | 0 | 0 |
 | Aiman | 1 | 0 | 0 |

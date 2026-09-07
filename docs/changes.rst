@@ -163,6 +163,14 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
+Version 2.0.0b25 (not released yet)
+-----------------------------------
+
+New features:
+
+- create/import-tar --json: report the deduplicated size of the new archive, #10335.
+  It is also included in the archive_progress JSON output.
+
 Version 2.0.0b24 (2026-09-02)
 -----------------------------
 

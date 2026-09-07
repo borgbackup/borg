@@ -977,6 +977,21 @@ def test_create_json(archivers, request):
     assert "stats" in archive
 
 
+def test_create_json_deduplicated_size(archivers, request):
+    """create --json reports the deduplicated size of the new archive, see #10335."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=os.urandom(1024 * 80))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    stats = json.loads(cmd(archiver, "create", "--json", "test", "input"))["archive"]["stats"]
+    # fresh repository: all of the file content was new to the repository.
+    assert 1024 * 80 <= stats["deduplicated_size"] <= stats["original_size"]
+    # same, unchanged input again: the file content gets deduplicated against the first archive,
+    # only the new archive's metadata gets added to the repository.
+    stats = json.loads(cmd(archiver, "create", "--json", "test", "input"))["archive"]["stats"]
+    assert 1024 * 80 <= stats["original_size"]
+    assert 0 < stats["deduplicated_size"] < 1024 * 80
+
+
 def test_hostname_and_username_override(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

@@ -44,8 +44,8 @@ class DiffStats:
         self.added_items = 0  # items present in ARCHIVE2 only
         self.removed_items = 0  # items present in ARCHIVE1 only
         self.changed_items = 0  # items present in both archives, but not equal
-        self.added_chunk_volume = 0  # size of the content chunks added (by added and by changed items)
-        self.removed_chunk_volume = 0  # size of the content chunks removed (by removed and by changed items)
+        self.size_added = 0  # total size of the content added (by added and by changed items)
+        self.size_removed = 0  # total size of the content removed (by removed and by changed items)
         self.unknown_size_items = 0  # items whose content changed by an unknown amount
 
     def add(self, diff: ItemDiff, changes: dict) -> None:
@@ -54,8 +54,8 @@ class DiffStats:
         if content is not None:
             info = content.to_dict()
             if "added" in info or "removed" in info:
-                self.added_chunk_volume += info.get("added", 0)
-                self.removed_chunk_volume += info.get("removed", 0)
+                self.size_added += info.get("added", 0)
+                self.size_removed += info.get("removed", 0)
             else:
                 # a "modified" that was determined by comparing the content: no byte counts.
                 self.unknown_size_items += 1
@@ -71,8 +71,8 @@ class DiffStats:
             "added_items": self.added_items,
             "removed_items": self.removed_items,
             "changed_items": self.changed_items,
-            "added_chunk_volume": self.added_chunk_volume,
-            "removed_chunk_volume": self.removed_chunk_volume,
+            "size_added": self.size_added,
+            "size_removed": self.size_removed,
             "unknown_size_items": self.unknown_size_items,
         }
 
@@ -81,8 +81,8 @@ class DiffStats:
             f"Added items: {self.added_items}",
             f"Removed items: {self.removed_items}",
             f"Changed items: {self.changed_items}",
-            f"Added chunk volume: {format_file_size(self.added_chunk_volume)}",
-            f"Removed chunk volume: {format_file_size(self.removed_chunk_volume)}",
+            f"Added size: {format_file_size(self.size_added)}",
+            f"Removed size: {format_file_size(self.size_removed)}",
         ]
         if self.unknown_size_items:
             # these items are not accounted for in the added/removed data above, so say so.
@@ -322,12 +322,13 @@ class DiffMixIn:
             Added items: 23
             Removed items: 2
             Changed items: 315
-            Added chunk volume: 53.70 MB
-            Removed chunk volume: 51.10 MB
+            Added size: 53.70 MB
+            Removed size: 51.10 MB
 
         "Added"/"Removed" items only exist in ARCHIVE2/ARCHIVE1, "changed" items exist in both
-        archives but differ. "Added chunk volume"/"Removed chunk volume" sum up the size of the
-        content chunks added/removed by all of these items. Items whose content borg could only
+        archives but differ. "Added size"/"Removed size" sum up the file content (in bytes) added/removed
+        by all of these items, i.e. the per-path byte counts that ``--sort-by size_added`` /
+        ``size_removed`` sort by. Items whose content borg could only
         compare byte by byte (see "Performance considerations" below) contribute no byte counts;
         if there are any, an additional "Items with unknown size changes" line reports how many.
 
@@ -335,8 +336,8 @@ class DiffMixIn:
         ``{"stats": {...}}`` instead, so it is easy to tell apart from the per-path lines
         (wrapped here for readability, borg prints it as a single line)::
 
-            {"stats": {"added_chunk_volume": 53700000, "added_items": 23, "changed_items": 315,
-                       "removed_chunk_volume": 51100000, "removed_items": 2, "unknown_size_items": 0}}
+            {"stats": {"added_items": 23, "changed_items": 315, "removed_items": 2,
+                       "size_added": 53700000, "size_removed": 51100000, "unknown_size_items": 0}}
 
         Sorting
         ++++++++

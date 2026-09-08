@@ -608,6 +608,10 @@ def _setup_stats_archives(archiver):
     create_regular_file(archiver.input_path, "file_removed", contents=b"b" * 5)
     create_regular_file(archiver.input_path, "file_touched", contents=b"c" * 7)
     cmd(archiver, "create", "test0", "input")
+    # let the timestamps move on before the second archive: the metadata test expects the input directory
+    # to be reported as changed (mtime/ctime), which needs more than one timestamp tick on filesystems with
+    # whole-second timestamps (e.g. HFS+).
+    granularity_sleep()
     create_regular_file(archiver.input_path, "file_changed", contents=b"d" * 120)
     os.unlink("input/file_removed")
     create_regular_file(archiver.input_path, "file_added", contents=b"e" * 30)
@@ -627,9 +631,9 @@ def test_stats(archivers, request):
     assert "Removed items: 1" in lines
     assert "Changed items: 1" in lines
     # added: file_added (30) + the new content of file_changed (120)
-    assert_line_exists(lines, r"^Added chunk volume: 150 B$")
+    assert_line_exists(lines, r"^Added size: 150 B$")
     # removed: file_removed (5) + the old content of file_changed (100)
-    assert_line_exists(lines, r"^Removed chunk volume: 105 B$")
+    assert_line_exists(lines, r"^Removed size: 105 B$")
     # all sizes are known, so this line is omitted
     assert_line_not_exists(lines, r"^Items with unknown size changes:")
 
@@ -645,8 +649,8 @@ def test_stats_counts_metadata_only_changes(archivers, request):
     assert "Added items: 1" in lines
     assert "Removed items: 1" in lines
     assert "Changed items: 3" in lines
-    assert_line_exists(lines, r"^Added chunk volume: 150 B$")
-    assert_line_exists(lines, r"^Removed chunk volume: 105 B$")
+    assert_line_exists(lines, r"^Added size: 150 B$")
+    assert_line_exists(lines, r"^Removed size: 105 B$")
 
 
 def test_stats_json_lines(archivers, request):
@@ -661,8 +665,8 @@ def test_stats_json_lines(archivers, request):
             "added_items": 1,
             "removed_items": 1,
             "changed_items": 1,
-            "added_chunk_volume": 150,
-            "removed_chunk_volume": 105,
+            "size_added": 150,
+            "size_removed": 105,
             "unknown_size_items": 0,
         }
     }
@@ -679,8 +683,8 @@ def test_stats_unknown_sizes(archivers, request):
     output = cmd(archiver, "diff", "--stats", "--content-only", "test0", "test1")
     lines = output.splitlines()
     assert "Changed items: 1" in lines
-    assert_line_exists(lines, r"^Added chunk volume: 0 B$")
-    assert_line_exists(lines, r"^Removed chunk volume: 0 B$")
+    assert_line_exists(lines, r"^Added size: 0 B$")
+    assert_line_exists(lines, r"^Removed size: 0 B$")
     assert "Items with unknown size changes: 1" in lines
 
 

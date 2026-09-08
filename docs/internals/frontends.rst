@@ -667,6 +667,33 @@ item2:
 *changed owner*, *changed user*, *changed group*, *ctime* and *mtime* changes. Items that have
 only such changes are then not printed at all.
 
+With ``--stats``, a final line of the shape ``{"stats": {...}}`` follows the per-path lines. It has
+no **path** and no **changes** property, so it is easy to tell apart. The *stats* object has these
+properties (all of them JSON numbers):
+
+added_items:
+    The number of items that only exist in ARCHIVE2.
+
+removed_items:
+    The number of items that only exist in ARCHIVE1.
+
+changed_items:
+    The number of items that exist in both archives, but differ.
+
+size_added:
+    The total amount of file content (in bytes) added by all of these items, i.e. the sum of the
+    **added** properties of their content changes (see above).
+
+size_removed:
+    The total amount of file content (in bytes) removed by all of these items, i.e. the sum of the
+    **removed** properties of their content changes (see above).
+
+unknown_size_items:
+    The number of items whose content was modified by an unknown amount (see **added** above).
+    They are counted in *changed_items*, but contribute nothing to *size_added* / *size_removed*.
+
+``--content-only`` narrows these counts the same way it narrows the per-path output.
+
 
 Example of ``borg diff --json-lines --sort-by path ARCHIVE1 ARCHIVE2``::
 
@@ -679,6 +706,10 @@ Example of ``borg diff --json-lines --sort-by path ARCHIVE1 ARCHIVE2``::
     {"changes": [{"added": 8, "removed": 0, "type": "added"}], "path": "data/file3"}
     {"changes": [{"added": 8, "removed": 4, "type": "modified"}, {"item1": "2026-08-28T09:00:12.816498270+02:00", "item2": "2026-08-28T09:00:14.334788977+02:00", "type": "ctime"}, {"item1": "2026-08-28T09:00:12.816498270+02:00", "item2": "2026-08-28T09:00:14.334788977+02:00", "type": "mtime"}], "path": "data/file5"}
     {"changes": [{"type": "changed link"}, {"item1": "2026-08-28T09:00:12.820243127+02:00", "item2": "2026-08-28T09:00:14.332850526+02:00", "type": "ctime"}, {"item1": "2026-08-28T09:00:12.820210210+02:00", "item2": "2026-08-28T09:00:14.332821942+02:00", "type": "mtime"}], "path": "data/link1"}
+
+With ``--stats``, the same command additionally ends with::
+
+    {"stats": {"added_items": 2, "changed_items": 4, "removed_items": 3, "size_added": 16, "size_removed": 8, "unknown_size_items": 0}}
 
 
 Archive Analysis

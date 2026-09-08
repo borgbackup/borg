@@ -1,7 +1,7 @@
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import classify_ec, max_ec
+from ...helpers import classify_ec, max_ec, add_warning, get_ec, get_reset_ec, init_ec_warnings
 
 
 @pytest.mark.parametrize(
@@ -62,3 +62,24 @@ def test_ec_invalid():
 )
 def test_max_ec(ec1, ec2, ec_max):
     assert max_ec(ec1, ec2) == ec_max
+
+
+def test_get_ec_warnings():
+    init_ec_warnings()
+    # no warnings: the exit code set via set_ec (or given to get_ec) is returned as is.
+    assert get_ec() == EXIT_SUCCESS
+    # only warnings of one kind: the exit code is that specific warning code.
+    add_warning("some warning", wc=EXIT_WARNING_BASE + 1)
+    add_warning("some warning", wc=EXIT_WARNING_BASE + 1)
+    assert get_ec() == EXIT_WARNING_BASE + 1
+    # warnings of different kinds: the exit code is the generic warning code.
+    add_warning("another warning", wc=EXIT_WARNING_BASE + 2)
+    assert get_ec() == EXIT_WARNING
+    # an error is more severe than any warning.
+    assert get_ec(EXIT_ERROR) == EXIT_ERROR
+    # get_reset_ec returns the exit code and then starts over (no exit code, no warnings).
+    assert get_reset_ec() == EXIT_ERROR
+    assert get_ec() == EXIT_SUCCESS
+    add_warning("some warning", wc=EXIT_WARNING_BASE + 1)
+    assert get_reset_ec() == EXIT_WARNING_BASE + 1
+    assert get_ec() == EXIT_SUCCESS

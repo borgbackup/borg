@@ -95,6 +95,11 @@ def add_warning(msg, *args, **kwargs):
     assert isinstance(warning_code, int)
     warning_type = kwargs.get("wt", "percent")
     assert warning_type in ("percent", "curly")
+    # Store exceptions given as args (e.g. the BackupError wrapped by a BackupWarning) as their message text:
+    # an exception references its traceback and thus the frames (with all their locals, e.g. the chunk data
+    # that was being written) of the code that failed - keeping that for every warning, for the whole borg
+    # run, would leak memory. The text is what formatting the message with the exception gives anyway.
+    args = tuple(str(arg) if isinstance(arg, BaseException) else arg for arg in args)
     _warnings_list.append(warning_info(warning_code, msg, args, warning_type))
 
 

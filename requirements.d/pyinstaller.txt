@@ -1,1 +1,1 @@
-pyinstaller==6.21.0
+pyinstaller==6.22.0

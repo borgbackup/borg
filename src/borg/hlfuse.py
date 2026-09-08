@@ -29,6 +29,15 @@ from .vfs import ArchiveVFS, ChunkMissing, parse_mount_options
 BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
 
 
+def fuse_options(options):
+    """Convert a libfuse option list (e.g. ["ro", "fsname=borgfs"]) to mfusepy keyword arguments."""
+    kwargs = {}
+    for option in options:
+        key, sep, value = option.partition("=")
+        kwargs[key] = value if sep else True
+    return kwargs
+
+
 class borgfs(hlfuse.Operations):
     """Export archive contents as a FUSE filesystem"""
 
@@ -64,9 +73,13 @@ class borgfs(hlfuse.Operations):
         lock_refreshing_thread = LockRefresher(self._repository.info, sleep_interval=60, lock=self._repo_lock)
         lock_refreshing_thread.start()
         try:
-            # Run the FUSE main loop in foreground (we might be daemonized already or not)
+            # Run the FUSE main loop in foreground (we might be daemonized already or not).
+            # mfusepy takes the libfuse options as keyword arguments (a flag option as True);
+            # raw_fi=True makes it pass the fuse_file_info struct to open/read/release/getattr.
+            fuse_kwargs = fuse_options(options)
+            fuse_kwargs.update(raw_fi=True, foreground=True, use_ino=True)
             with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
-                hlfuse.FUSE(self, mountpoint, options, foreground=True, use_ino=True)
+                hlfuse.FUSE(self, mountpoint, **fuse_kwargs)
         finally:
             lock_refreshing_thread.terminate()
 
@@ -128,9 +141,10 @@ class borgfs(hlfuse.Operations):
             "f_namemax": 255,  # == NAME_MAX (depends on archive source OS / FS)
         }
 
-    def getattr(self, path, fh=None):
-        # use the file handle if we have one, to avoid the path lookup
-        node = self._node_from_handle(fh) if fh is not None else self._find_node(path)
+    def getattr(self, path, fi=None):
+        # use the file handle (in the fuse_file_info struct, see raw_fi in mount) if we have one,
+        # to avoid the path lookup.
+        node = self._node_from_handle(fi.fh) if fi is not None else self._find_node(path)
         return self._stat(node)
 
     def listxattr(self, path):

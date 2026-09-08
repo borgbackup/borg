@@ -171,6 +171,12 @@ New features:
 - create/import-tar --json: report the deduplicated size of the new archive, #10335.
   It is also included in the archive_progress JSON output.
 
+Fixes:
+
+- subprocess environment: also remove BORG_NEW_PASSPHRASE, BORG_OTHER_PASSPHRASE, BORG_PASSCOMMAND,
+  BORG_OTHER_PASSCOMMAND, BORG_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD and BORGSTORE_REST_PASSWORD
+  from the environment given to subprocesses (previously only BORG_PASSPHRASE was removed), #6480.
+
 Version 2.0.0b24 (2026-09-02)
 -----------------------------
 

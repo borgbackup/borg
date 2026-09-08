@@ -8,6 +8,7 @@ import errno
 import os
 import stat
 import sys
+import time
 
 import pytest
 
@@ -330,6 +331,30 @@ def test_fuse_allow_damaged_files(archivers, request):
             # no exception raised, missing data will be all-zero
             data = f.read()
         assert data.endswith(b"\0\0")
+
+
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+def test_fuse_read_to_eof_after_attr_timeout(archivers, request):
+    """Reading up to EOF after the attribute timeout must work, and the mount must be read-only.
+
+    When a read reaches EOF after the (default 1 s) attribute timeout, the kernel asks for the
+    attributes of the *open* file first (fgetattr, with the file handle). This used to fail with
+    EINVAL on the mfusepy backend, and that backend also used to drop all libfuse mount options
+    (the mount was not even read-only), see the mfusepy FUSE() call in hlfuse.py.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", size=64 * 1024)
+    cmd(archiver, "create", "archive", "input")
+    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
+    with fuse_mount(archiver, mountpoint, "-a", "archive"):
+        assert os.statvfs(mountpoint).f_flag & os.ST_RDONLY, "libfuse options (ro) not applied"
+        with open(os.path.join(mountpoint, "archive", "input", "file"), "rb", buffering=0) as f:
+            assert len(f.read(4096)) == 4096
+            time.sleep(1.5)  # longer than the default attr_timeout of 1 s
+            # a read reaching EOF makes the kernel revalidate the size of the *open* file (fgetattr).
+            # use a raw read: an fstat (as f.read() does) would refresh the attributes without a handle.
+            assert len(os.read(f.fileno(), 64 * 1024)) == 64 * 1024 - 4096
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")

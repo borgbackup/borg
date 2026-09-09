@@ -602,15 +602,17 @@ Example (excerpt) of ``borg list --json-lines``::
 Archive Differencing
 ++++++++++++++++++++
 
-Each archive difference item (file contents, user/group/mode) output by :ref:`borg_diff` is represented by an *ItemDiff* object.
-The properties of an *ItemDiff* object are:
+Each item that :ref:`borg_diff` reports as different between the two archives (in its file contents, in its
+metadata like mode, owner or timestamps, or because it only exists in one of the archives) is represented by
+an *ItemDiff* object. The properties of an *ItemDiff* object are:
 
 path:
     The filename/path of the *Item* (file, directory, symlink).
 
 changes:
     A list of *Change* objects describing the changes made to the item in the two archives. For example,
-    there will be two changes if the contents of a file are changed, and its ownership are changed.
+    a file whose contents were modified usually has three changes: the content change itself and the
+    resulting *mtime* and *ctime* changes (see the example below).
 
 The *Change* object can contain a number of properties depending on the type of change that occurred.
 If a 'property' is not required for the type of change, it is not output.

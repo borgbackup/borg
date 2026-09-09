@@ -184,7 +184,7 @@ Other changes:
   from source, #10342.
 - binaries: strip the debug symbols from the Linux binaries, bundle only the
   botocore (S3) service models borg needs, and build cryptography against the
-  bundled OpenSSL in the glibc239 binaries instead of bundling a second OpenSSL
+  bundled OpenSSL in the Linux binaries instead of bundling a second OpenSSL
   with it, #10345.
 
 Version 2.0.0b24 (2026-09-02)

@@ -35,13 +35,18 @@ permissions:
 env:
   # The standalone binaries expected for a release: for every platform the
   # single-file binary and, as a .tgz, the single-directory variant.  See the
-  # "binary" entries of the native_tests matrix, the "artifact_prefix" entries
-  # of the vm_tests matrix and the windows_tests job in ci.yml - keep in sync.
+  # "binary" entries of the native_tests and oldglibc_binary matrices, the
+  # "artifact_prefix" entries of the vm_tests matrix and the windows_tests job
+  # in ci.yml - keep in sync.
   EXPECTED_ASSETS: >-
     borg-linux-glibc243-x86_64-gh
     borg-linux-glibc243-x86_64-gh.tgz
     borg-linux-glibc243-arm64-gh
     borg-linux-glibc243-arm64-gh.tgz
+    borg-linux-glibc239-x86_64-gh
+    borg-linux-glibc239-x86_64-gh.tgz
+    borg-linux-glibc239-arm64-gh
+    borg-linux-glibc239-arm64-gh.tgz
     borg-macos-15-arm64-gh
     borg-macos-15-arm64-gh.tgz
     borg-macos-15-x86_64-gh
@@ -182,6 +187,11 @@ jobs:
         For each platform there is a single-file binary (\`borg-*-gh\`, \`.exe\` on Windows)
         and, as a \`.tgz\`, the same thing as a directory (\`borg-dir/borg.exe\`), which
         starts up faster.
+
+        The Linux binaries come in two flavours: \`glibc243\` (built on Ubuntu 26.04) and
+        \`glibc239\` (built on Ubuntu 24.04) for systems with an older glibc or with a CPU
+        below x86-64-v3, on which the \`glibc243\` x86_64 binary does not run. Your system
+        needs at least the glibc version in the name.
 
         The macOS binaries are built **without** FUSE support, so \`borg mount\` does
         not work with them; install via \`pip\` instead if you need FUSE support.

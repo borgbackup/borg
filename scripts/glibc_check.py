@@ -34,6 +34,10 @@ def main():
             output = subprocess.check_output(["objdump", "-T", filename], stderr=subprocess.STDOUT)
             output = output.decode()
             versions = {parse_version(match.group(1)) for match in glibc_re.finditer(output)}
+            if not versions:
+                if verbose:
+                    print(f"{filename} does not reference any versioned glibc symbol.")
+                continue
             requires_glibc = max(versions)
             overall_versions.add(requires_glibc)
             if verbose:

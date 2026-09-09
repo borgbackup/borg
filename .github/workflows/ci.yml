@@ -440,6 +440,280 @@ jobs:
         env_vars: OS,python
         files: coverage.xml
 
+  oldglibc_binary:
+    # Linux binaries for older systems: the ones native_tests builds come from
+    # ubuntu-26.04 runners and thus need glibc 2.43, and the x86_64 one does not
+    # run on CPUs below x86-64-v3 (#10342). These are built on ubuntu-24.04
+    # (glibc 2.39), the oldest GitHub-hosted Ubuntu image, with its baseline
+    # x86-64 toolchain and packages.
+    #
+    # Ubuntu 24.04 ships OpenSSL 3.0 and Python 3.12, and the python that
+    # actions/setup-python provides for it links against that OpenSSL 3.0. So
+    # this job builds the current OpenSSL 3.5 (LTS) and Python 3.14 from source,
+    # links Python and borg's crypto extension against that OpenSSL, and
+    # PyInstaller then bundles those libraries instead of the system's.
+    #
+    # Unlike native_tests, this job builds the binary on every run and runs the
+    # test suite against it, so that a broken toolchain build or a broken binary
+    # shows up before a release, not while releasing. Only the provenance
+    # attestation is limited to tags.
+    #
+    # The sources are pinned by version and sha256 - bump both together. The
+    # checksums were verified against the .sha256 file published with the
+    # OpenSSL release and against the python.org sigstore bundle of the Python
+    # tarball (signed by the release manager).
+    needs: [lint]
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            binary: borg-linux-glibc239-x86_64-gh
+          - os: ubuntu-24.04-arm
+            binary: borg-linux-glibc239-arm64-gh
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    env:
+      OPENSSL_VERSION: "3.5.8"
+      OPENSSL_SHA256: "a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2"
+      PYTHON_VERSION: "3.14.7"
+      PYTHON_SHA256: "3b48dac8fb59f62eaa67ac83c1eb12bda1b7a08406dd286e252c11a66be27f81"
+      # The glibc of the runners above. The binary names promise this version,
+      # the "Check what the binary bundles" step verifies it.
+      GLIBC_VERSION: "2.39"
+      BINARY: ${{ matrix.binary }}
+      # The FUSE implementation borg gets built, bundled and tested with - the
+      # same one as for the native_tests Linux binaries, see the extras in the
+      # "Install borgbackup" step.
+      BORG_FUSE_IMPL: pyfuse3
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+
+    - name: Set the install prefix for OpenSSL and Python
+      # Outside of the checkout. Set here and not in the job's env, where the
+      # runner context (runner.temp) is not available.
+      run: echo "DEPS_PREFIX=$RUNNER_TEMP/borg-deps" >> "$GITHUB_ENV"
+
+    - name: Install Linux packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        # for borg - but no libssl-dev, OpenSSL is built from source below
+        sudo apt-get install -y libacl1-dev liblz4-dev
+        sudo apt-get install -y libfuse3-dev fuse3  # for pyfuse3
+        # for building python: the stdlib modules borg and its dependencies
+        # need (zlib, bz2, lzma, sqlite3 for coverage, ctypes) and the usual
+        # readline/curses/uuid ones, so the build is close to a normal python.
+        sudo apt-get install -y zlib1g-dev libbz2-dev liblzma-dev libsqlite3-dev libffi-dev libreadline-dev libncurses-dev uuid-dev
+        sudo apt-get install -y bash zsh fish  # for shell completion tests
+        sudo apt-get install -y rclone  # for the rclone remote repo test
+
+    - name: Build OpenSSL ${{ env.OPENSSL_VERSION }}
+      run: |
+        set -euxo pipefail
+        mkdir -p "$RUNNER_TEMP/openssl-src"
+        cd "$RUNNER_TEMP/openssl-src"
+        curl -fsSL -o openssl.tar.gz "https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz"
+        echo "$OPENSSL_SHA256  openssl.tar.gz" | sha256sum -c -
+        tar xzf openssl.tar.gz
+        cd "openssl-$OPENSSL_VERSION"
+        # --openssldir: where libcrypto looks for openssl.cnf and the CA certs
+        #   at runtime. The bundled libcrypto runs on the user's system, so this
+        #   has to be the system's directory (/etc/ssl on Debian/Ubuntu and most
+        #   others), not something below the prefix. Where it does not exist,
+        #   OpenSSL just uses its built-in defaults.
+        # --libdir=lib: x86_64 would default to lib64, aarch64 to lib.
+        # -Wl,-rpath: the system has a libcrypto.so.3 / libssl.so.3 with the
+        #   same SONAMEs, but OpenSSL 3.0 - the rpath makes libssl and the
+        #   openssl program load the libraries from the prefix instead.
+        # no-tests: the test suite takes much longer than the build itself and
+        #   is never run here.
+        # no-docs: nothing needs the man pages, and building them is slow, too.
+        ./Configure --prefix="$DEPS_PREFIX" --openssldir=/etc/ssl --libdir=lib -Wl,-rpath,"$DEPS_PREFIX/lib" \
+          shared no-tests no-docs
+        make -j"$(nproc)"
+        make install_sw
+        "$DEPS_PREFIX/bin/openssl" version
+
+    - name: Build Python ${{ env.PYTHON_VERSION }}
+      run: |
+        set -euxo pipefail
+        mkdir -p "$RUNNER_TEMP/python-src"
+        cd "$RUNNER_TEMP/python-src"
+        curl -fsSL -o python.tar.xz "https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tar.xz"
+        echo "$PYTHON_SHA256  python.tar.xz" | sha256sum -c -
+        tar xJf python.tar.xz
+        cd "Python-$PYTHON_VERSION"
+        # --enable-shared: PyInstaller needs libpython. The rpath makes the
+        #   python binary and the extension modules find libpython and the
+        #   OpenSSL libs in the prefix without LD_LIBRARY_PATH - the system has
+        #   a libcrypto.so.3 / libssl.so.3 with the same SONAME, but OpenSSL 3.0.
+        # --enable-optimizations: PGO, like the python from actions/setup-python
+        #   that the other Linux binaries are built with.
+        # --with-openssl: build the ssl and hashlib modules against the OpenSSL
+        #   built above.
+        # PROFILE_TASK: the PGO training run is a subset of python's test suite
+        #   (see Lib/test/libregrtest/pgo.py); run it in parallel worker
+        #   processes, gcc merges their profile data under a file lock.
+        ./configure --prefix="$DEPS_PREFIX" --enable-shared --enable-optimizations \
+          --with-openssl="$DEPS_PREFIX" --with-openssl-rpath=auto \
+          LDFLAGS="-Wl,-rpath,$DEPS_PREFIX/lib" \
+          PROFILE_TASK="-m test --pgo -j$(nproc) --timeout=1200"
+        make -j"$(nproc)"
+        make install
+
+    - name: Check that Python uses the OpenSSL we built
+      run: |
+        "$DEPS_PREFIX/bin/python3" - <<'EOF'
+        import os, ssl, sys
+        print(sys.version)
+        print(ssl.OPENSSL_VERSION)  # the library the ssl module loaded at runtime
+        want = "OpenSSL " + os.environ["OPENSSL_VERSION"] + " "
+        if not ssl.OPENSSL_VERSION.startswith(want):
+            raise SystemExit(f"the ssl module uses {ssl.OPENSSL_VERSION!r}, not {want.strip()!r}")
+        EOF
+
+    - name: Create the virtualenv
+      run: |
+        set -euxo pipefail
+        "$DEPS_PREFIX/bin/python3" -m venv "$RUNNER_TEMP/venv"
+        # python, pip, pytest, pyinstaller and borg come from this venv from now on
+        echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+    - name: Install Python requirements
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.d/development.lock.txt
+        pip install -r requirements.d/pyinstaller.txt
+
+    - name: Install borgbackup
+      env:
+        # Link borg's crypto extension against the OpenSSL built above - with
+        # libssl-dev installed, pkg-config would find the system's OpenSSL 3.0...
+        BORG_OPENSSL_PREFIX: ${{ env.DEPS_PREFIX }}
+        # ... and make it load that one at runtime, see the python build above.
+        LDFLAGS: -Wl,-rpath,${{ env.DEPS_PREFIX }}/lib
+      run: |
+        set -euxo pipefail
+        pip install -ve ".[pyfuse3,cockpit,s3,sftp,rclone]"
+        # check that the crypto extension really uses that OpenSSL
+        low_level=$(python -c 'import borg.crypto.low_level as m; print(m.__file__)')
+        ldd "$low_level"
+        ldd "$low_level" | grep "libcrypto.so.3 => $DEPS_PREFIX/lib/"
+
+    - name: Build Borg fat binaries (${{ matrix.binary }})
+      run: ./scripts/build-borg-using-pyinstaller.sh
+
+    - name: Smoke-test the built binary (${{ matrix.binary }})
+      run: |
+        set -euxo pipefail
+        pushd dist/binary
+        echo "single-file binary"
+        chmod +x borg.exe
+        ./borg.exe -V
+        echo "single-directory binary"
+        chmod +x borg-dir/borg.exe
+        ./borg-dir/borg.exe -V
+        tar czf borg.tgz borg-dir
+        popd
+        # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
+        export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
+        echo "borg.exe binary in PATH"
+        borg.exe -V
+
+    - name: Check what the binary bundles (${{ matrix.binary }})
+      # The point of this job: the binary has to contain the Python and the
+      # OpenSSL built above, not the system's ones, and it must not need a
+      # newer glibc than its name promises.
+      run: |
+        set -euxo pipefail
+        # borg-dir has everything as plain files, and PyInstaller bundles the
+        # shared libraries as they are (no strip, no upx there - see the spec):
+        # the bundled ones must be the files from the prefix.
+        for lib in libcrypto.so.3 libssl.so.3 "libpython${PYTHON_VERSION%.*}.so.1.0"; do
+          cmp "$DEPS_PREFIX/lib/$lib" "$(find dist/binary/borg-dir -name "$lib")"
+        done
+        # the bundled python is the one built above
+        dist/binary/borg-dir/borg.exe debug info
+        dist/binary/borg-dir/borg.exe debug info | grep "Python: CPython $PYTHON_VERSION "
+        # no bundled ELF file needs a newer glibc than the one in the binary's name
+        find dist/binary/borg-dir -type f \( -name '*.so' -o -name '*.so.*' -o -name 'borg.exe' \) -print0 \
+          | xargs -0 python scripts/glibc_check.py "$GLIBC_VERSION"
+
+    - name: Run tests
+      # No SFTP, S3 or rest-over-ssh test servers here (see native_tests): those
+      # tests exercise the transports, not the toolchain, and skip without them.
+      run: |
+        set -euo pipefail
+        # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
+        export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
+        borg.exe -V
+        python -m pytest -v -n auto -rs --benchmark-skip --junitxml=test-results.xml --pyargs borg.testsuite
+
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+      env:
+        OS: ${{ runner.os }}
+        python: ${{ env.PYTHON_VERSION }}
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        report_type: test_results
+        env_vars: OS,python
+        files: test-results.xml
+
+    - name: Prepare binaries (${{ matrix.binary }})
+      run: |
+        set -euxo pipefail
+        mkdir -p artifacts
+        cp dist/binary/borg.exe "artifacts/$BINARY"
+        cp dist/binary/borg.tgz "artifacts/$BINARY.tgz"
+        echo "binary files"
+        ls -l artifacts/
+
+    - name: Attest binaries provenance (${{ matrix.binary }})
+      id: attest-binaries
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+      with:
+        subject-path: 'artifacts/*'
+
+    - name: Name the sigstore bundle after the binaries (${{ matrix.binary }})
+      # The sigstore bundle rides along with the binaries and the release job
+      # attaches it to the release as <asset>.sigstore.jsonl - see the same step
+      # in native_tests for the details. One attestation covers both the
+      # single-file binary and the .tgz, so the same bundle is stored under both
+      # names - one for each asset.
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      env:
+        BUNDLE_PATH: ${{ steps.attest-binaries.outputs.bundle-path }}
+      run: |
+        set -euxo pipefail
+        # the glob is expanded before the loop body creates any file:
+        for asset in artifacts/*; do
+          cp "$BUNDLE_PATH" "$asset.sigstore.jsonl"
+        done
+        ls -l artifacts/
+
+    - name: Upload binaries (${{ matrix.binary }})
+      # Also for non-tag runs (without the attestation), so that the binary of
+      # a PR or master build can be tried out on an older system.
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: ${{ matrix.binary }}
+        path: artifacts/*
+        if-no-files-found: error
+
   vm_tests:
     permissions:
       contents: read
@@ -958,10 +1232,11 @@ jobs:
     # above built for this tag, see .github/workflows/release.yml.
     #
     # vm_tests is continue-on-error (a flaky BSD VM must not stop a release), so
-    # this waits for it, but only requires native_tests to have succeeded. A
-    # binary that did not get built is warned about while drafting the release.
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') && needs.native_tests.result == 'success' }}
-    needs: [native_tests, vm_tests]
+    # this waits for it, but only requires native_tests and oldglibc_binary to
+    # have succeeded. A binary that did not get built is warned about while
+    # drafting the release.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') && needs.native_tests.result == 'success' && needs.oldglibc_binary.result == 'success' }}
+    needs: [native_tests, oldglibc_binary, vm_tests]
 
     permissions:
       contents: write

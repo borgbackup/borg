@@ -33,6 +33,13 @@ Binaries built on GitHub servers
 
 borg-linux-glibc243-x86_64-gh Linux AMD/Intel (built on Ubuntu 26.04 LTS with glibc 2.43)
 borg-linux-glibc243-arm64-gh  Linux ARM (built on Ubuntu 26.04 LTS with glibc 2.43)
+borg-linux-glibc239-x86_64-gh Linux AMD/Intel (built on Ubuntu 24.04 LTS with glibc 2.39)
+borg-linux-glibc239-arm64-gh  Linux ARM (built on Ubuntu 24.04 LTS with glibc 2.39)
+
+The glibc239 binaries are for systems with an older glibc, and for CPUs below
+x86-64-v3, on which the glibc243 x86_64 binary does not run ("Illegal
+instruction"). As Ubuntu 24.04 only has OpenSSL 3.0 and Python 3.12, they bundle
+OpenSSL 3.5 and Python 3.14 built from source.
 
 borg-macos-15-arm64-gh        macOS Apple Silicon (built on macOS 15 w/o FUSE support)
 borg-macos-15-x86_64-gh       macOS Intel (built on macOS 15 w/o FUSE support)

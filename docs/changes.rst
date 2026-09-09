@@ -177,6 +177,12 @@ Fixes:
   BORG_OTHER_PASSCOMMAND, BORG_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD and BORGSTORE_REST_PASSWORD
   from the environment given to subprocesses (previously only BORG_PASSPHRASE was removed), #6480.
 
+Other changes:
+
+- CI: also build Linux binaries on Ubuntu 24.04 (glibc 2.39) for systems with an
+  older glibc or a CPU below x86-64-v3, with OpenSSL 3.5 and Python 3.14 built
+  from source, #10342.
+
 Version 2.0.0b24 (2026-09-02)
 -----------------------------
 

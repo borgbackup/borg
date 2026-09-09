@@ -144,8 +144,9 @@ def generate_archiver_tests(metafunc, kinds: str):
     #   backend implements the same way, so it runs "local,binary" only: repo lifecycle (repo create/
     #   delete), locking, repo space, tar, recreate, and pure command/formatting logic (prune scheduling,
     #   diff/list/info rendering, rename, delete/undelete, key handling, debug, return codes, fuse mount).
-    # - "binary" runs the frozen borg.exe; it is only built for tag releases, so it does not affect normal
-    #   PR/push CI run time.
+    # - "binary" runs the frozen borg.exe; the regular CI jobs only build it for tag releases (just the
+    #   oldglibc_binary job in ci.yml always builds and tests it), so it does not affect normal PR/push CI
+    #   run time.
     archivers = []
     for kind in kinds.split(","):
         if kind == "local":

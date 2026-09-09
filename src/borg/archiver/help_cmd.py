@@ -614,6 +614,11 @@ class HelpMixIn:
                 "More than one passphrase environment variable is set". The same applies to the
                 ``BORG_OTHER_*`` variants (which are a separate, independent group).
                 See also BORG_NEW_PASSPHRASE.
+                borg removes the passphrase-related variables (BORG_PASSPHRASE, BORG_NEW_PASSPHRASE,
+                BORG_PASSCOMMAND, BORG_PASSPHRASE_FD and their ``BORG_OTHER_*`` variants) as well as
+                BORGSTORE_REST_PASSWORD from the environment of the subprocesses it starts (like the
+                command given in BORG_PASSCOMMAND, ``--paths-from-command`` / ``--content-from-command``
+                commands, tar filter commands and ``borg with-lock`` commands).
             BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
                 When set, use the standard output of the command (trailing newlines are stripped) to answer the
                 passphrase question for encrypted repositories.

@@ -325,6 +325,23 @@ def is_terminal(fd=sys.stdout):
     return hasattr(fd, "isatty") and fd.isatty() and (not is_win32 or "ANSICON" in os.environ)
 
 
+# Environment variables that prepare_subprocess_env() removes from the environment of subprocesses.
+# The passphrases and the borgstore REST password are secrets, the commands given in BORG_PASSCOMMAND /
+# BORG_OTHER_PASSCOMMAND often embed secrets or paths to them. The *_FD variables refer to file
+# descriptors that the subprocess does not inherit (Popen closes them), so they would be dangling and
+# misleading there.
+SUBPROCESS_ENV_REMOVE = (
+    "BORG_PASSPHRASE",
+    "BORG_NEW_PASSPHRASE",
+    "BORG_OTHER_PASSPHRASE",
+    "BORG_PASSCOMMAND",
+    "BORG_OTHER_PASSCOMMAND",
+    "BORG_PASSPHRASE_FD",
+    "BORG_OTHER_PASSPHRASE_FD",
+    "BORGSTORE_REST_PASSWORD",
+)
+
+
 def prepare_subprocess_env(system, env=None):
     """
     Prepare the environment for a subprocess we are going to create.
@@ -356,8 +373,9 @@ def prepare_subprocess_env(system, env=None):
             lp = env.get(lp_key)
             if lp is not None and getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
                 env.pop(lp_key)
-    # security: do not give secrets to subprocess
-    env.pop("BORG_PASSPHRASE", None)
+    # security: do not give secrets (and things only meaningful in this process) to the subprocess
+    for name in SUBPROCESS_ENV_REMOVE:
+        env.pop(name, None)
     # for information, give borg version to the subprocess
     env["BORG_VERSION"] = __version__
     return env

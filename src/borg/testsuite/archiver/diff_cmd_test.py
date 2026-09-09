@@ -695,3 +695,29 @@ def test_no_stats_by_default(archivers, request):
     assert_line_not_exists(output.splitlines(), r"^Added items:")
     output = cmd(archiver, "diff", "--content-only", "--json-lines", "test0", "test1")
     assert all("stats" not in json.loads(line) for line in output.splitlines() if line.startswith("{"))
+
+
+def test_reordered_chunks(archivers, request):
+    """Reordering the chunks of a file changes its content, but not the set of its chunk ids."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    chunk_a, chunk_b = b"a" * 1024, b"b" * 1024
+    # with the fixed chunker, both versions of the file consist of exactly these two chunks.
+    create_regular_file(archiver.input_path, "file_swapped", contents=chunk_a + chunk_b)
+    cmd(archiver, "create", "--chunker-params", "fixed,1024", "test0", "input")
+    granularity_sleep()  # the same-size rewrite must get a new ctime, or the files cache would reuse the old chunks
+    create_regular_file(archiver.input_path, "file_swapped", contents=chunk_b + chunk_a)
+    cmd(archiver, "create", "--chunker-params", "fixed,1024", "test1", "input")
+    # the same chunks in a different order: the content changed, but no bytes were added or removed.
+    output = cmd(archiver, "diff", "--content-only", "test0", "test1")
+    assert_line_exists(output.splitlines(), r"^modified:\s+0 B\s+0 B input/file_swapped$")
+    output = cmd(archiver, "diff", "--content-only", "--json-lines", "test0", "test1")
+    joutput = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    assert joutput == [{"changes": [{"added": 0, "removed": 0, "type": "modified"}], "path": "input/file_swapped"}]
+    # such a change is counted, although it contributes no bytes.
+    output = cmd(archiver, "diff", "--stats", "--content-only", "test0", "test1")
+    lines = output.splitlines()
+    assert "Changed items: 1" in lines
+    assert_line_exists(lines, r"^Added size: 0 B$")
+    assert_line_exists(lines, r"^Removed size: 0 B$")
+    assert_line_not_exists(lines, r"^Items with unknown size changes:")

@@ -723,6 +723,11 @@ class ItemDiff:
         if not self._can_compare_chunk_ids:
             self._changes['content'] = DiffChange("modified")
             return True
+        if self._item1.chunks == self._item2.chunks:
+            # same chunk lists, same content (e.g. a file that was only touched): no content change.
+            return False
+        # the byte counts sum up the chunks only present in one of the items, so both are 0 if the content
+        # only changed by reordering or duplicating chunks - it is a content change nevertheless.
         chunk_ids1 = {c.id for c in self._item1.chunks}
         chunk_ids2 = {c.id for c in self._item2.chunks}
         added_ids = chunk_ids2 - chunk_ids1

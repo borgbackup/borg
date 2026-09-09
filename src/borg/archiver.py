@@ -4755,12 +4755,15 @@ class Archiver:
         **About modes without encryption:**
 
         Avoid using ``none`` mode. If you think about using ``none`` mode,
-        please reconsider and be absolutely sure. Using any mode other than
-        ``none`` allows Borg to detect accidental corruption or malicious
-        tampering with the repo. It also prevents denial-of-service attacks
-        against clients. Instead of ``none`` mode, you likely want to use
-        ``authenticated`` mode, or ``repokey`` or ``keyfile`` modes with an
-        empty passphrase instead (see below).
+        please reconsider and be absolutely sure. ``none`` mode still detects
+        accidental corruption (via CRC32 and the SHA-256 chunk IDs, e.g. when
+        extracting or running ``borg check --verify-data``), but as no secret
+        key is involved, it cannot detect malicious tampering with the repo.
+        Any other mode allows Borg to detect such tampering (as long as the
+        attacker does not have the key and its passphrase) and also prevents
+        denial-of-service attacks against clients. Instead of ``none`` mode,
+        you likely want to use ``authenticated`` mode, or ``repokey`` or
+        ``keyfile`` modes with an empty passphrase instead (see below).
 
         If you don't want to encrypt your data, use ``authenticated`` or
         ``authenticated-blake2`` modes. These modes require a passphrase in

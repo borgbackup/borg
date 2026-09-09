@@ -320,6 +320,30 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.lock.txt
 
+    - name: Build cryptography against the system OpenSSL (${{ matrix.binary }})
+      # For the Linux binaries: cryptography (a paramiko dependency, sftp
+      # extra) comes as a manylinux wheel that statically links its own copy of
+      # OpenSSL - a second OpenSSL in the binary, next to the system's libcrypto
+      # that borg's crypto extension uses and that PyInstaller bundles, see
+      # #10345. Build it from source against the system OpenSSL instead
+      # (libssl-dev is installed and pkg-config finds it, the runner image has
+      # the Rust toolchain) - like the oldglibc_binary job does, just without a
+      # custom OpenSSL prefix. Only the "binary" matrix entries do this, so it
+      # runs on master pushes and tags, not in the reduced pull request matrix.
+      if: ${{ matrix.binary && runner.os == 'Linux' }}
+      run: |
+        set -euxo pipefail
+        rustc --version
+        pip install --no-binary cryptography cryptography
+        # check that the extension links the system OpenSSL dynamically and
+        # loads the same version as the system's openssl program
+        rust_ext=$(python -c 'import cryptography.hazmat.bindings._rust as m; print(m.__file__)')
+        ldd "$rust_ext"
+        ldd "$rust_ext" | grep 'libcrypto.so.3 => /'
+        loaded=$(python -c 'from cryptography.hazmat.backends.openssl.backend import backend; print(backend.openssl_version_text())')
+        echo "$loaded"
+        test "$(echo "$loaded" | cut -d' ' -f1,2)" = "$(openssl version | cut -d' ' -f1,2)"
+
     - name: Install borgbackup
       run: |
         if [[ "$TOXENV" == *"llfuse"* ]]; then
@@ -354,6 +378,13 @@ jobs:
         export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
         echo "borg.exe binary in PATH"
         borg.exe -V
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          # cryptography links the bundled libcrypto, it does not bring its own
+          # OpenSSL (see the step that builds it)
+          readelf -d "$(find dist/binary/borg-dir -name '_rust.abi3.so')" | grep 'NEEDED.*libcrypto.so.3'
+        fi
+        du -sh dist/binary/borg-dir
+        ls -l dist/binary/borg.exe dist/binary/borg.tgz
 
     - name: Prepare binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}

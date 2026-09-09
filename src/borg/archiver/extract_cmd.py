@@ -160,6 +160,21 @@ class ExtractMixIn:
             When parent directories are not extracted (because of using file/directory selection
             or any other reason), Borg cannot restore parent directories' metadata, e.g., owner,
             group, permissions, etc.
+
+        .. note::
+
+            Restoring some file metadata requires root privileges (or equivalent
+            capabilities). This includes the owner and group of files, device nodes,
+            privileged file flags (like immutable or append-only) and privileged
+            extended attributes (like Linux capabilities or ``trusted.*`` xattrs).
+
+            When running as a normal user, borg still extracts the file contents, but
+            the extracted files are owned by the invoking user (the failure to restore
+            ownership is silently ignored: no warning, exit code unaffected), privileged
+            flags are skipped while the other flags are still set, and privileged xattrs
+            and device nodes are skipped with a warning. ``--numeric-ids`` does not
+            change this, it only selects whether the archived numeric IDs or the archived
+            user/group names are used. To restore all metadata, run ``borg extract`` as root.
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_extract.__doc__, epilog=extract_epilog)

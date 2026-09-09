@@ -121,8 +121,10 @@ def test_basic_functionality(archivers, request):
         change = "modified.*0 B" if can_compare_ids else r"modified:  \(can't get size\)"
         assert_line_exists(lines, f"{change}.*input/empty")
 
-        # Do not show a 0 byte change for a file whose contents weren't modified.
+        # Do not show a content change for a file whose contents weren't modified: neither a 0 byte change
+        # (same chunker params), nor a "modified: (can't get size)" change (different chunker params).
         assert_line_not_exists(lines, "0 B.*input/file_touched")
+        assert_line_not_exists(lines, "modified.*input/file_touched")
         if not content_only:
             assert_line_exists(lines, "[cm]time:.*input/file_touched")
         else:
@@ -167,8 +169,8 @@ def test_basic_functionality(archivers, request):
             # return a flattened list of changes for given filename
             return sum(chgsets, [])
 
-        # convert output to list of dicts
-        joutput = [json.loads(line) for line in output.split("\n") if line]
+        # convert output to list of dicts, skipping non-JSON lines (like the "diff will be slow" warning)
+        joutput = [json.loads(line) for line in output.split("\n") if line.startswith("{")]
 
         # File contents changed (deleted and replaced with a new file)
         expected = {"type": "modified", "added": 4096, "removed": 1024} if can_compare_ids else {"type": "modified"}
@@ -177,9 +179,9 @@ def test_basic_functionality(archivers, request):
         # File unchanged
         assert not any(get_changes("input/file_unchanged", joutput))
 
-        # Do not show a 0 byte change for a file whose contents weren't modified.
-        unexpected = {"type": "modified", "added": 0, "removed": 0}
-        assert unexpected not in get_changes("input/file_touched", joutput)
+        # Do not show a content change for a file whose contents weren't modified: neither a 0 byte change
+        # (same chunker params), nor a "modified" change without byte counts (different chunker params).
+        assert not any(chg["type"] == "modified" for chg in get_changes("input/file_touched", joutput))
         if not content_only:
             # on win32, no ctime is archived, see #8730.
             expected = {"mtime"} if is_win32 else {"mtime", "ctime"}
@@ -258,6 +260,9 @@ def test_basic_functionality(archivers, request):
     output = cmd(archiver, "diff", "test0", "test1a")
     do_asserts(output, True)
 
+    output = cmd(archiver, "diff", "test0", "test1b")
+    do_asserts(output, False)
+
     output = cmd(archiver, "diff", "test0", "test1b", "--content-only")
     do_asserts(output, False, content_only=True)
 
@@ -266,6 +271,12 @@ def test_basic_functionality(archivers, request):
 
     output = cmd(archiver, "diff", "test0", "test1a", "--json-lines", "--content-only")
     do_json_asserts(output, True, content_only=True)
+
+    output = cmd(archiver, "diff", "test0", "test1b", "--json-lines")
+    do_json_asserts(output, False)
+
+    output = cmd(archiver, "diff", "test0", "test1b", "--json-lines", "--content-only")
+    do_json_asserts(output, False, content_only=True)
 
 
 def _create_archive_with_items(archiver, name, items):
@@ -685,6 +696,43 @@ def test_stats_unknown_sizes(archivers, request):
     assert "Changed items: 1" in lines
     assert_line_exists(lines, r"^Added size: 0 B$")
     assert_line_exists(lines, r"^Removed size: 0 B$")
+    assert "Items with unknown size changes: 1" in lines
+
+
+def test_touched_file_with_different_chunker_params(archivers, request):
+    """A file that was only touched has no content change, even if borg has to compare the file contents."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file_touched", contents=b"a" * 100)
+    cmd(archiver, "create", "test0", "input")
+    granularity_sleep()
+    Path("input/file_touched").touch()
+    # different chunker params: borg can't compare the chunk ids, it has to compare the content.
+    cmd(archiver, "create", "--chunker-params", "buzhash,10,23,16,4095", "test1", "input")
+    # only the timestamps changed, the content did not.
+    output = cmd(archiver, "diff", "test0", "test1")
+    lines = output.splitlines()
+    assert_line_exists(lines, r"[cm]time:.*input/file_touched")
+    assert_line_not_exists(lines, r"modified.*input/file_touched")
+    output = cmd(archiver, "diff", "--json-lines", "test0", "test1")
+    joutput = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    changes = [chg["type"] for j in joutput if j["path"] == "input/file_touched" for chg in j["changes"]]
+    assert changes == (["mtime"] if is_win32 else ["ctime", "mtime"])  # on win32, no ctime is archived, see #8730.
+    output = cmd(archiver, "diff", "--content-only", "test0", "test1")
+    assert "input/file_touched" not in output
+    # as the content was not modified, there is no content change of unknown size to report either.
+    output = cmd(archiver, "diff", "--stats", "test0", "test1")
+    lines = output.splitlines()
+    assert_line_exists(lines, r"^Added size: 0 B$")
+    assert_line_exists(lines, r"^Removed size: 0 B$")
+    assert_line_not_exists(lines, r"^Items with unknown size changes:")
+    # a content change of the same size is only found by comparing the content, so its size is unknown.
+    granularity_sleep()  # the same-size rewrite must get a new ctime, or the files cache would reuse the old chunks
+    create_regular_file(archiver.input_path, "file_touched", contents=b"b" * 100)
+    cmd(archiver, "create", "--chunker-params", "buzhash,10,23,16,4095", "test2", "input")
+    output = cmd(archiver, "diff", "--stats", "test0", "test2")
+    lines = output.splitlines()
+    assert_line_exists(lines, r"^modified:  \(can't get size\).*input/file_touched$")
     assert "Items with unknown size changes: 1" in lines
 
 

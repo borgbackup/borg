@@ -176,6 +176,9 @@ Fixes:
 - subprocess environment: also remove BORG_NEW_PASSPHRASE, BORG_OTHER_PASSPHRASE, BORG_PASSCOMMAND,
   BORG_OTHER_PASSCOMMAND, BORG_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD and BORGSTORE_REST_PASSWORD
   from the environment given to subprocesses (previously only BORG_PASSPHRASE was removed), #6480.
+- diff: a file whose content is unchanged, but whose timestamps changed (e.g. it was only touched),
+  was reported as "modified:  (can't get size)" if the two archives were created with different
+  --chunker-params (--content-only was not affected), #10351.
 
 Other changes:
 

@@ -128,6 +128,18 @@ Are there other known limitations?
   remove files which are in the destination, but not in the archive.
   See :issue:`4598` for a workaround and more details.
 
+Why are the extracted files owned by me and not by the original owner?
+----------------------------------------------------------------------
+
+Restoring the owner and group of files requires root privileges (the same is
+true for some other metadata, like device nodes, privileged file flags and
+privileged extended attributes). When you run ``borg extract`` as a normal
+user, the operating system refuses to change the ownership and borg silently
+keeps the extracted files owned by the invoking user - no warning is given.
+For the other kinds of metadata it cannot restore, borg issues warnings.
+``--numeric-ids`` does not change that. To restore all metadata, run
+``borg extract`` as root. See :ref:`borg_extract` for details.
+
 Is Borg recommended for large amounts of data?
 ----------------------------------------------
 

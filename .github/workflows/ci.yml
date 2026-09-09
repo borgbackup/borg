@@ -596,6 +596,29 @@ jobs:
         pip install -r requirements.d/development.lock.txt
         pip install -r requirements.d/pyinstaller.txt
 
+    - name: Build cryptography against the OpenSSL we built
+      # cryptography (a paramiko dependency, sftp extra) comes as a manylinux
+      # wheel that statically links its own copy of OpenSSL, which would be a
+      # second OpenSSL in the binary, see #10345. Build it from source against
+      # the OpenSSL built above instead - the runner image has the Rust
+      # toolchain this needs.
+      env:
+        # where openssl-sys (the Rust OpenSSL bindings) finds the OpenSSL
+        # headers and libraries; the link is dynamic unless OPENSSL_STATIC is set.
+        OPENSSL_DIR: ${{ env.DEPS_PREFIX }}
+        # make the extension load that OpenSSL at runtime, see the python build above
+        RUSTFLAGS: -C link-arg=-Wl,-rpath,${{ env.DEPS_PREFIX }}/lib
+      run: |
+        set -euxo pipefail
+        rustc --version
+        pip install --no-binary cryptography cryptography
+        # check that the extension is linked against (and loads) that OpenSSL
+        rust_ext=$(python -c 'import cryptography.hazmat.bindings._rust as m; print(m.__file__)')
+        ldd "$rust_ext"
+        ldd "$rust_ext" | grep "libcrypto.so.3 => $DEPS_PREFIX/lib/"
+        python -c 'from cryptography.hazmat.backends.openssl.backend import backend; print(backend.openssl_version_text())' \
+          | grep "^OpenSSL $OPENSSL_VERSION "
+
     - name: Install borgbackup
       env:
         # Link borg's crypto extension against the OpenSSL built above - with
@@ -637,11 +660,19 @@ jobs:
       # newer glibc than its name promises.
       run: |
         set -euxo pipefail
-        # borg-dir has everything as plain files, and PyInstaller bundles the
-        # shared libraries as they are (no strip, no upx there - see the spec):
-        # the bundled ones must be the files from the prefix.
+        # borg-dir has everything as plain files: the bundled libraries must be
+        # the ones from the prefix. PyInstaller strips them (see the spec), so
+        # compare the GNU build IDs, which identify the link output and survive
+        # stripping, instead of the files.
+        build_id() { readelf -n "$1" | grep -o 'Build ID: [0-9a-f]*' || true; }
         for lib in libcrypto.so.3 libssl.so.3 "libpython${PYTHON_VERSION%.*}.so.1.0"; do
-          cmp "$DEPS_PREFIX/lib/$lib" "$(find dist/binary/borg-dir -name "$lib")"
+          ours=$(build_id "$DEPS_PREFIX/lib/$lib")
+          bundled=$(build_id "$(find dist/binary/borg-dir -name "$lib")")
+          echo "$lib: prefix [$ours] bundled [$bundled]"
+          if [ -z "$ours" ] || [ "$ours" != "$bundled" ]; then
+            echo "::error::the bundled $lib is not the one built in this job"
+            exit 1
+          fi
         done
         # the bundled python is the one built above
         dist/binary/borg-dir/borg.exe debug info
@@ -649,6 +680,51 @@ jobs:
         # no bundled ELF file needs a newer glibc than the one in the binary's name
         find dist/binary/borg-dir -type f \( -name '*.so' -o -name '*.so.*' -o -name 'borg.exe' \) -print0 \
           | xargs -0 python scripts/glibc_check.py "$GLIBC_VERSION"
+        # cryptography uses the bundled OpenSSL, it does not bring its own (see
+        # the step that builds it)
+        readelf -d "$(find dist/binary/borg-dir -name '_rust.abi3.so')" | grep 'NEEDED.*libcrypto.so.3'
+        # the shared libraries are stripped (see strip_binaries in the spec):
+        # none of them may still carry debug info
+        if find dist/binary/borg-dir -type f \( -name '*.so' -o -name '*.so.*' \) -exec file {} + | grep 'with debug_info'; then
+          echo "::error::bundled shared libraries still carry debug info"
+          exit 1
+        fi
+        # only the botocore models borg needs are bundled (see the spec)
+        ls dist/binary/borg-dir/_internal/botocore/data
+        test -d dist/binary/borg-dir/_internal/botocore/data/s3
+        test ! -e dist/binary/borg-dir/_internal/botocore/data/ec2
+        du -sh dist/binary/borg-dir
+        ls -l dist/binary/borg.exe dist/binary/borg.tgz
+
+    - name: Smoke-test the binary against an S3 server (${{ matrix.binary }})
+      # The spec bundles only the botocore models borg needs: exercise the s3
+      # model and the endpoint files of the frozen binary against a real S3
+      # server (MinIO, like the test suite's S3 test - which runs borg from the
+      # venv, not the binary).
+      run: |
+        set -euxo pipefail
+        case "$(uname -m)" in
+          x86_64|amd64) srv_url=https://dl.min.io/server/minio/release/linux-amd64/minio ;;
+          aarch64|arm64) srv_url=https://dl.min.io/server/minio/release/linux-arm64/minio ;;
+          *) echo "Unsupported arch: $(uname -m)"; exit 1 ;;
+        esac
+        curl -fsSL -o "$RUNNER_TEMP/minio" "$srv_url"
+        chmod +x "$RUNNER_TEMP/minio"
+        mkdir -p "$RUNNER_TEMP/minio-data"
+        # default credentials: minioadmin / minioadmin
+        nohup "$RUNNER_TEMP/minio" server "$RUNNER_TEMP/minio-data" --address 127.0.0.1:9000 > "$RUNNER_TEMP/minio.log" 2>&1 &
+        for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9000) >/dev/null 2>&1 && break; sleep 1; done
+        # the bucket has to exist - the venv has boto3 (s3 extra)
+        python -c 'import boto3; boto3.client("s3", endpoint_url="http://127.0.0.1:9000", aws_access_key_id="minioadmin", aws_secret_access_key="minioadmin").create_bucket(Bucket="borg")'
+        export BORG_REPO="s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/binary-repo"
+        export BORG_PASSPHRASE=test
+        borg=dist/binary/borg-dir/borg.exe
+        $borg repo-create -e aes256-ocb
+        $borg create --stats archive1 src/borg/testsuite
+        $borg list archive1 | wc -l
+        $borg check
+        $borg extract --dry-run archive1
+        $borg repo-delete --force
 
     - name: Run tests
       # No SFTP, S3 or rest-over-ssh test servers here (see native_tests): those

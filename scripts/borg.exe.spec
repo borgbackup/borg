@@ -4,6 +4,15 @@
 import os, sys
 
 is_win32 = sys.platform.startswith('win32')
+is_linux = sys.platform.startswith('linux')
+
+# Strip the symbol tables and debug info from the collected shared libraries
+# (libpython, the extension modules, libcrypto, ...) on Linux: pythons built
+# with the default CFLAGS carry -g debug info, which makes up about half of
+# the size of the Linux binaries, see #10345. Only on Linux: on macOS the
+# strip would interfere with code signing, and it is not recommended on
+# Windows. Python tracebacks do not need any of this, only gdb would.
+strip_binaries = is_linux
 
 # Note: SPEC contains the spec file argument given to pyinstaller
 here = os.path.dirname(os.path.abspath(SPEC))
@@ -50,6 +59,26 @@ if sys.platform == 'darwin':
     # mismatch to the installed kernel driver of osxfuse.
     a.binaries = [b for b in a.binaries if 'libosxfuse' not in b[0]]
 
+# botocore (boto3, s3 extra) ships the JSON service models of all ~430 AWS
+# services (23 MiB, ~14 MiB in the compressed binary, see #10345), but borg
+# only ever creates an s3 client - also for S3-compatible services like MinIO
+# or Backblaze B2, which just get a different endpoint URL. Keep the s3 model,
+# the shared top-level files (endpoints.json, partitions.json, ...) and the
+# models the credential providers may need: sts (assume-role and web-identity
+# profiles), sso and sso-oidc (SSO profiles). Everything else is dead weight.
+botocore_needed_services = ('s3', 'sts', 'sso', 'sso-oidc')
+
+
+def is_unneeded_botocore_model(dest_name):
+    parts = os.path.normpath(dest_name).split(os.sep)
+    if parts[:2] != ['botocore', 'data'] or len(parts) < 4:
+        # not a service model - e.g. a shared top-level file like botocore/data/endpoints.json
+        return False
+    return parts[2] not in botocore_needed_services
+
+
+a.datas = [d for d in a.datas if not is_unneeded_botocore_model(d[0])]
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(pyz,
@@ -59,7 +88,7 @@ exe = EXE(pyz,
           a.datas,
           name='borg.exe',
           debug=False,
-          strip=False,
+          strip=strip_binaries,
           upx=True,
           console=True,
           icon='NONE')
@@ -74,7 +103,7 @@ slim_exe = EXE(pyz,
             exclude_binaries=True,
             name='borg.exe',
             debug=False,
-            strip=False,
+            strip=strip_binaries,
             upx=False,
             console=True)
 
@@ -82,6 +111,6 @@ coll = COLLECT(slim_exe,
                 a.binaries,
                 a.zipfiles,
                 a.datas,
-                strip=False,
+                strip=strip_binaries,
                 upx=False,
                 name='borg-dir')

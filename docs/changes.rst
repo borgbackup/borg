@@ -182,6 +182,10 @@ Other changes:
 - CI: also build Linux binaries on Ubuntu 24.04 (glibc 2.39) for systems with an
   older glibc or a CPU below x86-64-v3, with OpenSSL 3.5 and Python 3.14 built
   from source, #10342.
+- binaries: strip the debug symbols from the Linux binaries, bundle only the
+  botocore (S3) service models borg needs, and build cryptography against the
+  bundled OpenSSL in the glibc239 binaries instead of bundling a second OpenSSL
+  with it, #10345.
 
 Version 2.0.0b24 (2026-09-02)
 -----------------------------

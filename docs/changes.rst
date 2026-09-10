@@ -174,6 +174,9 @@ New features:
 - the "previously unknown unencrypted repository" warning now says why the repository
   is considered unencrypted: a none-* / authenticated-* mode (no data encryption) or a
   repokey with an empty passphrase, #9072
+- extract/export-tar --list --log-json: output a file_status JSON object per listed item,
+  like create does. The text listing of export-tar has the same "+" prefix as extract's now.
+  prune --list --log-json: output an archive_status JSON object per listed archive, #9454.
 
 Fixes:
 

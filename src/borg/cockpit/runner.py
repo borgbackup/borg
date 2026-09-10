@@ -15,20 +15,26 @@ from .events import ProcessFinished, RawLine, parse_json_line
 INJECTED_OPTIONS = ("--log-json", "--progress")
 
 
-def borg_command(args, executable=None):
+def borg_command(args, executable=None, json_stdout=False):
     """
     Build the command line to run borg with the given args and the cockpit's options injected.
 
     :param args: the borg command line (without the borg executable and without --cockpit).
     :param executable: the command prefix starting borg [the interpreter / pyinstaller binary running this code].
+    :param json_stdout: also add --json, so the command outputs its final results as JSON on stdout.
     """
     if executable is None:
         if getattr(sys, "frozen", False):
             executable = [sys.executable]  # sys.executable is the pyinstaller-made binary
         else:
             executable = [sys.executable, "-m", "borg"]
+    args = list(args)
+    if json_stdout and "--json" not in args:
+        # --json is an option of the subcommand, so it must come after it: at the end of the command line,
+        # or before a "--" end-of-options marker (as used by e.g. --paths-from-command).
+        args.insert(args.index("--") if "--" in args else len(args), "--json")
     injected = [option for option in INJECTED_OPTIONS if option not in args]
-    return list(executable) + injected + list(args)
+    return list(executable) + injected + args
 
 
 class BorgRunner:
@@ -50,15 +56,17 @@ class BorgRunner:
     # How long to wait for borg to finish after SIGTERM before killing it [seconds].
     TERMINATE_TIMEOUT = 10.0
 
-    def __init__(self, args, callback, *, executable=None):
+    def __init__(self, args, callback, *, executable=None, json_stdout=False):
         """
         :param args: the borg command line (without the borg executable and without --cockpit).
         :param callback: called with each Event, the last one being ProcessFinished.
         :param executable: see borg_command(), for tests.
+        :param json_stdout: see borg_command().
         """
         self.args = list(args)
         self.callback = callback
         self.executable = executable
+        self.json_stdout = json_stdout
         self.process = None
         self.logger = logging.getLogger(__name__)
 
@@ -67,7 +75,7 @@ class BorgRunner:
         if self.process is not None:
             self.logger.warning("Borg process already running.")
             return
-        cmd = borg_command(self.args, self.executable)
+        cmd = borg_command(self.args, self.executable, self.json_stdout)
         self.logger.info(f"Starting Borg process: {cmd}")
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"

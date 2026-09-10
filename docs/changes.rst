@@ -187,7 +187,10 @@ Other changes:
   bundled OpenSSL in the Linux binaries instead of bundling a second OpenSSL
   with it, #10345.
 - cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
-  instead of parsing text lines, #9454.
+  instead of parsing text lines, #9454. The display depends on the command: archive
+  statistics for create/import-tar/recreate/transfer (with the final statistics from
+  --json), a progress bar for extract/export-tar, the progress phases for the other
+  commands. Yes/no prompts are shown as a dialog.
 
 Version 2.0.0b24 (2026-09-02)
 -----------------------------

@@ -339,3 +339,135 @@ def test_runner_start_failure():
     asyncio.run(runner.start())
     assert len(events) == 1
     assert isinstance(events[0], ProcessFinished) and events[0].rc == -1 and events[0].error
+
+
+def test_borg_command_json_stdout():
+    assert borg_command(["create", "x"], executable=["borg"], json_stdout=True) == [
+        "borg",
+        "--log-json",
+        "--progress",
+        "create",
+        "x",
+        "--json",
+    ]
+    # --json goes before a "--" end-of-options marker, and is not duplicated
+    assert borg_command(["create", "x", "--", "-p"], executable=["borg"], json_stdout=True)[-4:] == [
+        "x",
+        "--json",
+        "--",
+        "-p",
+    ]
+    assert borg_command(["create", "--json", "x"], executable=["borg"], json_stdout=True).count("--json") == 1
+
+
+FINAL_JSON = """
+{
+    "archive": {
+        "duration": 90.5,
+        "id": "0123abcd0123abcd",
+        "name": "test",
+        "stats": {
+            "chunking_time": 0.25,
+            "deduplicated_size": 300,
+            "files_stats": {"A": 2, "M": 1, "d": 1},
+            "hashing_time": 0.5,
+            "nfiles": 3,
+            "original_size": 3000,
+            "store_stats": {"store_calls": 7, "store_volume": 2048}
+        }
+    },
+    "repository": {"id": "abcd", "location": "/repo"}
+}
+"""
+
+
+def test_session_final_stats_from_stdout():
+    session = Session(command="create", capture_stdout=True)
+    session.feed(ArchiveProgress(nfiles=2, original_size=2000, deduplicated_size=200, files_stats={"A": 2}))
+    session.feed(FileStatus(status="A", path="a"))
+    for line in FINAL_JSON.splitlines():
+        session.feed(RawLine(stream="stdout", line=line))
+    assert session.final_json is None and session.stdout_lines  # only parsed at the end
+    lines, _ = session.drain()
+    assert [line.kind for line in lines] == ["status"]  # the captured stdout is not logged
+    session.feed(ProcessFinished(rc=0))
+    assert session.final_json["archive"]["name"] == "test"
+    assert session.archive_name == "test" and session.archive_duration == 90.5
+    # the final statistics win over the --list lines and archive_progress
+    assert session.nfiles == 3 and session.files_stats == {"A": 2, "M": 1, "d": 1}
+    assert session.original_size == 3000 and session.deduplicated_size == 300
+    lines, _ = session.drain()
+    assert all(line.kind == "log" and line.tag == "STATS" for line in lines)
+    assert [line.text for line in lines] == [
+        "Archive name: test",
+        "Archive fingerprint: 0123abcd0123abcd",
+        "Duration: 1 minutes 30.500 seconds",
+        "Number of files: 3",
+        "Original size: 3.00 kB",
+        "Deduplicated size: 300 B",
+        "Time spent in hashing: 0.500 seconds",
+        "Time spent in chunking: 0.250 seconds",
+        "Added files: 2",
+        "Unchanged files: 0",
+        "Modified files: 1",
+        "Error files: 0",
+        "Files changed while reading: 0",
+        "Store store calls: 7",
+        "Store store volume: 2.05 kB",
+    ]
+
+
+def test_session_final_stats_dry_run():
+    session = Session(command="create", capture_stdout=True)
+    for line in '{"dry_run": true, "stats": {"nfiles": 5, "original_size": 1234}, "repository": {}}'.splitlines():
+        session.feed(RawLine(stream="stdout", line=line))
+    session.feed(ProcessFinished(rc=0))
+    assert session.archive_name is None
+    assert session.nfiles == 5 and session.original_size == 1234 and session.deduplicated_size is None
+    lines, _ = session.drain()
+    assert [line.text for line in lines] == [
+        "Dry run: no archive was created.",
+        "Number of files: 5",
+        "Original size: 1.23 kB",
+    ]
+
+
+def test_session_stdout_that_is_not_json():
+    session = Session(command="create", capture_stdout=True)
+    session.feed(RawLine(stream="stdout", line="just text"))
+    session.feed(ProcessFinished(rc=2))
+    assert session.final_json is None and session.final_stats is None
+    lines, _ = session.drain()
+    assert [(line.kind, line.text) for line in lines] == [("raw", "just text")]
+
+
+def test_session_counts_warnings():
+    session = Session()
+    session.feed(LogMessage(message="w", levelname="WARNING"))
+    session.feed(LogMessage(message="e", levelname="ERROR"))
+    session.feed(LogMessage(message="c", levelname="CRITICAL"))
+    session.feed(LogMessage(message="i", levelname="INFO"))
+    session.feed(LogMessage(message="+ listed", name=LIST_LOGGER))
+    assert (session.warnings, session.errors) == (1, 2)
+
+
+def test_session_phase_lookup_and_rates():
+    session = Session()
+    session.feed(ProgressPercent(operation=1, msgid="extract", message="", current=0, total=1000))
+    session.feed(ProgressMessage(operation=2, msgid="cache.close", message="Saving"))
+    assert session.phase("extract").operation == 1 and session.phase("nope") is None
+    assert session.active_phase.operation == 2
+    session.sample(now=session.started + 1.0)
+    session.feed(ProgressPercent(operation=1, msgid="extract", message="", current=500, total=1000))
+    session.sample(now=session.started + 2.0)
+    assert session.phase("extract").rate == 500.0
+    assert session.active_phase.operation == 1
+    session.feed(ProgressPercent(operation=1, msgid="extract", finished=True, message=""))
+    assert session.active_phase is None
+    session.sample(now=session.started + 3.0)
+    assert session.phase("extract").rate == 0.0
+    # after the run, the rates are zero
+    session.feed(ArchiveProgress(nfiles=100))
+    session.feed(ProcessFinished(rc=0))
+    session.sample(now=session.started + 4.0)
+    assert session.files_per_second == 0.0

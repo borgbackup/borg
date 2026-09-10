@@ -263,6 +263,8 @@ Other changes:
   but was never really used)
 - security: drop the manifest timestamp replay check (not needed any more)
 - debug get-obj, put-obj, delete-obj: need the key now (to access the chunk index)
+- cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
+  instead of parsing text lines, #9454.
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088

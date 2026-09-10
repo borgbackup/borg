@@ -281,7 +281,12 @@ class Archiver(
         parser.add_argument(
             "-V", "--version", action="version", version="%(prog)s " + __version__, help="show version number and exit"
         )
-        parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
+        parser.add_argument(
+            "--cockpit",
+            dest="cockpit",
+            action="store_true",
+            help="run the command in the cockpit TUI, a full-screen progress display",
+        )
         parser.common_options.add_common_group(parser, provide_defaults=True)
 
         common_parser = ArgumentParser(prog=self.prog)
@@ -659,7 +664,9 @@ def main():  # pragma: no cover
                 borg_args=[arg for arg in sys.argv[1:] if arg != "--cockpit"], command=getattr(args, "subcommand", None)
             )
             app.run()
-            sys.exit(EXIT_SUCCESS)  # borg subprocess RC was already shown on the TUI
+            # exit with the exit code of the borg subprocess (it was shown on the TUI); rc < 0: borg could not be run.
+            rc = app.session.rc
+            sys.exit(rc if rc is not None and rc >= 0 else EXIT_ERROR)
 
         # normal borg CLI operation
         try:

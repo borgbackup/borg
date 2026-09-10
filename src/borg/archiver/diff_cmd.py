@@ -95,24 +95,12 @@ class DiffMixIn:
     def do_diff(self, args, repository, manifest):
         """Finds differences between two archives."""
 
-        def actual_change(j):
-            j = j.to_dict()
-            if j["type"] == "modified":
-                # Added/removed keys will not exist if chunker params differ
-                # between the two archives. Err on the side of caution and assume
-                # a real modification in this case (short-circuiting retrieving
-                # non-existent keys).
-                return not {"added", "removed"} <= j.keys() or not (j["added"] == 0 and j["removed"] == 0)
-            else:
-                # All other change types are indeed changes.
-                return True
-
         def reported_changes(diff):
             """The changes of diff that are actually shown to the user."""
             return {
                 name: change
                 for name, change in diff.changes().items()
-                if actual_change(change) and (not args.content_only or (name not in DiffFormatter.METADATA))
+                if not args.content_only or name not in DiffFormatter.METADATA
             }
 
         def print_json_output(diff, changes):
@@ -287,9 +275,11 @@ class DiffMixIn:
         For each matching item in both archives, Borg reports:
 
         - Content changes: total added/removed bytes within files. If chunker parameters are comparable,
-          Borg compares chunk IDs quickly; otherwise, it compares the content. In the latter case, borg
-          can only tell that a file was modified, not by how much: no byte counts are given for it, the
-          text output shows "modified:  (can't get size)" instead.
+          Borg compares chunk IDs quickly: the byte counts are the total sizes of the chunks only present
+          in one of the two versions of a file, so a file whose chunks were merely reordered or duplicated
+          is reported as modified with 0 B added and 0 B removed. Otherwise, Borg compares the content. In
+          the latter case, borg can only tell that a file was modified, not by how much: no byte counts
+          are given for it, the text output shows "modified:  (can't get size)" instead.
         - Metadata changes: user, group, mode, and other metadata shown inline as "[old -> new]", like
           "[-rw-r--r-- -> -rwxr-xr-x]" for a mode change. Use ``--content-only`` to suppress metadata changes.
         - Added/removed items: printed as "added: SIZE path" or "removed: SIZE path".

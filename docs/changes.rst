@@ -267,7 +267,8 @@ Other changes:
   instead of parsing text lines, #9454. The display depends on the command: archive
   statistics for create/import-tar/recreate/transfer (with the final statistics from
   --json), a progress bar for extract/export-tar, the progress phases for the other
-  commands. Yes/no prompts are shown as a dialog.
+  commands. Yes/no prompts are shown as a dialog. The cockpit exits with the exit code
+  of the borg command.
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088
@@ -277,6 +278,7 @@ Other changes:
   - derive the borg passphrase from a YubiKey (challenge-response), #4549
   - protect the borg passphrase with age (which also supports crypto tokens,
     TPM, Apple Secure Enclave, ... via age plugins), #4549
+  - add a usage page for the cockpit TUI, #9454
 - tests:
 
   - add an archiver-level test for BORG_WORKAROUNDS=authenticated_no_key

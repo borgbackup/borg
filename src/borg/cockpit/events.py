@@ -76,6 +76,16 @@ class FileStatus(Event):
 
 
 @dataclass(frozen=True)
+class ArchiveStatus(Event):
+    """archive_status: one archive listed by prune, kept or pruned."""
+
+    name: str
+    kept: bool
+    message: str  # the text line of the listing
+    data: dict = field(default_factory=dict)  # the whole object, see the frontends docs for its keys
+
+
+@dataclass(frozen=True)
 class Question(Event):
     """question_*: a yes/no prompt (kind "prompt" / "prompt_retry") or a message about how a prompt was answered."""
 
@@ -193,6 +203,10 @@ def parse_json_line(line):
         )
     if msg_type == "file_status":
         return FileStatus(status=_opt_str(data.get("status")) or "?", path=_opt_str(data.get("path")) or "")
+    if msg_type == "archive_status":
+        return ArchiveStatus(
+            name=_opt_str(data.get("name")) or "", kept=bool(data.get("kept")), message=message, data=data
+        )
     if msg_type.startswith("question_"):
         return Question(
             kind=msg_type[len("question_") :], message=message, msgid=msgid, env_var=_opt_str(data.get("env_var"))

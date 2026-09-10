@@ -18,6 +18,7 @@ BORG_DICTIONARY = {  # English -> Borg
     "Progress: ": "Assimilating: ",
     "Warnings: ": "Anomalies: ",
     "Archive: ": "Collective: ",
+    "Archives: ": "Collectives: ",
     "Extracted: ": "Released: ",
     "Items: ": "Entities: ",
     "Included: ": "Selected: ",

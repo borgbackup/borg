@@ -1,6 +1,7 @@
 """Tests for the cockpit's event parsing, session model and borg runner. They do not need Textual."""
 
 import asyncio
+import json
 import sys
 import time
 
@@ -8,6 +9,7 @@ import pytest
 
 from borg.cockpit.events import (
     ArchiveProgress,
+    ArchiveStatus,
     FileStatus,
     LogMessage,
     ProcessFinished,
@@ -19,7 +21,7 @@ from borg.cockpit.events import (
     parse_json_line,
 )
 from borg.cockpit.runner import INJECTED_OPTIONS, BorgRunner, borg_command
-from borg.cockpit.session import LIST_LOGGER, NO_TERMINAL_WARNING, NO_TERMINAL_HINT, Session
+from borg.cockpit.session import NO_TERMINAL_WARNING, NO_TERMINAL_HINT, Session
 
 # JSON lines as documented in docs/internals/frontends.rst
 ARCHIVE_PROGRESS = (
@@ -175,21 +177,19 @@ def test_session_counts_list_lines():
     assert session.original_size == 1000 and session.deduplicated_size == 10
 
 
-def test_session_list_logger_shim():
+def test_session_archive_status():
     session = Session()
-    session.feed(LogMessage(message="+ extracted/file", name=LIST_LOGGER))
-    session.feed(LogMessage(message="- excluded/file", name=LIST_LOGGER))
-    session.feed(LogMessage(message="Keeping archive (rule: daily #1): foo", name=LIST_LOGGER))
-    session.feed(LogMessage(message="+ not a list line", name="borg.archiver"))
-    assert session.files_stats == {"+": 1, "-": 1}
+    session.feed(ArchiveStatus(name="a1", kept=False, message="Would prune: a1", data={"kept": False}))
+    session.feed(ArchiveStatus(name="a2", kept=True, message="Keeping archive (rule: daily #1): a2", data={}))
+    session.feed(ArchiveStatus(name="a3", kept=True, message="Keeping archive (rule: daily #2): a3", data={}))
+    assert (session.archives_kept, session.archives_pruned) == (2, 1)
+    assert session.files_stats == {}  # archives are not items of a file listing
     lines, _ = session.drain()
-    assert [(line.kind, line.tag) for line in lines] == [
-        ("status", "+"),
-        ("status", "-"),
-        ("log", "INFO"),
-        ("log", "INFO"),
+    assert [(line.kind, line.tag, line.text) for line in lines] == [
+        ("archive", "pruned", "Would prune: a1"),
+        ("archive", "kept", "Keeping archive (rule: daily #1): a2"),
+        ("archive", "kept", "Keeping archive (rule: daily #2): a3"),
     ]
-    assert lines[0].text == "+ extracted/file"
 
 
 def test_session_phases():
@@ -447,7 +447,6 @@ def test_session_counts_warnings():
     session.feed(LogMessage(message="e", levelname="ERROR"))
     session.feed(LogMessage(message="c", levelname="CRITICAL"))
     session.feed(LogMessage(message="i", levelname="INFO"))
-    session.feed(LogMessage(message="+ listed", name=LIST_LOGGER))
     assert (session.warnings, session.errors) == (1, 2)
 
 
@@ -471,3 +470,24 @@ def test_session_phase_lookup_and_rates():
     session.feed(ProcessFinished(rc=0))
     session.sample(now=session.started + 4.0)
     assert session.files_per_second == 0.0
+
+
+def test_parse_archive_status():
+    line = (
+        '{"name": "daily-2026-09-09", "archive": "daily-2026-09-09", "id": "ab12", '
+        '"time": "2026-09-09T02:00:00+02:00", '
+        '"group": {"name": "daily"}, "kept": true, "keep_rule": "daily", "kept_oldest": false, '
+        '"kept_archive_number": 1, "type": "archive_status", "message": "Keeping archive (rule: daily #1): ..."}'
+    )
+    event = parse_json_line(line)
+    assert isinstance(event, ArchiveStatus)
+    assert (event.name, event.kept) == ("daily-2026-09-09", True)
+    assert event.message.startswith("Keeping archive")
+    assert event.data["keep_rule"] == "daily" and event.data["group"] == {"name": "daily"}
+    pruned = parse_json_line('{"type": "archive_status", "name": "old", "kept": false, "message": "Would prune: old"}')
+    assert pruned == ArchiveStatus(
+        name="old",
+        kept=False,
+        message="Would prune: old",
+        data=json.loads('{"type": "archive_status", "name": "old", "kept": false, "message": "Would prune: old"}'),
+    )

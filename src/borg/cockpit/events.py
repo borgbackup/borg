@@ -77,10 +77,10 @@ class FileStatus(Event):
 
 @dataclass(frozen=True)
 class ArchiveStatus(Event):
-    """archive_status: one archive listed by prune, kept or pruned."""
+    """archive_status: one archive listed by prune, delete or undelete."""
 
     name: str
-    kept: bool
+    status: str  # kept, pruned, deleted, undeleted
     message: str  # the text line of the listing
     data: dict = field(default_factory=dict)  # the whole object, see the frontends docs for its keys
 
@@ -205,7 +205,7 @@ def parse_json_line(line):
         return FileStatus(status=_opt_str(data.get("status")) or "?", path=_opt_str(data.get("path")) or "")
     if msg_type == "archive_status":
         return ArchiveStatus(
-            name=_opt_str(data.get("name")) or "", kept=bool(data.get("kept")), message=message, data=data
+            name=_opt_str(data.get("name")) or "", status=_opt_str(data.get("status")) or "", message=message, data=data
         )
     if msg_type.startswith("question_"):
         return Question(

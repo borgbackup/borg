@@ -208,12 +208,14 @@ Other changes:
   instead of parsing text lines, #9454. The display depends on the command: archive
   statistics for create/import-tar/recreate/transfer (with the final statistics from
   --json), a progress bar for extract/export-tar, the progress phases for the other
-  commands. Yes/no prompts are shown as a dialog.
+  commands. Yes/no prompts are shown as a dialog. The cockpit exits with the exit code
+  of the borg command.
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088
   - fix two inaccuracies in the borg diff JSON docs, #7486
   - an empty passphrase can be replaced later with ``borg key change-passphrase``, #9072
+  - add a usage page for the cockpit TUI, #9454
 
 
 Version 2.0.0b24 (2026-09-02)

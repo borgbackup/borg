@@ -193,7 +193,7 @@ development header files (sometimes in a separate `-dev` or `-devel` package).
   - borgstore[rest,blake3,sftp] ~= 0.6.1 (use `pip install borgbackup[sftp]`)
 * Optionally, if you wish to use rclone Backend:
   - borgstore[rest,blake3,rclone] ~= 0.6.1 (use `pip install borgbackup[rclone]`)
-* Optionally, if you wish to use the TUI (``borg --cockpit``):
+* Optionally, if you wish to use the cockpit TUI (``borg --cockpit``, see :ref:`cockpit`):
   - textual >= 6.8.0 (use `pip install borgbackup[cockpit]`)
 
 If you have troubles finding the right package names, have a look at the

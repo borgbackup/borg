@@ -35,6 +35,7 @@ Usage
 
 .. toctree::
    usage/general
+   usage/cockpit
 
    usage/repo-create
    usage/repo-space

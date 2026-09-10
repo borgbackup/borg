@@ -282,7 +282,11 @@ A passphrase should be a single line of text. Any trailing linefeed will be
 stripped.
 
 Do not use empty passphrases, as these can be trivially guessed, which does not
-leave any encrypted data secure.
+leave any encrypted data secure. Borg accepts an empty passphrase nevertheless
+(e.g. for a keyfile-mode repository on a client with an encrypted disk); such a
+repository is still encrypted with a random key and you can add a passphrase
+later with ``borg key change-passphrase``. ``borg repo-info`` shows whether the
+key has an empty passphrase.
 
 Avoid passphrases containing non-ASCII characters.
 Borg can process any unicode text, but problems may arise at input due to text

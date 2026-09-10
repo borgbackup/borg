@@ -182,6 +182,11 @@ Fixes:
 
 Other changes:
 
+- repo-info: show if the key has an empty passphrase, #9072.
+- the "previously unknown unencrypted repository" warning now says why the repository is
+  considered unencrypted: a none-* / authenticated-* mode (no data encryption) or a repokey
+  with an empty passphrase, #9072.
+- docs: an empty passphrase can be replaced later with "borg key change-passphrase", #9072.
 - CI: also build Linux binaries on Ubuntu 24.04 (glibc 2.39) for systems with an
   older glibc or a CPU below x86-64-v3, with OpenSSL 3.5 and Python 3.14 built
   from source, #10342.

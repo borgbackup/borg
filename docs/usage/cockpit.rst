@@ -48,7 +48,8 @@ right depends on the command:
 
 All other commands
     The phases of the operation borg reports progress for, e.g. "Checking index" and
-    "Checking archives" for ``check``, each with a progress bar.
+    "Checking archives" for ``check``, each with a progress bar. For ``prune``, also the
+    numbers of kept and pruned archives.
 
 Every panel also shows the elapsed time, the number of warnings and errors and, when
 borg has finished, its exit code. The cockpit stays on the screen until you press ``q``,

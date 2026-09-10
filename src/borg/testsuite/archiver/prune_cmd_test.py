@@ -1087,6 +1087,7 @@ def test_prune_list_json(archivers, request, backup_files):
     statuses = {msg["name"]: msg for msg in messages if msg["type"] == "archive_status"}
     assert set(statuses) == {"test1", "test2"}
     pruned, kept = statuses["test1"], statuses["test2"]
+    assert pruned["status"] == "pruned" and kept["status"] == "kept"
     assert pruned["kept"] is False and pruned["deleted_archive_number"] == 1
     assert pruned["message"].startswith("Would prune:") and "test1" in pruned["message"]
     assert kept["kept"] is True and kept["keep_rule"] == "daily" and kept["kept_oldest"] is False
@@ -1099,6 +1100,6 @@ def test_prune_list_json(archivers, request, backup_files):
     output = prune_ungrouped(archiver, "--list-pruned", "--keep-daily=1", "--log-json")
     messages = [json.loads(line) for line in output.splitlines()]
     statuses = [msg for msg in messages if msg["type"] == "archive_status"]
-    assert [(msg["name"], msg["kept"]) for msg in statuses] == [("test1", False)]
+    assert [(msg["name"], msg["status"], msg["kept"]) for msg in statuses] == [("test1", "pruned", False)]
     assert statuses[0]["message"].startswith("Pruning archive (1/1):")
     assert "test1" not in cmd(archiver, "repo-list")

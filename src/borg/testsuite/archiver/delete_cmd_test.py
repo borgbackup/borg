@@ -2,6 +2,8 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers import CommandError
+import json
+
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -135,3 +137,24 @@ def test_delete_name_and_match_archives_are_combined(archivers, request, monkeyp
     cmd(archiver, "delete", "home", "-a", "host:host1")
     output = cmd(archiver, "repo-list", "--format={hostname}{NL}")
     assert output.strip() == "host2"
+
+
+def test_delete_list_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")
+    cmd(archiver, "create", "test2", "input")
+    # with --log-json, the listing consists of archive_status objects (one per archive), no text lines
+    output = cmd(archiver, "delete", "--dry-run", "--list", "--log-json", "-a", "sh:test*")
+    messages = [json.loads(line) for line in output.splitlines()]
+    statuses = [msg for msg in messages if msg["type"] == "archive_status"]
+    assert {(msg["name"], msg["status"]) for msg in statuses} == {("test1", "deleted"), ("test2", "deleted")}
+    for msg in statuses:
+        assert msg["message"].startswith("Would delete: ") and msg["name"] in msg["message"]
+        assert msg["archive"] == msg["name"] and len(msg["id"]) == 64 and "T" in msg["time"]
+    output = cmd(archiver, "delete", "--list", "--log-json", "test1")
+    statuses = [msg for msg in map(json.loads, output.splitlines()) if msg["type"] == "archive_status"]
+    assert [(msg["name"], msg["status"]) for msg in statuses] == [("test1", "deleted")]
+    assert statuses[0]["message"].startswith("Deleted archive: ") and statuses[0]["message"].endswith("(1/1)")
+    assert "test1" not in cmd(archiver, "repo-list")

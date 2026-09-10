@@ -202,8 +202,8 @@ def test_app_generic_screen():
         ProgressMessage(operation=2, msgid="cache.close", message="Saving files cache"),
         ProgressPercent(operation=1, msgid="check.index", finished=True, message=""),
         LogMessage(message="Archive consistency check complete, no problems found.", levelname="INFO"),
-        ArchiveStatus(name="old", kept=False, message="Would prune: old"),
-        ArchiveStatus(name="new", kept=True, message="Keeping archive (rule: daily #1): new"),
+        ArchiveStatus(name="old", status="pruned", message="Would prune: old"),
+        ArchiveStatus(name="new", status="kept", message="Keeping archive (rule: daily #1): new"),
     ]
     factory, runners = make_runner_factory(events)
     app = BorgCockpitApp(borg_args=["check"], command="check", runner_factory=factory)

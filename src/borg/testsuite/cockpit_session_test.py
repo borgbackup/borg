@@ -179,16 +179,18 @@ def test_session_counts_list_lines():
 
 def test_session_archive_status():
     session = Session()
-    session.feed(ArchiveStatus(name="a1", kept=False, message="Would prune: a1", data={"kept": False}))
-    session.feed(ArchiveStatus(name="a2", kept=True, message="Keeping archive (rule: daily #1): a2", data={}))
-    session.feed(ArchiveStatus(name="a3", kept=True, message="Keeping archive (rule: daily #2): a3", data={}))
-    assert (session.archives_kept, session.archives_pruned) == (2, 1)
+    session.feed(ArchiveStatus(name="a1", status="pruned", message="Would prune: a1", data={"kept": False}))
+    session.feed(ArchiveStatus(name="a2", status="kept", message="Keeping archive (rule: daily #1): a2"))
+    session.feed(ArchiveStatus(name="a3", status="kept", message="Keeping archive (rule: daily #2): a3"))
+    session.feed(ArchiveStatus(name="a4", status="deleted", message="Deleted archive: a4 (1/1)"))
+    assert session.archive_counts == {"kept": 2, "pruned": 1, "deleted": 1}
     assert session.files_stats == {}  # archives are not items of a file listing
     lines, _ = session.drain()
     assert [(line.kind, line.tag, line.text) for line in lines] == [
         ("archive", "pruned", "Would prune: a1"),
         ("archive", "kept", "Keeping archive (rule: daily #1): a2"),
         ("archive", "kept", "Keeping archive (rule: daily #2): a3"),
+        ("archive", "deleted", "Deleted archive: a4 (1/1)"),
     ]
 
 
@@ -477,17 +479,15 @@ def test_parse_archive_status():
         '{"name": "daily-2026-09-09", "archive": "daily-2026-09-09", "id": "ab12", '
         '"time": "2026-09-09T02:00:00+02:00", '
         '"group": {"name": "daily"}, "kept": true, "keep_rule": "daily", "kept_oldest": false, '
-        '"kept_archive_number": 1, "type": "archive_status", "message": "Keeping archive (rule: daily #1): ..."}'
+        '"kept_archive_number": 1, "status": "kept", "type": "archive_status", '
+        '"message": "Keeping archive (rule: daily #1): ..."}'
     )
     event = parse_json_line(line)
     assert isinstance(event, ArchiveStatus)
-    assert (event.name, event.kept) == ("daily-2026-09-09", True)
+    assert (event.name, event.status) == ("daily-2026-09-09", "kept")
     assert event.message.startswith("Keeping archive")
     assert event.data["keep_rule"] == "daily" and event.data["group"] == {"name": "daily"}
-    pruned = parse_json_line('{"type": "archive_status", "name": "old", "kept": false, "message": "Would prune: old"}')
-    assert pruned == ArchiveStatus(
-        name="old",
-        kept=False,
-        message="Would prune: old",
-        data=json.loads('{"type": "archive_status", "name": "old", "kept": false, "message": "Would prune: old"}'),
+    line = '{"type": "archive_status", "name": "old", "status": "deleted", "message": "Deleted archive: old (1/1)"}'
+    assert parse_json_line(line) == ArchiveStatus(
+        name="old", status="deleted", message="Deleted archive: old (1/1)", data=json.loads(line)
     )

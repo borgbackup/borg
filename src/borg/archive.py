@@ -2239,6 +2239,12 @@ class ArchiveChecker:
             drop_corrupt_tail=repair,
             write_immediately=False,
         )
+        # repository.chunks is a separate index, lazily built when repository.get() resolves a
+        # chunk location. It walks the same packs, so give it the same corrupt-header handling the
+        # rebuild above got - otherwise the check aborts at a header it just resynced past, halfway
+        # through its diagnosis. Dropping the rest of that pack stays a --repair action.
+        self.repository.chunkindex_validate = validate
+        self.repository.chunkindex_drop_corrupt_tail = repair
         if self.key is None:
             self.key = self.make_key(repository)
             self.repo_objs = RepoObj(self.key)

@@ -29,6 +29,7 @@ from .helpers import Error
 from .helpers import get_cache_dir
 from .helpers import archive_hostname, archive_username
 from .helpers import chunkit
+from .helpers import CorruptPack, IntegrityError
 from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
 from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
@@ -909,6 +910,8 @@ def build_chunkindex_from_repo(
     # the walk skips content. It only reports, it does not change what the walk does.
     # drop_corrupt_tail: without a validator, index a pack with a corrupt object header up to that
     # header and drop the rest of it, instead of raising, see PackReader.iter_headers.
+    # With neither of the two, a corrupt object header aborts the rebuild with CorruptPack: the
+    # index would be missing every object after it.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
@@ -1004,13 +1007,18 @@ def build_chunkindex_from_repo(
         pi.show(increase=1)
         pack_id = hex_to_bin(info.name)
         reader = PackReader(repository.store, pack_id)
-        for chunk_id, obj_offset, obj_size in reader.iter_headers(
-            validate=validate, on_drop=on_drop, drop_corrupt_tail=drop_corrupt_tail
-        ):
-            num_chunks += 1
-            chunks[chunk_id] = ChunkIndexEntry(
-                flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
-            )
+        try:
+            for chunk_id, obj_offset, obj_size in reader.iter_headers(
+                validate=validate, on_drop=on_drop, drop_corrupt_tail=drop_corrupt_tail
+            ):
+                num_chunks += 1
+                chunks[chunk_id] = ChunkIndexEntry(
+                    flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+                )
+        except IntegrityError as err:
+            # the walk stopped at a corrupt object header, so this index would be incomplete: abort
+            # and point at "borg check --repair", which resyncs past the damage.
+            raise CorruptPack(err) from err
         headers_parsed += reader.headers_parsed
     if pack_infos:
         pi.show(current=len(pack_infos))  # finish at 100%

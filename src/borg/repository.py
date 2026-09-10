@@ -495,9 +495,9 @@ class PackReader:
                     # no validator, so payload bytes that look like a header can not be told from
                     # an object: there is no way to resync past this header.
                     if not drop_corrupt_tail:
-                        raise IntegrityError(
-                            f'pack {pack_hex}: {problem} at offset {offset} (pack corruption), run "borg check"'
-                        )
+                        # the callers that can say something more useful than "there is corruption
+                        # here" wrap this, see build_chunkindex_from_repo.
+                        raise IntegrityError(f"pack {pack_hex}: {problem} at offset {offset} (pack corruption)")
                     if on_drop is not None:
                         on_drop()
                     logger.warning(
@@ -872,6 +872,12 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
+        # corrupt-header handling for the lazy .chunks rebuild, set by ArchiveChecker.check() (see
+        # PackReader.iter_headers): a validate callable makes the rebuild resync past a corrupt
+        # object header, drop_corrupt_tail - only set when repairing - makes it index the pack up
+        # to that header and drop the rest. Without either, such a header aborts the rebuild.
+        self.chunkindex_validate = None
+        self.chunkindex_drop_corrupt_tail = False
         # pack_id -> PackReader holding the whole pack; get_many loads into it, get() reuses it
         self._pack_cache = LRUCache(capacity=self.PACK_READER_CACHE_SIZE)
 
@@ -1039,7 +1045,9 @@ class Repository:
         if self._chunks is None:
             from .cache import build_chunkindex_from_repo
 
-            self._chunks = build_chunkindex_from_repo(self)
+            self._chunks = build_chunkindex_from_repo(
+                self, validate=self.chunkindex_validate, drop_corrupt_tail=self.chunkindex_drop_corrupt_tail
+            )
         return self._chunks
 
     @chunks.setter

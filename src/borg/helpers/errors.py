@@ -60,6 +60,12 @@ class DecompressionError(IntegrityError):
     exit_mcode = 92
 
 
+class CorruptPack(Error):
+    """{}. Run "borg check --repair" to recover the objects that are still readable."""
+
+    exit_mcode = 93
+
+
 class CancelledByUser(Error):
     """Cancelled by user."""
 

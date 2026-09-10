@@ -655,7 +655,9 @@ def main():  # pragma: no cover
                 print("Please install them using: pip install 'borgbackup[cockpit]'", file=sys.stderr)
                 sys.exit(EXIT_ERROR)
 
-            app = BorgCockpitApp(borg_args=[arg for arg in sys.argv[1:] if arg != "--cockpit"])
+            app = BorgCockpitApp(
+                borg_args=[arg for arg in sys.argv[1:] if arg != "--cockpit"], command=getattr(args, "subcommand", None)
+            )
             app.run()
             sys.exit(EXIT_SUCCESS)  # borg subprocess RC was already shown on the TUI
 

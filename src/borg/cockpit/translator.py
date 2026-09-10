@@ -16,6 +16,13 @@ BORG_DICTIONARY = {  # English -> Borg
     "Original: ": "Raw biomass: ",
     "Deduplicated: ": "Assimilated biomass: ",
     "Progress: ": "Assimilating: ",
+    "Warnings: ": "Anomalies: ",
+    "Archive: ": "Collective: ",
+    "Extracted: ": "Released: ",
+    "Items: ": "Entities: ",
+    "Included: ": "Selected: ",
+    "Excluded: ": "Irrelevant: ",
+    "Phases": "Stages",
     "Log": "Subspace Transmissions",
 }
 

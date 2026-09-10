@@ -4,9 +4,8 @@ Borg Cockpit - Application Entry Point.
 
 import asyncio
 
-from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer
-from textual.containers import Horizontal, Container
+from textual.app import App
+from textual.css.query import NoMatches
 
 from .events import Question
 from .session import Session
@@ -24,33 +23,31 @@ class BorgCockpitApp(App):
 
     SPEED_INTERVAL = 1.0  # seconds between two speed samples (one sparkline column each)
     REFRESH_INTERVAL = 0.2  # seconds between two refreshes of the widgets from the session
+    # These commands output the statistics of the new archive as JSON on stdout when given --json.
+    FINAL_STATS_COMMANDS = ("create", "import-tar")
 
-    def __init__(self, borg_args=None, runner_factory=None, **kwargs):
+    def __init__(self, borg_args=None, command=None, runner_factory=None, **kwargs):
         """
         :param borg_args: the borg command line to run, without --cockpit [borg --version].
-        :param runner_factory: callable(args, callback) giving a BorgRunner-like object, for tests [BorgRunner].
+        :param command: the borg subcommand in borg_args, e.g. "create"; it selects the screen [None: generic].
+        :param runner_factory: callable(args, callback, json_stdout=...) giving a BorgRunner-like object, for tests.
         """
         super().__init__(**kwargs)
         self.borg_args = ["--version"] if borg_args is None else list(borg_args)
+        self.command = command
+        self.json_stdout = command in self.FINAL_STATS_COMMANDS
         self.runner_factory = runner_factory
-        self.session = Session()
+        self.session = Session(command=command, capture_stdout=self.json_stdout)
+        self.main_screen = None
         self.runner = None
         self.runner_task = None
 
-    def compose(self) -> ComposeResult:
-        """Create child widgets for the app."""
-        from .widgets import LogoPanel, StatusPanel, StandardLog
+    def get_default_screen(self):
+        """The screen for the command that runs (Textual calls this when the app starts)."""
+        from .screens import screen_for_command
 
-        yield Header(show_clock=True)
-
-        with Container(id="main-grid"):
-            with Horizontal(id="top-row"):
-                yield LogoPanel(id="logopanel")
-                yield StatusPanel(id="status")
-
-            yield StandardLog(id="standard-log")
-
-        yield Footer()
+        self.main_screen = screen_for_command(self.command)()
+        return self.main_screen
 
     def get_theme_variable_defaults(self):
         # make these variables available to ALL themes
@@ -69,9 +66,6 @@ class BorgCockpitApp(App):
 
     def on_mount(self) -> None:
         """Initialize components."""
-        self.query_one("#logo").styles.animate("opacity", 1, duration=1)
-        self.query_one("#slogan").styles.animate("opacity", 1, duration=1)
-
         # Delay runner start until after widgets are fully mounted
         self.call_after_refresh(self.start_runner)
 
@@ -80,7 +74,7 @@ class BorgCockpitApp(App):
         from .runner import BorgRunner
 
         factory = self.runner_factory or BorgRunner
-        self.runner = factory(self.borg_args, self.handle_event)
+        self.runner = factory(self.borg_args, self.handle_event, json_stdout=self.json_stdout)
         self.runner_task = asyncio.create_task(self.runner.start())
         self.speed_timer = self.set_interval(self.SPEED_INTERVAL, self.sample_speed)
         self.refresh_timer = self.set_interval(self.REFRESH_INTERVAL, self.refresh_from_session)
@@ -103,15 +97,19 @@ class BorgCockpitApp(App):
             self.run_worker(self.runner.answer(answer))
 
     def sample_speed(self) -> None:
-        """Compute the current rates and add a column to the speed sparkline."""
+        """Compute the current rates and show them."""
         self.session.sample()
-        self.query_one("#status").update_speed(self.session.files_per_second)
+        try:
+            self.main_screen.sample_speed(self.session)
+        except NoMatches:
+            pass  # the widgets are being torn down (the app exits), the timer still fires
 
     def refresh_from_session(self) -> None:
         """Show the current state of the session in the widgets."""
-        self.query_one("#status").update_from_session(self.session)
-        lines, dropped = self.session.drain()
-        self.query_one("#standard-log").add_lines(lines, dropped)
+        try:
+            self.main_screen.refresh_from_session(self.session)
+        except NoMatches:
+            pass  # see sample_speed()
 
     async def on_unmount(self) -> None:
         """Cleanup resources on app shutdown."""
@@ -126,8 +124,7 @@ class BorgCockpitApp(App):
             await self.runner.stop()
         if self.runner_task is not None:
             await self.runner_task
-        self.query_one("#logo").styles.animate("opacity", 0, duration=2)
-        self.query_one("#slogan").styles.animate("opacity", 0, duration=2)
+        self.main_screen.fade_out()
         await asyncio.sleep(2)  # give the user a chance the see the borg RC
         self.exit()
 
@@ -136,7 +133,4 @@ class BorgCockpitApp(App):
         from .translator import TRANSLATOR
 
         TRANSLATOR.toggle()
-        # Refresh dynamic UI elements
-        self.query_one("#status").refresh_ui_labels()
-        self.query_one("#standard-log").update_title()
-        self.query_one("#slogan").update_slogan()
+        self.main_screen.refresh_ui_labels()

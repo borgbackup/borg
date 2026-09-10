@@ -2,6 +2,8 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers import CommandError
+import json
+
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -125,3 +127,26 @@ def test_undelete_multiple_run(archivers, request):
     assert "normal" in output
     assert "deleted1" in output
     assert "deleted2" in output
+
+
+def test_undelete_list_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "deleted1", "input")
+    cmd(archiver, "create", "deleted2", "input")
+    cmd(archiver, "delete", "deleted1")
+    cmd(archiver, "delete", "deleted2")
+    # with --log-json, the listing consists of archive_status objects (one per archive), no text lines
+    output = cmd(archiver, "undelete", "--dry-run", "--list", "--log-json", "-a", "sh:deleted*")
+    messages = [json.loads(line) for line in output.splitlines()]
+    statuses = [msg for msg in messages if msg["type"] == "archive_status"]
+    assert {(msg["name"], msg["status"]) for msg in statuses} == {("deleted1", "undeleted"), ("deleted2", "undeleted")}
+    for msg in statuses:
+        assert msg["message"].startswith("Would undelete: ") and msg["name"] in msg["message"]
+        assert msg["archive"] == msg["name"] and len(msg["id"]) == 64 and "T" in msg["time"]
+    output = cmd(archiver, "undelete", "--list", "--log-json", "-a", "sh:deleted1")
+    statuses = [msg for msg in map(json.loads, output.splitlines()) if msg["type"] == "archive_status"]
+    assert [(msg["name"], msg["status"]) for msg in statuses] == [("deleted1", "undeleted")]
+    assert statuses[0]["message"].startswith("Undeleted archive: ") and statuses[0]["message"].endswith("(1/1)")
+    assert "deleted1" in cmd(archiver, "repo-list")

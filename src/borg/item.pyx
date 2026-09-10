@@ -721,6 +721,12 @@ class ItemDiff:
             self._changes['content'] = DiffChange("removed", {"added": 0, "removed": sz})
             return True
         if not self._can_compare_chunk_ids:
+            # the chunk ids can not be compared, so the content itself has to be compared to find out whether
+            # it changed (and borg can't tell by how much then). as the chunk iterators can be consumed only
+            # once, the comparison is done here only and _content_equal() reuses the result.
+            sizes_equal = self._item1.get_size() == self._item2.get_size()
+            if sizes_equal and chunks_contents_equal(self._chunk_1, self._chunk_2):
+                return False
             self._changes['content'] = DiffChange("modified")
             return True
         if self._item1.chunks == self._item2.chunks:
@@ -800,9 +806,8 @@ class ItemDiff:
     def _content_equal(self):
         if self._can_compare_chunk_ids:
             return self._item1.chunks == self._item2.chunks
-        if self._item1.get_size() != self._item2.get_size():
-            return False
-        return chunks_contents_equal(self._chunk_1, self._chunk_2)
+        # the content was already compared by _content_diff(), see there.
+        return 'content' not in self._changes
 
 
 def chunks_contents_equal(chunks_a, chunks_b):

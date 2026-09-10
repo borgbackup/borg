@@ -77,7 +77,7 @@ Footer {
     /* If content grows too large, scroll rather than pushing the log off-screen */
     overflow-y: auto;
     /* Adjust this if status or logo panel shall get more/less height. */
-    height: 16;
+    height: 19;
 }
 
 #logopanel {
@@ -198,4 +198,32 @@ Pulsar.dim {
 
 .rc-error {
     color: $error;
+}
+
+/* The dialog for borg's yes/no prompts */
+PromptModal {
+    align: center middle;
+}
+
+#prompt-dialog {
+    width: 80%;
+    max-width: 100;
+    height: auto;
+    border: double $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#prompt-message {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#prompt-buttons {
+    height: auto;
+    align-horizontal: center;
+}
+
+#prompt-buttons Button {
+    margin: 0 2;
 }

@@ -186,6 +186,8 @@ Other changes:
   botocore (S3) service models borg needs, and build cryptography against the
   bundled OpenSSL in the Linux binaries instead of bundling a second OpenSSL
   with it, #10345.
+- cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
+  instead of parsing text lines, #9454.
 
 Version 2.0.0b24 (2026-09-02)
 -----------------------------

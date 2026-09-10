@@ -10,45 +10,75 @@ from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widgets import Static, RichLog
 from textual.containers import Vertical, Container
-from ..helpers import classify_ec
+from ..helpers import classify_ec, format_file_size
+from ..helpers.parseformat import ellipsis_truncate
 from .translator import T, TRANSLATOR
 
 
 class StatusPanel(Static):
+    """The numbers of the current borg run, shown from the Session, see update_from_session()."""
+
     elapsed_time = reactive(0.0, init=False)
-    files_count = reactive(0, init=False)  # unchanged + modified + added + other + error
+    files_count = reactive(0, init=False)  # regular files processed, or all listed items without archive_progress
+    original_size = reactive(None, init=False)  # bytes, None: unknown (no archive_progress seen)
+    deduplicated_size = reactive(None, init=False)
     unchanged_count = reactive(0, init=False)
     modified_count = reactive(0, init=False)
     added_count = reactive(0, init=False)
     other_count = reactive(0, init=False)
     error_count = reactive(0, init=False)
+    progress_text = reactive("", init=False)  # what borg works on right now
     rc = reactive(None, init=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.speed_history = [0.0] * SpeedSparkline.HISTORY_SIZE
+        self.files_per_second = 0.0
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield SpeedSparkline(self.speed_history, id="speed-sparkline")
-            yield Static(T("Speed: 0/s"), id="status-speed")
+            yield Static(T("Speed: ") + "0 files/s", id="status-speed")
 
             with Vertical(id="statuses"):
-                yield Static(T("Elapsed: 00d 00:00:00"), classes="status", id="status-elapsed")
-                yield Static(T("Files: 0"), classes="status", id="status-files")
-                yield Static(T("Unchanged: 0"), classes="status", id="status-unchanged")
-                yield Static(T("Modified: 0"), classes="status", id="status-modified")
-                yield Static(T("Added: 0"), classes="status", id="status-added")
-                yield Static(T("Other: 0"), classes="status", id="status-other")
-                yield Static(T("Errors: 0"), classes="status error-ok", id="status-errors")
-                yield Static(T("RC: RUNNING"), classes="status", id="status-rc")
+                yield Static(T("Elapsed: ") + "00d 00:00:00", classes="status", id="status-elapsed")
+                yield Static(T("Files: ") + "0", classes="status", id="status-files")
+                yield Static(T("Original: ") + "-", classes="status", id="status-original")
+                yield Static(T("Deduplicated: ") + "-", classes="status", id="status-deduplicated")
+                yield Static(T("Unchanged: ") + "0", classes="status", id="status-unchanged")
+                yield Static(T("Modified: ") + "0", classes="status", id="status-modified")
+                yield Static(T("Added: ") + "0", classes="status", id="status-added")
+                yield Static(T("Other: ") + "0", classes="status", id="status-other")
+                yield Static(T("Errors: ") + "0", classes="status errors-ok", id="status-errors")
+                yield Static(T("Progress: "), classes="status", id="status-progress")
+                yield Static(T("RC: ") + "RUNNING", classes="status", id="status-rc")
 
-    def update_speed(self, kfiles_per_second: float):
-        self.speed_history.append(kfiles_per_second)
+    def update_from_session(self, session):
+        """Show the current state of the session."""
+        self.elapsed_time = session.elapsed
+        self.files_count = session.nfiles
+        self.original_size = session.original_size
+        self.deduplicated_size = session.deduplicated_size
+        self.unchanged_count = session.count("U-")
+        self.modified_count = session.count("M")
+        self.added_count = session.count("A+")
+        self.error_count = session.count("E")
+        self.other_count = sum(session.files_stats.values()) - session.count("U-MA+E")
+        self.progress_text = session.progress_text
+        self.rc = session.rc
+
+    def update_speed(self, files_per_second):
+        """Add one sample to the speed sparkline."""
+        self.files_per_second = files_per_second
+        self.speed_history.append(files_per_second)
         self.speed_history = self.speed_history[-SpeedSparkline.HISTORY_SIZE :]
         # Use our custom update method
         self.query_one("#speed-sparkline").update_data(self.speed_history)
-        self.query_one("#status-speed").update(T(f"Speed: {int(kfiles_per_second * 1000)}/s"))
+        self.query_one("#status-speed").update(T("Speed: ") + f"{files_per_second:.0f} files/s")
+
+    @staticmethod
+    def _format_size(size):
+        return "-" if size is None else format_file_size(size)
 
     def watch_error_count(self, count: int) -> None:
         sw = self.query_one("#status-errors")
@@ -58,27 +88,40 @@ class StatusPanel(Static):
         else:
             sw.remove_class("errors-ok")
             sw.add_class("errors-warning")
-        sw.update(T(f"Errors: {count}"))
+        sw.update(T("Errors: ") + str(count))
 
     def watch_files_count(self, count: int) -> None:
-        self.query_one("#status-files").update(T(f"Files: {count}"))
+        self.query_one("#status-files").update(T("Files: ") + str(count))
+
+    def watch_original_size(self, size) -> None:
+        self.query_one("#status-original").update(T("Original: ") + self._format_size(size))
+
+    def watch_deduplicated_size(self, size) -> None:
+        self.query_one("#status-deduplicated").update(T("Deduplicated: ") + self._format_size(size))
 
     def watch_unchanged_count(self, count: int) -> None:
-        self.query_one("#status-unchanged").update(T(f"Unchanged: {count}"))
+        self.query_one("#status-unchanged").update(T("Unchanged: ") + str(count))
 
     def watch_modified_count(self, count: int) -> None:
-        self.query_one("#status-modified").update(T(f"Modified: {count}"))
+        self.query_one("#status-modified").update(T("Modified: ") + str(count))
 
     def watch_added_count(self, count: int) -> None:
-        self.query_one("#status-added").update(T(f"Added: {count}"))
+        self.query_one("#status-added").update(T("Added: ") + str(count))
 
     def watch_other_count(self, count: int) -> None:
-        self.query_one("#status-other").update(T(f"Other: {count}"))
+        self.query_one("#status-other").update(T("Other: ") + str(count))
+
+    def watch_progress_text(self, text: str) -> None:
+        label = T("Progress: ")
+        # a wrapped line would push the lines below it out of the panel, thus the truncation.
+        space = (self.size.width or 60) - len(label) - 1
+        text = ellipsis_truncate(text, space).rstrip() if text else ""
+        self.query_one("#status-progress").update(label + escape(text))
 
     def watch_rc(self, rc: int):
         label = self.query_one("#status-rc")
         if rc is None:
-            label.update(T("RC: RUNNING"))
+            label.update(T("RC: ") + "RUNNING")
             return
 
         label.remove_class("rc-ok")
@@ -93,7 +136,7 @@ class StatusPanel(Static):
         else:  # error, signal
             label.add_class("rc-error")
 
-        label.update(T(f"RC: {rc}"))
+        label.update(T("RC: ") + str(rc))
 
     def watch_elapsed_time(self, elapsed: float) -> None:
         if TRANSLATOR.enabled:
@@ -112,73 +155,75 @@ class StatusPanel(Static):
     def refresh_ui_labels(self):
         """Update static UI labels with current translation."""
         self.watch_elapsed_time(self.elapsed_time)
-        self.query_one("#status-files").update(T(f"Files: {self.files_count}"))
-        self.query_one("#status-unchanged").update(T(f"Unchanged: {self.unchanged_count}"))
-        self.query_one("#status-modified").update(T(f"Modified: {self.modified_count}"))
-        self.query_one("#status-added").update(T(f"Added: {self.added_count}"))
-        self.query_one("#status-other").update(T(f"Other: {self.other_count}"))
-        self.query_one("#status-errors").update(T(f"Errors: {self.error_count}"))
-
-        if self.rc is not None:
-            self.watch_rc(self.rc)
-        else:
-            self.query_one("#status-rc").update(T("RC: RUNNING"))
+        self.watch_files_count(self.files_count)
+        self.watch_original_size(self.original_size)
+        self.watch_deduplicated_size(self.deduplicated_size)
+        self.watch_unchanged_count(self.unchanged_count)
+        self.watch_modified_count(self.modified_count)
+        self.watch_added_count(self.added_count)
+        self.watch_other_count(self.other_count)
+        self.watch_error_count(self.error_count)
+        self.watch_progress_text(self.progress_text)
+        self.watch_rc(self.rc)
+        self.query_one("#status-speed").update(T("Speed: ") + f"{self.files_per_second:.0f} files/s")
 
 
 class StandardLog(Vertical):
+    """The log panel: log messages, --list lines and everything else borg outputs."""
+
+    # Styles for the --list status characters, see "Item flags" in the borg create help.
+    STATUS_STYLES = {
+        "E": "red",  # error
+        "C": "yellow",  # regular file, changed while reading
+        "?": "red",  # missing status, a bug
+        "A": "white",  # added regular file (cache miss, slow!)
+        "M": "white",  # modified regular file (cache hit, but different, slow!)
+        "U": "green",  # unchanged regular file (cache hit)
+        "-": "white",  # excluded
+        "x": "white",  # skipped (dataless)
+    }
+    DEFAULT_STATUS_STYLE = "green"  # d, b, c, h, s, f, i: metadata only. +: included.
+    # Styles for the log levels (and the prompts).
+    LEVEL_STYLES = {
+        "DEBUG": "dim",
+        "WARNING": "yellow",
+        "ERROR": "red",
+        "CRITICAL": "bold red",
+        "PROMPT": "bold yellow",
+    }
+    MAX_LINES = 5000  # lines kept for scrolling back
+
     def compose(self) -> ComposeResult:
         yield Static(T("Log"), classes="panel-title", id="standard-log-title")
-        yield RichLog(id="standard-log-content", highlight=False, markup=True, auto_scroll=True, max_lines=None)
+        yield RichLog(
+            id="standard-log-content", highlight=False, markup=True, auto_scroll=True, max_lines=self.MAX_LINES
+        )
 
     def update_title(self):
         self.query_one("#standard-log-title").update(T("Log"))
 
-    def add_line(self, line: str):
-        # TODO: make this more generic, use json output from borg.
-        # currently, this is only really useful for borg create/extract --list
-        line = line.rstrip()
-        if len(line) == 0:
+    @classmethod
+    def style_for(cls, line):
+        """The rich style for a Line from the Session, None for plain text."""
+        if line.kind == "status":
+            return cls.STATUS_STYLES.get(line.tag, cls.DEFAULT_STATUS_STYLE)
+        if line.kind == "log":
+            return cls.LEVEL_STYLES.get(line.tag)
+        if line.kind == "hint":
+            return "bold yellow"
+        return None
+
+    def add_lines(self, lines, dropped=0):
+        """Append the lines taken from Session.drain(); dropped lines are only mentioned."""
+        if not lines and not dropped:
             return
-
-        markup_tag = None
-        if len(line) >= 2:
-            if line[1] == " " and line[0] in "EAMUdcbs+-":
-                # looks like from borg create/extract --list
-                status_panel = self.app.query_one("#status")
-                status_panel.files_count += 1
-                status = line[0]
-                match status:
-                    case "E":
-                        status_panel.error_count += 1
-                    case "U" | "-":
-                        status_panel.unchanged_count += 1
-                    case "M":
-                        status_panel.modified_count += 1
-                    case "A" | "+":
-                        status_panel.added_count += 1
-                    case "d" | "c" | "b" | "s":
-                        status_panel.other_count += 1
-
-                markup_tag = {
-                    "E": "red",  # Error
-                    "A": "white",  # Added regular file (cache miss, slow!)
-                    "M": "white",  # Modified regular file (cache hit, but different, slow!)
-                    "U": "green",  # Updated regular file (cache hit)
-                    "d": "green",  # directory
-                    "c": "green",  # char device
-                    "b": "green",  # block device
-                    "s": "green",  # socket
-                    "-": "white",  # excluded
-                    "+": "green",  # included
-                }.get(status)
-
         log_widget = self.query_one("#standard-log-content")
-
-        safe_line = escape(line)
-        if markup_tag:
-            safe_line = f"[{markup_tag}]{safe_line}[/]"
-
-        log_widget.write(safe_line)
+        if dropped:
+            log_widget.write(f"[dim]... {dropped} more lines not shown ...[/]")
+        for line in lines:
+            text = escape(line.text)
+            style = self.style_for(line)
+            log_widget.write(f"[{style}]{text}[/]" if style else text)
 
 
 class Starfield(Static):

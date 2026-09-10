@@ -12,6 +12,10 @@ BORG_DICTIONARY = {  # English -> Borg
     "Other: ": "Other: ",
     "Errors: ": "Escaped: ",
     "RC: ": "Termination Code: ",
+    "Speed: ": "Assimilation rate: ",
+    "Original: ": "Raw biomass: ",
+    "Deduplicated: ": "Assimilated biomass: ",
+    "Progress: ": "Assimilating: ",
     "Log": "Subspace Transmissions",
 }
 

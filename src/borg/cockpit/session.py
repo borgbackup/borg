@@ -16,6 +16,7 @@ from datetime import timedelta
 from ..helpers import format_file_size, format_timedelta
 from .events import (
     ArchiveProgress,
+    ArchiveStatus,
     FileStatus,
     LogMessage,
     ProcessFinished,
@@ -25,14 +26,6 @@ from .events import (
     RawLine,
     UnknownJson,
 )
-
-# The status characters of --list output, see "Item flags" in the borg create help.
-LIST_STATUSES = "AMUCEdbchsf+-ix?"
-
-# extract, export-tar and prune have no file_status JSON type (yet): their --list lines arrive as
-# log_message objects of this logger, with the status character in front, like for borg create --list.
-# TODO: remove this shim when borg emits file_status objects for them.
-LIST_LOGGER = "borg.output.list"
 
 # Python's getpass() prints this when it can not use a terminal (the runner starts borg without one)
 # and falls back to reading the passphrase from stdin, which the cockpit does not support (yet).
@@ -49,7 +42,8 @@ class Line:
     """One line for the log panel."""
 
     text: str
-    kind: str  # "status": a --list line, tag is the status char. "log": tag is the level name. "raw", "hint".
+    kind: str  # "status": a --list line, tag is the status char. "archive": tag is "kept" / "pruned".
+    # "log": tag is the level name. "raw", "hint".
     tag: str = ""
 
 
@@ -93,6 +87,8 @@ class Session:
         self.archive_progress = None  # the latest ArchiveProgress carrying statistics
         self.archive_finished = False
         self.status_counts = Counter()  # status char -> count, from the --list lines
+        self.archives_kept = 0  # archives listed by prune
+        self.archives_pruned = 0
         self.phases = {}  # operation id -> Phase, in order of appearance
         self._active_phase = None  # operation id of the phase updated last
         self.progress_text = ""  # what borg works on right now: the current path or progress message
@@ -220,6 +216,12 @@ class Session:
                 self._feed_log_message(event)
             case FileStatus():
                 self._add_status(event.status, event.path)
+            case ArchiveStatus():
+                if event.kept:
+                    self.archives_kept += 1
+                else:
+                    self.archives_pruned += 1
+                self._add_line(Line(event.message, "archive", "kept" if event.kept else "pruned"))
             case ArchiveProgress():
                 if event.finished:
                     # the final object carries no statistics, keep the previous ones.
@@ -248,15 +250,11 @@ class Session:
                     self._parse_stdout()
 
     def _feed_log_message(self, event):
-        message = event.message
-        if event.name == LIST_LOGGER and len(message) >= 2 and message[1] == " " and message[0] in LIST_STATUSES:
-            self._add_status(message[0], message[2:])
-        else:
-            if event.levelname == "WARNING":
-                self.warnings += 1
-            elif event.levelname in ("ERROR", "CRITICAL"):
-                self.errors += 1
-            self._add_line(Line(message, "log", event.levelname))
+        if event.levelname == "WARNING":
+            self.warnings += 1
+        elif event.levelname in ("ERROR", "CRITICAL"):
+            self.errors += 1
+        self._add_line(Line(event.message, "log", event.levelname))
 
     def _add_status(self, status, path):
         self.status_counts[status] += 1

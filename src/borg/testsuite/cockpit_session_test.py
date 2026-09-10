@@ -19,7 +19,7 @@ from borg.cockpit.events import (
     parse_json_line,
 )
 from borg.cockpit.runner import INJECTED_OPTIONS, BorgRunner, borg_command
-from borg.cockpit.session import LIST_LOGGER, PASSPHRASE_FALLBACK_WARNING, PASSPHRASE_HINT, Session
+from borg.cockpit.session import LIST_LOGGER, NO_TERMINAL_WARNING, NO_TERMINAL_HINT, Session
 
 # JSON lines as documented in docs/internals/frontends.rst
 ARCHIVE_PROGRESS = (
@@ -248,13 +248,13 @@ def test_session_sample_rates():
 
 def test_session_passphrase_hint():
     session = Session()
-    session.feed(RawLine(stream="stderr", line=PASSPHRASE_FALLBACK_WARNING))
+    session.feed(RawLine(stream="stderr", line=NO_TERMINAL_WARNING))
     session.feed(RawLine(stream="stderr", line="Enter passphrase for key /repo: ", partial=True))
     assert session.passphrase_needed
     lines, _ = session.drain()
     assert [(line.kind, line.text) for line in lines] == [
-        ("raw", PASSPHRASE_FALLBACK_WARNING),
-        ("hint", PASSPHRASE_HINT),
+        ("raw", NO_TERMINAL_WARNING),
+        ("hint", NO_TERMINAL_HINT),
         ("raw", "Enter passphrase for key /repo: "),
     ]
 

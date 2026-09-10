@@ -42,7 +42,7 @@ class Line:
     """One line for the log panel."""
 
     text: str
-    kind: str  # "status": a --list line, tag is the status char. "archive": tag is "kept" / "pruned".
+    kind: str  # "status": a --list line, tag is the status char. "archive": tag is kept / pruned / deleted / ...
     # "log": tag is the level name. "raw", "hint".
     tag: str = ""
 
@@ -87,8 +87,7 @@ class Session:
         self.archive_progress = None  # the latest ArchiveProgress carrying statistics
         self.archive_finished = False
         self.status_counts = Counter()  # status char -> count, from the --list lines
-        self.archives_kept = 0  # archives listed by prune
-        self.archives_pruned = 0
+        self.archive_counts = Counter()  # status -> count, the archives listed by prune / delete / undelete
         self.phases = {}  # operation id -> Phase, in order of appearance
         self._active_phase = None  # operation id of the phase updated last
         self.progress_text = ""  # what borg works on right now: the current path or progress message
@@ -217,11 +216,8 @@ class Session:
             case FileStatus():
                 self._add_status(event.status, event.path)
             case ArchiveStatus():
-                if event.kept:
-                    self.archives_kept += 1
-                else:
-                    self.archives_pruned += 1
-                self._add_line(Line(event.message, "archive", "kept" if event.kept else "pruned"))
+                self.archive_counts[event.status] += 1
+                self._add_line(Line(event.message, "archive", event.status))
             case ArchiveProgress():
                 if event.finished:
                     # the final object carries no statistics, keep the previous ones.

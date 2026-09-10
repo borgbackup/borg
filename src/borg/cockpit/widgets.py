@@ -262,8 +262,11 @@ class GenericStatusPanel(StatusPanelBase):
     def show_session(self, session):
         self.show_elapsed(session)
         self.show_warnings(session)
-        kept, pruned = session.archives_kept, session.archives_pruned
-        self.show_value("status-archives", "Archives: ", f"{kept} kept, {pruned} pruned" if kept or pruned else "-")
+        counts = session.archive_counts
+        statuses = [status for status in ("kept", "pruned", "deleted", "undeleted") if counts[status]]
+        statuses += [status for status in counts if status not in statuses]
+        parts = [f"{counts[status]} {status}" for status in statuses]
+        self.show_value("status-archives", "Archives: ", ", ".join(parts) if parts else "-")
         self.show_rc(session)
         self.show("phases-title", T("Phases"))
         space = (self.size.width or 60) - self.BAR_WIDTH - 3
@@ -324,7 +327,7 @@ class StandardLog(Vertical):
         if line.kind == "status":
             return cls.STATUS_STYLES.get(line.tag, cls.DEFAULT_STATUS_STYLE)
         if line.kind == "archive":
-            return "green" if line.tag == "kept" else "white"
+            return "green" if line.tag in ("kept", "undeleted") else "white"  # the archive stays / is back
         if line.kind == "log":
             return cls.LEVEL_STYLES.get(line.tag)
         if line.kind == "hint":

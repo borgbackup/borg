@@ -1,5 +1,6 @@
 import errno
 import io
+import json
 import os
 from pathlib import Path
 import shutil
@@ -1145,3 +1146,21 @@ def test_extract_close_error_is_a_warning(archivers, request):
     out = _extract_with_raw_file_class(archiver, BadCloseRaw, BackupIOError)
     assert f"input/file1: close: [Errno {errno.EIO}] Input/output error" in out
     assert os.path.getsize("output/input/file1") == 1024  # the content was written completely
+
+
+def test_extract_list_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    cmd(archiver, "create", "test", "input")
+
+    with changedir("output"):
+        output = cmd(archiver, "extract", "test", "--list", "--log-json", "-e", "input/file2")
+    # with --log-json, the listing consists of file_status objects (one per item), no text lines
+    messages = [json.loads(line) for line in output.splitlines()]
+    file_status = [msg for msg in messages if msg["type"] == "file_status"]
+    assert {"type": "file_status", "status": "+", "path": "input"} in file_status
+    assert {"type": "file_status", "status": "+", "path": "input/file1"} in file_status
+    assert {"type": "file_status", "status": "-", "path": "input/file2"} in file_status
+    assert len(file_status) == 3

@@ -170,6 +170,9 @@ New features:
 
 - create/import-tar --json: report the deduplicated size of the new archive, #10335.
   It is also included in the archive_progress JSON output.
+- extract/export-tar --list --log-json: output a file_status JSON object per listed item,
+  like create does. The text listing of export-tar has the same "+" prefix as extract's now.
+  prune --list --log-json: output an archive_status JSON object per listed archive, #9454.
 
 Fixes:
 

@@ -140,6 +140,9 @@ class Archiver(
         self.lock_wait = lock_wait
         self.prog = prog
         self.start_backup = None
+        # for print_file_status(): the commands with a file listing set these from their options.
+        self.output_list = False
+        self.output_filter = None
 
     def print_warning(self, msg, *args, **kw):
         warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code

@@ -1074,3 +1074,31 @@ def test_prune_group_by_invalid_key(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "prune", "--group-by", "bogus", "--keep-daily=1", exit_code=2)
     assert "Invalid group-by key: bogus" in output
+
+
+def test_prune_list_json(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", backup_files)
+    cmd(archiver, "create", "test2", backup_files)
+    # with --log-json, the listing consists of archive_status objects (one per listed archive), no text lines
+    output = prune_ungrouped(archiver, "--list", "--dry-run", "--keep-daily=1", "--log-json")
+    messages = [json.loads(line) for line in output.splitlines()]
+    statuses = {msg["name"]: msg for msg in messages if msg["type"] == "archive_status"}
+    assert set(statuses) == {"test1", "test2"}
+    pruned, kept = statuses["test1"], statuses["test2"]
+    assert pruned["kept"] is False and pruned["deleted_archive_number"] == 1
+    assert pruned["message"].startswith("Would prune:") and "test1" in pruned["message"]
+    assert kept["kept"] is True and kept["keep_rule"] == "daily" and kept["kept_oldest"] is False
+    assert kept["kept_archive_number"] == 1
+    assert kept["message"].startswith("Keeping archive (rule: daily #1):") and "test2" in kept["message"]
+    for status in statuses.values():
+        assert status["archive"] == status["name"] and len(status["id"]) == 64 and "T" in status["time"]
+        assert status["group"] == {}  # grouping is switched off by prune_ungrouped()
+    # --list-pruned lists the pruned archives only, and it really prunes without --dry-run
+    output = prune_ungrouped(archiver, "--list-pruned", "--keep-daily=1", "--log-json")
+    messages = [json.loads(line) for line in output.splitlines()]
+    statuses = [msg for msg in messages if msg["type"] == "archive_status"]
+    assert [(msg["name"], msg["kept"]) for msg in statuses] == [("test1", False)]
+    assert statuses[0]["message"].startswith("Pruning archive (1/1):")
+    assert "test1" not in cmd(archiver, "repo-list")

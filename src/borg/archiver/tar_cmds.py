@@ -396,6 +396,7 @@ class TarMixIn:
 
         progress = args.progress
         output_list = args.output_list
+        self.output_list = output_list  # for print_file_status()
         strip_components = args.strip_components
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
@@ -500,7 +501,7 @@ class TarMixIn:
                 if args.tar_format in ("BORG", "PAX"):
                     tarinfo.pax_headers = item_to_paxheaders(args.tar_format, item)
                 if output_list:
-                    logging.getLogger("borg.output.list").info(remove_surrogates(orig_path))
+                    self.print_file_status("+", orig_path)
                 sparse_content = sparsify_tarinfo(item, tarinfo) if args.sparse and needs_content else None
                 if sparse_content is not None:
                     stream_plan, map_bytes = sparse_content

@@ -1,16 +1,18 @@
 from typing import Callable, NamedTuple
 from datetime import datetime, timedelta
+import json
 import logging
 import math
 from functools import partial, wraps
 import os
+import sys
 from itertools import count, combinations
 from ._common import with_repository, Highlander, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
 from ..helpers import GroupBySpec
-from ..helpers import json_print, basic_json_data
+from ..helpers import json_print, basic_json_data, BorgJsonEncoder
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, Manifest, format_group_key, group_archives
 
@@ -254,10 +256,10 @@ class PruneMixIn:
                 break
             # get_item_data/format_item may internally load the archive from the repository,
             # so we must call it before deleting the archive.
-            if args.json:
+            if args.json or self.log_json:
                 archive_data = formatter.get_item_data(archive_info, jsonline=True)
                 archive_data["group"] = dict(zip(group_by, group_of[archive_info]))
-            else:
+            if not args.json:
                 archive_formatted = formatter.format_item(archive_info, jsonline=False)
             if archive_info in archives_to_prune:
                 if not args.json:
@@ -268,14 +270,14 @@ class PruneMixIn:
                 else:
                     log_message = f"Pruning archive ({num_archives_deleted}/{len(archives_to_prune)}):"
                     manifest.archives.delete_by_id(archive_info.id)
-                if args.json:
+                if args.json or self.log_json:
                     archive_data["kept"] = False
                     archive_data["deleted_archive_number"] = num_archives_deleted
             else:
                 result = keep[archive_info]
                 result_message = f"{result.rule.key}{'[oldest]' if result.oldest else ''} #{result.idx + 1}"
                 log_message = f"Keeping archive (rule: {result_message}):"
-                if args.json:
+                if args.json or self.log_json:
                     archive_data["kept"] = True
                     archive_data["keep_rule"] = result.rule.key
                     archive_data["kept_oldest"] = result.oldest
@@ -293,7 +295,13 @@ class PruneMixIn:
                 or (args.list_pruned and archive_info in archives_to_prune)
                 or (args.list_kept and archive_info not in archives_to_prune)
             ):
-                list_logger.info(f"{log_message:<44} {archive_formatted}")
+                message = f"{log_message:<44} {archive_formatted}"
+                if self.log_json:
+                    # one JSON object per listed archive, like the file_status objects of the file listings.
+                    archive_data |= {"type": "archive_status", "message": message}
+                    print(json.dumps(archive_data, cls=BorgJsonEncoder), file=sys.stderr)
+                else:
+                    list_logger.info(message)
         if not args.json:
             pi.finish()
         if args.json:

@@ -205,7 +205,10 @@ Other changes:
 - add_warning: store exceptions given as args as text, not the exception object -
   reduces memory usage when there are many warnings
 - cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
-  instead of parsing text lines, #9454.
+  instead of parsing text lines, #9454. The display depends on the command: archive
+  statistics for create/import-tar/recreate/transfer (with the final statistics from
+  --json), a progress bar for extract/export-tar, the progress phases for the other
+  commands. Yes/no prompts are shown as a dialog.
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088

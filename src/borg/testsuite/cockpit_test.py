@@ -9,6 +9,7 @@ import pytest
 
 from borg.cockpit.events import (
     ArchiveProgress,
+    ArchiveStatus,
     FileStatus,
     LogMessage,
     ProcessFinished,
@@ -17,7 +18,6 @@ from borg.cockpit.events import (
     Question,
     RawLine,
 )
-from borg.cockpit.session import LIST_LOGGER
 from borg.platformflags import is_freebsd, is_win32
 
 try:
@@ -175,8 +175,8 @@ def test_app_extract_screen():
     events = [
         ProgressPercent(operation=1, msgid="extract", message="Calculating total archive size", current=0, total=0),
         ProgressPercent(operation=1, msgid="extract", message=" 25.0% Extracting: a", current=250, total=1000),
-        LogMessage(message="+ a", name=LIST_LOGGER),
-        LogMessage(message="- b", name=LIST_LOGGER),
+        FileStatus(status="+", path="a"),
+        FileStatus(status="-", path="b"),
         ProgressPercent(operation=1, msgid="extract", message=" 75.0% Extracting: c", current=750, total=1000),
         ProgressPercent(operation=1, msgid="extract", finished=True, message=""),
         ProgressPercent(operation=2, msgid="extract.permissions", message="Setting directory permissions 50%"),
@@ -202,6 +202,8 @@ def test_app_generic_screen():
         ProgressMessage(operation=2, msgid="cache.close", message="Saving files cache"),
         ProgressPercent(operation=1, msgid="check.index", finished=True, message=""),
         LogMessage(message="Archive consistency check complete, no problems found.", levelname="INFO"),
+        ArchiveStatus(name="old", kept=False, message="Would prune: old"),
+        ArchiveStatus(name="new", kept=True, message="Keeping archive (rule: daily #1): new"),
     ]
     factory, runners = make_runner_factory(events)
     app = BorgCockpitApp(borg_args=["check"], command="check", runner_factory=factory)
@@ -213,7 +215,8 @@ def test_app_generic_screen():
         "[bold white]▶ ░░░░░░░░░░ Saving files cache[/]",
     ]
     assert shown["status-warnings"] == "Warnings: 0" and shown["status-rc"] == "RC: 0"
-    assert "no problems found" in text
+    assert shown["status-archives"] == "Archives: 1 kept, 1 pruned"
+    assert "no problems found" in text and "Would prune: old" in text
 
 
 def test_app_answers_prompt():

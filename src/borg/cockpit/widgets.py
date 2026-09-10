@@ -244,8 +244,8 @@ class ExtractStatusPanel(StatusPanelBase):
 class GenericStatusPanel(StatusPanelBase):
     """All other commands: elapsed time, warnings, exit code and the phases borg reports progress for."""
 
-    HEIGHT = 17  # 3 lines, the title, PHASE_LINES
-    PHASE_LINES = 13  # the phases shown (the last ones, if there are more)
+    HEIGHT = 17  # 4 lines, the title, PHASE_LINES
+    PHASE_LINES = 12  # the phases shown (the last ones, if there are more)
     BAR_WIDTH = 10
     PERCENTAGE = re.compile(r"\s*\d+(\.\d+)?%$")  # the percentage at the end of a progress message
 
@@ -254,6 +254,7 @@ class GenericStatusPanel(StatusPanelBase):
             with Vertical(id="statuses"):
                 yield self._line("status-elapsed", "Elapsed: ", "00d 00:00:00")
                 yield self._line("status-warnings", "Warnings: ", "0", classes="status errors-ok")
+                yield self._line("status-archives", "Archives: ", "-")
                 yield self._line("status-rc", "RC: ", "RUNNING")
             yield Static(T("Phases"), classes="panel-title", id="phases-title")
             yield Static("", id="phases")
@@ -261,6 +262,8 @@ class GenericStatusPanel(StatusPanelBase):
     def show_session(self, session):
         self.show_elapsed(session)
         self.show_warnings(session)
+        kept, pruned = session.archives_kept, session.archives_pruned
+        self.show_value("status-archives", "Archives: ", f"{kept} kept, {pruned} pruned" if kept or pruned else "-")
         self.show_rc(session)
         self.show("phases-title", T("Phases"))
         space = (self.size.width or 60) - self.BAR_WIDTH - 3
@@ -320,6 +323,8 @@ class StandardLog(Vertical):
         """The rich style for a Line from the Session, None for plain text."""
         if line.kind == "status":
             return cls.STATUS_STYLES.get(line.tag, cls.DEFAULT_STATUS_STYLE)
+        if line.kind == "archive":
+            return "green" if line.tag == "kept" else "white"
         if line.kind == "log":
             return cls.LEVEL_STYLES.get(line.tag)
         if line.kind == "hint":

@@ -1,18 +1,15 @@
 from typing import Callable, NamedTuple
 from datetime import datetime, timedelta
-import json
-import logging
 import math
 from functools import partial, wraps
 import os
-import sys
 from itertools import count, combinations
 from ._common import with_repository, Highlander, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
 from ..helpers import GroupBySpec
-from ..helpers import json_print, basic_json_data, BorgJsonEncoder
+from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, Manifest, format_group_key, group_archives
 
@@ -247,7 +244,6 @@ class PruneMixIn:
                     )
             logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(archives_to_prune))
 
-        list_logger = logging.getLogger("borg.output.list")
         # set up counters for the progress display
         num_archives_deleted = 0
         pi = ProgressIndicatorPercent(total=len(archives_to_prune), msg="Pruning archives %3.0f%%", msgid="prune")
@@ -265,6 +261,7 @@ class PruneMixIn:
                 if not args.json:
                     pi.show()
                 num_archives_deleted += 1
+                status = "pruned"
                 if args.dry_run:
                     log_message = "Would prune:"
                 else:
@@ -277,6 +274,7 @@ class PruneMixIn:
                 result = keep[archive_info]
                 result_message = f"{result.rule.key}{'[oldest]' if result.oldest else ''} #{result.idx + 1}"
                 log_message = f"Keeping archive (rule: {result_message}):"
+                status = "kept"
                 if args.json or self.log_json:
                     archive_data["kept"] = True
                     archive_data["keep_rule"] = result.rule.key
@@ -296,12 +294,7 @@ class PruneMixIn:
                 or (args.list_kept and archive_info not in archives_to_prune)
             ):
                 message = f"{log_message:<44} {archive_formatted}"
-                if self.log_json:
-                    # one JSON object per listed archive, like the file_status objects of the file listings.
-                    archive_data |= {"type": "archive_status", "message": message}
-                    print(json.dumps(archive_data, cls=BorgJsonEncoder), file=sys.stderr)
-                else:
-                    list_logger.info(message)
+                self.print_archive_status(status, archive_info, message, archive_data if self.log_json else None)
         if not args.json:
             pi.finish()
         if args.json:

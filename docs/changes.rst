@@ -204,6 +204,8 @@ Other changes:
   for big chunks at high-speed, low-compression zstd levels
 - add_warning: store exceptions given as args as text, not the exception object -
   reduces memory usage when there are many warnings
+- cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
+  instead of parsing text lines, #9454.
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088

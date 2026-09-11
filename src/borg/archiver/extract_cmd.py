@@ -147,6 +147,14 @@ class ExtractMixIn:
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
 
+        If a file's content chunks are missing from the repository or are corrupted (they fail
+        authentication, decryption or decompression), the extraction does not abort: each such
+        chunk is written as all-zero data of the correct size, an error naming the chunk is logged,
+        the file is reported with a warning and the exit code is a warning. The extracted file thus
+        has the correct size and metadata, but wrong (all-zero) content where the damaged chunks
+        were. Run ``borg check`` to find out which chunks and archives are affected. This also
+        applies to ``--dry-run`` (which thus can be used to find unreadable files) and ``--stdout``.
+
         When using ``--stats``, borg reports the store statistics (lines prefixed with
         "Store") for the extraction: per-operation call counts and timings, the load/store
         data volumes and throughput, and cache hits/misses. This includes ``--dry-run``

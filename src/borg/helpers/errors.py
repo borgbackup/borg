@@ -239,5 +239,22 @@ class BackupBrokenSymlinkError(BackupError):
     exit_mcode = 112
 
 
+class BackupDamagedChunksError(BackupError):
+    """{}: {}"""
+
+    # Raised by extract after a file's content was written: some of its chunks were missing from the
+    # repository or corrupted and DownloadPipeline.fetch_many replaced them by all-zero data of the
+    # correct size, so the file has its right size but wrong content in those places. Reported as a
+    # per-file warning (path: message); borg check reports which chunks / archives are affected.
+    exit_mcode = 113
+
+    def __init__(self, count):
+        super().__init__(count)
+        self.count = count
+
+    def __str__(self):
+        return f"{self.count} chunk(s) missing or corrupted in the repository, replaced by all-zero data"
+
+
 class BackupItemExcluded(Exception):
     """Used internally to skip an item from processing when it is excluded."""

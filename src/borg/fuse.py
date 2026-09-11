@@ -61,6 +61,7 @@ logger = create_logger()
 
 from .helpers import daemonizing, signal_handler
 from .storelocking import LockRefresher
+from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .vfs import ArchiveVFS, ChunkMissing, parse_mount_options
 
 BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
@@ -219,6 +220,10 @@ class FuseOperations(llfuse.Operations):
         try:
             return self.vfs.read(fh, offset, size, pos_key=fh)
         except ChunkMissing:
+            raise llfuse.FUSEError(errno.EIO) from None
+        except IntegrityErrorBase as err:
+            # a corrupted chunk (unless allow_damaged_files replaced it by zeros): report it, EIO for the read.
+            logger.error("mount: %s", err)
             raise llfuse.FUSEError(errno.EIO) from None
 
     def _readdir_entries(self, fh):

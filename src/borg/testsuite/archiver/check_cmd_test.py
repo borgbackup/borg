@@ -12,6 +12,7 @@ from ...archive import ArchiveChecker, ChunkBuffer
 from ...cache import delete_chunkindex_from_repo
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
+from ...helpers import BackupDamagedChunksError
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
@@ -1033,10 +1034,12 @@ def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
     assert "id verification failed" in output
 
-    # with "read" in BORG_ASSERT_ID, reads check it too:
+    # with "read" in BORG_ASSERT_ID, reads check it too: extract treats the chunk as corrupted, i.e.
+    # it extracts all-zero data instead and reports the file with a warning.
     monkeypatch.setenv("BORG_ASSERT_ID", "read")
-    with pytest.raises(IntegrityError):  # local (not forked): the Error propagates instead of setting the rc
-        cmd(archiver, "extract", "archive1")
+    output = cmd(archiver, "extract", "archive1", exit_code=BackupDamagedChunksError.exit_mcode)
+    assert "id verification failed" in output
+    assert "1 chunk(s) missing or corrupted in the repository, replaced by all-zero data" in output
 
 
 def test_repair_wrong_item_metadata_chunk_content(archivers, request, monkeypatch):

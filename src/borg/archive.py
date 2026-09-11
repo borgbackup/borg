@@ -28,7 +28,7 @@ from .constants import *  # NOQA
 from .digests import ContentDigester
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError, BackupItemExcluded
-from .helpers import BackupSymlinkParentError, BackupPathTraversalError
+from .helpers import BackupSymlinkParentError, BackupPathTraversalError, BackupDamagedChunksError
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError, BackupTimeoutError
 from .helpers import HardLinkManager
 from .helpers import archive_hostname, archive_username
@@ -392,8 +392,32 @@ class DownloadPipeline:
                         item.chunks_healthy = [ChunkListEntry(*e) for e in item.chunks_healthy]
                     yield item
 
-    def fetch_many(self, chunks, ro_type=None, replacement_chunk=True):
+    def fetch_many(self, chunks, ro_type=None, replacement_chunk=True, replace_corrupted=False, damaged=None):
+        """
+        Yield the plaintext data of *chunks* (ChunkListEntry objects or bare chunk ids), in order.
+
+        A chunk that is missing from the repository or that is corrupted (does not authenticate,
+        decrypt or decompress) can not be returned as it was. If *replacement_chunk* is set and
+        the chunk size is known (ChunkListEntry), a missing chunk is replaced by an all-zero chunk
+        of the correct size and an error is logged; otherwise it yields None. A corrupted chunk
+        is replaced the same way if additionally *replace_corrupted* is set (extract and mount
+        do that, so a damaged file still comes out with the right size); otherwise it raises
+        IntegrityError, so commands that create new archives or repositories from the data
+        (recreate, transfer) abort instead of storing all-zero data as if it were the content.
+        If *damaged* is a list, the ids of the replaced chunks are appended to it, so the caller
+        can report the affected file.
+        """
         assert ro_type is not None
+
+        def replacement(id, size, problem):
+            # all-zero chunk of the correct size, so the content stream keeps its offsets.
+            logger.error(f"repository object {bin_to_hex(id)} {problem}, returning {size} zero bytes.")
+            if damaged is not None:
+                damaged.append(id)
+            data = zeros[:size]
+            assert len(data) == size, f"replacement chunk size {size} exceeds {len(zeros)}"
+            return data
+
         ids = []
         sizes = []
         if all(isinstance(chunk, ChunkListEntry) for chunk in chunks):
@@ -416,8 +440,7 @@ class DownloadPipeline:
             cdata = next(fetched)
             if cdata is None:
                 if replacement_chunk and size is not None:
-                    logger.error(f"repository object {bin_to_hex(id)} missing, returning {size} zero bytes.")
-                    data = zeros[:size]  # return an all-zero replacement chunk of correct size
+                    data = replacement(id, size, "missing")
                 else:
                     logger.error(f"repository object {bin_to_hex(id)} missing, returning None.")
                     data = None
@@ -425,8 +448,14 @@ class DownloadPipeline:
                 try:
                     data = self.parsed_cache[(id, ro_type)]
                 except KeyError:
-                    _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
-                    self.parsed_cache[(id, ro_type)] = data
+                    try:
+                        _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
+                    except IntegrityErrorBase as err:
+                        if not (replacement_chunk and replace_corrupted and size is not None):
+                            raise
+                        data = replacement(id, size, f"corrupted ({err})")
+                    else:
+                        self.parsed_cache[(id, ro_type)] = data
             assert data is None or size is None or len(data) == size
             yield data
 
@@ -947,7 +976,10 @@ Duration: {0.duration}
                     # it does not really set hard links due to dry_run, but behave the same as non-dry_run.
                     if "chunks" in item:
                         item_chunks_size = 0
-                        for data in self.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
+                        damaged = []  # ids of missing/corrupted chunks that were replaced by zeros
+                        for data in self.pipeline.fetch_many(
+                            item.chunks, ro_type=ROBJ_FILE_STREAM, replace_corrupted=True, damaged=damaged
+                        ):
                             if pi:
                                 pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                             if stdout:
@@ -963,6 +995,8 @@ Duration: {0.duration}
                                         item_size, item_chunks_size
                                     )
                                 )
+                        if damaged:
+                            raise BackupDamagedChunksError(len(damaged))
             return
 
         dest = self.cwd
@@ -1016,7 +1050,10 @@ Duration: {0.duration}
                     fd = open(path, "wb")
                 try:
                     trailing_hole = False
-                    for data in self.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
+                    damaged = []  # ids of missing/corrupted chunks that were replaced by zeros
+                    for data in self.pipeline.fetch_many(
+                        item.chunks, ro_type=ROBJ_FILE_STREAM, replace_corrupted=True, damaged=damaged
+                    ):
                         if pi:
                             pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                         with backup_io("write"):
@@ -1059,6 +1096,9 @@ Duration: {0.duration}
                         raise BackupError(
                             f"Size inconsistency detected: size {item_size}, chunks size {item_chunks_size}"
                         )
+                if damaged:
+                    # the file is complete (size, attrs), but parts of its content are all-zero replacements.
+                    raise BackupDamagedChunksError(len(damaged))
             return
         with backup_io:
             # No repository access beyond this point.

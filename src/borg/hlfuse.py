@@ -24,6 +24,7 @@ logger = create_logger()
 
 from .helpers import daemonizing, signal_handler
 from .storelocking import LockRefresher
+from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .vfs import ArchiveVFS, ChunkMissing, parse_mount_options
 
 BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
@@ -183,6 +184,10 @@ class borgfs(hlfuse.Operations):
         try:
             return self.vfs.read(node.ino, offset, size, pos_key=fi.fh)
         except ChunkMissing:
+            raise hlfuse.FuseOSError(errno.EIO) from None
+        except IntegrityErrorBase as err:
+            # a corrupted chunk (unless allow_damaged_files replaced it by zeros): report it, EIO for the read.
+            logger.error("mount: %s", err)
             raise hlfuse.FuseOSError(errno.EIO) from None
 
     def readdir(self, path, fh=None):

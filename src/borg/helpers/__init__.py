@@ -20,6 +20,7 @@ from .errors import BackupError, BackupOSError, BackupRaceConditionError, Backup
 from .errors import BackupPermissionError, BackupIOError, BackupFileNotFoundError, BackupTimeoutError
 from .errors import BackupSymlinkParentError, BackupPathTraversalError, BackupHardlinkSourceError
 from .errors import BackupBrokenSymlinkError
+from .errors import BackupDamagedChunksError
 from .fs import ensure_dir, join_base_dir
 from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get_config_dir, get_runtime_dir
 from .fs import dir_is_tagged, dir_is_cachedir, remove_dotdot_prefixes, make_path_safe, scandir_inorder

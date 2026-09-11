@@ -19,9 +19,11 @@ from ...item import Item
 from ...manifest import Manifest
 from ...repository import Repository
 from ...helpers import EXIT_WARNING, BackupIOError, BackupOSError, BackupPermissionError, BackupSymlinkParentError
+from ...helpers import BackupDamagedChunksError
 from ...helpers import bin_to_hex
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns, granularity_sleep
+from ..repository_test import corrupt_chunk_on_disk
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ...platform import get_birthtime_ns
 from ...platformflags import is_darwin, is_freebsd, is_win32
@@ -38,6 +40,7 @@ from . import (
     create_src_archive,
     open_archive,
     src_file,
+    src_dir,
 )
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -1026,23 +1029,62 @@ def test_dry_run_extraction_flags(archivers, request):
     assert not os.listdir("output"), "Output directory should be empty after dry-run"
 
 
-def test_extract_file_with_missing_chunk(archivers, request):
-    archiver = request.getfixturevalue(archivers)
+def _damage_last_chunk(archiver, damage):
+    """Create an archive of src_dir and damage the last chunk of src_file in the repository.
+
+    *damage* is "missing" (the chunk gets deleted) or "corrupted" (a byte of the chunk is flipped
+    in its pack, so it does not authenticate any more). Returns (item path, damaged chunk).
+    """
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_src_archive(archiver, "archive")
-    # Get rid of a chunk
     archive, repository = open_archive(archiver.repository_path, "archive")
     with repository:
         for item in archive.iter_items():
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
-                repository.delete(chunk.id)
-                break
+                if damage == "missing":
+                    repository.delete(chunk.id)
+                else:
+                    corrupt_chunk_on_disk(repository, chunk.id)
+                return item.path, chunk
         else:
             assert False  # missed the file
-    output = cmd(archiver, "extract", "archive")
-    # TODO: this is a bit dirty still: no warning/error rc, no filename output for the damaged file.
-    assert f"repository object {bin_to_hex(chunk.id)} missing, returning {chunk.size} zero bytes." in output
+
+
+@pytest.mark.parametrize("damage", ["missing", "corrupted"])
+def test_extract_file_with_damaged_chunk(archivers, request, damage):
+    # a missing or corrupted chunk does not abort the extraction: it is replaced by all-zero data
+    # of the correct size, the file gets a warning and the rc is a warning, the other files are fine.
+    archiver = request.getfixturevalue(archivers)
+    path, chunk = _damage_last_chunk(archiver, damage)
+    with open(os.path.join(os.path.dirname(src_dir), src_file), "rb") as f:
+        original = f.read()
+    with changedir("output"):
+        output = cmd(archiver, "extract", "archive", exit_code=BackupDamagedChunksError.exit_mcode)
+        assert f"repository object {bin_to_hex(chunk.id)} {damage}" in output
+        assert f"returning {chunk.size} zero bytes." in output
+        assert f"{path}: 1 chunk(s) missing or corrupted in the repository, replaced by all-zero data" in output
+        with open(path, "rb") as f:
+            extracted = f.read()
+        assert len(extracted) == len(original)
+        assert extracted[: -chunk.size] == original[: -chunk.size]
+        assert extracted[-chunk.size :] == bytes(chunk.size)
+        # the other files of the archive were extracted normally
+        with open(os.path.join(os.path.dirname(path), "extract_cmd.py"), "rb") as f1:
+            with open(os.path.join(src_dir, "extract_cmd.py"), "rb") as f2:
+                assert f1.read() == f2.read()
+
+
+@pytest.mark.parametrize("damage", ["missing", "corrupted"])
+def test_extract_dry_run_with_damaged_chunk(archivers, request, damage):
+    # --dry-run reads and verifies all data, so it reports damaged files the same way (and can be
+    # used to find them), without writing anything.
+    archiver = request.getfixturevalue(archivers)
+    path, chunk = _damage_last_chunk(archiver, damage)
+    with changedir("output"):
+        output = cmd(archiver, "extract", "--dry-run", "archive", exit_code=BackupDamagedChunksError.exit_mcode)
+        assert f"{path}: 1 chunk(s) missing or corrupted in the repository, replaced by all-zero data" in output
+        assert not os.listdir(".")
 
 
 def test_extract_existing_directory(archivers, request):

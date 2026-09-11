@@ -21,6 +21,7 @@ from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import fakeroot_detected, skipif_not_linux, skipif_fakeroot_detected
 from ..platform.platform_test import skipif_acls_not_working
+from ..repository_test import corrupt_chunk_on_disk
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 from . import Archiver
@@ -304,16 +305,20 @@ def test_fuse_archive_dir_format(archivers, request, monkeypatch):
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
-def test_fuse_allow_damaged_files(archivers, request):
+@pytest.mark.parametrize("damage", ["missing", "corrupted"])
+def test_fuse_allow_damaged_files(archivers, request, damage):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_src_archive(archiver, "archive")
-    # Get rid of a chunk and repair it
+    # damage the last chunk of a file: delete it or corrupt it in its pack (it does not authenticate then)
     archive, repository = open_archive(archiver.repository_path, "archive")
     with repository:
         for item in archive.iter_items():
             if item.path.endswith(src_file):
-                repository.delete(item.chunks[-1].id)
+                if damage == "missing":
+                    repository.delete(item.chunks[-1].id)
+                else:
+                    corrupt_chunk_on_disk(repository, item.chunks[-1].id)
                 path = item.path  # store full path for later
                 break
         else:
@@ -328,7 +333,7 @@ def test_fuse_allow_damaged_files(archivers, request):
 
     with fuse_mount(archiver, mountpoint, "-a", "archive", "-o", "allow_damaged_files"):
         with open(os.path.join(mountpoint, "archive", path), "rb") as f:
-            # no exception raised, missing data will be all-zero
+            # no exception raised, the damaged part will be all-zero
             data = f.read()
         assert data.endswith(b"\0\0")
 

@@ -3,6 +3,7 @@ import hmac
 import os
 import textwrap
 from hashlib import sha256
+from itertools import islice
 from math import ceil
 from pathlib import Path
 from typing import Any, Literal, ClassVar, Optional
@@ -24,7 +25,7 @@ from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, Passphrase
 from ..helpers import msgpack
 from ..helpers import workarounds
 from ..item import Key, EncryptedKey
-from ..manifest import Manifest
+from ..manifest import Manifest, NoManifestError
 from ..platform import SaveFile
 from ..repoobj import RepoObj, RepoObj1
 
@@ -222,7 +223,17 @@ def identify_key(manifest_data):
     raise UnsupportedPayloadError(key_type)
 
 
-def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
+def identify_stored_key(manifest_chunk, *, ro_cls=RepoObj):
+    """Return (key class, data slot) of the stored object manifest_chunk.
+
+    A stored object is an object header, a metadata slot and a data slot (see RepoObj). The first
+    byte of the data slot is the key type byte, which selects the key class.
+
+    manifest_chunk: the stored object, e.g. the manifest.
+    ro_cls: the RepoObj class that parses manifest_chunk.
+    Raises IntegrityError if manifest_chunk is damaged (see ro_cls.extract_crypted_data), and
+    UnsupportedPayloadError if the key type byte selects no key class usable with ro_cls.
+    """
     manifest_data = ro_cls.extract_crypted_data(manifest_chunk)
     assert manifest_data, "manifest data must not be zero bytes long"
     key_cls = identify_key(manifest_data)
@@ -232,9 +243,47 @@ def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
         # tagged envelope modes (see MACKeyBase). The legacy key classes only exist to read borg
         # 1.x repositories (ro_cls is RepoObj1 then), e.g. for "borg transfer --from-borg1".
         raise UnsupportedPayloadError(manifest_data[0])
+    return key_cls, manifest_data
+
+
+def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
+    key_cls, manifest_data = identify_stored_key(manifest_chunk, ro_cls=ro_cls)
     key = key_cls.detect(repository, manifest_data, other=other)
     key.stored_type = manifest_data[0]
     return key
+
+
+def key_from_repository(repository, ids=None):
+    """Return the key of repository, loaded from the first stored object that identifies the key type.
+
+    Stored objects are read in this order: the manifest, then the objects of the chunk ids in ids, at
+    most 999 of them. An object identifies the key type if identify_stored_key accepts it. Errors
+    loading the key, e.g. a wrong passphrase, propagate.
+
+    repository: the Repository whose key is loaded.
+    ids: iterable of chunk ids. None: the chunk ids in the chunks index of repository.
+    Raises IntegrityError if no object read identifies the key type.
+    """
+    max_objects = 999
+
+    def stored_objects():
+        try:
+            yield repository.get_manifest()
+        except NoManifestError:
+            pass
+        chunk_ids = (id for id, _ in repository.list(limit=max_objects)) if ids is None else ids
+        for id in islice(chunk_ids, max_objects):
+            yield repository.get(id)
+
+    count = 0
+    for cdata in stored_objects():
+        count += 1
+        try:
+            identify_stored_key(cdata)
+        except (IntegrityError, UnsupportedPayloadError):
+            continue
+        return key_factory(repository, cdata)
+    raise IntegrityError(f"no stored object identifies the key type ({count} objects read)")
 
 
 def uses_same_chunker_secret(other_key, key):

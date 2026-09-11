@@ -342,7 +342,7 @@ def test_missing_file_chunk(archivers, request):
             if item.path.endswith(src_file):
                 valid_chunks = item.chunks
                 killed_chunk = valid_chunks[-1]
-                repository.delete(killed_chunk.id)
+                repository.delete(killed_chunk.id, validate=None)
                 break
         else:
             pytest.fail("should not happen")  # convert 'fail'
@@ -398,7 +398,7 @@ def test_missing_file_chunk_report_truncated(archiver):
                 continue
             chunk_id = item.chunks[-1].id
             if chunk_id not in killed_ids:
-                repository.delete(chunk_id)
+                repository.delete(chunk_id, validate=None)
                 killed_ids.append(chunk_id)
             if len(killed_ids) >= 3:
                 break
@@ -430,7 +430,7 @@ def test_missing_file_chunk_refs_truncated(archivers, request):
         for item in archive.iter_items():
             if item.path.endswith("samefile0"):
                 killed_id = item.chunks[0].id
-                repository.delete(killed_id)
+                repository.delete(killed_id, validate=None)
                 break
     assert killed_id is not None
 
@@ -445,7 +445,7 @@ def test_missing_archive_item_chunk(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        repository.delete(archive.item_ids[0])
+        repository.delete(archive.item_ids[0], validate=None)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -456,7 +456,7 @@ def test_missing_archive_metadata(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        repository.delete(archive.id)
+        repository.delete(archive.id, validate=None)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -524,7 +524,7 @@ def test_check_format_missing_archive_metadata(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        repository.delete(archive.id)
+        repository.delete(archive.id, validate=None)
     archive_id_hex = bin_to_hex(archive.id)
     output = cmd(archiver, "check", "-v", "--archives-only", "--format", "{archive} {comment}", exit_code=1)
     # the archive directory entry has no name for it, only the id, which {archive} {comment} would not show.
@@ -543,7 +543,7 @@ def test_missing_manifest(archivers, request):
         if isinstance(repository, Repository):
             repository.store_delete("config/manifest")
         else:
-            repository.delete(Manifest.MANIFEST_ID)
+            repository.delete(Manifest.MANIFEST_ID, validate=None)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive1" in output

@@ -12,7 +12,7 @@ from ...compress import ZSTD, ZLIB, LZ4, CNONE
 from ...archiver.repo_compress_cmd import PackRecompressor
 
 from . import create_regular_file, cmd, RK_ENCRYPTION
-from ..repository_test import H, fchunk, pdchunk
+from ..repository_test import H, accept_all, fchunk, pdchunk
 
 
 def test_repo_compress(archiver):
@@ -264,7 +264,7 @@ def test_transform_pack_keeps_unindexed_gap(tmp_path):
         replacements = {H(0): fchunk(b"W" * 100, chunk_id=H(0)), H(2): fchunk(b"y", chunk_id=H(2))}
         calls = []
         new_pack_id, new_size = repository.transform_pack(
-            pack_id, [H(0), H(2)], transform_via(replacements), before_change=lambda: calls.append(1)
+            pack_id, [H(0), H(2)], transform_via(replacements), before_change=lambda: calls.append(1), validate=None
         )
         assert new_pack_id != pack_id
         assert calls == [1]  # before_change called (once), the store was modified
@@ -303,7 +303,10 @@ def test_transform_pack_drops_superseded_gap(tmp_path):
         assert pack_b != pack_a
 
         w_new = fchunk(b"W" * 100, chunk_id=H(0))
-        new_pack_id, new_size = repository.transform_pack(pack_a, [H(0)], transform_via({H(0): w_new}))
+        # fchunk objects have no encrypted metadata slot (see fchunk), so accept_all stands in for validate.
+        new_pack_id, new_size = repository.transform_pack(
+            pack_a, [H(0)], transform_via({H(0): w_new}), validate=accept_all
+        )
         assert new_pack_id != pack_a
         assert new_size == len(w_new)  # only W remains, X's superseded bytes were dropped
         assert pdchunk(repository.get(H(0))) == b"W" * 100
@@ -324,7 +327,7 @@ def test_transform_pack_unchanged_pack_untouched(tmp_path):
 
         calls = []
         new_pack_id, new_size = repository.transform_pack(
-            pack_id, [H(0), H(1)], transform_via({}), before_change=lambda: calls.append(1)
+            pack_id, [H(0), H(1)], transform_via({}), before_change=lambda: calls.append(1), validate=None
         )
         assert new_pack_id == pack_id
         assert calls == []  # nothing changed, so before_change was never called

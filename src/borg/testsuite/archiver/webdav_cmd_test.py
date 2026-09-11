@@ -627,7 +627,7 @@ def test_webdav_damaged_file(archivers, request):
         archive = Archive(manifest, manifest.archives.get("test").id)
         for item in archive.iter_items():
             if item.path.endswith("big"):
-                repository.delete(item.chunks[-1].id)  # get rid of a chunk of "big"
+                repository.delete(item.chunks[-1].id, validate=None)  # get rid of a chunk of "big"
                 break
         else:
             assert False  # missed the file

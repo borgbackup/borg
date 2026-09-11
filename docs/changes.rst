@@ -170,6 +170,10 @@ New features:
 
 - create/import-tar --json: report the deduplicated size of the new archive, #10335.
   It is also included in the archive_progress JSON output.
+- extract/export-tar --list --log-json: output a file_status JSON object per listed item,
+  like create does. The text listing of export-tar has the same "+" prefix as extract's now.
+  prune/delete/undelete --list --log-json: output an archive_status JSON object per listed
+  archive, #9454.
 
 Fixes:
 
@@ -194,6 +198,13 @@ Other changes:
   botocore (S3) service models borg needs, and build cryptography against the
   bundled OpenSSL in the Linux binaries instead of bundling a second OpenSSL
   with it, #10345.
+- cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
+  instead of parsing text lines, #9454. The display depends on the command: archive
+  statistics for create/import-tar/recreate/transfer (with the final statistics from
+  --json), a progress bar for extract/export-tar, the progress phases for the other
+  commands. Yes/no prompts are shown as a dialog. The cockpit exits with the exit code
+  of the borg command.
+- docs: add a usage page for the cockpit TUI.
 
 Version 2.0.0b24 (2026-09-02)
 -----------------------------

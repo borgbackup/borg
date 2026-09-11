@@ -39,6 +39,7 @@ class ExtractMixIn:
 
         progress = args.progress
         output_list = args.output_list
+        self.output_list = output_list  # for print_file_status()
         dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
@@ -69,8 +70,7 @@ class ExtractMixIn:
             is_matched = matcher.match(orig_path)
 
             if output_list:
-                log_prefix = "+" if is_matched else "-"
-                logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
+                self.print_file_status("+" if is_matched else "-", item.path)
 
             if is_matched:
                 if not dry_run:

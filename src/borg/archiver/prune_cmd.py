@@ -1,6 +1,5 @@
 from typing import Callable, NamedTuple
 from datetime import datetime, timedelta
-import logging
 import math
 from functools import partial, wraps
 import os
@@ -245,7 +244,6 @@ class PruneMixIn:
                     )
             logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(archives_to_prune))
 
-        list_logger = logging.getLogger("borg.output.list")
         # set up counters for the progress display
         num_archives_deleted = 0
         pi = ProgressIndicatorPercent(total=len(archives_to_prune), msg="Pruning archives %3.0f%%", msgid="prune")
@@ -254,28 +252,30 @@ class PruneMixIn:
                 break
             # get_item_data/format_item may internally load the archive from the repository,
             # so we must call it before deleting the archive.
-            if args.json:
+            if args.json or self.log_json:
                 archive_data = formatter.get_item_data(archive_info, jsonline=True)
                 archive_data["group"] = dict(zip(group_by, group_of[archive_info]))
-            else:
+            if not args.json:
                 archive_formatted = formatter.format_item(archive_info, jsonline=False)
             if archive_info in archives_to_prune:
                 if not args.json:
                     pi.show()
                 num_archives_deleted += 1
+                status = "pruned"
                 if args.dry_run:
                     log_message = "Would prune:"
                 else:
                     log_message = f"Pruning archive ({num_archives_deleted}/{len(archives_to_prune)}):"
                     manifest.archives.delete_by_id(archive_info.id)
-                if args.json:
+                if args.json or self.log_json:
                     archive_data["kept"] = False
                     archive_data["deleted_archive_number"] = num_archives_deleted
             else:
                 result = keep[archive_info]
                 result_message = f"{result.rule.key}{'[oldest]' if result.oldest else ''} #{result.idx + 1}"
                 log_message = f"Keeping archive (rule: {result_message}):"
-                if args.json:
+                status = "kept"
+                if args.json or self.log_json:
                     archive_data["kept"] = True
                     archive_data["keep_rule"] = result.rule.key
                     archive_data["kept_oldest"] = result.oldest
@@ -293,7 +293,8 @@ class PruneMixIn:
                 or (args.list_pruned and archive_info in archives_to_prune)
                 or (args.list_kept and archive_info not in archives_to_prune)
             ):
-                list_logger.info(f"{log_message:<44} {archive_formatted}")
+                message = f"{log_message:<44} {archive_formatted}"
+                self.print_archive_status(status, archive_info, message, archive_data if self.log_json else None)
         if not args.json:
             pi.finish()
         if args.json:

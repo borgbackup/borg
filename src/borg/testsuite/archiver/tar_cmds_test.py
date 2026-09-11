@@ -808,3 +808,22 @@ def test_acl_roundtrip(archivers, request):
         assert "acl_default" in extracted_dir_acl
         assert extracted_dir_acl["acl_default"] == dir_acl["acl_default"]
         assert b"user:root:r--" in dir_acl["acl_default"]
+
+
+def test_export_tar_list_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    os.unlink("input/flagfile")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    # the text listing has the "+" prefix, like the listing of borg extract
+    output = cmd(archiver, "export-tar", "test", "simple.tar", "--list", "--tar-format=GNU")
+    assert "+ input/file1\n" in output
+    assert "+ input/dir2\n" in output
+    # with --log-json, the listing consists of file_status objects (one per item), no text lines
+    output = cmd(archiver, "export-tar", "test", "simple2.tar", "--list", "--log-json", "--tar-format=GNU")
+    messages = [json.loads(line) for line in output.splitlines()]
+    file_status = [msg for msg in messages if msg["type"] == "file_status"]
+    assert {"type": "file_status", "status": "+", "path": "input/file1"} in file_status
+    assert {"type": "file_status", "status": "+", "path": "input/dir2"} in file_status
+    assert all(msg["status"] == "+" for msg in file_status)

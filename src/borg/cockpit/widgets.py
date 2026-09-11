@@ -3,26 +3,126 @@ Borg Cockpit - UI Widgets.
 """
 
 import random
+import re
 import time
+from datetime import timedelta
 
 from rich.markup import escape
 from textual.app import ComposeResult
-from textual.reactive import reactive
-from textual.widgets import Static, RichLog
+from textual.widgets import ProgressBar, RichLog, Static
 from textual.containers import Vertical, Container
-from ..helpers import classify_ec
+from ..helpers import classify_ec, format_file_size, format_timedelta
+from ..helpers.parseformat import ellipsis_truncate
 from .translator import T, TRANSLATOR
 
 
-class StatusPanel(Static):
-    elapsed_time = reactive(0.0, init=False)
-    files_count = reactive(0, init=False)  # unchanged + modified + added + other + error
-    unchanged_count = reactive(0, init=False)
-    modified_count = reactive(0, init=False)
-    added_count = reactive(0, init=False)
-    other_count = reactive(0, init=False)
-    error_count = reactive(0, init=False)
-    rc = reactive(None, init=False)
+class StatusPanelBase(Static):
+    """
+    Base class of the panels showing the numbers of a borg run, next to the logo.
+
+    Subclasses compose their lines (Static widgets with an id) and implement show_session(), which
+    shows the state of a Session in them; HEIGHT is the number of lines they need, the screen sizes
+    the top row accordingly. A line is only updated when its text changes.
+    """
+
+    HEIGHT = 0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.session = None
+        self.shown = {}  # widget id -> text currently shown
+
+    @staticmethod
+    def _line(widget_id, label, value="", classes="status"):
+        """A Static for one "Label: value" line, for compose()."""
+        return Static(T(label) + value, classes=classes, id=widget_id)
+
+    def show(self, widget_id, text):
+        """Show <text> in the widget with <widget_id>, if it is not shown already."""
+        if self.shown.get(widget_id) != text:
+            self.shown[widget_id] = text
+            self.query_one(f"#{widget_id}").update(text)
+
+    def show_value(self, widget_id, label, value, truncate=False):
+        """Show a translated label and a value; long values can be truncated to the panel width, so they don't wrap."""
+        label = T(label)
+        value = str(value)
+        if truncate and value:
+            space = (self.size.width or 60) - len(label) - 1
+            value = ellipsis_truncate(value, space).rstrip()
+        self.show(widget_id, label + escape(value))
+
+    def update_from_session(self, session):
+        """Show the current state of the session."""
+        self.session = session
+        self.show_session(session)
+
+    def show_session(self, session):
+        raise NotImplementedError
+
+    def update_speed(self, session):
+        """Called once per second, after Session.sample(): update the speed display, if the panel has one."""
+
+    def show_speed(self, session):
+        """Show the current rates, if the panel has a speed display."""
+
+    def refresh_ui_labels(self):
+        """Redo all lines with the current translation."""
+        self.shown.clear()
+        if self.session is not None:
+            self.show_session(self.session)
+            self.show_speed(self.session)
+
+    # lines most panels have
+
+    @staticmethod
+    def _format_size(size):
+        return "-" if size is None else format_file_size(size)
+
+    def show_elapsed(self, session):
+        if TRANSLATOR.enabled:
+            # There seems to be no official formula for stardates, so we make something up.
+            # When showing the stardate, it is an absolute time, not relative "elapsed time".
+            ut = time.time()
+            sd = (ut - 1735689600) / 60.0  # Minutes since 2025-01-01 00:00.00 UTC
+            self.show("status-elapsed", f"Stardate {sd:.1f}")
+        else:
+            seconds = int(session.elapsed)
+            days, seconds = divmod(seconds, 86400)
+            h, m, s = seconds // 3600, (seconds % 3600) // 60, seconds % 60
+            self.show("status-elapsed", f"Elapsed: {days:02d}d {h:02d}:{m:02d}:{s:02d}")
+
+    def show_count(self, widget_id, label, count):
+        """Show a count that is fine when zero and a warning otherwise."""
+        widget = self.query_one(f"#{widget_id}")
+        widget.set_class(count == 0, "errors-ok")
+        widget.set_class(count != 0, "errors-warning")
+        self.show_value(widget_id, label, count)
+
+    def show_warnings(self, session):
+        self.show_count("status-warnings", "Warnings: ", session.warnings + session.errors)
+
+    def show_activity(self, session):
+        """What borg works on right now."""
+        self.show_value("status-activity", "Progress: ", session.progress_text, truncate=True)
+
+    def show_rc(self, session):
+        rc = session.rc
+        if rc is None:
+            self.show("status-rc", T("RC: ") + "RUNNING")
+            return
+        status = classify_ec(rc)
+        widget = self.query_one("#status-rc")
+        widget.set_class(status == "success", "rc-ok")
+        widget.set_class(status == "warning", "rc-warning")
+        widget.set_class(status not in ("success", "warning"), "rc-error")  # error, signal
+        self.show("status-rc", T("RC: ") + str(rc))
+
+
+class CreateStatusPanel(StatusPanelBase):
+    """create, import-tar, recreate, transfer: the statistics of the archive being created."""
+
+    HEIGHT = 17  # sparkline (4), speed (1), 12 lines
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -31,154 +131,220 @@ class StatusPanel(Static):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield SpeedSparkline(self.speed_history, id="speed-sparkline")
-            yield Static(T("Speed: 0/s"), id="status-speed")
+            yield self._line("status-speed", "Speed: ", "0 files/s", classes="")
 
             with Vertical(id="statuses"):
-                yield Static(T("Elapsed: 00d 00:00:00"), classes="status", id="status-elapsed")
-                yield Static(T("Files: 0"), classes="status", id="status-files")
-                yield Static(T("Unchanged: 0"), classes="status", id="status-unchanged")
-                yield Static(T("Modified: 0"), classes="status", id="status-modified")
-                yield Static(T("Added: 0"), classes="status", id="status-added")
-                yield Static(T("Other: 0"), classes="status", id="status-other")
-                yield Static(T("Errors: 0"), classes="status error-ok", id="status-errors")
-                yield Static(T("RC: RUNNING"), classes="status", id="status-rc")
+                yield self._line("status-elapsed", "Elapsed: ", "00d 00:00:00")
+                yield self._line("status-files", "Files: ", "0")
+                yield self._line("status-original", "Original: ", "-")
+                yield self._line("status-deduplicated", "Deduplicated: ", "-")
+                yield self._line("status-unchanged", "Unchanged: ", "0")
+                yield self._line("status-modified", "Modified: ", "0")
+                yield self._line("status-added", "Added: ", "0")
+                yield self._line("status-other", "Other: ", "0")
+                yield self._line("status-errors", "Errors: ", "0", classes="status errors-ok")
+                yield self._line("status-warnings", "Warnings: ", "0", classes="status errors-ok")
+                yield self._line("status-activity", "Progress: ")
+                yield self._line("status-rc", "RC: ", "RUNNING")
 
-    def update_speed(self, kfiles_per_second: float):
-        self.speed_history.append(kfiles_per_second)
+    def show_session(self, session):
+        self.show_elapsed(session)
+        self.show_value("status-files", "Files: ", session.nfiles)
+        original, deduplicated = session.original_size, session.deduplicated_size
+        self.show_value("status-original", "Original: ", self._format_size(original))
+        ratio = f" ({deduplicated * 100 / original:.1f}%)" if deduplicated is not None and original else ""
+        self.show_value("status-deduplicated", "Deduplicated: ", self._format_size(deduplicated) + ratio)
+        self.show_value("status-unchanged", "Unchanged: ", session.count("U-"))
+        self.show_value("status-modified", "Modified: ", session.count("M"))
+        self.show_value("status-added", "Added: ", session.count("A+"))
+        self.show_value("status-other", "Other: ", sum(session.files_stats.values()) - session.count("U-MA+E"))
+        self.show_count("status-errors", "Errors: ", session.count("E"))
+        self.show_warnings(session)
+        if not session.running and session.archive_name is not None:
+            # the final --json output tells about the archive that was created.
+            duration = session.archive_duration
+            value = session.archive_name
+            if duration is not None:
+                value += f" ({format_timedelta(timedelta(seconds=duration))})"
+            self.show_value("status-activity", "Archive: ", value, truncate=True)
+        else:
+            self.show_activity(session)
+        self.show_rc(session)
+
+    def update_speed(self, session):
+        self.speed_history.append(session.files_per_second)
         self.speed_history = self.speed_history[-SpeedSparkline.HISTORY_SIZE :]
-        # Use our custom update method
         self.query_one("#speed-sparkline").update_data(self.speed_history)
-        self.query_one("#status-speed").update(T(f"Speed: {int(kfiles_per_second * 1000)}/s"))
+        self.show_speed(session)
 
-    def watch_error_count(self, count: int) -> None:
-        sw = self.query_one("#status-errors")
-        if count == 0:
-            sw.remove_class("errors-warning")
-            sw.add_class("errors-ok")
-        else:
-            sw.remove_class("errors-ok")
-            sw.add_class("errors-warning")
-        sw.update(T(f"Errors: {count}"))
+    def show_speed(self, session):
+        rates = f"{session.files_per_second:.0f} files/s, {format_file_size(session.original_bytes_per_second)}/s"
+        self.show("status-speed", T("Speed: ") + rates)
 
-    def watch_files_count(self, count: int) -> None:
-        self.query_one("#status-files").update(T(f"Files: {count}"))
 
-    def watch_unchanged_count(self, count: int) -> None:
-        self.query_one("#status-unchanged").update(T(f"Unchanged: {count}"))
+class ExtractStatusPanel(StatusPanelBase):
+    """extract, export-tar: a progress bar over the bytes to extract, and the counts of the --list lines."""
 
-    def watch_modified_count(self, count: int) -> None:
-        self.query_one("#status-modified").update(T(f"Modified: {count}"))
+    HEIGHT = 14  # sparkline (4), speed (1), progress bar (1), 8 lines
+    PHASE = "extract"  # the msgid of the progress operation the bar shows
 
-    def watch_added_count(self, count: int) -> None:
-        self.query_one("#status-added").update(T(f"Added: {count}"))
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.speed_history = [0.0] * SpeedSparkline.HISTORY_SIZE
 
-    def watch_other_count(self, count: int) -> None:
-        self.query_one("#status-other").update(T(f"Other: {count}"))
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield SpeedSparkline(self.speed_history, id="speed-sparkline")
+            yield self._line("status-speed", "Speed: ", "0 B/s", classes="")
+            yield ProgressBar(id="extract-bar")  # indeterminate until the total is known
 
-    def watch_rc(self, rc: int):
-        label = self.query_one("#status-rc")
-        if rc is None:
-            label.update(T("RC: RUNNING"))
-            return
+            with Vertical(id="statuses"):
+                yield self._line("status-extracted", "Extracted: ", "-")
+                yield self._line("status-elapsed", "Elapsed: ", "00d 00:00:00")
+                yield self._line("status-items", "Items: ", "0")
+                yield self._line("status-included", "Included: ", "0")
+                yield self._line("status-excluded", "Excluded: ", "0")
+                yield self._line("status-warnings", "Warnings: ", "0", classes="status errors-ok")
+                yield self._line("status-activity", "Progress: ")
+                yield self._line("status-rc", "RC: ", "RUNNING")
 
-        label.remove_class("rc-ok")
-        label.remove_class("rc-warning")
-        label.remove_class("rc-error")
+    def show_session(self, session):
+        phase = session.phase(self.PHASE)
+        bar = self.query_one("#extract-bar")
+        extracted = "-"
+        if phase is not None and phase.total:
+            current = phase.total if phase.finished else min(phase.current or 0, phase.total)
+            bar.update(total=phase.total, progress=current)
+            extracted = f"{format_file_size(current)} / {format_file_size(phase.total)}"
+        elif phase is not None and phase.finished:  # there was nothing to extract
+            bar.update(total=1, progress=1)
+        self.show_value("status-extracted", "Extracted: ", extracted)
+        self.show_elapsed(session)
+        self.show_value("status-items", "Items: ", sum(session.status_counts.values()))
+        self.show_value("status-included", "Included: ", session.status_counts.get("+", 0))
+        self.show_value("status-excluded", "Excluded: ", session.status_counts.get("-", 0))
+        self.show_warnings(session)
+        self.show_activity(session)
+        self.show_rc(session)
 
-        status = classify_ec(rc)
-        if status == "success":
-            label.add_class("rc-ok")
-        elif status == "warning":
-            label.add_class("rc-warning")
-        else:  # error, signal
-            label.add_class("rc-error")
+    def _rate(self, session):
+        phase = session.phase(self.PHASE)
+        return 0.0 if phase is None else phase.rate
 
-        label.update(T(f"RC: {rc}"))
+    def update_speed(self, session):
+        self.speed_history.append(self._rate(session))
+        self.speed_history = self.speed_history[-SpeedSparkline.HISTORY_SIZE :]
+        self.query_one("#speed-sparkline").update_data(self.speed_history)
+        self.show_speed(session)
 
-    def watch_elapsed_time(self, elapsed: float) -> None:
-        if TRANSLATOR.enabled:
-            # There seems to be no official formula for stardates, so we make something up.
-            # When showing the stardate, it is an absolute time, not relative "elapsed time".
-            ut = time.time()
-            sd = (ut - 1735689600) / 60.0  # Minutes since 2025-01-01 00:00.00 UTC
-            msg = f"Stardate {sd:.1f}"
-        else:
-            seconds = int(elapsed)
-            days, seconds = divmod(seconds, 86400)
-            h, m, s = seconds // 3600, (seconds % 3600) // 60, seconds % 60
-            msg = f"Elapsed: {days:02d}d {h:02d}:{m:02d}:{s:02d}"
-        self.query_one("#status-elapsed").update(msg)
+    def show_speed(self, session):
+        self.show("status-speed", T("Speed: ") + f"{format_file_size(self._rate(session))}/s")
 
-    def refresh_ui_labels(self):
-        """Update static UI labels with current translation."""
-        self.watch_elapsed_time(self.elapsed_time)
-        self.query_one("#status-files").update(T(f"Files: {self.files_count}"))
-        self.query_one("#status-unchanged").update(T(f"Unchanged: {self.unchanged_count}"))
-        self.query_one("#status-modified").update(T(f"Modified: {self.modified_count}"))
-        self.query_one("#status-added").update(T(f"Added: {self.added_count}"))
-        self.query_one("#status-other").update(T(f"Other: {self.other_count}"))
-        self.query_one("#status-errors").update(T(f"Errors: {self.error_count}"))
 
-        if self.rc is not None:
-            self.watch_rc(self.rc)
-        else:
-            self.query_one("#status-rc").update(T("RC: RUNNING"))
+class GenericStatusPanel(StatusPanelBase):
+    """All other commands: elapsed time, warnings, exit code and the phases borg reports progress for."""
+
+    HEIGHT = 17  # 4 lines, the title, PHASE_LINES
+    PHASE_LINES = 12  # the phases shown (the last ones, if there are more)
+    BAR_WIDTH = 10
+    PERCENTAGE = re.compile(r"\s*\d+(\.\d+)?%$")  # the percentage at the end of a progress message
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            with Vertical(id="statuses"):
+                yield self._line("status-elapsed", "Elapsed: ", "00d 00:00:00")
+                yield self._line("status-warnings", "Warnings: ", "0", classes="status errors-ok")
+                yield self._line("status-archives", "Archives: ", "-")
+                yield self._line("status-rc", "RC: ", "RUNNING")
+            yield Static(T("Phases"), classes="panel-title", id="phases-title")
+            yield Static("", id="phases")
+
+    def show_session(self, session):
+        self.show_elapsed(session)
+        self.show_warnings(session)
+        counts = session.archive_counts
+        statuses = [status for status in ("kept", "pruned", "deleted", "undeleted") if counts[status]]
+        statuses += [status for status in counts if status not in statuses]
+        parts = [f"{counts[status]} {status}" for status in statuses]
+        self.show_value("status-archives", "Archives: ", ", ".join(parts) if parts else "-")
+        self.show_rc(session)
+        self.show("phases-title", T("Phases"))
+        space = (self.size.width or 60) - self.BAR_WIDTH - 3
+        lines = []
+        for phase in list(session.phases.values())[-self.PHASE_LINES :]:
+            if phase.finished:
+                mark, filled, style = "✔", self.BAR_WIDTH, "green"
+            else:
+                fraction = phase.fraction
+                mark, filled, style = "▶", 0 if fraction is None else round(fraction * self.BAR_WIDTH), "bold white"
+            bar = "█" * filled + "░" * (self.BAR_WIDTH - filled)
+            message = phase.message or phase.msgid or ""
+            if phase.finished:  # the last percentage borg reported before finishing is not the final one
+                message = self.PERCENTAGE.sub("", message)
+            text = ellipsis_truncate(message, space).rstrip()
+            lines.append(f"[{style}]{mark} {bar} {escape(text)}[/]")
+        self.show("phases", "\n".join(lines))
 
 
 class StandardLog(Vertical):
+    """The log panel: log messages, --list lines and everything else borg outputs."""
+
+    # Styles for the --list status characters, see "Item flags" in the borg create help.
+    STATUS_STYLES = {
+        "E": "red",  # error
+        "C": "yellow",  # regular file, changed while reading
+        "?": "red",  # missing status, a bug
+        "A": "white",  # added regular file (cache miss, slow!)
+        "M": "white",  # modified regular file (cache hit, but different, slow!)
+        "U": "green",  # unchanged regular file (cache hit)
+        "-": "white",  # excluded
+        "x": "white",  # skipped (dataless)
+    }
+    DEFAULT_STATUS_STYLE = "green"  # d, b, c, h, s, f, i: metadata only. +: included.
+    # Styles for the log levels (and the prompts and the final statistics).
+    LEVEL_STYLES = {
+        "DEBUG": "dim",
+        "WARNING": "yellow",
+        "ERROR": "red",
+        "CRITICAL": "bold red",
+        "PROMPT": "bold yellow",
+        "STATS": "bold",
+    }
+    MAX_LINES = 5000  # lines kept for scrolling back
+
     def compose(self) -> ComposeResult:
         yield Static(T("Log"), classes="panel-title", id="standard-log-title")
-        yield RichLog(id="standard-log-content", highlight=False, markup=True, auto_scroll=True, max_lines=None)
+        yield RichLog(
+            id="standard-log-content", highlight=False, markup=True, auto_scroll=True, max_lines=self.MAX_LINES
+        )
 
     def update_title(self):
         self.query_one("#standard-log-title").update(T("Log"))
 
-    def add_line(self, line: str):
-        # TODO: make this more generic, use json output from borg.
-        # currently, this is only really useful for borg create/extract --list
-        line = line.rstrip()
-        if len(line) == 0:
+    @classmethod
+    def style_for(cls, line):
+        """The rich style for a Line from the Session, None for plain text."""
+        if line.kind == "status":
+            return cls.STATUS_STYLES.get(line.tag, cls.DEFAULT_STATUS_STYLE)
+        if line.kind == "archive":
+            return "green" if line.tag in ("kept", "undeleted") else "white"  # the archive stays / is back
+        if line.kind == "log":
+            return cls.LEVEL_STYLES.get(line.tag)
+        if line.kind == "hint":
+            return "bold yellow"
+        return None
+
+    def add_lines(self, lines, dropped=0):
+        """Append the lines taken from Session.drain(); dropped lines are only mentioned."""
+        if not lines and not dropped:
             return
-
-        markup_tag = None
-        if len(line) >= 2:
-            if line[1] == " " and line[0] in "EAMUdcbs+-":
-                # looks like from borg create/extract --list
-                status_panel = self.app.query_one("#status")
-                status_panel.files_count += 1
-                status = line[0]
-                match status:
-                    case "E":
-                        status_panel.error_count += 1
-                    case "U" | "-":
-                        status_panel.unchanged_count += 1
-                    case "M":
-                        status_panel.modified_count += 1
-                    case "A" | "+":
-                        status_panel.added_count += 1
-                    case "d" | "c" | "b" | "s":
-                        status_panel.other_count += 1
-
-                markup_tag = {
-                    "E": "red",  # Error
-                    "A": "white",  # Added regular file (cache miss, slow!)
-                    "M": "white",  # Modified regular file (cache hit, but different, slow!)
-                    "U": "green",  # Updated regular file (cache hit)
-                    "d": "green",  # directory
-                    "c": "green",  # char device
-                    "b": "green",  # block device
-                    "s": "green",  # socket
-                    "-": "white",  # excluded
-                    "+": "green",  # included
-                }.get(status)
-
         log_widget = self.query_one("#standard-log-content")
-
-        safe_line = escape(line)
-        if markup_tag:
-            safe_line = f"[{markup_tag}]{safe_line}[/]"
-
-        log_widget.write(safe_line)
+        if dropped:
+            log_widget.write(f"[dim]... {dropped} more lines not shown ...[/]")
+        for line in lines:
+            text = escape(line.text)
+            style = self.style_for(line)
+            log_widget.write(f"[{style}]{text}[/]" if style else text)
 
 
 class Starfield(Static):

@@ -38,6 +38,7 @@ try:
     from ..helpers import add_warning, BorgWarning, BackupWarning
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
+    from ..helpers import bin_to_hex, OutputTimestamp, BorgJsonEncoder
     from ..helpers import DatetimeWrapper, replace_placeholders
     from ..helpers.argparsing import flatten_namespace, ArgumentTypeError, ArgumentParser, SUPPRESS
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
@@ -140,6 +141,9 @@ class Archiver(
         self.lock_wait = lock_wait
         self.prog = prog
         self.start_backup = None
+        # for print_file_status(): the commands with a file listing set these from their options.
+        self.output_list = False
+        self.output_filter = None
 
     def print_warning(self, msg, *args, **kw):
         warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
@@ -170,6 +174,27 @@ class Archiver(
                 print(json.dumps(json_data), file=sys.stderr)
             else:
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))
+
+    def print_archive_status(self, status, archive_info, message, data=None):
+        """
+        List an archive a command processed, like print_file_status() lists the items of a file listing.
+
+        With --log-json, an archive_status JSON object is printed: name, id and time of the archive, the
+        <status> (e.g. "kept", "pruned", "deleted"), the <message> (the text line) and the keys of <data>.
+        Without it, the text line goes to the "borg.output.list" logger. The callers check the --list options.
+        """
+        if self.log_json:
+            json_data = {
+                "name": archive_info.name,
+                "archive": archive_info.name,
+                "id": bin_to_hex(archive_info.id),
+                "time": OutputTimestamp(archive_info.ts),
+            }
+            json_data |= data or {}
+            json_data |= {"status": status, "type": "archive_status", "message": message}
+            print(json.dumps(json_data, cls=BorgJsonEncoder), file=sys.stderr)
+        else:
+            logging.getLogger("borg.output.list").info(message)
 
     def preprocess_args(self, args):
         deprecations = [
@@ -281,7 +306,12 @@ class Archiver(
         parser.add_argument(
             "-V", "--version", action="version", version="%(prog)s " + __version__, help="show version number and exit"
         )
-        parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
+        parser.add_argument(
+            "--cockpit",
+            dest="cockpit",
+            action="store_true",
+            help="run the command in the cockpit TUI, a full-screen progress display",
+        )
         parser.common_options.add_common_group(parser, provide_defaults=True)
 
         common_parser = ArgumentParser(prog=self.prog)
@@ -655,10 +685,13 @@ def main():  # pragma: no cover
                 print("Please install them using: pip install 'borgbackup[cockpit]'", file=sys.stderr)
                 sys.exit(EXIT_ERROR)
 
-            app = BorgCockpitApp()
-            app.borg_args = [arg for arg in sys.argv[1:] if arg != "--cockpit"]
+            app = BorgCockpitApp(
+                borg_args=[arg for arg in sys.argv[1:] if arg != "--cockpit"], command=getattr(args, "subcommand", None)
+            )
             app.run()
-            sys.exit(EXIT_SUCCESS)  # borg subprocess RC was already shown on the TUI
+            # exit with the exit code of the borg subprocess (it was shown on the TUI); rc < 0: borg could not be run.
+            rc = app.session.rc
+            sys.exit(rc if rc is not None and rc >= 0 else EXIT_ERROR)
 
         # normal borg CLI operation
         try:

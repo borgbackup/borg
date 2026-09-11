@@ -756,16 +756,46 @@ def test_reordered_chunks(archivers, request):
     granularity_sleep()  # the same-size rewrite must get a new ctime, or the files cache would reuse the old chunks
     create_regular_file(archiver.input_path, "file_swapped", contents=chunk_b + chunk_a)
     cmd(archiver, "create", "--chunker-params", "fixed,1024", "test1", "input")
-    # the same chunks in a different order: the content changed, but no bytes were added or removed.
+    # aligning the chunk lists keeps one of the two chunks, the other one is removed and added again.
     output = cmd(archiver, "diff", "--content-only", "test0", "test1")
-    assert_line_exists(output.splitlines(), r"^modified:\s+0 B\s+0 B input/file_swapped$")
+    assert_line_exists(output.splitlines(), r"^modified:\s+\+1.0 kB\s+-1.0 kB input/file_swapped$")
     output = cmd(archiver, "diff", "--content-only", "--json-lines", "test0", "test1")
     joutput = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
-    assert joutput == [{"changes": [{"added": 0, "removed": 0, "type": "modified"}], "path": "input/file_swapped"}]
-    # such a change is counted, although it contributes no bytes.
+    assert joutput == [
+        {"changes": [{"added": 1024, "removed": 1024, "type": "modified"}], "path": "input/file_swapped"}
+    ]
     output = cmd(archiver, "diff", "--stats", "--content-only", "test0", "test1")
     lines = output.splitlines()
     assert "Changed items: 1" in lines
-    assert_line_exists(lines, r"^Added size: 0 B$")
-    assert_line_exists(lines, r"^Removed size: 0 B$")
+    assert_line_exists(lines, r"^Added size: 1.02 kB$")
+    assert_line_exists(lines, r"^Removed size: 1.02 kB$")
     assert_line_not_exists(lines, r"^Items with unknown size changes:")
+
+
+def test_duplicated_chunks(archivers, request):
+    """Duplicating the chunks of a file adds content, although it does not add any new chunk id."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    chunk_a = b"a" * 1024
+    create_regular_file(archiver.input_path, "file_repeated", contents=chunk_a)
+    cmd(archiver, "create", "--chunker-params", "fixed,1024", "test0", "input")
+    create_regular_file(archiver.input_path, "file_repeated", contents=chunk_a * 3)
+    cmd(archiver, "create", "--chunker-params", "fixed,1024", "test1", "input")
+    # the file grew by two chunks, even though both versions only use the one chunk id.
+    output = cmd(archiver, "diff", "--content-only", "--json-lines", "test0", "test1")
+    joutput = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    assert joutput == [{"changes": [{"added": 2048, "removed": 0, "type": "modified"}], "path": "input/file_repeated"}]
+
+
+def test_inserted_chunk(archivers, request):
+    """A chunk inserted into a file counts as added bytes only, the chunks behind it are just moved."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    chunk_a, chunk_b, chunk_c = b"a" * 1024, b"b" * 1024, b"c" * 1024
+    create_regular_file(archiver.input_path, "file_grown", contents=chunk_a + chunk_b)
+    cmd(archiver, "create", "--chunker-params", "fixed,1024", "test0", "input")
+    create_regular_file(archiver.input_path, "file_grown", contents=chunk_a + chunk_c + chunk_b)
+    cmd(archiver, "create", "--chunker-params", "fixed,1024", "test1", "input")
+    output = cmd(archiver, "diff", "--content-only", "--json-lines", "test0", "test1")
+    joutput = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    assert joutput == [{"changes": [{"added": 1024, "removed": 0, "type": "modified"}], "path": "input/file_grown"}]

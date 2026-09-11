@@ -168,32 +168,48 @@ Version 2.0.0b25 (not released yet)
 
 New features:
 
-- create/import-tar --json: report the deduplicated size of the new archive, #10335.
-  It is also included in the archive_progress JSON output.
+- create/import-tar --json: report the deduplicated size of the new archive, #10335
+- diff --stats: show a summary of the differences, #796
+- repo-info: show whether the key uses an empty passphrase, #9072
+- the "previously unknown unencrypted repository" warning now says why the repository
+  is considered unencrypted: a none-* / authenticated-* mode (no data encryption) or a
+  repokey with an empty passphrase, #9072
 
 Fixes:
 
-- subprocess environment: also remove BORG_NEW_PASSPHRASE, BORG_OTHER_PASSPHRASE, BORG_PASSCOMMAND,
-  BORG_OTHER_PASSCOMMAND, BORG_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD and BORGSTORE_REST_PASSWORD
-  from the environment given to subprocesses (previously only BORG_PASSPHRASE was removed), #6480.
-- diff: a file whose content is unchanged, but whose timestamps changed (e.g. it was only touched),
-  was reported as "modified:  (can't get size)" if the two archives were created with different
-  --chunker-params (--content-only was not affected), #10351.
+- treat an empty BORG_ZSTD_MT_WORKERS as unset (an empty value made borg fail)
+- extract: report a failing close() of an extracted file as a warning
+- prepare_subprocess_env: remove all passphrase-related env vars, #6480
+- mount: mfusepy: pass the libfuse options as keyword arguments, fix getattr with a file handle
+- index rebuild: abort cleanly on a corrupt object header, #10122
+- check --repair: misc. improvements and fixes, #8476
+- diff:
+
+  - do not report a merely touched file as modified when the chunker params differ, #10351
+  - report a file as modified when chunks were reordered or duplicated
 
 Other changes:
 
-- repo-info: show if the key has an empty passphrase, #9072.
-- the "previously unknown unencrypted repository" warning now says why the repository is
-  considered unencrypted: a none-* / authenticated-* mode (no data encryption) or a repokey
-  with an empty passphrase, #9072.
-- docs: an empty passphrase can be replaced later with "borg key change-passphrase", #9072.
-- CI: also build Linux binaries on Ubuntu 24.04 (glibc 2.39) for systems with an
-  older glibc or a CPU below x86-64-v3, with OpenSSL 3.5 and Python 3.14 built
-  from source, #10342.
-- binaries: strip the debug symbols from the Linux binaries, bundle only the
-  botocore (S3) service models borg needs, and build cryptography against the
-  bundled OpenSSL in the Linux binaries instead of bundling a second OpenSSL
-  with it, #10345.
+- update pyinstaller to 6.22.0
+- Linux binaries:
+
+  - build binaries for older CPUs and older glibc on Ubuntu 24.04, #10342
+  - reduce binary size, #10345:
+
+    - strip debug symbols
+    - avoid bundling OpenSSL twice
+    - bundle only needed botocore models
+
+- compress: reuse the zstd compressor per thread, improving throughput especially
+  for big chunks at high-speed, low-compression zstd levels
+- add_warning: store exceptions given as args as text, not the exception object -
+  reduces memory usage when there are many warnings
+- docs:
+
+  - extract: document the metadata that can only be restored as root, #8088
+  - fix two inaccuracies in the borg diff JSON docs, #7486
+  - an empty passphrase can be replaced later with ``borg key change-passphrase``, #9072
+
 
 Version 2.0.0b24 (2026-09-02)
 -----------------------------

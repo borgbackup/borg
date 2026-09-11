@@ -23,6 +23,55 @@ def test_repo_list_glob(archivers, request, backup_files):
     assert "something-else" not in output
 
 
+def test_repo_list_exclude_archives(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test-1", backup_files)
+    cmd(archiver, "create", "test-2", backup_files)
+    cmd(archiver, "create", "other-1", backup_files)
+    output = cmd(archiver, "repo-list", "--exclude-archives=sh:test-*")
+    assert "test-1" not in output
+    assert "test-2" not in output
+    assert "other-1" in output
+
+
+def test_repo_list_exclude_archives_multiple(archivers, request, backup_files):
+    # several exclusion patterns are ORed: an archive matching any of them is skipped
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test-1", backup_files)
+    cmd(archiver, "create", "test-2", backup_files)
+    cmd(archiver, "create", "test-3", backup_files)
+    output = cmd(archiver, "repo-list", "--exclude-archives=test-1", "--exclude-archives=test-3")
+    assert "test-1" not in output
+    assert "test-2" in output
+    assert "test-3" not in output
+
+
+def test_repo_list_match_and_exclude_archives(archivers, request, backup_files):
+    # an archive is considered if it matches all --match-archives and none of the --exclude-archives
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test-1", backup_files)
+    cmd(archiver, "create", "test-2", backup_files)
+    cmd(archiver, "create", "other-1", backup_files)
+    output = cmd(archiver, "repo-list", "--match-archives=sh:test-*", "--exclude-archives=test-2")
+    assert "test-1" in output
+    assert "test-2" not in output
+    assert "other-1" not in output
+
+
+def test_repo_list_exclude_archives_by_tag(archivers, request, backup_files):
+    # exclusion accepts the same selector prefixes as --match-archives, not just names
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--tags", "keepme", "--", "test-1", backup_files)
+    cmd(archiver, "create", "test-2", backup_files)
+    output = cmd(archiver, "repo-list", "--exclude-archives=tags:keepme")
+    assert "test-1" not in output
+    assert "test-2" in output
+
+
 def test_archives_format(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

@@ -131,6 +131,14 @@ class RepoCreateMixIn:
         You can change your passphrase for existing repositories at any time; it will not affect
         the encryption/decryption key or other secrets.
 
+        Borg also accepts an empty passphrase. The repository is still encrypted with a random
+        key then, but that key is not protected: with ``repokey`` storage, anybody who can read
+        the repository can also unlock the key, which is as good as no encryption at all (with
+        ``keyfile`` storage, the key is only on your client, so an empty passphrase may be
+        acceptable if e.g. the client's disk is encrypted). Unlike with the ``none-*`` modes,
+        you can add a passphrase later with ``borg key change-passphrase``. ``borg repo-info``
+        shows whether the key has an empty passphrase.
+
         Choosing a crypto suite
         +++++++++++++++++++++++
 

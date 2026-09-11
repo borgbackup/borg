@@ -198,9 +198,18 @@ class SecurityManager:
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         if not key.logically_encrypted and not self.known():
+            if key.encrypts:
+                # the only encrypting key that is not logically encrypted: a repokey with an empty passphrase.
+                reason = (
+                    "The repository is encrypted, but its key is stored inside the repository (repokey) "
+                    "and has an empty passphrase, so anybody who can read the repository can also unlock the key."
+                )
+            else:
+                reason = f"The repository uses the {key.ENC_NAME} mode, which does not encrypt the data."
             msg = (
                 "Warning: Attempting to access a previously unknown unencrypted repository!\n"
-                + "Do you want to continue? [yN] "
+                + reason
+                + "\nDo you want to continue? [yN] "
             )
             allow_access = not warn_if_unencrypted or yes(
                 msg,

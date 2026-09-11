@@ -28,6 +28,10 @@ class RepoInfoMixIn:
             mode = {KeyBlobStorage.KEYFILE: "keyfile", KeyBlobStorage.REPO: "repokey"}.get(storage)
             # the "none-*" and "authenticated-*" modes name their id hash in ENC_NAME already.
             suite = key.ENC_NAME if key.IDHASH_IN_ENC_NAME else "%s, %s" % (key.ENC_NAME, key.IDHASH_NAME)
+            if key.encrypts and key.empty_passphrase:
+                # the key is not protected by a passphrase: with repokey storage, this is as good as
+                # no encryption at all, so make it visible here, see #9072.
+                suite += ", empty passphrase"
             if not key.encrypts:
                 # these modes do not encrypt data; the "authenticated-*" ones (unlike "none-*")
                 # still have a key stored as a keyfile or repokey, so show that location if there is one.

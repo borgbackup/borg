@@ -347,6 +347,12 @@ class KeyBase:
     # was supplied, and if an empty passphrase works, then Borg won't ask for one.
     logically_encrypted = False
 
+    # Whether the borg key of this instance was unlocked / saved with an empty passphrase.
+    # Unlike logically_encrypted, this is also True for keyfile storage (where an empty passphrase
+    # is a legitimate choice, as the key is not stored together with the data), so that
+    # "borg repo-info" can show it. Only set for keys that have a passphrase at all (see FlexiKey).
+    empty_passphrase = False
+
     def __init__(self, repository):
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
@@ -501,6 +507,7 @@ class FlexiKey:
     # have to infer their types across the module import cycle.
     chunk_seed: int
     crypt_key: bytes
+    empty_passphrase: bool
     id_key: bytes
     storage: str
     target: Any
@@ -850,6 +857,7 @@ class FlexiKey:
             # the manifest key-type byte, so save/remove/list operate on the right storage afterwards.
             self.storage = KeyBlobStorage.KEYFILE if keyfile_path is not None else KeyBlobStorage.REPO
             self.target = keyfile_path if self.storage == KeyBlobStorage.KEYFILE else self.repository
+            self.empty_passphrase = passphrase == ""  # nosec B105
             if self.storage == KeyBlobStorage.REPO:
                 # While the repository is encrypted, we consider a repokey repository with a blank
                 # passphrase an unencrypted repository.
@@ -883,6 +891,7 @@ class FlexiKey:
         # replace=True replaces the previously-loaded borg key (change-passphrase semantics);
         # replace=False adds an additional borg key, keeping the existing ones (key add).
         key_data = self._save(passphrase, algorithm, label=label)
+        self.empty_passphrase = passphrase == ""  # nosec B105
         if self.storage == KeyBlobStorage.KEYFILE:
             old_target = getattr(self, "target", None)
             keys_dir = get_keys_dir()

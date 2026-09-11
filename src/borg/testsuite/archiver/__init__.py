@@ -3,6 +3,7 @@ import filecmp
 import io
 import os
 import re
+import shlex
 import stat
 import subprocess
 import sys
@@ -37,6 +38,18 @@ from ...xattr import get_all
 RK_ENCRYPTION = "--encryption=aes256-ocb"
 KF_ENCRYPTION = "--encryption=chacha20-poly1305"
 KF_LOCATION = "--key-location=keyfile"
+
+
+def set_empty_passphrase(monkeypatch):
+    """Make borg use an empty passphrase, also in forked (binary) test runs.
+
+    BORG_PASSPHRASE="" does not work for that: on Windows, os.environ["X"] = "" removes X from the
+    environment given to child processes (CPython's putenv builds "X=", which the C runtime treats
+    as deletion), so a forked borg.exe would prompt for the passphrase and block.
+    """
+    monkeypatch.delenv("BORG_PASSPHRASE", raising=False)
+    monkeypatch.setenv("BORG_PASSCOMMAND", shlex.quote(sys.executable.replace("\\", "/")) + " -c pass")
+
 
 # This points to the ``src/borg/archiver`` directory (small, with only a few files).
 # There are quite a lot of files in there, because there is a __pycache__ subdirectory.

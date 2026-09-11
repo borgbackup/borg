@@ -13,6 +13,7 @@ from .. import llfuse
 from .. import changedir
 from . import cmd, _extract_repository_id, create_test_files
 from . import _set_repository_id, create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
+from . import set_empty_passphrase
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
 
@@ -191,7 +192,28 @@ def test_unknown_unencrypted(archivers, request, monkeypatch):
         with pytest.raises(Cache.CacheInitAbortedError):
             cmd(archiver, "repo-info")
     monkeypatch.setenv("BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK", "yes")
+    output = cmd(archiver, "repo-info")
+    # the warning says why the repository counts as unencrypted, see #9072
+    assert "previously unknown unencrypted repository" in output
+    assert "uses the none-sha256 mode, which does not encrypt the data" in output
+
+
+def test_unknown_unencrypted_empty_passphrase(archivers, request, monkeypatch):
+    # a repokey repository with an empty passphrase is treated like an unencrypted one, but the
+    # warning must say so, as "borg repo-info" reports the repository as encrypted, see #9072.
+    archiver = request.getfixturevalue(archivers)
+    set_empty_passphrase(monkeypatch)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # Ok: repository is known
     cmd(archiver, "repo-info")
+
+    # Needs confirmation: cache and security dir both gone (e.g. another host or rm -rf ~)
+    shutil.rmtree(archiver.cache_path)
+    shutil.rmtree(get_security_directory(archiver.repository_path))
+    monkeypatch.setenv("BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK", "yes")
+    output = cmd(archiver, "repo-info")
+    assert "previously unknown unencrypted repository" in output
+    assert "stored inside the repository (repokey) and has an empty passphrase" in output
 
 
 def test_unknown_feature_on_create(archivers, request):

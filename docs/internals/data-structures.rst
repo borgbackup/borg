@@ -50,7 +50,7 @@ archives/
 
 The (encrypted and compressed) repository objects are not stored one store
 object each: many of them are batched into a **pack** file and that pack file
-is stored as a single store object. Its name is the hex-encoded sha256 hash of
+is stored as a single store object. Its name is the hex-encoded blake3 hash of
 the pack file's content:
 
 packs/
@@ -61,7 +61,7 @@ index/
   0000... .. ffff...
     the chunks index (chunk ID -> location within a pack file), stored as a set
     of immutable, encrypted index fragments. A fragment's name is the
-    hex-encoded sha256 hash of its content.
+    hex-encoded blake3 hash of its content.
 
 See :ref:`packs` for the pack file format, the ``index/`` namespace and how
 both are written and compacted.
@@ -77,7 +77,7 @@ cache/
     check finishes.
   referenced-by-archive.<hex-encoded archive ID>
     what one archive references (object ID -> plaintext object size), plus the file
-    count and content size of that archive, with an appended sha256 for integrity.
+    count and content size of that archive, with an appended blake3 hash for integrity.
     It lets a following ``borg compact`` or ``borg analyze`` skip re-reading the items
     of an unchanged archive.
   chunkindex-invalid
@@ -92,7 +92,7 @@ all clients); it is not the client-local cache described in
 
 keys/
     When using repokey mode, the encrypted, passphrase protected borg keys are
-    stored here as a base64 encoded text. The sha256 content hash of the
+    stored here as a base64 encoded text. The blake3 content hash of the
     stored borg key is used for the name.
 
     A repository may contain *multiple* such borg keys (one per passphrase) to
@@ -724,7 +724,7 @@ The files cache
 
 The **files cache** is a client-local file, stored in the borg cache directory
 of the repository (see :ref:`env_vars`) as ``files.<SUFFIX>``. SUFFIX is the
-sha256 of the archive (series) name, so each archive series gets its own files
+blake3 hash of the archive (series) name, so each archive series gets its own files
 cache; ``BORG_FILES_CACHE_SUFFIX`` overrides it. The files cache is used at
 backup time to quickly determine whether a given file is unchanged and we have
 all its chunks.
@@ -1116,7 +1116,7 @@ All modes
 
 Encryption keys (and other secrets) are kept either in the keys directory on
 the client ('keyfile' mode) or under the keys/ namespace in the repository
-('repokey' mode) using the sha256 of the borg key content as the name.
+('repokey' mode) using the blake3 hash of the borg key content as the name.
 
 In both cases, the secrets are generated from random and then encrypted by a
 key derived from your passphrase (this happens on the client before the key

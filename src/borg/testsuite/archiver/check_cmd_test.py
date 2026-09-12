@@ -92,8 +92,8 @@ def test_check_soft_interrupt(archivers, request, monkeypatch):
         orig_hash = repository.store.hash
         pack_checks = []
 
-        def hash_then_interrupt(key):
-            result = orig_hash(key)
+        def hash_then_interrupt(key, **kwargs):
+            result = orig_hash(key, **kwargs)
             if key.startswith("packs/"):  # count pack checks, not the index files hashed first
                 pack_checks.append(key)
                 if len(pack_checks) == 1:  # one Ctrl-C after the first pack is checked
@@ -183,8 +183,8 @@ def test_check_interrupt_skips_archive_check(archivers, request, monkeypatch):
     orig_hash = Store.hash
     pack_checks = []
 
-    def hash_then_interrupt(self, key):
-        result = orig_hash(self, key)
+    def hash_then_interrupt(self, key, **kwargs):
+        result = orig_hash(self, key, **kwargs)
         if key.startswith("packs/"):  # count pack checks, not the index files hashed first
             pack_checks.append(key)
             if len(pack_checks) == 1:  # one Ctrl-C after the first pack is checked
@@ -623,8 +623,8 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request):
     with repository:
         index_infos = list(repository.store_list("index"))
         assert index_infos  # a fresh index was persisted
-        for info in index_infos:  # each fragment's content still matches its sha256 name
-            assert repository.store.hash(f"index/{info.name}") == info.name
+        for info in index_infos:  # each fragment's content still matches its blake3 name
+            assert repository.store.hash(f"index/{info.name}", algorithm="blake3") == info.name
     cmd(archiver, "check", exit_code=0)  # the repository is consistent again
     assert "archive1" in cmd(archiver, "repo-list")  # and remains usable
 
@@ -772,7 +772,7 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
             assert (chunk_id in repository.chunks) == (chunk_id != damaged_id)
     cmd(archiver, "list", "archive1", exit_code=0)  # the archives are readable
     # the pack still holds the damaged bytes, so it keeps failing the store-level check: a pack is
-    # named by the sha256 of its content. Repairing that is repository-level repair (#10026).
+    # named by the blake3 hash of its content. Repairing that is repository-level repair (#10026).
     output = cmd(archiver, "check", "--repository-only", exit_code=1)
     assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
 
@@ -892,7 +892,7 @@ def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monk
     monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
     monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
     # --archives-only: the repository check would stop at the damaged pack (a pack is named by the
-    # sha256 of its content) before the archives check ever walks it.
+    # blake3 hash of its content) before the archives check ever walks it.
     with pytest.raises(CorruptPack) as excinfo:
         cmd(archiver, "check", "--archives-only")
     assert f"no object header at offset {damaged_offset} (pack corruption)" in str(excinfo.value)
@@ -1102,7 +1102,7 @@ def test_corrupted_file_chunk(archivers, request, init_args):
 
 
 @pytest.mark.skip(
-    reason="TODO: a non-repair check verifies index and packs by sha256 and uses that verified index (it does "
+    reason="TODO: a non-repair check verifies index and packs by content hash and uses that verified index (it does "
     "not rebuild it); after dropping all packs the index still lists their chunks, so reading them raises "
     "ObjectNotFound instead of being reported as missing. Needs the index/repair redesign, refs #8572."
 )

@@ -120,7 +120,7 @@ blobs after the damaged one are still found; the damaged blob itself is dropped,
 it can not be read back.
 
 The walk rebuilds the index from the pack as it is: the damaged bytes stay where
-they are, as a gap no index entry covers. A pack is named by the sha256 of its
+they are, as a gap no index entry covers. A pack is named by the blake3 hash of its
 content, so a pack damaged in the store keeps failing the store-level check that
 ``borg check`` runs over ``packs/``, also after ``borg check --repair`` has
 rebuilt the index from it. Rewriting such a pack is repository-level repair, see
@@ -161,9 +161,9 @@ Blobs follow one another contiguously with no padding::
 Pack ID
 ~~~~~~~
 
-The pack ID is the SHA-256 of the pack file's bytes::
+The pack ID is the 256 bit BLAKE3 hash of the pack file's bytes::
 
-    pack_id = sha256(pack_bytes)
+    pack_id = blake3(pack_bytes)
 
 Content-addressing the file by its own bytes makes the name commit to the
 content, so borgstore can verify and cache it and ``borg check`` can detect
@@ -278,10 +278,10 @@ A fragment is a serialized ``ChunkIndex`` (a ``borghash`` ``HashTableNT`` keyed 
 of each entry are zeroed before serializing. Fragments are **not** encrypted: they map
 ``chunk_id`` to ``(pack_id, obj_offset, obj_size)``, which anyone with access to the
 repository could equally well read out of the unencrypted blob headers (see
-:ref:`pack-recovery`). A fragment's name is the SHA-256 digest of its own content::
+:ref:`pack-recovery`). A fragment's name is the BLAKE3 digest of its own content::
 
     index/
-      <sha256_of_content_hex>
+      <blake3_of_content_hex>
 
 An ordinary backup writes only the entries that are new in that session; a full
 rewrite (e.g. by ``borg compact``) writes all of them. In both cases the write is

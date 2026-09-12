@@ -36,7 +36,7 @@ from . import low_level
 
 
 def keyfile_name_for(content: bytes) -> str:
-    return sha256(content).hexdigest()
+    return blake3_256_hex(content)
 
 
 KEYFILE_ID = "BORG_KEY"
@@ -86,6 +86,27 @@ def get_blake3_mt_threshold() -> int:
                 raise Error(f"BORG_BLAKE3_MT_THRESHOLD must not be negative, but is: {threshold_kib}")
         _blake3_mt_threshold = threshold_kib * 1024
     return _blake3_mt_threshold
+
+
+def _blake3_hasher(data: bytes):
+    # big inputs (packs, index fragments) are hashed multi-threaded from get_blake3_mt_threshold()
+    # on; the hash is the same either way.
+    max_threads = blake3.AUTO if len(data) >= get_blake3_mt_threshold() else 1
+    return blake3(data, max_threads=max_threads)
+
+
+def blake3_256(data: bytes) -> bytes:
+    """Return the unkeyed 256 bit blake3 hash of *data* (32 bytes)."""
+    return _blake3_hasher(data).digest(length=32)
+
+
+def blake3_256_hex(data: bytes) -> str:
+    """Return the unkeyed 256 bit blake3 hash of *data* as 64 lowercase hex digits.
+
+    Content-addressed store objects (packs/, index/, keys/, locks/) and automatically named
+    keyfiles are named by this hash of their content.
+    """
+    return _blake3_hasher(data).hexdigest(length=32)
 
 
 def is_keyfile(data: str | bytes, repoid: str | None = None) -> bool:
@@ -852,7 +873,7 @@ class FlexiKey:
         else:
             keydata = repo.load_key()
             if keydata:
-                result.append((sha256(keydata).hexdigest(), keydata.decode("utf-8"), None))
+                result.append((blake3_256_hex(keydata), keydata.decode("utf-8"), None))
         return result
 
     def _keyfile_candidates(self):
@@ -865,7 +886,7 @@ class FlexiKey:
                     blob = fd.read()
             except OSError:
                 continue
-            result.append((sha256(blob).hexdigest(), blob.decode("utf-8"), str(path)))
+            result.append((blake3_256_hex(blob), blob.decode("utf-8"), str(path)))
         return result
 
     def _iter_keys(self):
@@ -932,7 +953,7 @@ class FlexiKey:
                     blob = fd.read()
             except OSError:
                 return False
-            return self._try_key(sha256(blob).hexdigest(), blob.decode("utf-8"), str(target), passphrase)
+            return self._try_key(blake3_256_hex(blob), blob.decode("utf-8"), str(target), passphrase)
         else:
             return self.load_any(passphrase)
 
@@ -967,7 +988,7 @@ class FlexiKey:
                         secure_erase(old_target, avoid_collateral_damage=True)
                     except OSError as exc:
                         logger.debug('Could not remove previous keyfile "%s": %s', old_target, exc)
-            self._loaded_key_id = sha256(keyfile_data.encode()).hexdigest()
+            self._loaded_key_id = blake3_256_hex(keyfile_data.encode())
         elif self.storage == KeyBlobStorage.REPO:
             self.logically_encrypted = passphrase != ""  # nosec B105
             key_data = keyfile_format(bin_to_hex(self.repository_id), key_data)
@@ -978,7 +999,7 @@ class FlexiKey:
                 self._loaded_key_id = store_key(key_data)
             else:
                 target.save_key(key_data)  # legacy repository: single borg key
-                self._loaded_key_id = sha256(key_data).hexdigest()
+                self._loaded_key_id = blake3_256_hex(key_data)
         else:
             raise TypeError("Unsupported borg key storage type")
         self.target = target if self.storage != KeyBlobStorage.REPO else self.repository
@@ -1210,9 +1231,7 @@ class Blake3ChecksumKey(ChecksumKeyBase):
     IDHASH_NAME = "blake3"
 
     def id_hash(self, data):
-        # see ID_BLAKE3_256.id_hash about max_threads
-        max_threads = blake3.AUTO if len(data) >= get_blake3_mt_threshold() else 1
-        return blake3(data, max_threads=max_threads).digest(length=32)
+        return blake3_256(data)
 
     def mac(self, prefix, payload):
         max_threads = blake3.AUTO if len(payload) >= get_blake3_mt_threshold() else 1

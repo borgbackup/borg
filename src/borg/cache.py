@@ -1,5 +1,4 @@
 import configparser
-import hashlib
 import io
 import os
 import shutil
@@ -38,6 +37,7 @@ from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
+from .crypto.key import blake3_256, blake3_256_hex
 from .manifest import Manifest
 from .platform import SaveFile
 from .repository import Repository, StoreObjectNotFound, PackReader
@@ -57,7 +57,7 @@ def files_cache_name(archive_name, files_cache_name="files"):
     # when not, the user may manually do that by using the env var.
     if not suffix:
         # avoid issues with too complex or long archive_name by hashing it:
-        suffix = hashlib.sha256(archive_name.encode()).hexdigest()
+        suffix = blake3_256_hex(archive_name.encode())
     return files_cache_name + "." + suffix
 
 
@@ -595,7 +595,7 @@ def list_chunkindex_fragments(repository):
     """List the index/ fragments, returning each fragment's (name, approximate entry count).
 
     This is the single primitive that walks the index/ namespace; list_chunkindex_hashes is a thin
-    wrapper over it. In that namespace each object's name is the sha256 hash of its content. The entry
+    wrapper over it. In that namespace each object's name is the blake3 hash of its content. The entry
     count is estimated from the stored object's byte size (chunkindex_fragment_entry_size() bytes per
     entry), so we can classify fragments (small vs. sealed) without loading them. The estimate ignores
     the small fixed header, which is negligible for the fragment sizes we care about.
@@ -663,10 +663,10 @@ def delete_chunkindex_from_repo(repository):
 
 
 def _store_chunkindex_fragment(repository, batch, stored_hashes, *, force_write):
-    """Serialize a temporary ChunkIndex `batch` and store it as an index/<sha256> fragment.
+    """Serialize a temporary ChunkIndex `batch` and store it as an index/<blake3> fragment.
 
     We don't serialize the flags or the size, so callers pass entries with those zeroed. The object
-    is stored under index/<hash>, where <hash> is the sha256 of its content, so borgstore can verify
+    is stored under index/<hash>, where <hash> is the blake3 hash of its content, so borgstore can verify
     it like any other object; an incompatible format from a different borg version is rejected by
     borghash's own versioned header (MAGIC + VERSION) when read back.
 
@@ -676,7 +676,7 @@ def _store_chunkindex_fragment(repository, batch, stored_hashes, *, force_write)
     with io.BytesIO() as f:
         batch.write(f)
         data = f.getvalue()
-    new_hash = hashlib.sha256(data).hexdigest()
+    new_hash = blake3_256_hex(data)
     stored = False
     if force_write or new_hash not in stored_hashes:
         index_name = f"index/{new_hash}"
@@ -820,7 +820,7 @@ def read_chunkindex_from_repo(repository, hash):
     except StoreObjectNotFound:
         logger.debug(f"{index_name} not found in the repository.")
     else:
-        if hashlib.sha256(chunks_data).digest() == hex_to_bin(hash):
+        if blake3_256(chunks_data) == hex_to_bin(hash):
             logger.debug(f"{index_name} is valid.")
             try:
                 with io.BytesIO(chunks_data) as f:
@@ -1050,7 +1050,7 @@ def build_chunkindex_from_repo(
 # cache/referenced-by-archive.<archive id hex>. it lets a following compact or analyze skip re-scanning
 # an unchanged archive's items. the blob is: file_count (uint64 LE), content_size (uint64 LE), a
 # serialized HashTableNT mapping object id (32 bytes) -> plaintext object size (uint32), and a
-# sha256 of all of that appended for integrity.
+# blake3 hash of all of that appended for integrity.
 REFERENCED_BY_ARCHIVE = "referenced-by-archive."  # name prefix within the "cache" store namespace
 ArchiveReferenceEntry = namedtuple("ArchiveReferenceEntry", "size")
 ArchiveReferenceEntryFormatT = namedtuple("ArchiveReferenceEntryFormatT", "size")
@@ -1081,11 +1081,11 @@ def load_archive_references(repository, archive_id: bytes):
         data = repository.store_load(archive_reference_cache_name(archive_id))
     except StoreObjectNotFound:
         return None
-    # the serialized blob has a sha256 of its content appended (the store name cannot also carry it,
-    # as borgstore's name length limit is too small for archive id hex + sha256 hex). a mismatch means
+    # the serialized blob has a blake3 hash of its content appended (the store name cannot also carry
+    # it, as borgstore's name length limit is too small for archive id hex + hash hex). a mismatch means
     # the cache is corrupted; we then return None so the caller falls back to scanning the archive.
     hex_id = bin_to_hex(archive_id)
-    if len(data) < 16 + 32 or hashlib.sha256(data[:-32]).digest() != data[-32:]:
+    if len(data) < 16 + 32 or blake3_256(data[:-32]) != data[-32:]:
         logger.warning(f"Ignoring corrupted references cache of archive {hex_id}.")
         return None
     try:
@@ -1100,13 +1100,13 @@ def load_archive_references(repository, archive_id: bytes):
 
 
 def store_archive_references(repository, archive_id: bytes, references) -> None:
-    """Serialize the references (a small header plus the id->size table, with a sha256 appended)."""
+    """Serialize the references (a small header plus the id->size table, with a blake3 hash appended)."""
     with io.BytesIO() as f:
         f.write(references.file_count.to_bytes(8, "little"))
         f.write(references.content_size.to_bytes(8, "little"))
         references.ids.write(f)
         data = f.getvalue()
-    data += hashlib.sha256(data).digest()
+    data += blake3_256(data)
     repository.store_store(archive_reference_cache_name(archive_id), data)
 
 

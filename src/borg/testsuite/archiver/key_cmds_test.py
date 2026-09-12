@@ -1,6 +1,6 @@
 import binascii
 import os
-from hashlib import sha256
+from blake3 import blake3
 
 import pytest
 
@@ -101,17 +101,17 @@ def test_change_location_authenticated_to_repokey(archivers, request):
     assert "(repokey, authenticated-sha256)" in log
 
 
-def test_keyfile_name_is_content_sha256(archivers, request):
+def test_keyfile_name_is_content_blake3(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     [key_filename] = os.listdir(archiver.keys_path)
     key_path = os.path.join(archiver.keys_path, key_filename)
     with open(key_path, "rb") as fd:
         key_content = fd.read()
-    assert key_filename == sha256(key_content).hexdigest()
+    assert key_filename == blake3(key_content).hexdigest()
 
 
-def test_change_passphrase_renames_keyfile_to_new_sha256(archivers, request):
+def test_change_passphrase_renames_keyfile_to_new_blake3(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     [old_key_filename] = os.listdir(archiver.keys_path)
@@ -125,7 +125,7 @@ def test_change_passphrase_renames_keyfile_to_new_sha256(archivers, request):
     assert not os.path.exists(old_key_path)
     with open(new_key_path, "rb") as fd:
         key_content = fd.read()
-    assert new_key_filename == sha256(key_content).hexdigest()
+    assert new_key_filename == blake3(key_content).hexdigest()
     cmd(archiver, "repo-list")
 
 

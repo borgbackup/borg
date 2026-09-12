@@ -72,7 +72,6 @@ might have acquired its own lock meanwhile), so there is no safe way to continue
 """
 
 import datetime
-import hashlib
 import json
 import random
 import threading
@@ -83,6 +82,7 @@ from borgstore.store import ObjectNotFound
 
 from . import platform
 from .constants import MAX_MUTUAL_CLOCK_SKEW
+from .crypto.key import blake3_256_hex
 from .helpers import Error, ErrorWithTraceback, format_timedelta
 from .logger import create_logger
 
@@ -221,7 +221,7 @@ class Lock:
         timestamp = now.isoformat(timespec="milliseconds")
         lock = dict(exclusive=exclusive, hostid=self.id[0], processid=self.id[1], threadid=self.id[2], time=timestamp)
         value = json.dumps(lock).encode("utf-8")
-        key = hashlib.sha256(value).hexdigest()
+        key = blake3_256_hex(value)
         logger.debug(f"LOCK-CREATE: creating lock in store. key: {key}, lock: {lock}.")
         self.store.store(f"locks/{key}", value)
         if update_last_refresh:

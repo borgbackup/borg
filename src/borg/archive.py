@@ -2203,7 +2203,7 @@ class ArchiveChecker:
         self.format = format
         self.repository = repository
         # A normal (non-repair) archives check trusts the in-repo index: the repository check verified
-        # each index object's sha256, and the index is the authoritative record of which chunks exist,
+        # each index object's blake3 hash, and the index is the authoritative record of which chunks exist,
         # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
         # --repair does rebuild from the packs (slow_rebuild=repair), working from the real packs so it
         # can detect and fix archives that reference chunks whose pack has gone missing.

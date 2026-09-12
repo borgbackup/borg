@@ -129,7 +129,7 @@ MAX_ARCHIVES = 400000
 # repo.list() result count limit used by the Borg client
 LIST_SCAN_LIMIT = 100000
 
-# The chunks index is stored in the repo as immutable, content-addressed index/<sha256> fragments.
+# The chunks index is stored in the repo as immutable, content-addressed index/<blake3> fragments.
 # We keep each fragment's entry count within [MIN, MAX] where possible: MAX bounds a fragment's size,
 # MIN keeps the fragment count down. Small (< MIN) fragments are merged (repacked); fragments already
 # in range are left untouched (stable/immutable). SMALL_FRAGMENT_CAP bounds how many sub-MIN fragments

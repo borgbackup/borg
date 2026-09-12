@@ -582,7 +582,7 @@ If you create a new keyfile-encrypted repository at the same filesystem
 path multiple times (for example, when a previous repository at that path
 was moved away or unmounted), Borg will not overwrite or reuse an existing
 key file in your keys directory. Instead, each repository gets a key file
-of its own, named after the SHA-256 hash of the key file's own content --
+of its own, named after the BLAKE3 hash of the key file's own content --
 the header line naming the repository's ID, followed by the encrypted key
 material. Both the repository ID and the key material are freshly
 randomized when the repository is created, so two repositories, even ones
@@ -598,7 +598,7 @@ names shortened for readability):
 
 Each belongs to a distinct repository, wherever it was created -- a name
 collision between different repositories would require an outright
-SHA-256 hash collision, not just an unlucky path reuse. Borg does not use
+BLAKE3 hash collision, not just an unlucky path reuse. Borg does not use
 the key file name to find the right key either: to open a repository, it
 scans all files in the keys directory (see :ref:`env_vars` for
 ``BORG_KEYS_DIR``) and picks the one whose header names that repository's

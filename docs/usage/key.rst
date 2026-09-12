@@ -31,7 +31,7 @@ Examples
 
 .. note::
 
-    Automatically placed key files are named after the SHA-256 hash of their own
+    Automatically placed key files are named after the BLAKE3 hash of their own
     contents, not after the repository directory name. Because changing the
     passphrase re-encrypts the key, the key file is rewritten under a new name and
     the previous one is removed — that is why the two paths above differ. Use

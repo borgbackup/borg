@@ -6,7 +6,6 @@ import threading
 import time
 from collections import defaultdict, namedtuple
 from pathlib import Path
-from hashlib import sha256
 
 from borghash import HashTableNT
 
@@ -601,13 +600,13 @@ class PackTracker:
     Records are kept across checks: intact records (result=1) are reused by checks run with
     max_age, corrupt records (result=0) are kept for repair and always re-verified. Records of
     packs no longer listed in packs/ are pruned when a check finishes scanning packs/.
-    Stored at cache/checked-packs as the serialized table with a sha256 over it appended.
+    Stored at cache/checked-packs as the serialized table with a blake3 hash over it appended.
     new() starts an empty tracker, load() reads the stored one.
     """
 
     NAME = "cache/checked-packs"
     KEY_SIZE = 32  # pack id
-    DIGEST_SIZE = 32  # sha256
+    DIGEST_SIZE = 32  # blake3_256
     Entry = namedtuple("Entry", "timestamp result")
     EntryFormatT = namedtuple("EntryFormatT", "timestamp result")
     _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=corrupt
@@ -626,14 +625,14 @@ class PackTracker:
     def load(cls, store):
         """Return a tracker holding the stored table.
 
-        Return an empty one if cache/checked-packs is missing, its appended sha256 does not match,
+        Return an empty one if cache/checked-packs is missing, its appended blake3 hash does not match,
         it does not deserialize, or its entries do not have this class's key size and Entry layout.
         """
         try:
             data = store.load(cls.NAME)
         except StoreObjectNotFound:
             return cls.new(store)
-        if len(data) < cls.DIGEST_SIZE or sha256(data[: -cls.DIGEST_SIZE]).digest() != data[-cls.DIGEST_SIZE :]:
+        if len(data) < cls.DIGEST_SIZE or blake3_256(data[: -cls.DIGEST_SIZE]) != data[-cls.DIGEST_SIZE :]:
             logger.warning("Ignoring corrupted checked-packs set.")
             return cls.new(store)
         try:
@@ -682,7 +681,7 @@ class PackTracker:
         with io.BytesIO() as f:
             self.table.write(f)
             data = f.getvalue()
-        self.store.store(self.NAME, data + sha256(data).digest())
+        self.store.store(self.NAME, data + blake3_256(data))
 
     def clear(self):
         self.table.clear()

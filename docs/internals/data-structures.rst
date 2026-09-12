@@ -77,7 +77,7 @@ cache/
     check finishes.
   referenced-by-archive.<hex-encoded archive ID>
     what one archive references (object ID -> plaintext object size), plus the file
-    count and content size of that archive, with an appended sha256 for integrity.
+    count and content size of that archive, with an appended blake3 hash for integrity.
     It lets a following ``borg compact`` or ``borg analyze`` skip re-reading the items
     of an unchanged archive.
   chunkindex-invalid

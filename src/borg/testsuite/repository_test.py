@@ -5,8 +5,6 @@ import struct
 import sys
 import time
 from collections import namedtuple
-from hashlib import sha256
-
 from blake3 import blake3
 
 import pytest
@@ -1308,7 +1306,7 @@ def test_check_checked_packs_roundtrip(tmp_path):
         assert tuple(loaded.table[H(2)]) == (456, 0)
 
         corrupted = bytearray(repository.store.load(PackTracker.NAME))
-        corrupted[0] ^= 0xFF  # break the appended sha256
+        corrupted[0] ^= 0xFF  # break the appended blake3 hash
         repository.store.store(PackTracker.NAME, bytes(corrupted))
         rotted = PackTracker.load(repository.store)
         assert len(rotted) == 0
@@ -1736,7 +1734,7 @@ def test_check_max_age_reuses_records_of_plain_check(tmp_path, monkeypatch):
 
 
 def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
-    # load() drops a set whose entries have a different layout than Entry, even though its sha256 matches.
+    # load() drops a set whose entries have a different layout than Entry, even though its blake3 hash matches.
     OtherEntry = namedtuple("OtherEntry", "timestamp result extra")
     OtherFormat = namedtuple("OtherFormat", "timestamp result extra")
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
@@ -1747,7 +1745,7 @@ def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
         with io.BytesIO() as f:
             table.write(f)
             data = f.getvalue()
-        repository.store_store(PackTracker.NAME, data + sha256(data).digest())
+        repository.store_store(PackTracker.NAME, data + blake3(data).digest())
 
         tracker = PackTracker.load(repository.store)
         assert len(tracker) == 0

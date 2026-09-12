@@ -31,12 +31,18 @@ from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
 from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
-from .crypto.key import is_keyfile
+from .crypto.key import is_keyfile, blake3_256
 
 logger = create_logger(__name__)
 
-# an object name is its sha256 as 64 lowercase hex digits.
+# an object name is the hex blake3 hash of the object's content (64 lowercase hex digits), see
+# crypto.key.blake3_256().
 _valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
+
+# the hash algorithm content-addressed objects (packs/, index/) are named by, as borgstore calls it:
+# borgstore names the packs it writes for us (defrag) and verifies objects (hash) with it, so it must
+# be one borgstore supports, and it must match blake3_256().
+NAME_HASH = "blake3"
 
 # how much of a pack PackReader reads at once when searching for the next object header.
 RESYNC_WINDOW_SIZE = 1024 * 1024
@@ -246,10 +252,10 @@ class PackWriter:
             # that incremental string concatenation would cause in Python).
             pack_data = b"".join(cdata for _, cdata in pieces)
 
-            # Name the pack by the SHA-256 of its bytes: the name commits to the stored content,
+            # Name the pack by the blake3 hash of its bytes: the name commits to the stored content,
             # so borgstore can verify and cache the file.
             self._trace("H", trace)
-            pack_id = sha256(pack_data).digest()
+            pack_id = blake3_256(pack_data)
 
             # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
             results = []
@@ -941,7 +947,7 @@ class Repository:
         # store a single repokey borg key (content-addressed). does NOT delete other borg keys,
         # so a repository can have multiple borg keys (one per passphrase). returns the
         # store object name (= borg key id) under which the borg key was stored.
-        digest = sha256(keydata).hexdigest()
+        digest = bin_to_hex(blake3_256(keydata))
         self.store.store(f"keys/{digest}", keydata)
         return digest
 
@@ -1126,9 +1132,9 @@ class Repository:
     def check(self, repair=False, max_duration=0, max_age=0, repo_only=False):
         """Check repository consistency.
 
-        packs/ and index/ objects are named by the sha256 of their content, so a pack or index file
-        is intact iff store.hash(name) still equals name. The whole pack is hashed; the REST backend
-        computes the hash server-side, so for it nothing is downloaded.
+        packs/ and index/ objects are named by the blake3 hash of their content, so a pack or index
+        file is intact iff store.hash(name) still equals name. The whole pack is hashed; the REST
+        backend computes the hash server-side, so for it nothing is downloaded.
 
         The index is hashed first and the packs only if it is intact. The packs could be hashed even
         with a corrupt index, but a corrupt index already means the user has to repair it, and that
@@ -1137,7 +1143,7 @@ class Repository:
         far too slow and expensive for a routine (e.g. cron) check. With repair=True and a corrupt
         index, and if every pack is intact, the index is rebuilt from the packs' object headers and
         persisted; on a full check the archives phase rebuilds and re-persists it afterwards, see
-        ArchiveChecker.finish. Packs are verified by sha256, which is content-addressing rather than a
+        ArchiveChecker.finish. Packs are verified by blake3, which is content-addressing rather than a
         MAC, so this rebuild detects accidental corruption but not tampering, refs #9901, #10026. If any
         pack is corrupt the index is left unchanged, refs #8572, #10026. Pack ids found corrupt are kept
         in cache/checked-packs, refs #9696.
@@ -1164,14 +1170,14 @@ class Repository:
         """
 
         def verify(namespace, name):
-            # name is the sha256 of the object's content, so it is intact iff store.hash() matches.
+            # name is the blake3 hash of the object's content, so it is intact iff store.hash() matches.
             key = f"{namespace}/{name}"
             try:
-                ok = self.store.hash(key) == name
+                ok = self.store.hash(key, algorithm=NAME_HASH) == name
             except StoreObjectNotFound:
                 return True  # vanished since store.list(); not an error
             if not ok:
-                logger.error(f"Store object {key} is corrupted: content does not match its name (sha256).")
+                logger.error(f"Store object {key} is corrupted: content does not match its name ({NAME_HASH}).")
             return ok
 
         def store_list(namespace):
@@ -1330,7 +1336,7 @@ class Repository:
                 # build_chunkindex_from_repo matches this verification. write_immediately persists the
                 # index and drops the corrupt fragments.
                 # the walk gets no validator: validating needs the key, which a Repository does not
-                # have. A pack is named by the sha256 of its content, so a pack damaged in the store
+                # have. A pack is named by the blake3 hash of its content, so a pack damaged in the store
                 # fails verify() above and pack_errors > 0 keeps it out of here. A pack that matches
                 # its name and still has a bad object header makes iter_headers raise, see #10026.
                 build_chunkindex_from_repo(self, slow_rebuild=True, write_immediately=True)
@@ -1628,12 +1634,12 @@ class Repository:
         if cursor < pack_size:
             sources.append((pack_hex, cursor, pack_size - cursor))
 
-        # write the new pack (named sha256 of its content) from those spans before touching the index
+        # write the new pack (named blake3 of its content) from those spans before touching the index
         # or the old pack, so a failed read-back leaves everything unchanged. a span reading back short
         # (defrag raises ReadRangeError) means the pack file is truncated or corrupt.
         if sources:
             try:
-                new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+                new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm=NAME_HASH, namespace="packs"))
             except ReadRangeError as e:
                 raise IntegrityError(f'pack {pack_hex}: {e}, run "borg check"') from e
         else:
@@ -1733,7 +1739,7 @@ class Repository:
         if current:
             batches.append(current)
 
-        # write each batch as a new pack (named sha256 of its content) and repoint its objects: an
+        # write each batch as a new pack (named blake3 of its content) and repoint its objects: an
         # object's new offset is the running byte total of the packs before its pack in the batch,
         # plus its old offset within that pack.
         pi = ProgressIndicatorPercent(total=len(batches), msg="Merging packs %3.0f%%", msgid="repository.merge_packs")
@@ -1744,7 +1750,7 @@ class Repository:
             self._lock_refresh()  # refresh the lock per batch, the loop can run for a while
             sources = [(bin_to_hex(pid), 0, pack_size[pid]) for pid in batch]
             try:
-                new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm="sha256", namespace="packs"))
+                new_pack_id = hex_to_bin(self.store.defrag(sources, algorithm=NAME_HASH, namespace="packs"))
             except ReadRangeError as e:  # a source pack shrank or is corrupt
                 raise IntegrityError(f'merge_packs: {e}, run "borg check"') from e
             produced.add(new_pack_id)
@@ -1790,7 +1796,7 @@ class Repository:
         IntegrityError, before anything is written.
 
         If every object is kept and no gap bytes are dropped, the store and the chunk index are not
-        touched at all. Otherwise the new pack (named sha256 of its content) is stored, the indexed
+        touched at all. Otherwise the new pack (named blake3 of its content) is stored, the indexed
         objects are repointed at it, and the old pack is deleted last, so the objects' bytes are
         never the only copy.
 
@@ -1852,7 +1858,7 @@ class Repository:
         if not changed:
             return pack_id, pack_size
         pack_data = b"".join(pieces)
-        new_pack_id = sha256(pack_data).digest()
+        new_pack_id = blake3_256(pack_data)
         if new_pack_id == pack_id:  # the transforms reproduced the pack byte-identically
             return pack_id, pack_size
 

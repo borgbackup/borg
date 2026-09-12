@@ -7,6 +7,8 @@ import time
 from collections import namedtuple
 from hashlib import sha256
 
+from blake3 import blake3
+
 import pytest
 from borghash import HashTableNT
 
@@ -88,7 +90,7 @@ def reopen(repository, exclusive: bool | None = True, create=False):
 
 def fchunk(data, meta=b"", chunk_id=b"\x00" * 32):
     # Build a raw chunk with a valid RepoObj layout but no encryption or compression. Pass a unique
-    # chunk_id when objects must not share a pack: identical bytes hash to the same sha256 pack id
+    # chunk_id when objects must not share a pack: identical bytes hash to the same blake3 pack id
     # and would otherwise collapse into one pack.
     hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, chunk_id, len(meta), len(data))
     assert isinstance(data, bytes)
@@ -422,7 +424,7 @@ def test_compact_pack_drops_whole_pack(repo_fixtures, request):
 
 
 def test_compact_pack_keep_all_is_noop(repo_fixtures, request):
-    # Keeping every object reproduces the same pack: same sha256 name, old pack not deleted. Ids passed
+    # Keeping every object reproduces the same pack: same blake3 name, old pack not deleted. Ids passed
     # out of order must give the same result, since compact_pack sorts by offset.
     chunk0 = fchunk(b"DATA0", chunk_id=H(0))
     chunk1 = fchunk(b"DATA1", chunk_id=H(1))
@@ -781,7 +783,7 @@ def test_pack_writer_n1_flush():
     assert len(results) == 1
     stored_id, pack_id, obj_offset, obj_size = results[0]
     assert stored_id == chunk_id
-    assert pack_id == sha256(cdata).digest()
+    assert pack_id == blake3(cdata).digest()
     assert obj_offset == 0
     assert obj_size == len(cdata)
 
@@ -796,7 +798,7 @@ def test_pack_writer_n2_flush():
     assert results is not None
     assert len(results) == 2
     pack_data = data1 + data2
-    expected_pack_id = sha256(pack_data).digest()
+    expected_pack_id = blake3(pack_data).digest()
     assert results[0] == (id1, expected_pack_id, 0, len(data1))
     assert results[1] == (id2, expected_pack_id, len(data1), len(data2))
 
@@ -873,10 +875,10 @@ def test_pack_writer_async_defers_results():
     pw = PackWriter(store, max_count=1, chunks=chunks)
     assert pw.add(id1, data1) is None  # pack 1 handed to the store-thread, nothing to report yet
     results = pw.add(id2, data2)  # joins pack 1's store, hands off pack 2
-    assert results == [(id1, sha256(data1).digest(), 0, len(data1))]
+    assert results == [(id1, blake3(data1).digest(), 0, len(data1))]
     assert not chunks.is_pending(id1)  # the join resolved pack 1's entries
-    assert pw.add(id3, data3) == [(id2, sha256(data2).digest(), 0, len(data2))]
-    assert pw.flush() == [(id3, sha256(data3).digest(), 0, len(data3))]  # barrier: joins pack 3
+    assert pw.add(id3, data3) == [(id2, blake3(data2).digest(), 0, len(data2))]
+    assert pw.flush() == [(id3, blake3(data3).digest(), 0, len(data3))]  # barrier: joins pack 3
     for chunk_id in (id1, id2, id3):
         assert not chunks.is_pending(chunk_id)
 
@@ -989,7 +991,7 @@ def test_put_marks_id_in_chunk_index(tmp_path):
         repository.flush()
         entry = repository._chunks.get(id1)
         assert not repository._chunks.is_pending(id1)
-        assert entry.pack_id == sha256(fchunk(b"ZEROS")).digest()
+        assert entry.pack_id == blake3(fchunk(b"ZEROS")).digest()
         assert entry.size == 0  # uncompressed size filled in by cache layer
 
 
@@ -1031,7 +1033,7 @@ def test_flush_store_failure_drops_pending_entries(tmp_path):
 
 
 def _serialized_chunkindex():
-    # Serialize an empty ChunkIndex to bytes, as stored under index/<sha256(content)>. check() parses
+    # Serialize an empty ChunkIndex to bytes, as stored under index/<blake3(content)>. check() parses
     # index fragments, so a fragment must be a real ChunkIndex serialization.
     with io.BytesIO() as f:
         ChunkIndex().write(f)
@@ -1040,11 +1042,11 @@ def _serialized_chunkindex():
 
 def test_check_detects_corruption_in_later_object(tmp_path):
     # Corruption anywhere in a multi-object pack must be caught, not just in the first object: the pack
-    # is named by sha256(content), so flipping any byte makes its stored hash differ from its name.
+    # is named by blake3(content), so flipping any byte makes its stored hash differ from its name.
     chunk1 = fchunk(b"FIRST", chunk_id=H(1))
     chunk2 = fchunk(b"SECOND", chunk_id=H(2))
     pack = chunk1 + chunk2
-    pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
+    pack_name = "packs/" + bin_to_hex(blake3(pack).digest())
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
         assert repository.check(repair=False) is True  # both objects are intact
@@ -1057,12 +1059,12 @@ def test_check_detects_corruption_in_later_object(tmp_path):
 
 
 def test_check_detects_index_corruption(tmp_path):
-    # index/ objects are named by sha256(content) like packs, so check verifies them the same way.
+    # index/ objects are named by blake3(content) like packs, so check verifies them the same way.
     content = _serialized_chunkindex()
-    index_name = "index/" + bin_to_hex(sha256(content).digest())
+    index_name = "index/" + bin_to_hex(blake3(content).digest())
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(index_name, content)
-        assert repository.check(repair=False) is True  # index object intact (name == sha256(content))
+        assert repository.check(repair=False) is True  # index object intact (name == blake3(content))
 
         corrupted = bytearray(content)
         corrupted[0] ^= 0xFF
@@ -1096,7 +1098,7 @@ def test_check_repair_rebuilds_corrupt_index(tmp_path):
     with reopen(repository) as repository:
         index_names = [f"index/{info.name}" for info in repository.store_list("index")]
         assert index_names  # close() persisted at least one index fragment
-        for name in index_names:  # rot every fragment so its content no longer matches its sha256 name
+        for name in index_names:  # rot every fragment so its content no longer matches its blake3 name
             data = bytearray(repository.store_load(name))
             data[0] ^= 0xFF
             repository.store_store(name, bytes(data))
@@ -1121,7 +1123,7 @@ def test_check_repair_refuses_when_pack_corrupt(tmp_path):
     with reopen(repository) as repository:
         bad_pack_name = "packs/" + bin_to_hex(repository.chunks[H(2)].pack_id)
         data = bytearray(repository.store_load(bad_pack_name))
-        data[-1] ^= 0xFF  # rot the pack holding H(2): its content no longer matches its sha256 name
+        data[-1] ^= 0xFF  # rot the pack holding H(2): its content no longer matches its blake3 name
         repository.store_store(bad_pack_name, bytes(data))
         for info in repository.store_list("index"):  # rot the index so repair takes the rebuild path
             name = f"index/{info.name}"
@@ -1198,7 +1200,7 @@ def test_check_intact_multi_object_pack_passes(tmp_path):
     # An intact pack with several objects passes: it is hashed as a whole, so the object count
     # does not matter.
     pack = fchunk(b"A", chunk_id=H(1)) + fchunk(b"BB", chunk_id=H(2)) + fchunk(b"CCC", chunk_id=H(3))
-    pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
+    pack_name = "packs/" + bin_to_hex(blake3(pack).digest())
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
         assert repository.check(repair=False) is True
@@ -1247,9 +1249,9 @@ def test_check_reports_orphan_pack_not_referenced_by_index(tmp_path, caplog):
             repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
         repository.flush()  # flush before close persists the index
     with Repository(location, exclusive=True) as repository:
-        # a validly-named pack (name == sha256(content)) that no index entry points into.
+        # a validly-named pack (name == blake3(content)) that no index entry points into.
         content = b"orphan pack content"
-        orphan_id = sha256(content).digest()
+        orphan_id = blake3(content).digest()
         repository.store_store("packs/" + bin_to_hex(orphan_id), content)
         with caplog.at_level(logging.INFO):
             assert repository.check(repair=False) is True
@@ -1269,7 +1271,7 @@ def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, ca
         pack_id = repository.chunks[H(0)].pack_id
         repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
         content = b"not a serialized chunk index"
-        repository.store_store("index/" + bin_to_hex(sha256(content).digest()), content)
+        repository.store_store("index/" + bin_to_hex(blake3(content).digest()), content)
         with caplog.at_level(logging.WARNING):
             assert repository.check(repair=False) is True
         assert "Missing pack" not in caplog.text
@@ -1315,7 +1317,7 @@ def test_check_checked_packs_roundtrip(tmp_path):
 def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
     # a partial check verifies a new pack even when its id sorts before an already-checked pack.
     intact = fchunk(b"INTACT", chunk_id=H(1))
-    intact_id = sha256(intact).digest()
+    intact_id = blake3(intact).digest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(intact_id), intact)
 
@@ -1350,18 +1352,18 @@ def _spy_hash(repository, monkeypatch):
     hashed_keys = []
     orig_hash = repository.store.hash
 
-    def spy_hash(key):
+    def spy_hash(key, **kwargs):
         hashed_keys.append(key)
-        return orig_hash(key)
+        return orig_hash(key, **kwargs)
 
     monkeypatch.setattr(repository.store, "hash", spy_hash)
     return hashed_keys
 
 
 def _store_intact_pack(repository, chunk_id=H(1)):
-    # a distinct chunk_id yields distinct bytes and thus a distinct sha256 pack id.
+    # a distinct chunk_id yields distinct bytes and thus a distinct blake3 pack id.
     intact = fchunk(b"INTACT", chunk_id=chunk_id)
-    intact_id = sha256(intact).digest()
+    intact_id = blake3(intact).digest()
     pack_key = "packs/" + bin_to_hex(intact_id)
     repository.store_store(pack_key, intact)
     return intact_id, pack_key
@@ -1514,9 +1516,9 @@ def test_check_partial_break_reports_unreached_corrupt_record(tmp_path, monkeypa
         hashed_keys = []
         orig_hash = repository.store.hash
 
-        def hash_and_advance(key):
+        def hash_and_advance(key, **kwargs):
             hashed_keys.append(key)
-            result = orig_hash(key)
+            result = orig_hash(key, **kwargs)
             if key == intact_key:
                 clock["t"] = 10**9
             return result
@@ -1669,9 +1671,9 @@ def test_check_max_age_prunes_vanished_ok_record(tmp_path):
 def test_check_max_age_partial_progress(tmp_path, monkeypatch):
     # a partial check with max_age skips packs with a fresh intact record and verifies the rest.
     pack_a = fchunk(b"A", chunk_id=H(1))
-    pack_a_id = sha256(pack_a).digest()
+    pack_a_id = blake3(pack_a).digest()
     pack_b = fchunk(b"BB", chunk_id=H(2))
-    pack_b_id = sha256(pack_b).digest()
+    pack_b_id = blake3(pack_b).digest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(pack_a_id), pack_a)
         repository.store_store("packs/" + bin_to_hex(pack_b_id), pack_b)
@@ -1771,9 +1773,9 @@ def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):
 
     monkeypatch.setattr("borg.repository.ProgressIndicatorPercent", FakePI)
     pack = fchunk(b"A", chunk_id=H(1))
-    pack_name = "packs/" + bin_to_hex(sha256(pack).digest())
+    pack_name = "packs/" + bin_to_hex(blake3(pack).digest())
     index_content = _serialized_chunkindex()
-    index_name = "index/" + bin_to_hex(sha256(index_content).digest())
+    index_name = "index/" + bin_to_hex(blake3(index_content).digest())
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
         repository.store_store(index_name, index_content)
@@ -1788,8 +1790,8 @@ def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):
         assert pi.position == pi.total
 
 
-def test_pack_writer_final_partial_pack_uses_sha256():
-    # A final flush with fewer pieces than max_count must still use SHA256(pack_bytes).
+def test_pack_writer_final_partial_pack_uses_blake3():
+    # A final flush with fewer pieces than max_count must still use blake3(pack_bytes).
     store = MockStore()
     chunk_id = b"d" * 32
     cdata = b"solo"
@@ -1799,7 +1801,7 @@ def test_pack_writer_final_partial_pack_uses_sha256():
     assert results is not None
     assert len(results) == 1
     _, pack_id, _, _ = results[0]
-    assert pack_id == sha256(cdata).digest()
+    assert pack_id == blake3(cdata).digest()
     assert pack_id != chunk_id
 
 

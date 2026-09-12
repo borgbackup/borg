@@ -112,12 +112,12 @@ class CheckMixIn:
         It consists of two major steps:
 
         1. Checking the consistency of the repository itself. The objects in the ``index/``
-           and ``packs/`` namespaces are named by the sha256 hash of their content, so such
+           and ``packs/`` namespaces are named by the blake3 hash of their content, so such
            an object is intact if and only if the hash of its content still equals its name.
            The check verifies the (small) index objects first and, only if they are intact,
            all packs. It also cross-checks the chunk index against the packs present in the
            repository to detect referenced but missing packs. Bit rot and other types of
-           accidental damage can be detected this way, but as sha256 content-addressing is
+           accidental damage can be detected this way, but as content-addressing is
            not a MAC, this step does not detect tampering. Running the repository check can
            be split into multiple partial checks using ``--max-duration``.
            For rest:// repositories, the server computes the hashes, so the pack contents do

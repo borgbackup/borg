@@ -309,7 +309,7 @@ The ciphertext is then converted to base64.
 
 This base64-encoded *borg key* is then stored in the key file or under the
 repository's ``keys/`` namespace (keyfile and repokey modes respectively), named
-by the sha256 of its content.
+by the blake3 hash of its content.
 
 The use of a constant IV is secure because an identical passphrase will
 result in a different derived KEK for every key encryption due to the salt.
@@ -325,7 +325,7 @@ key material. This lets several people access a shared repository with
 independent passphrases, without sharing one secret. Or you can add borg keys
 for redundant, more fault-tolerant storage.
 
-keyfile and repokey borg keys use the same format and the same sha256-content
+keyfile and repokey borg keys use the same format and the same blake3-content
 naming; borg locates a borg key independently of its key type byte and tries each
 available one against the supplied passphrase until one decrypts. A borg key may
 carry a label for management. The constant-IV argument above still holds, because
@@ -377,7 +377,7 @@ used:
   object's metadata slot and data slot are encrypted and authenticated with the borg
   key (see :ref:`security_encryption`); its per-object header is unencrypted and
   carries the magic, the format version and the chunk id (see :ref:`pack-format`).
-- ``index/<sha256>`` -- the chunk id to pack location index. It is not encrypted,
+- ``index/<blake3>`` -- the chunk id to pack location index. It is not encrypted,
   but it only contains chunk ids and locations, which the pack headers expose anyway.
 - ``archives/<hex(archive_id)>`` -- one empty object per archive. The archive name,
   its timestamps, the item metadata and the chunk lists all live inside encrypted
@@ -386,7 +386,7 @@ used:
   modification time.
 - ``config/manifest`` (an encrypted repository object), plus the plaintext
   ``config/version``, ``config/id`` and ``config/readme``.
-- ``keys/<sha256>`` -- in ``repokey`` mode, the borg key(s), encrypted with the
+- ``keys/<blake3>`` -- in ``repokey`` mode, the borg key(s), encrypted with the
   passphrase-derived KEK (see :ref:`key_encryption`).
 - ``locks/*`` and ``cache/*``. Note that the per-archive reference caches
   ``cache/referenced-by-archive.<hex(archive_id)>``, written by ``borg compact`` and

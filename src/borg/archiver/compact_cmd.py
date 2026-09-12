@@ -33,6 +33,7 @@ class ArchiveGarbageCollector:
         self.total_files = None  # overall number of source files written to all archives in this repo
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
+        self.archive_series_names = None  # names of the existing archives, set by analyze_archives()
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
         self.threshold = threshold  # rewrite a mixed pack only when its wasted-bytes fraction reaches this percent
         self.dry_run = dry_run
@@ -62,6 +63,12 @@ class ArchiveGarbageCollector:
         chunks = build_chunkindex_from_repo(
             self.repository, write_immediately=not self.dry_run, init_flags=ChunkIndex.F_NONE
         )
+        # Hand this index to the repository as well, so reading the archives below does not lazily
+        # build a second, identical copy of the biggest structure borg keeps in memory (see the
+        # .chunks property). The repository only reads pack locations and F_PENDING from it, never
+        # the F_USED flags or sizes this index tracks for compaction and --stats. It stays shared
+        # until compact_packs() invalidates the chunk index before its first store change.
+        self.repository.chunks = chunks
         return chunks
 
     def save_chunk_index(self):
@@ -69,6 +76,8 @@ class ArchiveGarbageCollector:
         # and also remove all older chunk indexes.
         # write_chunkindex_to_repo now removes all flags and size infos.
         # we need this, as we put the wrong size in there to support --stats computations.
+        # clear=True empties the index in place: safe, the repository dropped its reference to it in
+        # compact_packs() before the first store change, so it cannot see an empty index here.
         write_chunkindex_to_repo(
             self.repository, self.chunks, incremental=False, clear=True, force_write=True, delete_other=True
         )
@@ -78,9 +87,14 @@ class ArchiveGarbageCollector:
         """
         Clean up files cache files for archive series names that no longer exist in the repository.
 
+        Works from the archive names analyze_archives() collected, so this needs no repository access:
+        it runs after save_chunk_index() has cleared the chunk index, and the archive set does not
+        change in between (compaction only removes soft-deleted archives, which were never in it).
+
         Note: this only works perfectly if the files cache filename suffixes are automatically generated
         and the user does not manually control them via more than one BORG_FILES_CACHE_SUFFIX env var value.
         """
+        assert self.archive_series_names is not None, "analyze_archives() must run first"
         logger.info("Cleaning up files cache...")
 
         cache_dir = Path(get_cache_dir(self.repository.id_str, create=False))
@@ -89,7 +103,7 @@ class ArchiveGarbageCollector:
             return
 
         # Get all existing archive series names
-        existing_series = set(self.manifest.archives.names())
+        existing_series = self.archive_series_names
         logger.debug(f"Found {len(existing_series)} existing archive series.")
 
         # Get the set of all existing files cache file names.
@@ -141,6 +155,9 @@ class ArchiveGarbageCollector:
         missing_chunks: set[bytes] = set()
         archive_infos = self.manifest.archives.list(sort_by=["ts"])
         num_archives = len(archive_infos)
+        # an archive's name is its series name; cleanup_files_cache() needs these later, and reading
+        # every archive's metadata a second time just to get them again would be wasteful.
+        self.archive_series_names = {info.name for info in archive_infos}
         cached_hex_ids = list_archive_reference_caches(self.repository)
         if not self.dry_run:
             # drop the reference caches of archives that do not exist anymore.
@@ -365,7 +382,11 @@ class ArchiveGarbageCollector:
             logger.info("Deleting 0 unused objects...")
             return repo_size_before, repo_size_before  # nothing worth doing; chunk indexes stay valid
 
-        # crash-safety (#9748): invalidate chunk indexes before the first store change
+        # crash-safety (#9748): invalidate chunk indexes before the first store change. This also
+        # drops the repository's reference to self.chunks (shared since get_repository_chunks()).
+        # Do not hand it back: until save_chunk_index() has written the updated index, the repo
+        # must hold no in-memory index that close() could persist on an aborted run. Nothing below
+        # needs one, compact_pack() and merge_packs() work on chunks=self.chunks.
         delete_chunkindex_from_repo(self.repository)
         self.store_changed = True
 

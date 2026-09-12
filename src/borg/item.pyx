@@ -1,5 +1,6 @@
 import stat
-from collections import namedtuple
+from collections import Counter, namedtuple
+from difflib import SequenceMatcher
 
 from libc.string cimport memcmp
 from cpython.bytes cimport PyBytes_AsStringAndSize
@@ -610,6 +611,57 @@ cpdef _init_names():
 _init_names()
 
 
+# Cost limits for the chunk list alignment done by chunks_diff_size(). difflib.SequenceMatcher
+# degrades to quadratic runtime on chunk lists that contain the same chunk id over and over again,
+# like the ones of a sparse file or a VM image with big all-zero ranges.
+MAX_ALIGN_CHUNKS = 1 << 16  # max. length of a chunk list (the common prefix/suffix is not counted)
+MAX_ALIGN_WORK = 1 << 20  # max. estimated matcher work: for each chunk of list 1, its count in list 2
+
+
+def chunks_diff_size(chunks1, chunks2):
+    """
+    Determine how many content bytes chunks2 added and how many chunks1 removed.
+
+    Both chunk lists are aligned as sequences, like a text diff aligns lines: the chunks that are
+    part of the alignment are the unchanged content, all others are counted - the ones of chunks1
+    as removed bytes, the ones of chunks2 as added bytes. Insertions, removals, moves and
+    duplicated chunks are therefore all reflected by the byte counts.
+
+    For chunk lists that are too long or too repetitive to align within MAX_ALIGN_CHUNKS /
+    MAX_ALIGN_WORK, the chunks are only counted per chunk id and just the surplus occurrences of an
+    id are counted as added/removed, so moved chunks do not show up in the byte counts then.
+    """
+    # The common prefix and suffix align trivially. Stripping them is what makes the usual cases
+    # cheap (e.g. a file that was appended to) and it also keeps the matcher away from the long
+    # runs of identical chunks it is slow on.
+    start, end1, end2 = 0, len(chunks1), len(chunks2)
+    while start < end1 and start < end2 and chunks1[start].id == chunks2[start].id:
+        start += 1
+    while end1 > start and end2 > start and chunks1[end1 - 1].id == chunks2[end2 - 1].id:
+        end1 -= 1
+        end2 -= 1
+    mid1, mid2 = chunks1[start:end1], chunks2[start:end2]
+    ids1 = [chunk.id for chunk in mid1]
+    ids2 = [chunk.id for chunk in mid2]
+    counts2 = Counter(ids2)
+    work = sum(counts2[cid] for cid in ids1)
+    if max(len(ids1), len(ids2)) > MAX_ALIGN_CHUNKS or work > MAX_ALIGN_WORK:
+        counts1 = Counter(ids1)
+        # a chunk id always refers to the same content, thus also always to the same size.
+        sizes = {chunk.id: chunk.size for chunk in mid1}
+        sizes.update((chunk.id, chunk.size) for chunk in mid2)
+        added = sum((counts2[cid] - counts1[cid]) * sizes[cid] for cid in counts2 if counts2[cid] > counts1[cid])
+        removed = sum((counts1[cid] - counts2[cid]) * sizes[cid] for cid in counts1 if counts1[cid] > counts2[cid])
+        return added, removed
+    added = removed = 0
+    matcher = SequenceMatcher(a=ids1, b=ids2, autojunk=False)  # autojunk would skip popular chunks
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag != 'equal':
+            removed += sum(chunk.size for chunk in mid1[i1:i2])
+            added += sum(chunk.size for chunk in mid2[j1:j2])
+    return added, removed
+
+
 class DiffChange:
     """
     Stores a change in a diff.
@@ -732,14 +784,7 @@ class ItemDiff:
         if self._item1.chunks == self._item2.chunks:
             # same chunk lists, same content (e.g. a file that was only touched): no content change.
             return False
-        # the byte counts sum up the chunks only present in one of the items, so both are 0 if the content
-        # only changed by reordering or duplicating chunks - it is a content change nevertheless.
-        chunk_ids1 = {c.id for c in self._item1.chunks}
-        chunk_ids2 = {c.id for c in self._item2.chunks}
-        added_ids = chunk_ids2 - chunk_ids1
-        removed_ids = chunk_ids1 - chunk_ids2
-        added = self._item2.get_size(consider_ids=added_ids)
-        removed = self._item1.get_size(consider_ids=removed_ids)
+        added, removed = chunks_diff_size(self._item1.chunks, self._item2.chunks)
         self._changes['content'] = DiffChange("modified", {"added": added, "removed": removed})
         return True
 

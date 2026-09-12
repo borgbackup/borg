@@ -642,11 +642,14 @@ type:
 added:
     If **type** is '*modified*', '*added*' or '*removed*', **added** and **removed** give the
     amount of data (in bytes) added and removed. For '*added*', **removed** is 0; for '*removed*',
-    **added** is 0. For '*modified*', **added** / **removed** is the total size of the chunks only
-    present in the ARCHIVE2 / ARCHIVE1 version of the file, so both are 0 for a file whose chunks
-    were merely reordered or duplicated. If the chunk ids can not be compared (the archives were
-    created with different ``--chunker-params``), a '*modified*' change has neither property and
-    the only information available is that the file contents were modified.
+    **added** is 0. For '*modified*', the two chunk lists of the file are aligned as sequences and
+    **added** / **removed** is the total size of the chunks of the ARCHIVE2 / ARCHIVE1 version that
+    are not part of that alignment, so inserted, removed, moved and duplicated content is accounted
+    for. For files with very long or very repetitive chunk lists, only the number of occurrences of
+    each chunk id is compared (aligning them would be too slow), so moved content does not show up
+    in their byte counts. If the chunk ids can not be compared (the archives were created with
+    different ``--chunker-params``), a '*modified*' change has neither property and the only
+    information available is that the file contents were modified.
 
 removed:
     See **added** property.

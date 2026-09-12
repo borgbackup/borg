@@ -275,10 +275,14 @@ class DiffMixIn:
         For each matching item in both archives, Borg reports:
 
         - Content changes: total added/removed bytes within files. If chunker parameters are comparable,
-          Borg compares chunk IDs quickly: the byte counts are the total sizes of the chunks only present
-          in one of the two versions of a file, so a file whose chunks were merely reordered or duplicated
-          is reported as modified with 0 B added and 0 B removed. Otherwise, Borg compares the content. In
-          the latter case, borg can only tell that a file was modified, not by how much: no byte counts
+          Borg compares chunk IDs quickly: it aligns the two chunk lists of a file like a text diff
+          aligns lines, and the byte counts are the total sizes of the chunks that are not part of that
+          alignment. Inserted, removed, moved and duplicated content is therefore accounted for - a
+          chunk that only moved within the file shows up as removed and added again. Files with very
+          long or very repetitive chunk lists are not aligned (this would be too slow); for these, only
+          the number of occurrences of each chunk ID is compared, so moved content does not show up in
+          their byte counts. If chunker parameters are not comparable, Borg compares the content. In
+          that case, borg can only tell that a file was modified, not by how much: no byte counts
           are given for it, the text output shows "modified:  (can't get size)" instead.
         - Metadata changes: user, group, mode, and other metadata shown inline as "[old -> new]", like
           "[-rw-r--r-- -> -rwxr-xr-x]" for a mode change. Use ``--content-only`` to suppress metadata changes.

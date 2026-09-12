@@ -1,7 +1,7 @@
 import pytest
 
 from ..cache import ChunkListEntry
-from ..item import Item, ItemDiff, chunks_contents_equal
+from ..item import MAX_ALIGN_CHUNKS, MAX_ALIGN_WORK, Item, ItemDiff, chunks_contents_equal, chunks_diff_size
 from ..helpers import StableDict
 from ..helpers.msgpack import Timestamp
 from ..platformflags import is_pypy
@@ -188,3 +188,49 @@ def test_item_diff_time_ns_resolution(ctime1_ns, ctime2_ns, change_expected):
     diff = ItemDiff("p", item1, item2, iter([]), iter([]), can_compare_chunk_ids=True)
     assert (diff.ctime() is not None) == change_expected
     assert diff.mtime() is None
+
+
+# chunk ids for the chunks_diff_size tests, all chunks are 10 bytes long.
+CA, CB, CC, CD = (ChunkListEntry(bytes([n]) * 32, 10) for n in range(4))
+
+
+@pytest.mark.parametrize(
+    "chunks1, chunks2, expected",
+    [
+        ([], [], (0, 0)),
+        ([CA, CB], [CA, CB], (0, 0)),  # identical
+        ([CA, CB], [CA, CB, CC], (10, 0)),  # appended
+        ([CA, CB, CC], [CA, CB], (0, 10)),  # truncated
+        ([CA, CB], [CC, CA, CB], (10, 0)),  # prepended
+        ([CA, CB], [CA, CC, CB], (10, 0)),  # inserted in the middle
+        ([CA, CB, CC], [CA, CD, CC], (10, 10)),  # replaced in the middle
+        ([CA, CB], [CB, CA], (10, 10)),  # swapped: one of the two chunks aligns, the other one moved
+        ([CA, CB, CC], [CC, CB, CA], (20, 20)),  # reversed: only one chunk aligns
+        ([CA], [CA, CA, CA], (20, 0)),  # duplicated: no new chunk id, but the content grew
+        ([CA, CA, CA], [CA], (0, 20)),  # de-duplicated
+        ([CA, CB], [CC, CD], (20, 20)),  # nothing in common
+    ],
+)
+def test_chunks_diff_size(chunks1, chunks2, expected):
+    assert chunks_diff_size(chunks1, chunks2) == expected
+
+
+def test_chunks_diff_size_over_length_limit():
+    """Above MAX_ALIGN_CHUNKS the chunk lists are not aligned, the chunk ids are only counted."""
+    chunks1 = [ChunkListEntry((n + 1).to_bytes(32, "big"), 10) for n in range(MAX_ALIGN_CHUNKS + 1)]
+    # the first and the last chunk differ, so neither a common prefix nor a common suffix is stripped.
+    chunks2 = [CA] + chunks1[1:-1] + [CB]
+    assert chunks_diff_size(chunks1, chunks2) == (20, 20)
+    # a pure reordering is not detected on this code path, thus no bytes are reported.
+    assert chunks_diff_size(chunks1, chunks1[::-1]) == (0, 0)
+
+
+def test_chunks_diff_size_over_work_limit():
+    """Chunk lists that repeat the same chunk id too often are not aligned either."""
+    n = int(MAX_ALIGN_WORK**0.5) + 1  # n * n occurrences of the same id exceed the work limit
+    chunks1 = [CA] * n + [CB]
+    chunks2 = [CB] + [CA] * n
+    # the same multiset of chunks, only reordered: not detected without aligning the lists.
+    assert chunks_diff_size(chunks1, chunks2) == (0, 0)
+    # a chunk that really was added is still counted correctly.
+    assert chunks_diff_size(chunks1, chunks2 + [CC]) == (10, 0)

@@ -34,7 +34,7 @@ Each blob is a self-contained unit::
     Offset (relative to blob start)  Size              Type     Field
     --------------------------------  ----------------  -------  -----
     0                                 len(OBJ_MAGIC)    bytes    OBJ_MAGIC = ASCII b"BORG_OBJ"
-    8                                 1                 uint8    Format version: 0x02 (0x01 still readable)
+    8                                 1                 uint8    Format version: 0x02
     9                                 32                bytes    chunk_id
     41                                4                 uint32le meta_size
     45                                4                 uint32le data_size
@@ -56,7 +56,8 @@ The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
 ``len(OBJ_MAGIC)`` + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
 ``REPOOBJ_HEADER_SIZE = len(OBJ_MAGIC) + 1 + 32 + 4 + 4 = 49``
 
-Format version ``0x02`` (``OBJ_VERSION_HEADER_AAD``) binds the header's first 41 bytes (``OBJ_MAGIC``
+The format version is ``0x02`` (``OBJ_VERSION_HEADER_AAD``), the only version ``RepoObj.format()``
+writes and ``parse()``/``parse_meta()`` accept. It binds the header's first 41 bytes (``OBJ_MAGIC``
 + version + ``chunk_id`` -- ``REPOOBJ_HEADER_AAD_SIZE``) into the authentication of
 ``encrypted_meta`` and ``encrypted_data`` as additional authenticated data (AAD: data that is
 authenticated together with the ciphertext, but not itself encrypted). This applies to all borg 2
@@ -75,10 +76,6 @@ its slot. This stops an attacker controlling repo storage from swapping the two 
 ``meta_size``/``data_size`` to match): decrypting a ciphertext under the wrong slot's AAD fails
 authentication.
 
-Format version ``0x01`` (``OBJ_VERSION_NO_HEADER_AAD``) authenticates ``encrypted_meta`` and
-``encrypted_data`` with ``aad=chunk_id`` only, without the header bound in. ``RepoObj.format()``
-writes version ``0x02``; ``parse()``/``parse_meta()`` accept both versions.
-
 ``iter_headers()`` (used for pack recovery/compaction, see below) reads the header without
 decrypting, so it does not check header AAD authentication. The repair walk described below is the
 exception: given a validator it reads and decrypts each metadata slot, and thus does check it.
@@ -90,8 +87,8 @@ exception: given a validator it reads and decrypts each metadata slot, and thus 
 
     The fixed 49-byte blob header. ``meta_size`` and ``data_size`` drive
     traversal; integrity comes from the content-addressed pack name and the
-    per-blob tag, which at version ``0x02`` authenticates magic/version/chunk_id
-    as additional authenticated data.
+    per-blob tag, which authenticates magic/version/chunk_id as additional
+    authenticated data.
 
 A reader locates the next blob by advancing::
 

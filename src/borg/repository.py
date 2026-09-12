@@ -31,12 +31,12 @@ from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
 from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
-from .crypto.key import is_keyfile, blake3_256
+from .crypto.key import is_keyfile, blake3_256, blake3_256_hex
 
 logger = create_logger(__name__)
 
 # an object name is the hex blake3 hash of the object's content (64 lowercase hex digits), see
-# crypto.key.blake3_256().
+# crypto.key.blake3_256_hex().
 _valid_object_name = re.compile(r"[0-9a-f]{64}").fullmatch
 
 # the hash algorithm content-addressed objects (packs/, index/) are named by, as borgstore calls it:
@@ -947,7 +947,7 @@ class Repository:
         # store a single repokey borg key (content-addressed). does NOT delete other borg keys,
         # so a repository can have multiple borg keys (one per passphrase). returns the
         # store object name (= borg key id) under which the borg key was stored.
-        digest = bin_to_hex(blake3_256(keydata))
+        digest = blake3_256_hex(keydata)
         self.store.store(f"keys/{digest}", keydata)
         return digest
 

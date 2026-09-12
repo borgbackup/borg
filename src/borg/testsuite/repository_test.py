@@ -1046,7 +1046,7 @@ def test_check_detects_corruption_in_later_object(tmp_path):
     chunk1 = fchunk(b"FIRST", chunk_id=H(1))
     chunk2 = fchunk(b"SECOND", chunk_id=H(2))
     pack = chunk1 + chunk2
-    pack_name = "packs/" + bin_to_hex(blake3(pack).digest())
+    pack_name = "packs/" + blake3(pack).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
         assert repository.check(repair=False) is True  # both objects are intact
@@ -1061,7 +1061,7 @@ def test_check_detects_corruption_in_later_object(tmp_path):
 def test_check_detects_index_corruption(tmp_path):
     # index/ objects are named by blake3(content) like packs, so check verifies them the same way.
     content = _serialized_chunkindex()
-    index_name = "index/" + bin_to_hex(blake3(content).digest())
+    index_name = "index/" + blake3(content).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(index_name, content)
         assert repository.check(repair=False) is True  # index object intact (name == blake3(content))
@@ -1200,7 +1200,7 @@ def test_check_intact_multi_object_pack_passes(tmp_path):
     # An intact pack with several objects passes: it is hashed as a whole, so the object count
     # does not matter.
     pack = fchunk(b"A", chunk_id=H(1)) + fchunk(b"BB", chunk_id=H(2)) + fchunk(b"CCC", chunk_id=H(3))
-    pack_name = "packs/" + bin_to_hex(blake3(pack).digest())
+    pack_name = "packs/" + blake3(pack).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
         assert repository.check(repair=False) is True
@@ -1271,7 +1271,7 @@ def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, ca
         pack_id = repository.chunks[H(0)].pack_id
         repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
         content = b"not a serialized chunk index"
-        repository.store_store("index/" + bin_to_hex(blake3(content).digest()), content)
+        repository.store_store("index/" + blake3(content).hexdigest(), content)
         with caplog.at_level(logging.WARNING):
             assert repository.check(repair=False) is True
         assert "Missing pack" not in caplog.text
@@ -1773,9 +1773,9 @@ def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):
 
     monkeypatch.setattr("borg.repository.ProgressIndicatorPercent", FakePI)
     pack = fchunk(b"A", chunk_id=H(1))
-    pack_name = "packs/" + bin_to_hex(blake3(pack).digest())
+    pack_name = "packs/" + blake3(pack).hexdigest()
     index_content = _serialized_chunkindex()
-    index_name = "index/" + bin_to_hex(blake3(index_content).digest())
+    index_name = "index/" + blake3(index_content).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
         repository.store_store(index_name, index_content)

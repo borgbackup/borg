@@ -38,7 +38,7 @@ from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
-from .crypto.key import blake3_256
+from .crypto.key import blake3_256, blake3_256_hex
 from .manifest import Manifest
 from .platform import SaveFile
 from .repository import Repository, StoreObjectNotFound, PackReader
@@ -58,7 +58,7 @@ def files_cache_name(archive_name, files_cache_name="files"):
     # when not, the user may manually do that by using the env var.
     if not suffix:
         # avoid issues with too complex or long archive_name by hashing it:
-        suffix = bin_to_hex(blake3_256(archive_name.encode()))
+        suffix = blake3_256_hex(archive_name.encode())
     return files_cache_name + "." + suffix
 
 
@@ -677,7 +677,7 @@ def _store_chunkindex_fragment(repository, batch, stored_hashes, *, force_write)
     with io.BytesIO() as f:
         batch.write(f)
         data = f.getvalue()
-    new_hash = bin_to_hex(blake3_256(data))
+    new_hash = blake3_256_hex(data)
     stored = False
     if force_write or new_hash not in stored_hashes:
         index_name = f"index/{new_hash}"

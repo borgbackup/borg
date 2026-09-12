@@ -82,8 +82,8 @@ from borgstore.store import ObjectNotFound
 
 from . import platform
 from .constants import MAX_MUTUAL_CLOCK_SKEW
-from .crypto.key import blake3_256
-from .helpers import Error, ErrorWithTraceback, format_timedelta, bin_to_hex
+from .crypto.key import blake3_256_hex
+from .helpers import Error, ErrorWithTraceback, format_timedelta
 from .logger import create_logger
 
 logger = create_logger(__name__)
@@ -221,7 +221,7 @@ class Lock:
         timestamp = now.isoformat(timespec="milliseconds")
         lock = dict(exclusive=exclusive, hostid=self.id[0], processid=self.id[1], threadid=self.id[2], time=timestamp)
         value = json.dumps(lock).encode("utf-8")
-        key = bin_to_hex(blake3_256(value))
+        key = blake3_256_hex(value)
         logger.debug(f"LOCK-CREATE: creating lock in store. key: {key}, lock: {lock}.")
         self.store.store(f"locks/{key}", value)
         if update_last_refresh:

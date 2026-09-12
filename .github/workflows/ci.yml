@@ -34,6 +34,17 @@ env:
   # to pytest (pass_env = ["*"]).
   PY_COLORS: "1"       # pytest
   TOX_COLORED: "yes"   # tox's own output
+  # The S3 tests run against a MinIO server. MinIO retired its dl.min.io downloads (they
+  # answer HTTP 410 now) and its releases from RELEASE.2025-10-15T17-29-55Z on carry no
+  # binaries at all, so fetch the last releases that still publish them on GitHub and
+  # check what we downloaded. Bumping a release means updating its sha256 here, too:
+  # the sums are the ones published next to the binaries (<asset>.sha256sum).
+  MINIO_RELEASE: "RELEASE.2025-09-07T16-13-09Z"
+  MINIO_SHA256_LINUX_AMD64: "7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f"
+  MINIO_SHA256_LINUX_ARM64: "5c83cd2cf151717ba0243f73e1c7802ff36e272b67144bdd7f1f7d684fd6f03d"
+  MC_RELEASE: "RELEASE.2025-08-13T08-35-41Z"
+  MC_SHA256_LINUX_AMD64: "01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891"
+  MC_SHA256_LINUX_ARM64: "14c8c9616cfce4636add161304353244e8de383b2e2752c0e9dad01d4c27c12c"
 
 jobs:
   lint:
@@ -290,12 +301,16 @@ jobs:
         set -e
         arch=$(uname -m)
         case "$arch" in
-          x86_64|amd64) srv_url=https://dl.min.io/server/minio/release/linux-amd64/minio; cli_url=https://dl.min.io/client/mc/release/linux-amd64/mc ;;
-          aarch64|arm64) srv_url=https://dl.min.io/server/minio/release/linux-arm64/minio; cli_url=https://dl.min.io/client/mc/release/linux-arm64/mc ;;
+          x86_64|amd64) plat=linux-amd64; srv_sha=$MINIO_SHA256_LINUX_AMD64; cli_sha=$MC_SHA256_LINUX_AMD64 ;;
+          aarch64|arm64) plat=linux-arm64; srv_sha=$MINIO_SHA256_LINUX_ARM64; cli_sha=$MC_SHA256_LINUX_ARM64 ;;
           *) echo "Unsupported arch: $arch"; exit 1 ;;
         esac
+        srv_url=https://github.com/minio/minio/releases/download/$MINIO_RELEASE/minio.$plat.$MINIO_RELEASE
+        cli_url=https://github.com/minio/mc/releases/download/$MC_RELEASE/mc.$plat.$MC_RELEASE
         curl -fsSL -o /usr/local/bin/minio "$srv_url"
         curl -fsSL -o /usr/local/bin/mc "$cli_url"
+        echo "$srv_sha  /usr/local/bin/minio" | sha256sum -c -
+        echo "$cli_sha  /usr/local/bin/mc" | sha256sum -c -
         sudo chmod +x /usr/local/bin/minio /usr/local/bin/mc
         export PATH=/usr/local/bin:$PATH
         # Start MinIO on :9000 with default credentials (minioadmin/minioadmin)
@@ -735,11 +750,13 @@ jobs:
       run: |
         set -euxo pipefail
         case "$(uname -m)" in
-          x86_64|amd64) srv_url=https://dl.min.io/server/minio/release/linux-amd64/minio ;;
-          aarch64|arm64) srv_url=https://dl.min.io/server/minio/release/linux-arm64/minio ;;
+          x86_64|amd64) plat=linux-amd64; srv_sha=$MINIO_SHA256_LINUX_AMD64 ;;
+          aarch64|arm64) plat=linux-arm64; srv_sha=$MINIO_SHA256_LINUX_ARM64 ;;
           *) echo "Unsupported arch: $(uname -m)"; exit 1 ;;
         esac
+        srv_url=https://github.com/minio/minio/releases/download/$MINIO_RELEASE/minio.$plat.$MINIO_RELEASE
         curl -fsSL -o "$RUNNER_TEMP/minio" "$srv_url"
+        echo "$srv_sha  $RUNNER_TEMP/minio" | sha256sum -c -
         chmod +x "$RUNNER_TEMP/minio"
         mkdir -p "$RUNNER_TEMP/minio-data"
         # default credentials: minioadmin / minioadmin

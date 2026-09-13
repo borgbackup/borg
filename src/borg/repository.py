@@ -1026,7 +1026,9 @@ class Repository:
             self.store_opened = True
         try:
             readme = self.store.load("config/readme").decode()
-        except StoreObjectNotFound:
+        except (StoreObjectNotFound, StoreBackendDoesNotExist):
+            # A rest:// store's open() does not contact the server, so for rest:// a missing repository
+            # only shows up here, when the first request fails with BackendDoesNotExist (#10365).
             raise self.DoesNotExist(str(self._location)) from None
         if readme != REPOSITORY_README:
             raise self.InvalidRepository(str(self._location))

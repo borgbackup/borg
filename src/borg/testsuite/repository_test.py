@@ -60,6 +60,17 @@ def test_propagate_rsh(monkeypatch):
     assert "BORGSTORE_RSH" not in os.environ
 
 
+@pytest.mark.parametrize("proto", ["file", "rest"])
+def test_open_nonexistent_repository(tmp_path, proto):
+    # A missing repository raises Repository.DoesNotExist, also via the rest:// transport (#10365).
+    path = os.fspath(tmp_path / "nonexistent")
+    location = Location(path if proto == "file" else f"rest:///{path}")
+    with pytest.raises(Repository.DoesNotExist):
+        with Repository(location, exclusive=True):
+            pass
+    assert not os.path.exists(path)
+
+
 @pytest.fixture()
 def repository(tmp_path):
     repository_location = os.fspath(tmp_path / "repository")

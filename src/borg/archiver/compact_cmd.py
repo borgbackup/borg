@@ -67,7 +67,10 @@ class ArchiveGarbageCollector:
         # build a second, identical copy of the biggest structure borg keeps in memory (see the
         # .chunks property). The repository only reads pack locations and F_PENDING from it, never
         # the F_USED flags or sizes this index tracks for compaction and --stats. It stays shared
-        # until compact_packs() invalidates the chunk index before its first store change.
+        # until compact_packs() invalidates the chunk index before its first store change - or, on
+        # a dry run or when there is nothing to compact, until close(), which then persists only
+        # what the build flagged F_NEW: nothing after reading the fragments, everything after a
+        # slow rebuild from the packs (exactly what the lazy .chunks build would have done).
         self.repository.chunks = chunks
         return chunks
 
@@ -88,8 +91,9 @@ class ArchiveGarbageCollector:
         Clean up files cache files for archive series names that no longer exist in the repository.
 
         Works from the archive names analyze_archives() collected, so this needs no repository access:
-        it runs after save_chunk_index() has cleared the chunk index, and the archive set does not
-        change in between (compaction only removes soft-deleted archives, which were never in it).
+        it may run after save_chunk_index() has cleared the chunk index (it does whenever the store
+        changed), and the archive set does not change in between (compaction only removes
+        soft-deleted archives, which were never in it).
 
         Note: this only works perfectly if the files cache filename suffixes are automatically generated
         and the user does not manually control them via more than one BORG_FILES_CACHE_SUFFIX env var value.

@@ -767,25 +767,42 @@ def test_compact_files_cache_cleanup(archivers, request):
     assert expected_cache_files == remaining_cache_files, "Unexpected cache files found"
 
 
-def test_compact_builds_the_chunk_index_only_once(archivers, request, monkeypatch):
+@pytest.mark.parametrize("scenario", ("rewrite", "dry_run", "slow_rebuild", "merge"))
+def test_compact_builds_the_chunk_index_only_once(archivers, request, monkeypatch, scenario):
     """The chunk index is the biggest structure borg keeps in memory, so compact must build one, not
     several copies of it.
 
     Compact builds its own index (it needs the usage flags) and hands it to the repository, so reading
     the archives resolves pack locations through that same index instead of lazily building a second,
-    identical one.
+    identical one. Every path through compact_packs() must keep it at one build: a pack rewrite, a dry
+    run (nothing is invalidated, the shared index lives until close()), a slow rebuild from the packs
+    when the repo has no index fragments, and a merge of tiny packs.
     """
     archiver = request.getfixturevalue(archivers)
 
-    # file_a only ever belongs to archive1, file_b to both: deleting archive1 leaves file_a's chunks
-    # unused next to still-used objects in the same pack, so compaction rewrites that pack.
-    create_regular_file(archiver.input_path, "file_a", contents=os.urandom(1024 * 1024))
-    create_regular_file(archiver.input_path, "file_b", contents=os.urandom(1024 * 1024))
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "archive1", "input")
-    os.remove(os.path.join(archiver.input_path, "file_a"))
-    cmd(archiver, "create", "archive2", "input")
-    cmd(archiver, "delete", "-a", "archive1")
+    if scenario == "merge":
+        # many tiny, fully used packs: nothing to reclaim, but their combined size reaches a full pack,
+        # so compact_packs() takes the merge path (see test_compact_packs_merges_tiny_packs).
+        monkeypatch.setenv("BORG_PACK_MAX_SIZE", "100000")
+        for i in range(12):
+            create_regular_file(archiver.input_path, "file", contents=os.urandom(12 * 1024))
+            cmd(archiver, "create", f"archive{i}", "input")
+        survivor = "archive11"
+    else:
+        # file_a only ever belongs to archive1, file_b to both: deleting archive1 leaves file_a's chunks
+        # unused next to still-used objects in the same pack, so compaction rewrites that pack.
+        create_regular_file(archiver.input_path, "file_a", contents=os.urandom(1024 * 1024))
+        create_regular_file(archiver.input_path, "file_b", contents=os.urandom(1024 * 1024))
+        cmd(archiver, "create", "archive1", "input")
+        os.remove(os.path.join(archiver.input_path, "file_a"))
+        cmd(archiver, "create", "archive2", "input")
+        cmd(archiver, "delete", "-a", "archive1")
+        survivor = "archive2"
+    if scenario == "slow_rebuild":
+        # no index/* left: the only way to get an index is the slow walk over the pack headers.
+        with open_repository(archiver) as repository:
+            delete_chunkindex_from_repo(repository)
 
     builds = 0
     original_build = cache.build_chunkindex_from_repo
@@ -799,15 +816,17 @@ def test_compact_builds_the_chunk_index_only_once(archivers, request, monkeypatc
     monkeypatch.setattr(cache, "build_chunkindex_from_repo", counting_build)
     monkeypatch.setattr(compact_cmd, "build_chunkindex_from_repo", counting_build)
 
+    dry_run = scenario == "dry_run"
     repository = open_repository(archiver)
     with repository:
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
-        gc = ArchiveGarbageCollector(repository, manifest, stats=True, threshold=0.0)
+        gc = ArchiveGarbageCollector(repository, manifest, stats=True, threshold=0.0, dry_run=dry_run)
         gc.garbage_collect()
-        assert gc.store_changed, "this repo must really get compacted, or the test proves nothing"
+        # the store must really change (or, on the dry run, really not), or the test proves nothing
+        assert gc.store_changed is (not dry_run)
 
     assert builds == 1
 
     # the repository is still intact and the surviving archive still reads back
     cmd(archiver, "check")
-    cmd(archiver, "list", "archive2")
+    cmd(archiver, "list", survivor)

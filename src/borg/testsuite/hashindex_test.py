@@ -38,6 +38,20 @@ def test_chunkindex_add():
         chunks.add(x, 3)  # inconsistent size (we already have a different size)
 
 
+def test_chunkindex_add_keeps_resolved_location():
+    chunks = ChunkIndex()
+    x = H2(1)
+    chunks.add(x, 10)
+    pack_id = H2(2)
+    chunks.update_pack_info([(x, pack_id, 0, 50)])
+    assert not chunks.is_pending(x)
+    # re-adding a stored chunk keeps its resolved location, so the chunk stays readable and an
+    # aborted re-put cannot lose it (#10013); the next flush() overwrites it via update_pack_info().
+    chunks.add(x, 10)
+    assert not chunks.is_pending(x)
+    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=10, pack_id=pack_id, obj_offset=0, obj_size=50)
+
+
 def test_chunkindex_update_pack_info():
     chunks = ChunkIndex()
     x1, x2 = H2(1), H2(2)

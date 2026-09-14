@@ -121,11 +121,6 @@ zeros = bytes(MAX_DATA_SIZE)
 # borg serve (borg.legacy.remote) read() buffer size
 BUFSIZE = 10 * 1024 * 1024
 
-# To use a safe, limited unpacker, we need to set an upper limit to the archive count in the manifest.
-# this does not mean that you can always really reach that number, because it also needs to be less than
-# MAX_DATA_SIZE or it will trigger the check for that.
-MAX_ARCHIVES = 400000
-
 # repo.list() result count limit used by the Borg client
 LIST_SCAN_LIMIT = 100000
 

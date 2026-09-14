@@ -66,6 +66,12 @@ def archive_datetime_dispatch(func: Callable[[datetime], str]) -> Callable[[Arch
 # Each of these is a factory: prune() asks for a fresh period grouping function per invocation.
 
 
+# Assumed upper bound of the archive count prune() has to deal with. It only determines the zero-padding
+# width of the counter keys made by unique_period_func(), it is not an enforced limit: borg 2 has no
+# limit on the number of archives in a repository.
+MAX_ARCHIVES = 999999
+
+
 def unique_period_func():
     counter = count()
     max_digits = math.ceil(math.log10(MAX_ARCHIVES))

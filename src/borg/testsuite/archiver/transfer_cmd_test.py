@@ -368,7 +368,7 @@ def test_transfer_from_borg1_known_repo(archivers, request, monkeypatch, tmp_pat
     key_type_file = repo_security_dir / "key-type"
     key_type_file.write_text(str(KeyType.REPO))
     (repo_security_dir / "location").write_text(Location(Path(src_repo).absolute().as_uri()).canonical_path())
-    (repo_security_dir / "manifest-timestamp").write_text("1970-01-01T00:00:00.000000")
+    (repo_security_dir / "manifest-timestamp").write_text("1970-01-01T00:00:00.000000")  # borg 2 ignores it
 
     other_repo1 = f"--other-repo={src_repo}"
     cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")

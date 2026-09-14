@@ -76,34 +76,6 @@ Warning: Using Borg with multiple repositories that have identical repository ID
 creating 1:1 repository copies) is not supported and can lead to various issues,
 for example cache coherency issues, malfunction, or data corruption.
 
-"this is either an attack or unsafe" warning
---------------------------------------------
-
-About the warning:
-
-  Cache or information obtained from the security directory is newer than the
-  repository — this is either an attack or unsafe (multiple repositories with the same ID)
-
-"unsafe": If not following the advice from the previous section, you can easily
-run into this by yourself by restoring an older copy of your repository.
-
-"attack": An attacker may have replaced your repo with an older copy, trying to
-trigger AES counter reuse and break your repo encryption.
-
-Borg users have also reported that file system issues (e.g., hardware issues or I/O errors causing
-the file system to become read-only) can cause this warning, see :issue:`7853`.
-
-If you decide to ignore this and accept unsafe operation for this repository,
-you could delete the manifest-timestamp and the local cache:
-
-::
-
-  borg repo-info   # shows the repository ID and the security directory path
-  rm SECURITY_DIRECTORY/manifest-timestamp
-  borg repo-delete --cache-only
-
-This is an unsafe and unsupported way to use Borg. You have been warned.
-
 Which file types, attributes, etc. are *not* preserved?
 -------------------------------------------------------
 

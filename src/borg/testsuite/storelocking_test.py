@@ -249,8 +249,7 @@ class TestLock:
 
     def test_skew_warning_below_stale_threshold(self, lockstore):
         # a live lock whose writer's clock runs 10 minutes ahead of ours: far from the stale
-        # threshold, but still worth a warning (e.g. concurrent manifest writes could produce
-        # a spurious RepositoryReplay later), see #9870.
+        # threshold, but still worth a warning, see #9870.
         dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=10)
         write_raw_lock(lockstore, ID1, exclusive=False, dt=dt)  # store mtime: now
         lock = Lock(lockstore, exclusive=False, id=ID2)

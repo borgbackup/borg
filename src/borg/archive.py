@@ -2267,14 +2267,7 @@ class ArchiveChecker:
         # decryption per object and it needs the key, so read the key here if we do not have it yet.
         # manifest_only=True: the other key source make_key uses is self.chunks, built just below.
         if repair and self.key is None:
-            try:
-                self.key = self.make_key(repository, manifest_only=True)
-            except IntegrityError as err:
-                logger.warning(
-                    f"Could not read the key ({err}), so the rebuild can not validate object headers: "
-                    "a pack with a corrupt object header is indexed up to that header and the rest "
-                    "of it is dropped."
-                )
+            self.key = self.make_key(repository, manifest_only=True)
         if self.key is not None:
             # the validator decrypts metadata slots, so it needs a RepoObj built from the key.
             self.repo_objs = RepoObj(self.key)

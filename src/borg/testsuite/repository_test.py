@@ -132,6 +132,11 @@ def pdchunk(chunk):
     return pchunk(chunk)[0]
 
 
+def validate_any(chunk_id, obj):
+    # A validator for check(repair=True) that accepts every object.
+    return True
+
+
 def test_basic_operations(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
@@ -1121,11 +1126,46 @@ def test_check_repair_rebuilds_corrupt_index(tmp_path):
             repository.store_store(name, bytes(data))
         assert repository.check(repair=False) is False  # read-only check reports the corrupt index
     with reopen(repository) as repository:
-        assert repository.check(repair=True) is True  # repair rebuilds the index from the packs
+        assert repository.check(repair=True, validate=validate_any) is True  # repair rebuilds the index from the packs
     with reopen(repository) as repository:
         assert repository.check(repair=False) is True  # the rebuilt index passes a read-only check
         for i, cid in enumerate(ids):
             assert pdchunk(repository.get(cid)) == bytes([i]) * 20  # every chunk is indexed and resolves
+
+
+@pytest.mark.parametrize("repo_only", [True, False])
+def test_check_repair_rebuild_validates_objects(tmp_path, caplog, repo_only):
+    # check(repair=True, validate=...) does not index an object validate rejects and reports it, refs
+    # #9901. That fails a repository-only run only.
+    location = os.fspath(tmp_path / "repo")
+    ids = [H(x) for x in range(10)]
+    rejected_id = ids[4]
+    with Repository(location, exclusive=True, create=True) as repository:
+        for i, cid in enumerate(ids):
+            repository.put(cid, fchunk(bytes([i]) * 20, chunk_id=cid))
+        repository.flush()
+    with reopen(repository) as repository:
+        for info in repository.store_list("index"):  # corrupt every index fragment
+            name = f"index/{info.name}"
+            data = bytearray(repository.store_load(name))
+            data[0] ^= 0xFF
+            repository.store_store(name, bytes(data))
+    validated = []
+
+    def validate(chunk_id, obj):
+        validated.append(chunk_id)
+        return chunk_id != rejected_id
+
+    caplog.set_level(logging.INFO)
+    with reopen(repository) as repository:
+        assert repository.check(repair=True, repo_only=repo_only, validate=validate) is not repo_only
+    assert set(ids) <= set(validated)
+    assert "skipped 1 pack byte range(s) it could not authenticate" in caplog.text
+    with reopen(repository) as repository:
+        assert rejected_id not in repository.chunks
+        for i, cid in enumerate(ids):
+            if cid != rejected_id:
+                assert pdchunk(repository.get(cid)) == bytes([i]) * 20  # every other object is indexed
 
 
 def test_check_repair_refuses_when_pack_corrupt(tmp_path):
@@ -1149,7 +1189,7 @@ def test_check_repair_refuses_when_pack_corrupt(tmp_path):
             repository.store_store(name, bytes(idata))
     with reopen(repository) as repository:
         # a repository-only repair cannot fix a corrupt pack, so it fails.
-        assert repository.check(repair=True, repo_only=True) is False
+        assert repository.check(repair=True, repo_only=True, validate=validate_any) is False
         # the corrupt pack is left in place, not dropped.
         assert bad_pack_name in [f"packs/{info.name}" for info in repository.store_list("packs")]
     with reopen(repository) as repository:
@@ -1174,7 +1214,8 @@ def test_check_repair_leaves_index_when_interrupted(tmp_path, caplog, monkeypatc
     with reopen(repository) as repository:
         monkeypatch.setattr("borg.repository.sig_int", True)  # simulate a SIGINT before the pack loop
         with caplog.at_level(logging.ERROR, logger="borg.repository"):
-            assert repository.check(repair=True) is False  # interrupted: index not rebuilt, so it fails
+            # interrupted: index not rebuilt, so it fails
+            assert repository.check(repair=True, validate=validate_any) is False
         assert "index still corrupt" in caplog.text
     with reopen(repository) as repository:
         assert repository.check(repair=False) is False  # repair left the index corrupt
@@ -1195,12 +1236,12 @@ def test_check_repair_reports_missing_pack_as_error(tmp_path, caplog):
     with reopen(repository) as repository:
         # a repository-only repair cannot recover the lost chunks, so it fails and reports the error.
         with caplog.at_level(logging.ERROR, logger="borg.repository"):
-            assert repository.check(repair=True, repo_only=True) is False
+            assert repository.check(repair=True, repo_only=True, validate=validate_any) is False
         assert f"Missing pack: {bin_to_hex(pack_id)}" in caplog.text
         assert "errors found" in caplog.text
     with reopen(repository) as repository:
         # a full check defers the missing pack to the archives phase, so the repository phase passes.
-        assert repository.check(repair=True, repo_only=False) is True
+        assert repository.check(repair=True, repo_only=False, validate=validate_any) is True
 
 
 def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):

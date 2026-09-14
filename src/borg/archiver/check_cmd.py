@@ -3,10 +3,12 @@ import os
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
+from ..crypto.key import key_from_repository
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error, IntegrityError
 from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.time import archive_ts_now, calculate_relative_offset
+from ..repoobj import RepoObj, object_validator
 
 from ..logger import create_logger
 
@@ -69,7 +71,10 @@ class CheckMixIn:
             try:
                 archive_checker.key = archive_checker.make_key(repository, manifest_only=True)
             except IntegrityError:
-                pass  # will try to make key later again
+                if args.repair:
+                    # repair needs the key to validate the index rebuild. The manifest did not give it,
+                    # so read it from the objects the chunk index lists.
+                    archive_checker.key = key_from_repository(repository)
             if args.format is not None:
                 format = args.format
             else:
@@ -78,8 +83,18 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
+            validate = None  # the object validator for the index rebuild, which only a repair does
+            if args.repair:
+                # ids=(): read the key from the manifest only. Chunk objects are found through the index,
+                # which this check may find corrupt.
+                key = archive_checker.key if not args.repo_only else key_from_repository(repository, ())
+                validate = object_validator(RepoObj(key))
             if not repository.check(
-                repair=args.repair, max_duration=args.max_duration, max_age=max_age, repo_only=args.repo_only
+                repair=args.repair,
+                max_duration=args.max_duration,
+                max_age=max_age,
+                repo_only=args.repo_only,
+                validate=validate,
             ):
                 set_ec(EXIT_WARNING)
             if sig_int:  # repository check interrupted; skip the archive check
@@ -244,10 +259,14 @@ class CheckMixIn:
         In practice, repair mode hooks into both the repository and archive checks:
 
         1. When checking the repository's consistency, repair mode rebuilds the repository
-           index from the packs if the index is corrupt, provided every pack is intact. If
-           any pack is corrupt, the repository check leaves the index and the packs untouched
-           and reports the corruption; salvaging a corrupt pack's still-intact objects is not
-           implemented yet (refs #8572).
+           index from the packs if the index is corrupt, provided every pack matches its
+           store hash. If any pack fails its store hash, the repository check leaves the
+           index and the packs untouched and reports it; salvaging the intact objects of
+           such a pack is not implemented yet (refs #8572). The rebuild authenticates
+           each object's header and metadata with the key, leaves an object that fails
+           this out of the index and reports it as an error. Repair therefore always
+           needs the key, ``--repository-only`` included, and aborts if the key can not
+           be read.
 
         2. When checking the consistency and correctness of archives, repair mode might
            remove whole archives from the manifest if their archive metadata chunk is

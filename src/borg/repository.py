@@ -1160,7 +1160,7 @@ class Repository:
         info = dict(id=self.id, version=self.version)
         return info
 
-    def check(self, repair=False, max_duration=0, max_age=0, repo_only=False):
+    def check(self, repair=False, max_duration=0, max_age=0, repo_only=False, validate=None):
         """Check repository consistency.
 
         packs/ and index/ objects are named by the store hash of their content, so a pack or index
@@ -1174,10 +1174,11 @@ class Repository:
         far too slow and expensive for a routine (e.g. cron) check. With repair=True and a corrupt
         index, and if every pack is intact, the index is rebuilt from the packs' object headers and
         persisted; on a full check the archives phase rebuilds and re-persists it afterwards, see
-        ArchiveChecker.finish. Packs are verified by the store hash, which is content-addressing rather than a
-        MAC, so this rebuild detects accidental corruption but not tampering, refs #9901, #10026. If any
-        pack is corrupt the index is left unchanged, refs #8572, #10026. Pack ids found corrupt are kept
-        in cache/checked-packs, refs #9696.
+        ArchiveChecker.finish. Packs are verified by the store hash, which is content-addressing rather
+        than a MAC, so that check detects accidental corruption but not tampering; the rebuild therefore
+        checks every object with validate, see below, refs #9901, #10026. If any pack is corrupt the index
+        is left unchanged, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs,
+        refs #9696.
 
         A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
         it. The record clears at the check that finds the pack intact again or gone (removed by
@@ -1195,10 +1196,20 @@ class Repository:
         max_age, accepting a future timestamp up to MAX_CLOCK_SKEW (clock skew). Results are recorded
         regardless of max_age.
 
-        repo_only: whether this is a repository-only run. In repair mode it sets the return value for a
-        corrupt pack, which repair does not fix: fail if repo_only, else defer (a full check's archives
-        phase can repair a corrupt pack holding metadata, or file content with --verify-data).
+        repo_only: whether this is a repository-only run. In repair mode it sets the return value for
+        damage repair does not fix, i.e. a corrupt pack or a skipped pack byte range (see validate):
+        fail if repo_only, else defer (a full check's archives phase can repair a corrupt pack holding
+        metadata, or file content with --verify-data, and reports chunks the archives reference but the
+        index lacks).
+
+        validate: validate(chunk_id, obj) -> bool, True if obj (an object's header plus its metadata
+        slot) is the repo object with id chunk_id, see repoobj.object_validator. Required if repair.
+        The index rebuild checks every object with it and leaves an object it rejects out of the index.
+        A skipped pack byte range is the pack content the rebuild discards at one place: a rejected
+        object plus the bytes up to the next object it accepts, or the rest of the pack if it accepts
+        none. Each skipped range counts as one error.
         """
+        assert validate is not None or not repair
 
         def verify(namespace, name):
             # name is the store hash of the object's content, so it is intact iff store.hash() matches.
@@ -1238,6 +1249,7 @@ class Repository:
         pack_files = pack_errors = pack_skipped = 0
         missing_pack_ids = []  # packs referenced by the index but absent from packs/ (refs #9898)
         index_repaired = False
+        drops = 0  # number of pack byte ranges the index rebuild skipped
         packs_scanned = False
         # index and packs get separate progress indicators, each running from 0% to 100%.
         # the index is checked first and in full, on partial checks too: it is small, and index errors
@@ -1363,19 +1375,22 @@ class Repository:
             # run: sig_int breaks the loop early, so "no pack errors" must be paired with "all packs
             # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs.
             if index_errors and pack_errors == 0 and not sig_int and pack_files == len(pack_infos):
+
+                def note_drop():
+                    nonlocal drops
+                    drops += 1
+
                 # the exclusive check lock keeps the pack set fixed, so re-listing packs/ inside
                 # build_chunkindex_from_repo matches this verification. write_immediately persists the
                 # index and drops the corrupt fragments.
-                # the walk gets no validator: validating needs the key, which a Repository does not
-                # have. A pack is named by the store hash of its content, so a pack damaged in the store
-                # fails verify() above and pack_errors > 0 keeps it out of here. A pack that matches
-                # its name and still has a bad object header makes iter_headers raise, see #10026.
-                build_chunkindex_from_repo(self, slow_rebuild=True, write_immediately=True)
+                build_chunkindex_from_repo(
+                    self, slow_rebuild=True, validate=validate, on_drop=note_drop, write_immediately=True
+                )
                 self.invalidate_chunk_index()  # the rebuilt index is persisted; drop the in-memory copy
                 index_repaired = True
         else:
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
-        objs_errors = index_errors + pack_errors + len(missing_pack_ids)
+        objs_errors = index_errors + pack_errors + len(missing_pack_ids) + drops
         summary = (
             f"Checked {index_files} index files ({index_errors} errors) "
             f"and {pack_files} packs ({pack_errors} errors)."
@@ -1394,6 +1409,8 @@ class Repository:
             )
         if index_repaired:
             logger.info("Repository index was corrupted and has been rebuilt from the packs.")
+        if drops:
+            logger.error(f"The index rebuild skipped {drops} pack byte range(s) it could not authenticate.")
         # corrupt_ids() includes packs recorded corrupt in earlier runs; report them only when this
         # run scanned the packs.
         corrupt_ids = tracker.corrupt_ids() if packs_scanned else []
@@ -1410,7 +1427,7 @@ class Repository:
             logger.info(f"{done} {mode} repository check, no problems found{so_far}.")
         elif not repair:
             logger.error(f"{done} {mode} repository check, errors found{so_far}.")
-        elif index_repaired and not (pack_errors or corrupt_ids or missing_pack_ids):
+        elif index_repaired and not (pack_errors or corrupt_ids or missing_pack_ids or drops):
             # the index was the only problem and it has been rebuilt from the packs.
             logger.info(f"{done} {mode} repository check, repaired{so_far}.")
         elif pack_errors or corrupt_ids:
@@ -1423,6 +1440,14 @@ class Repository:
                 # a full check's archives phase reads archive/item metadata (and file content with
                 # --verify-data), so it repairs a corrupt pack holding such objects; warn rather than fail.
                 logger.warning(f"{done} {mode} repository check, corrupt pack(s) found{so_far}.")
+        elif drops:
+            # a full check's archives phase reports the chunks the archives reference but the index
+            # lacks, so warn only.
+            log = logger.error if repo_only else logger.warning
+            log(
+                f"{done} {mode} repository check, "
+                f"index rebuilt without pack byte range(s) it could not authenticate{so_far}."
+            )
         elif index_errors and not index_repaired:
             # the index is corrupt but was not rebuilt, e.g. the pack verification was interrupted
             # before every pack was confirmed intact; the corrupt index is left in place.
@@ -1430,12 +1455,13 @@ class Repository:
         else:
             # index-referenced packs are missing, so their chunks are lost.
             logger.error(f"{done} {mode} repository check, errors found{so_far}.")
-        # in repair mode a corrupt index left unrebuilt is a failure; a corrupt or missing pack fails
-        # only a repository-only run, while a full check defers it to the archives phase.
+        # in repair mode a corrupt index left unrebuilt is a failure; a corrupt or missing pack, or a
+        # skipped pack byte range, fails only a repository-only run, while a full check defers it to the
+        # archives phase.
         if repair:
             if index_errors and not index_repaired:
                 return False
-            return not (repo_only and (pack_errors or corrupt_ids or missing_pack_ids))
+            return not (repo_only and (pack_errors or corrupt_ids or missing_pack_ids or drops))
         return not problems
 
     def list(self, limit=None, marker=None):

@@ -526,6 +526,7 @@ class Manifest:
         self.repo_objs = ro_cls(key)
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
+        self._loaded_data = None  # the packed manifest as loaded from the repository, see write()
 
     @property
     def id_str(self):
@@ -541,6 +542,7 @@ class Manifest:
             key = key_factory(repository, cdata, other=other, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
         _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
+        manifest._loaded_data = data
         manifest_dict = key.unpack_manifest(data)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = manifest.repo_objs.id_hash(data)
@@ -582,6 +584,14 @@ class Manifest:
         return result
 
     def write(self):
+        """
+        Store the manifest in the repository, but only if its content differs from what was loaded.
+
+        The manifest only holds the item keys known to the repository and (optional) feature flags,
+        so it usually does not change at all: archive operations call this, but it only results in a
+        store write when e.g. a newer borg version added item keys, or when the loaded manifest still
+        had a legacy "timestamp" entry.
+        """
         from .item import ManifestItem
 
         # include checks for limits as enforced by limited unpacker (used by load())
@@ -591,5 +601,10 @@ class Manifest:
         manifest = ManifestItem(version=2, archives=manifest_archives, config=StableDict(self.config))
         data = self.key.pack_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
+        if data == self._loaded_data:
+            logger.debug("manifest unchanged, not writing it.")
+            return
+        logger.debug("writing the manifest.")
         robj = self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST)
         self.repository.put_manifest(robj)
+        self._loaded_data = data

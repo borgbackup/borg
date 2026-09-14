@@ -238,8 +238,11 @@ index. Different from all other repository objects, the chunk id in its object
 header is not the hash of its content, but all-zero
 (``Manifest.MANIFEST_ID``).
 
-The manifest is rewritten each time an archive is created, deleted,
-or modified. It looks like this:
+The manifest is written when the repository is created and by ``borg check
+--repair`` when it rebuilds a lost or corrupted manifest. Commands that modify
+the repository also call ``Manifest.write()``, but that only stores a new
+manifest object if the content changed, e.g. because a newer borg version
+added item keys. It looks like this:
 
 .. code-block:: python
 
@@ -289,7 +292,7 @@ chunks that are not readable with the current feature set. The third
 category are operations that require accurate reference counts, for example
 archive deletion and check.
 
-As the manifest is always updated and always read, it is the ideal place to store
+As the manifest is always read (and rewritten whenever its content changes), it is the ideal place to store
 feature flags, comparable to the super-block of a file system. The only problem
 is to recover from a lost manifest, i.e. how is it possible to detect which feature
 flags are enabled, if there is no manifest to tell. This issue is left open at this time,

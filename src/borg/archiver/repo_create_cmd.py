@@ -26,7 +26,7 @@ ENCRYPTION_DESCRIPTIONS = {
 
 class RepoCreateMixIn:
     @with_repository(create=True, exclusive=True, manifest=False)
-    @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
+    @with_other_repository(manifest=True)
     def do_repo_create(self, args, repository, *, other_repository=None, other_manifest=None):
         """Creates a new, empty repository."""
         other_key = other_manifest.key if other_manifest is not None else None

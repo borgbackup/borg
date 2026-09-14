@@ -8,7 +8,6 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ItemFormatter, BaseFormatter, PathSpec
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -16,7 +15,7 @@ logger = create_logger()
 
 
 class FindMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     def do_find(self, args, repository, manifest):
         """Find files across archives."""
         matcher = build_matcher(args.patterns, args.paths)

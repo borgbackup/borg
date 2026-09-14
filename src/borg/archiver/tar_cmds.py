@@ -29,7 +29,6 @@ from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ._common import with_repository, with_archive, Highlander, define_exclusion_group
 from ._common import build_matcher, build_filter
@@ -343,7 +342,7 @@ def create_zstd_filter(stream, stream_close, decompress):
 
 
 class TarMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     @with_archive
     def do_export_tar(self, args, repository, manifest, archive):
         """Export archive contents as a tarball"""
@@ -522,7 +521,7 @@ class TarMixIn:
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
-    @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(cache=True)
     def do_import_tar(self, args, repository, manifest, cache):
         """Create a backup archive from a tarball"""
         self.output_filter = args.output_filter

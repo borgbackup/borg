@@ -11,7 +11,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def archive_id(archiver, name):
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         return manifest.archives.get_one([name]).id
 
 
@@ -29,7 +29,7 @@ def test_copy(archivers, request):
     new_id = archive_id(archiver, "test.copy")
     assert new_id != old_id
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 2
         assert manifest.archives.exists_name_and_id("test", old_id)
         assert manifest.archives.exists_name_and_id("test.copy", new_id)
@@ -50,7 +50,7 @@ def test_copy_by_archive_id(archivers, request):
     cmd(archiver, "copy", f"aid:{bin_to_hex(old_id)[:8]}", "test.copy")
 
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 2
         assert manifest.archives.exists("test.copy")
 
@@ -65,7 +65,7 @@ def test_copy_shares_item_stream(archivers, request):
     cmd(archiver, "copy", "test", "test.copy")
 
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         original = Archive(manifest, manifest.archives.get_one(["test"]).id)
         copied = Archive(manifest, manifest.archives.get_one(["test.copy"]).id)
         assert original.metadata.item_ptrs == copied.metadata.item_ptrs
@@ -88,7 +88,7 @@ def test_copy_delete_original(archivers, request):
     cmd(archiver, "compact")  # actually free everything the deleted archive was the only referrer of
 
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 1
         assert manifest.archives.exists("test.copy")
 
@@ -109,7 +109,7 @@ def test_copy_to_existing_name(archivers, request):
     cmd(archiver, "copy", "test", "series")
 
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 3
         assert len(list(manifest.archives.list(match=["series"]))) == 2
 
@@ -125,7 +125,7 @@ def test_copy_to_same_name(archivers, request):
     assert "can not be copied to the same name" in output
 
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 1
 
 
@@ -141,5 +141,5 @@ def test_copy_ambiguous_name(archivers, request):
     assert "needed to match precisely one archive" in output
 
     with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 2

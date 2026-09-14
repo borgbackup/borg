@@ -1,4 +1,3 @@
-import enum
 import re
 from collections import defaultdict, namedtuple
 from datetime import datetime
@@ -484,32 +483,6 @@ class Archives:
 
 
 class Manifest:
-    @enum.unique
-    class Operation(enum.StrEnum):
-        # The comments here only roughly describe the scope of each feature. In the end, additions need to be
-        # based on potential problems older clients could produce when accessing newer repositories and the
-        # trade-offs of locking version out or still allowing access. As all older versions and their exact
-        # behaviours are known when introducing new features sometimes this might not match the general descriptions
-        # below.
-
-        # The READ operation describes which features are needed to list and extract the archives safely in the
-        # repository.
-        READ = "read"
-        # The CHECK operation is for all operations that need either to understand every detail
-        # of the repository (for consistency checks and repairs) or are seldom used functions that just
-        # should use the most restrictive feature set because more fine grained compatibility tracking is
-        # not needed.
-        CHECK = "check"
-        # The WRITE operation is for adding archives. Features here ensure that older clients don't add archives
-        # in an old format, or is used to lock out clients that for other reasons can no longer safely add new
-        # archives.
-        WRITE = "write"
-        # The DELETE operation is for all operations (like archive deletion) that need a 100% correct reference
-        # count and the need to be able to find all (directly and indirectly) referenced chunks of a given archive.
-        DELETE = "delete"
-
-    NO_OPERATION_CHECK: Sequence[Operation] = tuple()
-
     MANIFEST_ID = b"\0" * 32
 
     def __init__(self, key, repository, ro_cls=RepoObj):
@@ -532,7 +505,7 @@ class Manifest:
         return bin_to_hex(self.id)
 
     @classmethod
-    def load(cls, repository, operations, key=None, *, other=False, ro_cls=RepoObj):
+    def load(cls, repository, key=None, *, other=False, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory
 

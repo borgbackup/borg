@@ -7,7 +7,6 @@ from ..helpers import PathSpec, FilesystemDirSpec
 from ..helpers import location_validator
 from ..helpers import umount
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -34,7 +33,7 @@ class MountMixIn:
 
         self._do_mount(args)
 
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     def _do_mount(self, args, repository, manifest):
         from ..fuse_impl import has_mfusepy
 

@@ -28,7 +28,7 @@ class RepoDeleteMixIn:
                 location = repository._location.canonical_path()
                 msg = []
                 try:
-                    manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+                    manifest = Manifest.load(repository)
                     n_archives = manifest.archives.count()
                     msg.append(
                         f"You requested to DELETE the following repository completely "

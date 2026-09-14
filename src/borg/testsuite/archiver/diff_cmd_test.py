@@ -284,7 +284,7 @@ def _create_archive_with_items(archiver, name, items):
     # metadata (uid/gid/user/group) can be controlled exactly (without needing root).
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         with Cache(repository, manifest, archive_name=name) as cache:
             archive = Archive(manifest, name, cache=cache, create=True)
             for item in items:

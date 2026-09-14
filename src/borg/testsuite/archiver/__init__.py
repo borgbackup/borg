@@ -210,7 +210,7 @@ def create_src_archive(archiver, name, ts=None):
 def open_archive(repo_path, name):
     repository = Repository(repo_path, exclusive=True)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         archive_info = manifest.archives.get_one([name])
         archive = Archive(manifest, archive_info.id)
     return archive, repository

@@ -5,7 +5,6 @@ from ..crypto.key import KEY_LOCATIONS
 from ..crypto.keymanager import KeyManager
 from ..helpers import FilesystemPathSpec, CommandError
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ._common import with_repository
 
@@ -15,7 +14,7 @@ logger = create_logger(__name__)
 
 
 class KeysMixIn:
-    @with_repository(compatibility=(Manifest.Operation.CHECK,))
+    @with_repository()
     def do_key_change_passphrase(self, args, repository, manifest):
         """Changes the repository key file passphrase."""
         key = manifest.key
@@ -27,7 +26,7 @@ class KeysMixIn:
             # print key location to make backing it up easier
             logger.info("Key location: %s", key.find_key())
 
-    @with_repository(manifest=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(manifest=True)
     def do_key_add(self, args, repository, manifest):
         """Add a new borg key (protected by an independent passphrase) to the repository."""
         key = manifest.key
@@ -38,7 +37,7 @@ class KeysMixIn:
         if hasattr(key, "find_key"):
             logger.info("Key location: %s", key.find_key())
 
-    @with_repository(manifest=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(manifest=True)
     def do_key_remove(self, args, repository, manifest):
         """Remove a borg key from the repository."""
         key = manifest.key
@@ -47,7 +46,7 @@ class KeysMixIn:
         victim = key.remove_key(label=args.label, key_id=args.key, current=args.by_passphrase)
         logger.info("Borg key %s (label %r) removed.", victim["id"][:12], victim["label"])
 
-    @with_repository(manifest=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(manifest=True)
     def do_key_list(self, args, repository, manifest):
         """List the borg keys of the repository."""
         key = manifest.key
@@ -59,7 +58,7 @@ class KeysMixIn:
             marker = "*" if bk["current"] else ""
             print(fmt % (marker, bk["id"][:12], bk["mode"], bk["label"] or "-", bk["algorithm"] or "-"))
 
-    @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(exclusive=True, manifest=True, cache=True)
     def do_key_change_location(self, args, repository, manifest, cache):
         """Changes the location of the borg key used to unlock this repository."""
         key = manifest.key

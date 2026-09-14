@@ -10,7 +10,6 @@ from ..constants import *  # NOQA
 from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec
 from ..helpers import format_file_size, hex_to_bin
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 from ..repoobj import object_validator
 from ..repository import Repository
 
@@ -189,7 +188,7 @@ class PackRecompressor:
 
 
 class RepoCompressMixIn:
-    @with_repository(manifest=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(manifest=True, exclusive=True)
     def do_repo_compress(self, args, repository, manifest):
         """Repository (re-)compression."""
         if not isinstance(repository, Repository):

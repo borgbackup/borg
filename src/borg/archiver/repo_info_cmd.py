@@ -4,7 +4,6 @@ from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -12,7 +11,7 @@ logger = create_logger()
 
 
 class RepoInfoMixIn:
-    @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
+    @with_repository(cache=True)
     def do_repo_info(self, args, repository, manifest, cache):
         """Show repository information."""
         key = manifest.key

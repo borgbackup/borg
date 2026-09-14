@@ -3,7 +3,6 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, archivename_validator, tag_validator
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -11,7 +10,7 @@ logger = create_logger()
 
 
 class TagMixIn:
-    @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(cache=True)
     def do_tag(self, args, repository, manifest, cache):
         """Manage tags."""
 

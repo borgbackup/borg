@@ -2322,7 +2322,7 @@ class ArchiveChecker:
             rebuild_manifest = True
         else:
             try:
-                self.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=self.key)
+                self.manifest = Manifest.load(repository, key=self.key)
             except IntegrityErrorBase as exc:
                 logger.error("Repository manifest is corrupted: %s", exc)
                 self.error_found = True

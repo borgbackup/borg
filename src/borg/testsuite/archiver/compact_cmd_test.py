@@ -136,7 +136,7 @@ def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, mon
     # unused objects), but force it to abort right before it writes the fresh, updated chunk index.
     repository = open_repository(archiver)
     with repository:
-        manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        manifest = Manifest.load(repository)
         gc = ArchiveGarbageCollector(repository, manifest, stats=stats, threshold=40.0)
 
         def interrupt():
@@ -180,7 +180,7 @@ def test_compact_soft_interrupt_persists_valid_index(archivers, request, monkeyp
         pack_names_before = {info.name for info in repository.store_list("packs")}
         assert len(pack_names_before) >= 2  # need several packs to observe an early stop
 
-        manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        manifest = Manifest.load(repository)
         gc = ArchiveGarbageCollector(repository, manifest, stats=False, threshold=10)
 
         original_store_delete = repository.store_delete
@@ -422,7 +422,7 @@ def test_compact_keeps_undelete_data_when_chunks_missing(archivers, request):
     # sees a missing object and treats the repo as damaged.
     repository = open_repository(archiver)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         kept = Archive(manifest, manifest.archives.get_one(["kept"]).id)
         victim = next(id for item in kept.iter_items() if "chunks" in item for id, _ in item.chunks)
         del repository.chunks[victim]
@@ -691,7 +691,7 @@ def test_compact_archive_reference_cache(archivers, request):
     def archive_ids():
         repository = open_repository(archiver)
         with repository:
-            manifest = Manifest.load(repository, (Manifest.Operation.READ,))
+            manifest = Manifest.load(repository)
             return {bin_to_hex(info.id) for info in manifest.archives.list(sort_by=["ts"])}
 
     # no reference caches exist before the first compact
@@ -819,7 +819,7 @@ def test_compact_builds_the_chunk_index_only_once(archivers, request, monkeypatc
     dry_run = scenario == "dry_run"
     repository = open_repository(archiver)
     with repository:
-        manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        manifest = Manifest.load(repository)
         gc = ArchiveGarbageCollector(repository, manifest, stats=True, threshold=0.0, dry_run=dry_run)
         gc.garbage_collect()
         # the store must really change (or, on the dry run, really not), or the test proves nothing

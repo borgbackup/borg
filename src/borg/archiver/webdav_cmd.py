@@ -6,7 +6,6 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import sig_int, daemonizing, signal_handler
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -14,7 +13,7 @@ logger = create_logger()
 
 
 class WebDAVMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     def do_webdav(self, args, repository, manifest):
         """Serve archive contents via a read-only WebDAV / HTTP server on localhost."""
         from ..webdav import make_server

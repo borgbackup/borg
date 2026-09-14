@@ -12,7 +12,7 @@ from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
 from ..helpers import GroupBySpec
 from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, Manifest, format_group_key, group_archives
+from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, format_group_key, group_archives
 
 from ..logger import create_logger
 
@@ -195,7 +195,7 @@ def prune(
 
 
 class PruneMixIn:
-    @with_repository(compatibility=(Manifest.Operation.DELETE,))
+    @with_repository()
     def do_prune(self, args, repository, manifest):
         """Prune archives according to specified rules."""
         self._validate_prune_args(args)

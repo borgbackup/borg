@@ -7,7 +7,7 @@ from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
 from ..helpers import GroupBySpec
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import AI_GROUP_BY_KEYS, Manifest, format_group_key, group_archives
+from ..manifest import AI_GROUP_BY_KEYS, format_group_key, group_archives
 
 from ..logger import create_logger
 
@@ -18,7 +18,7 @@ FORMAT_DEFAULT = "{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {h
 
 
 class RepoListMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,), allow_v1=True)
+    @with_repository(allow_v1=True)
     def do_repo_list(self, args, repository, manifest):
         """List the archives contained in a repository."""
         if args.format is not None:

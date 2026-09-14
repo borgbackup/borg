@@ -62,7 +62,7 @@ def _create_malicious_archive(archiver, name, items):
     # produce a child below a symlink or a path with embedded "..").
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         with Cache(repository, manifest, archive_name=name) as cache:
             archive = Archive(manifest, name, cache=cache, create=True)
             for item in items:

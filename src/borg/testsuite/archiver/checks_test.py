@@ -170,7 +170,7 @@ def test_repository_move(archivers, request, monkeypatch):
     # it also needs no confirmation if we have no knowledge about the previous location.
     cmd(archiver, "repo-info")
     # it will re-create security-related infos in the security dir:
-    for file in ("location", "key-type", "manifest-timestamp"):
+    for file in ("location", "key-type"):
         assert os.path.exists(os.path.join(security_dir, file))
 
 
@@ -318,3 +318,36 @@ def test_remote_repo_strip_components_doesnt_leak(remote_archiver):
         with assert_creates_file("input/dir/file"):
             res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "0")
             assert marker not in res
+
+
+def test_stale_manifest_timestamp_file_is_ignored(archivers, request):
+    # older borg 2 versions stored the manifest timestamp in the security dir and refused access when the
+    # repository's manifest was older than that. that check is gone: a leftover (even "future") file is ignored.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    security_dir = get_security_directory(archiver.repository_path)
+    with open(os.path.join(security_dir, "manifest-timestamp"), "w") as fd:
+        fd.write("9999-01-01T00:00:00.000000")
+    cmd(archiver, "repo-info")
+    cmd(archiver, "create", "test", "input")
+
+
+def test_repository_restored_from_older_copy_is_accepted(archivers, request):
+    # restoring an older copy of the repository (a "rollback") must not lock the user out of it.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("needs a local repository to copy")
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive1", "input")
+    backup_path = archiver.repository_path + "_copy"
+    shutil.copytree(archiver.repository_path, backup_path)
+    cmd(archiver, "create", "archive2", "input")
+    shutil.rmtree(archiver.repository_path)
+    shutil.copytree(backup_path, archiver.repository_path)
+    output = cmd(archiver, "repo-list")
+    assert "archive1" in output
+    assert "archive2" not in output
+    # the files cache still knows the files from archive2 (whose chunks are gone), that must not matter.
+    cmd(archiver, "create", "archive3", "input")
+    cmd(archiver, "check")

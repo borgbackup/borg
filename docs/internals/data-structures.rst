@@ -257,8 +257,10 @@ borg 1.x repositories have (they are supported read-only, e.g. for
 ``borg transfer``). The versions differ in the way feature flags are handled,
 described below.
 
-The *timestamp* field is used to avoid logical replay attacks where
-the server just resets the repository to a previous state.
+The *timestamp* field records when the manifest was last written. It is kept
+strictly monotonically increasing across writes (even if the clock went
+backwards) and is shown by ``borg repo-info`` as the repository's last
+modification time.
 
 The *archives* dict is always empty: the list of archives is not part of the
 manifest, each archive has its own pointer object in the ``archives/``

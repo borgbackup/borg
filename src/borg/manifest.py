@@ -589,7 +589,8 @@ class Manifest:
     def write(self):
         from .item import ManifestItem
 
-        # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
+        # self.timestamp is the repository's "last modified" stamp (shown by "borg repo-info"). It is kept
+        # strictly monotonically increasing so it never goes backwards, as clocks often are not set correctly.
         if self.timestamp is None:
             self.timestamp = datetime.now(tz=UTC).isoformat(timespec="microseconds")
         else:

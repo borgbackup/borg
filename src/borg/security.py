@@ -39,6 +39,8 @@ class RepositoryAccessAborted(Error):
     exit_mcode = 62
 
 
+# The two errors below are not raised anymore: the manifest timestamp replay check that raised them was
+# removed. The classes are kept so that their return codes stay reserved and never get a different meaning.
 class RepositoryIDNotUnique(Error):
     """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
 
@@ -54,7 +56,7 @@ class RepositoryReplay(Error):
 class SecurityManager:
     """
     Tracks repositories. Ensures that nothing bad happens (repository swaps,
-    replay attacks, unknown repositories, etc.).
+    relocations, unknown unencrypted repositories, etc.).
 
     This is complicated by the cache being initially used for this, while
     only some commands actually use the cache, which meant that other commands
@@ -76,7 +78,6 @@ class SecurityManager:
         self.dir = Path(_security_dir(repository))
         self.key_type_file = self.dir / "key-type"
         self.location_file = self.dir / "location"
-        self.manifest_ts_file = self.dir / "manifest-timestamp"
 
     @staticmethod
     def destroy(repository, path=None):
@@ -86,7 +87,7 @@ class SecurityManager:
             shutil.rmtree(path)
 
     def known(self):
-        return all(f.exists() for f in (self.key_type_file, self.location_file, self.manifest_ts_file))
+        return all(f.exists() for f in (self.key_type_file, self.location_file))
 
     def key_matches(self, key):
         if not self.known():
@@ -100,19 +101,16 @@ class SecurityManager:
         except OSError as exc:
             logger.warning("Could not read/parse key type file: %s", exc)
 
-    def save(self, manifest, key):
+    def save(self, key):
         logger.debug("security: saving state for %s to %s", self.repository.id_str, str(self.dir))
         current_location = self.repository._location.canonical_path()
         logger.debug("security: current location   %s", current_location)
         key_type = key.TYPE if key.stored_type is None else key.stored_type
         logger.debug("security: key type           %s", str(key_type))
-        logger.debug("security: manifest timestamp %s", manifest.timestamp)
         with SaveFile(self.location_file) as fd:
             fd.write(current_location)
         with SaveFile(self.key_type_file) as fd:
             fd.write(str(key_type))
-        with SaveFile(self.manifest_ts_file) as fd:
-            fd.write(manifest.timestamp)
 
     def assert_location_matches(self):
         # Warn user before sending data to a relocated repository
@@ -152,49 +150,26 @@ class SecurityManager:
             with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
 
-    def assert_no_manifest_replay(self, manifest, key):
-
-        try:
-            with self.manifest_ts_file.open() as fd:
-                timestamp = fd.read()
-            logger.debug("security: read manifest timestamp %r", timestamp)
-        except FileNotFoundError:
-            logger.debug("security: manifest timestamp file %s not found", self.manifest_ts_file)
-            timestamp = ""
-        except OSError as exc:
-            logger.warning("Could not read previous location file: %s", exc)
-            timestamp = ""
-        logger.debug("security: determined newest manifest timestamp as %s", timestamp)
-        # If repository is older than the cache or security dir something fishy is going on
-        if timestamp and timestamp > manifest.timestamp:
-            if not key.has_secret_key:
-                # unkeyed modes ("none-*", and borg 1.x "none"): the repository id is not derived
-                # from any secret, so two repositories can legitimately have the same id.
-                raise RepositoryIDNotUnique()
-            else:
-                raise RepositoryReplay()
-
     def assert_key_type(self, key):
         # Make sure an encrypted repository has not been swapped for an unencrypted repository
         if self.known() and not self.key_matches(key):
             raise EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, *, warn_if_unencrypted=True):
+    def assert_secure(self, key, *, warn_if_unencrypted=True):
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
-        self.assert_access_unknown(warn_if_unencrypted, manifest, key)
-        self._assert_secure(manifest, key)
+        self.assert_access_unknown(warn_if_unencrypted, key)
+        self._assert_secure(key)
         logger.debug("security: repository checks ok, allowing access")
 
-    def _assert_secure(self, manifest, key):
+    def _assert_secure(self, key):
         self.assert_location_matches()
         self.assert_key_type(key)
-        self.assert_no_manifest_replay(manifest, key)
         if not self.known():
             logger.debug("security: remembering previously unknown repository")
-            self.save(manifest, key)
+            self.save(key)
 
-    def assert_access_unknown(self, warn_if_unencrypted, manifest, key):
+    def assert_access_unknown(self, warn_if_unencrypted, key):
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         if not key.logically_encrypted and not self.known():
@@ -223,11 +198,11 @@ class SecurityManager:
                     logger.debug("security: remembering unknown unencrypted repository (explicitly allowed)")
                 else:
                     logger.debug("security: initializing unencrypted repository")
-                self.save(manifest, key)
+                self.save(key)
             else:
                 raise CacheInitAbortedError()
 
 
 def assert_secure(repository, manifest):
     sm = SecurityManager(repository)
-    sm.assert_secure(manifest, manifest.key)
+    sm.assert_secure(manifest.key)

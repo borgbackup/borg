@@ -1298,12 +1298,12 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
 
         # Warn user before sending data to a never seen before unencrypted repository
         if not self.path.exists():
-            self.security_manager.assert_access_unknown(warn_if_unencrypted, manifest, self.key)
+            self.security_manager.assert_access_unknown(warn_if_unencrypted, self.key)
             self.create()
 
         self.open()
         try:
-            self.security_manager.assert_secure(manifest, self.key)
+            self.security_manager.assert_secure(self.key)
 
             if not self.check_cache_compatibility():
                 self.wipe_cache()
@@ -1335,7 +1335,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         self.cache_config.load()
 
     def close(self):
-        self.security_manager.save(self.manifest, self.key)
+        self.security_manager.save(self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
         if self._files is not None:
             pi.output("Saving files cache")

@@ -29,6 +29,8 @@ from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
 
 
+# Not raised anymore: the repository feature flags mechanism was removed. The class is kept so that its
+# return code stays reserved and never gets a different meaning.
 class MandatoryFeatureUnsupported(Error):
     """Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository."""
 
@@ -508,8 +510,6 @@ class Manifest:
 
     NO_OPERATION_CHECK: Sequence[Operation] = tuple()
 
-    SUPPORTED_REPO_FEATURES: frozenset[str] = frozenset([])
-
     MANIFEST_ID = b"\0" * 32
 
     def __init__(self, key, repository, ro_cls=RepoObj):
@@ -552,41 +552,15 @@ class Manifest:
         # the list of item keys (borg 1.x: "item_keys", older borg 2 versions: config["item_keys"]).
         manifest.config = m.config
         manifest.config.pop("item_keys", None)
-        manifest.check_repository_compatibility(operations)
         return manifest
-
-    def check_repository_compatibility(self, operations):
-        for operation in operations:
-            assert isinstance(operation, self.Operation)
-            feature_flags = self.config.get("feature_flags", None)
-            if feature_flags is None:
-                return
-            if operation not in feature_flags:
-                continue
-            requirements = feature_flags[operation]
-            if "mandatory" in requirements:
-                unsupported = set(requirements["mandatory"]) - self.SUPPORTED_REPO_FEATURES
-                if unsupported:
-                    raise MandatoryFeatureUnsupported(list(unsupported))
-
-    def get_all_mandatory_features(self):
-        result = {}
-        feature_flags = self.config.get("feature_flags", None)
-        if feature_flags is None:
-            return result
-
-        for operation, requirements in feature_flags.items():
-            if "mandatory" in requirements:
-                result[operation] = set(requirements["mandatory"])
-        return result
 
     def write(self):
         """
         Store the manifest in the repository, but only if its content differs from what was loaded.
 
-        The manifest only holds the (optional) feature flags, so it usually does not change at all:
-        archive operations call this, but it only results in a store write when the config changed
-        or when the loaded manifest still had legacy entries (a timestamp, the item keys list).
+        The manifest content is static (borg does not store anything in its config dict currently), so
+        archive operations calling this usually do not result in a store write: only when the loaded
+        manifest still had legacy entries (a timestamp, the item keys list) is it rewritten.
         """
         from .item import ManifestItem
 

@@ -583,17 +583,6 @@ cdef class ManifestItem(PropDict):
                     ck = fix_key(cd, ck)
                     if ck == 'tam_required':
                         assert isinstance(cv, bool)
-                    if ck == 'feature_flags':
-                        assert isinstance(cv, dict)
-                        ops = {'read', 'check', 'write', 'delete'}
-                        for op, specs in list(cv.items()):
-                            op = fix_key(cv, op)
-                            assert op in ops
-                            for speck, specv in list(specs.items()):
-                                speck = fix_key(specs, speck)
-                                if speck == 'mandatory':
-                                    specs[speck] = fix_tuple_of_str(specv)
-                        assert set(cv).issubset(ops)
             if k == 'item_keys':
                 v = fix_tuple_of_str(v)
             self._dict[k] = v

@@ -30,7 +30,7 @@ from .helpers import get_cache_dir
 from .helpers import archive_hostname, archive_username
 from .helpers import chunkit
 from .helpers import CorruptPack, IntegrityError
-from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
+from .helpers import hex_to_bin, bin_to_hex
 from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
 from .helpers import ProgressIndicatorMessage, ProgressIndicatorPercent
@@ -141,10 +141,6 @@ class CacheConfig:
         self._check_upgrade(self.config_path)
         self.id = self._config.get("cache", "repository")
         self.manifest_id = hex_to_bin(self._config.get("cache", "manifest"))
-        self.ignored_features = set(parse_stringified_list(self._config.get("cache", "ignored_features", fallback="")))
-        self.mandatory_features = set(
-            parse_stringified_list(self._config.get("cache", "mandatory_features", fallback=""))
-        )
         try:
             self.integrity = dict(self._config.items("integrity"))
             if self._config.get("cache", "manifest") != self.integrity.pop("manifest"):
@@ -163,8 +159,6 @@ class CacheConfig:
     def save(self, manifest=None):
         if manifest:
             self._config.set("cache", "manifest", manifest.id_str)
-            self._config.set("cache", "ignored_features", ",".join(self.ignored_features))
-            self._config.set("cache", "mandatory_features", ",".join(self.mandatory_features))
             if not self._config.has_section("integrity"):
                 self._config.add_section("integrity")
             for file, integrity_data in self.integrity.items():
@@ -1304,11 +1298,6 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         self.open()
         try:
             self.security_manager.assert_secure(self.key)
-
-            if not self.check_cache_compatibility():
-                self.wipe_cache()
-
-            self.update_compatibility()
         except:  # noqa
             self.close()
             raise
@@ -1369,35 +1358,3 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         self.cache_config.close()
         pi.finish()
         self.cache_config = None
-
-    def check_cache_compatibility(self):
-        my_features = Manifest.SUPPORTED_REPO_FEATURES
-        if self.cache_config.ignored_features & my_features:
-            # The cache might not contain references of chunks that need a feature that is mandatory for some operation
-            # and which this version supports. To avoid corruption while executing that operation force rebuild.
-            return False
-        if not self.cache_config.mandatory_features <= my_features:
-            # The cache was build with consideration to at least one feature that this version does not understand.
-            # This client might misinterpret the cache. Thus force a rebuild.
-            return False
-        return True
-
-    def wipe_cache(self):
-        logger.warning("Discarding incompatible cache and forcing a cache rebuild")
-        self._chunks = ChunkIndex()
-        self.repository.chunks = self._chunks
-        self.cache_config.manifest_id = ""
-        self.cache_config._config.set("cache", "manifest", "")
-
-        self.cache_config.ignored_features = set()
-        self.cache_config.mandatory_features = set()
-
-    def update_compatibility(self):
-        operation_to_features_map = self.manifest.get_all_mandatory_features()
-        my_features = Manifest.SUPPORTED_REPO_FEATURES
-        repo_features = set()
-        for operation, features in operation_to_features_map.items():
-            repo_features.update(features)
-
-        self.cache_config.ignored_features.update(repo_features - my_features)
-        self.cache_config.mandatory_features.update(repo_features & my_features)

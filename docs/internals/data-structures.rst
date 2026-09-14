@@ -253,8 +253,7 @@ manifest object if the content changed. It looks like this:
 
 Borg 2 always writes *version* 2. Reading also accepts version 1, which is what
 borg 1.x repositories have (they are supported read-only, e.g. for
-``borg transfer``). The versions differ in the way feature flags are handled,
-described below.
+``borg transfer``).
 
 A *timestamp* entry, as written by borg 1.x and by older borg 2 versions, is
 accepted and ignored when reading.
@@ -264,147 +263,11 @@ manifest, each archive has its own pointer object in the ``archives/``
 namespace, see :ref:`archive`.
 
 *config* is a general-purpose location for additional metadata. All versions
-of Borg preserve its contents. Borg stores these keys in there:
-
-*config['feature_flags']* are the feature flags of the repository, see below.
+of Borg preserve its contents. Currently, borg does not store anything in there.
 
 A *config['item_keys']* list (written by older borg 2 versions) or a top-level
 *item_keys* list (borg 1.x) is accepted and ignored when reading: *borg check*
 does not validate item keys against such a list anymore, see Item_.
-
-Feature flags
-+++++++++++++
-
-Feature flags are used to add features to data structures without causing
-corruption if older versions are used to access or modify them. The main issues
-to consider for a feature flag oriented design are flag granularity,
-flag storage, and cache_ invalidation.
-
-Feature flags are divided in approximately three categories, detailed below.
-Due to the nature of ID-based deduplication, write (i.e. creating archives) and
-read access are not symmetric; it is possible to create archives referencing
-chunks that are not readable with the current feature set. The third
-category are operations that require accurate reference counts, for example
-archive deletion and check.
-
-As the manifest is always read (and rewritten whenever its content changes), it is the ideal place to store
-feature flags, comparable to the super-block of a file system. The only problem
-is to recover from a lost manifest, i.e. how is it possible to detect which feature
-flags are enabled, if there is no manifest to tell. This issue is left open at this time,
-but is not expected to be a major hurdle; it doesn't have to be handled efficiently, it just
-needs to be handled.
-
-Lastly, cache_ invalidation is handled by noting which feature
-flags were and which were not understood while manipulating a cache.
-This allows borg to detect whether the cache needs to be invalidated,
-i.e. rebuilt from scratch. See `Cache feature flags`_ below.
-
-The *config* key stores the feature flags enabled on a repository:
-
-.. code-block:: python
-
-    config = {
-        'feature_flags': {
-            'read': {
-                'mandatory': ['some_feature'],
-            },
-            'check': {
-                'mandatory': ['other_feature'],
-            }
-            'write': ...,
-            'delete': ...
-        },
-    }
-
-The top-level distinction for feature flags is the operation the client intends
-to perform,
-
-| the *read* operation includes extraction and listing of archives,
-| the *write* operation includes creating new archives,
-| the *delete* (archives) operation,
-| the *check* operation requires full understanding of everything in the repository.
-|
-
-These are weakly set-ordered; *check* will include everything required for *delete*,
-*delete* will likely include *write* and *read*. However, *read* may require more
-features than *write* (due to ID-based deduplication, *write* does not necessarily
-require reading/understanding repository contents).
-
-Each operation can contain several sets of feature flags. Only one set,
-the *mandatory* set is currently defined.
-
-Upon reading the manifest, the Borg client has already determined which operation
-should be performed. If feature flags are found in the manifest, the set
-of feature flags supported by the client is compared to the mandatory set
-found in the manifest. If any unsupported flags are found (i.e. the mandatory set is
-not a subset of the features supported by the Borg client used), the operation
-is aborted with a *MandatoryFeatureUnsupported* error:
-
-    Unsupported repository feature(s) {'some_feature'}. A newer version of Borg is required to access this repository.
-
-Older Borg releases do not have this concept and do not perform feature flags checks.
-These are locked out with manifest version 2, which is what Borg 2 always writes:
-the only difference between manifest versions 1 and 2 is that the latter is only
-accepted by Borg releases implementing feature flags.
-
-.. _Cache feature flags:
-.. rubric:: Cache feature flags
-
-:ref:`The local cache <cache>` does not have its separate set of feature flags.
-Instead, Borg stores which flags were used to create or modify a cache (as the
-*mandatory_features* / *ignored_features* keys in the cache ``config`` file).
-
-All mandatory manifest features from all operations are gathered in one set.
-Then, two sets of features are computed;
-
-- those features that are supported by the client and mandated by the manifest
-  are added to the *mandatory_features* set,
-- the *ignored_features* set comprised of those features mandated by the manifest,
-  but not supported by the client.
-
-Because the client previously checked compliance with the mandatory set of features
-required for the particular operation it is executing, the *mandatory_features* set
-will contain all necessary features required for using the cache safely.
-
-Conversely, the *ignored_features* set contains only those features which were not
-relevant to operating the cache. Otherwise, the client would not pass the feature
-set test against the manifest.
-
-When opening a cache and the *mandatory_features* set is not a subset of the features
-supported by the client, the cache is wiped out and rebuilt,
-since a client not supporting a mandatory feature that the cache was built with
-would be unable to update it correctly.
-The assumption behind this behaviour is that any of the unsupported features could have
-been reflected in the cache and there is no way for the client to discern whether
-that is the case.
-Meanwhile, it may not be practical for every feature to have clients using it track
-whether the feature had an impact on the cache.
-Therefore, the cache is wiped.
-
-When opening a cache and the intersection of *ignored_features* and the features
-supported by the client contains any elements, i.e. the client possesses features
-that the previous client did not have and those new features are enabled in the repository,
-the cache is wiped out and rebuilt.
-
-While the former condition likely requires no tweaks, the latter condition is formulated
-in an especially conservative way to play it safe. It seems likely that specific features
-might be exempted from the latter condition.
-
-.. rubric:: Defined feature flags
-
-Currently no feature flags are defined.
-
-From currently planned features, some examples follow,
-these may/may not be implemented and purely serve as examples.
-
-- A mandatory *read* feature could be using a different encryption scheme (e.g. session keys).
-  This may not be mandatory for the *write* operation - reading data is not strictly required for
-  creating an archive.
-- Any additions to the way chunks are referenced (e.g. to support larger archives) would
-  become a mandatory *delete* and *check* feature; *delete* implies knowing correct
-  reference counts, so all object references need to be understood. *check* must
-  discover the entire object graph as well, otherwise the "orphan chunks check"
-  could delete data still in use.
 
 .. _archive:
 
@@ -1400,8 +1263,6 @@ the file's name (see :ref:`the files cache <cache>` about that name):
     version = 1
     repository = 3c4...e59
     manifest = 10e...21c
-    ignored_features =
-    mandatory_features =
 
     [integrity]
     manifest = 10e...21c

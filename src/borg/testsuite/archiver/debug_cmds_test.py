@@ -259,7 +259,7 @@ def test_debug_dump_manifest(archivers, request):
         result = json.load(f)
     assert "archives" in result
     assert "config" in result
-    assert "timestamp" in result
+    assert "timestamp" not in result
     assert "version" in result
     assert "item_keys" in result["config"]
     assert frozenset(result["config"]["item_keys"]) == ITEM_KEYS

@@ -1,7 +1,7 @@
 import json
 
 from ...constants import *  # NOQA
-from . import checkts, cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION, KF_LOCATION
+from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION, KF_LOCATION
 from . import set_empty_passphrase
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -55,9 +55,7 @@ def test_info_json(archivers, request):
     info_repo = json.loads(cmd(archiver, "repo-info", "--json"))
     repository = info_repo["repository"]
     assert len(repository["id"]) == 64
-    assert "last_modified" in repository
-
-    checkts(repository["last_modified"])
+    assert "last_modified" not in repository  # the manifest has no timestamp anymore
     assert info_repo["encryption"]["encryption"] == RK_ENCRYPTION[13:]  # --encryption=aes256-ocb
     assert info_repo["encryption"]["id_hash"] == "sha256"  # default id-hash
     assert "keyfile" not in info_repo["encryption"]  # repokey storage -> no keyfile path

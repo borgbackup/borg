@@ -2769,7 +2769,6 @@ class ArchiveChecker:
                 )
             # drop the in-memory index so close() does not persist it over the index just written.
             self.repository.invalidate_chunk_index()
-            logger.info("Writing Manifest.")
             self.manifest.write()
 
 

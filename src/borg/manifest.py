@@ -1,7 +1,7 @@
 import enum
 import re
 from collections import defaultdict, namedtuple
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from operator import attrgetter
 from collections.abc import Iterator, Sequence
 from typing import Protocol, runtime_checkable
@@ -526,15 +526,11 @@ class Manifest:
         self.repo_objs = ro_cls(key)
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
-        self.timestamp = None
+        self._loaded_data = None  # the packed manifest as loaded from the repository, see write()
 
     @property
     def id_str(self):
         return bin_to_hex(self.id)
-
-    @property
-    def last_timestamp(self):
-        return parse_timestamp(self.timestamp)
 
     @classmethod
     def load(cls, repository, operations, key=None, *, other=False, ro_cls=RepoObj):
@@ -546,13 +542,14 @@ class Manifest:
             key = key_factory(repository, cdata, other=other, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
         _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
+        manifest._loaded_data = data
         manifest_dict = key.unpack_manifest(data)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = manifest.repo_objs.id_hash(data)
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
         manifest.archives.prepare(manifest, m)
-        manifest.timestamp = m.get("timestamp")
+        # a "timestamp" entry (written by borg 1.x and by older borg 2 versions) is ignored.
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
         manifest.item_keys = ITEM_KEYS
@@ -587,25 +584,27 @@ class Manifest:
         return result
 
     def write(self):
+        """
+        Store the manifest in the repository, but only if its content differs from what was loaded.
+
+        The manifest only holds the item keys known to the repository and (optional) feature flags,
+        so it usually does not change at all: archive operations call this, but it only results in a
+        store write when e.g. a newer borg version added item keys, or when the loaded manifest still
+        had a legacy "timestamp" entry.
+        """
         from .item import ManifestItem
 
-        # self.timestamp is the repository's "last modified" stamp (shown by "borg repo-info"). It is kept
-        # strictly monotonically increasing so it never goes backwards, as clocks often are not set correctly.
-        if self.timestamp is None:
-            self.timestamp = datetime.now(tz=UTC).isoformat(timespec="microseconds")
-        else:
-            incremented_ts = self.last_timestamp + timedelta(microseconds=1)
-            now_ts = datetime.now(tz=UTC)
-            max_ts = max(incremented_ts, now_ts)
-            self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())
         assert len(self.item_keys) <= 100
         self.config["item_keys"] = tuple(sorted(self.item_keys))
         manifest_archives = self.archives.finish(self)
-        manifest = ManifestItem(
-            version=2, archives=manifest_archives, timestamp=self.timestamp, config=StableDict(self.config)
-        )
+        manifest = ManifestItem(version=2, archives=manifest_archives, config=StableDict(self.config))
         data = self.key.pack_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
+        if data == self._loaded_data:
+            logger.debug("manifest unchanged, not writing it.")
+            return
+        logger.debug("writing the manifest.")
         robj = self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST)
         self.repository.put_manifest(robj)
+        self._loaded_data = data

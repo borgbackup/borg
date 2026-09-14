@@ -551,7 +551,7 @@ cdef class ManifestItem(PropDict):
 
     version = PropDictProperty(int)
     archives = PropDictProperty(dict, 'dict of str -> dict')  # name -> dict
-    timestamp = PropDictProperty(str)
+    timestamp = PropDictProperty(str)  # legacy: written by borg 1.x and older borg 2 versions, ignored now.
     config = PropDictProperty(dict)
     item_keys = PropDictProperty(tuple, 'tuple of str')  # legacy. new location is inside config.
 

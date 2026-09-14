@@ -238,14 +238,16 @@ index. Different from all other repository objects, the chunk id in its object
 header is not the hash of its content, but all-zero
 (``Manifest.MANIFEST_ID``).
 
-The manifest is rewritten each time an archive is created, deleted,
-or modified. It looks like this:
+The manifest is written when the repository is created and by ``borg check
+--repair`` when it rebuilds a lost or corrupted manifest. Commands that modify
+the repository also call ``Manifest.write()``, but that only stores a new
+manifest object if the content changed, e.g. because a newer borg version
+added item keys. It looks like this:
 
 .. code-block:: python
 
     {
         'version': 2,
-        'timestamp': '2017-05-05T12:42:23.042864',
         'archives': {},
         'config': {
             'item_keys': ['acl_access', 'acl_default', ...],
@@ -257,10 +259,8 @@ borg 1.x repositories have (they are supported read-only, e.g. for
 ``borg transfer``). The versions differ in the way feature flags are handled,
 described below.
 
-The *timestamp* field records when the manifest was last written. It is kept
-strictly monotonically increasing across writes (even if the clock went
-backwards) and is shown by ``borg repo-info`` as the repository's last
-modification time.
+A *timestamp* entry, as written by borg 1.x and by older borg 2 versions, is
+accepted and ignored when reading.
 
 The *archives* dict is always empty: the list of archives is not part of the
 manifest, each archive has its own pointer object in the ``archives/``
@@ -292,7 +292,7 @@ chunks that are not readable with the current feature set. The third
 category are operations that require accurate reference counts, for example
 archive deletion and check.
 
-As the manifest is always updated and always read, it is the ideal place to store
+As the manifest is always read (and rewritten whenever its content changes), it is the ideal place to store
 feature flags, comparable to the super-block of a file system. The only problem
 is to recover from a lost manifest, i.e. how is it possible to detect which feature
 flags are enabled, if there is no manifest to tell. This issue is left open at this time,

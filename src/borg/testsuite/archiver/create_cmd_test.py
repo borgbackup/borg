@@ -967,7 +967,6 @@ def test_create_json(archivers, request):
     assert "encryption" in create_info
     assert "repository" in create_info
     assert "cache" in create_info
-    assert "last_modified" in create_info["repository"]
 
     archive = create_info["archive"]
     assert archive["name"] == "test"
@@ -2121,3 +2120,16 @@ def test_files_cache_rebuild_group_by_invalid(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "create", "--group-by", "", "home", "input", exit_code=2)
     assert "At least one group-by key is required" in output
+
+
+def test_create_does_not_rewrite_unchanged_manifest(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("opens the repository directly")
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        manifest_before = repository.get_manifest()
+    cmd(archiver, "create", "test", "input")
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        assert repository.get_manifest() == manifest_before

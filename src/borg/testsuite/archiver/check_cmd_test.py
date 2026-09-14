@@ -465,6 +465,77 @@ def test_missing_archive_metadata(archivers, request):
     cmd(archiver, "check", exit_code=0)
 
 
+@pytest.mark.parametrize(
+    "args, exit_code", [(["--archives-only"], 1), ([], 1), (["--repair"], 0)], ids=["archives-only", "full", "repair"]
+)
+def test_check_holds_a_single_chunk_index(archiver, monkeypatch, args, exit_code):
+    """check has at most one chunk index in memory: the repository uses the index the checker builds."""
+    # local-only: this patches in-process archive and repository internals.
+    check_cmd_setup(archiver)
+    # with an item metadata chunk missing, --repair stores a new item metadata stream.
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        repository.delete(archive.item_ids[0], validate=None)
+
+    loaded_at_build = []  # per checker index build: whether repository.chunks was loaded at that time
+    real_build = archive_module.build_chunkindex_from_repo
+
+    def build_chunkindex_from_repo(repository, **kwargs):
+        loaded_at_build.append(repository.is_chunk_index_loaded)
+        return real_build(repository, **kwargs)
+
+    repository_builds = 0  # index builds by the Repository.chunks property
+    real_chunks = Repository.chunks
+
+    def chunks(self):
+        nonlocal repository_builds
+        if not self.is_chunk_index_loaded:
+            repository_builds += 1
+        return real_chunks.fget(self)
+
+    same_index = []  # per rebuild_archives call: whether repository.chunks is the checker's index
+    real_rebuild_archives = ArchiveChecker.rebuild_archives
+
+    def rebuild_archives(self, **kwargs):
+        same_index.append(self.repository.chunks is self.chunks)
+        return real_rebuild_archives(self, **kwargs)
+
+    monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
+    monkeypatch.setattr(Repository, "chunks", property(chunks, real_chunks.fset))
+    monkeypatch.setattr(ArchiveChecker, "rebuild_archives", rebuild_archives)
+    cmd(archiver, "check", *args, exit_code=exit_code)
+
+    # builds: in check(), and with --repair also in finish().
+    assert loaded_at_build == ([False, False] if "--repair" in args else [False])
+    assert same_index == [True]
+    assert repository_builds == 0
+    if "--repair" in args:
+        cmd(archiver, "check", exit_code=0)
+
+
+def test_check_without_repair_leaves_the_chunk_index_alone(archivers, request):
+    """check without --repair does not change the chunk index.
+
+    The archive has an item metadata chunk missing: the checker re-chunks its item metadata stream into
+    chunks the repository does not have.
+    """
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        repository.delete(archive.item_ids[0], validate=None)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        index_before = {info.name for info in repository.store_list("index")}
+        chunk_ids_before = {chunk_id for chunk_id, _ in repository.chunks.iteritems()}
+
+    cmd(archiver, "check", "--archives-only", exit_code=1)
+    cmd(archiver, "check", exit_code=1)
+
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert {info.name for info in repository.store_list("index")} == index_before
+        assert {chunk_id for chunk_id, _ in repository.chunks.iteritems()} == chunk_ids_before
+
+
 def test_check_format(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)

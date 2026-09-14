@@ -2274,6 +2274,8 @@ class ArchiveChecker:
             validate = object_validator(self.repo_objs)
         else:
             validate = None
+        # free the chunk index the repository check may have loaded, so only one is in memory.
+        self.repository.invalidate_chunk_index()
         self.chunks = build_chunkindex_from_repo(
             self.repository,
             slow_rebuild=repair,
@@ -2287,10 +2289,16 @@ class ArchiveChecker:
             drop_corrupt_tail=repair,
             write_immediately=False,
         )
-        # repository.chunks is a separate index, lazily built when repository.get() resolves a
-        # chunk location. It walks the same packs, so give it the same corrupt-header handling the
-        # rebuild above got - otherwise the check aborts at a header it just resynced past, halfway
-        # through its diagnosis. Dropping the rest of that pack stays a --repair action.
+        if repair:
+            # the rebuild from the packs sets F_NEW (entry not stored in the index/ fragments yet) on every
+            # entry. finish() stores the complete index and deletes the old fragments. Clear F_NEW, so
+            # Repository.close() does not store the entries again as an extra fragment.
+            self.chunks.clear_new()
+        # the repository uses this index: get() looks up pack locations in it, put() adds entries to
+        # it, delete() removes entries from it.
+        self.repository.chunks = self.chunks
+        # corrupt object header handling for a rebuild of repository.chunks after invalidate_chunk_index():
+        # the same as for the rebuild above.
         self.repository.chunkindex_validate = validate
         self.repository.chunkindex_drop_corrupt_tail = repair
         if self.key is None:
@@ -2422,10 +2430,10 @@ class ArchiveChecker:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
                         # keeping the other chunks. update_index=False: finish() rebuilds the index from
                         # the rewritten packs anyway, so a per-chunk full index write would be wasted.
+                        # delete() also removes the chunk from self.chunks, so rebuild_archives reports
+                        # the file it belongs to.
                         self.repository.delete(defect_chunk, update_index=False, validate=validate)
                         self.chunks_modified = True
-                        # drop it from our own index too, so rebuild_archives reports the file it belongs to.
-                        del self.chunks[defect_chunk]
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
             else:
@@ -2568,14 +2576,11 @@ class ArchiveChecker:
             return id_
 
         def add_reference(id_, size, cdata):
-            # either we already have this chunk in repo and chunks index or we add it now
-            if id_ not in self.chunks:
+            # --repair: store a chunk the repository does not have. put() adds it to self.chunks.
+            if self.repair and id_ not in self.chunks:
                 assert cdata is not None
-                self.chunks.add(id_, size)
-                if self.repair:
-                    pack_results = self.repository.put(id_, cdata)
-                    self.chunks.update_pack_info(pack_results)
-                    self.chunks_modified = True
+                self.repository.put(id_, cdata)
+                self.chunks_modified = True
 
         def verify_file_chunks(archive_name, item):
             """Verify that all of a file's chunks are present, collecting any missing ones for the report."""
@@ -2797,9 +2802,10 @@ class ArchiveChecker:
             # writer buffer (close() requires an empty buffer, #10055) before we (re)build the index.
             self.repository.flush()
             if self.chunks_modified:
-                # the packs changed, so the index no longer matches them: rebuild it from the packs
-                # and persist it: deleting a defect chunk rewrites its pack and repoints that
-                # pack's other objects in the repository's index, so our offsets for them are stale.
+                # the packs changed: rebuild the index from them, validating every object header, and
+                # store it. Free the current index first, so only one is in memory.
+                self.repository.invalidate_chunk_index()
+                self.chunks = None
                 logger.info("Rebuilding and writing the repository chunks index.")
                 build_chunkindex_from_repo(
                     self.repository,

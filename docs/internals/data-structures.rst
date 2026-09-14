@@ -241,17 +241,14 @@ header is not the hash of its content, but all-zero
 The manifest is written when the repository is created and by ``borg check
 --repair`` when it rebuilds a lost or corrupted manifest. Commands that modify
 the repository also call ``Manifest.write()``, but that only stores a new
-manifest object if the content changed, e.g. because a newer borg version
-added item keys. It looks like this:
+manifest object if the content changed. It looks like this:
 
 .. code-block:: python
 
     {
         'version': 2,
         'archives': {},
-        'config': {
-            'item_keys': ['acl_access', 'acl_default', ...],
-        },
+        'config': {},
     }
 
 Borg 2 always writes *version* 2. Reading also accepts version 1, which is what
@@ -269,13 +266,11 @@ namespace, see :ref:`archive`.
 *config* is a general-purpose location for additional metadata. All versions
 of Borg preserve its contents. Borg stores these keys in there:
 
-*config['item_keys']* is a list containing all Item_ keys that may be
-encountered in the repository. It is used by *borg check*, which verifies that
-all keys in all items are a subset of these keys. Thus, an older version of
-*borg check* supporting this mechanism can correctly detect keys introduced in
-later versions.
-
 *config['feature_flags']* are the feature flags of the repository, see below.
+
+A *config['item_keys']* list (written by older borg 2 versions) or a top-level
+*item_keys* list (borg 1.x) is accepted and ignored when reading: *borg check*
+does not validate item keys against such a list anymore, see Item_.
 
 Feature flags
 +++++++++++++
@@ -479,10 +474,14 @@ dictionary created by the ``Item`` class that contains:
 * bsdflags (BSD-style file flags)
 * digests, hash digests over the full content of a regular file, see :ref:`item_digests`
 
-The full set of valid keys is ``ITEM_KEYS`` in ``constants.py``. It also
-contains some keys borg 2 does not write, but still reads from borg 1.x
-archives (e.g. when transferring them): *source* (borg 1.x symlink target, now:
-*target*), *hardlink_master*, *chunks_healthy* and *part*.
+The full set of keys known to this borg version is ``ITEM_KEYS`` in
+``constants.py``. It also contains some keys borg 2 does not write, but still
+reads from borg 1.x archives (e.g. when transferring them): *source* (borg 1.x
+symlink target, now: *target*), *hardlink_master*, *chunks_healthy* and *part*.
+Keys not in that set are preserved as they are when an item is read and written
+back (e.g. by ``borg check --repair``), so an older borg version does not damage
+items written by a newer one. ``borg check`` only requires the *path* and *mtime*
+keys to be present in every item and warns about keys it does not know.
 
 .. _item_digests:
 

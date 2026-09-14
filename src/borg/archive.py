@@ -2404,11 +2404,6 @@ class ArchiveChecker:
         """Rebuild the manifest object."""
 
         logger.info("Rebuilding missing/corrupted manifest.")
-        # as we have lost the manifest, we do not know any more what valid item keys we had.
-        # collecting any key we encounter in a damaged repo seems unwise, thus we just use
-        # the hardcoded list from the source code. thus, it is not recommended to rebuild a
-        # lost manifest on a older borg version than the most recent one that was ever used
-        # within this repository (assuming that newer borg versions support more item keys).
         return Manifest(self.key, self.repository)
 
     def rebuild_archives_directory(self):
@@ -2582,11 +2577,9 @@ class ArchiveChecker:
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            item_keys = self.manifest.item_keys
             required_item_keys = REQUIRED_ITEM_KEYS
-            unpacker = RobustUnpacker(
-                lambda item: isinstance(item, StableDict) and "path" in item, self.manifest.item_keys
-            )
+            unknown_keys = set()  # item keys this borg version does not know, collected for one warning per archive
+            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and "path" in item, ITEM_KEYS)
             _state = 0
 
             def missing_chunk_detector(chunk_id):
@@ -2610,8 +2603,6 @@ class ArchiveChecker:
                 keys = set(obj)
                 if not required_item_keys.issubset(keys):
                     return False, "missing required keys: " + list_keys_safe(required_item_keys - keys)
-                if not keys.issubset(item_keys):
-                    return False, "invalid keys: " + list_keys_safe(keys - item_keys)
                 return True, ""
 
             i = 0
@@ -2632,6 +2623,9 @@ class ArchiveChecker:
                         for item in unpacker:
                             valid, reason = valid_item(item)
                             if valid:
+                                # keys we do not know are kept as they are (see Item), they are likely
+                                # from a newer borg version. they are not an error, but worth a warning.
+                                unknown_keys.update(set(item) - ITEM_KEYS)
                                 yield Item(internal_dict=item)
                             else:
                                 report(
@@ -2651,6 +2645,11 @@ class ArchiveChecker:
                         report("Exception while decrypting or unpacking item metadata", chunk_id, i)
                         raise
                     i += 1
+            if unknown_keys:
+                logger.warning(
+                    f"Archive {archive.name}: items have keys unknown to this borg version "
+                    f"(possibly written by a newer borg): {list_keys_safe(sorted(unknown_keys))}"
+                )
 
         sort_by = sort_by.split(",")
         if any((first, last, match, older, newer, newest, oldest)):

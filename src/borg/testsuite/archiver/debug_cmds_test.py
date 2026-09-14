@@ -261,8 +261,7 @@ def test_debug_dump_manifest(archivers, request):
     assert "config" in result
     assert "timestamp" not in result
     assert "version" in result
-    assert "item_keys" in result["config"]
-    assert frozenset(result["config"]["item_keys"]) == ITEM_KEYS
+    assert "item_keys" not in result["config"]
 
 
 def test_debug_dump_archive(archivers, request):

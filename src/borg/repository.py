@@ -141,7 +141,9 @@ def build_rest_backend(location):
 class PackWriter:
     """Buffers chunks into a pack file and writes it to the store when full.
 
-    add() buffers a (chunk_id, cdata) pair and marks the chunk pending (F_PENDING);
+    add() buffers a (chunk_id, cdata) pair and marks the chunk pending (F_PENDING), unless
+    its index entry already has a resolved pack location (a re-put of a stored chunk keeps
+    that location, so the chunk stays readable, also if an abort drops the buffered copy);
     when the pack is full, it is built, hashed and stored, and each entry's pack_id,
     obj_offset and obj_size are set, clearing F_PENDING.
 
@@ -284,6 +286,8 @@ class PackWriter:
             # do not build the index from the repo here: join_inflight also runs while closing
             # or aborting, and that I/O could fail and mask an error being unwound.  the stored
             # pack is then simply not recorded, like the buffered pieces that die with an abort.
+            # flush() asserts the index is loaded while chunks are outstanding, so on the normal
+            # (non-aborting) path this state fails loudly there instead of being skipped here.
             return outcome.results
         self.chunks.update_pack_info(outcome.results)  # set the real location and clear F_PENDING
         return outcome.results
@@ -383,6 +387,13 @@ class PackWriter:
         every chunk written by this flush (including a joined in-flight pack), or
         None if there was nothing to do.
         """
+        # invalidating the chunk index with chunks buffered or in flight discards their entries,
+        # so this flush could not resolve their locations anymore: a caller must flush first.
+        assert (
+            self.repository is None
+            or self.repository.is_chunk_index_loaded
+            or (self._inflight is None and not self._pieces)
+        ), "chunk index not loaded; flush() before invalidate_chunk_index()"
         results = self.join_inflight() or []
         if self._pieces:
             pieces = self._take_pieces()
@@ -962,7 +973,7 @@ class Repository:
         try:
             self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         except Exception:
-            self.close()
+            self.close(aborting=True)
             raise
         return self
 
@@ -976,7 +987,7 @@ class Repository:
                 # exception -- nor persists pending index entries.
                 self._pack_writer.discard()
         finally:
-            self.close()
+            self.close(aborting=exc_type is not None)
 
     @property
     def id_str(self):
@@ -1167,7 +1178,14 @@ class Repository:
             self._lock_refresh()
             self._pack_writer.flush()  # PackWriter updates _chunks internally
 
-    def close(self):
+    def close(self, *, aborting=False):
+        """Close the repository: join an in-flight pack store, persist the chunk index, tear down.
+
+        aborting=True means close() runs while unwinding an exception: teardown errors are then
+        logged instead of raised, so they cannot mask the error being unwound.  On a clean close
+        (the default), a failing index persist or lock release raises, so the caller learns about
+        it -- but the lock release and store close still run, in the finally block.
+        """
         try:
             if self._pack_writer is not None:
                 try:
@@ -1176,8 +1194,8 @@ class Repository:
                     # pack gets recorded in the index and a failed one gets its index entries dropped.
                     self._pack_writer.join_inflight()
                 except Exception as exc:
-                    # do not raise: we are closing, probably unwinding an error already; raising here
-                    # would just mask that original error.
+                    # do not raise: a store error here was already raised at the caller's put() or
+                    # flush() if it cared; raising at close would mask an error being unwound.
                     logger.warning("pack store failed during close: %s", exc)
                 assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
             # close() may run again after the store was already closed (idempotent close), so we can
@@ -1190,25 +1208,31 @@ class Repository:
                 try:
                     write_chunkindex_to_repo(self, self.chunks, incremental=True)
                 except Exception as exc:
-                    # do not raise: the persisted index is only a cache (rebuilt when missing or
-                    # stale).  close() often runs while unwinding a store error, and this persist
-                    # writing to that same store would then raise again, masking the original error.
+                    if not aborting:
+                        raise
+                    # unwinding, often a store error: this persist writing to that same store would
+                    # raise again and mask it.  the persisted index is only a cache (rebuilt when
+                    # missing or stale), so losing this write costs a rebuild, not data.
                     logger.warning("failed to persist the chunk index during close: %s", exc)
         finally:
             # release the lock and close the store even when the above raised (e.g. the unflushed-
             # chunks assertion): a lock left behind would block other clients until it goes stale.
+            # while any error is unwinding (aborting, or the try block above raised), a failing
+            # release is logged, not raised, so it cannot mask that error.
+            unwinding = aborting or sys.exc_info()[0] is not None
             if self.lock:
-                # ignore_not_found: close() runs during normal teardown, but also while unwinding an
-                # exception. if the lock was already gone (e.g. it went stale and another client killed
-                # it, or refresh() aborted with LockTimeout), a NotLocked raised here would mask the
-                # original error. we are closing anyway, so treat a missing lock as nothing to release.
+                # ignore_not_found: if the lock was already gone (e.g. it went stale and another
+                # client killed it, or refresh() aborted with LockTimeout), a NotLocked raised
+                # here would mask the original error; a missing lock is nothing to release.
                 try:
                     self.lock.release(ignore_not_found=True)
+                    self.lock = None
                 except Exception as exc:
-                    # do not raise: when the store is dead, the release fails, too -- raising would
-                    # mask the original error, and the lock goes stale eventually anyway.
+                    if not unwinding:
+                        raise
+                    # when the store is dead, the release fails, too; the lock goes stale eventually.
                     logger.warning("failed to release the lock during close: %s", exc)
-                self.lock = None
+                    self.lock = None
             if self.store_opened:
                 self.store.close()
                 self.store_opened = False

@@ -1,4 +1,3 @@
-from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import re
 import shutil
@@ -575,14 +574,7 @@ def test_spoofed_manifest(archivers, request):
         cdata = manifest.repo_objs.format(
             Manifest.MANIFEST_ID,
             {},
-            msgpack.packb(
-                {
-                    "version": 1,
-                    "archives": {},
-                    "config": {},
-                    "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(timespec="microseconds"),
-                }
-            ),
+            msgpack.packb({"version": 1, "archives": {}, "config": {}}),
             # we assume that an attacker can put a file into backup src files that contains a fake manifest.
             # but, the attacker can not influence the ro_type borg will use to store user file data:
             ro_type=ROBJ_FILE_STREAM,  # a real manifest is stored with ROBJ_MANIFEST
@@ -1118,3 +1110,29 @@ def test_empty_repository(archivers, request):
         for info in repository.store_list("packs"):
             repository.store_delete("packs/" + info.name)
     cmd(archiver, "check", exit_code=1)
+
+
+def test_manifest_with_timestamp_is_accepted(archivers, request):
+    # borg 1.x and older borg 2 versions wrote a "timestamp" entry into the manifest. it is not written
+    # anymore, but such manifests must still load (and get rewritten without it).
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        data = manifest.key.pack_metadata(
+            {
+                "version": 2,
+                "archives": {},
+                "config": {"item_keys": tuple(sorted(ITEM_KEYS))},
+                "timestamp": "2026-01-01T00:00:00.000000",
+            }
+        )
+        repository.put_manifest(manifest.repo_objs.format(Manifest.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST))
+    output = cmd(archiver, "repo-list")
+    assert "archive1" in output
+    create_src_archive(archiver, "archive3")  # a writing command rewrites the manifest ...
+    dump_file = archiver.output_path + "/dump"
+    cmd(archiver, "debug", "dump-manifest", dump_file)
+    with open(dump_file) as f:
+        assert "timestamp" not in f.read()  # ... without the timestamp
+    cmd(archiver, "check", exit_code=0)

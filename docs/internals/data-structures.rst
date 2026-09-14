@@ -245,7 +245,6 @@ or modified. It looks like this:
 
     {
         'version': 2,
-        'timestamp': '2017-05-05T12:42:23.042864',
         'archives': {},
         'config': {
             'item_keys': ['acl_access', 'acl_default', ...],
@@ -257,10 +256,8 @@ borg 1.x repositories have (they are supported read-only, e.g. for
 ``borg transfer``). The versions differ in the way feature flags are handled,
 described below.
 
-The *timestamp* field records when the manifest was last written. It is kept
-strictly monotonically increasing across writes (even if the clock went
-backwards) and is shown by ``borg repo-info`` as the repository's last
-modification time.
+A *timestamp* entry, as written by borg 1.x and by older borg 2 versions, is
+accepted and ignored when reading.
 
 The *archives* dict is always empty: the list of archives is not part of the
 manifest, each archive has its own pointer object in the ``archives/``

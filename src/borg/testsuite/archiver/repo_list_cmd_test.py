@@ -168,7 +168,6 @@ def test_repo_list_json(archivers, request):
     list_repo = json.loads(cmd(archiver, "repo-list", "--json"))
     repository = list_repo["repository"]
     assert len(repository["id"]) == 64
-    checkts(repository["last_modified"])
     assert list_repo["encryption"]["encryption"] == RK_ENCRYPTION[13:]  # --encryption=aes256-ocb
     assert list_repo["encryption"]["id_hash"] == "sha256"  # default id-hash
     assert "keyfile" not in list_repo["encryption"]

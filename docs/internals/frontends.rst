@@ -318,7 +318,7 @@ commands implement a ``--json-lines`` option which generates output in the `JSON
 which is simply a number of JSON objects separated by new lines.
 
 Dates are formatted according to ISO 8601 in the local time zone of the borg client, including the
-UTC offset, e.g. ``2026-08-28T08:59:56.761172+02:00``. Repository and archive timestamps and the
+UTC offset, e.g. ``2026-08-28T08:59:56.761172+02:00``. Archive timestamps and the
 item timestamps of :ref:`borg_list` have microsecond precision (6 fraction digits). The item
 timestamps of :ref:`borg_diff` have nanosecond precision (9 fraction digits), because that is how
 borg stores them.
@@ -329,8 +329,6 @@ id
     The ID of the repository, normally 64 hex characters
 location
     Canonicalized repository path, thus this may be different from what is specified on the command line
-last_modified
-    Date when the repository was last modified by the Borg client
 
 The *encryption* key, if present, contains:
 
@@ -363,7 +361,6 @@ Example ``borg repo-info --json`` output::
         },
         "repository": {
             "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
-            "last_modified": "2026-08-28T08:59:55.908686+02:00",
             "location": "/home/user/repository"
         },
         "security_dir": "/home/user/.local/share/borg/security/65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94"
@@ -474,7 +471,6 @@ Example of a simple archive listing (``borg repo-list --format "{name}{comment}"
         },
         "repository": {
             "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
-            "last_modified": "2026-08-28T08:59:56.764587+02:00",
             "location": "/home/user/repository"
         }
     }
@@ -522,7 +518,6 @@ The same archive with more information (``borg info --last 1 --json``)::
         },
         "repository": {
             "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
-            "last_modified": "2026-08-28T08:59:56.764587+02:00",
             "location": "/home/user/repository"
         }
     }
@@ -574,7 +569,6 @@ collected while running::
         },
         "repository": {
             "id": "65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94",
-            "last_modified": "2026-08-28T08:59:56.764587+02:00",
             "location": "/home/user/repository"
         }
     }
@@ -794,7 +788,6 @@ Example of ``borg analyze -a 'sh:userA-*' --json``::
         "hotspots": [{"path": "home/user/src", "size": 1000}],
         "repository": {
             "id": "06e4027d32f8eae8333f8fe06b1c2c46bf12f22ad10bd4d04a0f30751a26d77b",
-            "last_modified": "2026-08-01T22:46:05.886533",
             "location": "/home/user/repository"
         }
     }

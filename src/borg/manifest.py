@@ -1,7 +1,7 @@
 import enum
 import re
 from collections import defaultdict, namedtuple
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from operator import attrgetter
 from collections.abc import Iterator, Sequence
 from typing import Protocol, runtime_checkable
@@ -526,15 +526,10 @@ class Manifest:
         self.repo_objs = ro_cls(key)
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
-        self.timestamp = None
 
     @property
     def id_str(self):
         return bin_to_hex(self.id)
-
-    @property
-    def last_timestamp(self):
-        return parse_timestamp(self.timestamp)
 
     @classmethod
     def load(cls, repository, operations, key=None, *, other=False, ro_cls=RepoObj):
@@ -552,7 +547,7 @@ class Manifest:
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
         manifest.archives.prepare(manifest, m)
-        manifest.timestamp = m.get("timestamp")
+        # a "timestamp" entry (written by borg 1.x and by older borg 2 versions) is ignored.
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
         manifest.item_keys = ITEM_KEYS
@@ -589,22 +584,11 @@ class Manifest:
     def write(self):
         from .item import ManifestItem
 
-        # self.timestamp is the repository's "last modified" stamp (shown by "borg repo-info"). It is kept
-        # strictly monotonically increasing so it never goes backwards, as clocks often are not set correctly.
-        if self.timestamp is None:
-            self.timestamp = datetime.now(tz=UTC).isoformat(timespec="microseconds")
-        else:
-            incremented_ts = self.last_timestamp + timedelta(microseconds=1)
-            now_ts = datetime.now(tz=UTC)
-            max_ts = max(incremented_ts, now_ts)
-            self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())
         assert len(self.item_keys) <= 100
         self.config["item_keys"] = tuple(sorted(self.item_keys))
         manifest_archives = self.archives.finish(self)
-        manifest = ManifestItem(
-            version=2, archives=manifest_archives, timestamp=self.timestamp, config=StableDict(self.config)
-        )
+        manifest = ManifestItem(version=2, archives=manifest_archives, config=StableDict(self.config))
         data = self.key.pack_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
         robj = self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST)

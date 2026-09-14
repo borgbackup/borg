@@ -967,7 +967,6 @@ def test_create_json(archivers, request):
     assert "encryption" in create_info
     assert "repository" in create_info
     assert "cache" in create_info
-    assert "last_modified" in create_info["repository"]
 
     archive = create_info["archive"]
     assert archive["name"] == "test"

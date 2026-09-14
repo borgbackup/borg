@@ -553,7 +553,7 @@ cdef class ManifestItem(PropDict):
     archives = PropDictProperty(dict, 'dict of str -> dict')  # name -> dict
     timestamp = PropDictProperty(str)  # legacy: written by borg 1.x and older borg 2 versions, ignored now.
     config = PropDictProperty(dict)
-    item_keys = PropDictProperty(tuple, 'tuple of str')  # legacy. new location is inside config.
+    item_keys = PropDictProperty(tuple, 'tuple of str')  # legacy: written by borg 1.x, ignored now.
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)

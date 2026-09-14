@@ -388,7 +388,7 @@ def _validator(value):
 
 
 def process(input):
-    unpacker = RobustUnpacker(validator=_validator, item_keys=ITEM_KEYS)
+    unpacker = RobustUnpacker(validator=_validator)
     result = []
     for should_sync, chunks in input:
         if should_sync:
@@ -435,11 +435,6 @@ def test_corrupt_chunk():
     assert result == [{"path": "foo"}, {"path": "boo"}, {"path": "baz"}]
 
 
-@pytest.fixture
-def item_keys_serialized():
-    return [msgpack.packb(name) for name in ITEM_KEYS]
-
-
 @pytest.mark.parametrize(
     "packed",
     [b"", b"x", b"foobar"]
@@ -448,11 +443,13 @@ def item_keys_serialized():
         for o in (
             [None, 0, 0.0, False, "", {}, [], ()]
             + [42, 23.42, True, b"foobar", {b"foo": b"bar"}, [b"foo", b"bar"], (b"foo", b"bar")]
+            # maps whose first key does not look like an item key:
+            + [{"": b""}, {"Path": b""}, {"a b": b""}, {"päth": b""}, {"path-x": b""}, {1: b""}]
         )
     ],
 )
-def test_invalid_msgpacked_item(packed, item_keys_serialized):
-    assert not valid_msgpacked_dict(packed, item_keys_serialized)
+def test_invalid_msgpacked_item(packed):
+    assert not valid_msgpacked_dict(packed)
 
 
 # pytest-xdist always requires the same order for the keys and dicts:
@@ -467,19 +464,29 @@ IK = sorted(list(ITEM_KEYS))
             {"path": b"/a/b/c"},  # small (different msgpack mapping type!)
             OrderedDict((k, b"") for k in IK),  # as big (key count) as it gets
             OrderedDict((k, b"x" * 1000) for k in IK),  # as big (key count and volume) as it gets
+            {"aaa": 1, "path": b"/a/b/c"},  # first key unknown to this borg version (e.g. from a newer one)
+            {"a" * 255: 1, "path": b"/a/b/c"},  # str8 key
         ]
     ],
-    ids=["minimal", "empty-values", "long-values"],
+    ids=["minimal", "empty-values", "long-values", "unknown-key", "str8-key"],
 )
-def test_valid_msgpacked_items(packed, item_keys_serialized):
-    assert valid_msgpacked_dict(packed, item_keys_serialized)
+def test_valid_msgpacked_items(packed):
+    assert valid_msgpacked_dict(packed)
 
 
 def test_key_length_msgpacked_items():
     key = "x" * 32  # 31 bytes is the limit for fixstr msgpack type
     data = {key: b""}
-    item_keys_serialized = [msgpack.packb(key)]
-    assert valid_msgpacked_dict(msgpack.packb(data), item_keys_serialized)
+    assert valid_msgpacked_dict(msgpack.packb(data))
+
+
+def test_resync_on_item_with_unknown_first_key():
+    # after damage, an item whose first key is unknown to this borg version is still found as a resync point.
+    item = {"aaa": 1, "path": "foo"}  # "aaa" sorts before all known item keys
+    unpacker = RobustUnpacker(validator=_validator)
+    unpacker.resync()
+    unpacker.feed(b"\x00\xff\xc1garbage" + msgpack.packb(item) + make_chunks(["bar"]))
+    assert list(unpacker) == [item, {"path": "bar"}]
 
 
 def test_backup_io():

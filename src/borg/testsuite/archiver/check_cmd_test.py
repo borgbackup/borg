@@ -7,10 +7,11 @@ from unittest.mock import patch
 import pytest
 
 from ... import archive as archive_module
-from ...archive import ArchiveChecker, ChunkBuffer
-from ...cache import delete_chunkindex_from_repo
+from ...archive import Archive, ArchiveChecker, ChunkBuffer
+from ...cache import Cache, delete_chunkindex_from_repo
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
+from ...item import Item
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
@@ -556,7 +557,7 @@ def test_corrupted_manifest(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get_manifest()
-        corrupted_manifest = corrupt(manifest, 250)
+        corrupted_manifest = corrupt(manifest, len(manifest) - 1)  # the manifest object is small, hit the ciphertext
         repository.put_manifest(corrupted_manifest)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
@@ -668,7 +669,7 @@ def test_spoofed_archive(archivers, request):
     with repository:
         # attacker would corrupt or delete the manifest to trigger a rebuild of it:
         manifest = repository.get_manifest()
-        corrupted_manifest = corrupt(manifest, 250)
+        corrupted_manifest = corrupt(manifest, len(manifest) - 1)  # the manifest object is small, hit the ciphertext
         repository.put_manifest(corrupted_manifest)
         archive_dict = {
             "command_line": "",
@@ -1134,5 +1135,40 @@ def test_manifest_with_timestamp_is_accepted(archivers, request):
     dump_file = archiver.output_path + "/dump"
     cmd(archiver, "debug", "dump-manifest", dump_file)
     with open(dump_file) as f:
-        assert "timestamp" not in f.read()  # ... without the timestamp
+        dump = f.read()
+    assert "timestamp" not in dump  # ... without the timestamp
+    assert "item_keys" not in dump  # ... and without the legacy item keys list
     cmd(archiver, "check", exit_code=0)
+
+
+def test_items_with_unknown_keys_are_kept(archivers, request):
+    # items with keys this borg version does not know (e.g. written by a newer borg) are not an error:
+    # check warns about them once per archive (rc stays 0) and --repair writes them back unchanged.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("archive is crafted via direct (local) repository access")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    item = Item(
+        internal_dict=dict(
+            path="dir/file", mode=0o100644, mtime=0, uid=0, gid=0, user="root", group="root", size=0, newkey="future"
+        )
+    )
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        with Cache(repository, manifest, archive_name="future") as cache:
+            archive = Archive(manifest, "future", cache=cache, create=True)
+            archive.items_buffer.add(item)
+            archive.save(name="future")
+
+    output = cmd(archiver, "check", "--archives-only", exit_code=0)
+    assert "Archive future: items have keys unknown to this borg version" in output
+    assert "newkey" in output
+    assert "Did not get expected metadata dict" not in output
+    cmd(archiver, "check", "--repair", "--archives-only", exit_code=0)
+    archive, repository = open_archive(archiver.repository_path, "future")
+    with repository:
+        items = list(archive.iter_items())
+    assert len(items) == 1
+    assert items[0].as_dict()["newkey"] == "future"
+    output = cmd(archiver, "check", "--archives-only", exit_code=0)
+    assert "keys unknown to this borg version" in output  # still just the warning

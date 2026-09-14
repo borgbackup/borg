@@ -512,7 +512,7 @@ class Manifest:
 
     MANIFEST_ID = b"\0" * 32
 
-    def __init__(self, key, repository, item_keys=None, ro_cls=RepoObj):
+    def __init__(self, key, repository, ro_cls=RepoObj):
         from .legacy.repository import LegacyRepository
         from .legacy.remote import LegacyRemoteRepository
         from .legacy.archives import LegacyArchives
@@ -525,7 +525,6 @@ class Manifest:
         self.key = key
         self.repo_objs = ro_cls(key)
         self.repository = repository
-        self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
         self._loaded_data = None  # the packed manifest as loaded from the repository, see write()
 
     @property
@@ -549,12 +548,10 @@ class Manifest:
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
         manifest.archives.prepare(manifest, m)
-        # a "timestamp" entry (written by borg 1.x and by older borg 2 versions) is ignored.
+        # a "timestamp" entry (written by borg 1.x and by older borg 2 versions) is ignored, as is
+        # the list of item keys (borg 1.x: "item_keys", older borg 2 versions: config["item_keys"]).
         manifest.config = m.config
-        # valid item keys are whatever is known in the repo or every key we know
-        manifest.item_keys = ITEM_KEYS
-        manifest.item_keys |= frozenset(m.config.get("item_keys", []))  # new location of item_keys since borg2
-        manifest.item_keys |= frozenset(m.get("item_keys", []))  # legacy: borg 1.x: item_keys not in config yet
+        manifest.config.pop("item_keys", None)
         manifest.check_repository_compatibility(operations)
         return manifest
 
@@ -587,16 +584,12 @@ class Manifest:
         """
         Store the manifest in the repository, but only if its content differs from what was loaded.
 
-        The manifest only holds the item keys known to the repository and (optional) feature flags,
-        so it usually does not change at all: archive operations call this, but it only results in a
-        store write when e.g. a newer borg version added item keys, or when the loaded manifest still
-        had a legacy "timestamp" entry.
+        The manifest only holds the (optional) feature flags, so it usually does not change at all:
+        archive operations call this, but it only results in a store write when the config changed
+        or when the loaded manifest still had legacy entries (a timestamp, the item keys list).
         """
         from .item import ManifestItem
 
-        # include checks for limits as enforced by limited unpacker (used by load())
-        assert len(self.item_keys) <= 100
-        self.config["item_keys"] = tuple(sorted(self.item_keys))
         manifest_archives = self.archives.finish(self)
         manifest = ManifestItem(version=2, archives=manifest_archives, config=StableDict(self.config))
         data = self.key.pack_metadata(manifest.as_dict())

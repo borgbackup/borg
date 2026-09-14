@@ -2070,8 +2070,19 @@ class TarfileObjectProcessors:
             return status
 
 
-def valid_msgpacked_dict(d, keys_serialized):
-    """check if the data <d> looks like a msgpacked dict"""
+# item keys are short lowercase identifiers (see ITEM_KEYS), keys added by newer borg versions are expected
+# to look alike. this is what the resync heuristic checks a candidate first key against.
+ITEM_KEY_CHARS = frozenset(b"abcdefghijklmnopqrstuvwxyz0123456789_")
+
+
+def valid_msgpacked_dict(d):
+    """check if the data <d> looks like a msgpacked item dict
+
+    That is: a msgpack map whose first key is a msgpack str that looks like an item key. Items are
+    packed with sorted keys, so the first key is the alphabetically smallest key of the item. The key
+    is not checked against a list of known keys, so items written by a newer borg version (with keys
+    this version does not know) are found as well.
+    """
     d_len = len(d)
     if d_len == 0:
         return False
@@ -2085,25 +2096,29 @@ def valid_msgpacked_dict(d, keys_serialized):
         return False
     if d_len <= offs:
         return False
-    # is the first dict key a bytestring?
-    if d[offs] & 0xE0 == 0xA0:  # key is a small bytestring (up to 31 chars)
-        pass
-    elif d[offs] in (0xD9, 0xDA, 0xDB):  # key is a str8, str16 or str32
-        pass
+    if d[offs] & 0xE0 == 0xA0:  # key is a fixstr (up to 31 chars)
+        key_len = d[offs] & 0x1F
+        key_offs = offs + 1
+    elif d[offs] == 0xD9:  # key is a str8 (up to 255 chars)
+        if d_len <= offs + 1:
+            return False
+        key_len = d[offs + 1]
+        key_offs = offs + 2
     else:
-        # key is not a bytestring
+        # key is not a (short) str
         return False
-    # is the bytestring any of the expected key names?
-    key_serialized = d[offs:]
-    return any(key_serialized.startswith(pattern) for pattern in keys_serialized)
+    key = d[key_offs : key_offs + key_len]
+    if key_len == 0 or len(key) < key_len:
+        return False
+    # does the key look like an item key?
+    return all(c in ITEM_KEY_CHARS for c in key)
 
 
 class RobustUnpacker:
     """A restartable/robust version of the streaming msgpack unpacker"""
 
-    def __init__(self, validator, item_keys):
+    def __init__(self, validator):
         super().__init__()
-        self.item_keys = [msgpack.packb(name) for name in item_keys]
         self.validator = validator
         self._buffered_data = []
         self._resync = False
@@ -2129,7 +2144,7 @@ class RobustUnpacker:
                 if not data:
                     raise StopIteration
                 # Abort early if the data does not look like a serialized item dict
-                if not valid_msgpacked_dict(data, self.item_keys):
+                if not valid_msgpacked_dict(data):
                     data = data[1:]
                     continue
                 self._unpacker = msgpack.Unpacker(object_hook=StableDict)
@@ -2404,11 +2419,6 @@ class ArchiveChecker:
         """Rebuild the manifest object."""
 
         logger.info("Rebuilding missing/corrupted manifest.")
-        # as we have lost the manifest, we do not know any more what valid item keys we had.
-        # collecting any key we encounter in a damaged repo seems unwise, thus we just use
-        # the hardcoded list from the source code. thus, it is not recommended to rebuild a
-        # lost manifest on a older borg version than the most recent one that was ever used
-        # within this repository (assuming that newer borg versions support more item keys).
         return Manifest(self.key, self.repository)
 
     def rebuild_archives_directory(self):
@@ -2582,11 +2592,9 @@ class ArchiveChecker:
 
             Missing item chunks will be skipped and the msgpack stream will be restarted
             """
-            item_keys = self.manifest.item_keys
             required_item_keys = REQUIRED_ITEM_KEYS
-            unpacker = RobustUnpacker(
-                lambda item: isinstance(item, StableDict) and "path" in item, self.manifest.item_keys
-            )
+            unknown_keys = set()  # item keys this borg version does not know, collected for one warning per archive
+            unpacker = RobustUnpacker(lambda item: isinstance(item, StableDict) and "path" in item)
             _state = 0
 
             def missing_chunk_detector(chunk_id):
@@ -2610,8 +2618,6 @@ class ArchiveChecker:
                 keys = set(obj)
                 if not required_item_keys.issubset(keys):
                     return False, "missing required keys: " + list_keys_safe(required_item_keys - keys)
-                if not keys.issubset(item_keys):
-                    return False, "invalid keys: " + list_keys_safe(keys - item_keys)
                 return True, ""
 
             i = 0
@@ -2632,6 +2638,9 @@ class ArchiveChecker:
                         for item in unpacker:
                             valid, reason = valid_item(item)
                             if valid:
+                                # keys we do not know are kept as they are (see Item), they are likely
+                                # from a newer borg version. they are not an error, but worth a warning.
+                                unknown_keys.update(set(item) - ITEM_KEYS)
                                 yield Item(internal_dict=item)
                             else:
                                 report(
@@ -2651,6 +2660,11 @@ class ArchiveChecker:
                         report("Exception while decrypting or unpacking item metadata", chunk_id, i)
                         raise
                     i += 1
+            if unknown_keys:
+                logger.warning(
+                    f"Archive {archive.name}: items have keys unknown to this borg version "
+                    f"(possibly written by a newer borg): {list_keys_safe(sorted(unknown_keys))}"
+                )
 
         sort_by = sort_by.split(",")
         if any((first, last, match, older, newer, newest, oldest)):

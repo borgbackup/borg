@@ -1,11 +1,11 @@
 # Contributors
 
-375 people have contributed to Borg, with 11,212 commits in total.
+375 people have contributed to Borg, with 11,262 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-09-07 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-09-14 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,21 +21,21 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,578 | 99,568 | 524 |
-| Marian Beermann | 1,140 | 7,756 | 156 |
+| Thomas Waldmann | 7,622 | 100,863 | 524 |
+| Marian Beermann | 1,140 | 7,754 | 156 |
 | Jonas Borgström | 560 | 969 | 38 |
 | Antoine Beaupré | 285 | 437 | 33 |
-| Mrityunjay Raj | 249 | 10,030 | 103 |
+| Mrityunjay Raj | 252 | 10,625 | 108 |
 | Andrey Bienkowski | 72 | 200 | 16 |
-| Ted Lawson | 71 | 4,565 | 39 |
+| Ted Lawson | 71 | 4,561 | 39 |
 | Thalian | 63 | 564 | 29 |
-| dependabot[bot] | 47 | 14 | 4 |
+| dependabot[bot] | 49 | 16 | 6 |
 | Martin Hostettler | 46 | 2,559 | 9 |
 | Milkey Mouse | 42 | 239 | 12 |
 | Dan Christensen | 40 | 5 | 2 |
 | Rayyan Ansari | 34 | 88 | 12 |
 | Abdel-Rahman | 30 | 2 | 2 |
-| Manuel Riel | 28 | 86 | 6 |
+| Manuel Riel | 28 | 84 | 6 |
 | Nehalenniæ Oudin | 26 | 47 | 11 |
 | anarcat | 24 | 33 | 4 |
 | Hugo Wallenburg | 23 | 1,102 | 11 |
@@ -61,18 +61,18 @@ show up there, so the number understates early contributions.  Generated files
 | Per Guth | 9 | 1 | 1 |
 | Jakob Schnitzer | 8 | 35 | 1 |
 | Josh Soref | 8 | 3 | 3 |
+| ThomasWaldmann | 7 | 179 | 1 |
 | Gianfranco Costamagna | 7 | 9 | 6 |
 | Frank Sachsenheim | 7 | 2 | 1 |
 | Hartmut Goebel | 7 | 0 | 0 |
-| William D. Jones | 6 | 246 | 6 |
-| ThomasWaldmann | 6 | 178 | 1 |
+| William D. Jones | 6 | 215 | 6 |
 | Michael Deyaso | 6 | 165 | 14 |
 | Peter Gerber | 6 | 102 | 9 |
 | Alf Mikula | 6 | 19 | 1 |
 | Felix Schwarz | 6 | 4 | 2 |
 | Alexander-N | 6 | 0 | 0 |
 | Paul D | 5 | 178 | 42 |
-| Simon Frei | 5 | 132 | 3 |
+| Simon Frei | 5 | 124 | 3 |
 | Dominik Stadler | 5 | 75 | 1 |
 | elandorr | 5 | 39 | 3 |
 | remyabel | 5 | 19 | 2 |
@@ -83,7 +83,7 @@ show up there, so the number understates early contributions.  Generated files
 | Radu Ciorba | 5 | 0 | 0 |
 | Charlie Herz | 4 | 626 | 5 |
 | Ebuzer Celil Durmaz | 4 | 78 | 5 |
-| Robert Blenis | 4 | 51 | 4 |
+| Robert Blenis | 4 | 49 | 4 |
 | Franco Ayala | 4 | 39 | 6 |
 | Suryansh Pal | 4 | 34 | 8 |
 | 8bit | 4 | 29 | 5 |
@@ -151,10 +151,10 @@ show up there, so the number understates early contributions.  Generated files
 | Vaskebjoern | 2 | 5 | 1 |
 | wormingdead | 2 | 5 | 1 |
 | Samuel | 2 | 4 | 3 |
-| a1346054 | 2 | 4 | 3 |
 | snsmac | 2 | 4 | 2 |
 | Andreas Gruhler | 2 | 3 | 1 |
 | Markus Engelbrecht | 2 | 3 | 1 |
+| a1346054 | 2 | 3 | 2 |
 | bbx0 | 2 | 3 | 1 |
 | jan | 2 | 3 | 1 |
 | Fabian Fröhlich | 2 | 2 | 1 |
@@ -191,7 +191,7 @@ show up there, so the number understates early contributions.  Generated files
 | motwok | 2 | 0 | 0 |
 | sven | 2 | 0 | 0 |
 | user062 | 2 | 0 | 0 |
-| Tarrailt | 1 | 363 | 7 |
+| Tarrailt | 1 | 362 | 7 |
 | axapaxa | 1 | 105 | 2 |
 | Benedikt Seidl | 1 | 103 | 1 |
 | Aleksey Korol | 1 | 91 | 1 |

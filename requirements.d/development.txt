@@ -12,3 +12,4 @@ pytest-cov
 pytest-benchmark
 Cython
 pre-commit
+pydantic>=2.0

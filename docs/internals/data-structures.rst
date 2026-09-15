@@ -35,9 +35,7 @@ Several store objects are content-addressed or carry an integrity checksum: they
 are named by, or have appended, the **store hash** of their content. The store
 hash is the unkeyed 256 bit BLAKE3 hash, see ``store_hash()`` in ``crypto/key.py``.
 It is the same for every repository and independent of the key/encryption mode
-(unlike the chunk id hash, which the key mode selects). This is the one place
-stating which hash function the store hash is; everywhere else it is only referred
-to as the store hash.
+(unlike the chunk id hash, which the key mode selects).
 
 config/
   readme

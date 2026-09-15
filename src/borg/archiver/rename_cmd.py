@@ -2,7 +2,6 @@ from ._common import with_repository, with_archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -10,7 +9,7 @@ logger = create_logger()
 
 
 class RenameMixIn:
-    @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(cache=True)
     @with_archive
     def do_rename(self, args, repository, manifest, cache, archive):
         """Rename an existing archive."""

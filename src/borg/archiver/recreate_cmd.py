@@ -5,7 +5,6 @@ from ..constants import *  # NOQA
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex, CompressionSpec
 from ..helpers import timestamp
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -13,7 +12,7 @@ logger = create_logger()
 
 
 class RecreateMixIn:
-    @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(cache=True)
     def do_recreate(self, args, repository, manifest, cache):
         """Recreate archives."""
         # omitting args.pattern_roots here, restricting to paths only by cli args.paths:

@@ -51,7 +51,7 @@ class TestAdHocWithFilesCache:
     @pytest.fixture
     def manifest(self, repository, key):
         Manifest(key, repository).write()
-        return Manifest.load(repository, key=key, operations=Manifest.NO_OPERATION_CHECK)
+        return Manifest.load(repository, key=key)
 
     @pytest.fixture
     def cache(self, repository, key, manifest):
@@ -482,7 +482,7 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
     all_ids = []
     for s in range(5):  # each session adds 100 new chunks (< MIN), so fragments must be consolidated
         with Repository(loc, exclusive=True) as repository:
-            manifest = Manifest.load(repository, key=key, operations=Manifest.NO_OPERATION_CHECK)
+            manifest = Manifest.load(repository, key=key)
             cache = AdHocWithFilesCache(manifest)
             try:
                 for i in range(s * 100, s * 100 + 100):
@@ -745,7 +745,7 @@ def test_files_cache_save_tolerates_missing_chunk(tmp_path, monkeypatch):
         Manifest(key, repository).write()
 
     with Repository(loc, exclusive=True) as repository:
-        manifest = Manifest.load(repository, key=key, operations=Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository, key=key)
         # size+inode+ctime cache mode -> files cache active; archive_name -> names the cache file
         cache = AdHocWithFilesCache(manifest, cache_mode="cis", archive_name="test")
         try:

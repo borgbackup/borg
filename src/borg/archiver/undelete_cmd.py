@@ -17,7 +17,7 @@ class UnDeleteMixIn:
         """Undeletes archives."""
         self.output_list = args.output_list
         dry_run = args.dry_run
-        manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        manifest = Manifest.load(repository)
         if args.name:
             archive_infos = [manifest.archives.get_one(archive_match_patterns(args), deleted=True)]
         else:

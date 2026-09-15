@@ -72,7 +72,7 @@ def webdav_server(archiver):
     )
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         server = make_server(manifest, args, port=0)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -515,7 +515,7 @@ def test_webdav_data_cache(archivers, request, monkeypatch):
     )
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         server = make_server(manifest, args, port=0)
         data_cache = server.RequestHandlerClass.vfs.reader.data_cache
         assert data_cache._capacity == 8  # the env var is honored
@@ -587,7 +587,7 @@ def test_webdav_file_without_chunks(archivers, request):
     )
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         server = make_server(manifest, args, port=0)
         # corrupt the in-memory tree: pretend file1 is non-empty but has no chunks
         vfs = server.RequestHandlerClass.vfs
@@ -623,7 +623,7 @@ def test_webdav_damaged_file(archivers, request):
     )
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         archive = Archive(manifest, manifest.archives.get("test").id)
         for item in archive.iter_items():
             if item.path.endswith("big"):

@@ -13,7 +13,6 @@ from ..helpers import format_file_size, log_multi
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.sorting import sort_spec_validator, sorted_by_spec
 from ..item import ItemDiff
-from ..manifest import Manifest
 from ..logger import create_logger
 
 logger = create_logger()
@@ -91,7 +90,7 @@ class DiffStats:
 
 
 class DiffMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     def do_diff(self, args, repository, manifest):
         """Finds differences between two archives."""
 

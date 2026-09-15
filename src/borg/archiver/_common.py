@@ -60,32 +60,7 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_leg
     return repository
 
 
-def compat_check(*, create, manifest, key, cache, compatibility, decorator_name):
-    if not create and (manifest or key or cache):
-        if compatibility is None:
-            raise AssertionError(f"{decorator_name} decorator used without compatibility argument")
-        if type(compatibility) is not tuple:
-            raise AssertionError(f"{decorator_name} decorator compatibility argument must be of type tuple")
-    else:
-        if compatibility is not None:
-            raise AssertionError(
-                f"{decorator_name} called with compatibility argument, " f"but would not check {compatibility!r}"
-            )
-        if create:
-            compatibility = Manifest.NO_OPERATION_CHECK
-    return compatibility
-
-
-def with_repository(
-    create=False,
-    lock=True,
-    exclusive=False,
-    manifest=True,
-    cache=False,
-    secure=True,
-    compatibility=None,
-    allow_v1=False,
-):
+def with_repository(create=False, lock=True, exclusive=False, manifest=True, cache=False, secure=True, allow_v1=False):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
@@ -96,20 +71,8 @@ def with_repository(
     :param manifest: load manifest and repo_objs (key), pass them as keyword arguments
     :param cache: open cache, pass it as keyword argument (implies manifest)
     :param secure: do assert_secure after loading manifest
-    :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory
-           feature categories to check
     :param allow_v1: (bool) allow legacy Borg 1.x repositories
     """
-    # Note: with_repository decorator does not have a "key" argument (yet?)
-    compatibility = compat_check(
-        create=create,
-        manifest=manifest,
-        key=manifest,
-        cache=cache,
-        compatibility=compatibility,
-        decorator_name="with_repository",
-    )
-
     # We may need to modify `lock` inside `wrapper`. Therefore we cannot use the
     # `nonlocal` statement to access `lock` as modifications would also
     # affect the scope outside of `wrapper`. Subsequent calls would
@@ -154,7 +117,7 @@ def with_repository(
                         from ..legacy.repoobj import RepoObj1
 
                         ro_cls = RepoObj1
-                    manifest_ = Manifest.load(repository, compatibility, other=False, ro_cls=ro_cls)
+                    manifest_ = Manifest.load(repository, other=False, ro_cls=ro_cls)
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor
@@ -177,7 +140,7 @@ def with_repository(
     return decorator
 
 
-def with_other_repository(manifest=False, cache=False, compatibility=None, required=False):
+def with_other_repository(manifest=False, cache=False, required=False):
     """
     this is a simplified version of "with_repository", just for the "other location".
 
@@ -185,15 +148,6 @@ def with_other_repository(manifest=False, cache=False, compatibility=None, requi
 
     :param required: the command can not work without the other repository, refuse to run if it is not given.
     """
-
-    compatibility = compat_check(
-        create=False,
-        manifest=manifest,
-        key=manifest,
-        cache=cache,
-        compatibility=compatibility,
-        decorator_name="with_other_repository",
-    )
 
     def decorator(method):
         @functools.wraps(method)
@@ -231,7 +185,7 @@ def with_other_repository(manifest=False, cache=False, compatibility=None, requi
                         from ..legacy.repoobj import RepoObj1
 
                         ro_cls = RepoObj1
-                    manifest_ = Manifest.load(repository, compatibility, other=True, ro_cls=ro_cls)
+                    manifest_ = Manifest.load(repository, other=True, ro_cls=ro_cls)
                     assert_secure(repository, manifest_)
                     if manifest:
                         kwargs["other_manifest"] = manifest_

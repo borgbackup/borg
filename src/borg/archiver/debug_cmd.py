@@ -13,7 +13,6 @@ from ..helpers import StableDict
 from ..helpers import archivename_validator, CompressionSpec
 from ..helpers import CommandError, IntegrityError, RTError
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
 from ..repoobj import RepoObj, object_validator
@@ -48,7 +47,7 @@ class DebugMixIn:
         print(sysinfo())
         print("Process ID:", get_process_id())
 
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    @with_repository()
     def do_debug_dump_archive_items(self, args, repository, manifest):
         """Dumps (decrypted, decompressed) archive item metadata (not data)."""
         repo_objs = manifest.repo_objs
@@ -62,7 +61,7 @@ class DebugMixIn:
                 fd.write(data)
         print("Done.")
 
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    @with_repository()
     def do_debug_dump_archive(self, args, repository, manifest):
         """Dumps decoded archive metadata (not data)."""
         archive_info = manifest.archives.get_one([args.name])
@@ -117,7 +116,7 @@ class DebugMixIn:
         with dash_open(args.path, "w") as fd:
             output(fd)
 
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    @with_repository()
     def do_debug_dump_manifest(self, args, repository, manifest):
         """Dumps decoded repository manifest."""
         repo_objs = manifest.repo_objs
@@ -222,7 +221,7 @@ class DebugMixIn:
             f.write(data)
         print("object %s fetched." % hex_id)
 
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    @with_repository()
     def do_debug_id_hash(self, args, repository, manifest):
         """Computes id-hash for file contents."""
         with open(args.path, "rb") as f:
@@ -231,7 +230,7 @@ class DebugMixIn:
         id = key.id_hash(data)
         print(id.hex())
 
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    @with_repository()
     def do_debug_parse_obj(self, args, repository, manifest):
         """Parses a Borg object file into a metadata dict and data (decrypting, decompressing)."""
 
@@ -254,7 +253,7 @@ class DebugMixIn:
         with open(args.binary_path, "wb") as f:
             f.write(data)
 
-    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    @with_repository()
     def do_debug_format_obj(self, args, repository, manifest):
         """Formats file and metadata into a Borg object file."""
 

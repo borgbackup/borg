@@ -10,7 +10,6 @@ from ..constants import *  # NOQA
 from ..helpers import ItemFormatter, BaseFormatter, archivename_validator, PathSpec
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.sorting import sort_spec_validator, sorted_by_spec
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -44,7 +43,7 @@ def item_sort_key(field, item):
 
 
 class ListMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     def do_list(self, args, repository, manifest):
         """List archive contents."""
         # omitting args.pattern_roots here, restricting to paths only by cli args.paths:

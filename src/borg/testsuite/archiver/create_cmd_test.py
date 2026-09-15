@@ -694,7 +694,7 @@ def test_create_dry_run(archivers, request):
     cmd(archiver, "create", "--dry-run", "test", "input")
     # Make sure no archive has been created
     with Repository(archiver.repository_path) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 0
 
 
@@ -713,7 +713,7 @@ def test_create_dry_run_stats(archivers, request):
     assert "Deduplicated size:" not in output
     # Make sure no archive has been created
     with Repository(archiver.repository_path) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 0
 
 

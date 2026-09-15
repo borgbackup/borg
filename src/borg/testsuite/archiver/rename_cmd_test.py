@@ -22,7 +22,7 @@ def test_rename(archivers, request):
     cmd(archiver, "extract", "test.4", "--dry-run")
     # Make sure both archives have been renamed
     with Repository(archiver.repository_path) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         assert manifest.archives.count() == 2
         assert manifest.archives.exists("test.3")
         assert manifest.archives.exists("test.4")

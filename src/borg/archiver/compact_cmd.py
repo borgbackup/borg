@@ -14,7 +14,6 @@ from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex
 from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin, IntegrityError
 from ..helpers import ProgressIndicatorPercent
-from ..manifest import Manifest
 from ..repoobj import object_validator
 from ..repository import Repository
 
@@ -456,7 +455,7 @@ class ArchiveGarbageCollector:
 
 
 class CompactMixIn:
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
+    @with_repository(exclusive=True)
     def do_compact(self, args, repository, manifest):
         """Collects garbage in the repository."""
         if not args.dry_run:

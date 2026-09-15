@@ -1,4 +1,3 @@
-import enum
 import re
 from collections import defaultdict, namedtuple
 from datetime import datetime
@@ -29,6 +28,8 @@ from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
 
 
+# Not raised anymore: the repository feature flags mechanism was removed. The class is kept so that its
+# return code stays reserved and never gets a different meaning.
 class MandatoryFeatureUnsupported(Error):
     """Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository."""
 
@@ -482,34 +483,6 @@ class Archives:
 
 
 class Manifest:
-    @enum.unique
-    class Operation(enum.StrEnum):
-        # The comments here only roughly describe the scope of each feature. In the end, additions need to be
-        # based on potential problems older clients could produce when accessing newer repositories and the
-        # trade-offs of locking version out or still allowing access. As all older versions and their exact
-        # behaviours are known when introducing new features sometimes this might not match the general descriptions
-        # below.
-
-        # The READ operation describes which features are needed to list and extract the archives safely in the
-        # repository.
-        READ = "read"
-        # The CHECK operation is for all operations that need either to understand every detail
-        # of the repository (for consistency checks and repairs) or are seldom used functions that just
-        # should use the most restrictive feature set because more fine grained compatibility tracking is
-        # not needed.
-        CHECK = "check"
-        # The WRITE operation is for adding archives. Features here ensure that older clients don't add archives
-        # in an old format, or is used to lock out clients that for other reasons can no longer safely add new
-        # archives.
-        WRITE = "write"
-        # The DELETE operation is for all operations (like archive deletion) that need a 100% correct reference
-        # count and the need to be able to find all (directly and indirectly) referenced chunks of a given archive.
-        DELETE = "delete"
-
-    NO_OPERATION_CHECK: Sequence[Operation] = tuple()
-
-    SUPPORTED_REPO_FEATURES: frozenset[str] = frozenset([])
-
     MANIFEST_ID = b"\0" * 32
 
     def __init__(self, key, repository, ro_cls=RepoObj):
@@ -532,7 +505,7 @@ class Manifest:
         return bin_to_hex(self.id)
 
     @classmethod
-    def load(cls, repository, operations, key=None, *, other=False, ro_cls=RepoObj):
+    def load(cls, repository, key=None, *, other=False, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory
 
@@ -552,41 +525,15 @@ class Manifest:
         # the list of item keys (borg 1.x: "item_keys", older borg 2 versions: config["item_keys"]).
         manifest.config = m.config
         manifest.config.pop("item_keys", None)
-        manifest.check_repository_compatibility(operations)
         return manifest
-
-    def check_repository_compatibility(self, operations):
-        for operation in operations:
-            assert isinstance(operation, self.Operation)
-            feature_flags = self.config.get("feature_flags", None)
-            if feature_flags is None:
-                return
-            if operation not in feature_flags:
-                continue
-            requirements = feature_flags[operation]
-            if "mandatory" in requirements:
-                unsupported = set(requirements["mandatory"]) - self.SUPPORTED_REPO_FEATURES
-                if unsupported:
-                    raise MandatoryFeatureUnsupported(list(unsupported))
-
-    def get_all_mandatory_features(self):
-        result = {}
-        feature_flags = self.config.get("feature_flags", None)
-        if feature_flags is None:
-            return result
-
-        for operation, requirements in feature_flags.items():
-            if "mandatory" in requirements:
-                result[operation] = set(requirements["mandatory"])
-        return result
 
     def write(self):
         """
         Store the manifest in the repository, but only if its content differs from what was loaded.
 
-        The manifest only holds the (optional) feature flags, so it usually does not change at all:
-        archive operations call this, but it only results in a store write when the config changed
-        or when the loaded manifest still had legacy entries (a timestamp, the item keys list).
+        The manifest content is static (borg does not store anything in its config dict currently), so
+        archive operations calling this usually do not result in a store write: only when the loaded
+        manifest still had legacy entries (a timestamp, the item keys list) is it rewritten.
         """
         from .item import ManifestItem
 

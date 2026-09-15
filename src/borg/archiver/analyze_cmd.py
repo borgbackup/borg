@@ -9,7 +9,7 @@ from ..helpers import basic_json_data, bin_to_hex, Error, format_file_size, json
 from ..helpers import ProgressIndicatorPercent
 from ..helpers.argparsing import ArgumentParser
 from ..helpers import GroupBySpec
-from ..manifest import AI_GROUP_BY_KEYS, Manifest, archive_group_key, format_group_key
+from ..manifest import AI_GROUP_BY_KEYS, archive_group_key, format_group_key
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -445,7 +445,7 @@ class ArchiveAnalyzer:
 
 
 class AnalyzeMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     def do_analyze(self, args, repository, manifest):
         """Analyzes archives."""
         ArchiveAnalyzer(args, repository, manifest).analyze()

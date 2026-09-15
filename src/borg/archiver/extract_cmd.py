@@ -13,7 +13,6 @@ from ..helpers import log_multi
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -21,7 +20,7 @@ logger = create_logger()
 
 
 class ExtractMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository()
     @with_archive
     def do_extract(self, args, repository, manifest, archive):
         """Extracts archive contents."""

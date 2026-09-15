@@ -9,7 +9,6 @@ from ..helpers import format_file_size, bin_to_hex
 from ..helpers import ChunkerParams, ChunkIteratorFileWrapper, CompressionSpec
 from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 from ..item import ChunkListEntry
-from ..manifest import Manifest
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -128,8 +127,8 @@ def transfer_chunks(
 
 
 class TransferMixIn:
-    @with_other_repository(manifest=True, required=True, compatibility=(Manifest.Operation.READ,))
-    @with_repository(manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_other_repository(manifest=True, required=True)
+    @with_repository(manifest=True, cache=True)
     def do_transfer(self, args, *, repository, manifest, cache, other_repository=None, other_manifest=None):
         """archives transfer from other repository, optionally upgrade data format"""
         key = manifest.key

@@ -20,7 +20,7 @@ def test_repo_compress(archiver):
         """Check that all chunks in the repo are compressed/obfuscated as expected."""
         repository = Repository(archiver.repository_path, exclusive=True)
         with repository:
-            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            manifest = Manifest.load(repository)
             for id, _ in repo_lister(repository, limit=LIST_SCAN_LIMIT):
                 chunk = repository.get(id, read_data=True)
                 meta, data = manifest.repo_objs.parse(
@@ -97,7 +97,7 @@ def test_repo_compress_zstd_negative_level(archiver):
         cmd(archiver, "repo-compress", "-C", f"zstd,{level}")
         repository = Repository(archiver.repository_path, exclusive=True)
         with repository:
-            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            manifest = Manifest.load(repository)
             for id, _ in repo_lister(repository, limit=LIST_SCAN_LIMIT):
                 chunk = repository.get(id, read_data=True)
                 meta, data = manifest.repo_objs.parse(id, chunk, ro_type=ROBJ_DONTCARE)
@@ -156,7 +156,7 @@ def test_repo_compress_multiple_packs(archiver, monkeypatch):
         packs_after = {info.name for info in repository.store_list("packs")}
         assert len(packs_before - packs_after) >= 2
         # no object is left with the old zlib compression
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         for id, _ in repo_lister(repository, limit=LIST_SCAN_LIMIT):
             meta = manifest.repo_objs.parse_meta(id, repository.get(id, read_data=False), ro_type=ROBJ_DONTCARE)
             assert meta["ctype"] != ZLIB.ID
@@ -204,7 +204,7 @@ def test_repo_compress_soft_interrupt_persists_valid_index(archiver, monkeypatch
         pack_names_before = {info.name for info in repository.store_list("packs")}
         assert len(pack_names_before) >= 2  # need several packs to observe an early stop
 
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         manifest.repo_objs.compressor = CompressionSpec("zstd,3").compressor
         recompressor = PackRecompressor(repository, manifest, print_stats=False)
 

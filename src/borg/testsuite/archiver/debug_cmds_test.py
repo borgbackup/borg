@@ -100,7 +100,7 @@ def put_pack_with_superseded_gap(archiver):
     Returns ((w_id, x_id, y_id), (w_size, x_size, y_size)), the object sizes in the first pack.
     """
     with open_repository(archiver) as repository:
-        repo_objs = Manifest.load(repository, Manifest.NO_OPERATION_CHECK).repo_objs
+        repo_objs = Manifest.load(repository).repo_objs
         datas = (b"W" * 100, b"X" * 100, b"Y" * 100)
         ids = tuple(repo_objs.id_hash(data) for data in datas)
         objs = [repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM) for id, data in zip(ids, datas)]

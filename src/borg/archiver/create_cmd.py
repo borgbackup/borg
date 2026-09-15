@@ -36,7 +36,6 @@ from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32, get_flags
 
@@ -64,7 +63,7 @@ def stat_root(path):
 
 
 class CreateMixIn:
-    @with_repository(compatibility=(Manifest.Operation.WRITE,))
+    @with_repository()
     def do_create(self, args, repository, manifest):
         """Creates a new archive."""
         if args.read_special_timeout is not None and not args.read_special:

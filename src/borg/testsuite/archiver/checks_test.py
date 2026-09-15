@@ -7,9 +7,6 @@ from ...cache import Cache
 from ...constants import *  # NOQA
 from ...helpers import Location, get_security_dir, bin_to_hex
 from ...helpers import EXIT_ERROR
-from ...manifest import Manifest, MandatoryFeatureUnsupported
-from ...repository import Repository
-from .. import llfuse
 from .. import changedir
 from . import cmd, _extract_repository_id, create_test_files
 from . import _set_repository_id, create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
@@ -21,22 +18,6 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 def get_security_directory(repo_path):
     repository_id = bin_to_hex(_extract_repository_id(repo_path))
     return get_security_dir(repository_id)
-
-
-def add_unknown_feature(repo_path, operation):
-    with Repository(repo_path, exclusive=True) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        manifest.config["feature_flags"] = {operation.value: {"mandatory": ["unknown-feature"]}}
-        manifest.write()
-
-
-def cmd_raises_unknown_feature(archiver, args):
-    if archiver.FORK_DEFAULT:
-        cmd(archiver, *args, exit_code=EXIT_ERROR)
-    else:
-        with pytest.raises(MandatoryFeatureUnsupported) as excinfo:
-            cmd(archiver, *args)
-        assert excinfo.value.args == (["unknown-feature"],)
 
 
 def test_repository_swap_detection(archivers, request):
@@ -214,86 +195,6 @@ def test_unknown_unencrypted_empty_passphrase(archivers, request, monkeypatch):
     output = cmd(archiver, "repo-info")
     assert "previously unknown unencrypted repository" in output
     assert "stored inside the repository (repokey) and has an empty passphrase" in output
-
-
-def test_unknown_feature_on_create(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    print(cmd(archiver, "repo-create", RK_ENCRYPTION))
-    add_unknown_feature(archiver.repository_path, Manifest.Operation.WRITE)
-    cmd_raises_unknown_feature(archiver, ["create", "test", "input"])
-
-
-def test_unknown_feature_on_change_passphrase(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    print(cmd(archiver, "repo-create", RK_ENCRYPTION))
-    add_unknown_feature(archiver.repository_path, Manifest.Operation.CHECK)
-    cmd_raises_unknown_feature(archiver, ["key", "change-passphrase"])
-
-
-def test_unknown_feature_on_read(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    print(cmd(archiver, "repo-create", RK_ENCRYPTION))
-    cmd(archiver, "create", "test", "input")
-    add_unknown_feature(archiver.repository_path, Manifest.Operation.READ)
-    with changedir("output"):
-        cmd_raises_unknown_feature(archiver, ["extract", "test"])
-    cmd_raises_unknown_feature(archiver, ["repo-list"])
-    cmd_raises_unknown_feature(archiver, ["info", "-a", "test"])
-
-
-def test_unknown_feature_on_rename(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    print(cmd(archiver, "repo-create", RK_ENCRYPTION))
-    cmd(archiver, "create", "test", "input")
-    add_unknown_feature(archiver.repository_path, Manifest.Operation.CHECK)
-    cmd_raises_unknown_feature(archiver, ["rename", "test", "other"])
-
-
-def test_unknown_feature_on_delete(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    print(cmd(archiver, "repo-create", RK_ENCRYPTION))
-    cmd(archiver, "create", "test", "input")
-    add_unknown_feature(archiver.repository_path, Manifest.Operation.DELETE)
-    # delete of an archive raises
-    cmd_raises_unknown_feature(archiver, ["delete", "-a", "test"])
-    cmd_raises_unknown_feature(archiver, ["prune", "--keep-daily=3"])
-    # delete of the whole repository ignores features
-    cmd(archiver, "repo-delete")
-
-
-@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
-def test_unknown_feature_on_mount(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test", "input")
-    add_unknown_feature(archiver.repository_path, Manifest.Operation.READ)
-    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
-    os.mkdir(mountpoint)
-    # XXX this might hang if it doesn't raise an error
-    cmd_raises_unknown_feature(archiver, ["mount", mountpoint])
-
-
-def test_unknown_mandatory_feature_in_cache(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    remote_repo = archiver.get_kind() == "remote"
-    print(cmd(archiver, "repo-create", RK_ENCRYPTION))
-
-    with Repository(archiver.repository_path, exclusive=True) as repository:
-        if remote_repo:
-            repository._location = Location(archiver.repository_location)
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        with Cache(repository, manifest) as cache:
-            cache.cache_config.mandatory_features = {"unknown-feature"}
-
-    if archiver.FORK_DEFAULT:
-        cmd(archiver, "create", "test", "input")
-
-    with Repository(archiver.repository_path, exclusive=True) as repository:
-        if remote_repo:
-            repository._location = Location(archiver.repository_location)
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        with Cache(repository, manifest) as cache:
-            assert cache.cache_config.mandatory_features == set()
 
 
 # Begin Remote Tests

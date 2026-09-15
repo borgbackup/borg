@@ -572,7 +572,7 @@ def test_spoofed_manifest(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         cdata = manifest.repo_objs.format(
             Manifest.MANIFEST_ID,
             {},
@@ -953,7 +953,7 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.repository = repository
         checker.key = checker.make_key(repository)
         checker.repo_objs = RepoObj(checker.key)
-        checker.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=checker.key)
+        checker.manifest = Manifest.load(repository, key=checker.key)
         # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
         checker.chunks_modified = True
 
@@ -1122,7 +1122,7 @@ def test_manifest_with_timestamp_is_accepted(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     with Repository(archiver.repository_path, exclusive=True) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         data = manifest.key.pack_metadata(
             {
                 "version": 2,
@@ -1157,7 +1157,7 @@ def test_items_with_unknown_keys_are_kept(archivers, request):
         )
     )
     with Repository(archiver.repository_path, exclusive=True) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        manifest = Manifest.load(repository)
         with Cache(repository, manifest, archive_name="future") as cache:
             archive = Archive(manifest, "future", cache=cache, create=True)
             archive.items_buffer.add(item)

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from ..crypto.key import store_hash
 from .hashindex_test import H
 from .crypto.key_test import TestKey
 from ..archive import Statistics
@@ -152,7 +153,7 @@ def test_read_chunkindex_from_repo_corrupt(tmp_path):
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
         content = b"not a serialized chunk index"
-        name = hashlib.sha256(content).hexdigest()  # valid name, so the name check passes
+        name = store_hash(content).hexdigest()  # valid name, so the name check passes
         repository.store_store(f"index/{name}", content)
         with pytest.raises(CorruptChunkIndexFragment):
             read_chunkindex_from_repo(repository, name)
@@ -166,7 +167,7 @@ def test_build_chunkindex_rebuilds_on_corrupt_fragment(tmp_path):
         ci[H(1)] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, H(1), 0, 4)
         write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
         content = b"not a serialized chunk index"
-        name = hashlib.sha256(content).hexdigest()
+        name = store_hash(content).hexdigest()
         repository.store_store(f"index/{name}", content)
         chunks = build_chunkindex_from_repo(repository)
         # the rebuild reads the (empty) packs namespace, so H(1) from the corrupt fragment is absent

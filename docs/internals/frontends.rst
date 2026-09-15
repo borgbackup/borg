@@ -993,6 +993,8 @@ Warnings
         {}: {}
     BackupBrokenSymlinkError rc: 112
         {}: {}
+    BackupDamagedChunksError rc: 113
+        {}: {}
 
 Operations
     - cache.close

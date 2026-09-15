@@ -65,8 +65,8 @@ class VFSOptions:
     directory that contains all its versions (see ArchiveVFS._load_archive).
     *numeric_ids*, *uid_forced*, *gid_forced* and *umask* control the ownership and
     permissions mapping, *strip_components* and *item_filter* which items are shown,
-    *allow_damaged_files* whether reads of files with missing chunks return zeros
-    instead of failing, and *dir_item* is the item used for synthesized directories.
+    *allow_damaged_files* whether reads of files with missing or corrupted chunks return
+    zeros instead of failing, and *dir_item* is the item used for synthesized directories.
     """
 
     def __init__(
@@ -558,8 +558,9 @@ class DataReader:
         """Yield the bytes at [offset, offset+size) of the content described by *chunks*.
 
         *pos_key* identifies the reader (e.g. a file handle) for the sequential-read
-        optimization. Raises ChunkMissing if a chunk is not in the repository (unless
-        allow_damaged_files is set - then all-zero data is returned for it).
+        optimization. Raises ChunkMissing if a chunk is not in the repository and IntegrityError
+        if it is corrupted (unless allow_damaged_files is set - then all-zero data is returned
+        for it).
         """
         if size <= 0:
             return
@@ -602,7 +603,12 @@ class DataReader:
                     del self.data_cache[entry.id]
                 return data
             data = next(
-                self.pipeline.fetch_many([entry], ro_type=ROBJ_FILE_STREAM, replacement_chunk=self.allow_damaged_files)
+                self.pipeline.fetch_many(
+                    [entry],
+                    ro_type=ROBJ_FILE_STREAM,
+                    replacement_chunk=self.allow_damaged_files,
+                    replace_corrupted=self.allow_damaged_files,
+                )
             )
             if data is None:
                 raise ChunkMissing(entry.id)

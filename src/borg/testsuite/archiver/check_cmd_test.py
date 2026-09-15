@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from ...crypto.key import STORE_HASH_NAME
 from ... import archive as archive_module
 from ...archive import ArchiveChecker, ChunkBuffer
 from ...cache import delete_chunkindex_from_repo
@@ -623,8 +624,8 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request):
     with repository:
         index_infos = list(repository.store_list("index"))
         assert index_infos  # a fresh index was persisted
-        for info in index_infos:  # each fragment's content still matches its blake3 name
-            assert repository.store.hash(f"index/{info.name}", algorithm="blake3") == info.name
+        for info in index_infos:  # each fragment's content still matches its store hash name
+            assert repository.store.hash(f"index/{info.name}", algorithm=STORE_HASH_NAME) == info.name
     cmd(archiver, "check", exit_code=0)  # the repository is consistent again
     assert "archive1" in cmd(archiver, "repo-list")  # and remains usable
 
@@ -772,7 +773,7 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
             assert (chunk_id in repository.chunks) == (chunk_id != damaged_id)
     cmd(archiver, "list", "archive1", exit_code=0)  # the archives are readable
     # the pack still holds the damaged bytes, so it keeps failing the store-level check: a pack is
-    # named by the blake3 hash of its content. Repairing that is repository-level repair (#10026).
+    # named by the store hash of its content. Repairing that is repository-level repair (#10026).
     output = cmd(archiver, "check", "--repository-only", exit_code=1)
     assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
 
@@ -892,7 +893,7 @@ def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monk
     monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
     monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
     # --archives-only: the repository check would stop at the damaged pack (a pack is named by the
-    # blake3 hash of its content) before the archives check ever walks it.
+    # store hash of its content) before the archives check ever walks it.
     with pytest.raises(CorruptPack) as excinfo:
         cmd(archiver, "check", "--archives-only")
     assert f"no object header at offset {damaged_offset} (pack corruption)" in str(excinfo.value)

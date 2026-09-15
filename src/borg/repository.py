@@ -2095,6 +2095,9 @@ class Repository:
             return self.store.load("config/manifest")
         except StoreObjectNotFound:
             raise NoManifestError
+        except OSError as exc:
+            # not "no manifest": check --repair must not rebuild a manifest it merely could not read, #3509.
+            raise self.StoreReadError("config/manifest", exc) from exc
 
     def put_manifest(self, data):
         self._lock_refresh()

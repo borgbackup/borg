@@ -1514,3 +1514,19 @@ def test_check_repair_stops_at_unreadable_archive_metadata(archivers, request, m
     state["failing"] = False
     assert "archive1" in cmd(archiver, "repo-list")
     cmd(archiver, "check", exit_code=0)
+
+
+def test_check_repair_unreadable_manifest_is_not_rebuilt(archivers, request, monkeypatch):
+    # an unreadable manifest is not a missing one: --repair must stop instead of replacing it with
+    # a rebuilt one, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    state = make_store_reads_fail(monkeypatch, lambda name, offset, size: name == "config/manifest")
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "check", "--repair", "--archives-only")
+
+    state["failing"] = False
+    assert "archive1" in cmd(archiver, "repo-list")  # the manifest was left alone
+    cmd(archiver, "check", exit_code=0)

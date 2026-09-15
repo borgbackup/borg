@@ -60,25 +60,22 @@ def get_assert_id_places():
 
 OBJ_MAGIC = b"BORG_OBJ"
 
-# meta_encrypted/data_encrypted are AEAD-authenticated with aad=chunk_id.
-OBJ_VERSION_NO_HEADER_AAD = 0x01
 # meta_encrypted/data_encrypted are AEAD-authenticated with aad=header_aad+slot_tag+chunk_id. header_aad
 # is the header prefix (magic, version, chunk_id; REPOOBJ_HEADER_AAD_SIZE bytes). slot_tag is b"M" for
 # meta_encrypted, b"D" for data_encrypted, binding each ciphertext to its slot. format() writes this version.
 OBJ_VERSION_HEADER_AAD = 0x02
 OBJ_VERSION = OBJ_VERSION_HEADER_AAD
 # Versions accepted by parse() and parse_meta().
-SUPPORTED_OBJ_VERSIONS = (OBJ_VERSION_NO_HEADER_AAD, OBJ_VERSION_HEADER_AAD)
+SUPPORTED_OBJ_VERSIONS = (OBJ_VERSION_HEADER_AAD,)
 
 # Fixed header size per blob: OBJ_MAGIC(8) + version(1) + chunk_id(32) + meta_size(4) + data_size(4)
 REPOOBJ_HEADER_SIZE = 49
 
 # Size of the header prefix used as AEAD AAD (additional authenticated data: authenticated together
-# with the ciphertext, but not itself encrypted) for OBJ_VERSION_HEADER_AAD objects: magic(8) +
-# version(1) + chunk_id(32). meta_size and data_size are excluded, since they are only known after
-# encryption. A change to either changes the ciphertext slice length, so parse(), which reads both
-# slots, fails authentication; parse_meta() reads the metadata slot alone and thus does not see a
-# changed data_size.
+# with the ciphertext, but not itself encrypted): magic(8) + version(1) + chunk_id(32). meta_size and
+# data_size are excluded, since they are only known after encryption. A change to either changes the
+# ciphertext slice length, so parse(), which reads both slots, fails authentication; parse_meta()
+# reads the metadata slot alone and thus does not see a changed data_size.
 REPOOBJ_HEADER_AAD_SIZE = len(OBJ_MAGIC) + 1 + 32
 
 META_AAD_TAG = b"M"
@@ -184,9 +181,9 @@ class RepoObj:
             raise IntegrityError(
                 f"object too small: expected at least {hdr_size + hdr.meta_size} bytes, got {len(obj)}"
             )
-        # header_aad, meta_aad: see OBJ_VERSION_HEADER_AAD above. b"" for OBJ_VERSION_NO_HEADER_AAD.
-        header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE]) if hdr.version == OBJ_VERSION_HEADER_AAD else b""
-        meta_aad = header_aad + META_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
+        # header_aad, meta_aad: see OBJ_VERSION_HEADER_AAD above.
+        header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE])
+        meta_aad = header_aad + META_AAD_TAG
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted, aad=meta_aad)
         meta = msgpack.unpackb(meta_packed)
@@ -233,10 +230,10 @@ class RepoObj:
         overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
         if overall_expected_size != len(obj):
             raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(obj)}")
-        # header_aad, meta_aad: see parse_meta().
-        header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE]) if hdr.version == OBJ_VERSION_HEADER_AAD else b""
-        meta_aad = header_aad + META_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
-        data_aad = header_aad + DATA_AAD_TAG if hdr.version == OBJ_VERSION_HEADER_AAD else header_aad
+        # header_aad, meta_aad, data_aad: see OBJ_VERSION_HEADER_AAD above.
+        header_aad = bytes(obj[:REPOOBJ_HEADER_AAD_SIZE])
+        meta_aad = header_aad + META_AAD_TAG
+        data_aad = header_aad + DATA_AAD_TAG
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted, aad=meta_aad)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
@@ -284,13 +281,11 @@ def object_validator(repo_objs):
     """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
 
     obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
-    computed over the slot itself and over the chunk id, so a wrong meta_size or chunk id fails it.
-    At object version OBJ_VERSION_HEADER_AAD the magic and the version are covered as well (as AAD,
-    additional authenticated data: bytes the tag covers without being part of the ciphertext); at
-    OBJ_VERSION_NO_HEADER_AAD they are not: a wrong magic fails the explicit magic check, and a
-    wrong version fails because the version selects the AAD the slot is parsed with. data_size, the
-    one header field outside the tag at either version, must match csize - the data slot's payload
-    size, recorded in the tagged metadata - plus the key's fixed envelope overhead.
+    computed over the slot itself, over the chunk id and over the header prefix (magic, version,
+    chunk id) as AAD (additional authenticated data: bytes the tag covers without being part of the
+    ciphertext), so a wrong magic, version, chunk id or meta_size fails it. data_size, the one header
+    field outside the tag, must match csize - the data slot's payload size, recorded in the tagged
+    metadata - plus the key's fixed envelope overhead.
 
     In the "none-*" modes the tag is an unkeyed checksum, and in the "authenticated-*" modes it is
     deterministic and binds an object to its chunk id alone. Both therefore accept an object that a

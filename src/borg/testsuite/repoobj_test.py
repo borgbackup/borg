@@ -11,8 +11,6 @@ from ..repoobj import (
     BORG_ASSERT_ID_DEFAULT,
     OBJ_MAGIC,
     OBJ_VERSION,
-    OBJ_VERSION_NO_HEADER_AAD,
-    REPOOBJ_HEADER_SIZE,
     RepoObj,
     object_validator,
 )
@@ -483,29 +481,6 @@ def test_assert_id_configurable_for_authenticated_key(authenticated_key, monkeyp
     for place in ASSERT_ID_PLACES_MANDATORY:  # ... but check --verify-data always verifies
         with pytest.raises(IntegrityError):
             repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
-
-
-def test_version1_object_without_header_aad_still_readable(aead_key):
-    # Builds an OBJ_VERSION_NO_HEADER_AAD object by hand (format() only writes OBJ_VERSION_HEADER_AAD)
-    # and checks that parse()/parse_meta() still decrypt it.
-    repo_objs = RepoObj(aead_key)
-    data = b"foobar" * 10
-    id = repo_objs.id_hash(data)
-    meta = {"type": ROBJ_FILE_STREAM}
-    meta, data_compressed = repo_objs.compressor.compress(meta, data)
-
-    # OBJ_VERSION_NO_HEADER_AAD encoding: aad=chunk_id only, no header bound in.
-    data_encrypted = aead_key.encrypt(id, data_compressed, aad=b"")
-    meta_packed = msgpack.packb(meta)
-    meta_encrypted = aead_key.encrypt(id, meta_packed, aad=b"")
-    hdr = RepoObj.ObjHeader(OBJ_MAGIC, OBJ_VERSION_NO_HEADER_AAD, id, len(meta_encrypted), len(data_encrypted))
-    cdata = RepoObj.obj_header.pack(*hdr) + meta_encrypted + data_encrypted
-    assert len(RepoObj.obj_header.pack(*hdr)) == REPOOBJ_HEADER_SIZE
-
-    got_meta = repo_objs.parse_meta(id, cdata, ro_type=ROBJ_FILE_STREAM)
-    assert got_meta["type"] == ROBJ_FILE_STREAM
-    got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
-    assert got_data == data
 
 
 def validator_input(repo_objs, data):

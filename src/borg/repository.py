@@ -1072,8 +1072,9 @@ class Repository:
 
         This property is the single owner of the in-memory index: get() resolves
         pack locations through it, PackWriter updates it, and the Cache reads it
-        from here rather than building its own.  Built lazily on first access and
-        persisted back to the repo cache at close().
+        from here rather than building its own.  Built lazily on first access, unless a
+        caller installed one through the setter, and persisted back to the repo cache at
+        close().
         """
         if self._chunks is None:
             from .cache import build_chunkindex_from_repo
@@ -1086,9 +1087,11 @@ class Repository:
     @chunks.setter
     def chunks(self, value):
         # The index is normally built lazily; this setter exists for the few callers
-        # that must install a specific index (e.g. wiping the cache, or restoring an
-        # index captured before close()).  To drop a stale index so it rebuilds, do not
-        # assign None here -- call invalidate_chunk_index() instead.
+        # that must install a specific index: wiping the cache, restoring an index
+        # captured before close(), or compact sharing the index it built itself (it
+        # needs the usage flags) so the repository does not build a second one.  To
+        # drop a stale index so it rebuilds, do not assign None here -- call
+        # invalidate_chunk_index() instead.
         self._chunks = value
 
     def invalidate_chunk_index(self):

@@ -953,10 +953,10 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
-        # corrupt-header handling for the lazy .chunks rebuild, set by ArchiveChecker.check() (see
-        # PackReader.iter_headers): a validate callable makes the rebuild resync past a corrupt
-        # object header, drop_corrupt_tail - only set when repairing - makes it index the pack up
-        # to that header and drop the rest. Without either, such a header aborts the rebuild.
+        # corrupt-header handling for the lazy .chunks rebuild (see PackReader.iter_headers): a
+        # validate callable makes the rebuild resync past a corrupt object header, drop_corrupt_tail
+        # makes it index the pack up to that header and drop the rest. Without either, such a header
+        # aborts the rebuild. No caller sets them: ArchiveChecker.check() installs its own index.
         self.chunkindex_validate = None
         self.chunkindex_drop_corrupt_tail = False
         # pack_id -> PackReader holding the whole pack; get_many loads into it, get() reuses it
@@ -1146,7 +1146,7 @@ class Repository:
     @chunks.setter
     def chunks(self, value):
         # The index is normally built lazily; this setter installs a specific index: wiping the
-        # cache, restoring an index captured before close(), or an index compact (it needs the
+        # cache, restoring an index captured before close(), or an index that compact (it needs the
         # usage flags) or check built itself, so the repository does not build a second one.
         # To drop a stale index so it rebuilds, do not assign None here -- call
         # invalidate_chunk_index() instead.
@@ -1155,9 +1155,10 @@ class Repository:
     def invalidate_chunk_index(self):
         """Drop the in-memory chunk index so close() will not persist a stale copy.
 
-        Called when the on-disk chunk index is deleted; the next access to
-        .chunks rebuilds the index from actual repository contents.  PackWriter
-        reads the index through this Repository, so it follows automatically.
+        Called when the on-disk chunk index is deleted, and before a caller builds
+        its own index, so the old one is freed first. The next access to .chunks
+        rebuilds the index from actual repository contents.  PackWriter reads the
+        index through this Repository, so it follows automatically.
         """
         self._chunks = None
 

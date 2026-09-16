@@ -53,7 +53,8 @@ from .manifest import Manifest
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
-from .repository import Repository
+from .hashindex import ChunkIndex, ChunkIndexEntry
+from .repository import Repository, PackReader
 from .repoobj import RepoObj, object_validator
 
 # macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
@@ -2212,9 +2213,24 @@ class ArchiveChecker:
     def __init__(self):
         self.error_found = False
         self.key = None
-        # True once repair drops a defect chunk or writes a new one, i.e. once the chunks index no
-        # longer matches the packs.
+        # True once repair wrote a pack: it stored a chunk or deleted a defect chunk.
         self.chunks_modified = False
+        # ids of the existing packs repair stored (put(), flush()) or wrote by rewriting a pack (delete()).
+        self.written_packs = set()
+
+    def record_stored(self, results):
+        """Add the pack ids in results to written_packs.
+
+        results: the (chunk_id, pack_id, obj_offset, obj_size) tuples Repository.put() or .flush() returns
+        for the packs it stored, or None if it stored no pack.
+        """
+        if results:
+            self.written_packs.update(pack_id for _, pack_id, _, _ in results)
+
+    def create_archive_entry(self, name, id, ts):
+        """Store the pack writer buffer, record the packs it wrote, create the archives directory entry."""
+        self.record_stored(self.repository.flush())
+        self.manifest.archives.create(name, id, ts)
 
     def note_dropped_objects(self):
         # The chunk index rebuild skipped repository content to get past a corrupt object header.
@@ -2273,6 +2289,7 @@ class ArchiveChecker:
             validate = object_validator(self.repo_objs)
         else:
             validate = None
+        assert not repair or validate is not None  # a repair validates every object it indexes
         # store the chunks buffered in the pack writer, so the index below has their pack locations
         # (pack id, offset and size in the pack).
         self.repository.flush()
@@ -2405,9 +2422,14 @@ class ArchiveChecker:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
                         # keeping the other chunks, and removes it from self.chunks, so rebuild_archives
                         # reports the file it belongs to. update_index=False: finish() stores the index
-                        # rebuilt from the packs and clears the invalid marker delete() writes.
-                        self.repository.delete(defect_chunk, update_index=False, validate=validate)
+                        # and clears the invalid marker delete() writes.
+                        # new_pack_id holds the other objects of the old pack, None if there were none.
+                        old_pack_id = self.chunks[defect_chunk].pack_id
+                        new_pack_id, _ = self.repository.delete(defect_chunk, update_index=False, validate=validate)
                         self.chunks_modified = True
+                        self.written_packs.discard(old_pack_id)
+                        if new_pack_id is not None:
+                            self.written_packs.add(new_pack_id)
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
             else:
@@ -2495,7 +2517,7 @@ class ArchiveChecker:
                     self.error_found = True
                     if self.repair:
                         logger.warning(f"Creating archives directory entry for {name} {archive_id_hex}.")
-                        self.manifest.archives.create(name, archive_id, archive.time)
+                        self.create_archive_entry(name, archive_id, archive.time)
                     else:
                         logger.warning(f"Would create archives directory entry for {name} {archive_id_hex}.")
 
@@ -2551,7 +2573,7 @@ class ArchiveChecker:
             # with --repair, store a chunk the repository does not have; put() adds it to self.chunks.
             if self.repair and id_ not in self.chunks:
                 assert cdata is not None
-                self.repository.put(id_, cdata)
+                self.record_stored(self.repository.put(id_, cdata))
                 self.chunks_modified = True
 
         def verify_file_chunks(archive_name, item):
@@ -2761,43 +2783,108 @@ class ArchiveChecker:
                     logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
                     cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
                     add_reference(new_archive_id, len(data), cdata)
-                    self.manifest.archives.create(info.name, new_archive_id, info.ts)
+                    self.create_archive_entry(info.name, new_archive_id, info.ts)
                     if archive_id != new_archive_id:
                         self.manifest.archives.delete_by_id(archive_id)
         finally:
             pi.finish()
             report_missing_chunks()
 
+    def verify_written_packs(self):
+        """Read the object headers of the packs in written_packs and make the chunks index match them.
+
+        put() and delete() compute the index entries of the packs they write without reading the packs.
+        This compares the (chunk_id, obj_offset, obj_size) of each object header in a written pack, read
+        with a validator, with the index entries that name the pack. Each difference is a check finding,
+        logged and fixed in the index:
+
+        - an index entry names an object the pack does not hold: the entry is removed.
+        - the pack holds an object whose chunk id is not indexed: the object is indexed.
+        - the pack does not exist: its index entries are removed.
+
+        An object whose chunk id is indexed at another location is a superseded duplicate, not a finding: a
+        pack delete() wrote can hold one, in a byte range compact_pack copied with no index entry covering it.
+        """
+        pack_ids = sorted(self.written_packs)
+        if not pack_ids:
+            return
+        logger.info(f"Re-reading the packs written by the repair: {len(pack_ids)}.")
+        # (chunk_id, obj_offset, obj_size) of the index entries, per written pack.
+        indexed = {pack_id: set() for pack_id in pack_ids}
+        for chunk_id, entry in self.chunks.iteritems():
+            entries = indexed.get(entry.pack_id)
+            if entries is not None:
+                entries.add((chunk_id, entry.obj_offset, entry.obj_size))
+        validate = object_validator(self.repo_objs)
+        for pack_id in pack_ids:
+            # PackReader reads from the store, which does not refresh the repository lock.
+            self.repository._lock_refresh()
+            pack_hex = bin_to_hex(pack_id)
+            expected = indexed.pop(pack_id)
+            reader = PackReader(self.repository.store, pack_id)
+            # iter_headers() yields nothing for a missing pack: the store reports size 0 for it.
+            if not self.repository.store.info(reader.key).exists:
+                self.error_found = True
+                logger.error(f"pack {pack_hex}: written by the repair, but it is missing. Removing its index entries.")
+                for chunk_id, _, _ in expected:
+                    del self.chunks[chunk_id]
+                continue
+            found = list(reader.iter_headers(validate=validate, on_drop=self.note_dropped_objects))
+            not_found = sorted(expected.difference(found))
+            for chunk_id, _, _ in not_found:
+                del self.chunks[chunk_id]
+            # the loop indexes each unindexed object, so of several unindexed copies of a chunk, the first
+            # is indexed and the others are superseded duplicates.
+            unindexed = []
+            for obj in found:
+                chunk_id, obj_offset, obj_size = obj
+                if obj in expected:
+                    continue
+                if chunk_id in self.chunks:
+                    logger.debug(
+                        f"pack {pack_hex}: {bin_to_hex(chunk_id)} at offset {obj_offset}, {obj_size} bytes: "
+                        "superseded duplicate"
+                    )
+                    continue
+                unindexed.append(obj)
+                # size=0: the object header does not hold the plaintext size.
+                self.chunks[chunk_id] = ChunkIndexEntry(
+                    flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+                )
+            if not (not_found or unindexed):
+                continue
+            self.error_found = True
+            logger.error(
+                f"pack {pack_hex}: the chunks index does not match the pack. Indexed objects not in the pack: "
+                f"{len(not_found)}, objects in the pack with an unindexed chunk id: {len(unindexed)}. "
+                "Fixed the index."
+            )
+            for chunk_id, obj_offset, obj_size in not_found:
+                logger.debug(
+                    f"pack {pack_hex}: {bin_to_hex(chunk_id)} at offset {obj_offset}, {obj_size} bytes: not in pack"
+                )
+            for chunk_id, obj_offset, obj_size in unindexed:
+                logger.debug(
+                    f"pack {pack_hex}: {bin_to_hex(chunk_id)} at offset {obj_offset}, {obj_size} bytes: not indexed"
+                )
+
     def finish(self):
         if self.repair:
-            # flush chunks re-added during repair so their packs are on the store and out of the pack
-            # writer buffer (close() requires an empty buffer, #10055) before we (re)build the index.
-            self.repository.flush()
+            # store the pack writer buffer before the index is written (close() requires an empty buffer, #10055).
+            self.record_stored(self.repository.flush())
             if self.chunks_modified:
-                # the packs changed: rebuild the index from them and store it. The index/ fragments lack
-                # the chunks this repair stored, so the index is invalid until the rebuilt one is stored.
-                # Free the current index first, so only one index is in memory.
+                # the index/ fragments do not have the chunks this repair stored.
                 write_chunkindex_invalid(self.repository)
-                self.repository.invalidate_chunk_index()
-                self.chunks = None
-                logger.info("Rebuilding and writing the repository chunks index.")
-                build_chunkindex_from_repo(
-                    self.repository,
-                    slow_rebuild=True,
-                    validate=object_validator(self.repo_objs),
-                    on_drop=self.note_dropped_objects,
-                    write_immediately=True,
-                )
-            else:
-                # the packs are unchanged, so the index still matches them: persist it as is.
-                logger.info("Writing the rebuilt repository chunks index.")
-                write_chunkindex_to_repo(
-                    self.repository, self.chunks, incremental=False, clear=False, force_write=True, delete_other=True
-                )
+                self.verify_written_packs()
+            logger.info("Writing the rebuilt repository chunks index.")
+            write_chunkindex_to_repo(
+                self.repository, self.chunks, incremental=False, clear=False, force_write=True, delete_other=True
+            )
+            # close() persists the in-memory index: drop it, the stored one is current.
+            self.repository.invalidate_chunk_index()
+            self.chunks = None
             # the stored index matches the packs: clear the invalid marker.
             delete_chunkindex_invalid(self.repository)
-            # drop the in-memory index so close() does not persist it over the index just written.
-            self.repository.invalidate_chunk_index()
 
 
 class ArchiveRecreater:

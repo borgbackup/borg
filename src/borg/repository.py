@@ -1145,11 +1145,10 @@ class Repository:
 
     @chunks.setter
     def chunks(self, value):
-        # The index is normally built lazily; this setter exists for the few callers
-        # that must install a specific index: wiping the cache, restoring an index
-        # captured before close(), or compact sharing the index it built itself (it
-        # needs the usage flags) so the repository does not build a second one.  To
-        # drop a stale index so it rebuilds, do not assign None here -- call
+        # The index is normally built lazily; this setter installs a specific index: wiping the
+        # cache, restoring an index captured before close(), or an index compact (it needs the
+        # usage flags) or check built itself, so the repository does not build a second one.
+        # To drop a stale index so it rebuilds, do not assign None here -- call
         # invalidate_chunk_index() instead.
         self._chunks = value
 

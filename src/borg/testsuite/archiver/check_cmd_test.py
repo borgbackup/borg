@@ -465,11 +465,15 @@ def test_missing_archive_metadata(archivers, request):
     cmd(archiver, "check", exit_code=0)
 
 
+# checker_builds: per index build in ArchiveChecker, whether repository.chunks was loaded at that time.
+# A full check without --repair uses the index the repository check loaded, --repair also builds in finish().
 @pytest.mark.parametrize(
-    "args, exit_code", [(["--archives-only"], 1), ([], 1), (["--repair"], 0)], ids=["archives-only", "full", "repair"]
+    "args, exit_code, checker_builds",
+    [(["--archives-only"], 1, [False]), ([], 1, []), (["--repair"], 0, [False, False])],
+    ids=["archives-only", "full", "repair"],
 )
-def test_check_holds_a_single_chunk_index(archiver, monkeypatch, args, exit_code):
-    """check has at most one chunk index in memory: the repository uses the index the checker builds."""
+def test_check_holds_a_single_chunk_index(archiver, monkeypatch, args, exit_code, checker_builds):
+    """check has at most one chunk index in memory: the repository and the checker use the same index."""
     # local-only: this patches in-process archive and repository internals.
     check_cmd_setup(archiver)
     # with an item metadata chunk missing, --repair stores a new item metadata stream.
@@ -477,7 +481,7 @@ def test_check_holds_a_single_chunk_index(archiver, monkeypatch, args, exit_code
     with repository:
         repository.delete(archive.item_ids[0], validate=None)
 
-    loaded_at_build = []  # per checker index build: whether repository.chunks was loaded at that time
+    loaded_at_build = []
     real_build = archive_module.build_chunkindex_from_repo
 
     def build_chunkindex_from_repo(repository, **kwargs):
@@ -505,8 +509,7 @@ def test_check_holds_a_single_chunk_index(archiver, monkeypatch, args, exit_code
     monkeypatch.setattr(ArchiveChecker, "rebuild_archives", rebuild_archives)
     cmd(archiver, "check", *args, exit_code=exit_code)
 
-    # builds: in check(), and with --repair also in finish().
-    assert loaded_at_build == ([False, False] if "--repair" in args else [False])
+    assert loaded_at_build == checker_builds
     assert same_index == [True]
     assert repository_builds == 0
     if "--repair" in args:

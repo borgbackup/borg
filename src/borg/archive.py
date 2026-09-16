@@ -2274,29 +2274,34 @@ class ArchiveChecker:
             validate = object_validator(self.repo_objs)
         else:
             validate = None
-        # free the chunk index the repository check may have loaded, so only one is in memory.
-        self.repository.invalidate_chunk_index()
-        self.chunks = build_chunkindex_from_repo(
-            self.repository,
-            slow_rebuild=repair,
-            validate=validate,
-            # dropped content is a check finding, with or without --repair.
-            on_drop=self.note_dropped_objects,
-            # without a validator the rebuild can not resync past a corrupt object header. --repair
-            # drops the rest of that pack to get on with the repair; without --repair the rebuild
-            # raises, so an index missing objects that are still there can not make the check report
-            # them as gone.
-            drop_corrupt_tail=repair,
-            write_immediately=False,
-        )
-        if repair:
-            # the rebuild from the packs sets F_NEW (entry not stored in the index/ fragments yet) on every
-            # entry. finish() stores the complete index and deletes the old fragments. Clear F_NEW, so
-            # Repository.close() does not store the entries again as an extra fragment.
-            self.chunks.clear_new()
-        # the repository uses this index: get() looks up pack locations in it, put() adds entries to
-        # it, delete() removes entries from it.
-        self.repository.chunks = self.chunks
+        if not repair and self.repository.is_chunk_index_loaded:
+            # the repository check loaded the index from the index/ fragments: use it.
+            self.chunks = self.repository.chunks
+        else:
+            # build the index, from the packs with --repair. Free the index the repository check may
+            # have loaded first, so only one is in memory.
+            self.repository.invalidate_chunk_index()
+            self.chunks = build_chunkindex_from_repo(
+                self.repository,
+                slow_rebuild=repair,
+                validate=validate,
+                # dropped content is a check finding, with or without --repair.
+                on_drop=self.note_dropped_objects,
+                # without a validator the rebuild can not resync past a corrupt object header. --repair
+                # drops the rest of that pack to get on with the repair; without --repair the rebuild
+                # raises, so an index missing objects that are still there can not make the check report
+                # them as gone.
+                drop_corrupt_tail=repair,
+                write_immediately=False,
+            )
+            if repair:
+                # the rebuild from the packs sets F_NEW (entry not stored in the index/ fragments yet) on
+                # every entry. Clear it, so Repository.close() does not store the whole index as a new
+                # fragment if the check stops before finish().
+                self.chunks.clear_new()
+            # the repository uses this index: get() looks up pack locations in it, put() adds entries to
+            # it, delete() removes entries from it.
+            self.repository.chunks = self.chunks
         # corrupt object header handling for a rebuild of repository.chunks after invalidate_chunk_index():
         # the same as for the rebuild above.
         self.repository.chunkindex_validate = validate
@@ -2576,6 +2581,7 @@ class ArchiveChecker:
             return id_
 
         def add_reference(id_, size, cdata):
+            # size: unused, archive_put_items passes it.
             # --repair: store a chunk the repository does not have. put() adds it to self.chunks.
             if self.repair and id_ not in self.chunks:
                 assert cdata is not None

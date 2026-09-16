@@ -1290,10 +1290,15 @@ class Repository:
         return self._chunks is not None
 
     def flush(self):
-        """Flush any buffered pack writer chunks."""
+        """Store the pack writer buffer as a pack, after waiting for the pack the background store-thread is storing.
+
+        Returns the (chunk_id, pack_id, obj_offset, obj_size) tuples of the objects in the packs this call
+        stored or waited for, or None if there were none.
+        """
         if self._pack_writer is not None:
             self._lock_refresh()
-            self._pack_writer.flush()  # PackWriter updates _chunks internally
+            return self._pack_writer.flush()  # PackWriter updates _chunks internally
+        return None
 
     def close(self, *, aborting=False):
         """Close the repository: join an in-flight pack store, persist the chunk index, tear down.
@@ -1376,12 +1381,10 @@ class Repository:
         continuing. A read-only check never rebuilds the index: reading every pack to do so would be
         far too slow and expensive for a routine (e.g. cron) check. With repair=True and a corrupt
         index, and if every pack is intact, the index is rebuilt from the packs' object headers and
-        persisted; on a full check the archives phase rebuilds and re-persists it afterwards, see
-        ArchiveChecker.finish. Packs are verified by the store hash, which is content-addressing rather
-        than a MAC, so that check detects accidental corruption but not tampering; the rebuild therefore
-        checks every object with validate, see below, refs #9901, #10026. If any pack is corrupt the index
-        is left unchanged, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs,
-        refs #9696.
+        persisted. Packs are verified by the store hash, which is content-addressing rather than a MAC, so
+        that check detects accidental corruption but not tampering; the rebuild therefore checks every
+        object with validate, see below, refs #9901, #10026. If any pack is corrupt the index is left
+        unchanged, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs, refs #9696.
 
         A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
         it. The record clears at the check that finds the pack intact again or gone (removed by
@@ -1820,9 +1823,12 @@ class Repository:
         Raises PermissionDenied before any store change unless the repo permissions grant write and delete
         on packs/ and index/ (see assert_writable).
 
+        validate: passed to compact_pack.
         update_index: True: store the full chunk index and delete the invalid marker. False: update the
             in-memory index only; the marker stays until the index is stored and the marker deleted.
-        validate: passed to compact_pack.
+
+        Returns compact_pack's (new_pack_id, dropped_bytes): the id of the pack holding the other objects
+        of the old pack (None if there were none), and the number of bytes the rewrite dropped.
         """
         from .cache import write_chunkindex_to_repo, write_chunkindex_invalid, delete_chunkindex_invalid
 
@@ -1835,7 +1841,7 @@ class Repository:
         # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
-        self.compact_pack(
+        result = self.compact_pack(
             pack_id,
             keep_ids=keep_ids,
             drop_ids={id},
@@ -1847,6 +1853,7 @@ class Repository:
             # the removal for the next borg process.
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
             delete_chunkindex_invalid(self)
+        return result
 
     def compact_pack(
         self, pack_id, *, keep_ids: set, drop_ids: set, validate, chunks=None, before_old_pack_delete=None

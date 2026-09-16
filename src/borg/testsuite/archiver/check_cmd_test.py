@@ -219,13 +219,12 @@ def test_check_repair_interrupt_during_index_rebuild(archivers, request, monkeyp
     cmd(archiver, "check", exit_code=0)
 
 
-def test_check_repair_finish_completes_index_rebuild_after_interrupt(archiver, monkeypatch, capsys):
-    """finish() runs with sig_int already set, #9850: its chunk index rebuild walks every pack and stores
-    an index that matches them, so the invalid marker is cleared and a plain check passes afterwards.
-    It warns that this rebuild can not be interrupted."""
+def test_check_repair_finish_completes_after_interrupt(archiver, monkeypatch):
+    """finish() runs with sig_int already set, #9850: it re-reads the packs the repair wrote and stores an
+    index that matches them, so the invalid marker is cleared and a plain check passes afterwards."""
     # local-only: this patches in-process internals, including check_cmd_setup's small ChunkBuffer.BUFFER_SIZE.
     # With the default buffer size an archive's item metadata is a single chunk, which the repair rewrites to
-    # the same id, so it stores nothing and finish() skips its index rebuild.
+    # the same id, so it stores nothing and finish() has no written pack to re-read.
     check_cmd_setup(archiver)  # two archives
 
     orig_create = Archives.create
@@ -267,10 +266,10 @@ def test_check_repair_finish_completes_index_rebuild_after_interrupt(archiver, m
     monkeypatch.setattr(ArchiveChecker, "finish", orig_finish)
     monkeypatch.setattr(PackReader, "iter_headers", orig_iter_headers)
 
-    # the repair stored re-packed item metadata chunks, so finish() takes its rebuild branch.
+    # the repair stored re-packed item metadata chunks, so finish() re-reads the packs it wrote.
     assert checker.chunks_modified is True
-    assert len(packs_read_in_finish) == pack_count
-    assert "This reads every pack and can not be interrupted." in capsys.readouterr().err
+    assert set(packs_read_in_finish) == checker.written_packs
+    assert 0 < len(packs_read_in_finish) < pack_count  # not every pack of the repository
     with Repository(archiver.repository_path, exclusive=True) as repository:
         assert not chunkindex_is_invalid(repository)  # finish() reached delete_chunkindex_invalid()
     cmd(archiver, "check", exit_code=0)  # the stored index matches the packs
@@ -606,10 +605,11 @@ def test_missing_archive_metadata(archivers, request):
 
 
 # checker_builds: per index build in ArchiveChecker, whether repository.chunks was loaded at that time.
-# A full check without --repair uses the index the repository check loaded, --repair also builds in finish().
+# A full check without --repair uses the index the repository check loaded. --repair builds once: finish()
+# re-reads only the packs the repair wrote, see test_repair_finish_reads_only_the_packs_put_wrote.
 @pytest.mark.parametrize(
     "args, exit_code, checker_builds",
-    [(["--archives-only"], 1, [False]), ([], 1, []), (["--repair"], 0, [False, False])],
+    [(["--archives-only"], 1, [False]), ([], 1, []), (["--repair"], 0, [False])],
     ids=["archives-only", "full", "repair"],
 )
 def test_check_holds_a_single_chunk_index(archiver, monkeypatch, args, exit_code, checker_builds):
@@ -748,24 +748,21 @@ def test_check_repair_verify_data_aborted_marks_the_index_invalid(archiver, monk
             repository.get(chunk_id)
 
 
-def test_check_repair_stopped_in_the_index_rebuild_marks_the_index_invalid(archiver, monkeypatch):
-    """A --repair check that stops in the index rebuild of finish() leaves the chunk index marked invalid.
+def test_check_repair_stopped_in_the_index_store_marks_the_index_invalid(archiver, monkeypatch):
+    """A --repair check that stops while finish() stores the chunk index leaves it marked invalid.
 
     The repair stored a new item metadata stream and new archive metadata, which the index/ fragments do not
     have. The marker makes the next use rebuild the index from the packs, which have them.
     """
     delete_first_item_chunk(archiver)
-    real_build = archive_module.build_chunkindex_from_repo
 
-    def build_chunkindex_from_repo(repository, **kwargs):
-        if kwargs.get("write_immediately"):  # the rebuild in finish()
-            raise Error("stopped in the index rebuild")
-        return real_build(repository, **kwargs)
+    def write_chunkindex_to_repo(repository, chunks, **kwargs):
+        raise Error("stopped in the index store")
 
     with monkeypatch.context() as m:
-        m.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
+        m.setattr(archive_module, "write_chunkindex_to_repo", write_chunkindex_to_repo)
         with open_repository(archiver) as repository:
-            with pytest.raises(Error, match="stopped in the index rebuild"):
+            with pytest.raises(Error, match="stopped in the index store"):
                 ArchiveChecker().check(repository, repair=True, sort_by="ts", format="{archive}")
 
     with open_repository(archiver) as repository:
@@ -1179,7 +1176,7 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
         checker.key = checker.make_key(repository)
         checker.repo_objs = RepoObj(checker.key)
         checker.manifest = Manifest.load(repository, key=checker.key)
-        # re-adding a chunk makes the chunks index no longer match the packs, so finish() rebuilds it.
+        checker.chunks = repository.chunks
         checker.chunks_modified = True
 
         # a chunk re-added during repair, buffered in the pack writer:
@@ -1189,6 +1186,308 @@ def test_repair_finish_flushes_pack_writer(archivers, request):
 
         checker.finish()
         assert not repository._pack_writer._pieces  # finish() stored it
+
+
+def record_finish_walks(monkeypatch):
+    """Return a list that collects the id of every pack whose object headers finish() walks.
+
+    ArchiveChecker.verify_written_packs walks a pack with PackReader.iter_headers.
+    """
+    walked = []
+    in_finish = False
+    real_finish = ArchiveChecker.finish
+    real_iter_headers = PackReader.iter_headers
+
+    def finish(self):
+        nonlocal in_finish
+        in_finish = True
+        try:
+            return real_finish(self)
+        finally:
+            in_finish = False
+
+    def iter_headers(self, *args, **kwargs):
+        if in_finish:
+            walked.append(self.pack_id)
+        return real_iter_headers(self, *args, **kwargs)
+
+    monkeypatch.setattr(ArchiveChecker, "finish", finish)
+    monkeypatch.setattr(PackReader, "iter_headers", iter_headers)
+    return walked
+
+
+def list_packs(archiver):
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        return {info.name for info in repository.store_list("packs")}
+
+
+def put_objects_in_one_pack(archiver, contents):
+    """Store an encrypted repo object per contents entry, all in one new pack no archive references.
+
+    Returns the object ids, in pack order, and the pack id.
+    """
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        manifest = Manifest.load(repository)
+        ids = []
+        for data in contents:
+            chunk_id = manifest.key.id_hash(data)
+            repository.put(chunk_id, manifest.repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM))
+            ids.append(chunk_id)
+        repository.flush()
+        entries = [repository.chunks[chunk_id] for chunk_id in ids]
+    assert {entry.pack_id for entry in entries} == {entries[0].pack_id}
+    assert [entry.obj_offset for entry in entries] == sorted(entry.obj_offset for entry in entries)
+    return ids, entries[0].pack_id
+
+
+def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
+    """--verify-data --repair removes a defect chunk; finish() re-reads only the pack delete() wrote."""
+    # local-only: this patches in-process archive and repository internals.
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "2")  # many packs, so a full walk would be noticed
+    check_cmd_setup(archiver)
+    # a defect chunk that no archive references, so the check after the repair finds nothing missing.
+    # delete() rewrites its pack, keeping the bystander.
+    (bystander_id, defect_id), pack_id = put_objects_in_one_pack(archiver, [b"bystander", b"defect"])
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        corrupt_chunk_on_disk(repository, defect_id)
+    packs_before = list_packs(archiver)
+    assert len(packs_before) > 10
+
+    walked = record_finish_walks(monkeypatch)
+    # the BUFFER_SIZE check_cmd_setup used: rebuild_archives re-chunks the item metadata into the same
+    # chunks, so it stores nothing and the rewritten pack is the only pack the repair writes.
+    with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
+        output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
+    assert f"{bin_to_hex(defect_id)}, integrity error" in output
+
+    new_packs = list_packs(archiver) - packs_before
+    assert packs_before - list_packs(archiver) == {bin_to_hex(pack_id)}
+    assert len(new_packs) == 1
+    assert [bin_to_hex(pack_id) for pack_id in walked] == list(new_packs)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert defect_id not in repository.chunks
+        assert bin_to_hex(repository.chunks[bystander_id].pack_id) in new_packs
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_repair_finish_reads_no_pack_after_deleting_a_whole_pack(archiver, monkeypatch):
+    """--verify-data --repair removes a defect chunk that is alone in its pack; finish() re-reads no pack.
+
+    delete() drops the whole pack and writes no new one, so the repair wrote no pack.
+    """
+    # local-only: this patches in-process archive and repository internals.
+    check_cmd_setup(archiver)
+    (defect_id,), pack_id = put_objects_in_one_pack(archiver, [b"defect"])
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        corrupt_chunk_on_disk(repository, defect_id)
+    packs_before = list_packs(archiver)
+
+    walked = record_finish_walks(monkeypatch)
+    findings = record_verify_findings(monkeypatch)
+    with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):  # see test_repair_finish_reads_only_the_rewritten_pack
+        output = cmd(archiver, "check", "--repair", "--verify-data", "--info", exit_code=0)
+    assert f"{bin_to_hex(defect_id)}, integrity error" in output
+    assert findings == [False]
+    assert "Re-reading the packs written by the repair" not in output
+    assert walked == []
+    assert list_packs(archiver) == packs_before - {bin_to_hex(pack_id)}
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert defect_id not in repository.chunks
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_repair_finish_reads_only_the_packs_put_wrote(archiver, monkeypatch):
+    """--repair re-stores a missing item metadata chunk; finish() re-reads only the packs put() wrote."""
+    # local-only: this patches in-process archive and repository internals.
+    # a pack per object, so every put() after the first returns the pack the background store-thread
+    # stored before it.
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1")
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        repository.delete(archive.item_ids[0], validate=None)
+    packs_before = list_packs(archiver)
+
+    walked = record_finish_walks(monkeypatch)
+    findings = record_verify_findings(monkeypatch)
+    cmd(archiver, "check", "--repair", exit_code=0)
+    assert findings == [False]
+
+    new_packs = list_packs(archiver) - packs_before
+    assert new_packs
+    assert sorted(bin_to_hex(pack_id) for pack_id in walked) == sorted(new_packs)  # each one once
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_repair_finish_reads_the_pack_its_flush_stores(archiver, monkeypatch):
+    """finish() re-reads the pack its own flush stores, e.g. for chunks buffered when a Ctrl-C stopped the repair."""
+    # local-only: this patches in-process archive and repository internals.
+    check_cmd_setup(archiver)
+    walked = record_finish_walks(monkeypatch)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        checker = ArchiveChecker()
+        checker.repair = True
+        checker.repository = repository
+        checker.key = checker.make_key(repository)
+        checker.repo_objs = RepoObj(checker.key)
+        checker.manifest = Manifest.load(repository, key=checker.key)
+        checker.chunks = repository.chunks
+        checker.chunks_modified = True
+        data = b"repaired"
+        chunk_id = checker.key.id_hash(data)
+        assert repository.put(chunk_id, checker.repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)) is None
+        checker.finish()
+        assert not checker.error_found
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert walked == [repository.chunks[chunk_id].pack_id]
+
+
+def test_repair_finish_reads_a_rewritten_pack_no_index_entry_names(archiver, monkeypatch):
+    """finish() re-reads a pack delete() wrote, also when no index entry names that pack.
+
+    The pack holds an object with a corrupt header, which the rebuild in check() drops, and a defect
+    chunk, which --verify-data --repair deletes. compact_pack copies the dropped object's bytes (no
+    index entry covers them) into the new pack, so the new pack exists, but no index entry points at it.
+    """
+    # local-only: this patches in-process archive and repository internals.
+    check_cmd_setup(archiver)
+    (dropped_id, defect_id), pack_id = put_objects_in_one_pack(archiver, [b"dropped", b"defect"])
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        corrupt_chunk_on_disk(repository, defect_id)  # the payload: the header still validates
+        key = "packs/" + bin_to_hex(pack_id)
+        dropped = repository.chunks[dropped_id]
+        repository.store_store(key, corrupt(repository.store_load(key), dropped.obj_offset))  # the magic
+    packs_before = list_packs(archiver)
+
+    walked = record_finish_walks(monkeypatch)
+    with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):  # see test_repair_finish_reads_only_the_rewritten_pack
+        output = cmd(archiver, "check", "--archives-only", "--repair", "--verify-data", "--debug", exit_code=0)
+    assert "no object header at offset 0" in output
+    assert f"{bin_to_hex(defect_id)}, integrity error" in output
+
+    assert packs_before - list_packs(archiver) == {bin_to_hex(pack_id)}
+    new_packs = list_packs(archiver) - packs_before
+    assert len(new_packs) == 1
+    assert [bin_to_hex(pack_id) for pack_id in walked] == list(new_packs)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert not any(bin_to_hex(entry.pack_id) in new_packs for _, entry in repository.chunks.iteritems())
+
+
+def test_repair_finish_accepts_a_superseded_duplicate_in_a_rewritten_pack(archiver, monkeypatch):
+    """A superseded duplicate that delete() copies into the new pack is not a finding of finish().
+
+    The pack holds an object with a corrupt header, two copies of one chunk and a defect chunk. The
+    rebuild in check() drops the first object and indexes the second copy. compact_pack copies the bytes
+    before the second copy, which no index entry covers, into the new pack: its search for superseded
+    duplicates there stops at the corrupt header. So the new pack holds both copies, the index names
+    only the second.
+    """
+    # local-only: this patches in-process archive and repository internals.
+    check_cmd_setup(archiver)
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "4")  # the four objects below go into one pack
+    (dropped_id, dup_id, _, defect_id), pack_id = put_objects_in_one_pack(
+        archiver, [b"dropped", b"duplicate", b"duplicate", b"defect"]
+    )
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        corrupt_chunk_on_disk(repository, defect_id)  # the payload: the header still validates
+        key = "packs/" + bin_to_hex(pack_id)
+        dropped = repository.chunks[dropped_id]
+        repository.store_store(key, corrupt(repository.store_load(key), dropped.obj_offset))  # the magic
+
+    walked = record_finish_walks(monkeypatch)
+    with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):  # see test_repair_finish_reads_only_the_rewritten_pack
+        output = cmd(archiver, "check", "--archives-only", "--repair", "--verify-data", "--debug", exit_code=0)
+    assert f"{bin_to_hex(defect_id)}, integrity error" in output
+    assert "in a gap, keeping the remaining" in output
+    assert len(walked) == 1
+    assert "the chunks index does not match the pack" not in output
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        entry = repository.chunks[dup_id]
+        assert entry.pack_id == walked[0]
+        # the second copy: the first one starts where the dropped object ends.
+        assert entry.obj_offset > dropped.obj_size
+    cmd(archiver, "check", exit_code=0)
+
+
+def record_verify_findings(monkeypatch, tamper=None):
+    """Return a list that collects, per verify_written_packs call, whether that call found a problem.
+
+    tamper(checker) runs right before the call. The problems found before it (e.g. the damage the
+    repair fixed) stay recorded in checker.error_found, but do not count for the call.
+    """
+    findings = []
+    real_verify = ArchiveChecker.verify_written_packs
+
+    def verify_written_packs(self):
+        if tamper is not None:
+            tamper(self)
+        error_found, self.error_found = self.error_found, False
+        try:
+            return real_verify(self)
+        finally:
+            findings.append(self.error_found)
+            self.error_found = self.error_found or error_found
+
+    monkeypatch.setattr(ArchiveChecker, "verify_written_packs", verify_written_packs)
+    return findings
+
+
+def test_repair_finish_fixes_a_wrong_index_entry_for_a_written_pack(archiver, monkeypatch):
+    """finish() compares the written packs with their index entries, reports a difference and fixes it."""
+    # local-only: this patches in-process archive and repository internals.
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        repository.delete(archive.item_ids[0], validate=None)
+
+    tampered = {}
+
+    def tamper(checker):
+        # an index entry with a wrong offset, as a bug in the offset arithmetic would make one.
+        pack_id = min(checker.written_packs)
+        chunk_id, entry = next((cid, e) for cid, e in checker.chunks.iteritems() if e.pack_id == pack_id)
+        checker.chunks[chunk_id] = entry._replace(obj_offset=entry.obj_offset + 1)
+        tampered[chunk_id] = entry
+
+    findings = record_verify_findings(monkeypatch, tamper)
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert findings == [True]
+    ((chunk_id, entry),) = tampered.items()
+    assert f"pack {bin_to_hex(entry.pack_id)}: the chunks index does not match the pack" in output
+    assert "Indexed objects not in the pack: 1, objects in the pack with an unindexed chunk id: 1." in output
+    assert "Archive consistency check complete, problems found." in output
+
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        stored = repository.chunks[chunk_id]
+        assert (stored.pack_id, stored.obj_offset, stored.obj_size) == (entry.pack_id, entry.obj_offset, entry.obj_size)
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_repair_finish_reports_a_missing_written_pack(archiver, monkeypatch):
+    """finish() reports a written pack that is gone and removes the index entries that name it."""
+    # local-only: this patches in-process archive and repository internals.
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        repository.delete(archive.item_ids[0], validate=None)
+
+    removed = []
+
+    def tamper(checker):
+        # a written pack that vanished, as a store losing it would make it.
+        pack_id = min(checker.written_packs)
+        checker.repository.store_delete("packs/" + bin_to_hex(pack_id))
+        removed.append(pack_id)
+
+    findings = record_verify_findings(monkeypatch, tamper)
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert findings == [True]
+    (pack_id,) = removed
+    assert f"pack {bin_to_hex(pack_id)}: written by the repair, but it is missing." in output
+    assert "the chunks index does not match the pack" not in output
+    assert "Archive consistency check complete, problems found." in output
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        assert not any(entry.pack_id == pack_id for _, entry in repository.chunks.iteritems())
 
 
 @pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "authenticated-sha256"]])

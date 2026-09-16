@@ -421,6 +421,18 @@ def test_read_data(repo_fixtures, request):
         assert repository.get(H(0), read_data=False) == chunk_short
 
 
+def test_flush_returns_the_stored_objects(repository):
+    assert repository.flush() is None  # not opened, no pack writer
+    with repository:
+        assert repository.flush() is None  # nothing buffered
+        repository.put(H(0), fchunk(b"foo"))
+        ((chunk_id, pack_id, obj_offset, obj_size),) = repository.flush()
+        entry = repository.chunks[H(0)]
+        assert (chunk_id, pack_id, obj_offset, obj_size) == (H(0), entry.pack_id, entry.obj_offset, entry.obj_size)
+        assert repository.flush() is None
+    assert repository.flush() is None  # closed
+
+
 def test_consistency(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))

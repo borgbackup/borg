@@ -222,9 +222,9 @@ class CheckMixIn:
         ``borg check`` rebuilds the chunk index from the packs when ``--repair`` is given or when
         the stored index cannot be used. Ctrl-C stops that rebuild after the current object and
         discards the partial index: it lacks chunks that are still in the repository, so the check
-        would report them as lost. After a ``--repair`` that stored or deleted chunks, borg rebuilds and
-        stores the chunk index once more; that rebuild always runs to completion, also after a
-        Ctrl-C, and reads every pack.
+        would report them as lost. After a ``--repair`` that stored or deleted chunks, borg re-reads the
+        packs the repair wrote, makes the chunk index match them and stores it; that always runs to
+        completion, also after a Ctrl-C.
 
         About repair mode
         +++++++++++++++++

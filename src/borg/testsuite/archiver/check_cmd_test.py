@@ -6,13 +6,14 @@ from unittest.mock import patch
 
 import pytest
 
-from ...crypto.key import STORE_HASH_NAME
+from ...crypto.key import store_hash, STORE_HASH_NAME
 from ... import archive as archive_module
 from ...archive import Archive, ArchiveChecker, ChunkBuffer
 from ...cache import Cache, delete_chunkindex_from_repo
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
 from ...helpers import BackupDamagedChunksError
+from ...helpers.passphrase import PassphraseWrong
 from ...item import Item
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
@@ -624,6 +625,56 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request):
     assert "archive1" in cmd(archiver, "repo-list")  # and remains usable
 
 
+def tamper_object_keeping_pack_name(repository):
+    """Flip a byte in the metadata slot of the 2nd object of a pack holding more than 2 objects, and store
+    the pack under the store hash of its new content, so its content still matches its name. Corrupt
+    every index fragment. Return the ids of the changed object and of the object after it.
+    """
+    by_pack = {}
+    for chunk_id, entry in repository.chunks.iteritems():
+        by_pack.setdefault(entry.pack_id, []).append((entry.obj_offset, chunk_id))
+    pack_id, objects = next((p, sorted(o)) for p, o in by_pack.items() if len(o) > 2)
+    (offset, tampered_id), (_, neighbour_id) = objects[1], objects[2]
+    old_name = "packs/" + bin_to_hex(pack_id)
+    data = corrupt(repository.store_load(old_name), offset + RepoObj.obj_header.size)
+    repository.store_store("packs/" + store_hash(data).hexdigest(), data)
+    repository.store_delete(old_name)
+    for info in repository.store_list("index"):
+        name = f"index/{info.name}"
+        repository.store_store(name, corrupt(repository.store_load(name), 0))
+    return tampered_id, neighbour_id
+
+
+def test_check_repository_only_repair_validates_index_rebuild(archivers, request):
+    """--repository-only --repair leaves an object that fails validation out of the index (#9901)."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        tampered_id, neighbour_id = tamper_object_keeping_pack_name(repository)
+    output = cmd(archiver, "check", "-v", "--repository-only", "--repair", exit_code=1)
+    assert "does not authenticate" in output
+    assert "continuing at the object at offset" in output
+    assert "index rebuilt without pack byte range(s) it could not authenticate" in output
+    with Repository(archiver.repository_location) as repository:
+        assert tampered_id not in repository.chunks
+        assert neighbour_id in repository.chunks
+
+
+def test_check_repository_only_repair_aborts_on_wrong_passphrase(archivers, request, monkeypatch):
+    """--repair aborts on a wrong passphrase (#9901)."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        tamper_object_keeping_pack_name(repository)
+    monkeypatch.setenv("BORG_PASSPHRASE", "definitely-not-the-passphrase")
+    with pytest.raises(PassphraseWrong):
+        cmd(archiver, "check", "-v", "--repository-only", "--repair")
+
+
 @pytest.mark.skip(reason="TODO: repair does not yet rewrite store-corrupted packs, refs #8572")
 def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
@@ -772,62 +823,22 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
     assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
 
 
-def test_repair_without_the_key_rebuilds_without_validating(archivers, request, monkeypatch):
-    """--repair that can not read the key says so and rebuilds the chunks index without validating.
-
-    make_key gives up with an IntegrityError when the manifest yields no key, which a badly damaged
-    repository can do. The rebuild then walks the object headers alone, and a pack with a corrupt
-    object header is indexed up to that header, the rest of it dropped.
-    """
+def test_check_repair_validates_index_rebuild(archivers, request):
+    """--repair leaves an object that fails validation out of the index and keeps the object after it (#9901)."""
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() != "local":
-        pytest.skip("patches in-process archive internals")
+        pytest.skip("inspects the store directly")
     check_cmd_setup(archiver)
-
-    # two objects no archive references: they go into a pack of their own, so the damage below
-    # stays out of the objects the check reads back.
-    kept_id = b"kept-chunk".ljust(32, b".")  # object ids are 32 bytes long
-    damaged_id = b"damaged-chunk".ljust(32, b".")
     with Repository(archiver.repository_location, exclusive=True) as repository:
-        repository.put(kept_id, fchunk(b"kept", chunk_id=kept_id))
-        repository.put(damaged_id, fchunk(b"damaged", chunk_id=damaged_id))
-        repository.flush()
-    with Repository(archiver.repository_location, exclusive=True) as repository:
-        kept, damaged = repository.chunks[kept_id], repository.chunks[damaged_id]
-        assert kept.pack_id == damaged.pack_id and kept.obj_offset < damaged.obj_offset
-        damaged_offset = damaged.obj_offset
-        key = "packs/" + bin_to_hex(damaged.pack_id)
-        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
-
-    real_make_key = ArchiveChecker.make_key
-
-    def make_key(self, repository, manifest_only=False):
-        if manifest_only:  # the read that yields the validator's key; the later full read succeeds
-            raise IntegrityError("no key")
-        return real_make_key(self, repository, manifest_only=manifest_only)
-
-    real_build = archive_module.build_chunkindex_from_repo
-    validators = []
-    indexes = []
-
-    def build_chunkindex_from_repo(repository, **kwargs):
-        validators.append(kwargs.get("validate"))
-        index = real_build(repository, **kwargs)
-        indexes.append(index)
-        return index
-
-    monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
-    monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
-    output = cmd(archiver, "check", "--repair", exit_code=0)
-    assert "Could not read the key (" in output
-    assert validators[0] is None  # the rebuild got no validator, so it walked the headers alone
-    assert f"no object header at offset {damaged_offset}, no validator to resync with" in output
-    assert "Archive consistency check complete, problems found." in output  # the drop is a problem
-    # indexes[0] is the keyless rebuild: it indexed the pack up to the damaged header. The objects
-    # put above are not encrypted repo objects, so the validating rebuild in finish() drops them.
-    assert kept_id in indexes[0]
-    assert damaged_id not in indexes[0]
-    cmd(archiver, "list", "archive1", exit_code=0)  # the archives are still readable
+        tampered_id, neighbour_id = tamper_object_keeping_pack_name(repository)
+    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+    assert "does not authenticate" in output
+    assert "continuing at the object at offset" in output
+    assert "index rebuilt without pack byte range(s) it could not authenticate" in output
+    assert "Archive consistency check complete, problems found." in output
+    with Repository(archiver.repository_location) as repository:
+        assert tampered_id not in repository.chunks
+        assert neighbour_id in repository.chunks
 
 
 def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monkeypatch):

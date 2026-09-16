@@ -97,12 +97,19 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         else:
             flags = v.flags | self.F_USED
             assert v.size == 0 or v.size == size
-        # F_PENDING marks the pack location (pack_id, obj_offset, obj_size) as not yet set.
-        # Re-adding a chunk resets it to UNKNOWN/pending, dropping any prior location until the next flush().
-        self[key] = ChunkIndexEntry(
-            flags=flags | self.F_PENDING, size=size,
-            pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
-        )
+        if v is not None and not (v.flags & self.F_PENDING):
+            # the chunk already has a resolved pack location: keep it, so the chunk stays readable
+            # and an abort can not lose a chunk that is already stored (#10013).  the re-added
+            # copy's location replaces it at the next flush(), via update_pack_info().
+            self[key] = ChunkIndexEntry(
+                flags=flags, size=size, pack_id=v.pack_id, obj_offset=v.obj_offset, obj_size=v.obj_size
+            )
+        else:
+            # F_PENDING marks the pack location (pack_id, obj_offset, obj_size) as not yet set.
+            self[key] = ChunkIndexEntry(
+                flags=flags | self.F_PENDING, size=size,
+                pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+            )
 
     def __getitem__(self, key):
         """Specialized __getitem__ that hides system flags."""

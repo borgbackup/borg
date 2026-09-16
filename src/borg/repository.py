@@ -141,7 +141,9 @@ def build_rest_backend(location):
 class PackWriter:
     """Buffers chunks into a pack file and writes it to the store when full.
 
-    add() buffers a (chunk_id, cdata) pair and marks the chunk pending (F_PENDING);
+    add() buffers a (chunk_id, cdata) pair and marks the chunk pending (F_PENDING), unless
+    its index entry already has a resolved pack location (a re-put of a stored chunk keeps
+    that location, so the chunk stays readable, also if an abort drops the buffered copy);
     when the pack is full, it is built, hashed and stored, and each entry's pack_id,
     obj_offset and obj_size are set, clearing F_PENDING.
 
@@ -277,10 +279,16 @@ class PackWriter:
         """
         if outcome.error is not None:
             # the pack was not stored: drop the index entries for its chunks.
-            for chunk_id in outcome.pending_ids:
-                if chunk_id in self.chunks:  # a chunk_id may appear more than once in this pack
-                    del self.chunks[chunk_id]
+            self._drop_index_entries(outcome.pending_ids)
             raise outcome.error
+        if self.repository is not None and not self.repository.is_chunk_index_loaded:
+            # no in-memory index: this pack's entries died with it (see _drop_index_entries).
+            # do not build the index from the repo here: join_inflight also runs while closing
+            # or aborting, and that I/O could fail and mask an error being unwound.  the stored
+            # pack is then simply not recorded, like the buffered pieces that die with an abort.
+            # flush() asserts the index is loaded while chunks are outstanding, so on the normal
+            # (non-aborting) path this state fails loudly there instead of being skipped here.
+            return outcome.results
         self.chunks.update_pack_info(outcome.results)  # set the real location and clear F_PENDING
         return outcome.results
 
@@ -307,17 +315,35 @@ class PackWriter:
         self._inflight = (thread, outcome)
         thread.start()
 
+    def _drop_index_entries(self, chunk_ids):
+        """Drop the (still pending) index entries of *chunk_ids*, without building the index.
+
+        Runs while aborting (a pack store failed, or the caller is unwinding an exception),
+        so it must never build the chunk index from the repo: that I/O can fail and mask the
+        error being unwound.  No in-memory index means nothing to delete: add() installs a
+        chunk's index entry before buffering its piece, so pending entries never outlive a
+        dropped index.  Entries that are not pending anymore are kept: their chunk is in a
+        stored pack, only the aborted (duplicate) piece dies.
+        """
+        if self.repository is not None and not self.repository.is_chunk_index_loaded:
+            return
+        for chunk_id in chunk_ids:
+            # a chunk_id may appear more than once in a pack or buffer
+            if chunk_id in self.chunks and self.chunks.is_pending(chunk_id):
+                del self.chunks[chunk_id]
+
     def _drop_buffered(self):
         """Drop the buffered pieces and their (still pending) index entries.
 
-        Called when a pack store failed: the caller is aborting, so chunks not yet handed
-        to the store die with it.  Dropping their entries keeps the index free of F_PENDING
-        leftovers, like the sync store path does, so the close()-time index persist works.
+        Called when a pack store failed or the caller is unwinding an exception: the caller
+        is aborting, so chunks not yet handed to the store die with it.  Dropping their
+        entries keeps the index free of F_PENDING leftovers, like the sync store path does,
+        so the close()-time index persist works.
         """
         pieces = self._take_pieces()
-        for chunk_id, _ in pieces:
-            if chunk_id in self.chunks:  # a chunk_id may appear more than once in the buffer
-                del self.chunks[chunk_id]
+        if pieces:
+            logger.debug("dropping %d buffered chunk(s) while aborting", len(pieces))
+        self._drop_index_entries(chunk_id for chunk_id, _ in pieces)
 
     def join_inflight(self):
         """Wait for an in-flight pack store and apply it to the index.
@@ -336,6 +362,22 @@ class PackWriter:
             self._drop_buffered()
             raise
 
+    def discard(self):
+        """Join a still in-flight pack store, then drop the buffered pieces.
+
+        The abort-side counterpart to flush(): a pack already handed to the store-thread is
+        joined first, so a stored pack gets recorded in the index and a failed one gets its
+        entries dropped; the pieces still buffered were never stored and die with the aborted
+        operation.  Store errors are logged, not raised: the caller is aborting already, and
+        raising here would mask the error being unwound.
+        """
+        try:
+            self.join_inflight()
+        except Exception as exc:
+            # join_inflight already dropped the failed pack's index entries and the buffer.
+            logger.warning("pack store failed while aborting: %s", exc)
+        self._drop_buffered()
+
     def flush(self):
         """Write the current pack to the store.  This is a barrier: any in-flight store
         is joined first and the current buffer is written synchronously, so afterwards
@@ -345,6 +387,13 @@ class PackWriter:
         every chunk written by this flush (including a joined in-flight pack), or
         None if there was nothing to do.
         """
+        # invalidating the chunk index with chunks buffered or in flight discards their entries,
+        # so this flush could not resolve their locations anymore: a caller must flush first.
+        assert (
+            self.repository is None
+            or self.repository.is_chunk_index_loaded
+            or (self._inflight is None and not self._pieces)
+        ), "chunk index not loaded; flush() before invalidate_chunk_index()"
         results = self.join_inflight() or []
         if self._pieces:
             pieces = self._take_pieces()
@@ -924,12 +973,21 @@ class Repository:
         try:
             self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         except Exception:
-            self.close()
+            self.close(aborting=True)
             raise
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        try:
+            if exc_type is not None and self._pack_writer is not None:
+                # unwinding an exception: chunks still buffered in the pack writer were never
+                # stored, so they die with the aborted operation.  discard them (joining a
+                # still in-flight pack store first, so a stored pack gets recorded) so that
+                # close() neither trips its flush assertion -- which would mask the original
+                # exception -- nor persists pending index entries.
+                self._pack_writer.discard()
+        finally:
+            self.close(aborting=exc_type is not None)
 
     @property
     def id_str(self):
@@ -1120,38 +1178,66 @@ class Repository:
             self._lock_refresh()
             self._pack_writer.flush()  # PackWriter updates _chunks internally
 
-    def close(self):
-        if self._pack_writer is not None:
-            try:
-                # normally a no-op: flush() is a barrier and runs before close().  when close() runs
-                # while unwinding an error, a pack store may still be in flight: join it, so a stored
-                # pack gets recorded in the index and a failed one gets its index entries dropped.
-                self._pack_writer.join_inflight()
-            except Exception as exc:
-                # do not raise: we are closing, probably unwinding an error already; raising here
-                # would just mask that original error.
-                logger.warning("pack store failed during close: %s", exc)
-            assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
-        # close() may run again after the store was already closed (idempotent close), so we can
-        # only persist while the store is open. Persisting is also a no-op unless chunks were added
-        # this session (only F_NEW entries are serialized, and an empty incremental write is skipped).
-        # guard on is_chunk_index_loaded so we never trigger a lazy rebuild just to persist on close.
-        if self.store_opened and self.is_chunk_index_loaded:
-            from .cache import write_chunkindex_to_repo
+    def close(self, *, aborting=False):
+        """Close the repository: join an in-flight pack store, persist the chunk index, tear down.
 
-            write_chunkindex_to_repo(self, self.chunks, incremental=True)
-        if self.lock:
-            # ignore_not_found: close() runs during normal teardown, but also while unwinding an
-            # exception. if the lock was already gone (e.g. it went stale and another client killed
-            # it, or refresh() aborted with LockTimeout), a NotLocked raised here would mask the
-            # original error. we are closing anyway, so treat a missing lock as nothing to release.
-            self.lock.release(ignore_not_found=True)
-            self.lock = None
-        if self.store_opened:
-            self.store.close()
-            self.store_opened = False
-        self.opened = False
-        self._pack_cache.clear()
+        aborting=True means close() runs while unwinding an exception: teardown errors are then
+        logged instead of raised, so they cannot mask the error being unwound.  On a clean close
+        (the default), a failing index persist or lock release raises, so the caller learns about
+        it -- but the lock release and store close still run, in the finally block.
+        """
+        try:
+            if self._pack_writer is not None:
+                try:
+                    # normally a no-op: flush() is a barrier and runs before close().  when close() runs
+                    # while unwinding an error, a pack store may still be in flight: join it, so a stored
+                    # pack gets recorded in the index and a failed one gets its index entries dropped.
+                    self._pack_writer.join_inflight()
+                except Exception as exc:
+                    # do not raise: a store error here was already raised at the caller's put() or
+                    # flush() if it cared; raising at close would mask an error being unwound.
+                    logger.warning("pack store failed during close: %s", exc)
+                assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
+            # close() may run again after the store was already closed (idempotent close), so we can
+            # only persist while the store is open. Persisting is also a no-op unless chunks were added
+            # this session (only F_NEW entries are serialized, and an empty incremental write is skipped).
+            # guard on is_chunk_index_loaded so we never trigger a lazy rebuild just to persist on close.
+            if self.store_opened and self.is_chunk_index_loaded:
+                from .cache import write_chunkindex_to_repo
+
+                try:
+                    write_chunkindex_to_repo(self, self.chunks, incremental=True)
+                except Exception as exc:
+                    if not aborting:
+                        raise
+                    # unwinding, often a store error: this persist writing to that same store would
+                    # raise again and mask it.  the persisted index is only a cache (rebuilt when
+                    # missing or stale), so losing this write costs a rebuild, not data.
+                    logger.warning("failed to persist the chunk index during close: %s", exc)
+        finally:
+            # release the lock and close the store even when the above raised (e.g. the unflushed-
+            # chunks assertion): a lock left behind would block other clients until it goes stale.
+            # while any error is unwinding (aborting, or the try block above raised), a failing
+            # release is logged, not raised, so it cannot mask that error.
+            unwinding = aborting or sys.exc_info()[0] is not None
+            if self.lock:
+                # ignore_not_found: if the lock was already gone (e.g. it went stale and another
+                # client killed it, or refresh() aborted with LockTimeout), a NotLocked raised
+                # here would mask the original error; a missing lock is nothing to release.
+                try:
+                    self.lock.release(ignore_not_found=True)
+                    self.lock = None
+                except Exception as exc:
+                    if not unwinding:
+                        raise
+                    # when the store is dead, the release fails, too; the lock goes stale eventually.
+                    logger.warning("failed to release the lock during close: %s", exc)
+                    self.lock = None
+            if self.store_opened:
+                self.store.close()
+                self.store_opened = False
+            self.opened = False
+            self._pack_cache.clear()
 
     def info(self):
         """return some infos about the repo (must be opened first)"""

@@ -51,15 +51,12 @@ class TestAdHocWithFilesCache:
 
     @pytest.fixture
     def manifest(self, repository, key):
-        Manifest(key, repository).write()
+        repository.save_config(key)
         return Manifest.load(repository, key=key)
 
     @pytest.fixture
     def cache(self, repository, key, manifest):
         return AdHocWithFilesCache(manifest)
-
-    def test_does_not_contain_manifest(self, cache):
-        assert not cache.seen_chunk(Manifest.MANIFEST_ID)
 
     def test_seen_chunk_add_chunk_size(self, cache):
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
@@ -478,7 +475,7 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
     loc = os.fspath(tmp_path / "repository")
     with Repository(loc, exclusive=True, create=True) as repository:
         key = AESOCBKey.create(repository, TestKey.MockArgs())
-        Manifest(key, repository).write()
+        repository.save_config(key)
 
     all_ids = []
     for s in range(5):  # each session adds 100 new chunks (< MIN), so fragments must be consolidated
@@ -743,7 +740,7 @@ def test_files_cache_save_tolerates_missing_chunk(tmp_path, monkeypatch):
     loc = os.fspath(tmp_path / "repository")
     with Repository(loc, exclusive=True, create=True) as repository:
         key = AESOCBKey.create(repository, TestKey.MockArgs())
-        Manifest(key, repository).write()
+        repository.save_config(key)
 
     with Repository(loc, exclusive=True) as repository:
         manifest = Manifest.load(repository, key=key)

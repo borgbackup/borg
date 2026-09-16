@@ -24,7 +24,7 @@ from . import xattr
 from .chunkers import get_chunker, Chunk, release_chunk_data
 from .cache import ChunkListEntry, build_chunkindex_from_repo, write_chunkindex_to_repo
 from .cache import write_chunkindex_invalid, delete_chunkindex_invalid
-from .crypto.key import key_from_repository
+from .crypto.key import key_factory
 from .constants import *  # NOQA
 from .digests import ContentDigester
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -53,7 +53,7 @@ from .manifest import Manifest
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
-from .repository import Repository, NoManifestError
+from .repository import Repository
 from .repoobj import RepoObj, object_validator
 
 # macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
@@ -841,7 +841,6 @@ Duration: {0.duration}
         # fragment referencing uncommitted objects, which compact/rebuild prunes (#10239).
         self.cache.write_chunks_index()
         self.manifest.archives.create(name, self.id, metadata.time)
-        self.manifest.write()
         return metadata
 
     def calc_stats(self, cache, want_unique=True):
@@ -2266,9 +2265,8 @@ class ArchiveChecker:
         # The rebuild validates every object header it walks, because a corrupt data_size parses fine
         # and points the walk into the middle of the pack. That costs one metadata slot read and one
         # decryption per object and it needs the key, so read the key here if we do not have it yet.
-        # manifest_only=True: self.chunks, the other key source of make_key, is set up below.
         if repair and self.key is None:
-            self.key = self.make_key(repository, manifest_only=True)
+            self.key = self.make_key(repository)
         if self.key is not None:
             # the validator decrypts metadata slots, so it needs a RepoObj built from the key.
             self.repo_objs = RepoObj(self.key)
@@ -2317,22 +2315,7 @@ class ArchiveChecker:
             self.repo_objs.set_assert_id_place("repair")
         if verify_data:
             self.verify_data()
-        rebuild_manifest = False
-        try:
-            repository.get_manifest()
-        except NoManifestError:
-            logger.error("Repository manifest is missing.")
-            self.error_found = True
-            rebuild_manifest = True
-        else:
-            try:
-                self.manifest = Manifest.load(repository, key=self.key)
-            except IntegrityErrorBase as exc:
-                logger.error("Repository manifest is corrupted: %s", exc)
-                self.error_found = True
-                rebuild_manifest = True
-        if rebuild_manifest:
-            self.manifest = self.rebuild_manifest()
+        self.manifest = Manifest.load(repository, key=self.key)
         # On Ctrl-C, skip any scan not yet started; a scan already running stops at its own boundary.
         if find_lost_archives and not sig_int:
             self.rebuild_archives_directory()
@@ -2347,7 +2330,7 @@ class ArchiveChecker:
                 newer=newer,
                 newest=newest,
             )
-        # finish() writes the manifest and a consistent chunk index; run it on Ctrl-C too (#9850).
+        # finish() writes a consistent chunk index; run it on Ctrl-C too (#9850).
         self.finish()
         if sig_int:
             if self.error_found:
@@ -2361,17 +2344,9 @@ class ArchiveChecker:
             logger.info("Archive consistency check complete, no problems found.")
         return self.repair or not self.error_found
 
-    def make_key(self, repository, manifest_only=False):
-        """Return the key loaded by key_from_repository.
-
-        manifest_only: read only the manifest, else also the objects of the chunk ids in self.chunks.
-        """
-
-        def chunk_ids():  # reads self.chunks only if the manifest does not identify the key type
-            for id, _ in self.chunks.iteritems():
-                yield id
-
-        return key_from_repository(repository, () if manifest_only else chunk_ids())
+    def make_key(self, repository):
+        """Return the key of repository, see key_factory."""
+        return key_factory(repository)
 
     def verify_data(self):
         logger.info("Starting cryptographic data integrity verification...")
@@ -2457,12 +2432,6 @@ class ArchiveChecker:
                 verified,
                 errors,
             )
-
-    def rebuild_manifest(self):
-        """Rebuild the manifest object."""
-
-        logger.info("Rebuilding missing/corrupted manifest.")
-        return Manifest(self.key, self.repository)
 
     def rebuild_archives_directory(self):
         """Rebuild the archives directory, undeleting archives.
@@ -2832,7 +2801,6 @@ class ArchiveChecker:
             delete_chunkindex_invalid(self.repository)
             # drop the in-memory index so close() does not persist it over the index just written.
             self.repository.invalidate_chunk_index()
-            self.manifest.write()
 
 
 class ArchiveRecreater:

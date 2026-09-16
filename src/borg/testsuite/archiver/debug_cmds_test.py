@@ -247,23 +247,6 @@ def test_debug_format_obj_respects_type(archivers, request):
     assert meta_read["type"] == ROBJ_ARCHIVE_STREAM
 
 
-def test_debug_dump_manifest(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test", "input")
-    dump_file = archiver.output_path + "/dump"
-    output = cmd(archiver, "debug", "dump-manifest", dump_file)
-    assert output == ""
-    with open(dump_file) as f:
-        result = json.load(f)
-    assert "archives" in result
-    assert "config" in result
-    assert "timestamp" not in result
-    assert "version" in result
-    assert "item_keys" not in result["config"]
-
-
 def test_debug_dump_archive(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

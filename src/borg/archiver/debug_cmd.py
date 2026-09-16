@@ -3,7 +3,8 @@ import textwrap
 
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..crypto.key import key_from_repository, KeyfileInvalidError, RepoKeyNotFoundError, UnsupportedKeyFormatError
+from ..crypto.key import key_factory, KeyfileInvalidError, RepoKeyNotFoundError, UnsupportedKeyFormatError
+from ..crypto.key import RepositoryKeyInfoMissing
 from ..helpers import msgpack
 from ..helpers import FilesystemPathSpec
 from ..helpers import sysinfo
@@ -11,7 +12,7 @@ from ..helpers import bin_to_hex, hex_to_bin, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
 from ..helpers import archivename_validator, CompressionSpec
-from ..helpers import CommandError, IntegrityError, RTError
+from ..helpers import CommandError, RTError
 from ..helpers.argparsing import ArgumentParser
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
@@ -28,14 +29,14 @@ logger = create_logger()
 def gap_validator(repository):
     """Return repoobj.object_validator for the key of repository, or None if there is no key to use.
 
-    The key is loaded with key_from_repository. There is no key to use if no stored object identifies
-    the key type (IntegrityError), no key is found (RepoKeyNotFoundError), or the key is invalid
+    The key is loaded with key_factory. There is no key to use if the repository config has no key info
+    (RepositoryKeyInfoMissing), no key is found (RepoKeyNotFoundError), or the key is invalid
     (KeyfileInvalidError, UnsupportedKeyFormatError); a warning is logged then. Other errors, e.g. a
     wrong passphrase, propagate.
     """
     try:
-        key = key_from_repository(repository)
-    except (IntegrityError, RepoKeyNotFoundError, KeyfileInvalidError, UnsupportedKeyFormatError) as err:
+        key = key_factory(repository)
+    except (RepositoryKeyInfoMissing, RepoKeyNotFoundError, KeyfileInvalidError, UnsupportedKeyFormatError) as err:
         logger.warning(f"Could not set up the key, so rewritten packs keep their superseded gap bytes: {err}")
         return None
     return object_validator(RepoObj(key))
@@ -116,18 +117,6 @@ class DebugMixIn:
         with dash_open(args.path, "w") as fd:
             output(fd)
 
-    @with_repository()
-    def do_debug_dump_manifest(self, args, repository, manifest):
-        """Dumps decoded repository manifest."""
-        repo_objs = manifest.repo_objs
-        cdata = repository.get_manifest()
-        _, data = repo_objs.parse(manifest.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
-
-        meta = prepare_dump_dict(msgpack.unpackb(data, object_hook=StableDict))
-
-        with dash_open(args.path, "w") as fd:
-            json.dump(meta, fd, indent=4)
-
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
         """Dumps (decrypted, decompressed) repository objects."""
@@ -142,7 +131,7 @@ class DebugMixIn:
             with open(filename, "wb") as fd:
                 fd.write(data)
 
-        repo_objs = RepoObj(key_from_repository(repository))
+        repo_objs = RepoObj(key_factory(repository))
         for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
             cdata = repository.get(id)
             decrypt_dump(id, cdata)
@@ -175,7 +164,7 @@ class DebugMixIn:
         if not wanted:
             raise CommandError("search term needs to be hex:123abc or str:foobar style")
 
-        repo_objs = RepoObj(key_from_repository(repository))
+        repo_objs = RepoObj(key_factory(repository))
 
         last_data = b""
         last_id = None
@@ -378,19 +367,6 @@ class DebugMixIn:
         )
         debug_parsers.add_subcommand("dump-archive", subparser, help="dump decoded archive metadata (debug)")
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
-        subparser.add_argument("path", metavar="PATH", type=FilesystemPathSpec, help="file to dump data into")
-
-        debug_dump_manifest_epilog = process_epilog(
-            """
-        This command dumps manifest metadata of a repository in a decoded form to a file.
-        """
-        )
-        subparser = ArgumentParser(
-            parents=[mid_common_parser],
-            description=self.do_debug_dump_manifest.__doc__,
-            epilog=debug_dump_manifest_epilog,
-        )
-        debug_parsers.add_subcommand("dump-manifest", subparser, help="dump decoded repository metadata (debug)")
         subparser.add_argument("path", metavar="PATH", type=FilesystemPathSpec, help="file to dump data into")
 
         debug_dump_repo_objs_epilog = process_epilog(

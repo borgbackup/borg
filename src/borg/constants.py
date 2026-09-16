@@ -56,7 +56,6 @@ STDIN_MODE_DEFAULT = 0o660
 READ_SPECIAL_TIMEOUT_DEFAULT = 1800.0
 
 # RepoObj types
-ROBJ_MANIFEST = "M"  # Manifest (directory of archives, other metadata) object
 ROBJ_ARCHIVE_META = "A"  # main archive metadata object
 ROBJ_ARCHIVE_CHUNKIDS = "C"  # objects with a list of archive metadata stream chunkids
 ROBJ_ARCHIVE_STREAM = "S"  # archive metadata stream chunk (containing items)

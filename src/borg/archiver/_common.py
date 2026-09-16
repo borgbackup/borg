@@ -29,7 +29,9 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_legacy):
+def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_legacy, allow_incomplete=False):
+    # create_config=False: when creating, the command (repo-create) writes the repository config itself,
+    # once the key exists, see Repository.create(). For an existing repository, the flag is irrelevant.
     if location.proto == "ssh":
         if v1_legacy:
             from ..legacy.remote import LegacyRemoteRepository
@@ -47,20 +49,46 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_leg
     elif (
         location.proto in ("rest", "sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_legacy
     ):  # stuff directly supported by borgstore
-        repository = Repository(location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
+        repository = Repository(
+            location,
+            create=create,
+            create_config=False,
+            allow_incomplete=allow_incomplete,
+            exclusive=exclusive,
+            lock_wait=lock_wait,
+            lock=lock,
+        )
 
     else:
         if v1_legacy:
             from ..legacy.repository import LegacyRepository
 
-            RepoCls = LegacyRepository
+            repository = LegacyRepository(
+                location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock
+            )
         else:
-            RepoCls = Repository
-        repository = RepoCls(location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
+            repository = Repository(
+                location.path,
+                create=create,
+                create_config=False,
+                allow_incomplete=allow_incomplete,
+                exclusive=exclusive,
+                lock_wait=lock_wait,
+                lock=lock,
+            )
     return repository
 
 
-def with_repository(create=False, lock=True, exclusive=False, manifest=True, cache=False, secure=True, allow_v1=False):
+def with_repository(
+    create=False,
+    lock=True,
+    exclusive=False,
+    manifest=True,
+    cache=False,
+    secure=True,
+    allow_v1=False,
+    allow_incomplete=False,
+):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
 
@@ -72,6 +100,8 @@ def with_repository(create=False, lock=True, exclusive=False, manifest=True, cac
     :param cache: open cache, pass it as keyword argument (implies manifest)
     :param secure: do assert_secure after loading manifest
     :param allow_v1: (bool) allow legacy Borg 1.x repositories
+    :param allow_incomplete: (bool) also open a store without repository config (repository.incomplete is
+           True then, nothing else is usable), see Repository.create() - for "borg repo-delete --force".
     """
     # We may need to modify `lock` inside `wrapper`. Therefore we cannot use the
     # `nonlocal` statement to access `lock` as modifications would also
@@ -100,11 +130,12 @@ def with_repository(create=False, lock=True, exclusive=False, manifest=True, cac
                 lock=lock,
                 args=args,
                 v1_legacy=v1_legacy,
+                allow_incomplete=allow_incomplete,
             )
 
             with repository:
-                acceptable_versions = (1,) if v1_legacy else (4,)
-                if repository.version not in acceptable_versions:
+                acceptable_versions = (1,) if v1_legacy else (5,)
+                if not getattr(repository, "incomplete", False) and repository.version not in acceptable_versions:
                     raise Error(
                         f"This borg version only accepts version {' or '.join(str(v) for v in acceptable_versions)} "
                         f"repos for -r/--repo, but not version {repository.version}. "
@@ -171,7 +202,7 @@ def with_other_repository(manifest=False, cache=False, required=False):
             )
 
             with repository:
-                acceptable_versions = (1,) if v1_legacy else (4,)
+                acceptable_versions = (1,) if v1_legacy else (5,)
                 if repository.version not in acceptable_versions:
                     raise Error(
                         f"This borg version only accepts version {' or '.join(str(v) for v in acceptable_versions)} "

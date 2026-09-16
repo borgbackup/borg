@@ -12,7 +12,6 @@ from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
-from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex, hex_to_bin
 from .helpers.time import (
     parse_timestamp,
@@ -36,6 +35,8 @@ class MandatoryFeatureUnsupported(Error):
     exit_mcode = 25
 
 
+# Not raised anymore: borg 2 repositories have no manifest object (their config is the config/config store
+# object). The class is kept so that its return code stays reserved and never gets a different meaning.
 class NoManifestError(Error):
     """Repository has no manifest."""
 
@@ -129,7 +130,6 @@ class ArchivesInterface(Protocol):  # pragma: no cover
     """
 
     def prepare(self, manifest, m) -> None: ...
-    def finish(self, manifest) -> dict: ...
     def ids(self, *, deleted: bool = False) -> Iterator: ...
     def count(self) -> int: ...
     def names(self) -> Iterator: ...
@@ -174,10 +174,7 @@ class Archives:
         self.manifest = manifest
 
     def prepare(self, manifest, m):
-        pass  # borgstore manages the archive directory; nothing to load from the manifest blob
-
-    def finish(self, manifest):
-        return {}  # manifest["archives"] is always empty in Borg 2
+        pass  # only the legacy borg 1.x manifest has an archives list to load, see LegacyArchives
 
     def ids(self, *, deleted=False):
         # yield the binary IDs of all archives
@@ -483,7 +480,18 @@ class Archives:
 
 
 class Manifest:
-    MANIFEST_ID = b"\0" * 32
+    """
+    The repository's key, RepoObj and archives directory, bundled for the code that works with archives.
+
+    Historically (borg 1.x), the manifest was a repository object holding the archives list and other
+    metadata. borg 2 repositories have no manifest object: the archives are in the archives/ namespace
+    and the repository config is the config/config store object (see Repository.save_config). This class
+    only lives on as the container the archive-level code takes its key, repo_objs, repository and
+    archives from. For borg 1.x repositories (read-only, e.g. "borg transfer --from-borg1"), load()
+    still reads the manifest object, as it holds their archives list.
+    """
+
+    MANIFEST_ID = b"\0" * 32  # legacy: the id of a borg 1.x repository's manifest object
 
     def __init__(self, key, repository, ro_cls=RepoObj):
         from .legacy.repository import LegacyRepository
@@ -494,57 +502,37 @@ class Manifest:
             self.archives: ArchivesInterface = LegacyArchives(repository, self)
         else:
             self.archives: ArchivesInterface = Archives(repository, self)
-        self.config = {}
         self.key = key
         self.repo_objs = ro_cls(key)
         self.repository = repository
-        self._loaded_data = None  # the packed manifest as loaded from the repository, see write()
-
-    @property
-    def id_str(self):
-        return bin_to_hex(self.id)
 
     @classmethod
     def load(cls, repository, key=None, *, other=False, ro_cls=RepoObj):
+        """Return the Manifest of repository, loading its key (see key_factory) if key is not given."""
+        from .crypto.key import key_factory  # crypto.key imports this module, hence the local import
+        from .legacy.repository import LegacyRepository
+        from .legacy.remote import LegacyRemoteRepository
+
+        if isinstance(repository, (LegacyRepository, LegacyRemoteRepository)):
+            return cls._load_legacy(repository, key, other=other, ro_cls=ro_cls)
+        if not key:
+            key = key_factory(repository, other=other)
+        return cls(key, repository, ro_cls=ro_cls)
+
+    @classmethod
+    def _load_legacy(cls, repository, key, *, other, ro_cls):
+        # a borg 1.x repository: its manifest object identifies the key type and holds the archives list.
         from .item import ManifestItem
-        from .crypto.key import key_factory
+        from .crypto.key import legacy_key_factory
 
         cdata = repository.get_manifest()
         if not key:
-            key = key_factory(repository, cdata, other=other, ro_cls=ro_cls)
+            key = legacy_key_factory(repository, cdata, other=other)
         manifest = cls(key, repository, ro_cls=ro_cls)
-        _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
-        manifest._loaded_data = data
-        manifest_dict = key.unpack_manifest(data)
-        m = ManifestItem(internal_dict=manifest_dict)
-        manifest.id = manifest.repo_objs.id_hash(data)
+        # borg 1.x objects carry no type in their (non-existent) metadata; RepoObj1.parse ignores ro_type.
+        _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata, ro_type=ROBJ_DONTCARE)
+        m = ManifestItem(internal_dict=key.unpack_manifest(data))
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
         manifest.archives.prepare(manifest, m)
-        # a "timestamp" entry (written by borg 1.x and by older borg 2 versions) is ignored, as is
-        # the list of item keys (borg 1.x: "item_keys", older borg 2 versions: config["item_keys"]).
-        manifest.config = m.config
-        manifest.config.pop("item_keys", None)
         return manifest
-
-    def write(self):
-        """
-        Store the manifest in the repository, but only if its content differs from what was loaded.
-
-        The manifest content is static (borg does not store anything in its config dict currently), so
-        archive operations calling this usually do not result in a store write: only when the loaded
-        manifest still had legacy entries (a timestamp, the item keys list) is it rewritten.
-        """
-        from .item import ManifestItem
-
-        manifest_archives = self.archives.finish(self)
-        manifest = ManifestItem(version=2, archives=manifest_archives, config=StableDict(self.config))
-        data = self.key.pack_metadata(manifest.as_dict())
-        self.id = self.repo_objs.id_hash(data)
-        if data == self._loaded_data:
-            logger.debug("manifest unchanged, not writing it.")
-            return
-        logger.debug("writing the manifest.")
-        robj = self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST)
-        self.repository.put_manifest(robj)
-        self._loaded_data = data

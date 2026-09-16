@@ -14,7 +14,6 @@ class RenameMixIn:
     def do_rename(self, args, repository, manifest, cache, archive):
         """Rename an existing archive."""
         archive.rename(args.newname)
-        manifest.write()
 
     def build_parser_rename(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

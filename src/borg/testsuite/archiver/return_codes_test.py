@@ -32,13 +32,14 @@ def test_return_codes(archivers, request):
 
 def test_exit_codes(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
-    # we create the repo path, but do NOT initialize the borg repo,
-    # so the borg create commands are expected to fail with DoesNotExist (was: InvalidRepository in borg 1.4).
+    # we create the repo path, but do NOT initialize the borg repo: the store exists, but has no repository
+    # config, so the borg create commands are expected to fail with InvalidRepository (DoesNotExist is only
+    # for a store that does not exist at all).
     os.makedirs(archiver.repository_path)
     monkeypatch.setenv("BORG_EXIT_CODES", "classic")
     cmd(archiver, "create", "archive", "input", fork=True, exit_code=EXIT_ERROR)
     monkeypatch.setenv("BORG_EXIT_CODES", "modern")
-    cmd(archiver, "create", "archive", "input", fork=True, exit_code=Repository.DoesNotExist.exit_mcode)
+    cmd(archiver, "create", "archive", "input", fork=True, exit_code=Repository.InvalidRepository.exit_mcode)
 
 
 def test_print_warning_instance_does_not_retain_exception():

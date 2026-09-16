@@ -5,11 +5,10 @@ import textwrap
 from hashlib import sha256
 
 from ..helpers import Error, CommandError, yes, bin_to_hex, hex_to_bin, dash_open, get_keys_dir
-from ..repoobj import RepoObj
 
 
 from .key import keyfile_format, keyfile_parse, is_keyfile
-from .key import RepoKeyNotFoundError, KeyBlobStorage, KEY_LOCATIONS, identify_key, keyfile_name_for
+from .key import RepoKeyNotFoundError, KeyBlobStorage, KEY_LOCATIONS, key_class_of, keyfile_name_for
 
 
 class NotABorgKeyFile(Error):
@@ -51,9 +50,7 @@ class KeyManager:
         self.loaded_key_id = None
         self.loaded_label = None
 
-        manifest_chunk = repository.get_manifest()
-        manifest_data = RepoObj.extract_crypted_data(manifest_chunk)
-        self.key_cls = identify_key(manifest_data)
+        self.key_cls = key_class_of(repository)
         self.keyblob_storage = self.key_cls.STORAGE
         if self.keyblob_storage == KeyBlobStorage.NO_STORAGE:
             raise UnencryptedRepo()

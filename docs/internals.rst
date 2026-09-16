@@ -9,8 +9,8 @@ of Borg.
 
 Borg uses a low-level, key-value store, the :ref:`repository`, and
 implements a more complex data structure on top of it, which is made
-up of the :ref:`manifest <manifest>`, :ref:`archives <archive>`,
-:ref:`items <item>` and data :ref:`chunks`.
+up of the :ref:`archives <archive>`, :ref:`items <item>` and data
+:ref:`chunks`.
 
 Each repository can hold multiple :ref:`archives <archive>`, which
 represent individual backups that contain a full archive of the files

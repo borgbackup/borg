@@ -2735,3 +2735,144 @@ def test_superseded_gap_ranges_ends_at_an_object_reaching_past_the_gap(tmp_path,
         f"pack {bin_to_hex(THIS_PACK)}: object reaching past its gap at offset 0 in a gap, "
         f"keeping the remaining {len(obj) - 1} bytes of the gap." in caplog.text
     )
+
+
+def test_config_roundtrip(tmp_path):
+    # the config/config store object holds version, id and the crypto suite of the key, see Repository.save_config
+    from ..crypto.key import Blake3CHPOKey
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        # create() wrote a config without key info:
+        text = repository.store_load("config/config").decode()
+        assert text.startswith("# This is a Borg Backup repository.\n")
+        assert "[repository]\nversion = 5\n" in text
+        assert "encryption" not in text and "id_hash" not in text
+        assert (repository.encryption, repository.id_hash) == (None, None)
+        key = Blake3CHPOKey(repository)
+        repository.save_config(key)
+        id = repository.id
+        text = repository.store_load("config/config").decode()
+    assert "encryption = chacha20-poly1305\nid_hash = blake3\n" in text
+    with Repository(location, exclusive=True) as repository:
+        assert repository.version == 5
+        assert repository.id == id
+        assert (repository.encryption, repository.id_hash) == ("chacha20-poly1305", "blake3")
+        repository.save_config()  # without a key: the recorded crypto suite is kept
+    with Repository(location, exclusive=True) as repository:
+        assert (repository.encryption, repository.id_hash) == ("chacha20-poly1305", "blake3")
+
+
+def test_store_without_config_is_not_a_repository(tmp_path):
+    # with create_config=False (as repo-create uses it), create() does not write the config, save_config()
+    # does: until then, the store is not a repository.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True, create_config=False):
+        pass
+    assert os.path.exists(location)
+    with pytest.raises(Repository.InvalidRepository):
+        with Repository(location, exclusive=True):
+            pass
+    with pytest.raises(Repository.IncompleteRepository):
+        with Repository(location, exclusive=True, create=True):
+            pass
+    # allow_incomplete (as repo-delete --force uses it): opens, tells, and the store can be destroyed.
+    with Repository(location, exclusive=True, allow_incomplete=True) as repository:
+        assert repository.incomplete and repository.version is None and repository.id is None
+        assert repository.looks_like_borg_store()  # create() made the namespaces
+        repository.destroy()
+    assert not os.path.exists(location)
+
+
+def test_repository_that_lost_its_config(tmp_path):
+    # a repository with data whose config got lost is not a valid repository (not "does not exist").
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository.put(H(1), fchunk(b"DATA", chunk_id=H(1)))
+        repository.flush()
+    os.unlink(os.path.join(location, "config", "config"))
+    with pytest.raises(Repository.InvalidRepository):
+        with Repository(location, exclusive=True):
+            pass
+    with Repository(location, exclusive=True, allow_incomplete=True) as repository:
+        assert repository.incomplete
+        assert repository.looks_like_borg_store()
+
+
+def test_create_refuses_non_empty_directory(tmp_path):
+    # a non-empty directory that is no repository: the backend refuses to create the store there, and borg
+    # only knows that there is no repository config (it can not tell what the directory holds).
+    location = os.fspath(tmp_path / "data")
+    os.mkdir(location)
+    with open(os.path.join(location, "file"), "w") as f:
+        f.write("some data")
+    with pytest.raises(Repository.IncompleteRepository):
+        with Repository(location, exclusive=True, create=True):
+            pass
+    assert os.listdir(location) == ["file"]  # and it leaves the directory alone
+    with Repository(location, exclusive=True, allow_incomplete=True) as repository:
+        assert repository.incomplete
+        assert not repository.looks_like_borg_store()  # no borg namespaces: never destroyed by borg
+    assert os.listdir(location) == ["file"]
+    # a repository (with config) is reported as existing, too:
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True):
+        pass
+    with pytest.raises(Repository.AlreadyExists):
+        with Repository(location, exclusive=True, create=True):
+            pass
+
+
+def test_open_refuses_bad_config(tmp_path):
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True):
+        pass
+    config_path = os.path.join(location, "config", "config")  # the store is a directory, write the object directly
+    with open(config_path, "rb") as f:
+        good = f.read()
+
+    def write_config(data):
+        with open(config_path, "wb") as f:
+            f.write(data)
+
+    write_config(good.replace(b"version = 5", b"version = 4"))
+    with pytest.raises(Repository.InvalidRepositoryConfig):
+        with Repository(location, exclusive=True):
+            pass
+    bad_configs = [
+        b"",  # no [repository] section
+        b"[repository]\nversion = 5\n",  # no id
+        b"[repository]\nversion = x\nid = 00\n",  # invalid version and id
+        good + b"encryption = aes256-ocb\n",  # key info must be complete (encryption AND id_hash)
+        good + b"id_hash = sha256\n",
+        b"version = 5\n",  # not an INI file (no section header)
+        b"\xff\xfe",  # not even text
+    ]
+    for bad in bad_configs:
+        write_config(bad)
+        with pytest.raises(Repository.InvalidRepository):
+            with Repository(location, exclusive=True):
+                pass
+    write_config(good)
+    with Repository(location, exclusive=True):
+        pass
+
+
+def test_create_failure_leaves_no_store_behind(tmp_path, monkeypatch):
+    # a failure inside create() after the store was created (e.g. disk full while writing the empty chunk
+    # index) must not leave a store without config behind.
+    from .. import cache as cache_module
+
+    def failing_write(*args, **kwargs):
+        raise OSError("simulated disk full")
+
+    monkeypatch.setattr(cache_module, "write_chunkindex_to_repo", failing_write)
+    location = os.fspath(tmp_path / "repo")
+    with pytest.raises(OSError, match="simulated disk full"):
+        with Repository(location, exclusive=True, create=True):
+            pass
+    assert not os.path.exists(location)
+    monkeypatch.undo()
+    with Repository(location, exclusive=True, create=True):  # and creating it afterwards works
+        pass
+    assert os.path.exists(os.path.join(location, "config", "config"))

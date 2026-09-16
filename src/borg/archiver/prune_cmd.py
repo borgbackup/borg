@@ -305,7 +305,6 @@ class PruneMixIn:
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))
         if num_archives_deleted > 0 and not args.dry_run:
-            manifest.write()
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")

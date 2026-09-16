@@ -2,12 +2,13 @@ from ._common import with_repository
 from ..cache import Cache
 from ..security import SecurityManager
 from ..constants import *  # NOQA
-from ..helpers import CancelledByUser
+from ..helpers import CancelledByUser, Error
 from ..helpers import format_archive
 from ..helpers import bin_to_hex
 from ..helpers import yes
 from ..helpers.argparsing import ArgumentParser
-from ..manifest import Manifest, NoManifestError
+from ..crypto.key import RepositoryKeyInfoMissing
+from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -15,12 +16,32 @@ logger = create_logger()
 
 
 class RepoDeleteMixIn:
-    @with_repository(exclusive=True, manifest=False)
+    @with_repository(exclusive=True, manifest=False, allow_incomplete=True)
     def do_repo_delete(self, args, repository):
         """Deletes a repository."""
         self.output_list = args.output_list
         dry_run = args.dry_run
         keep_security_info = args.keep_security_info
+
+        if repository.incomplete:
+            # a store without repository config (see Repository.create()), e.g. the leftover of an
+            # interrupted repo-create: --force destroys it, if it looks like a store borg created.
+            location = repository._location.canonical_path()
+            if args.cache_only:
+                raise Error(f"{location} has no repository config, so its cache can not be identified.")
+            if not args.forced:
+                raise Error(f"{location} has no repository config. Deleting this requires the --force option.")
+            if not repository.looks_like_borg_store():
+                raise Error(
+                    f"{location} has no repository config and does not look like a borg store "
+                    "(no packs, archives, index and config namespaces), so borg does not destroy it."
+                )
+            if dry_run:
+                logger.info("Would destroy the store (it has no repository config).")
+            else:
+                repository.destroy()
+                logger.info("Store destroyed (it had no repository config).")
+            return
 
         if not args.cache_only:
             if not args.forced:  # without --force, we let the user see the archives list and confirm.
@@ -34,7 +55,7 @@ class RepoDeleteMixIn:
                         f"You requested to DELETE the following repository completely "
                         f"*including* {n_archives} archives it contains:"
                     )
-                except NoManifestError:
+                except RepositoryKeyInfoMissing:
                     n_archives = None
                     msg.append(
                         "You requested to DELETE the following repository completely "
@@ -57,7 +78,7 @@ class RepoDeleteMixIn:
                             msg.append("This repository does not appear to have any archives.")
                     else:
                         msg.append(
-                            "This repository seems to have no manifest, so we cannot "
+                            "This repository has no key information in its config, so we cannot "
                             "tell anything about its contents."
                         )
 
@@ -98,6 +119,9 @@ class RepoDeleteMixIn:
         (if any) are also deleted. Alternatively, you can delete just the local cache
         with the ``--cache-only`` option, or keep the security info with the
         ``--keep-security-info`` option.
+
+        ``--force`` also destroys a store that has no repository config, provided it looks
+        like a borg store (it has the packs, archives, index and config namespaces).
 
         Always first use ``--dry-run --list`` to see what would be deleted.
         """

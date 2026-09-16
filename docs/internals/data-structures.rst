@@ -38,14 +38,8 @@ It is the same for every repository and independent of the key/encryption mode
 (unlike the chunk id hash, which the key mode selects).
 
 config/
-  readme
-    simple text object telling that this is a Borg repository
-  id
-    the unique repository ID encoded as hexadecimal number text
-  version
-    the repository version encoded as decimal number text
-  manifest
-    the manifest (see :ref:`manifest`), a repository object, binary
+  config
+    the repository config (see :ref:`repo_config`), a text object
   space-reserve.N
     purely random binary data to reserve space, e.g. for disk-full emergencies.
     These objects are created and removed by ``borg repo-space``.
@@ -179,10 +173,9 @@ Repo object metadata
 
 Metadata is a MessagePack-encoded (and encrypted/authenticated) dict with:
 
-- type (the repo object type, a one-character string: ``M`` manifest,
-  ``A`` archive metadata, ``C`` archive metadata stream chunk ids,
-  ``S`` archive metadata stream chunk, ``F`` file content stream chunk -
-  see the ``ROBJ_*`` constants)
+- type (the repo object type, a one-character string: ``A`` archive metadata,
+  ``C`` archive metadata stream chunk ids, ``S`` archive metadata stream chunk,
+  ``F`` file content stream chunk - see the ``ROBJ_*`` constants)
 - ctype (compression type 0..255)
 - clevel (compression level, one byte, interpreted depending on ctype - see
   :ref:`data-compression`)
@@ -237,47 +230,59 @@ More on how this helps security in :ref:`security_structural_auth`.
     :figwidth: 100%
     :width: 100%
 
-.. _manifest:
+.. _repo_config:
 
-The manifest
-~~~~~~~~~~~~
+Repository config
+~~~~~~~~~~~~~~~~~
 
-The manifest is a repository object stored as the ``config/manifest`` store
-object (see Repository_), so it is not inside a pack file and not in the chunks
-index. Different from all other repository objects, the chunk id in its object
-header is not the hash of its content, but all-zero
-(``Manifest.MANIFEST_ID``).
+The repository config is the ``config/config`` store object (see Repository_), a
+plain text ``INI``-style file. It is the only object borg needs to read to open a
+repository. It looks like this::
 
-The manifest is written when the repository is created and by ``borg check
---repair`` when it rebuilds a lost or corrupted manifest. Commands that modify
-the repository also call ``Manifest.write()``, but that only stores a new
-manifest object if the content changed. It looks like this:
+    # This is a Borg Backup repository.
+    # See https://borgbackup.readthedocs.io/
 
-.. code-block:: python
+    [repository]
+    version = 5
+    id = 0a2744f216526be75ae14a5fa5b123127bb218558219f6203e09e4f220e45903
+    encryption = aes256-ocb
+    id_hash = sha256
 
-    {
-        'version': 2,
-        'archives': {},
-        'config': {},
-    }
+*version* is the repository version. borg refuses to open a repository whose
+version it does not support (currently, only version 5 is supported).
 
-Borg 2 always writes *version* 2. Reading also accepts version 1, which is what
-borg 1.x repositories have (they are supported read-only, e.g. for
-``borg transfer``).
+*id* is the unique repository ID (32 bytes, hex encoded). It does not change if
+the repository is moved to another location. The keys of the repository are
+bound to it (see :ref:`key_files`), and the client's cache and security
+directories are named after it.
 
-A *timestamp* entry, as written by borg 1.x and by older borg 2 versions, is
-accepted and ignored when reading.
+*encryption* and *id_hash* record the crypto suite of the repository's key, by
+the same names ``borg repo-create --encryption`` and ``--id-hash`` accept. This
+is how borg selects the key class when opening a repository, without reading any
+repository object. The config is plaintext and not authenticated; see
+:ref:`remote_access_security` for what protects against a swapped crypto suite.
+Where the key is stored (keyfile or repokey) is not recorded
+here: that is a property of each individual key, see :ref:`key_files`. Both
+entries are present, or none: a repository created via the Python API
+(``Repository.create()``) without a key has none, it can be used as a key/value
+store, but borg refuses to load a key for it.
 
-The *archives* dict is always empty: the list of archives is not part of the
-manifest, each archive has its own pointer object in the ``archives/``
-namespace, see :ref:`archive`.
+``borg repo-create`` writes the config once, after the key was created: writing
+it is what makes the store a repository. A store without it (e.g. the leftover of
+an interrupted ``borg repo-create``) is not a repository: borg reports it as not
+a valid repository, and ``borg repo-create`` refuses to create a repository in a
+non-empty location, saying whether it found a repository config there.
+``borg repo-delete --force`` destroys such a store, provided it looks like a borg
+store (it has the packs, archives, index and config namespaces, which
+``Repository.create()`` makes in advance), so that it can be removed without other
+access to the storage.
 
-*config* is a general-purpose location for additional metadata. All versions
-of Borg preserve its contents. Currently, borg does not store anything in there.
-
-A *config['item_keys']* list (written by older borg 2 versions) or a top-level
-*item_keys* list (borg 1.x) is accepted and ignored when reading: *borg check*
-does not validate item keys against such a list anymore, see Item_.
+The config is the one object ``borg check --repair`` can not restore. If a
+repository lost or damaged its config, it can be recreated by hand: the version
+is 5, the id is in the key (the ``BORG_KEY <id>`` header line of a keyfile or of
+a ``keys/`` object, see :ref:`key_files`), and the encryption mode and id hash
+are what ``borg repo-create`` was given (the key type byte of any repository
+object encodes them as well, see ``KeyType`` in ``constants.py``).
 
 .. _archive:
 
@@ -1022,8 +1027,7 @@ version
   currently always an integer, 2
 
 repository_id
-  the repository ID, as stored in the repository's ``config/id`` object,
-  see Repository_.
+  the repository ID, as stored in the repository config (see :ref:`repo_config`).
 
 crypt_key
   the initial key material used for the AEAD crypto (512 bits)
@@ -1272,32 +1276,19 @@ the file's name (see :ref:`the files cache <cache>` about that name):
     [cache]
     version = 1
     repository = 3c4...e59
-    manifest = 10e...21c
 
     [integrity]
-    manifest = 10e...21c
     files.9f8...a08 = {"algorithm": "SHA256", "digests": {"final": "e2a...b24"}}
 
 The chunks index is not in this list: it is not a local file, but lives in the
 repository below ``index/`` and has its own integrity mechanism, see
 :ref:`pack-index-namespace`.
 
-The manifest ID is duplicated in the integrity section due to the way all Borg
-versions handle the config file. Instead of creating a "new" config file from
-an internal representation containing only the data understood by Borg,
-the config file is read in entirety (using the Python ConfigParser) and modified.
-This preserves all sections and values not understood by the Borg version
-modifying it.
-
-Thus, if an older versions uses a cache with integrity data, it would preserve
-the integrity section and its contents. If a integrity-aware Borg version
-would read this cache, it would incorrectly report checksum errors, since
-the older version did not update the checksums.
-
-However, by duplicating the manifest ID in the integrity section, it is
-easy to tell whether the checksums concern the current state of the cache.
-If they do not match, borg logs a warning and just does not use the integrity
-data.
+The cache config file is read in its entirety (using the Python ConfigParser),
+modified and written back, so sections and values a Borg version does not
+understand are preserved. There is no guard against an older Borg version
+updating the files cache without updating its integrity data: every Borg
+version that can open a version 5 repository knows the ``[integrity]`` section.
 
 A files cache that fails its integrity check (or can not be read at all) is
 discarded, not used: borg then rebuilds the files cache from the most recent

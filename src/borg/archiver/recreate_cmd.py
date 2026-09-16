@@ -51,8 +51,6 @@ class RecreateMixIn:
                 delete_original = True
             if not recreater.recreate(archive_info.id, target, delete_original, args.comment):
                 logger.info(f"Skipped archive {name} {hex_id}: Nothing to do.")
-        if not args.dry_run:
-            manifest.write()
 
     def build_parser_recreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

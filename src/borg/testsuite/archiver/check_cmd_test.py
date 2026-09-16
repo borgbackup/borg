@@ -964,12 +964,11 @@ def test_check_repair_validates_index_rebuild(archivers, request):
         assert neighbour_id in repository.chunks
 
 
-def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monkeypatch):
-    """A check without --repair reports a corrupt object header, it does not index the pack up to it.
+def test_check_without_key_aborts_on_a_corrupt_pack_header(archivers, request, monkeypatch):
+    """A check without --repair and without the key raises CorruptPack at a corrupt object header.
 
-    Without a validator the walk can not resync past a corrupt object header. --repair passes
-    drop_corrupt_tail, so the rest of that pack is dropped and the repair gets on; a check without
-    --repair passes drop_corrupt_tail=False and the walk raises instead.
+    Without the key there is no object validator, and without one the pack walk raises at a corrupt
+    object header.
 
     The rebuild only walks the packs when the chunk index fragments are unusable, and it only walks
     without a validator when the key can not be read, so the test arranges both.
@@ -1013,9 +1012,9 @@ def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monk
         try:
             index = real_build(repository, **kwargs)
         except Exception as err:
-            rebuilds.append((kwargs.get("drop_corrupt_tail"), err))
+            rebuilds.append((kwargs.get("validate"), err))
             raise
-        rebuilds.append((kwargs.get("drop_corrupt_tail"), index))
+        rebuilds.append((kwargs.get("validate"), index))
         return index
 
     monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
@@ -1025,10 +1024,9 @@ def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monk
     with pytest.raises(CorruptPack) as excinfo:
         cmd(archiver, "check", "--archives-only")
     assert f"no object header at offset {damaged_offset} (pack corruption)" in str(excinfo.value)
-    drop_corrupt_tail, outcome = rebuilds[0]
-    # the rebuild raised, it did not return an index with the pack's tail missing
+    validate, outcome = rebuilds[0]
+    assert validate is None
     assert isinstance(outcome, CorruptPack)
-    assert drop_corrupt_tail is False  # a check that only diagnoses does not ask for the drop
 
 
 def test_repo_list_aborts_cleanly_on_corrupt_pack(archivers, request):

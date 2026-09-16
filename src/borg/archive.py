@@ -2285,14 +2285,11 @@ class ArchiveChecker:
             self.chunks = build_chunkindex_from_repo(
                 self.repository,
                 slow_rebuild=repair,
+                # validate is None only without --repair and without the key: a corrupt object header then
+                # raises CorruptPack.
                 validate=validate,
                 # dropped content is a check finding, with or without --repair.
                 on_drop=self.note_dropped_objects,
-                # without a validator the rebuild can not resync past a corrupt object header. --repair
-                # drops the rest of that pack to get on with the repair; without --repair the rebuild
-                # raises, so an index missing objects that are still there can not make the check report
-                # them as gone.
-                drop_corrupt_tail=repair,
                 write_immediately=False,
             )
             # clear F_NEW (entry not in the index/ fragments yet), so Repository.close() does not store

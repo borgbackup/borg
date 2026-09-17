@@ -3,7 +3,6 @@ import hmac
 import os
 import textwrap
 from hashlib import sha256
-from itertools import islice
 from math import ceil
 from pathlib import Path
 from typing import Any, Literal, ClassVar, Optional
@@ -25,9 +24,9 @@ from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, Passphrase
 from ..helpers import msgpack
 from ..helpers import workarounds
 from ..item import Key, EncryptedKey
-from ..manifest import Manifest, NoManifestError
+from ..manifest import Manifest
 from ..platform import SaveFile
-from ..repoobj import RepoObj, RepoObj1
+from ..repoobj import RepoObj1
 
 
 from .low_level import bytes_to_int, num_cipher_blocks, hmac_sha256
@@ -240,6 +239,58 @@ def id_hash_argument_names():
     return names
 
 
+class RepositoryKeyInfoMissing(Error):
+    """Repository {} has no key information in its config."""
+
+    exit_mcode = 54
+
+
+def key_class_for(encryption, id_hash):
+    """Return the key class of the crypto suite named by the repository config values encryption and id_hash.
+
+    None if no key class implements that suite (e.g. a newer borg version wrote the config).
+    """
+    for key in AVAILABLE_KEY_TYPES:
+        if key.ENC_NAME == encryption and key.IDHASH_NAME == id_hash:
+            return key
+    return None
+
+
+def key_class_of(repository):
+    """Return the key class of repository, as recorded in its config (see Repository.save_config)."""
+    if repository.encryption is None or repository.id_hash is None:
+        raise RepositoryKeyInfoMissing(repository._location.canonical_path())
+    key_cls = key_class_for(repository.encryption, repository.id_hash)
+    if key_cls is None:
+        from ..repository import Repository  # repository imports this module, hence the local import
+
+        raise Repository.InvalidRepositoryConfig(
+            repository._location.canonical_path(),
+            f'unsupported crypto suite: encryption "{repository.encryption}", id hash "{repository.id_hash}" '
+            "(a newer version of Borg may be required)",
+        )
+    return key_cls
+
+
+def key_factory(repository, *, other=False):
+    """Return the (loaded) key of repository, its class selected by the repository config."""
+    return key_class_of(repository).detect(repository, None, other=other)
+
+
+def legacy_key_factory(repository, manifest_chunk, *, other=False):
+    """Return the (loaded) key of a borg 1.x repository, its class selected by the key type byte of its manifest.
+
+    manifest_chunk: the stored manifest object of the borg 1.x repository. The first byte of its
+    crypted data is the key type byte (see identify_key).
+    """
+    manifest_data = RepoObj1.extract_crypted_data(manifest_chunk)
+    assert manifest_data, "manifest data must not be zero bytes long"
+    key_cls = identify_key(manifest_data)
+    key = key_cls.detect(repository, manifest_data, other=other)
+    key.stored_type = manifest_data[0]
+    return key
+
+
 def identify_key(manifest_data):
     # the key-type byte only identifies the crypto suite (id hash, MAC, cipher), NOT where the key is
     # stored: keyfile and repokey share one class now and accept both historic type bytes. The legacy
@@ -249,69 +300,6 @@ def identify_key(manifest_data):
         if key_type in key.TYPES_ACCEPTABLE:
             return key
     raise UnsupportedPayloadError(key_type)
-
-
-def identify_stored_key(manifest_chunk, *, ro_cls=RepoObj):
-    """Return (key class, data slot) of the stored object manifest_chunk.
-
-    A stored object is an object header, a metadata slot and a data slot (see RepoObj). The first
-    byte of the data slot is the key type byte, which selects the key class.
-
-    manifest_chunk: the stored object, e.g. the manifest.
-    ro_cls: the RepoObj class that parses manifest_chunk.
-    Raises IntegrityError if manifest_chunk is damaged (see ro_cls.extract_crypted_data), and
-    UnsupportedPayloadError if the key type byte selects no key class usable with ro_cls.
-    """
-    manifest_data = ro_cls.extract_crypted_data(manifest_chunk)
-    assert manifest_data, "manifest data must not be zero bytes long"
-    key_cls = identify_key(manifest_data)
-    if key_cls in LEGACY_KEY_TYPES and ro_cls is not RepoObj1:
-        # A borg 2 repository using a borg 1.x key type: that can only be a repository created by
-        # a borg 2 beta in the old "none" or "authenticated" mode, which have been replaced by the
-        # tagged envelope modes (see MACKeyBase). The legacy key classes only exist to read borg
-        # 1.x repositories (ro_cls is RepoObj1 then), e.g. for "borg transfer --from-borg1".
-        raise UnsupportedPayloadError(manifest_data[0])
-    return key_cls, manifest_data
-
-
-def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
-    key_cls, manifest_data = identify_stored_key(manifest_chunk, ro_cls=ro_cls)
-    key = key_cls.detect(repository, manifest_data, other=other)
-    key.stored_type = manifest_data[0]
-    return key
-
-
-def key_from_repository(repository, ids=None):
-    """Return the key of repository, loaded from the first stored object that identifies the key type.
-
-    Stored objects are read in this order: the manifest, then the objects of the chunk ids in ids, at
-    most 999 of them. An object identifies the key type if identify_stored_key accepts it. Errors
-    loading the key, e.g. a wrong passphrase, propagate.
-
-    repository: the Repository whose key is loaded.
-    ids: iterable of chunk ids. None: the chunk ids in the chunks index of repository.
-    Raises IntegrityError if no object read identifies the key type.
-    """
-    max_objects = 999
-
-    def stored_objects():
-        try:
-            yield repository.get_manifest()
-        except NoManifestError:
-            pass
-        chunk_ids = (id for id, _ in repository.list(limit=max_objects)) if ids is None else ids
-        for id in islice(chunk_ids, max_objects):
-            yield repository.get(id)
-
-    count = 0
-    for cdata in stored_objects():
-        count += 1
-        try:
-            identify_stored_key(cdata)
-        except (IntegrityError, UnsupportedPayloadError):
-            continue
-        return key_factory(repository, cdata)
-    raise IntegrityError(f"no stored object identifies the key type ({count} objects read)")
 
 
 def uses_same_chunker_secret(other_key, key):
@@ -1561,8 +1549,9 @@ class AEADKeyBase(KeyBase):
 
 # Each of these is one unified key class per crypto suite. A key of this class may be stored either as
 # a keyfile or inside the repository (repokey) - that is a per-key storage property (self.storage), not
-# a class distinction. The class is selected from the manifest's key-type byte (see identify_key), which
-# only encodes the crypto suite (there is exactly one type byte per suite now).
+# a class distinction. The class is selected from the crypto suite recorded in the repository config (see
+# key_class_for); the key-type byte in every stored object only encodes the crypto suite as well (there is
+# exactly one type byte per suite now).
 
 # AES-OCB has a birthday-type bound: an attacker's advantage in distinguishing the ciphertexts from
 # random is about 6 * sigma^2 / 2^128, sigma being the number of 128bit cipher blocks encrypted using

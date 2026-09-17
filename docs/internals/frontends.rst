@@ -831,6 +831,8 @@ Errors
 
     Repository.AlreadyExists rc: 10 traceback: no
         A repository already exists at {}.
+    Repository.IncompleteRepository rc: 11 traceback: no
+        {} has no repository config.
     Repository.CheckNeeded rc: 12 traceback: yes
         Inconsistency detected. Please run "borg check {}".
     Repository.DoesNotExist rc: 13 traceback: no
@@ -900,6 +902,8 @@ Errors
         Passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect.
     PasswordRetriesExceeded rc: 53 traceback: no
         Exceeded the maximum password retries.
+    RepositoryKeyInfoMissing rc: 54 traceback: no
+        Repository {} has no key information in its config.
 
     CacheInitAbortedError rc: 60 traceback: no
         Cache initialization aborted

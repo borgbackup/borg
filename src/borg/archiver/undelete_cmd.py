@@ -51,7 +51,6 @@ class UnDeleteMixIn:
         if dry_run:
             logger.info("Finished dry-run.")
         elif undeleted:
-            manifest.write()
             self.print_warning("Done.", wc=None)
         else:
             self.print_warning("Aborted.", wc=None)

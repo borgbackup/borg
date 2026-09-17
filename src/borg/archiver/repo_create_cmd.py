@@ -34,14 +34,20 @@ class RepoCreateMixIn:
         logger.info('Initializing repository at "%s"' % path)
         if other_key is not None:
             other_key.copy_crypt_key = args.copy_crypt_key
+        key = None
         try:
             key = key_creator(repository, args, other_key=other_key)
-        except (EOFError, KeyboardInterrupt):
+            # writing the config is what makes the store a repository, see Repository.create().
+            repository.save_config(key)
+        except BaseException as exc:
+            # an interrupted or failed repo-create must not leave a (partial) repository behind, nor a keyfile.
+            if key is not None and key.storage == KeyBlobStorage.KEYFILE:
+                key.remove(key.target)
             repository.destroy()
-            raise CancelledByUser()
+            if isinstance(exc, (EOFError, KeyboardInterrupt)):
+                raise CancelledByUser()
+            raise
         manifest = Manifest(key, repository)
-        manifest.key = key
-        manifest.write()
         with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
         if key.has_secret_key:  # any key-bearing suite (everything except the "none-*" modes)

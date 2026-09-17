@@ -1,4 +1,5 @@
 import io
+import configparser
 import os
 import re
 import sys
@@ -28,7 +29,6 @@ from .helpers import ProgressIndicatorPercent
 from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
-from .manifest import NoManifestError
 from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
 from .crypto.key import is_keyfile, store_hash, STORE_HASH_NAME, STORE_HASH_SIZE
 
@@ -767,6 +767,10 @@ class PackTracker:
             pass
 
 
+class _ConfigMissing(Exception):
+    """internal: the store exists, but has no repository config object (see Repository._load_config)."""
+
+
 class Repository:
     """borgstore-based key/value store."""
 
@@ -774,6 +778,11 @@ class Repository:
         """A repository already exists at {}."""
 
         exit_mcode = 10
+
+    class IncompleteRepository(Error):
+        """{} has no repository config."""
+
+        exit_mcode = 11
 
     class CheckNeeded(ErrorWithTraceback):
         """Inconsistency detected. Please run "borg check {}"."""
@@ -866,6 +875,8 @@ class Repository:
         self,
         path_or_location,
         create=False,
+        create_config=True,
+        allow_incomplete=False,
         exclusive=False,
         lock_wait=1.0,
         lock=True,
@@ -938,6 +949,10 @@ class Repository:
         self.permissions = None if location.proto == "rest" else permissions
         self.store_opened = False
         self.version = None
+        self.id = None
+        # the crypto suite of the repository's key, as recorded in the repository config (see save_config):
+        self.encryption = None  # the "--encryption" name, e.g. "aes256-ocb"
+        self.id_hash = None  # the "--id-hash" name, e.g. "sha256"
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client
         # in a timely manner, in case we have a RemoteRepository.
@@ -945,7 +960,15 @@ class Repository:
         self._send_log = send_log_cb or (lambda: None)
         self.do_create = create
         self.created = False
-        self.acceptable_repo_versions = (4,)
+        # create_config=False: create() does not write the repository config, the caller does that via
+        # save_config() (used by "borg repo-create", which writes it once the key exists, see create()).
+        self._create_config = create_config
+        self._config_written = False
+        # allow_incomplete=True: open() also accepts a store without repository config (see create()),
+        # so that "borg repo-delete --force" can destroy it. self.incomplete tells whether that happened.
+        self._allow_incomplete = allow_incomplete
+        self.incomplete = False
+        self.acceptable_repo_versions = (5,)
         self.opened = False
         self.lock = None
         self.do_lock = lock
@@ -974,6 +997,9 @@ class Repository:
             self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         except Exception:
             self.close(aborting=True)
+            if self.created:
+                # we just created the store, but could not open it: do not leave it behind (see create()).
+                self.store.destroy()
             raise
         return self
 
@@ -994,34 +1020,145 @@ class Repository:
         return bin_to_hex(self.id)
 
     def create(self):
-        """Create a new empty repository"""
+        """Create the store for a new repository, give it a fresh id and write the repository config.
+
+        The config has no key information yet (see save_config), so the repository can be opened and
+        used as a key/value store, but its key can not be loaded until save_config(key) was called.
+
+        With create_config=False (see __init__), the config is not written here, but by the caller via
+        save_config(). Until then, the store is not a repository (open() reports it as not a valid
+        repository): "borg repo-create" uses this, so that an interrupted repo-create does not leave a
+        repository behind.
+
+        If anything fails after the store was created, the store is destroyed again, so a failure (e.g.
+        disk full, permission denied) does not leave a store without config behind either.
+        """
         try:
             self.store.create()
         except StoreBackendAlreadyExists:
-            raise self.AlreadyExists(self.url)
-        self.store.open()
+            raise self._already_exists_error() from None
         try:
-            self.store.store("config/readme", REPOSITORY_README.encode())
-            self.version = 4
-            self.store.store("config/version", str(self.version).encode())
-            self.store.store("config/id", bin_to_hex(os.urandom(32)).encode())
-            # we know repo/packs/ still does not have any chunks stored in it,
-            # but for some stores, there might be a lot of empty directories and
-            # listing them all might be rather slow, so we better cache an empty
-            # ChunkIndex from here so that the first repo operation does not have
-            # to build the ChunkIndex the slow way by listing all the directories.
-            from borg.cache import write_chunkindex_to_repo
+            # create all namespace directories in advance (saves ad-hoc mkdirs later, see borgstore). This
+            # also is what tells a store borg created apart from any other directory, see looks_like_borg_store().
+            self.store.create_levels()
+            self.store.open()
+            try:
+                self.version = 5
+                self.id = os.urandom(32)
+                if self._create_config:
+                    self.save_config()
+                # we know repo/packs/ still does not have any chunks stored in it,
+                # but for some stores, there might be a lot of empty directories and
+                # listing them all might be rather slow, so we better cache an empty
+                # ChunkIndex from here so that the first repo operation does not have
+                # to build the ChunkIndex the slow way by listing all the directories.
+                from borg.cache import write_chunkindex_to_repo
 
-            write_chunkindex_to_repo(self, ChunkIndex(), clear=True, force_write=True)
-        finally:
-            self.store.close()
+                write_chunkindex_to_repo(self, ChunkIndex(), clear=True, force_write=True)
+            finally:
+                self.store.close()
+        except BaseException:
+            # do not leave the just created store behind (see above); the original error is what matters.
+            try:
+                self.store.destroy()
+            except Exception as exc:
+                logger.warning("could not remove the incompletely created store: %s", exc)
+            raise
+
+    def _already_exists_error(self):
+        # the store backend refused to create the store, e.g. because the directory is not empty. if there
+        # is a repository config, it is a repository. else we only know that there is no borg 2 repository:
+        # the directory may hold anything, e.g. a borg 1.x repository, or be the leftover of an interrupted
+        # repo-create (see create()).
+        try:
+            self.store.open()
+            try:
+                self.store.load("config/config")
+            except StoreObjectNotFound:
+                return self.IncompleteRepository(self.url)
+            finally:
+                self.store.close()
+        except StoreBackendError:
+            pass  # can not look inside, so we do not know more
+        return self.AlreadyExists(self.url)
+
+    def save_config(self, key=None):
+        """Store the repository config (the config/config store object).
+
+        It holds the repository version and id and the crypto suite of the repository's key (encryption
+        mode and id hash), so that the key class is known without reading any repository object.
+        Writing it is what makes the store a repository: open() requires it.
+
+        key: the repository's key, its crypto suite gets recorded. None: record the crypto suite known
+        from a previous config (if any) - without it, the repository can be opened, but its key can not
+        be loaded (see key_factory).
+        """
+        if key is not None:
+            self.encryption, self.id_hash = key.ENC_NAME, key.IDHASH_NAME
+        config = configparser.ConfigParser(interpolation=None)
+        config.add_section("repository")
+        config.set("repository", "version", str(self.version))
+        config.set("repository", "id", bin_to_hex(self.id))
+        if self.encryption is not None and self.id_hash is not None:
+            config.set("repository", "encryption", self.encryption)
+            config.set("repository", "id_hash", self.id_hash)
+        with io.StringIO() as f:
+            for line in REPOSITORY_README.splitlines():
+                f.write(f"# {line}\n")
+            f.write("\n")
+            config.write(f)
+            self.store.store("config/config", f.getvalue().encode())
+        self._config_written = True
+
+    def _load_config(self):
+        try:
+            text = self.store.load("config/config").decode()
+        except StoreBackendDoesNotExist:
+            # A rest:// store's open() does not contact the server, so for rest:// a missing repository
+            # only shows up here, when the first request fails with BackendDoesNotExist (#10365).
+            raise self.DoesNotExist(str(self._location)) from None
+        except StoreObjectNotFound:
+            # the store exists, but has no repository config: a repository that lost its config, something
+            # that never was a borg 2 repository, or the leftover of an interrupted repo-create (see create()).
+            raise _ConfigMissing() from None
+        except UnicodeDecodeError:
+            raise self.InvalidRepository(str(self._location)) from None
+        config = configparser.ConfigParser(interpolation=None)
+        try:
+            config.read_string(text)
+            self.version = config.getint("repository", "version")
+            self.id = hex_to_bin(config.get("repository", "id"), length=32)
+            self.encryption = config.get("repository", "encryption", fallback=None)
+            self.id_hash = config.get("repository", "id_hash", fallback=None)
+        except (configparser.Error, ValueError):
+            raise self.InvalidRepository(str(self._location)) from None
+        if (self.encryption is None) != (self.id_hash is None):
+            # the crypto suite is recorded by both entries or by none, see save_config().
+            raise self.InvalidRepository(str(self._location))
+
+    def looks_like_borg_store(self):
+        """Does the (opened, config-less) store have the packs, archives, index and config namespaces?
+
+        create() makes them, so every store borg created has them, even the leftover of an interrupted
+        repo-create. Any other directory (data, a home directory, a borg 1.x repository) does not, and
+        "borg repo-delete --force" must never destroy it.
+        """
+
+        def namespace_exists(name):
+            try:
+                next(iter(self.store.list(name)), None)  # an existing namespace lists (maybe nothing)
+            except StoreObjectNotFound:
+                return False
+            return True
+
+        return all(namespace_exists(name) for name in ("packs", "archives", "index", "config"))
 
     def _set_id(self, id):
         # for testing: change the id of an existing repository
         assert self.opened
         assert isinstance(id, bytes) and len(id) == 32
         self.id = id
-        self.store.store("config/id", bin_to_hex(id).encode())
+        self.save_config()
 
     def _lock_refresh(self):
         if self.lock is not None:
@@ -1083,21 +1220,23 @@ class Repository:
             raise self.DoesNotExist(str(self._location)) from None
         else:
             self.store_opened = True
-        try:
-            readme = self.store.load("config/readme").decode()
-        except (StoreObjectNotFound, StoreBackendDoesNotExist):
-            # A rest:// store's open() does not contact the server, so for rest:// a missing repository
-            # only shows up here, when the first request fails with BackendDoesNotExist (#10365).
-            raise self.DoesNotExist(str(self._location)) from None
-        if readme != REPOSITORY_README:
-            raise self.InvalidRepository(str(self._location))
-        self.version = int(self.store.load("config/version").decode())
+        if self.created and not self._config_written:
+            pass  # create() just ran and set version and id; the config is written later by save_config().
+        else:
+            try:
+                self._load_config()
+            except _ConfigMissing:
+                if not self._allow_incomplete:
+                    raise self.InvalidRepository(str(self._location)) from None
+                # a store without repository config: version and id are unknown, nothing gets locked, the
+                # only thing the caller may do with it is looks_like_borg_store() / destroy().
+                self.incomplete = True
+                return
         if self.version not in self.acceptable_repo_versions:
             self.close()
             raise self.InvalidRepositoryConfig(
                 str(self._location), "repository version %d is not supported by this borg version" % self.version
             )
-        self.id = hex_to_bin(self.store.load("config/id").decode(), length=32)
         # important: lock *after* making sure that there actually is an existing, supported repository.
         if lock:
             self.lock = Lock(
@@ -2043,17 +2182,6 @@ class Repository:
         # note: only needed for local repos
         if self.lock is not None:
             self.lock.migrate_lock(old_id, new_id)
-
-    def get_manifest(self):
-        self._lock_refresh()
-        try:
-            return self.store.load("config/manifest")
-        except StoreObjectNotFound:
-            raise NoManifestError
-
-    def put_manifest(self, data):
-        self._lock_refresh()
-        return self.store.store("config/manifest", data)
 
     def store_list(self, name, *, deleted=False):
         self._lock_refresh()

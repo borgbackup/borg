@@ -9,22 +9,21 @@ from ...crypto.key import BLAKE3_MT_THRESHOLD_KIB, get_blake3_mt_threshold
 from ...crypto.key import ChecksumKey, Blake3ChecksumKey, keyfile_parse
 from ...crypto.key import AuthenticatedKey, Blake3AuthenticatedKey
 from ...crypto.key import AESCTRKey, Blake2AESCTRKey, Blake2AuthenticatedKey
-from ...crypto.key import LegacyPlaintextKey, LegacyAuthenticatedKey
+from ...crypto.key import LegacyAuthenticatedKey
 from ...crypto.key import AEADKeyBase
 from ...crypto.key import AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey
 from ...crypto.key import AES_OCB_MAX_SESSION_BLOCKS
 from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError, UnsupportedPayloadError
 from ...crypto.key import RepoKeyNotFoundError
-from ...crypto.key import identify_key, key_from_repository
+from ...crypto.key import identify_key, key_class_for, key_class_of, key_factory, RepositoryKeyInfoMissing
+from ...crypto.key import AVAILABLE_KEY_TYPES
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
 from ...helpers import Error
 from ...helpers import IntegrityError
 from ...helpers import Location
 from ...helpers import msgpack
-from ...manifest import NoManifestError
-from ...repoobj import RepoObj
-from ...constants import KEY_ALGORITHMS, KeyBlobStorage, KeyType, ROBJ_FILE_STREAM, ROBJ_MANIFEST
+from ...constants import KEY_ALGORITHMS, KeyBlobStorage, KeyType
 from ...helpers import hex_to_bin, bin_to_hex
 
 
@@ -602,21 +601,6 @@ def test_legacy_authenticated_no_key_key_gone(cls, monkeypatch, tmp_path):
     assert bytes(key.decrypt(None, envelope)) == payload
 
 
-def test_dropped_borg2_beta_key_types(tmpdir):
-    # the borg2 beta "none"/"authenticated" formats were dropped, see #9104. A borg2 repository
-    # using them must be refused instead of being read with the legacy classes.
-    from ...repoobj import RepoObj
-    from ...crypto.key import key_factory
-
-    for legacy_cls in (LegacyPlaintextKey, LegacyAuthenticatedKey):
-        key = legacy_cls(MagicMock(id=bytes(32)))
-        if legacy_cls is LegacyAuthenticatedKey:
-            key.id_key = bytes(32)
-        manifest_chunk = RepoObj(key).format(bytes(32), {}, b"manifest", ro_type=ROBJ_MANIFEST)
-        with pytest.raises(UnsupportedPayloadError):
-            key_factory(MagicMock(id=bytes(32)), manifest_chunk, ro_cls=RepoObj)
-
-
 def test_dropped_blake3_authenticated_type_byte():
     with pytest.raises(UnsupportedPayloadError):
         identify_key(bytes([KeyType.DROPPED_BLAKE3AUTHENTICATED]) + b"payload")
@@ -669,70 +653,26 @@ def test_argon2_wrong_passphrase_returns_none(monkeypatch):
     assert key.decrypt_key_file(a2b_base64(saved_b64), "wrong passphrase") is None
 
 
-class StoredObjectsRepository:
-    """A repository with a stored manifest (None: no manifest) and objects by chunk id."""
-
-    def __init__(self, manifest, objects):
-        self.manifest = manifest
-        self.objects = objects
-
-    def get_manifest(self):
-        if self.manifest is None:
-            raise NoManifestError
-        return self.manifest
-
-    def get(self, id):
-        return self.objects[id]
-
-    def list(self, limit=None):
-        return [(id, len(obj)) for id, obj in self.objects.items()][:limit]
+@pytest.mark.parametrize("cls", AVAILABLE_KEY_TYPES)
+def test_key_class_for_names_every_creatable_suite(cls):
+    # the repository config records the crypto suite by the --encryption / --id-hash names
+    assert key_class_for(cls.ENC_NAME, cls.IDHASH_NAME) is cls
 
 
-def stored_object(key_cls, id):
-    return RepoObj(key_cls(MagicMock(id=bytes(32)))).format(id, {}, b"data", ro_type=ROBJ_FILE_STREAM)
+def test_key_class_for_unknown_suite():
+    from ...repository import Repository
+
+    assert key_class_for("rot13", "sha256") is None
+    repository = MagicMock(encryption="rot13", id_hash="sha256")
+    with pytest.raises(Repository.InvalidRepositoryConfig, match="unsupported crypto suite"):
+        key_class_of(repository)
 
 
-def with_key_type(cdata, key_type):
-    """Return cdata with its key type byte, the first byte of the data slot, set to key_type."""
-    offset = len(cdata) - len(RepoObj.extract_crypted_data(cdata))
-    return cdata[:offset] + bytes([key_type]) + cdata[offset + 1 :]
-
-
-def test_key_from_repository_reads_the_key_type_from_the_manifest():
-    objects = {b"o" * 32: stored_object(ChecksumKey, b"o" * 32)}
-    repository = StoredObjectsRepository(stored_object(Blake3ChecksumKey, bytes(32)), objects)
-    assert isinstance(key_from_repository(repository), Blake3ChecksumKey)
-
-
-def test_key_from_repository_skips_objects_that_do_not_identify_a_key_type():
-    good = stored_object(ChecksumKey, b"g" * 32)
-    objects = {
-        b"d" * 32: b"damaged",
-        b"u" * 32: with_key_type(good, KeyType.DROPPED_BLAKE3AUTHENTICATED),
-        b"g" * 32: good,
-    }
-    repository = StoredObjectsRepository(b"damaged manifest", objects)
-    assert isinstance(key_from_repository(repository), ChecksumKey)
-
-
-def test_key_from_repository_raises_if_no_object_identifies_the_key_type():
-    objects = {b"g" * 32: stored_object(ChecksumKey, b"g" * 32)}
-    with pytest.raises(IntegrityError):
-        key_from_repository(StoredObjectsRepository(None, objects), ids=())  # the manifest only
-    with pytest.raises(IntegrityError):
-        key_from_repository(StoredObjectsRepository(None, {b"d" * 32: b"damaged"}))
-
-
-def test_key_from_repository_loads_the_key_once(monkeypatch):
-    ids = (b"a" * 32, b"b" * 32)
-    repository = StoredObjectsRepository(None, {id: stored_object(ChecksumKey, id) for id in ids})
-    detected = []
-
-    def detect(repository, manifest_data, *, other=False):
-        detected.append(manifest_data)
-        raise IntegrityError("the key can not be loaded")
-
-    monkeypatch.setattr(ChecksumKey, "detect", detect)
-    with pytest.raises(IntegrityError, match="the key can not be loaded"):
-        key_from_repository(repository)
-    assert len(detected) == 1
+def test_key_class_of_needs_key_info():
+    repository = MagicMock(encryption=None, id_hash=None)
+    with pytest.raises(RepositoryKeyInfoMissing):
+        key_class_of(repository)
+    with pytest.raises(RepositoryKeyInfoMissing):
+        key_factory(repository)
+    repository = MagicMock(encryption="none-sha256", id_hash="sha256")
+    assert key_class_of(repository) is ChecksumKey

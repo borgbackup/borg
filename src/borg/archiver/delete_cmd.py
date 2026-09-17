@@ -58,7 +58,6 @@ class DeleteMixIn:
         if dry_run:
             logger.info("Finished dry-run.")
         elif deleted:
-            manifest.write()
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         else:
             self.print_warning("Aborted.", wc=None)

@@ -15,7 +15,6 @@ class CopyMixIn:
         """Copy an archive to a new archive name."""
         old_id = archive.id
         archive.copy(args.newname)
-        manifest.write()
         logger.info(f"id: {bin_to_hex(old_id):.8} -> {bin_to_hex(archive.id):.8}, name: {archive.name}.")
 
     def build_parser_copy(self, subparsers, common_parser, mid_common_parser):

@@ -125,7 +125,7 @@ rebuilt the index from it. Rewriting such a pack is repository-level repair, see
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
 only when it validates like any walked header. Validating needs the key, so a
-repair that cannot read the manifest walks without it.
+repair that cannot load the key walks without it.
 
 In the ``none-*`` modes the tag is an unkeyed checksum, and in the
 ``authenticated-*`` modes it binds a blob to its chunk id and nothing else (see
@@ -357,22 +357,11 @@ without decrypting any blob and without the repository key.
 Repository Version
 ------------------
 
-Repositories using pack files require repository version **4**, and the version is the
-only gate for the pack format.
+Repositories using pack files require repository version **5** or later, and the version
+is the only gate for the pack format.
 
-``Repository.create()`` stores ``4`` as the ``config/version`` store object.
+``Repository.save_config()`` stores the version in the repository config (see
+:ref:`repo_config`; currently ``5``, which also introduced the config object itself).
 ``Repository.open()`` reads it back and, if it is not in
-``Repository.acceptable_repo_versions`` (currently ``(4,)``), closes the store again
-and raises ``InvalidRepositoryConfig`` -- before any repository data is read. A borg
-version that only accepts version 3 rejects a version 4 repository the same way, so
-the version bump alone locks out every client that does not know about packs.
-
-Borg does have a feature flag mechanism for locking out clients more selectively
-(``Manifest.check_repository_compatibility()``, fed from a ``feature_flags`` entry in
-the manifest ``config`` -- see :ref:`manifest`), but it currently defines no flags at
-all: ``Manifest.SUPPORTED_REPO_FEATURES`` is the empty set, and no borg code writes a
-``feature_flags`` entry. On a repository borg creates, the compatibility check is
-therefore a no-op; there is in particular no ``pack_files`` feature flag.
-
-There is no migration path from version 3 repositories to version 4. Users of the
-version 3 beta format must create a new repository with ``borg repo-create``.
+``Repository.acceptable_repo_versions`` (currently ``(5,)``), closes the store again
+and raises ``InvalidRepositoryConfig`` -- before any repository data is read.

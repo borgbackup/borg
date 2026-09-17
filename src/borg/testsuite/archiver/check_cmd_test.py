@@ -19,8 +19,9 @@ from ...cache import (
     read_chunkindex_from_repo,
     write_chunkindex_invalid,
 )
+from ...crypto.key import RepositoryKeyInfoMissing
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
+from ...helpers import bin_to_hex, CommandError, CorruptPack, Error, sig_int
 from ...helpers import BackupDamagedChunksError
 from ...helpers.passphrase import PassphraseWrong
 from ...hashindex import ChunkIndex
@@ -739,63 +740,6 @@ def test_check_format_missing_archive_metadata(archivers, request):
     assert "Analyzing archive archive2" in output  # the intact archive still uses the given format
 
 
-def test_missing_manifest(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    check_cmd_setup(archiver)
-    archive, repository = open_archive(archiver.repository_path, "archive1")
-    with repository:
-        if isinstance(repository, Repository):
-            repository.store_delete("config/manifest")
-        else:
-            repository.delete(Manifest.MANIFEST_ID, validate=None)
-    cmd(archiver, "check", exit_code=1)
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "archive1" in output
-    assert "archive2" in output
-    cmd(archiver, "check", exit_code=0)
-
-
-def test_corrupted_manifest(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    check_cmd_setup(archiver)
-    archive, repository = open_archive(archiver.repository_path, "archive1")
-    with repository:
-        manifest = repository.get_manifest()
-        corrupted_manifest = corrupt(manifest, len(manifest) - 1)  # the manifest object is small, hit the ciphertext
-        repository.put_manifest(corrupted_manifest)
-    cmd(archiver, "check", exit_code=1)
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "archive1" in output
-    assert "archive2" in output
-    cmd(archiver, "check", exit_code=0)
-
-
-def test_spoofed_manifest(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    check_cmd_setup(archiver)
-    archive, repository = open_archive(archiver.repository_path, "archive1")
-    with repository:
-        manifest = Manifest.load(repository)
-        cdata = manifest.repo_objs.format(
-            Manifest.MANIFEST_ID,
-            {},
-            msgpack.packb({"version": 1, "archives": {}, "config": {}}),
-            # we assume that an attacker can put a file into backup src files that contains a fake manifest.
-            # but, the attacker can not influence the ro_type borg will use to store user file data:
-            ro_type=ROBJ_FILE_STREAM,  # a real manifest is stored with ROBJ_MANIFEST
-        )
-        # maybe a repo-side attacker could manage to move the fake manifest file chunk over to the manifest ID.
-        # we simulate this here by directly writing the fake manifest data to the manifest ID.
-        repository.put_manifest(cdata)
-    # borg should notice that the manifest has the wrong ro_type.
-    cmd(archiver, "check", exit_code=1)
-    # borg check --repair should remove the corrupted manifest and rebuild a new one.
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "archive1" in output
-    assert "archive2" in output
-    cmd(archiver, "check", exit_code=0)
-
-
 def test_check_repair_rebuilds_corrupt_index(archivers, request):
     # A corrupt index with all packs intact: the default (full) --repair rebuilds the index from the
     # packs and persists it (via the archives check, see ArchiveChecker.finish), leaving the repository
@@ -876,25 +820,6 @@ def test_check_repository_only_repair_aborts_on_wrong_passphrase(archivers, requ
         cmd(archiver, "check", "-v", "--repository-only", "--repair")
 
 
-@pytest.mark.skip(reason="TODO: repair does not yet rewrite store-corrupted packs, refs #8572")
-def test_manifest_rebuild_corrupted_chunk(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    check_cmd_setup(archiver)
-    archive, repository = open_archive(archiver.repository_path, "archive1")
-    with repository:
-        manifest = repository.get_manifest()
-        # flip a byte inside the encrypted manifest data so its integrity check fails and
-        # check --repair rebuilds the manifest.
-        corrupted_manifest = corrupt(manifest, len(manifest) // 3)
-        repository.put_manifest(corrupted_manifest)
-        corrupt_chunk_on_disk(repository, archive.id)
-    cmd(archiver, "check", exit_code=1)
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "archive1" not in output
-    assert "archive2" in output
-    cmd(archiver, "check", exit_code=0)
-
-
 def test_check_undelete_archives(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)  # creates archive1 and archive2
@@ -921,10 +846,6 @@ def test_spoofed_archive(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     repo_objs = archive.repo_objs
     with repository:
-        # attacker would corrupt or delete the manifest to trigger a rebuild of it:
-        manifest = repository.get_manifest()
-        corrupted_manifest = corrupt(manifest, len(manifest) - 1)  # the manifest object is small, hit the ciphertext
-        repository.put_manifest(corrupted_manifest)
         archive_dict = {
             "command_line": "",
             "item_ptrs": [],
@@ -948,8 +869,9 @@ def test_spoofed_archive(archivers, request):
             ),
         )
         repository.flush()  # make the put durable before close()/the check below
-    cmd(archiver, "check", exit_code=1)
-    cmd(archiver, "check", "--repair", "--debug", exit_code=0)
+    # the attacker would hope that the search for lost archives picks the fake archive up, but
+    # borg notices that the object has the wrong ro_type.
+    cmd(archiver, "check", "--repair", "--find-lost-archives", "--debug", exit_code=0)
     output = cmd(archiver, "repo-list")
     assert "archive1" in output
     assert "archive2" in output
@@ -1077,12 +999,12 @@ def test_check_without_repair_does_not_drop_a_pack_tail(archivers, request, monk
 
     real_make_key = ArchiveChecker.make_key
 
-    def make_key(self, repository, manifest_only=False):
-        # fail the manifest_only read, the one the rebuild's validator needs, as an unreadable key
-        # would. check_cmd already read the key before the check (#1931), hence the full read below.
-        if manifest_only:
-            raise IntegrityError("no key")
-        return real_make_key(self, repository, manifest_only=manifest_only)
+    def make_key(self, repository):
+        # fail the reads before the index rebuild (the one the rebuild's validator needs), as a
+        # repository config without key info would. the full read after the rebuild succeeds.
+        if getattr(self, "chunks", None) is None:
+            raise RepositoryKeyInfoMissing("no key")
+        return real_make_key(self, repository)
 
     real_build = archive_module.build_chunkindex_from_repo
     rebuilds = []
@@ -1327,34 +1249,6 @@ def test_empty_repository(archivers, request):
         for info in repository.store_list("packs"):
             repository.store_delete("packs/" + info.name)
     cmd(archiver, "check", exit_code=1)
-
-
-def test_manifest_with_timestamp_is_accepted(archivers, request):
-    # borg 1.x and older borg 2 versions wrote a "timestamp" entry into the manifest. it is not written
-    # anymore, but such manifests must still load (and get rewritten without it).
-    archiver = request.getfixturevalue(archivers)
-    check_cmd_setup(archiver)
-    with Repository(archiver.repository_path, exclusive=True) as repository:
-        manifest = Manifest.load(repository)
-        data = manifest.key.pack_metadata(
-            {
-                "version": 2,
-                "archives": {},
-                "config": {"item_keys": tuple(sorted(ITEM_KEYS))},
-                "timestamp": "2026-01-01T00:00:00.000000",
-            }
-        )
-        repository.put_manifest(manifest.repo_objs.format(Manifest.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST))
-    output = cmd(archiver, "repo-list")
-    assert "archive1" in output
-    create_src_archive(archiver, "archive3")  # a writing command rewrites the manifest ...
-    dump_file = archiver.output_path + "/dump"
-    cmd(archiver, "debug", "dump-manifest", dump_file)
-    with open(dump_file) as f:
-        dump = f.read()
-    assert "timestamp" not in dump  # ... without the timestamp
-    assert "item_keys" not in dump  # ... and without the legacy item keys list
-    cmd(archiver, "check", exit_code=0)
 
 
 def test_items_with_unknown_keys_are_kept(archivers, request):

@@ -3,8 +3,8 @@ import os
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
-from ..crypto.key import key_from_repository
-from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error, IntegrityError
+from ..crypto.key import key_factory, RepositoryKeyInfoMissing
+from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error
 from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.time import archive_ts_now, calculate_relative_offset
@@ -69,12 +69,10 @@ class CheckMixIn:
             # if we need the key later for the archives check, ask NOW for the passphrase! #1931
             archive_checker = ArchiveChecker()
             try:
-                archive_checker.key = archive_checker.make_key(repository, manifest_only=True)
-            except IntegrityError:
+                archive_checker.key = archive_checker.make_key(repository)
+            except RepositoryKeyInfoMissing:
                 if args.repair:
-                    # repair needs the key to validate the index rebuild. The manifest did not give it,
-                    # so read it from the objects the chunk index lists.
-                    archive_checker.key = key_from_repository(repository)
+                    raise  # repair needs the key to validate the index rebuild
             if args.format is not None:
                 format = args.format
             else:
@@ -85,9 +83,8 @@ class CheckMixIn:
         if not args.archives_only:
             validate = None  # the object validator for the index rebuild, which only a repair does
             if args.repair:
-                # ids=(): read the key from the manifest only. Chunk objects are found through the index,
-                # which this check may find corrupt.
-                key = archive_checker.key if not args.repo_only else key_from_repository(repository, ())
+                # the key class comes from the repository config, so loading the key reads no object.
+                key = archive_checker.key if not args.repo_only else key_factory(repository)
                 validate = object_validator(RepoObj(key))
             if not repository.check(
                 repair=args.repair,

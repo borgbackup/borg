@@ -12,7 +12,6 @@ from datetime import datetime
 from operator import attrgetter
 
 from ..constants import *  # NOQA
-from ..helpers.datastruct import StableDict
 from ..helpers.errors import CommandError, Error
 from ..helpers.parseformat import bin_to_hex
 from ..helpers.time import parse_timestamp, compile_date_pattern, DatePatternError
@@ -45,9 +44,6 @@ class LegacyArchives:
 
     def prepare(self, manifest, m):
         self._set_raw_dict(m.archives)
-
-    def finish(self, manifest):
-        return StableDict(self._get_raw_dict())
 
     def ids(self, *, deleted=False):
         for archive_info in self._archives.values():

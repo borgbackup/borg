@@ -1,6 +1,6 @@
 import pytest
 
-from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
+from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
 from ..crypto.key import AESOCBKey, ChecksumKey, AuthenticatedKey, CHPOKey, LegacyPlaintextKey
 from ..helpers import CompressionSpec, msgpack
 from ..helpers.errors import Error, IntegrityError
@@ -174,18 +174,6 @@ def test_malformed_object_inconsistent_sizes(key):
         repo_objs.parse_meta(id, hdr, ro_type=ROBJ_FILE_STREAM)
     with pytest.raises(IntegrityError):
         repo_objs.parse(id, hdr, ro_type=ROBJ_FILE_STREAM)
-
-
-def test_spoof_manifest(key):
-    repo_objs = RepoObj(key)
-    data = b"fake or malicious manifest data"  # File content could be provided by an attacker.
-    id = repo_objs.id_hash(data)
-    # Create a repository object containing user data (file content data).
-    cdata = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
-    # Let's assume an attacker managed to replace the manifest with that repository object.
-    # As Borg always gives the ro_type it intends to read, this should fail:
-    with pytest.raises(IntegrityError):
-        repo_objs.parse(id, cdata, ro_type=ROBJ_MANIFEST)
 
 
 def test_spoof_archive(key):

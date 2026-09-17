@@ -87,12 +87,6 @@ def test_prepare():
     assert la._archives == {"x": {"id": _id(5), "time": TS}}
 
 
-def test_finish():
-    la, _, manifest = _archives([("a", _id(1), TS)])
-    result = la.finish(manifest)
-    assert result == {"a": {"id": _id(1), "time": TS}}
-
-
 def test_ids():
     la, _, _ = _archives([("a", _id(1), TS), ("b", _id(2), TS)])
     assert list(la.ids()) == [_id(1), _id(2)]

@@ -135,3 +135,29 @@ def test_repo_create_refuse_to_overwrite_keyfile(archivers, request, monkeypatch
     with open(keyfile) as file:
         after = file.read()
     assert before == after
+
+
+def test_repo_create_failure_leaves_nothing_behind(archivers, request, monkeypatch):
+    # not only a cancelled, also a failed repo-create must not leave a (partial) repository or a keyfile.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("patches object")
+    keys_dir = os.path.join(archiver.tmpdir, "keys")
+    monkeypatch.setenv("BORG_KEYS_DIR", keys_dir)
+
+    def failing_save_config(self, key=None):
+        raise OSError("simulated store failure while writing the config")
+
+    from ...repository import Repository
+
+    with patch.object(Repository, "save_config", failing_save_config):
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION, exit_code=2)
+        else:
+            with pytest.raises(OSError, match="simulated store failure"):
+                cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
+    assert not os.path.exists(archiver.repository_location)
+    assert not os.path.exists(keys_dir) or not os.listdir(keys_dir)  # the keyfile written before the failure is gone
+    # and nothing stands in the way of creating the repository there now.
+    cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
+    assert os.listdir(keys_dir)

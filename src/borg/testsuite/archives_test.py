@@ -77,11 +77,6 @@ def test_prepare_is_noop():
     m.assert_not_called()
 
 
-def test_finish_returns_empty_dict():
-    ar, _, manifest = _archives()
-    assert ar.finish(manifest) == {}
-
-
 def test_ids_empty():
     ar, _, _ = _archives()
     assert list(ar.ids()) == []

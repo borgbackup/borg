@@ -71,7 +71,7 @@ Above used to be all for borg 1.x and was the reason why it needed the
 tertiary authentication mechanism (TAM) for manifest and archives.
 
 borg 2 now stores the ro_type ("meaning") of a repo object's data into that
-object's metadata (like e.g.: manifest vs. archive vs. user file content data).
+object's metadata (like e.g.: archive metadata vs. user file content data).
 When loading data from the repo, borg verifies that the type of object it got
 matches the type it wanted. borg 2 does not use TAMs any more.
 
@@ -87,7 +87,7 @@ carry an unkeyed checksum rather than a MAC, and an attacker who modifies an
 object can simply recompute it. What still constrains an attacker there is the
 object ID being the (unkeyed) hash of the plaintext: the content of an existing
 object can not be replaced without the ID no longer matching. But the object's
-metadata, the archives list and the manifest are not anchored to anything secret,
+metadata and the archives list are not anchored to anything secret,
 so a ``none-*`` repository provides no tamper protection - only detection of
 accidental corruption.
 
@@ -384,8 +384,26 @@ used:
   repository objects, so the pointer object itself only reveals the archive id (a MAC
   over the archive metadata) plus whatever the store records about it, e.g. its
   modification time.
-- ``config/manifest`` (an encrypted repository object), plus the plaintext
-  ``config/version``, ``config/id`` and ``config/readme``.
+- ``config/config`` -- the plaintext repository config: version, id and the names of
+  the crypto suite (encryption mode, id hash), see :ref:`repo_config`. It is neither
+  encrypted nor authenticated, so an attacker with repository access can rewrite the
+  crypto suite. What protects against a swapped crypto suite is not this object, but:
+
+  - a swap to a suite that does not encrypt (``none-*``, but also
+    ``authenticated-*``: its key blob carries the same key material and no suite
+    name, so it loads fine) would make the client write plaintext. That is caught
+    by the client's security directory: it records the key type of every
+    repository the client accessed, and borg refuses to continue with
+    ``EncryptionMethodMismatch`` if the suite changed. A repository that does not
+    encrypt and is unknown to the client is only accessed after an explicit
+    confirmation (``BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK``). Note that this
+    requires the client environment to be persistent, see `Attack model`_.
+  - a swap between encrypting suites can not expose plaintext: the client
+    would write new objects with the same secret key material under the other
+    cipher, and merely fail to read the existing objects. On a client that knows
+    the repository, the security directory catches this swap as well. The key blobs
+    themselves are bound to the repository id and unlocked by the passphrase, so a
+    client never ends up using key material of the attacker's choice.
 - ``keys/<store hash>`` -- in ``repokey`` mode, the borg key(s), encrypted with the
   passphrase-derived KEK (see :ref:`key_encryption`).
 - ``locks/*`` and ``cache/*``. Note that the per-archive reference caches
@@ -492,7 +510,7 @@ Note that the msgpack unpackers of the RPC data channel (``get_limited_unpacker(
 kinds ``client`` and ``server``) are deliberately configured with the maximum buffer
 size, because whole repository objects are transferred through them. They therefore
 do not bound the memory a peer can make the other side allocate; the stricter limits
-of that helper apply to manifest, archive and key data.
+of that helper apply to archive and key data.
 
 The msgpack implementation used (msgpack-python) has a good security track record,
 a large test suite and no issues found by fuzzing. It is based on the msgpack-c implementation,

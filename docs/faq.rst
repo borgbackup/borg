@@ -30,7 +30,7 @@ Can I back up from multiple servers into a single repository?
 Yes, you can! Even simultaneously.
 
 The clocks of machines sharing a repository should be roughly synchronized
-(e.g. via NTP): repository locks and archive/manifest timestamps are based on
+(e.g. via NTP): repository locks and archive timestamps are based on
 the clients' clocks, so big clock differences between clients can cause
 trouble. Where the storage backend provides object timestamps (file, sftp, s3
 and current rest servers - but not rclone), borg cross-checks lock staleness

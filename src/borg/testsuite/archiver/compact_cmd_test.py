@@ -7,7 +7,6 @@ import pytest
 from ...constants import *  # NOQA
 from ...helpers import get_cache_dir, bin_to_hex, sig_int, Error
 from ...hashindex import ChunkIndex
-from ...crypto.key import ChecksumKey
 from ...repoobj import RepoObj
 from ...repository import Repository
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
@@ -19,14 +18,15 @@ from ...archiver.compact_cmd import ArchiveGarbageCollector
 from ... import cache
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
+from .. import make_test_key
 from ..repository_test import H, fchunk, pdchunk
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
 def gc_manifest(repository):
-    """Return a manifest stand-in for ArchiveGarbageCollector, whose repo_objs use a none-sha256 key."""
-    return SimpleNamespace(repo_objs=RepoObj(ChecksumKey(repository)))
+    """Return a manifest stand-in for ArchiveGarbageCollector, whose repo_objs use a test key."""
+    return SimpleNamespace(repo_objs=RepoObj(make_test_key(repository)))
 
 
 @pytest.mark.parametrize("stats", (True, False))

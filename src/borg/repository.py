@@ -663,7 +663,7 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
             # TODO: obj_size is verified only for objects validate accepts. A wrong obj_size
             # usually ends the walk at a header that does not parse, so the superseded duplicates in
             # the rest of the gap are kept on every rewrite. PackReader._find_header could resync to
-            # the next object validate accepts, but in the none-* and authenticated-* modes that can
+            # the next object validate accepts, but in the authenticated-* modes that can
             # be a copy of an object inside another object's unencrypted data, whose range can cover
             # bytes of the gap objects after it, which would then be dropped.
             offset += obj_size

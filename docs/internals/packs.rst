@@ -62,8 +62,8 @@ writes and ``parse()``/``parse_meta()`` accept. It binds the header's first 41 b
 ``encrypted_meta`` and ``encrypted_data`` as additional authenticated data (AAD: data that is
 authenticated together with the ciphertext, but not itself encrypted). This applies to all borg 2
 modes: the AEAD encryption modes (AES-256-OCB, ChaCha20-Poly1305) authenticate it with their AEAD
-tag, the ``authenticated-*`` modes with their MAC and the ``none-*`` modes with their (unkeyed)
-checksum, see :ref:`tagged_envelope`. ``meta_size`` and ``data_size`` are excluded from the AAD.
+tag, the ``authenticated-*`` modes with their MAC, see :ref:`tagged_envelope`.
+``meta_size`` and ``data_size`` are excluded from the AAD.
 ``RepoObj.parse()`` reads both slots, so tampering with either size still fails the check, by
 changing the length of the slice being read. ``parse_meta()`` reads the metadata slot alone: it
 catches a changed ``meta_size`` the same way, but not a changed ``data_size``, which the repair
@@ -127,10 +127,9 @@ rebuilt the index from it. Rewriting such a pack is repository-level repair, see
 only when it validates like any walked header. Validating needs the key, so a
 repair that cannot load the key walks without it.
 
-In the ``none-*`` modes the tag is an unkeyed checksum, and in the
-``authenticated-*`` modes it binds a blob to its chunk id and nothing else (see
-:ref:`security_structural_auth`), so validating does not establish there that
-this repository wrote the blob. Both modes also store payloads as they are, so a
+In the ``authenticated-*`` modes the tag binds a blob to its chunk id and nothing
+else (see :ref:`security_structural_auth`), so validating does not establish there
+that this repository wrote the blob. These modes also store payloads as they are, so a
 backed up file can contain something that validates - the blobs of a repository
 sharing the key, for instance. Such a blob reads back as itself, adding a chunk
 nothing references, but the extent its ``data_size`` claims covers whatever

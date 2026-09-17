@@ -19,8 +19,6 @@ ENCRYPTION_DESCRIPTIONS = {
     "chacha20-poly1305": "ChaCha20 with Poly1305: encryption and authentication",
     "authenticated-sha256": "no encryption, authentication via HMAC-SHA-256",
     "authenticated-blake3": "no encryption, authentication via keyed BLAKE3",
-    "none-sha256": "no encryption, no authentication, only SHA-256 checksums",
-    "none-blake3": "no encryption, no authentication, only BLAKE3 checksums",
 }
 
 
@@ -50,22 +48,21 @@ class RepoCreateMixIn:
         manifest = Manifest(key, repository)
         with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
-        if key.has_secret_key:  # any key-bearing suite (everything except the "none-*" modes)
-            logger.warning(
-                "\n"
-                "IMPORTANT: you will need both KEY AND PASSPHRASE to access this repository!\n"
-                "\n"
-                "Key storage location depends on the mode:\n"
-                "- repokey modes: key is stored in the repository directory.\n"
-                "- keyfile modes: key is stored in the home directory of this user.\n"
-                "\n"
-                "For any mode, you should:\n"
-                "1. Export the Borg key and store the result in a safe place:\n"
-                "   borg key export -r REPOSITORY           encrypted-key-backup\n"
-                "   borg key export -r REPOSITORY --paper   encrypted-key-backup.txt\n"
-                "   borg key export -r REPOSITORY --qr-html encrypted-key-backup.html\n"
-                "2. Write down the Borg key passphrase and store it in a safe place."
-            )
+        logger.warning(
+            "\n"
+            "IMPORTANT: you will need both KEY AND PASSPHRASE to access this repository!\n"
+            "\n"
+            "Key storage location depends on the mode:\n"
+            "- repokey modes: key is stored in the repository directory.\n"
+            "- keyfile modes: key is stored in the home directory of this user.\n"
+            "\n"
+            "For any mode, you should:\n"
+            "1. Export the Borg key and store the result in a safe place:\n"
+            "   borg key export -r REPOSITORY           encrypted-key-backup\n"
+            "   borg key export -r REPOSITORY --paper   encrypted-key-backup.txt\n"
+            "   borg key export -r REPOSITORY --qr-html encrypted-key-backup.html\n"
+            "2. Write down the Borg key passphrase and store it in a safe place."
+        )
         logger.warning(
             "\n"
             "Reserve some repository storage space now for emergencies like 'disk full'\n"
@@ -141,9 +138,9 @@ class RepoCreateMixIn:
         key then, but that key is not protected: with ``repokey`` storage, anybody who can read
         the repository can also unlock the key, which is as good as no encryption at all (with
         ``keyfile`` storage, the key is only on your client, so an empty passphrase may be
-        acceptable if e.g. the client's disk is encrypted). Unlike with the ``none-*`` modes,
-        you can add a passphrase later with ``borg key change-passphrase``. ``borg repo-info``
-        shows whether the key has an empty passphrase.
+        acceptable if e.g. the client's disk is encrypted). You can add a passphrase later with
+        ``borg key change-passphrase``. ``borg repo-info`` shows whether the key has an empty
+        passphrase.
 
         Choosing a crypto suite
         +++++++++++++++++++++++
@@ -157,8 +154,6 @@ class RepoCreateMixIn:
         - ``chacha20-poly1305``: ChaCha20 + Poly1305 (encryption + authentication).
         - ``authenticated-sha256`` / ``authenticated-blake3``: no encryption, but authentication
           (tamper detection) using HMAC-SHA-256 resp. keyed BLAKE3.
-        - ``none-sha256`` / ``none-blake3``: neither encryption nor authentication, only
-          SHA-256 resp. BLAKE3 checksums (see below).
 
         ``--id-hash`` selects the id hash function of the **encrypted** modes:
 
@@ -180,15 +175,6 @@ class RepoCreateMixIn:
         This also applies to the ``authenticated-*`` modes: they do not encrypt your data, but they
         still have a key (used for the id hash and the authentication), so ``--key-location``
         selects where that key is stored, just like for the encrypted modes.
-        ``--key-location`` is only ignored for the ``none-*`` modes, which have no key at all.
-
-        The ``none-*`` modes use neither encryption nor authentication: everything in the
-        repository is readable by anybody, and while every repository object carries a checksum
-        (which detects accidental corruption, e.g. bad storage hardware), anybody who modifies an
-        object can just recompute that checksum. You are advised NOT to use these modes: in case
-        of malicious activity in the repository, they expose you to a Denial-of-Service risk (due
-        to how the :ref:`internals_hashindex` works) and other issues (confidentiality,
-        tampering, ...).
 
         If you do **not** want to encrypt the contents of your backups, but still want to detect
         malicious tampering, use ``--encryption authenticated-sha256`` (or ``-blake3``). These
@@ -244,8 +230,8 @@ class RepoCreateMixIn:
             required=True,
             choices=encryption_argument_names(),
             action=Highlander,
-            help="select the mode: 'aes256-ocb', 'chacha20-poly1305', 'authenticated-sha256', "
-            "'authenticated-blake3', 'none-sha256' or 'none-blake3' **(required)**",
+            help="select the mode: 'aes256-ocb', 'chacha20-poly1305', 'authenticated-sha256' "
+            "or 'authenticated-blake3' **(required)**",
         )
         subparser.add_argument(
             "-i",
@@ -256,7 +242,7 @@ class RepoCreateMixIn:
             default=None,  # None: not given. Do not default to sha256 here, see key_creator.
             action=Highlander,
             help="select the id hash function of the encrypted modes: 'sha256' or 'blake3'. "
-            "The 'none-*' and 'authenticated-*' modes name their hash themselves.",
+            "The 'authenticated-*' modes name their hash themselves.",
         )
         subparser.add_argument(
             "--key-location",
@@ -266,7 +252,7 @@ class RepoCreateMixIn:
             default="repokey",
             action=Highlander,
             help="where to store the key: 'repokey' (in the repository, default) or 'keyfile' "
-            "(in the local keys directory). Ignored for the ``none-*`` modes (which have no key).",
+            "(in the local keys directory).",
         )
         subparser.add_argument(
             "--copy-crypt-key",

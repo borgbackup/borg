@@ -70,6 +70,11 @@ locations and passphrases first:
     # 4. Check whether we have everything (same as step 2):
     $ borg transfer --from-borg1 --chunker-params=$CHUNKER_PARAMS --dry-run
 
+A Borg 1.x repository in ``none`` mode (not encrypted, unkeyed sha256 chunk IDs) is transferred
+like in the second example, re-chunking with ``--chunker-params``: all Borg 2 modes use keyed
+chunk IDs. Such a repository has no key material to copy, so create the new repository without
+giving the Borg 1.x repository as ``--other-repo``.
+
 Keyfile considerations when upgrading from Borg 1.x
 ++++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -14,12 +14,13 @@ from .. import repository as repository_module
 from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_chunkindex_invalid
 from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
-from ..crypto.key import CHPOKey, ChecksumKey
+from ..crypto.key import CHPOKey
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
 from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
+from . import make_test_key
 from .hashindex_test import H
 from .repoobj_test import CHUNK_ID_OFFSET, DATA_SIZE_OFFSET, META_SIZE_OFFSET
 
@@ -2346,10 +2347,10 @@ def test_pack_reader_resync_recovers_from_size_past_the_pack_end():
     ]
 
 
-def none_repo_objs():
-    # a RepoObj with a "none-*" key and no compression: it formats real objects (tagged metadata
+def plain_repo_objs():
+    # a RepoObj with an "authenticated-*" key and no compression: it formats real objects (tagged metadata
     # slot, csize) and stores their payload as it is.
-    repo_objs = RepoObj(ChecksumKey(None))
+    repo_objs = RepoObj(make_test_key(None))
     repo_objs.compressor = CNONE()
     return repo_objs
 
@@ -2363,7 +2364,7 @@ def real_chunk(repo_objs, data):
 def test_pack_reader_reads_no_further_than_the_pack_end():
     # the walk asks for META_READ_SIZE bytes per header, so the last objects of a pack have fewer
     # bytes left than that. Every read stays inside the pack and asks for at least a header.
-    repo_objs = none_repo_objs()
+    repo_objs = plain_repo_objs()
     id1, obj1 = real_chunk(repo_objs, b"payload-one")
     id2, obj2 = real_chunk(repo_objs, b"payload-two")
     pack = bytes(obj1) + bytes(obj2)
@@ -2386,7 +2387,7 @@ def test_pack_reader_resync_rejects_a_header_with_a_wrong_data_size(shape):
     # pack leaves the header parseable, so the walk checks it against csize from the tagged metadata
     # and drops obj1. The shapes are where the wrong size points: into obj3, exactly onto obj3's
     # header, and back into obj1 itself.
-    repo_objs = none_repo_objs()
+    repo_objs = plain_repo_objs()
     _, obj1 = real_chunk(repo_objs, b"A" * 100)
     id2, obj2 = real_chunk(repo_objs, b"B" * 100)
     id3, obj3 = real_chunk(repo_objs, b"C" * 100)
@@ -2407,7 +2408,7 @@ def test_pack_reader_resync_rejects_a_header_with_a_wrong_data_size(shape):
 
 def test_pack_reader_resync_rejects_a_header_with_a_wrong_meta_size():
     # the metadata slot's tag covers the slot, so a wrong meta_size fails it.
-    repo_objs = none_repo_objs()
+    repo_objs = plain_repo_objs()
     _, obj1 = real_chunk(repo_objs, b"A" * 100)
     id2, obj2 = real_chunk(repo_objs, b"B" * 100)
     obj1 = bytearray(obj1)
@@ -2418,7 +2419,7 @@ def test_pack_reader_resync_rejects_a_header_with_a_wrong_meta_size():
 
 def test_pack_reader_resync_rejects_a_header_with_a_wrong_chunk_id():
     # the chunk id is part of the AAD of the metadata slot's tag.
-    repo_objs = none_repo_objs()
+    repo_objs = plain_repo_objs()
     _, obj1 = real_chunk(repo_objs, b"A" * 100)
     id2, obj2 = real_chunk(repo_objs, b"B" * 100)
     obj1 = bytearray(obj1)
@@ -2428,10 +2429,10 @@ def test_pack_reader_resync_rejects_a_header_with_a_wrong_chunk_id():
 
 
 def test_pack_reader_resync_starts_past_the_last_validated_object():
-    # "none-*" mode, no compression: obj1's payload holds a complete, intact object - a user backed
+    # "authenticated-*" mode, no compression: obj1's payload holds a complete, intact object - a user backed
     # up such bytes. obj2's header is broken. The walk validated obj1, so the scan starts past it
     # and never sees the decoy; obj1 is kept.
-    repo_objs = none_repo_objs()
+    repo_objs = plain_repo_objs()
     _, decoy = real_chunk(repo_objs, b"decoy")
     id1, obj1 = real_chunk(repo_objs, b"A" * 30 + decoy + b"A" * 30)
     assert decoy in obj1  # the decoy is in the pack verbatim
@@ -2528,13 +2529,14 @@ def test_pack_reader_resync_accepts_an_object_with_corrupt_data(tmp_path):
         repo_objs.parse(real_id, bytes(obj2), ro_type=ROBJ_FILE_STREAM)
 
 
-def test_pack_reader_resync_rejects_damaged_user_content_without_a_key(tmp_path):
-    # In "none-*" mode with no compression, user content lands in the pack as it is, so a backed up
-    # file can contain something shaped like an object. The metadata slot's checksum covers the
+def test_pack_reader_resync_rejects_damaged_user_content_without_encryption(tmp_path):
+    # In "authenticated-*" mode with no compression, user content lands in the pack as it is, so a
+    # backed up file can contain something shaped like an object. The metadata slot's tag covers the
     # object header, so damaged candidate bytes are still ruled out - what these modes can not rule
-    # out is an intact object put into a file on purpose, there being no secret to tell them apart.
+    # out is an intact object (written with the same key) put into a file on purpose: the tag is
+    # deterministic and binds an object to its chunk id alone.
     repository = Repository(str(tmp_path / "repo"), create=True)
-    repo_objs = RepoObj(ChecksumKey(repository))
+    repo_objs = RepoObj(make_test_key(repository))
     repo_objs.compressor = CNONE()
     decoy = bytearray(repo_objs.format(repo_objs.id_hash(b"decoy"), {}, b"decoy", ro_type=ROBJ_FILE_STREAM))
     hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(bytes(decoy[: RepoObj.obj_header.size])))

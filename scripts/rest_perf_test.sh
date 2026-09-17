@@ -56,6 +56,7 @@ profile_params() {
 # --rest', so BORG_REMOTE_PATH is the command the server runs.
 export BORG_REMOTE_PATH="$VENV/bin/borg"
 export BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=yes
+export BORG_PASSPHRASE=rest-perf-test
 export BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=YES
 
 RESULTS="$(mktemp -t rest_perf_results.XXXXXX)"
@@ -172,7 +173,7 @@ run_profile() {
     run_borg repo-delete --repo "$REPO_URL" >/dev/null 2>&1 || true
     # start each profile with a cold pack cache (only when the opt-in cache is enabled)
     if [ -n "${BORG_PACKCACHE_URL:-}" ]; then rm -rf "${BORG_PACKCACHE_URL#file://}"; fi
-    run_borg repo-create --encryption none-sha256 --repo "$REPO_URL"
+    run_borg repo-create --encryption authenticated-sha256 --repo "$REPO_URL"
 
     # backup 1 (cold)
     run_borg create --stats --json --repo "$REPO_URL" backup1 "$DATA_DIR"

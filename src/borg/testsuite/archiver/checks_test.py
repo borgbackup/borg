@@ -5,11 +5,13 @@ import pytest
 
 from ...cache import Cache
 from ...constants import *  # NOQA
+from ...crypto.key import keyfile_format, keyfile_parse
 from ...helpers import Location, get_security_dir, bin_to_hex
 from ...helpers import EXIT_ERROR
+from ...repository import Repository
 from .. import changedir
 from . import cmd, _extract_repository_id, create_test_files
-from . import _set_repository_id, create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
+from . import create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
 from . import set_empty_passphrase
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
@@ -20,6 +22,21 @@ def get_security_directory(repo_path):
     return get_security_dir(repository_id)
 
 
+def _set_repository_id(repo_path, id):
+    """Change the id of the repository at repo_path and label its repokeys for the new id.
+
+    This is what an attacker does to make their own "authenticated-*" repository (which has a borg
+    key, labelled with the repository id) look like the repository of somebody else.
+    """
+    with Repository(repo_path) as repository:
+        keys = repository.load_keys()
+        repository._set_id(id)
+        for name, keydata in keys:
+            _, b64data = keyfile_parse(keydata)
+            repository.delete_key(name)
+            repository.store_key(keyfile_format(bin_to_hex(id), b64data).encode())
+
+
 def test_repository_swap_detection(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
@@ -28,7 +45,7 @@ def test_repository_swap_detection(archivers, request):
     repository_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "create", "test", "input")
     shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     _set_repository_id(archiver.repository_path, repository_id)
     assert repository_id == _extract_repository_id(archiver.repository_path)
     if archiver.FORK_DEFAULT:
@@ -42,9 +59,9 @@ def test_repository_swap_detection2(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     original_location = archiver.repository_location
-    archiver.repository_location = original_location + "_unencrypted"
-    cmd(archiver, "repo-create", "--encryption=none-sha256")
     os.environ["BORG_PASSPHRASE"] = "passphrase"
+    archiver.repository_location = original_location + "_unencrypted"
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     archiver.repository_location = original_location + "_encrypted"
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
@@ -65,7 +82,7 @@ def test_repository_swap_detection_no_cache(archivers, request):
     repository_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "create", "test", "input")
     shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     _set_repository_id(archiver.repository_path, repository_id)
     assert repository_id == _extract_repository_id(archiver.repository_path)
     cmd(archiver, "repo-delete", "--cache-only")
@@ -80,9 +97,9 @@ def test_repository_swap_detection2_no_cache(archivers, request):
     archiver = request.getfixturevalue(archivers)
     original_location = archiver.repository_location
     create_test_files(archiver.input_path)
-    archiver.repository_location = original_location + "_unencrypted"
-    cmd(archiver, "repo-create", "--encryption=none-sha256")
     os.environ["BORG_PASSPHRASE"] = "passphrase"
+    archiver.repository_location = original_location + "_unencrypted"
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     archiver.repository_location = original_location + "_encrypted"
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
@@ -157,7 +174,7 @@ def test_repository_move(archivers, request, monkeypatch):
 
 def test_unknown_unencrypted(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     # Ok: repository is known
     cmd(archiver, "repo-info")
 
@@ -176,7 +193,7 @@ def test_unknown_unencrypted(archivers, request, monkeypatch):
     output = cmd(archiver, "repo-info")
     # the warning says why the repository counts as unencrypted, see #9072
     assert "previously unknown unencrypted repository" in output
-    assert "uses the none-sha256 mode, which does not encrypt the data" in output
+    assert "uses the authenticated-sha256 mode, which does not encrypt the data" in output
 
 
 def test_unknown_unencrypted_empty_passphrase(archivers, request, monkeypatch):

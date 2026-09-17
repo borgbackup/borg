@@ -271,6 +271,20 @@ def filter_xattrs(x):
     raise ValueError("Unsupported type: %s" % type(x))
 
 
+def make_test_key(repository=None):
+    """Return an "authenticated-sha256" key for tests that just need some working key.
+
+    The key material is fixed, so the chunk ids and the stored objects are the same in every test run.
+    The key is not stored anywhere (no borg key, no passphrase).
+    """
+    from ..crypto.key import AuthenticatedKey
+
+    key = AuthenticatedKey(repository)
+    key.init_from_given_data(crypt_key=b"c" * 64, id_key=b"i" * 32, chunk_seed=0)
+    key.init_ciphers()
+    return key
+
+
 class BaseTestCase(unittest.TestCase):
     assert_in = unittest.TestCase.assertIn
     assert_not_in = unittest.TestCase.assertNotIn

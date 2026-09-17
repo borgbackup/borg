@@ -7,10 +7,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from . import rejected_dotdot_paths, is_utime_fully_supported
+from . import rejected_dotdot_paths, is_utime_fully_supported, make_test_key
 from ..cache import ChunkListEntry
 from ..constants import ROBJ_FILE_STREAM, zeros
-from ..crypto.key import ChecksumKey
 from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacker, valid_msgpacked_dict
 from ..archive import ITEM_KEYS, Statistics
 from ..archive import zero_chunk_flags, zero_chunk_id, zero_chunk_ids
@@ -195,7 +194,7 @@ def test_stats_as_dict(stats):
 )
 def test_timestamp_parsing(monkeypatch, isoformat, expected):
     repository = Mock()
-    key = ChecksumKey(repository)
+    key = make_test_key(repository)
     manifest = Manifest(key, repository)
     a = Archive(manifest, "test", create=True)
     a.metadata = ArchiveItem(time=isoformat)
@@ -219,7 +218,7 @@ class MockCache:
 def test_cache_chunk_buffer():
     data = [Item(path="p1"), Item(path="p2")]
     cache = MockCache()
-    key = ChecksumKey(None)
+    key = make_test_key(None)
     chunks = CacheChunkBuffer(cache, key, None)
     for d in data:
         chunks.add(d)
@@ -236,7 +235,7 @@ def test_partial_cache_chunk_buffer():
     big = "0123456789abcdefghijklmnopqrstuvwxyz" * 25000
     data = [Item(path="full", target=big), Item(path="partial", target=big)]
     cache = MockCache()
-    key = ChecksumKey(None)
+    key = make_test_key(None)
     chunks = CacheChunkBuffer(cache, key, None)
     for d in data:
         chunks.add(d)
@@ -271,7 +270,7 @@ def test_download_pipeline_parsed_cache():
     # a content data stream may reference the same chunk many times (e.g. the all-zero
     # chunks of a sparse file): repeated chunks shall be parsed (decrypted, authenticated,
     # decompressed) only once, see issue #1678.
-    key = ChecksumKey(None)
+    key = make_test_key(None)
     repo_objs = RepoObj(key)
     # note: repeated, but not all-zero data, so it is not served via the zeros shortcut
     chunks_data = [b"foobar" * 100, b"idletone" * 125, b"barbaz" * 100]
@@ -304,7 +303,7 @@ def test_download_pipeline_parsed_cache():
 def test_download_pipeline_missing_chunk(replacement_chunk):
     # a chunk missing in the repository is either replaced by all-zero data of the
     # correct size, or reported as None - and never blows up on the size check.
-    key = ChecksumKey(None)
+    key = make_test_key(None)
     repo_objs = RepoObj(key)
     data = b"foobar" * 100
     id = repo_objs.id_hash(data)
@@ -318,7 +317,7 @@ def test_download_pipeline_missing_chunk(replacement_chunk):
 def test_download_pipeline_zero_chunks_served_locally():
     # repeated all-zero chunks (e.g. from the holes of a sparse file) shall be served
     # directly from the zeros constant, without repository access, see issue #1678.
-    key = ChecksumKey(None)
+    key = make_test_key(None)
     repo_objs = RepoObj(key)
     data = b"foobar" * 100
     data_id = repo_objs.id_hash(data)
@@ -358,7 +357,7 @@ def test_zero_chunk_flags():
     # cheap all-zero chunk detection from the chunk ids/sizes alone: the zero chunk id
     # is computed for ids occurring repeatedly, while unique ids are only compared
     # against already memoized zero chunk ids.
-    key = ChecksumKey(None)
+    key = make_test_key(None)
     id_hash = key.id_hash
     data = b"foobar" * 100
     data_id = id_hash(data)

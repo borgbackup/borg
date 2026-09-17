@@ -47,11 +47,12 @@ def make_files(dir, count, size, rnd=True):
 def test_disk_full(test_pass, cmd_fixture, monkeypatch):
     monkeypatch.setenv("BORG_CHECK_I_KNOW_WHAT_I_AM_DOING", "YES")
     monkeypatch.setenv("BORG_DELETE_I_KNOW_WHAT_I_AM_DOING", "YES")
+    monkeypatch.setenv("BORG_PASSPHRASE", "waytooeasyonlyfortests")
     repo = os.path.join(DF_MOUNT, "repo")
     input = os.path.join(DF_MOUNT, "input")
     shutil.rmtree(repo, ignore_errors=True)
     shutil.rmtree(input, ignore_errors=True)
-    rc, out = cmd_fixture(f"--repo={repo}", "repo-create", "--encryption=none-sha256")
+    rc, out = cmd_fixture(f"--repo={repo}", "repo-create", "--encryption=authenticated-sha256")
     if rc != EXIT_SUCCESS:
         print("repo-create", rc, out)
     assert rc == EXIT_SUCCESS

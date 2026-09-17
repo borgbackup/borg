@@ -1,8 +1,8 @@
 import pytest
 
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
-from ..crypto.key import AESOCBKey, ChecksumKey, AuthenticatedKey, CHPOKey, LegacyPlaintextKey
-from ..helpers import CompressionSpec, msgpack
+from ..crypto.key import AESOCBKey, AuthenticatedKey, CHPOKey, LegacyAuthenticatedKey, LegacyPlaintextKey
+from ..helpers import CompressionSpec
 from ..helpers.errors import Error, IntegrityError
 from ..repository import Repository
 from ..repoobj import (
@@ -16,6 +16,7 @@ from ..repoobj import (
 )
 from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
+from . import make_test_key
 
 # offsets of object header fields.
 CHUNK_ID_OFFSET = len(OBJ_MAGIC) + 1  # after the magic and the version byte
@@ -30,23 +31,14 @@ def repository(tmpdir):
 
 @pytest.fixture
 def key(repository):
-    # "none-sha256" mode: not encrypted and not authenticated, but checksummed.
-    return ChecksumKey(repository)
+    # "authenticated-sha256" mode: not encrypted, but the envelope is MAC-authenticated.
+    return make_test_key(repository)
 
 
 @pytest.fixture
 def legacy_key(repository):
     # borg 1.x "none" mode: no envelope protection at all (read-only in borg 2).
     return LegacyPlaintextKey(repository)
-
-
-@pytest.fixture
-def authenticated_key(repository):
-    # "authenticated-sha256" mode: not encrypted, but the envelope is MAC-authenticated.
-    key = AuthenticatedKey(repository)
-    key.init_from_random_data()
-    key.init_ciphers()
-    return key
 
 
 @pytest.fixture
@@ -100,10 +92,13 @@ def test_format_parse_roundtrip_borg1(legacy_key):  # legacy
     assert edata.startswith(bytes((key.TYPE, compressor.ID, compressor.level)))
 
 
-def test_borg1_borg2_transition(legacy_key, key):
+def test_borg1_borg2_transition(repository, key):
     # Borg transfer reads Borg 1.x repository objects (without decompressing them),
     # and writes Borg 2 repository objects (providing already-compressed data to avoid recompression).
-    # The borg 1.x "none" and the borg 2 "none-sha256" mode use the same (unkeyed sha256) chunk ids.
+    # The borg 1.x "authenticated" and the borg 2 "authenticated-sha256" mode use the same (hmac-sha256)
+    # chunk ids, if the borg 2 repository is a related one, i.e. has the same id key.
+    legacy_key = LegacyAuthenticatedKey(repository)
+    legacy_key.id_key = key.id_key
     meta = {}  # borg1 does not support this kind of metadata
     data = b"foobar" * 10
     len_data = len(data)
@@ -195,10 +190,10 @@ def _tamper(cdata, offset):
     return bytes(tampered)
 
 
-@pytest.fixture(params=["key", "authenticated_key", "aead_key"])
+@pytest.fixture(params=["key", "aead_key"])
 def protected_key(request):
-    # every borg 2 mode protects the object with a tag over the payload and the AAD - an unkeyed
-    # checksum for "none-*", a MAC for "authenticated-*", the AEAD tag for the encrypted modes.
+    # every borg 2 mode protects the object with a tag over the payload and the AAD - a MAC for
+    # "authenticated-*", the AEAD tag for the encrypted modes.
     return request.getfixturevalue(request.param)
 
 
@@ -267,29 +262,6 @@ def test_tampered_data_detected(protected_key):
         tampered = _tamper(cdata, offset=offset)
         with pytest.raises(IntegrityError):
             repo_objs.parse(id, tampered, ro_type=ROBJ_FILE_STREAM)
-
-
-def test_checksum_mode_does_not_authenticate(key):
-    # The honest limit of the "none-*" modes: their tag is an unkeyed checksum, so somebody who
-    # modifies an object can just recompute it. Detecting that needs a secret - the
-    # "authenticated-*" and the encrypted modes have one, this mode does not.
-    repo_objs = RepoObj(key)
-    data = b"foobar" * 10
-    id = repo_objs.id_hash(data)
-    cdata = repo_objs.format(id, {"custom": "something"}, data, ro_type=ROBJ_FILE_STREAM)
-
-    hdr_size = RepoObj.obj_header.size
-    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(cdata[:hdr_size]))
-    header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
-    # rewrite the meta slot with attacker-chosen content and a recomputed checksum
-    forged_meta = dict(repo_objs.parse_meta(id, cdata, ro_type=ROBJ_FILE_STREAM), custom="forged")
-    forged_meta_slot = key.encrypt(id, msgpack.packb(forged_meta), aad=header_aad + b"M")
-    forged = (
-        RepoObj.obj_header.pack(hdr.magic, hdr.version, hdr.chunk_id, len(forged_meta_slot), hdr.data_size)
-        + forged_meta_slot
-        + cdata[hdr_size + hdr.meta_size :]
-    )
-    assert repo_objs.parse_meta(id, forged, ro_type=ROBJ_FILE_STREAM)["custom"] == "forged"
 
 
 def test_header_aad_tamper_detected_at_key_layer(protected_key):
@@ -440,27 +412,11 @@ def test_assert_id_places_env_var_mandatory_place(aead_key, monkeypatch):
     assert "verify_data: always verifies, can not be configured" in str(exc_info.value)
 
 
-def test_assert_id_never_skipped_for_unauthenticated_key(key, monkeypatch):
-    # ChecksumKey ("none-sha256" mode): the envelope checksum is unkeyed and thus no authentication,
-    # so the id check is the only integrity check reads have and must happen no matter what the
-    # user configured.
-    monkeypatch.setenv("BORG_ASSERT_ID", "")  # verify nowhere - but this is not switchable off
-    assert key.id_check_is_authentication
-    repo_objs = RepoObj(key)
-    id = repo_objs.id_hash(b"foobar" * 10)
-    cdata = wrong_content_object(repo_objs, id)
-
-    for place in ASSERT_ID_PLACES:
-        with pytest.raises(IntegrityError):
-            repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM, assert_id_place=place)
-
-
-def test_assert_id_configurable_for_authenticated_key(authenticated_key, monkeypatch):
+def test_assert_id_configurable_for_authenticated_key(key, monkeypatch):
     # AuthenticatedKey ("authenticated-sha256"): the envelope MAC authenticates every read (the
     # chunk id is in the AAD), so verifying the id on top of that is configurable, like for AEAD.
     monkeypatch.setenv("BORG_ASSERT_ID", "")  # verify at none of the configurable places
-    assert not authenticated_key.id_check_is_authentication
-    repo_objs = RepoObj(authenticated_key)
+    repo_objs = RepoObj(key)
     id = repo_objs.id_hash(b"foobar" * 10)
     cdata = wrong_content_object(repo_objs, id)
 
@@ -481,14 +437,13 @@ def validator_input(repo_objs, data):
     return chunk_id, obj[: hdr_size + meta_size]
 
 
-@pytest.mark.parametrize("key_class", [ChecksumKey, AuthenticatedKey, CHPOKey, AESOCBKey])
+@pytest.mark.parametrize("key_class", [AuthenticatedKey, CHPOKey, AESOCBKey])
 def test_object_validator_checks_the_sizes_for_every_envelope(key_class):
     # data_size == csize + the envelope overhead must hold for each key family; changing meta_size
     # or data_size must fail validation.
     key = key_class(None)
-    if hasattr(key, "init_from_random_data"):
-        key.init_from_random_data()
-        key.init_ciphers()
+    key.init_from_random_data()
+    key.init_ciphers()
     repo_objs = RepoObj(key)
     chunk_id, head = validator_input(repo_objs, b"payload" * 100)
     validate = object_validator(repo_objs)
@@ -501,9 +456,9 @@ def test_object_validator_checks_the_sizes_for_every_envelope(key_class):
 
 @pytest.mark.parametrize("meta", [b"not a mapping", 42, [1, 2, 3], {}, {"csize": "17"}, {"csize": True}])
 def test_object_validator_rejects_metadata_without_a_usable_csize(monkeypatch, meta):
-    # in the modes that authenticate without a secret key the metadata slot can unpack to any
-    # value. Each of these must come back as "invalid", not as an exception out of the validator.
-    repo_objs = RepoObj(ChecksumKey(None))
+    # if the tag is not verified (authenticated_no_key workaround), the metadata slot can unpack to
+    # any value. Each of these must come back as "invalid", not as an exception out of the validator.
+    repo_objs = RepoObj(make_test_key())
     chunk_id, head = validator_input(repo_objs, b"payload" * 100)
     monkeypatch.setattr(repo_objs, "parse_meta", lambda *args, **kwargs: meta)
     assert not object_validator(repo_objs)(chunk_id, head)
@@ -512,7 +467,7 @@ def test_object_validator_rejects_metadata_without_a_usable_csize(monkeypatch, m
 def test_object_validator_propagates_an_unexpected_exception(monkeypatch):
     # answering "invalid" for a bug would answer it for every object of every pack, so anything
     # other than a failed authentication or unpacking reaches the caller.
-    repo_objs = RepoObj(ChecksumKey(None))
+    repo_objs = RepoObj(make_test_key())
     chunk_id, head = validator_input(repo_objs, b"payload" * 100)
 
     def parse_meta_raising_valueerror(*args, **kwargs):
@@ -528,7 +483,7 @@ def test_object_validator_accepts_every_compression(compression):
     # data_size == csize + the envelope overhead is what pins data_size, so every compressor must
     # record the whole payload it produced as csize. The obfuscating one pads the payload and
     # records the padded size.
-    repo_objs = RepoObj(ChecksumKey(None))
+    repo_objs = RepoObj(make_test_key())
     repo_objs.compressor = CompressionSpec(compression).compressor
     chunk_id, head = validator_input(repo_objs, b"payload" * 100)
     assert object_validator(repo_objs)(chunk_id, head)

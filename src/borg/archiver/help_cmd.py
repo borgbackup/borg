@@ -785,7 +785,7 @@ class HelpMixIn:
                 An unknown place name is an error. An empty value (``BORG_ASSERT_ID=``) verifies at none of
                 these places, but still where borg always verifies (see below).
 
-                Why ``read`` is not in the default: in the keyed modes, the envelope already authenticates
+                Why ``read`` is not in the default: the envelope already authenticates
                 every read - the AEAD tag for the encrypted ciphersuites, the MAC for the (unencrypted)
                 ``authenticated-*`` modes - and the chunk id is part of what that tag is computed over. So
                 a successful decryption resp. tag check already proves that a holder of the borg key
@@ -807,10 +807,8 @@ class HelpMixIn:
 
                 - in ``borg check --verify-data``. That audit is what makes not verifying elsewhere
                   defensible, so it is not configurable (there is no ``verify_data`` place name).
-                - for ``none-*`` mode repositories: they have no key, so nothing authenticates a read
-                  there and their unkeyed checksums only detect accidental corruption. The id check is
-                  therefore not optional there: it happens at every place, whatever this variable says.
-                  Same for reading borg 1.x repositories (``borg transfer``).
+                - when reading borg 1.x repositories (``borg transfer --from-borg1``): their envelope does
+                  not cover the chunk id, so the id check is not optional there.
             BORG_BLAKE3_MT_THRESHOLD
                 When set to a numeric value, chunks of at least that many KiB get their id computed by
                 multi-threaded BLAKE3, smaller ones single-threaded (default: 256, i.e. 256KiB).
@@ -940,8 +938,7 @@ class HelpMixIn:
                     Without the key, borg can not verify anything that needs it: neither the
                     authentication tag of the repository objects nor the chunk ids. It therefore
                     reads the repository **unverified** - a corrupted or tampered repository will
-                    not be detected. (This only concerns the ``authenticated-*`` modes; the
-                    ``none-*`` modes need no key and keep verifying their checksums.)
+                    not be detected.
 
                     This workaround is **only** for emergencies and **only** to extract data
                     from an affected repository (read-only access)::

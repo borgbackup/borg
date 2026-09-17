@@ -24,23 +24,15 @@ ASSERT_ID_PLACES = (
 # not verifying elsewhere defensible, so it must not be switchable.
 ASSERT_ID_PLACES_MANDATORY = ("verify_data",)  # borg check --verify-data
 # Default value of the BORG_ASSERT_ID env var: verify everywhere except on the (hot) general read
-# path - there, the envelope authentication of the keyed modes already covers what a repository
-# could do to us, see AEADKeyBase.assert_id. (For the modes whose id check *is* the read path
-# authentication, this setting does not apply, see below.)
+# path - there, the envelope authentication already covers what a repository could do to us, see
+# AEADKeyBase.assert_id.
 BORG_ASSERT_ID_DEFAULT = ("repair", "transfer", "rechunk")
 # Reads through a RepoObj are attributed to this place unless a command sets another one.
 ASSERT_ID_PLACE_DEFAULT = "read"
 
 
 def get_assert_id_places():
-    """Determine the configurable places that shall verify the chunk id, see the BORG_ASSERT_ID docs.
-
-    Note: this only decides for keys that authenticate reads independently of the id hash (the AEAD
-    ciphersuites and the "authenticated-*" modes, see KeyBase.id_check_is_authentication) - for all
-    other keys, the id check is the read path authentication itself and thus always happens, no
-    matter what is configured here.
-    The same is true for ASSERT_ID_PLACES_MANDATORY.
-    """
+    """Determine the configurable places that shall verify the chunk id, see the BORG_ASSERT_ID docs."""
     value = os.environ.get("BORG_ASSERT_ID")
     if value is None:
         return frozenset(BORG_ASSERT_ID_DEFAULT)
@@ -254,23 +246,16 @@ class RepoObj:
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)
             meta, data = compressor.decompress(dict(meta_compressed), data_compressed[:psize])
-            # For keys where the id check is the read-path authentication (the "none-*" modes, whose
-            # envelope checksum is unkeyed and thus no authentication), it always has to happen -
-            # skipping it would remove all integrity checking from reads.
-            # For the keys that authenticate the envelope (the AEAD and the "authenticated-*" modes), the
-            # payload is already authenticated for this specific chunk id (the id is in the AAD), so the id
+            # All keys authenticate the envelope (the AEAD and the "authenticated-*" modes), so the
+            # payload is already authenticated for this specific chunk id (the id is in the AAD) and the id
             # check only adds detection of chunks whose plaintext does not match their id - which only an
             # evil/broken borg client that had the repo key could have written. Whether that extra
             # full-plaintext hash pass is worth it depends on the place we read at, see BORG_ASSERT_ID.
             place = assert_id_place if assert_id_place is not None else self.assert_id_place
-            assert_id = (
-                self.key.id_check_is_authentication
-                or place in ASSERT_ID_PLACES_MANDATORY
-                or place in self.assert_id_places
-            )
+            assert_id = place in ASSERT_ID_PLACES_MANDATORY or place in self.assert_id_places
             # the authenticated_no_key workaround fakes key material it could not unlock, so checks that
-            # need that key material can not work. The unkeyed modes need none, so they keep checking.
-            if assert_id and not (AUTHENTICATED_NO_KEY and self.key.has_secret_key):
+            # need that key material can not work.
+            if assert_id and not AUTHENTICATED_NO_KEY:
                 self.key.assert_id(id, data)
         else:
             meta, data = None, None
@@ -287,9 +272,8 @@ def object_validator(repo_objs):
     field outside the tag, must match csize - the data slot's payload size, recorded in the tagged
     metadata - plus the key's fixed envelope overhead.
 
-    In the "none-*" modes the tag is an unkeyed checksum, and in the "authenticated-*" modes it is
-    deterministic and binds an object to its chunk id alone. Both therefore accept an object that a
-    backed up file contains, at any offset in any pack.
+    In the "authenticated-*" modes the tag is deterministic and binds an object to its chunk id
+    alone. They therefore accept an object that a backed up file contains, at any offset in any pack.
     """
     hdr_size = RepoObj.obj_header.size
     overhead = repo_objs.key.PAYLOAD_OVERHEAD  # the envelope adds a fixed number of bytes to the payload
@@ -298,10 +282,10 @@ def object_validator(repo_objs):
         try:
             meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
         except (IntegrityErrorBase, msgpack.UnpackException):
-            # arbitrary bytes fail the authentication, or the msgpack unpacking in the modes that
-            # authenticate without a secret key (none-*, authenticated-*) and thus accept them.
+            # arbitrary bytes fail the authentication - or the msgpack unpacking, if the tag is not
+            # verified (authenticated-* modes with the authenticated_no_key workaround).
             return False
-        # in those modes the slot can unpack to any value, so check the value: only metadata that
+        # without tag verification the slot can unpack to any value, so check the value: only metadata that
         # is unusable here gives False, any other exception propagates.
         if not isinstance(meta, dict):
             return False

@@ -81,8 +81,7 @@ Main features
     authenticity.
 
     If you do not need confidentiality, there are also modes that only
-    authenticate (``authenticated-sha256`` / ``authenticated-blake3``) and
-    modes that do neither (``none-sha256`` / ``none-blake3``).
+    authenticate (``authenticated-sha256`` / ``authenticated-blake3``).
 
 **Hashing**
     You can choose between HMAC-SHA256 and Blake3.

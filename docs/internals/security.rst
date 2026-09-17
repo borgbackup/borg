@@ -82,15 +82,6 @@ to a different object ID. This holds for the AEAD encryption modes (where the
 AEAD tag authenticates them) as well as for the ``authenticated-*`` modes
 (where a MAC does, see :ref:`tagged_envelope`).
 
-It does **not** hold for the ``none-*`` modes: they have no key, so their objects
-carry an unkeyed checksum rather than a MAC, and an attacker who modifies an
-object can simply recompute it. What still constrains an attacker there is the
-object ID being the (unkeyed) hash of the plaintext: the content of an existing
-object can not be replaced without the ID no longer matching. But the object's
-metadata and the archives list are not anchored to anything secret,
-so a ``none-*`` repository provides no tamper protection - only detection of
-accidental corruption.
-
 This effectively 'anchors' each archive to the key, which is controlled by the
 client, thereby anchoring the DAG starting from the archives list entry,
 making it impossible for an attacker to add or modify any part of the
@@ -253,22 +244,6 @@ Different from the AEAD modes, the MAC is deterministic (a MAC needs no nonce): 
 session key, no IV and thus no usage limit to observe, and identical input produces identical
 objects.
 
-Unencrypted modes
-~~~~~~~~~~~~~~~~~
-
-Modes: ``--encryption none-(sha256|blake3)``
-
-Supported: borg 2.0+
-
-These modes have no key at all: they neither encrypt nor authenticate. Every repository
-object slot carries an *unkeyed* checksum (see :ref:`tagged_envelope`), which detects
-accidental corruption - bad storage hardware, a truncated write, a read that returned the
-wrong bytes - before the data is used. It is not a protection against an attacker: whoever
-modifies an object can recompute the checksum, and the chunk IDs are unkeyed hashes as well.
-
-You are advised not to use these modes. Use ``authenticated-*`` instead if you do not want
-your data encrypted but do want to detect tampering; it is the same thing plus a key.
-
 Legacy modes
 ~~~~~~~~~~~~
 
@@ -283,8 +258,8 @@ only used by these legacy modes; new repositories use ``sha256`` or ``blake3``
 
 The borg 1.x ``none`` and ``authenticated`` modes belong here, too: their repository
 objects have no tag at all, so nothing about an object is verified except the chunk ID
-over the plaintext - not even the object's metadata. They were replaced by the modes
-described above, which cover metadata and object header as well.
+over the plaintext - not even the object's metadata. borg 2 has no ``none`` mode, and its
+``authenticated-*`` modes (see above) cover metadata and object header as well.
 
 borg 2.0 does not support creating new repos using these modes,
 but ``borg transfer`` can still read such existing repos.
@@ -389,9 +364,9 @@ used:
   encrypted nor authenticated, so an attacker with repository access can rewrite the
   crypto suite. What protects against a swapped crypto suite is not this object, but:
 
-  - a swap to a suite that does not encrypt (``none-*``, but also
-    ``authenticated-*``: its key blob carries the same key material and no suite
-    name, so it loads fine) would make the client write plaintext. That is caught
+  - a swap to a suite that does not encrypt (``authenticated-*``: its key blob
+    carries the same key material and no suite name, so it loads fine) would make
+    the client write plaintext. That is caught
     by the client's security directory: it records the key type of every
     repository the client accessed, and borg refuses to continue with
     ``EncryptionMethodMismatch`` if the suite changed. A repository that does not

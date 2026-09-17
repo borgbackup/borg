@@ -7,17 +7,21 @@ from ...crypto.key import store_hash
 from ...constants import *  # NOQA
 from ...constants import KeyBlobStorage
 from ...crypto.key import AESOCBKey, CHPOKey, Passphrase, is_keyfile, keyfile_parse
+from ...crypto.key import RepoKeyNotFoundError
 from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile, UnencryptedRepo
 from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
 from ...repository import Repository
+from .. import changedir
 from ..crypto.key_test import TestKey
 from . import (
     RK_ENCRYPTION,
     KF_ENCRYPTION,
     KF_LOCATION,
     cmd,
+    assert_dirs_equal,
+    create_regular_file,
     _extract_repository_id,
     _set_repository_id,
     generate_archiver_tests,
@@ -731,3 +735,56 @@ def test_key_list_and_remove_corrupted_key(archivers, request):
     out = cmd(archiver, "key", "list")
     assert bad_id[:12] not in out
     assert "admin" in out
+
+
+def _lose_borg_key(archiver, scenario):
+    """Put the repository into the state the authenticated_no_key workaround is made for."""
+    if scenario == "repokey-gone":
+        with Repository(archiver.repository_path, exclusive=True) as repository:
+            for name, _ in repository.load_keys():
+                repository.delete_key(name)
+            assert not repository.load_keys()
+    elif scenario == "keyfile-gone":
+        keyfiles = os.listdir(archiver.keys_path)
+        assert len(keyfiles) == 1
+        os.unlink(os.path.join(archiver.keys_path, keyfiles[0]))
+    elif scenario == "passphrase-lost":
+        os.environ["BORG_PASSPHRASE"] = "this is not the passphrase"  # the borg key is still there
+    else:
+        raise ValueError(scenario)
+
+
+@pytest.mark.parametrize(
+    "scenario,no_key_error",
+    [
+        ("repokey-gone", RepoKeyNotFoundError),
+        ("keyfile-gone", RepoKeyNotFoundError),
+        ("passphrase-lost", PassphraseWrong),
+    ],
+)
+@pytest.mark.parametrize("mode", ["authenticated-sha256", "authenticated-blake3"])
+def test_authenticated_no_key_workaround(archivers, request, monkeypatch, mode, scenario, no_key_error):
+    # BORG_WORKAROUNDS=authenticated_no_key must make the data of an "authenticated-*" mode repository
+    # readable again after the borg key or its passphrase was lost, see the BORG_WORKAROUNDS docs.
+    # borg evaluates BORG_WORKAROUNDS at import time, thus all borg invocations below are forked.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "dir/file2", contents=b"authenticated, but not encrypted")
+    location_args = [KF_LOCATION] if scenario == "keyfile-gone" else []
+    cmd(archiver, "repo-create", f"--encryption={mode}", *location_args, fork=True)
+    cmd(archiver, "create", "test", "input", fork=True)
+    _lose_borg_key(archiver, scenario)
+
+    # without the workaround, there is no way to access the repository:
+    for args in (["repo-list"], ["list", "test"], ["extract", "test", "--dry-run"]):
+        cmd(archiver, *args, fork=True, exit_code=no_key_error.exit_mcode)
+
+    monkeypatch.setenv("BORG_WORKAROUNDS", "authenticated_no_key")
+    assert "test" in cmd(archiver, "repo-list", fork=True)
+    assert "input/file1" in cmd(archiver, "list", "test", fork=True)
+    with changedir("output"):
+        cmd(archiver, "extract", "test", fork=True)
+    assert_dirs_equal("input", "output/input")
+    # the docs tell the user to get rid of such a repository after extracting the data from it:
+    cmd(archiver, "repo-delete", fork=True)
+    assert not os.path.exists(archiver.repository_path)

@@ -855,6 +855,10 @@ Errors
         Object with key {} is indexed to pack {}, but that whole pack is missing from repository {}.
     Repository.PermissionDenied rc: 24 traceback: no
         Repository permission denied: {}
+    Repository.RepairUnsafe rc: 29 traceback: no
+        Not repairing: {} repository object(s) could not be read. Fix the underlying problem, then check again.
+    Repository.StoreReadError rc: 28 traceback: no
+        Error reading {} from the repository: {}. Check the storage hardware / filesystem.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
         Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.

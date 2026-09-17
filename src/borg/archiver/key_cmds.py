@@ -18,31 +18,23 @@ class KeysMixIn:
     def do_key_change_passphrase(self, args, repository, manifest):
         """Changes the repository key file passphrase."""
         key = manifest.key
-        if not hasattr(key, "change_passphrase"):
-            raise CommandError("This repository is not encrypted, cannot change the passphrase.")
         key.change_passphrase()
         logger.info("Key updated")
-        if hasattr(key, "find_key"):
-            # print key location to make backing it up easier
-            logger.info("Key location: %s", key.find_key())
+        # print key location to make backing it up easier
+        logger.info("Key location: %s", key.find_key())
 
     @with_repository(manifest=True)
     def do_key_add(self, args, repository, manifest):
         """Add a new borg key (protected by an independent passphrase) to the repository."""
         key = manifest.key
-        if not hasattr(key, "add_key"):
-            raise CommandError("This repository is not encrypted, cannot add a borg key.")
         key.add_key(label=args.label)
         logger.info("Borg key with label %r added.", args.label)
-        if hasattr(key, "find_key"):
-            logger.info("Key location: %s", key.find_key())
+        logger.info("Key location: %s", key.find_key())
 
     @with_repository(manifest=True)
     def do_key_remove(self, args, repository, manifest):
         """Remove a borg key from the repository."""
         key = manifest.key
-        if not hasattr(key, "remove_key"):
-            raise CommandError("This repository is not encrypted, cannot remove a borg key.")
         victim = key.remove_key(label=args.label, key_id=args.key, current=args.by_passphrase)
         logger.info("Borg key %s (label %r) removed.", victim["id"][:12], victim["label"])
 
@@ -50,8 +42,6 @@ class KeysMixIn:
     def do_key_list(self, args, repository, manifest):
         """List the borg keys of the repository."""
         key = manifest.key
-        if not hasattr(key, "list_keys"):
-            raise CommandError("This repository is not encrypted, there are no borg keys to list.")
         fmt = "%-1s %-12s %-8s %-24s %s"
         print(fmt % ("", "KEY ID", "MODE", "LABEL", "ALGORITHM"))
         for bk in key.list_keys():
@@ -62,11 +52,6 @@ class KeysMixIn:
     def do_key_change_location(self, args, repository, manifest, cache):
         """Changes the location of the borg key used to unlock this repository."""
         key = manifest.key
-        if not hasattr(key, "change_passphrase"):
-            raise CommandError("This repository is not encrypted, cannot change the key location.")
-        if not getattr(key, "LOCATION_CONFIGURABLE", False):
-            raise CommandError("This key's location cannot be changed (it has no keyfile/repokey storage).")
-
         new_storage = KEY_LOCATIONS[args.key_mode]
         if key.storage == new_storage:
             print(f"The borg key is already stored as {args.key_mode}, nothing to do.")

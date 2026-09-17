@@ -1685,7 +1685,10 @@ class Repository:
 
         The rewrite deletes the old pack, so the index/ fragments point the pack's other objects at a
         deleted pack until the index is stored again. The invalid marker (see write_chunkindex_invalid) is
-        written via compact_pack's before_change, just before the old pack is deleted.
+        written via compact_pack's before_old_pack_delete, just before the old pack is deleted.
+
+        Raises PermissionDenied before any store change unless the repo permissions grant write and delete
+        on packs/ and index/ (see assert_writable).
 
         update_index: True: store the full chunk index and delete the invalid marker. False: update the
             in-memory index only; the marker stays until the index is stored and the marker deleted.
@@ -1694,6 +1697,7 @@ class Repository:
         from .cache import write_chunkindex_to_repo, write_chunkindex_invalid, delete_chunkindex_invalid
 
         self._lock_refresh()
+        self.assert_writable()
         entry = self.chunks.get(id)
         if entry is None:
             raise self.ObjectNotFound(id, str(self._location))
@@ -1706,7 +1710,7 @@ class Repository:
             keep_ids=keep_ids,
             drop_ids={id},
             validate=validate,
-            before_change=lambda: write_chunkindex_invalid(self),
+            before_old_pack_delete=lambda: write_chunkindex_invalid(self),
         )
         if update_index:
             # close() only persists new entries incrementally, so write the full index here to record
@@ -1714,7 +1718,9 @@ class Repository:
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
             delete_chunkindex_invalid(self)
 
-    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, validate, chunks=None, before_change=None):
+    def compact_pack(
+        self, pack_id, *, keep_ids: set, drop_ids: set, validate, chunks=None, before_old_pack_delete=None
+    ):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
         keep_ids: chunk ids in this pack to copy into the new pack.
@@ -1722,8 +1728,8 @@ class Repository:
         validate: passed to superseded_gap_ranges, whose ranges are dropped.
         chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
             updates to. Must be the index keep_ids and drop_ids were derived from. Default: self.chunks.
-        before_change: callable without arguments, called once just before the old pack is deleted. Not
-            called when the pack is kept.
+        before_old_pack_delete: callable without arguments, called once just before the old pack is deleted.
+            Not called when no bytes are dropped, since the old pack then stays.
 
         Together, keep_ids and drop_ids must cover every object the chunk index lists for this pack;
         an unlisted indexed object would keep its bytes in the new pack but its index entry would go
@@ -1739,8 +1745,7 @@ class Repository:
         unchanged pack_id if nothing was dropped; dropped_bytes is the on-disk bytes this rewrite freed
         (unused indexed objects plus superseded duplicates), for --stats accounting.
 
-        Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
-        index back to the store afterwards.
+        Updates the in-memory chunk index only; requires the exclusive lock.
         """
         self._lock_refresh()
         if chunks is None:
@@ -1798,13 +1803,14 @@ class Repository:
         else:
             new_pack_id = None  # every byte was dropped: no replacement pack
 
+        # the new pack is not in the index/ fragments yet, so they still match the store; deleting the old
+        # pack makes them point at a deleted pack.
+        if before_old_pack_delete is not None and new_pack_id != pack_id:
+            before_old_pack_delete()
+
         for drop_id in drop_ids:  # remove dropped objects from the index
             del chunks[drop_id]
 
-        # the new pack is not in the index/ fragments yet, so they still match the store; deleting the old
-        # pack makes them point at a deleted pack.
-        if before_change is not None and new_pack_id != pack_id:
-            before_change()
         if new_pack_id is None:  # nothing kept: drop the pack, no replacement
             self.store_delete(pack_key)
             return None, dropped_bytes

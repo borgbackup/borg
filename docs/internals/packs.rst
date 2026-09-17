@@ -322,11 +322,14 @@ and deletes all the fragments it supersedes.
 
 A deletion that could drop entries -- dropping the index entirely, or the full rewrite
 above -- is guarded by a marker object, ``cache/chunkindex-invalid``, written before
-the first deletion and removed after the last one. While the marker is present,
-leftover fragments could be an incomplete index, so they are not merged; the index is
-rebuilt from the pack files on the next load instead. A consolidation needs no marker:
-the entries of the small fragments it deletes are already contained in the merged
-fragments it wrote before deleting them.
+the first deletion and removed after the last one. A single-object delete writes the
+marker just before it removes the old pack, and ``borg check --repair`` writes it
+before rebuilding the index after changing the packs; both remove it once the index
+is stored. While the marker is present, the fragments may be missing entries or point
+at deleted packs, so they are not merged; the index is rebuilt from the pack files on
+the next load instead. A consolidation needs no marker: the entries of the small
+fragments it deletes are already contained in the merged fragments it wrote before
+deleting them.
 
 If the entire ``index/`` namespace is lost or corrupt, the ChunkIndex can be rebuilt
 by scanning pack files directly; see :ref:`pack-recovery`.

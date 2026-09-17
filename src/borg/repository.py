@@ -953,10 +953,10 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
-        # corrupt-header handling for the lazy .chunks rebuild, set by ArchiveChecker.check() (see
-        # PackReader.iter_headers): a validate callable makes the rebuild resync past a corrupt
-        # object header, drop_corrupt_tail - only set when repairing - makes it index the pack up
-        # to that header and drop the rest. Without either, such a header aborts the rebuild.
+        # corrupt-header handling for the lazy .chunks rebuild (see PackReader.iter_headers): a
+        # validate callable makes the rebuild resync past a corrupt object header, drop_corrupt_tail
+        # makes it index the pack up to that header and drop the rest. Without either, such a header
+        # aborts the rebuild. TODO(#10378): nothing sets them, remove both.
         self.chunkindex_validate = None
         self.chunkindex_drop_corrupt_tail = False
         # pack_id -> PackReader holding the whole pack; get_many loads into it, get() reuses it
@@ -1145,20 +1145,18 @@ class Repository:
 
     @chunks.setter
     def chunks(self, value):
-        # The index is normally built lazily; this setter exists for the few callers
-        # that must install a specific index: wiping the cache, restoring an index
-        # captured before close(), or compact sharing the index it built itself (it
-        # needs the usage flags) so the repository does not build a second one.  To
-        # drop a stale index so it rebuilds, do not assign None here -- call
+        # The index is normally built lazily; this setter installs a specific index: wiping the
+        # cache, restoring an index captured before close(), or an index that compact (it needs the
+        # usage flags) or check built itself, so the repository does not build a second one.
+        # To drop a stale index so it rebuilds, do not assign None here -- call
         # invalidate_chunk_index() instead.
         self._chunks = value
 
     def invalidate_chunk_index(self):
-        """Drop the in-memory chunk index so close() will not persist a stale copy.
+        """Drop the in-memory chunk index, so close() does not persist it and its memory is freed.
 
-        Called when the on-disk chunk index is deleted; the next access to
-        .chunks rebuilds the index from actual repository contents.  PackWriter
-        reads the index through this Repository, so it follows automatically.
+        The next access to .chunks builds the index again. PackWriter reads the index through this
+        Repository, so it uses the new one.
         """
         self._chunks = None
 
@@ -1341,8 +1339,8 @@ class Repository:
         # the index is checked first and in full, on partial checks too: it is small, and index errors
         # stop the pack check below.
         index_infos = store_list("index")
-        # an interrupted fragment deletion leaves the invalid marker set; the index is rebuilt on next
-        # use, so warn rather than fail.
+        # with the invalid marker set, the index/ fragments may be missing entries or point at deleted
+        # packs (see write_chunkindex_invalid). The next use rebuilds the index from the packs, so warn.
         from .cache import chunkindex_is_invalid, build_chunkindex_from_repo
 
         index_invalid = chunkindex_is_invalid(self)
@@ -1685,13 +1683,21 @@ class Repository:
     def delete(self, id, *, validate, update_index=True):
         """Delete a single repo object by rewriting its pack without it (via compact_pack).
 
-        With update_index=True the full chunk index is written back so the next borg process sees the
-        deletion; callers that rebuild the index themselves (check --repair) pass update_index=False to
-        skip the per-object index rewrite.
+        The rewrite deletes the old pack, so the index/ fragments point the pack's other objects at a
+        deleted pack until the index is stored again. The invalid marker (see write_chunkindex_invalid) is
+        written via compact_pack's before_old_pack_delete, just before the old pack is deleted.
 
+        Raises PermissionDenied before any store change unless the repo permissions grant write and delete
+        on packs/ and index/ (see assert_writable).
+
+        update_index: True: store the full chunk index and delete the invalid marker. False: update the
+            in-memory index only; the marker stays until the index is stored and the marker deleted.
         validate: passed to compact_pack.
         """
+        from .cache import write_chunkindex_to_repo, write_chunkindex_invalid, delete_chunkindex_invalid
+
         self._lock_refresh()
+        self.assert_writable()
         entry = self.chunks.get(id)
         if entry is None:
             raise self.ObjectNotFound(id, str(self._location))
@@ -1699,15 +1705,22 @@ class Repository:
         # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
-        self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id}, validate=validate)
+        self.compact_pack(
+            pack_id,
+            keep_ids=keep_ids,
+            drop_ids={id},
+            validate=validate,
+            before_old_pack_delete=lambda: write_chunkindex_invalid(self),
+        )
         if update_index:
             # close() only persists new entries incrementally, so write the full index here to record
             # the removal for the next borg process.
-            from .cache import write_chunkindex_to_repo
-
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
+            delete_chunkindex_invalid(self)
 
-    def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, validate, chunks=None):
+    def compact_pack(
+        self, pack_id, *, keep_ids: set, drop_ids: set, validate, chunks=None, before_old_pack_delete=None
+    ):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
         keep_ids: chunk ids in this pack to copy into the new pack.
@@ -1715,6 +1728,8 @@ class Repository:
         validate: passed to superseded_gap_ranges, whose ranges are dropped.
         chunks: the ChunkIndex to look up the objects' pack locations in and to apply the index
             updates to. Must be the index keep_ids and drop_ids were derived from. Default: self.chunks.
+        before_old_pack_delete: callable without arguments, called once just before the old pack is deleted.
+            Not called when no bytes are dropped, since the old pack then stays.
 
         Together, keep_ids and drop_ids must cover every object the chunk index lists for this pack;
         an unlisted indexed object would keep its bytes in the new pack but its index entry would go
@@ -1730,8 +1745,7 @@ class Repository:
         unchanged pack_id if nothing was dropped; dropped_bytes is the on-disk bytes this rewrite freed
         (unused indexed objects plus superseded duplicates), for --stats accounting.
 
-        Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
-        index back to the store afterwards.
+        Updates the in-memory chunk index only; requires the exclusive lock.
         """
         self._lock_refresh()
         if chunks is None:
@@ -1788,6 +1802,11 @@ class Repository:
                 raise IntegrityError(f'pack {pack_hex}: {e}, run "borg check"') from e
         else:
             new_pack_id = None  # every byte was dropped: no replacement pack
+
+        # the new pack is not in the index/ fragments yet, so they still match the store; deleting the old
+        # pack makes them point at a deleted pack.
+        if before_old_pack_delete is not None and new_pack_id != pack_id:
+            before_old_pack_delete()
 
         for drop_id in drop_ids:  # remove dropped objects from the index
             del chunks[drop_id]

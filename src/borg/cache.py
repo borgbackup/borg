@@ -619,15 +619,21 @@ def chunkindex_is_invalid(repository):
 
 
 def write_chunkindex_invalid(repository):
-    """Mark the chunk index as invalid. Call before deleting index fragments.
+    """Store the invalid marker, cache/chunkindex-invalid.
 
-    If the deletion is interrupted, the marker remains and the index is rebuilt on next load.
+    Store it before deleting index/ fragments whose entries no other fragment holds, before deleting a pack
+    the fragments point at, and before rebuilding the index after pack changes the fragments do not record.
+    While it is present, build_chunkindex_from_repo rebuilds the index from the packs instead of merging the
+    fragments.
     """
     repository.store_store(f"cache/{CHUNKINDEX_INVALID_SENTINEL}", b"")
 
 
 def delete_chunkindex_invalid(repository):
-    """Clear the chunk-index-invalid marker. Call after all fragment deletions have completed."""
+    """Delete the invalid marker, if present.
+
+    The index/ fragments, if any, must hold the complete current index and point only at existing packs.
+    """
     try:
         repository.store_delete(f"cache/{CHUNKINDEX_INVALID_SENTINEL}")
     except StoreObjectNotFound:
@@ -648,7 +654,7 @@ def delete_chunkindex_from_repo(repository):
             pass
     if hashes or invalid:
         # clear the marker after every fragment is gone; also clears a marker left behind by an
-        # earlier interrupted deletion.
+        # interrupted operation.
         delete_chunkindex_invalid(repository)
     logger.debug(f"chunk indexes deleted: {hashes}")
     # the in-memory index is now stale; drop it so close() does not write it back into the
@@ -921,7 +927,7 @@ def build_chunkindex_from_repo(
             if chunkindex_is_invalid(repository):
                 if fragments_only:
                     return None
-                # leftover fragments may be incomplete or stale. Finish the interrupted deletion
+                # the fragments may be missing entries or point at deleted packs. Delete them
                 # (best-effort; a read-only client rebuilds in memory only), then rebuild from packs.
                 logger.warning("chunk index is invalid (interrupted operation), rebuilding it.")
                 try:

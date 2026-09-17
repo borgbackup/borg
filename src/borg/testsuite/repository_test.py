@@ -11,7 +11,7 @@ from borghash import HashTableNT
 
 from ..crypto.key import store_hash
 from .. import repository as repository_module
-from ..cache import write_chunkindex_invalid
+from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_chunkindex_invalid
 from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
 from ..crypto.key import CHPOKey, ChecksumKey
@@ -441,6 +441,90 @@ def test_delete_with_stale_earlier_object_in_pack(repo_fixtures, request):
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(H(1))
         assert pdchunk(repository.get(H(0))) == b"ccc"  # H(0) still served from its new pack
+
+
+@pytest.mark.parametrize("stored", [True, False], ids=["stored-index", "no-stored-index"])
+@pytest.mark.parametrize("update_index", [True, False])
+def test_delete_marks_the_chunk_index_invalid(repo_fixtures, request, update_index, stored):
+    """delete() marks the chunk index invalid before it deletes the old pack; update_index=True clears the marker.
+
+    Without stored fragments, the full index write deletes none and leaves the marker; delete() deletes it.
+    """
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), fchunk(b"aaa", chunk_id=H(0))), (H(1), fchunk(b"bbb", chunk_id=H(1)))])
+    with reopen(repository) as repository:
+        if not stored:
+            delete_chunkindex_from_repo(repository)
+        assert bool(list(repository.store_list("index"))) is stored
+        repository.delete(H(1), validate=None, update_index=update_index)
+        assert chunkindex_is_invalid(repository) is not update_index
+    with reopen(repository) as repository:
+        assert pdchunk(repository.get(H(0))) == b"aaa"
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(H(1))
+
+
+def test_delete_missing_object_leaves_the_chunk_index_valid(repo_fixtures, request):
+    """delete() of an object the index does not have does not mark the chunk index invalid."""
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        assert H(0) not in repository.chunks  # load the index before delete(): loading it deletes the marker
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.delete(H(0), validate=None)
+        assert not chunkindex_is_invalid(repository)
+
+
+@pytest.mark.parametrize("fail", ["overlap", "past-end", "no-delete"])
+def test_delete_refused_leaves_the_chunk_index_valid(repo_fixtures, request, monkeypatch, fail):
+    """A delete() refused before changing the store leaves no marker and the fragments and packs unchanged."""
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), fchunk(b"aaa", chunk_id=H(0))), (H(1), fchunk(b"bbb", chunk_id=H(1)))])
+    if fail == "no-delete":
+        monkeypatch.setenv("BORG_REPO_PERMISSIONS", "no-delete")
+    with reopen(repository) as repository:
+        pack_key = "packs/" + bin_to_hex(repository.chunks[H(0)].pack_id)
+        fragments = sorted(info.name for info in repository.store_list("index"))
+        packs = sorted(info.name for info in repository.store_list("packs"))
+        if fail == "overlap":  # check_pack_objects: H(1) overlaps H(0)
+            entry = repository.chunks[H(1)]
+            repository.chunks[H(1)] = entry._replace(obj_offset=repository.chunks[H(0)].obj_offset)
+        elif fail == "past-end":  # check_pack_objects: H(1) ends past the truncated pack
+            repository.store.store(pack_key, repository.store_load(pack_key)[:-1])
+        expected = Repository.PermissionDenied if fail == "no-delete" else IntegrityError
+        with pytest.raises(expected):
+            repository.delete(H(0), validate=None)
+        assert not chunkindex_is_invalid(repository)
+        assert sorted(info.name for info in repository.store_list("index")) == fragments
+        assert sorted(info.name for info in repository.store_list("packs")) == packs
+
+
+def test_delete_stopped_in_the_pack_rewrite_leaves_the_chunk_index_invalid(repo_fixtures, request, monkeypatch):
+    """A delete() that stops after deleting the old pack leaves the marker; the next use rebuilds the index."""
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # H(0) and H(1) share a pack
+        repository.put(H(0), fchunk(b"aaa", chunk_id=H(0)))
+        repository.put(H(1), fchunk(b"bbb", chunk_id=H(1)))
+        repository.flush()
+    old_pack_id = None
+    with pytest.raises(OSError, match="stopped"):
+        with reopen(repository) as repository:
+            old_pack_id = repository.chunks[H(0)].pack_id
+            real_store_delete = repository.store_delete
+
+            def store_delete(name, *args, **kwargs):
+                if name.startswith("packs/"):
+                    real_store_delete(name, *args, **kwargs)  # the old pack is gone, the index not stored yet
+                    raise OSError("stopped")
+                return real_store_delete(name, *args, **kwargs)
+
+            monkeypatch.setattr(repository, "store_delete", store_delete)
+            repository.delete(H(1), validate=None)
+    with reopen(repository) as repository:
+        assert chunkindex_is_invalid(repository)
+    with reopen(repository) as repository:
+        # the index rebuilt from the packs points H(0) at the rewritten pack.
+        assert repository.chunks[H(0)].pack_id != old_pack_id
+        assert pdchunk(repository.get(H(0))) == b"aaa"
+        assert not chunkindex_is_invalid(repository)
 
 
 def test_multi_object_pack_roundtrip(repo_fixtures, request):

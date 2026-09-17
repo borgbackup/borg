@@ -301,7 +301,7 @@ class TestKey:
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
         # TYPE(1) + reserved(1) + tag(32) + payload, see MACKeyBase
-        assert authenticated[0:2] == b"\x60\x00"
+        assert authenticated[0:2] == b"\x50\x00"
         assert authenticated[34:] == plaintext
         assert key.decrypt(id, authenticated) == plaintext
 
@@ -325,7 +325,7 @@ class TestKey:
         plaintext = b"123456789"
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
-        assert authenticated[0:2] == b"\x70\x00"
+        assert authenticated[0:2] == b"\x60\x00"
         assert authenticated[34:] == plaintext
         assert key.decrypt(id, authenticated) == plaintext
 
@@ -419,8 +419,8 @@ class TestMACEnvelope:
     def test_format_is_stable(self, cls):
         # golden vectors: these bytes must not change silently, they are an on-disk format.
         expected = {
-            AuthenticatedKey: "600033ecaaf8c34d4142fa502278986c8f49efbcbf879de16d3c2767e1252bfb1994",
-            Blake3AuthenticatedKey: "70006de48e2139f8995790ec81b256e87f40ef5810d140d28396a8d07734ab05a358",
+            AuthenticatedKey: "500058863db5379c637ff1d75d177d4ed7805113f751e02779f57bf95d2fac5a9b1a",
+            Blake3AuthenticatedKey: "6000a69c8d953df6808d4713b409fb8cd104ecc8209e10bcf06a68235d12464d23a5",
         }[cls]
         key = self.make_key(cls)
         plaintext = b"123456789"

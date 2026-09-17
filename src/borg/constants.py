@@ -272,8 +272,8 @@ class KeyType:
     BLAKE3CHPO = 0x40
     # the "authenticated-*" modes: not encrypted, but every repo object slot carries a tag (a MAC),
     # see MACKeyBase.
-    SHA256AUTHENTICATED = 0x60
-    BLAKE3AUTHENTICATED = 0x70
+    SHA256AUTHENTICATED = 0x50
+    BLAKE3AUTHENTICATED = 0x60
 
 
 CACHE_TAG_NAME = "CACHEDIR.TAG"

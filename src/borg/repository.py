@@ -956,7 +956,7 @@ class Repository:
         # corrupt-header handling for the lazy .chunks rebuild (see PackReader.iter_headers): a
         # validate callable makes the rebuild resync past a corrupt object header, drop_corrupt_tail
         # makes it index the pack up to that header and drop the rest. Without either, such a header
-        # aborts the rebuild. No caller sets them: ArchiveChecker.check() installs its own index.
+        # aborts the rebuild. TODO: nothing sets them, remove them (#10378).
         self.chunkindex_validate = None
         self.chunkindex_drop_corrupt_tail = False
         # pack_id -> PackReader holding the whole pack; get_many loads into it, get() reuses it
@@ -1153,12 +1153,10 @@ class Repository:
         self._chunks = value
 
     def invalidate_chunk_index(self):
-        """Drop the in-memory chunk index so close() will not persist a stale copy.
+        """Drop the in-memory chunk index, so close() does not persist it and its memory is freed.
 
-        Called when the on-disk chunk index is deleted, and before a caller builds
-        its own index, so the old one is freed first. The next access to .chunks
-        rebuilds the index from actual repository contents.  PackWriter reads the
-        index through this Repository, so it follows automatically.
+        The next access to .chunks builds the index again. PackWriter reads the index through this
+        Repository, so it uses the new one.
         """
         self._chunks = None
 
@@ -1341,8 +1339,8 @@ class Repository:
         # the index is checked first and in full, on partial checks too: it is small, and index errors
         # stop the pack check below.
         index_infos = store_list("index")
-        # an interrupted fragment deletion leaves the invalid marker set; the index is rebuilt on next
-        # use, so warn rather than fail.
+        # with the invalid marker set, the index/ fragments may be incomplete or stale (see
+        # write_chunkindex_invalid). The next use rebuilds the index from the packs, so warn.
         from .cache import chunkindex_is_invalid, build_chunkindex_from_repo
 
         index_invalid = chunkindex_is_invalid(self)
@@ -1685,12 +1683,16 @@ class Repository:
     def delete(self, id, *, validate, update_index=True):
         """Delete a single repo object by rewriting its pack without it (via compact_pack).
 
-        With update_index=True the full chunk index is written back so the next borg process sees the
-        deletion; callers that rebuild the index themselves (check --repair) pass update_index=False to
-        skip the per-object index rewrite.
+        The rewrite deletes the old pack, so the index/ fragments point the pack's other objects at a
+        deleted pack until the index is stored again. delete() writes the invalid marker (see
+        write_chunkindex_invalid) before the rewrite.
 
+        update_index: True: store the full chunk index and delete the invalid marker. False: update the
+            in-memory index only; the marker stays until the index is stored and the marker deleted.
         validate: passed to compact_pack.
         """
+        from .cache import write_chunkindex_to_repo, write_chunkindex_invalid, delete_chunkindex_invalid
+
         self._lock_refresh()
         entry = self.chunks.get(id)
         if entry is None:
@@ -1699,13 +1701,13 @@ class Repository:
         # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
+        write_chunkindex_invalid(self)
         self.compact_pack(pack_id, keep_ids=keep_ids, drop_ids={id}, validate=validate)
         if update_index:
             # close() only persists new entries incrementally, so write the full index here to record
             # the removal for the next borg process.
-            from .cache import write_chunkindex_to_repo
-
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
+            delete_chunkindex_invalid(self)
 
     def compact_pack(self, pack_id, *, keep_ids: set, drop_ids: set, validate, chunks=None):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.

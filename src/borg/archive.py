@@ -2266,7 +2266,7 @@ class ArchiveChecker:
         # The rebuild validates every object header it walks, because a corrupt data_size parses fine
         # and points the walk into the middle of the pack. That costs one metadata slot read and one
         # decryption per object and it needs the key, so read the key here if we do not have it yet.
-        # manifest_only=True: the other key source make_key uses is self.chunks, loaded or built just below.
+        # manifest_only=True: self.chunks, the other key source of make_key, is set up below.
         if repair and self.key is None:
             self.key = self.make_key(repository, manifest_only=True)
         if self.key is not None:
@@ -2275,15 +2275,14 @@ class ArchiveChecker:
             validate = object_validator(self.repo_objs)
         else:
             validate = None
-        # store the chunks the pack writer still buffers: an index rebuild would drop their entries,
-        # and get() can not read them from the index loaded below.
+        # store the chunks buffered in the pack writer, so the index below has their pack locations
+        # (pack id, offset and size in the pack).
         self.repository.flush()
         if not repair and self.repository.is_chunk_index_loaded:
-            # the repository check loaded the index from the index/ fragments: use it.
+            # without --repair, use the loaded index.
             self.chunks = self.repository.chunks
         else:
-            # build the index, from the packs with --repair. Free the index the repository check may
-            # have loaded first, so only one is in memory.
+            # free the loaded index first, so only one index is in memory. --repair builds it from the packs.
             self.repository.invalidate_chunk_index()
             self.chunks = build_chunkindex_from_repo(
                 self.repository,
@@ -2298,12 +2297,12 @@ class ArchiveChecker:
                 drop_corrupt_tail=repair,
                 write_immediately=False,
             )
-            # a rebuild from the packs sets F_NEW (entry not stored in the index/ fragments yet) on every
-            # entry. Clear it, so Repository.close() does not store this index as a new fragment: only
-            # finish() stores the index, and only with --repair.
+            # clear F_NEW (entry not in the index/ fragments yet), so Repository.close() does not store
+            # this index; finish() stores it with --repair. Without --repair, a repository without index/
+            # fragments keeps none. With the invalid marker set (see write_chunkindex_invalid), the build
+            # deletes the fragments.
             self.chunks.clear_new()
-            # the repository uses this index: get() looks up pack locations in it, put() adds entries to
-            # it, delete() removes entries from it.
+            # get(), put() and delete() use the repository's index.
             self.repository.chunks = self.chunks
         if self.key is None:
             self.key = self.make_key(repository)
@@ -2414,7 +2413,6 @@ class ArchiveChecker:
             if self.repair:
                 logger.warning("Found defect chunks, removing them from the repository.")
                 validate = object_validator(self.repo_objs)
-                index_marked_invalid = False
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
@@ -2433,17 +2431,9 @@ class ArchiveChecker:
                         )
                     except IntegrityErrorBase:
                         # failed twice -> remove this defect chunk. delete rewrites its pack without it,
-                        # keeping the other chunks. update_index=False: finish() rebuilds the index from
-                        # the rewritten packs anyway, so a per-chunk full index write would be wasted.
-                        # delete() also removes the chunk from self.chunks, so rebuild_archives reports
-                        # the file it belongs to.
-                        if not index_marked_invalid:
-                            # the index/ fragments point the other chunks of a rewritten pack at the
-                            # deleted pack until finish() stores the new index. Mark them invalid before
-                            # the first delete, so if the check stops before finish(), the next use
-                            # rebuilds the index from the packs.
-                            write_chunkindex_invalid(self.repository)
-                            index_marked_invalid = True
+                        # keeping the other chunks, and removes it from self.chunks, so rebuild_archives
+                        # reports the file it belongs to. update_index=False: finish() stores the index
+                        # rebuilt from the packs and clears the invalid marker delete() writes.
                         self.repository.delete(defect_chunk, update_index=False, validate=validate)
                         self.chunks_modified = True
                     else:
@@ -2585,14 +2575,14 @@ class ArchiveChecker:
             id_ = self.key.id_hash(chunk)
             cdata = None
             if self.repair and id_ not in self.chunks:
-                # only add_reference stores it, so only compress and encrypt the chunk for that.
+                # cdata: the compressed and encrypted chunk, which only add_reference stores.
                 cdata = self.repo_objs.format(id_, {}, chunk, ro_type=ROBJ_ARCHIVE_STREAM)
             add_reference(id_, len(chunk), cdata)
             return id_
 
         def add_reference(id_, size, cdata):
-            # size: unused, archive_put_items passes it.
-            # --repair: store a chunk the repository does not have. put() adds it to self.chunks.
+            # size: unused, part of the archive_put_items callback signature.
+            # with --repair, store a chunk the repository does not have; put() adds it to self.chunks.
             if self.repair and id_ not in self.chunks:
                 assert cdata is not None
                 self.repository.put(id_, cdata)
@@ -2818,8 +2808,10 @@ class ArchiveChecker:
             # writer buffer (close() requires an empty buffer, #10055) before we (re)build the index.
             self.repository.flush()
             if self.chunks_modified:
-                # the packs changed: rebuild the index from them, validating every object header, and
-                # store it. Free the current index first, so only one is in memory.
+                # the packs changed: rebuild the index from them and store it. The index/ fragments lack
+                # the chunks this repair stored, so the index is invalid until the rebuilt one is stored.
+                # Free the current index first, so only one index is in memory.
+                write_chunkindex_invalid(self.repository)
                 self.repository.invalidate_chunk_index()
                 self.chunks = None
                 logger.info("Rebuilding and writing the repository chunks index.")
@@ -2836,8 +2828,7 @@ class ArchiveChecker:
                 write_chunkindex_to_repo(
                     self.repository, self.chunks, incremental=False, clear=False, force_write=True, delete_other=True
                 )
-            # the index just written matches the packs: clear the invalid marker, set by verify_data() or left
-            # by an interrupted operation.
+            # the stored index matches the packs: clear the invalid marker.
             delete_chunkindex_invalid(self.repository)
             # drop the in-memory index so close() does not persist it over the index just written.
             self.repository.invalidate_chunk_index()

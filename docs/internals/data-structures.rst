@@ -92,7 +92,10 @@ cache/
     a marker object: while it is present, the chunks index in ``index/`` is considered
     invalid. It is written before deleting index fragments and removed after the last
     stale fragment is gone, so an interrupted run does not leave the remaining
-    fragments looking like a complete index.
+    fragments looking like a complete index. Deleting a single object rewrites its
+    pack without it and deletes the old pack, leaving the fragments pointing the pack's
+    other objects at a deleted pack: the marker is written before that rewrite and
+    removed after the index is stored.
 
 Note that this ``cache/`` namespace is inside the repository (and thus shared by
 all clients); it is not the client-local cache described in

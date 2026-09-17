@@ -12,6 +12,7 @@ from ...crypto.key import store_hash, STORE_HASH_NAME
 from ... import archive as archive_module
 from ...archive import Archive, ArchiveChecker, ChunkBuffer
 from ...cache import Cache, chunkindex_is_invalid, delete_chunkindex_from_repo, list_chunkindex_hashes
+from ...cache import read_chunkindex_from_repo
 from ...cache import write_chunkindex_invalid
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
@@ -530,27 +531,33 @@ def test_check_holds_a_single_chunk_index(archiver, monkeypatch, args, exit_code
         cmd(archiver, "check", exit_code=0)
 
 
-@pytest.mark.parametrize("delete_index", [False, True], ids=["index", "no-index"])
-def test_check_without_repair_leaves_the_chunk_index_alone(archivers, request, delete_index):
-    """check without --repair does not change the chunk index.
+@pytest.mark.parametrize("index", ["index", "no-index", "marker"])
+def test_check_without_repair_stores_no_chunk_index(archivers, request, index):
+    """check without --repair does not store a chunk index.
 
     The archive has an item metadata chunk missing: the checker re-chunks its item metadata stream into
-    chunks the repository does not have. Without index/ fragments, the checker builds the index from the
-    packs and does not store it either.
+    chunks the repository does not have. With index/ fragments, the check leaves them as they are. Without
+    them, the checker builds the index from the packs and does not store it. With the invalid marker set,
+    that build deletes the fragments and the marker, and the check does not store its index either.
     """
     archiver = request.getfixturevalue(archivers)
     delete_first_item_chunk(archiver)
     with open_repository(archiver) as repository:
         chunk_ids_before = {chunk_id for chunk_id, _ in repository.chunks.iteritems()}
-        if delete_index:
+        if index == "no-index":
             delete_chunkindex_from_repo(repository)
         index_before = list_chunkindex_hashes(repository)
+        assert bool(index_before) is (index != "no-index")
+        if index == "marker":
+            write_chunkindex_invalid(repository)
 
     cmd(archiver, "check", "--archives-only", exit_code=1)
     cmd(archiver, "check", exit_code=1)
 
     with open_repository(archiver) as repository:
-        assert list_chunkindex_hashes(repository) == index_before
+        # check the stored state before .chunks rebuilds the index and close() stores it.
+        assert list_chunkindex_hashes(repository) == (index_before if index == "index" else [])
+        assert not chunkindex_is_invalid(repository)
         assert {chunk_id for chunk_id, _ in repository.chunks.iteritems()} == chunk_ids_before
 
 
@@ -595,11 +602,47 @@ def test_check_repair_verify_data_aborted_marks_the_index_invalid(archiver, monk
                 ArchiveChecker().check(repository, verify_data=True, repair=True, sort_by="ts", format="{archive}")
 
     with open_repository(archiver) as repository:
+        # no .chunks access or get() here: rebuilding the index would clear the marker.
         assert chunkindex_is_invalid(repository)
-        # the index rebuilt from the packs finds every other chunk.
+        # the index/ fragments are still there and point chunks at the pack delete() removed.
+        packs = {info.name for info in repository.store_list("packs")}
+        stale = set()
+        for hash in list_chunkindex_hashes(repository):
+            fragment = read_chunkindex_from_repo(repository, hash)
+            stale |= {chunk_id for chunk_id, entry in fragment.items() if bin_to_hex(entry.pack_id) not in packs}
+        assert stale & chunk_ids
+    cmd(archiver, "check", "--repair", exit_code=0)
+    with open_repository(archiver) as repository:
+        assert not chunkindex_is_invalid(repository)
+        # the stored index finds every other chunk.
         for chunk_id in chunk_ids:
             repository.get(chunk_id)
-    cmd(archiver, "check", "--repair", exit_code=0)
+
+
+def test_check_repair_stopped_in_the_index_rebuild_marks_the_index_invalid(archiver, monkeypatch):
+    """A --repair check that stops in the index rebuild of finish() leaves the chunk index marked invalid.
+
+    The repair stored a new item metadata stream and new archive metadata, which the index/ fragments do not
+    have. The marker makes the next use rebuild the index from the packs, which have them.
+    """
+    delete_first_item_chunk(archiver)
+    real_build = archive_module.build_chunkindex_from_repo
+
+    def build_chunkindex_from_repo(repository, **kwargs):
+        if kwargs.get("write_immediately"):  # the rebuild in finish()
+            raise Error("stopped in the index rebuild")
+        return real_build(repository, **kwargs)
+
+    with monkeypatch.context() as m:
+        m.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
+        with open_repository(archiver) as repository:
+            with pytest.raises(Error, match="stopped in the index rebuild"):
+                ArchiveChecker().check(repository, repair=True, sort_by="ts", format="{archive}")
+
+    with open_repository(archiver) as repository:
+        assert chunkindex_is_invalid(repository)
+        assert list_chunkindex_hashes(repository)
+    cmd(archiver, "check", exit_code=0)
     with open_repository(archiver) as repository:
         assert not chunkindex_is_invalid(repository)
 

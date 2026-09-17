@@ -619,15 +619,17 @@ def chunkindex_is_invalid(repository):
 
 
 def write_chunkindex_invalid(repository):
-    """Mark the chunk index as invalid. Call before deleting index fragments.
+    """Store the invalid marker, cache/chunkindex-invalid.
 
-    If the deletion is interrupted, the marker remains and the index is rebuilt on next load.
+    While the marker is present, the index/ fragments may be incomplete (some of them deleted) or stale
+    (pointing objects at a pack that Repository.delete() rewrote and deleted), and build_chunkindex_from_repo
+    rebuilds the index from the packs instead of merging them.
     """
     repository.store_store(f"cache/{CHUNKINDEX_INVALID_SENTINEL}", b"")
 
 
 def delete_chunkindex_invalid(repository):
-    """Clear the chunk-index-invalid marker. Call after all fragment deletions have completed."""
+    """Delete the invalid marker, if present. The index/ fragments must be complete and match the packs."""
     try:
         repository.store_delete(f"cache/{CHUNKINDEX_INVALID_SENTINEL}")
     except StoreObjectNotFound:

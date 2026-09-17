@@ -137,10 +137,9 @@ CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
 # How often to restart merging the fragments into a chunk index when a listed fragment vanishes
 # mid-merge (a concurrent repack replaced it). After that, fall back to the slow rebuild from packs.
 CHUNKINDEX_MERGE_ATTEMPTS = 3
-# Marker object in the cache/ namespace: the chunk index is invalid. Written before deleting index
-# fragments, removed after the last fragment is gone. Written before Repository.delete() rewrites a pack
-# without an object and deletes the old pack, removed after the index is stored. While it is present, the
-# chunk index is rebuilt from the packs on next load and the leftover index/ fragments are deleted.
+# Marker object in the cache/ namespace: the chunk index is invalid. While it is present, the index/ fragments
+# may be missing entries or point at deleted packs, so the chunk index is rebuilt from the packs on next load
+# and the leftover fragments are deleted.
 # Removing the marker while index/ fragments remain makes those fragments look like a complete index, so
 # only delete_chunkindex_invalid() removes it, and clearing cache/ requires clearing index/ too.
 CHUNKINDEX_INVALID_SENTINEL = "chunkindex-invalid"

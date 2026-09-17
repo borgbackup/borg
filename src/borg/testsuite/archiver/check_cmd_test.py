@@ -11,9 +11,14 @@ import pytest
 from ...crypto.key import store_hash, STORE_HASH_NAME
 from ... import archive as archive_module
 from ...archive import Archive, ArchiveChecker, ChunkBuffer
-from ...cache import Cache, chunkindex_is_invalid, delete_chunkindex_from_repo, list_chunkindex_hashes
-from ...cache import read_chunkindex_from_repo
-from ...cache import write_chunkindex_invalid
+from ...cache import (
+    Cache,
+    chunkindex_is_invalid,
+    delete_chunkindex_from_repo,
+    list_chunkindex_hashes,
+    read_chunkindex_from_repo,
+    write_chunkindex_invalid,
+)
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack, CommandError, CorruptPack, Error, IntegrityError, sig_int
 from ...helpers import BackupDamagedChunksError

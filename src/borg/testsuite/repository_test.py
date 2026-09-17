@@ -8,6 +8,7 @@ from collections import namedtuple
 
 import pytest
 from borghash import HashTableNT
+from borgstore.backends.errors import PermissionDenied as StorePermissionDenied
 
 from ..crypto.key import store_hash
 from .. import repository as repository_module
@@ -450,22 +451,14 @@ def test_delete_marks_the_chunk_index_invalid(repo_fixtures, request, update_ind
 
     Without stored fragments, the full index write deletes none and leaves the marker; delete() deletes it.
     """
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), fchunk(b"aaa", chunk_id=H(0))), (H(1), fchunk(b"bbb", chunk_id=H(1)))])
+    with reopen(repository) as repository:
         if not stored:
-            delete_chunkindex_from_repo(repository)  # repository creation stored an empty index
-        repository._pack_writer.max_count = 2  # H(0) and H(1) share a pack
-        repository.put(H(0), fchunk(b"aaa", chunk_id=H(0)))
-        repository.put(H(1), fchunk(b"bbb", chunk_id=H(1)))
-        repository.flush()
-        if not stored:
-            assert not list(repository.store_list("index"))
-            repository.delete(H(1), validate=None, update_index=update_index)
-            assert chunkindex_is_invalid(repository) is not update_index
-    if stored:
-        with reopen(repository) as repository:
-            assert list(repository.store_list("index"))
-            repository.delete(H(1), validate=None, update_index=update_index)
-            assert chunkindex_is_invalid(repository) is not update_index
+            delete_chunkindex_from_repo(repository)
+        assert bool(list(repository.store_list("index"))) is stored
+        repository.delete(H(1), validate=None, update_index=update_index)
+        assert chunkindex_is_invalid(repository) is not update_index
     with reopen(repository) as repository:
         assert pdchunk(repository.get(H(0))) == b"aaa"
         with pytest.raises(Repository.ObjectNotFound):
@@ -479,6 +472,30 @@ def test_delete_missing_object_leaves_the_chunk_index_valid(repo_fixtures, reque
         with pytest.raises(Repository.ObjectNotFound):
             repository.delete(H(0), validate=None)
         assert not chunkindex_is_invalid(repository)
+
+
+@pytest.mark.parametrize("fail", ["overlap", "past-end", "no-delete"])
+def test_delete_refused_leaves_the_chunk_index_valid(repo_fixtures, request, monkeypatch, fail):
+    """A delete() that compact_pack refuses before changing the store leaves no marker and the fragments."""
+    repository = get_repository_from_fixture(repo_fixtures, request)
+    build_one_pack(repository, [(H(0), fchunk(b"aaa", chunk_id=H(0))), (H(1), fchunk(b"bbb", chunk_id=H(1)))])
+    if fail == "no-delete":
+        monkeypatch.setenv("BORG_REPO_PERMISSIONS", "no-delete")
+    with reopen(repository) as repository:
+        pack_key = "packs/" + bin_to_hex(repository.chunks[H(0)].pack_id)
+        fragments = sorted(info.name for info in repository.store_list("index"))
+        packs = sorted(info.name for info in repository.store_list("packs"))
+        if fail == "overlap":  # check_pack_objects: H(1) overlaps H(0)
+            entry = repository.chunks[H(1)]
+            repository.chunks[H(1)] = entry._replace(obj_offset=repository.chunks[H(0)].obj_offset)
+        elif fail == "past-end":  # check_pack_objects: H(1) ends past the truncated pack
+            repository.store.store(pack_key, repository.store_load(pack_key)[:-1])
+        expected = StorePermissionDenied if fail == "no-delete" else IntegrityError
+        with pytest.raises(expected):
+            repository.delete(H(0), validate=None)
+        assert not chunkindex_is_invalid(repository)
+        assert sorted(info.name for info in repository.store_list("index")) == fragments
+        assert sorted(info.name for info in repository.store_list("packs")) == packs
 
 
 def test_delete_stopped_in_the_pack_rewrite_leaves_the_chunk_index_invalid(repo_fixtures, request, monkeypatch):

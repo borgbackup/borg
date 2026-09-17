@@ -104,8 +104,6 @@ class PlaintextKey(KeyBase):
     IDHASH_NAME = "sha256"
 
     chunk_seed = 0
-    crypt_key = b""  # makes .derive_key() work, nothing secret here
-    id_key = b""  # makes .derive_key() work, nothing secret here
 
     logically_encrypted = False
     encrypts = False

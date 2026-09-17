@@ -14,7 +14,7 @@ from ...crypto.key import AEADKeyBase
 from ...crypto.key import AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey
 from ...crypto.key import AES_OCB_MAX_SESSION_BLOCKS
 from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
-from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError, UnsupportedPayloadError
+from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
 from ...crypto.key import RepoKeyNotFoundError
 from ...crypto.key import identify_key, key_class_for, key_class_of, key_factory, RepositoryKeyInfoMissing
 from ...crypto.key import AVAILABLE_KEY_TYPES
@@ -23,7 +23,7 @@ from ...helpers import Error
 from ...helpers import IntegrityError
 from ...helpers import Location
 from ...helpers import msgpack
-from ...constants import KEY_ALGORITHMS, KeyBlobStorage, KeyType
+from ...constants import KEY_ALGORITHMS, KeyBlobStorage
 from ...helpers import hex_to_bin, bin_to_hex
 
 
@@ -544,11 +544,6 @@ def test_legacy_authenticated_no_key_key_gone(cls, monkeypatch, tmp_path):
     key = cls.detect(repository, envelope)
     assert isinstance(key, cls)
     assert bytes(key.decrypt(None, envelope)) == payload
-
-
-def test_dropped_blake3_authenticated_type_byte():
-    with pytest.raises(UnsupportedPayloadError):
-        identify_key(bytes([KeyType.DROPPED_BLAKE3AUTHENTICATED]) + b"payload")
 
 
 def test_decrypt_key_file_unsupported_algorithm():

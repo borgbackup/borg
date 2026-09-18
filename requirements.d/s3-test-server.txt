@@ -1,0 +1,6 @@
+# The S3 server the CI tests run against: moto in server mode ("moto_server").
+# moto's own "server" extra pulls in the dependencies of all the AWS services it can
+# mock, for S3 the server only needs flask and flask-cors on top of the "s3" extra.
+moto[s3]==5.2.3
+flask==3.1.3
+flask-cors==6.0.5

@@ -136,3 +136,35 @@ def test_s3_repo_basics(archiver):
     list_output = cmd(archiver, "repo-list")
     assert archive_name not in list_output
     cmd(archiver, "repo-delete")
+
+
+@pytest.mark.skipif(not S3_URL, reason="BORG_TEST_S3_REPO not set.")
+def test_s3_repo_compact(archiver, monkeypatch):
+    # compact rewrites a mixed pack via store.defrag, which for the S3 backend means ranged GETs of
+    # the still used objects plus one PUT of the new pack. A server that ignores the requested range
+    # goes unnoticed by test_s3_repo_basics, but makes compact fail here.
+    # One big pack per create run: all of archive1's chunks land in a single pack, so that pack is
+    # mixed (used + unused objects) once archive1 is deleted below.
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1000")
+    contents_kept = os.urandom(100 * 1024)
+    create_regular_file(archiver.input_path, "file_dropped1", contents=os.urandom(10 * 1024))
+    create_regular_file(archiver.input_path, "file_kept", contents=contents_kept)
+    create_regular_file(archiver.input_path, "file_dropped2", contents=os.urandom(10 * 1024))
+    # an own repository, test_s3_repo_basics might run at the same time (pytest-xdist)
+    archiver.repository_location = S3_URL + "-compact"
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive1", "input")
+    # archive2 references only file_kept's chunks, which deduplicate against archive1's pack
+    os.remove(os.path.join(archiver.input_path, "file_dropped1"))
+    os.remove(os.path.join(archiver.input_path, "file_dropped2"))
+    cmd(archiver, "create", "archive2", "input")
+    cmd(archiver, "delete", "-a", "archive1")
+    # threshold 0: every pack with any unused bytes is rewritten
+    output = cmd(archiver, "compact", "-v", "--threshold", "0")
+    assert "Finished compaction" in output
+    cmd(archiver, "check")
+    with changedir("output"):
+        cmd(archiver, "extract", "archive2")
+    with open(os.path.join(archiver.output_path, "input", "file_kept"), "rb") as fd:
+        assert fd.read() == contents_kept
+    cmd(archiver, "repo-delete")

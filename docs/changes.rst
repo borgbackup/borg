@@ -240,6 +240,9 @@ Fixes:
   - report a file as modified when chunks were reordered or duplicated
 - import-tar: show the stored paths in the file status output
 
+- recreate --log-json --progress: output archive_progress JSON objects (as documented),
+  not text progress lines
+
 Other changes:
 
 - update pyinstaller to 6.22.3

@@ -154,8 +154,8 @@ class Session:
     # The --list lines are no source for them: they only exist if the user asked for the listing, and --filter
     # reduces them to some status characters, so counting them would give wrong numbers.
     # What borg does not tell is unknown: there is no archive_progress for a dry-run, only create fills
-    # files_stats, and recreate and transfer output their progress as text, even with --log-json.
-    # TODO: borg should output archive_progress for recreate and transfer, as docs/internals/frontends.rst says.
+    # files_stats, and transfer outputs its progress as text, even with --log-json.
+    # TODO: borg should output archive_progress for transfer, as docs/internals/frontends.rst says.
 
     @property
     def nfiles(self):

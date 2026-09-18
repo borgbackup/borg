@@ -50,8 +50,8 @@ terminal. The panel in the upper right depends on the command:
     ``--filter``, which only determine what the log shows. A ``-`` means that borg does
     not report that number: only ``create`` reports the counts by status, a ``--dry-run``
     reports the number of files and the original size when it has finished (and nothing
-    else), and ``recreate`` and ``transfer`` do not report their statistics in the JSON
-    format the cockpit reads.
+    else), and ``transfer`` does not report its statistics in the JSON format the cockpit
+    reads.
 
 ``extract``, ``export-tar``
     A progress bar with the percentage and the estimated remaining time, the amount of

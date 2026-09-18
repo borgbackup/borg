@@ -2965,6 +2965,7 @@ class ArchiveRecreater:
         dry_run=False,
         stats=False,
         progress=False,
+        log_json=False,
         file_status_printer=None,
         timestamp=None,
     ):
@@ -2994,6 +2995,7 @@ class ArchiveRecreater:
         self.dry_run = dry_run
         self.stats = stats
         self.progress = progress
+        self.log_json = log_json  # output the progress as archive_progress JSON objects
         self.print_file_status = file_status_printer or (lambda *args: None)
 
     def recreate(self, archive_id, target_name, delete_original, comment=None):
@@ -3138,6 +3140,7 @@ class ArchiveRecreater:
             name,
             create=True,
             progress=self.progress,
+            log_json=self.log_json,
             chunker_params=chunker_params or self.chunker_params,
             cache=self.cache,
         )

@@ -98,6 +98,10 @@ class StatusPanelBase(Static):
     def _format_size(size):
         return "-" if size is None else format_file_size(size)
 
+    @staticmethod
+    def _format_count(count):
+        return "-" if count is None else str(count)
+
     def show_elapsed(self, session):
         if TRANSLATOR.enabled:
             # There seems to be no official formula for stardates, so we make something up.
@@ -112,11 +116,11 @@ class StatusPanelBase(Static):
             self.show("status-elapsed", f"Elapsed: {days:02d}d {h:02d}:{m:02d}:{s:02d}")
 
     def show_count(self, widget_id, label, count):
-        """Show a count that is fine when zero and a warning otherwise."""
+        """Show a count that is fine when zero (or unknown: None) and a warning otherwise."""
         widget = self.query_one(f"#{widget_id}")
-        widget.set_class(count == 0, "errors-ok")
-        widget.set_class(count != 0, "errors-warning")
-        self.show_value(widget_id, label, count)
+        widget.set_class(not count, "errors-ok")
+        widget.set_class(bool(count), "errors-warning")
+        self.show_value(widget_id, label, self._format_count(count))
 
     def show_warnings(self, session):
         self.show_count("status-warnings", "Warnings: ", session.warnings + session.errors)
@@ -154,30 +158,35 @@ class CreateStatusPanel(StatusPanelBase):
 
             with Vertical(id="statuses"):
                 yield self._line("status-elapsed", "Elapsed: ", "00d 00:00:00")
-                yield self._line("status-files", "Files: ", "0")
+                yield self._line("status-files", "Files: ", "-")
                 yield self._line("status-original", "Original: ", "-")
                 yield self._line("status-deduplicated", "Deduplicated: ", "-")
-                yield self._line("status-unchanged", "Unchanged: ", "0")
-                yield self._line("status-modified", "Modified: ", "0")
-                yield self._line("status-added", "Added: ", "0")
-                yield self._line("status-other", "Other: ", "0")
-                yield self._line("status-errors", "Errors: ", "0", classes="status errors-ok")
+                yield self._line("status-unchanged", "Unchanged: ", "-")
+                yield self._line("status-modified", "Modified: ", "-")
+                yield self._line("status-added", "Added: ", "-")
+                yield self._line("status-other", "Other: ", "-")
+                yield self._line("status-errors", "Errors: ", "-", classes="status errors-ok")
                 yield self._line("status-warnings", "Warnings: ", "0", classes="status errors-ok")
                 yield self._line("status-activity", "Progress: ")
                 yield self._line("status-rc", "RC: ", "RUNNING")
 
     def show_session(self, session):
         self.show_elapsed(session)
-        self.show_value("status-files", "Files: ", session.nfiles)
+        self.show_value("status-files", "Files: ", self._format_count(session.nfiles))
         original, deduplicated = session.original_size, session.deduplicated_size
         self.show_value("status-original", "Original: ", self._format_size(original))
         ratio = f" ({deduplicated * 100 / original:.1f}%)" if deduplicated is not None and original else ""
         self.show_value("status-deduplicated", "Deduplicated: ", self._format_size(deduplicated) + ratio)
-        self.show_value("status-unchanged", "Unchanged: ", session.count("U-"))
-        self.show_value("status-modified", "Modified: ", session.count("M"))
-        self.show_value("status-added", "Added: ", session.count("A+"))
-        self.show_value("status-other", "Other: ", sum(session.files_stats.values()) - session.count("U-MA+E"))
-        self.show_count("status-errors", "Errors: ", session.count("E"))
+        # the counts by status are unknown (shown as "-") while borg does not tell them: only create has them,
+        # and not for a dry-run. They are borg's statistics, not the counts of the --list lines.
+        stats = session.files_stats
+        unchanged, modified, added, errors = (session.count(status) if stats else None for status in "UMAE")
+        other = sum(stats.values()) - unchanged - modified - added - errors if stats else None
+        self.show_value("status-unchanged", "Unchanged: ", self._format_count(unchanged))
+        self.show_value("status-modified", "Modified: ", self._format_count(modified))
+        self.show_value("status-added", "Added: ", self._format_count(added))
+        self.show_value("status-other", "Other: ", self._format_count(other))
+        self.show_count("status-errors", "Errors: ", errors)
         self.show_warnings(session)
         if not session.running and session.archive_name is not None:
             # the final --json output tells about the archive that was created.

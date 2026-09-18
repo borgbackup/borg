@@ -165,6 +165,7 @@ def test_app_create_screen():
     assert shown["status-original"] == "Original: 3.00 kB"
     assert shown["status-deduplicated"] == "Deduplicated: 300 B (10.0%)"
     assert shown["status-added"] == "Added: 2" and shown["status-modified"] == "Modified: 1"
+    assert shown["status-unchanged"] == "Unchanged: 0"
     assert shown["status-other"] == "Other: 1" and shown["status-errors"] == "Errors: 0"
     assert shown["status-warnings"] == "Warnings: 1"
     assert shown["status-activity"].startswith("Archive: test (1.")
@@ -172,6 +173,38 @@ def test_app_create_screen():
     assert "Creating archive" in text and "something is odd" in text
     assert "A src/a" in text and "M src/b" in text and "d src" in text
     assert "Archive name: test" in text and "Number of files: 3" in text and "Store store calls: 7" in text
+
+
+def test_app_create_screen_shows_the_statistics_of_borg():
+    # the --list lines (here: reduced by --filter) must not influence the numbers, see also the session tests.
+    events = [FileStatus(status="M", path=f"src/modified{number}") for number in range(3)]
+    events.append(
+        ArchiveProgress(original_size=5000, deduplicated_size=50, nfiles=100, files_stats={"M": 3, "U": 97, "d": 5})
+    )
+    factory, runners = make_runner_factory(events)
+    app = BorgCockpitApp(borg_args=["recreate"], command="recreate", runner_factory=factory)  # no final --json
+    shown, text, _ = asyncio.run(run_to_the_end(app))
+    assert shown["status-files"] == "Files: 100"
+    assert shown["status-unchanged"] == "Unchanged: 97" and shown["status-modified"] == "Modified: 3"
+    assert shown["status-added"] == "Added: 0" and shown["status-other"] == "Other: 5"
+    assert shown["status-errors"] == "Errors: 0"
+    assert "M src/modified2" in text
+
+
+def test_app_create_screen_shows_unknown_statistics_as_unknown():
+    # a dry-run: borg only tells the number of files and the original size, and only at the end.
+    events = [FileStatus(status="+", path="src/a"), FileStatus(status="-", path="src/b")]
+    final_json = {"dry_run": True, "stats": {"nfiles": 1, "original_size": 1000}, "repository": {}}
+    events += [RawLine(stream="stdout", line=line) for line in json.dumps(final_json, indent=4).splitlines()]
+    factory, runners = make_runner_factory(events)
+    app = BorgCockpitApp(borg_args=["create", "--dry-run"], command="create", runner_factory=factory)
+    shown, text, _ = asyncio.run(run_to_the_end(app))
+    assert shown["status-files"] == "Files: 1" and shown["status-original"] == "Original: 1.00 kB"
+    assert shown["status-deduplicated"] == "Deduplicated: -"
+    assert shown["status-unchanged"] == "Unchanged: -" and shown["status-modified"] == "Modified: -"
+    assert shown["status-added"] == "Added: -" and shown["status-other"] == "Other: -"
+    assert shown["status-errors"] == "Errors: -"
+    assert "+ src/a" in text and "- src/b" in text
 
 
 def test_app_extract_screen():

@@ -142,12 +142,13 @@ def feed_lines(session, lines):
 
 def test_session_archive_progress():
     session = Session()
-    assert session.running and session.nfiles == 0 and session.original_size is None
+    assert session.running and session.nfiles is None and session.original_size is None  # unknown yet
+    assert session.files_stats == {}
     feed_lines(session, [ARCHIVE_PROGRESS])
     assert session.nfiles == 3
     assert session.original_size == 250012 and session.deduplicated_size == 250012
     assert session.files_stats == {"A": 3, "d": 3}
-    assert session.count("A") == 3 and session.count("dbcs") == 3 and session.count("U-") == 0
+    assert session.count("A") == 3 and session.count("dbcs") == 3 and session.count("U") == 0
     assert session.progress_text == "src/linux/file1"
     feed_lines(session, [ARCHIVE_PROGRESS_FINISHED])
     # the final object carries no statistics, the previous ones stay
@@ -162,8 +163,9 @@ def test_session_counts_list_lines():
     session.feed(FileStatus(status="A", path="b"))
     session.feed(FileStatus(status="d", path="dir"))
     session.feed(FileStatus(status="E", path="broken"))
-    assert session.nfiles == 4  # all listed items
-    assert session.files_stats == {"A": 2, "d": 1, "E": 1}
+    assert session.status_counts == {"A": 2, "d": 1, "E": 1}
+    # the list lines are no source for the statistics of the archive: they are borg's statistics only.
+    assert session.nfiles is None and session.files_stats == {} and session.count("A") == 0
     lines, dropped = session.drain()
     assert dropped == 0
     assert [(line.kind, line.tag, line.text) for line in lines] == [
@@ -172,10 +174,22 @@ def test_session_counts_list_lines():
         ("status", "d", "d dir"),
         ("status", "E", "E broken"),
     ]
-    # the list lines stay the source of the counts, archive_progress (rate limited, can lag behind) only gives the sizes
     session.feed(ArchiveProgress(nfiles=3, original_size=1000, deduplicated_size=10, files_stats={"A": 1, "d": 1}))
-    assert session.nfiles == 4 and session.files_stats == {"A": 2, "d": 1, "E": 1}
+    assert session.nfiles == 3 and session.files_stats == {"A": 1, "d": 1}
     assert session.original_size == 1000 and session.deduplicated_size == 10
+
+
+def test_session_statistics_do_not_depend_on_the_listing():
+    # create --list --filter=AME: only a few of the items are listed.
+    session = Session(command="create")
+    for number in range(3):
+        session.feed(FileStatus(status="M", path=f"modified{number}"))
+    session.feed(ArchiveProgress(nfiles=23223, original_size=5000, files_stats={"M": 3, "U": 23220, "d": 46}))
+    assert session.status_counts == {"M": 3}
+    assert session.nfiles == 23223
+    assert session.count("U") == 23220 and session.count("M") == 3 and session.count("d") == 46
+    session.sample(now=session.started + 1.0)
+    assert session.files_per_second == 23223.0
 
 
 def test_session_archive_status():
@@ -435,7 +449,7 @@ def test_session_final_stats_from_stdout():
     session.feed(ProcessFinished(rc=0))
     assert session.final_json["archive"]["name"] == "test"
     assert session.archive_name == "test" and session.archive_duration == 90.5
-    # the final statistics win over the --list lines and archive_progress
+    # the final statistics win over archive_progress
     assert session.nfiles == 3 and session.files_stats == {"A": 2, "M": 1, "d": 1}
     assert session.original_size == 3000 and session.deduplicated_size == 300
     lines, _ = session.drain()
@@ -461,11 +475,19 @@ def test_session_final_stats_from_stdout():
 
 def test_session_final_stats_dry_run():
     session = Session(command="create", capture_stdout=True)
+    # a dry-run has no archive_progress, the statistics are unknown until the end, whatever gets listed.
+    session.feed(FileStatus(status="+", path="included"))
+    session.feed(FileStatus(status="-", path="excluded"))
+    assert session.nfiles is None and session.original_size is None and session.files_stats == {}
+    session.sample(now=session.started + 1.0)
+    assert session.files_per_second == 0.0
+    session.drain()
     for line in '{"dry_run": true, "stats": {"nfiles": 5, "original_size": 1234}, "repository": {}}'.splitlines():
         session.feed(RawLine(stream="stdout", line=line))
     session.feed(ProcessFinished(rc=0))
     assert session.archive_name is None
     assert session.nfiles == 5 and session.original_size == 1234 and session.deduplicated_size is None
+    assert session.files_stats == {}  # borg does not tell them for a dry-run
     lines, _ = session.drain()
     assert [line.text for line in lines] == [
         "Dry run: no archive was created.",

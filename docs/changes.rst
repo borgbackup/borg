@@ -251,6 +251,9 @@ Fixes:
 - locking: try at least once before a lock acquire times out, also with --lock-wait 0
 - repoobj: catch get() errors in --find-lost-archives, #10318
 
+- recreate --log-json --progress: output archive_progress JSON objects (as documented),
+  not text progress lines
+
 Other changes:
 
 - update pyinstaller to 6.22.3

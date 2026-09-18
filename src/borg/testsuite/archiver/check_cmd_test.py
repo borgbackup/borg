@@ -28,7 +28,7 @@ from ...hashindex import ChunkIndex
 from ...item import Item
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
-from ...repository import PackTracker, Repository
+from ...repository import PackReader, PackTracker, Repository
 from ..repoobj_test import DATA_SIZE_OFFSET
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
@@ -182,6 +182,94 @@ def test_check_repair_soft_interrupt(archivers, request, monkeypatch):
     # a second --repair finishes the job; a plain check then finds no problems.
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
+
+
+def test_check_repair_interrupt_during_index_rebuild(archivers, request, monkeypatch):
+    """A --repair archive check rebuilds the chunk index before it reads any archive. A Ctrl-C ends that
+    rebuild at the pack boundary and raises, the stored index keeps the fragments it had, and a second
+    --repair completes the check, #10042."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)  # produces several packs
+
+    orig_iter_headers = PackReader.iter_headers
+    packs_read = []
+
+    def iter_headers_then_interrupt(self, **kwargs):
+        packs_read.append(self.pack_id)
+        headers = list(orig_iter_headers(self, **kwargs))
+        sig_int._sig_int_triggered = True  # one Ctrl-C after the first pack was indexed
+        return iter(headers)
+
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        assert len(repository.store_list("packs")) > 1  # there is a pack boundary to stop at
+        index_before = set(list_chunkindex_hashes(repository))
+        monkeypatch.setattr(PackReader, "iter_headers", iter_headers_then_interrupt)
+        try:
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                ArchiveChecker().check(repository, repair=True, sort_by="ts", format="{archive} {time} {id}")
+        finally:
+            sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+        # restore the real method; monkeypatch.undo() would also drop the autouse env (BORG_TESTONLY_WEAKEN_KDF).
+        monkeypatch.setattr(PackReader, "iter_headers", orig_iter_headers)
+        assert len(packs_read) == 1  # the rebuild stopped at the pack boundary
+        assert set(list_chunkindex_hashes(repository)) == index_before  # no partial index was stored
+
+    # the repo is as it was before the interrupt, so a second --repair completes the check.
+    cmd(archiver, "check", "--repair", exit_code=0)
+    cmd(archiver, "check", exit_code=0)
+
+
+def test_check_repair_finish_completes_index_rebuild_after_interrupt(archivers, request, monkeypatch):
+    """finish() runs with sig_int already set, #9850: its chunk index rebuild walks every pack and stores
+    an index that matches them, so the invalid marker is cleared and a plain check passes afterwards."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)  # two archives
+
+    orig_create = Archives.create
+    orig_finish = ArchiveChecker.finish
+    orig_iter_headers = PackReader.iter_headers
+    in_finish = False
+    packs_read_in_finish = []
+    checker = ArchiveChecker()
+
+    def create_then_interrupt(self, *args, **kwargs):
+        orig_create(self, *args, **kwargs)
+        sig_int._sig_int_triggered = True  # one Ctrl-C after the first archive was rebuilt
+
+    def finish_spy(self):
+        nonlocal in_finish
+        in_finish = True
+        try:
+            return orig_finish(self)
+        finally:
+            in_finish = False
+
+    def count_packs_read(self, **kwargs):
+        if in_finish:
+            packs_read_in_finish.append(self.pack_id)
+        return orig_iter_headers(self, **kwargs)
+
+    monkeypatch.setattr(Archives, "create", create_then_interrupt)
+    monkeypatch.setattr(ArchiveChecker, "finish", finish_spy)
+    monkeypatch.setattr(PackReader, "iter_headers", count_packs_read)
+    try:
+        with Repository(archiver.repository_path, exclusive=True) as repository:
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                checker.check(repository, repair=True, sort_by="ts", format="{archive} {time} {id}")
+            pack_count = len(repository.store_list("packs"))
+    finally:
+        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+    # restore the real methods; monkeypatch.undo() would also drop the autouse env (BORG_TESTONLY_WEAKEN_KDF).
+    monkeypatch.setattr(Archives, "create", orig_create)
+    monkeypatch.setattr(ArchiveChecker, "finish", orig_finish)
+    monkeypatch.setattr(PackReader, "iter_headers", orig_iter_headers)
+
+    # the repair stored re-packed item metadata chunks, so finish() takes its rebuild branch.
+    assert checker.chunks_modified is True
+    assert len(packs_read_in_finish) == pack_count
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        assert not chunkindex_is_invalid(repository)  # finish() reached delete_chunkindex_invalid()
+    cmd(archiver, "check", exit_code=0)  # the stored index matches the packs
 
 
 def test_check_interrupt_skips_archive_check(archivers, request, monkeypatch):

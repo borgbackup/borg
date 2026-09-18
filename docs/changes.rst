@@ -174,6 +174,10 @@ New features:
 - the "previously unknown unencrypted repository" warning now says why the repository
   is considered unencrypted: a none-* / authenticated-* mode (no data encryption) or a
   repokey with an empty passphrase, #9072
+- extract/export-tar --list --log-json: output a file_status JSON object per listed item,
+  like create does. The text listing of export-tar has the same "+" prefix as extract's now.
+  prune/delete/undelete --list --log-json: output an archive_status JSON object per listed
+  archive, #9454.
 
 Fixes:
 
@@ -204,11 +208,18 @@ Other changes:
   for big chunks at high-speed, low-compression zstd levels
 - add_warning: store exceptions given as args as text, not the exception object -
   reduces memory usage when there are many warnings
+- cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
+  instead of parsing text lines, #9454. The display depends on the command: archive
+  statistics for create/import-tar/recreate/transfer (with the final statistics from
+  --json), a progress bar for extract/export-tar, the progress phases for the other
+  commands. Yes/no prompts are shown as a dialog. The cockpit exits with the exit code
+  of the borg command.
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088
   - fix two inaccuracies in the borg diff JSON docs, #7486
   - an empty passphrase can be replaced later with ``borg key change-passphrase``, #9072
+  - add a usage page for the cockpit TUI, #9454
 
 
 Version 2.0.0b24 (2026-09-02)

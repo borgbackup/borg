@@ -1,5 +1,3 @@
-import logging
-
 from ._common import with_repository, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
@@ -38,7 +36,6 @@ class DeleteMixIn:
             )
 
         deleted = False
-        logger_list = logging.getLogger("borg.output.list")
         for i, archive_info in enumerate(archive_infos, 1):
             name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
             # format early before deletion of the archive
@@ -54,7 +51,7 @@ class DeleteMixIn:
                 deleted = True
                 if self.output_list:
                     msg = "Would delete: {} ({}/{})" if dry_run else "Deleted archive: {} ({}/{})"
-                    logger_list.info(msg.format(archive_formatted, i, count))
+                    self.print_archive_status("deleted", archive_info, msg.format(archive_formatted, i, count))
         if dry_run:
             logger.info("Finished dry-run.")
         elif deleted:

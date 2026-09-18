@@ -76,8 +76,8 @@ Footer {
     border: double $primary;
     /* If content grows too large, scroll rather than pushing the log off-screen */
     overflow-y: auto;
-    /* Adjust this if status or logo panel shall get more/less height. */
-    height: 16;
+    /* The screens set the height to what their status panel needs (see CockpitScreen). */
+    height: 19;
 }
 
 #logopanel {
@@ -173,7 +173,6 @@ Pulsar.dim {
 #speed-sparkline {
     width: 100%;
     height: 4;
-    margin-bottom: 1;
 }
 
 .status {
@@ -198,4 +197,66 @@ Pulsar.dim {
 
 .rc-error {
     color: $error;
+}
+
+/* The dialog for borg's yes/no prompts */
+PromptModal {
+    align: center middle;
+}
+
+#prompt-dialog {
+    width: 80%;
+    max-width: 100;
+    height: auto;
+    border: double $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#prompt-message {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#prompt-buttons {
+    height: auto;
+    align-horizontal: center;
+}
+
+#prompt-buttons Button {
+    margin: 0 2;
+}
+
+/* The progress bar of the extract screen: bar, percentage and ETA over the full panel width */
+#extract-bar {
+    width: 100%;
+}
+
+#extract-bar Bar {
+    width: 1fr;
+}
+
+#extract-bar Bar > .bar--bar {
+    color: $primary;
+    background: $panel;
+}
+
+#extract-bar Bar > .bar--indeterminate {
+    color: $primary;
+    background: $panel;
+}
+
+#extract-bar Bar > .bar--complete {
+    color: $success;
+    background: $panel;
+}
+
+/* The lines of the status panels take only the height they need, what follows them comes right after. */
+#statuses {
+    height: auto;
+}
+
+/* The phase list of the generic screen */
+#phases {
+    height: auto;
 }

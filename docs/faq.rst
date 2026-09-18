@@ -76,6 +76,38 @@ Warning: Using Borg with multiple repositories that have identical repository ID
 creating 1:1 repository copies) is not supported and can lead to various issues,
 for example cache coherency issues, malfunction, or data corruption.
 
+Can I store the data of multiple repositories on disk only once?
+----------------------------------------------------------------
+
+If you need separate repositories (e.g. one per user, for access control or retention
+reasons), but their backup sources have a lot of data in common, you can make borg store
+byte-identical files for the data they share, so that a CoW filesystem (or an offline dedup
+tool) needs to keep it only once. You need all of:
+
+- Related repositories, see above: they share the chunker secret and the ``id_key``, so
+  identical input data is cut into identical chunks with identical chunk ids.
+- ``--encryption authenticated-sha256`` (or ``-blake3``) **and**
+  ``borg repo-create --copy-crypt-key``, so that the repositories also share the ``crypt_key``.
+  Only then do they store byte-identical repository objects for identical input. The
+  encrypting modes can not be used for this: they use a random session key, so their objects
+  differ even for identical input.
+- ``BORG_PACK_MAX_COUNT=1`` for every borg run on these repositories. The files in a
+  repository are packs (each batching many objects), not objects, and a pack file only matches
+  if it batched the same objects in the same order. With the default, size-bound packs that
+  stops being true as soon as the repositories' histories diverge - one of them already had a
+  chunk, or backed up something else first - and the packs differ although the objects inside
+  them are identical. One object per pack makes each pack file depend on that single object
+  only.
+
+The pack files are then the same in both repositories, down to their name below ``packs/``.
+Only the archive metadata objects differ (they contain per-archive data, e.g. timestamps),
+and so do the chunk index fragments and the repository config.
+
+Be aware of what one object per pack costs: it gives up exactly what pack files are for. The
+repository gets one file per chunk again, so every operation pays one store round trip per
+chunk - slow on high-latency backends and hard on filesystems that dislike huge directories.
+Only do this if the space you save is worth more to you than the speed you lose.
+
 Which file types, attributes, etc. are *not* preserved?
 -------------------------------------------------------
 

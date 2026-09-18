@@ -61,6 +61,12 @@ def unsupported_reason(args, streams=None):
     )
     if reads_stdin:
         return "this command reads from stdin, that does not work in the cockpit."
+    # borg's stdout is a pipe to the cockpit, which expects text lines (or the --json output) there.
+    writes_data_to_stdout = (command == "extract" and getattr(args, "stdout", False)) or (
+        command == "export-tar" and getattr(args, "tarfile", None) == "-"
+    )
+    if writes_data_to_stdout:
+        return "this command writes its data to stdout, that does not work in the cockpit."
     if streams is None:
         streams = (sys.stdin, sys.stdout, sys.stderr)
     if not all(stream is not None and stream.isatty() for stream in streams):
@@ -82,6 +88,10 @@ class BorgRunner:
     """
 
     READ_SIZE = 64 * 1024
+    # A line longer than this [bytes] is no line borg made for a frontend or a user, but bulk data: only
+    # its start is passed on, the rest is dropped. This bounds the memory needed for an unterminated line.
+    LINE_MAX = 1024 * 1024
+    LINE_MAX_SHOWN = 200  # bytes passed on of a line longer than LINE_MAX
     # An unterminated line (e.g. a prompt waiting for input) is passed on after this idle time [seconds].
     PARTIAL_LINE_TIMEOUT = 1.0
     # How long to wait for borg to finish after SIGTERM before killing it [seconds].
@@ -130,8 +140,13 @@ class BorgRunner:
             self.process = None
 
     async def _read(self, stream, name):
-        """Pass on the lines of <stream>; an unterminated line is passed on as partial after some idle time."""
+        """
+        Pass on the lines of <stream>; an unterminated line is passed on as partial after some idle time.
+
+        Of a line longer than LINE_MAX, only the start is passed on (as partial), the rest is dropped.
+        """
         buffer = b""
+        overlong = False  # inside a line longer than LINE_MAX: its start was passed on, the rest gets dropped
         while True:
             try:
                 data = await asyncio.wait_for(stream.read(self.READ_SIZE), self.PARTIAL_LINE_TIMEOUT)
@@ -146,7 +161,15 @@ class BorgRunner:
                 return
             *lines, buffer = (buffer + data).split(b"\n")
             for line in lines:
-                self._line(name, line)
+                if overlong:
+                    overlong = False  # that was the end of the overlong line
+                else:
+                    self._line(name, line)
+            if overlong:
+                buffer = b""
+            elif len(buffer) > self.LINE_MAX:
+                self._line(name, buffer[: self.LINE_MAX_SHOWN] + b" [...]", partial=True)
+                overlong, buffer = True, b""
 
     def _line(self, stream, raw, partial=False):
         line = raw.decode("utf-8", errors="replace").rstrip("\r")

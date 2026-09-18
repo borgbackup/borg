@@ -24,12 +24,13 @@ def test_with_lock(tmp_path):
     repo_path = tmp_path / "repo"
     env = os.environ.copy()
     env["BORG_REPO"] = Path(repo_path).as_uri()
+    env["BORG_PASSPHRASE"] = "waytooeasyonlyfortests"  # nosec B105
     # test debug output:
     print("sys.path: %r" % sys.path)
     print("PYTHONPATH: %s" % env.get("PYTHONPATH", ""))
     print("PATH: %s" % env.get("PATH", ""))
     python = sys.executable or "python3"
-    command0 = python, "-m", "borg", "repo-create", "--encryption=none-sha256"
+    command0 = python, "-m", "borg", "repo-create", "--encryption=authenticated-sha256"
     # Timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
     # so that lock acquisition for command2 fails as the test expects it.
     lock_wait = 2

@@ -46,10 +46,8 @@ def test_repo_create_requires_encryption_option(archivers, request):
         # the modes that do not encrypt name their id hash themselves, --id-hash does not apply
         (["--encryption=authenticated-sha256"], "No (repokey, authenticated-sha256)"),
         (["--encryption=authenticated-blake3"], "No (repokey, authenticated-blake3)"),
-        (["--encryption=none-sha256"], "No (none-sha256)"),
-        (["--encryption=none-blake3"], "No (none-blake3)"),
         # giving the matching --id-hash in addition is accepted
-        (["--encryption=none-blake3", "--id-hash=blake3"], "No (none-blake3)"),
+        (["--encryption=authenticated-blake3", "--id-hash=blake3"], "No (repokey, authenticated-blake3)"),
     ],
 )
 def test_repo_create_encryption_id_hash_combinations(archivers, request, extra_args, expected):
@@ -60,13 +58,13 @@ def test_repo_create_encryption_id_hash_combinations(archivers, request, extra_a
 
 
 @pytest.mark.parametrize("mode", ["none", "authenticated"])
-def test_repo_create_rejects_bare_unencrypted_mode_names(archivers, request, mode):
-    # these modes always name their id hash now, e.g. "none-sha256", see #9104.
+def test_repo_create_rejects_unsupported_unencrypted_mode_names(archivers, request, mode):
+    # there is no "none" mode, and the "authenticated-*" modes always name their id hash, see #9104.
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", f"--encryption={mode}", exit_code=2)
 
 
-@pytest.mark.parametrize("mode", ["none-sha256", "authenticated-blake3"])
+@pytest.mark.parametrize("mode", ["authenticated-sha256", "authenticated-blake3"])
 def test_repo_create_rejects_conflicting_id_hash(archivers, request, mode):
     # the id hash of these modes is part of the mode name, so a contradicting --id-hash is an error.
     archiver = request.getfixturevalue(archivers)

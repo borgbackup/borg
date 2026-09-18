@@ -15,7 +15,7 @@ except ImportError:
 pytestmark = pytest.mark.skipif(not have_cockpit, reason="can not import BorgCockpitApp, is textual installed?")
 
 
-def test_cockpit_app_create_archive(tmp_path):
+def test_cockpit_app_create_archive(tmp_path, monkeypatch):
     if not (is_freebsd or is_win32):
         pytest.skip("this slow test shall only run on FreeBSD and Windows")
     repo_path = tmp_path / "repo"
@@ -24,7 +24,8 @@ def test_cockpit_app_create_archive(tmp_path):
     for i in range(5000):
         (input_path / f"test{i}.txt").write_text(f"content {i}")
 
-    subprocess.run(["borg", "-r", str(repo_path), "repo-create", "--encryption", "none-sha256"], check=True)
+    monkeypatch.setenv("BORG_PASSPHRASE", "waytooeasyonlyfortests")  # also for the borg the app runs
+    subprocess.run(["borg", "-r", str(repo_path), "repo-create", "--encryption", "authenticated-sha256"], check=True)
 
     async def run():
         app = BorgCockpitApp()

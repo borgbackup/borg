@@ -536,7 +536,7 @@ def test_extract_hardlinks_twice(archivers, request):
     hl_b = os.path.join(path_b, "hardlink")
     create_regular_file(archiver.input_path, hl_a, contents=b"123456")
     os.link(hl_a, hl_b)
-    cmd(archiver, "repo-create", "--encryption=none-sha256")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     cmd(archiver, "create", "test", "input", "input")  # give input twice!
     # now test extraction
     with changedir("output"):
@@ -777,7 +777,7 @@ def test_extract_xattrs_errors(archivers, request):
 
     create_regular_file(archiver.input_path, "file")
     xattr.setxattr(b"input/file", b"user.attribute", b"value")
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         input_abspath = os.path.abspath("input/file")
@@ -805,7 +805,7 @@ def test_extract_xattrs_errors(archivers, request):
 def test_extract_xattrs_resourcefork(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file")
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     input_path = os.path.abspath("input/file")
     xa_key, xa_value = b"com.apple.ResourceFork", b"whatshouldbehere"  # issue #7234
     xattr.setxattr(input_path.encode(), xa_key, xa_value)
@@ -844,7 +844,7 @@ def test_extract_restores_append_flag(archivers, request):
     if (platform.get_flags(src_path, st) & stat.UF_APPEND) == 0:
         pytest.skip("UF_APPEND not settable on this filesystem")
     # archive and extract
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
@@ -864,7 +864,7 @@ def test_extract_flags_errors(archivers, request):
         raise OSError(errno.EPERM, "EPERM")
 
     create_regular_file(archiver.input_path, "file")
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         with patch.object(archive_module, "set_flags", patched_set_flags):
@@ -914,7 +914,7 @@ def test_do_not_fail_when_percent_is_in_xattr_name(archivers, request):
 
     create_regular_file(archiver.input_path, "file")
     xattr.setxattr(b"input/file", b"user.attribute%p", b"value")
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
@@ -934,7 +934,7 @@ def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
 
     os.makedirs(os.path.join(archiver.input_path, "dir%p"))
     xattr.setxattr(b"input/dir%p", b"user.attribute", b"value")
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
@@ -1162,7 +1162,7 @@ def test_extract_write_error_at_flush_is_a_warning(archivers, request):
 
     create_regular_file(archiver.input_path, "small1", size=1024)
     create_regular_file(archiver.input_path, "small2", size=1024)
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     cmd(archiver, "create", "test", "input")
     out = _extract_with_raw_file_class(archiver, NoSpaceRaw, BackupOSError)
     # both files got their warning, i.e. the extraction did not stop at the first one.
@@ -1182,7 +1182,7 @@ def test_extract_close_error_is_a_warning(archivers, request):
             raise OSError(errno.EIO, "Input/output error")
 
     create_regular_file(archiver.input_path, "file1", size=1024)
-    cmd(archiver, "repo-create", "-e", "none-sha256")
+    cmd(archiver, "repo-create", "-e", "authenticated-sha256")
     cmd(archiver, "create", "test", "input")
     out = _extract_with_raw_file_class(archiver, BadCloseRaw, BackupIOError)
     assert f"input/file1: close: [Errno {errno.EIO}] Input/output error" in out

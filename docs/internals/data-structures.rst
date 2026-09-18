@@ -122,15 +122,11 @@ function is selected via ``borg repo-create --id-hash``, independently of
 ``--encryption``. It is a keyed MAC over the plaintext (keyed by ``id_key``):
 ``sha256`` selects HMAC-SHA256, ``blake3`` selects a keyed BLAKE3.
 
-For the modes **without encryption**, the id hash is what protects the data, so
-it is part of the mode name and not separately selectable (giving ``--id-hash``
-in addition is only accepted if it agrees with the mode name):
-
-- ``authenticated-sha256`` / ``authenticated-blake3`` have key material and thus
-  use the same keyed MACs as the encrypted modes.
-- ``none-sha256`` / ``none-blake3`` have no key at all, so the id is a plain
-  SHA-256 resp. BLAKE3 hash of the plaintext. All repositories of such a mode
-  therefore deduplicate identically, see :ref:`tagged_envelope`.
+For the modes **without encryption** (``authenticated-sha256`` /
+``authenticated-blake3``), the id hash is what protects the data, so it is part
+of the mode name and not separately selectable (giving ``--id-hash`` in addition
+is only accepted if it agrees with the mode name). These modes have key material
+and thus use the same keyed MACs as the encrypted modes, see :ref:`tagged_envelope`.
 
 As the id / key is used for deduplication, id_hash must be a cryptographically
 strong hash or MAC.
@@ -934,7 +930,7 @@ session key changes also keep the total advantage low over the lifetime of a bor
 Modes without encryption
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``authenticated-*`` and ``none-*`` modes do not encrypt: the payload of a repository
+The ``authenticated-*`` modes do not encrypt: the payload of a repository
 object slot (the compressed chunk data resp. the packed metadata, see `Repository objects`_)
 is stored as-is. Every slot still carries a 32 byte tag::
 
@@ -957,25 +953,17 @@ There is no nonce, no session and no other state: the tag is deterministic. Two 
 with the same key material therefore store byte-identical objects for identical input, which
 allows deduplicating them on the filesystem level (e.g. with CoW/dedup tools).
 
-The modes differ in the tag algorithm and in whether they have a key at all:
+The tag is a **MAC** (HMAC-SHA256 for ``authenticated-sha256``, keyed BLAKE3 for
+``authenticated-blake3``), so only somebody who has the borg key can compute it - this detects
+malicious tampering, not just accidental corruption. The MAC key is derived from ``crypt_key``::
 
-- ``authenticated-sha256`` / ``authenticated-blake3``: the tag is a **MAC** (HMAC-SHA256 resp.
-  keyed BLAKE3), so only somebody who has the borg key can compute it - this detects malicious
-  tampering, not just accidental corruption. The MAC key is derived from ``crypt_key``::
+    tag_key = sha256(crypt_key + b"borg-repoobj-mac-hmac-sha256")[:32]   # authenticated-sha256
+    tag_key = sha256(crypt_key + b"borg-repoobj-mac-blake3")[:32]        # authenticated-blake3
 
-      tag_key = sha256(crypt_key + b"borg-repoobj-mac-hmac-sha256")[:32]   # authenticated-sha256
-      tag_key = sha256(crypt_key + b"borg-repoobj-mac-blake3")[:32]        # authenticated-blake3
-
-  It is deliberately not derived from ``id_key``: chunk ids are public, and related repositories
-  share the id key (see ``borg repo-create --other-repo``), which must not enable them to forge
-  each other's objects. ``--copy-crypt-key`` shares ``crypt_key`` and thus opts into producing
-  byte-identical objects across the related repositories.
-- ``none-sha256`` / ``none-blake3``: there is no key at all, so the tag is an **unkeyed** hash
-  (plain SHA-256 resp. BLAKE3 over the same input), i.e. a checksum. It detects accidental
-  corruption and reads that returned the wrong bytes, but anybody who modifies an object can
-  recompute it - it is no protection against malicious tampering. For the same reason, the chunk
-  ids of these modes are unkeyed hashes of the plaintext, which makes all repositories of such a
-  mode dedup identically.
+It is deliberately not derived from ``id_key``: chunk ids are public, and related repositories
+share the id key (see ``borg repo-create --other-repo``), which must not enable them to forge
+each other's objects. ``--copy-crypt-key`` shares ``crypt_key`` and thus opts into producing
+byte-identical objects across the related repositories.
 
 Legacy modes
 ~~~~~~~~~~~~
@@ -988,7 +976,8 @@ removed in a future release.
 
 The same applies to the borg 1.x ``none`` and ``authenticated`` modes: their envelope is just
 the type byte followed by the payload, so nothing about an object is verified except the chunk
-id over the plaintext. They were replaced by the tagged modes described above.
+id over the plaintext. borg 2 has no ``none`` mode, and its ``authenticated-*`` modes use the
+tagged envelope described above.
 
 All modes
 ~~~~~~~~~

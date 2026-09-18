@@ -443,7 +443,7 @@ def test_migrate_lock_alive(archivers, request):
     # Decorate
     Lock.migrate_lock = write_assert_data(Lock.migrate_lock)
     try:
-        cmd(archiver, "repo-create", "--encryption=none-sha256")
+        cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
         create_src_archive(archiver, "arch")
         mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
         # In order that the decoration is kept for the borg mount process, we must not spawn, but actually fork;

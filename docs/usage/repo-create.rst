@@ -11,9 +11,8 @@ Examples
     # Recommended AEAD cryptographic modes (key stored in the repository by default)
     $ borg repo-create --encryption=aes256-ocb
     $ borg repo-create --encryption=chacha20-poly1305
-    # No encryption (not recommended)
+    # No encryption, only authentication (not recommended)
     $ borg repo-create --encryption=authenticated-sha256
-    $ borg repo-create --encryption=none-sha256
 
     # For the encrypted modes, --encryption (the cipher / AE algorithm) and --id-hash
     # (the id hash function) are chosen independently. --id-hash defaults to sha256;
@@ -21,10 +20,9 @@ Examples
     $ borg repo-create --encryption=aes256-ocb --id-hash=blake3
     $ borg repo-create --encryption=chacha20-poly1305 --id-hash=blake3
 
-    # The 'authenticated-*' and 'none-*' modes name their id hash themselves, so they
+    # The 'authenticated-*' modes name their id hash themselves, so they
     # do not take a separate --id-hash.
     $ borg repo-create --encryption=authenticated-blake3
-    $ borg repo-create --encryption=none-blake3
 
     # Where the key is stored (--key-location) is also chosen independently.
     # --key-location defaults to repokey.

@@ -23,6 +23,8 @@ class RepoIdMismatch(Error):
     exit_mcode = 45
 
 
+# Not raised: every borg 2 mode has a borg key, so key management is always available.
+# The class stays defined to keep its exit code (rc 46) reserved.
 class UnencryptedRepo(Error):
     """Key management not available for unencrypted repositories."""
 
@@ -52,8 +54,6 @@ class KeyManager:
 
         self.key_cls = key_class_of(repository)
         self.keyblob_storage = self.key_cls.STORAGE
-        if self.keyblob_storage == KeyBlobStorage.NO_STORAGE:
-            raise UnencryptedRepo()
 
     def _list_borg_keys(self):
         # enumerate all borg keys of this repository together with their plaintext labels,

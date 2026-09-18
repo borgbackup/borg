@@ -8,7 +8,7 @@ from ...constants import *  # NOQA
 from ...constants import KeyBlobStorage
 from ...crypto.key import AESOCBKey, CHPOKey, Passphrase, is_keyfile, keyfile_parse
 from ...crypto.key import RepoKeyNotFoundError
-from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile, UnencryptedRepo
+from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
@@ -140,24 +140,6 @@ def test_borg_key_file_env_keeps_explicit_path(archivers, request, monkeypatch):
     cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     assert os.path.isfile(explicit_key_path)
     assert os.listdir(archiver.keys_path) == []
-
-
-@pytest.mark.parametrize("mode", ["none-sha256", "none-blake3"])
-def test_key_management_unavailable_for_keyless_repo(archivers, request, mode):
-    # the "none-*" modes have no key at all, so there is nothing to export/import.
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", f"--encryption={mode}")
-    export_file = archiver.output_path + "/exported"
-    if archiver.FORK_DEFAULT:
-        # a forked/binary run returns the exit code, not the exception (BORG_EXIT_CODES defaults
-        # to "modern", so that is the specific mcode of UnencryptedRepo, not the generic EXIT_ERROR).
-        cmd(archiver, "key", "export", export_file, exit_code=UnencryptedRepo.exit_mcode)
-        cmd(archiver, "key", "import", export_file, exit_code=UnencryptedRepo.exit_mcode)
-    else:
-        with pytest.raises(UnencryptedRepo):
-            cmd(archiver, "key", "export", export_file)
-        with pytest.raises(UnencryptedRepo):
-            cmd(archiver, "key", "import", export_file)
 
 
 def test_key_export_keyfile(archivers, request):

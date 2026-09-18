@@ -26,6 +26,7 @@ try:
     from borg.cockpit.app import BorgCockpitApp
     from borg.cockpit.prompt import PromptModal
     from borg.cockpit.screens import CreateScreen, ExtractScreen, GenericScreen, screen_for_command
+    from borg.cockpit.widgets import printable
 
     have_cockpit = True
 except ImportError:
@@ -265,6 +266,45 @@ def test_app_shows_text_from_borg_as_it_is():
         assert f"A {text}" in log_lines
         assert f"log {text}" in log_lines
         assert f"Keeping {text}" in log_lines
+
+
+def test_printable():
+    assert printable("plain text, ünïcödé \u20ac") == "plain text, ünïcödé \u20ac"
+    assert (
+        printable("esc\x1b[2J nul\x00 cr\r bel\x07 del\x7f csi\x9b2J")
+        == "esc\ufffd[2J nul\ufffd cr\ufffd bel\ufffd del\ufffd csi\ufffd2J"
+    )
+    assert printable("line1\nline2\tx") == "line1\ufffdline2\ufffdx"
+    assert printable("line1\nline2\tx\x1b", multiline=True) == "line1\nline2\tx\ufffd"
+
+
+def test_app_does_not_show_control_characters():
+    # e.g. a file name can contain an ESC, starting an escape sequence the terminal would interpret.
+    evil, shown_as = "evil\x1b[2J\x1b]0;title\x07\x00\rname", "evil\ufffd[2J\ufffd]0;title\ufffd\ufffd\ufffdname"
+    events = [
+        FileStatus(status="A", path=evil),
+        LogMessage(message=f"log {evil}", levelname="WARNING"),
+        ArchiveStatus(name=evil, status="kept", message=f"Keeping {evil}"),
+        ProgressMessage(operation=1, msgid="test", message=f"phase {evil}"),
+        RawLine(stream="stderr", line=f"raw {evil}"),
+    ]
+    factory, runners = make_runner_factory(events)
+    app = BorgCockpitApp(borg_args=["prune"], command="prune", runner_factory=factory)
+
+    def rendered(app):
+        panel = app.query_one("#status")
+        panel.show_value("status-archives", "Archives: ", evil + "\nline2", truncate=True)
+        value = panel.query_one("#status-archives").render_line(0).text.rstrip()
+        return value, panel.query_one("#phases").render_line(0).text.rstrip()
+
+    shown, text, (value, phase) = asyncio.run(run_to_the_end(app, inspect=rendered))
+    assert value == f"Archives: {shown_as}\ufffdline2"  # a panel line stays one line
+    assert phase == f"▶ ░░░░░░░░░░ phase {shown_as}"
+    log_lines = [line.rstrip() for line in text.splitlines()]
+    for line in f"A {shown_as}", f"log {shown_as}", f"Keeping {shown_as}", f"raw {shown_as}":
+        assert line in log_lines
+    assert not any(ord(char) < 0x20 or 0x7F <= ord(char) < 0xA0 for line in log_lines for char in line)
+    assert PromptModal(f"Really delete {evil}?\nType YES:").message == f"Really delete {shown_as}?\nType YES:"
 
 
 def test_app_answers_prompt():

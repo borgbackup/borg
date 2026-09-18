@@ -7,6 +7,8 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static
 
+from .widgets import printable
+
 
 class PromptModal(ModalScreen[str]):
     """
@@ -18,7 +20,7 @@ class PromptModal(ModalScreen[str]):
 
     def __init__(self, message):
         super().__init__()
-        self.message = message
+        self.message = printable(message, multiline=True)  # it can contain paths, archive names, ...
 
     def compose(self) -> ComposeResult:
         with Vertical(id="prompt-dialog"):

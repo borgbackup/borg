@@ -26,6 +26,7 @@ class BorgCockpitApp(App):
     REFRESH_INTERVAL = 0.2  # seconds between two refreshes of the widgets from the session
     # These commands output the statistics of the new archive as JSON on stdout when given --json.
     FINAL_STATS_COMMANDS = ("create", "import-tar")
+    QUIT_DELAY = 2.0  # seconds the final state stays on the screen (the logo fades out) before the cockpit exits
     # The signals asking the cockpit to end, see handle_signals().
     SIGNALS = ("SIGTERM", "SIGHUP", "SIGINT")
 
@@ -44,6 +45,7 @@ class BorgCockpitApp(App):
         self.main_screen = None
         self.runner = None
         self.runner_task = None
+        self.quitting = False  # the user quits: quit_app() runs
         self.handled_signals = []  # the names of the signals handled by on_signal()
         self.terminate_task = None
 
@@ -158,12 +160,30 @@ class BorgCockpitApp(App):
             await self.runner_task
 
     async def action_quit(self) -> None:
-        """Handle quit action."""
+        """Quit. Quitting terminates borg, so if borg still runs, ask for confirmation first."""
+        from .prompt import ConfirmQuitModal
+
+        if self.quitting:
+            return
+        if self.session.running and self.runner is not None:
+            if not isinstance(self.screen, ConfirmQuitModal):
+                self.push_screen(ConfirmQuitModal(), callback=self.quit_confirmed)
+            return
+        await self.quit_app()
+
+    def quit_confirmed(self, confirmed) -> None:
+        """The answer given in the quit confirmation dialog."""
+        if confirmed:
+            self.run_worker(self.quit_app())
+
+    async def quit_app(self) -> None:
+        """Terminate borg if it still runs, keep the final state on the screen for a moment, then exit."""
+        self.quitting = True
         if hasattr(self, "speed_timer"):
             self.speed_timer.stop()
         await self.stop_borg()
         self.main_screen.fade_out()
-        await asyncio.sleep(2)  # give the user a chance the see the borg RC
+        await asyncio.sleep(self.QUIT_DELAY)  # give the user a chance the see the borg RC
         self.exit()
 
     def action_toggle_translator(self) -> None:

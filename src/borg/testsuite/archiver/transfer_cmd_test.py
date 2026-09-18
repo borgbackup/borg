@@ -447,6 +447,23 @@ def test_transfer(archivers, request, monkeypatch):
     check_repo()
 
 
+def test_transfer_progress_json(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        create_test_files(archiver.input_path)
+        cmd(archiver, "create", "arch1", "input")
+    output = cmd(archiver, "transfer", other_repo1, "--log-json", "--progress")
+    lines = output.splitlines()
+    messages = [json.loads(line) for line in lines if line.startswith("{")]
+    progress = [msg for msg in messages if msg["type"] == "archive_progress"]
+    # with --log-json, the progress of the archive being created consists of archive_progress objects ...
+    assert len(progress) >= 2
+    assert not progress[0]["finished"] and progress[-1]["finished"]
+    assert {"nfiles", "original_size", "deduplicated_size", "path"} <= set(progress[0])
+    # ... and not of text lines like "1.02 kB O 0 B U 1 N input/file1".
+    assert not any(re.search(r" O .* U \d+ N ", line) for line in lines if not line.startswith("{"))
+
+
 @pytest.mark.parametrize("rechunkify", [False, True])
 def test_transfer_wrong_chunk_content(archivers, request, monkeypatch, rechunkify):
     # transferring re-anchors the content in another repository, so the chunkid == id_hash(content)

@@ -192,8 +192,8 @@ Fixes:
   - do not report a merely touched file as modified when the chunker params differ, #10351
   - report a file as modified when chunks were reordered or duplicated
 
-- recreate --log-json --progress: output archive_progress JSON objects (as documented),
-  not text progress lines
+- recreate/transfer --log-json --progress: output archive_progress JSON objects (as
+  documented), not text progress lines
 
 Other changes:
 

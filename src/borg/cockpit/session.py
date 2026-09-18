@@ -86,7 +86,9 @@ class Session:
         self.error = None  # why borg could not be run, if so
         self.archive_progress = None  # the latest ArchiveProgress carrying statistics
         self.archive_finished = False
-        self.status_counts = Counter()  # status char -> count, from the --list lines
+        # status char -> count of the --list lines. They only tell about the listing (which --filter reduces),
+        # the statistics of an archive being created never come from here, see nfiles and files_stats.
+        self.status_counts = Counter()
         self.archive_counts = Counter()  # status -> count, the archives listed by prune / delete / undelete
         self.phases = {}  # operation id -> Phase, in order of appearance
         self._active_phase = None  # operation id of the phase updated last
@@ -145,37 +147,34 @@ class Session:
         value = stats.get(key) if stats else None
         return value if isinstance(value, types) and not isinstance(value, bool) else None
 
-    # The final statistics (exact) are preferred over the --list lines (exact, but subject to --filter),
-    # which are preferred over archive_progress: that one is rate limited and its final object carries no
-    # statistics, so its counts can be a little behind at the end of a run (and stay at zero for a run
-    # shorter than the update interval).
+    # The statistics come from borg's statistics only: the final ones (exact) are preferred over the latest
+    # archive_progress. That one is rate limited and its final object carries no statistics, so without final
+    # statistics the numbers can be a little behind at the end of a run (and stay at zero for a run shorter
+    # than the update interval).
+    # The --list lines are no source for them: they only exist if the user asked for the listing, and --filter
+    # reduces them to some status characters, so counting them would give wrong numbers.
+    # What borg does not tell is unknown: there is no archive_progress for a dry-run, only create fills
+    # files_stats, and recreate and transfer output their progress as text, even with --log-json.
+    # TODO: borg should output archive_progress for recreate and transfer, as docs/internals/frontends.rst says.
 
     @property
     def nfiles(self):
-        """Number of regular files (final stats, archive_progress) or of all listed items (--list lines)."""
+        """Number of regular files processed, None if unknown (yet)."""
         nfiles = self._final_stat("nfiles")
         if nfiles is not None:
             return nfiles
-        if self.status_counts:
-            return sum(self.status_counts.values())
-        if self.archive_progress is not None:
-            return self.archive_progress.nfiles
-        return 0
+        return None if self.archive_progress is None else self.archive_progress.nfiles
 
     @property
     def files_stats(self):
-        """status char -> count, from the final stats, the --list lines or archive_progress."""
+        """status char -> count of the items processed, empty if unknown (yet)."""
         files_stats = self._final_stat("files_stats", dict)
         if files_stats is not None:
             return dict(files_stats)
-        if self.status_counts:
-            return dict(self.status_counts)
-        if self.archive_progress is not None:
-            return dict(self.archive_progress.files_stats)
-        return {}
+        return {} if self.archive_progress is None else dict(self.archive_progress.files_stats)
 
     def count(self, statuses):
-        """Number of items having one of the given status characters."""
+        """Number of items having one of the given status characters, see files_stats."""
         stats = self.files_stats
         return sum(stats.get(status, 0) for status in statuses)
 
@@ -365,7 +364,7 @@ class Session:
             for phase in self.phases.values():
                 phase.rate = 0.0
             return
-        current = (self.nfiles, self.original_size or 0, self.deduplicated_size or 0)
+        current = (self.nfiles or 0, self.original_size or 0, self.deduplicated_size or 0)
         self.files_per_second = max(current[0] - nfiles, 0) / dt
         self.original_bytes_per_second = max(current[1] - original_size, 0) / dt
         self.deduplicated_bytes_per_second = max(current[2] - deduplicated_size, 0) / dt

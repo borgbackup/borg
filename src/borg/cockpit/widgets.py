@@ -16,6 +16,20 @@ from ..helpers import classify_ec, format_file_size, format_timedelta
 from ..helpers.parseformat import ellipsis_truncate
 from .translator import T, TRANSLATOR
 
+# The control characters (C0, DEL, C1). Text from borg (paths, archive names, messages) can contain them,
+# e.g. an ESC starting a terminal escape sequence, and the terminal would interpret them.
+CONTROL_CHARS = {code: "\ufffd" for code in (*range(0x20), *range(0x7F, 0xA0))}
+CONTROL_CHARS_MULTILINE = {code: char for code, char in CONTROL_CHARS.items() if code not in (0x09, 0x0A)}
+
+
+def printable(text, multiline=False):
+    """
+    <text> with its control characters replaced by U+FFFD, so that showing it can not affect the terminal.
+
+    :param multiline: keep linefeeds and tabs, for text that may have more than one line.
+    """
+    return text.translate(CONTROL_CHARS_MULTILINE if multiline else CONTROL_CHARS)
+
 
 class StatusPanelBase(Static):
     """
@@ -26,7 +40,8 @@ class StatusPanelBase(Static):
     the top row accordingly. A line is only updated when its text changes.
 
     The lines show text that comes from borg (paths, archive names, messages), so they never
-    interpret their content as markup: any text must be shown as it is.
+    interpret their content as markup: any text must be shown as it is, except for control
+    characters, see printable().
     """
 
     HEIGHT = 0
@@ -50,7 +65,7 @@ class StatusPanelBase(Static):
     def show_value(self, widget_id, label, value, truncate=False):
         """Show a translated label and a value; long values can be truncated to the panel width, so they don't wrap."""
         label = T(label)
-        value = str(value)
+        value = printable(str(value))
         if truncate and value:
             space = (self.size.width or 60) - len(label) - 1
             value = ellipsis_truncate(value, space).rstrip()
@@ -282,7 +297,7 @@ class GenericStatusPanel(StatusPanelBase):
                 fraction = phase.fraction
                 mark, filled, style = "▶", 0 if fraction is None else round(fraction * self.BAR_WIDTH), "bold white"
             bar = "█" * filled + "░" * (self.BAR_WIDTH - filled)
-            message = phase.message or phase.msgid or ""
+            message = printable(phase.message or phase.msgid or "")
             if phase.finished:  # the last percentage borg reported before finishing is not the final one
                 message = self.PERCENTAGE.sub("", message)
             text = ellipsis_truncate(message, space).rstrip()
@@ -343,7 +358,7 @@ class StandardLog(Vertical):
         Append the lines taken from Session.drain(); dropped lines are only mentioned.
 
         The lines are written as rich Text objects: their text comes from borg (paths, messages) and
-        must be shown as it is, not interpreted as markup.
+        must be shown as it is, not interpreted as markup. Control characters are replaced, see printable().
         """
         if not lines and not dropped:
             return
@@ -351,7 +366,7 @@ class StandardLog(Vertical):
         if dropped:
             log_widget.write(Text(f"... {dropped} more lines not shown ...", style="dim"))
         for line in lines:
-            log_widget.write(Text(line.text, style=self.style_for(line) or ""))
+            log_widget.write(Text(printable(line.text, multiline=True), style=self.style_for(line) or ""))
 
 
 class Starfield(Static):

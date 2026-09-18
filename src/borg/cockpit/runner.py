@@ -120,6 +120,10 @@ class BorgRunner:
         self.logger.info(f"Starting Borg process: {cmd}")
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
+        # --cockpit is removed from the command line, but the option can also be set by the environment
+        # or by borg's config file; the environment overrides the config file. Without this, the borg
+        # started here would start a cockpit again.
+        env["BORG_COCKPIT"] = "false"
         kwargs = {} if is_win32 else {"start_new_session": True}
         try:
             self.process = await asyncio.create_subprocess_exec(

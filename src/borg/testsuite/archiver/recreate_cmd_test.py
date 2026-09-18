@@ -330,6 +330,24 @@ def test_recreate_list_output(archivers, request):
     assert "- input/file5" not in output
 
 
+def test_recreate_progress_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "recreate", "-a", "test", "--log-json", "--progress", "-e", "input/file2")
+    lines = output.splitlines()
+    messages = [json.loads(line) for line in lines if line.startswith("{")]
+    progress = [msg for msg in messages if msg["type"] == "archive_progress"]
+    # with --log-json, the progress of the archive being created consists of archive_progress objects ...
+    assert len(progress) >= 2
+    assert not progress[0]["finished"] and progress[-1]["finished"]
+    assert {"nfiles", "original_size", "deduplicated_size", "path"} <= set(progress[0])
+    # ... and not of text lines like "1.02 kB O 0 B U 1 N input/file1".
+    assert not any(re.search(r" O .* U \d+ N ", line) for line in lines if not line.startswith("{"))
+
+
 def test_comment(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

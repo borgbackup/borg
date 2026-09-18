@@ -33,8 +33,10 @@ added, and builds its display from the JSON output borg produces for frontends, 
     so they start a bit later than usual, see :ref:`borg_extract`.
 
 The lower part of the screen is the log: borg's messages, warnings and errors, the file
-list if you gave ``--list``, and everything else borg outputs. The panel in the upper
-right depends on the command:
+list if you gave ``--list``, and everything else borg outputs. Control characters (a file
+name can contain them, e.g. an ESC starting a terminal escape sequence) are shown as the
+replacement character (U+FFFD) everywhere in the cockpit, so they can not affect the
+terminal. The panel in the upper right depends on the command:
 
 ``create``, ``import-tar``, ``recreate``, ``transfer``
     The statistics of the archive being created: the number of files, the original and

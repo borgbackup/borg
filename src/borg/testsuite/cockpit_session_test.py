@@ -336,6 +336,32 @@ def test_runner():
     assert runner.process is None
 
 
+FAKE_BORG_BULK_DATA = """
+import sys
+
+out = sys.stdout.buffer
+out.write(b"first line\\n")
+for i in range(64):
+    out.write(b"\\0" * (1024 * 1024))  # 64 MiB without a line end
+out.write(b"\\nlast line\\n")
+"""
+
+
+def test_runner_bounds_overlong_lines():
+    events = []
+    runner = BorgRunner([], events.append, executable=[sys.executable, "-c", FAKE_BORG_BULK_DATA])
+    started = time.monotonic()
+    asyncio.run(asyncio.wait_for(runner.start(), 120))
+    assert time.monotonic() - started < 60  # unbounded, the buffer handling was quadratic (minutes for this)
+    start_of_data = "\0" * runner.LINE_MAX_SHOWN + " [...]"
+    assert events == [
+        RawLine(stream="stdout", line="first line"),
+        RawLine(stream="stdout", line=start_of_data, partial=True),  # the rest of the data was dropped
+        RawLine(stream="stdout", line="last line"),
+        ProcessFinished(rc=0),
+    ]
+
+
 def test_runner_start_failure():
     events = []
     runner = BorgRunner([], events.append, executable=["/nonexistent/borg-binary"])
@@ -512,6 +538,10 @@ class FakeStream:
         (["key", "import", "-"], "stdin"),
         (["key", "import", "--paper"], "stdin"),
         (["serve"], "stdin"),
+        (["extract", "--stdout", "archive"], "stdout"),
+        (["export-tar", "archive", "-"], "stdout"),
+        (["extract", "archive"], None),
+        (["export-tar", "archive", "file.tar"], None),
         (["create", "archive", "input"], None),
         (["create", "--paths-from-command", "archive", "--", "find", "."], None),
         (["import-tar", "archive", "file.tar"], None),

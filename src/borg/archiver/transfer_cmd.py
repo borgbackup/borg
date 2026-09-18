@@ -219,7 +219,9 @@ class TransferMixIn:
                     print(f"{name} {ts_str} {id_hex}: copying archive to destination repo...")
                 other_archive = Archive(other_manifest, id)
                 archive = (
-                    Archive(manifest, name, cache=cache, create=True, progress=args.progress) if not dry_run else None
+                    Archive(manifest, name, cache=cache, create=True, progress=args.progress, log_json=args.log_json)
+                    if not dry_run
+                    else None
                 )
                 upgrader.new_archive(archive=archive)
                 for item in other_archive.iter_items():

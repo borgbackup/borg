@@ -34,17 +34,6 @@ env:
   # to pytest (pass_env = ["*"]).
   PY_COLORS: "1"       # pytest
   TOX_COLORED: "yes"   # tox's own output
-  # The S3 tests run against a MinIO server. MinIO retired its dl.min.io downloads (they
-  # answer HTTP 410 now) and its releases from RELEASE.2025-10-15T17-29-55Z on carry no
-  # binaries at all, so fetch the last releases that still publish them on GitHub and
-  # check what we downloaded. Bumping a release means updating its sha256 here, too:
-  # the sums are the ones published next to the binaries (<asset>.sha256sum).
-  MINIO_RELEASE: "RELEASE.2025-09-07T16-13-09Z"
-  MINIO_SHA256_LINUX_AMD64: "7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f"
-  MINIO_SHA256_LINUX_ARM64: "5c83cd2cf151717ba0243f73e1c7802ff36e272b67144bdd7f1f7d684fd6f03d"
-  MC_RELEASE: "RELEASE.2025-08-13T08-35-41Z"
-  MC_SHA256_LINUX_AMD64: "01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891"
-  MC_SHA256_LINUX_ARM64: "14c8c9616cfce4636add161304353244e8de383b2e2752c0e9dad01d4c27c12c"
 
 jobs:
   lint:
@@ -295,36 +284,21 @@ jobs:
         echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
         echo "BORG_TEST_REST_REPO=rest://sftpuser@localhost:22/borg/rest-repo" >> $GITHUB_ENV
 
-    - name: Install and configure MinIO S3 server (test only)
+    - name: Install and start moto S3 server (test only)
+      # The S3 tests run against moto in server mode: it comes from PyPI (pinned in
+      # requirements.d/s3-test-server.txt), so there is no server binary to download.
+      # It keeps the objects in memory and accepts any credentials.
       if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') }}
       run: |
         set -e
-        arch=$(uname -m)
-        case "$arch" in
-          x86_64|amd64) plat=linux-amd64; srv_sha=$MINIO_SHA256_LINUX_AMD64; cli_sha=$MC_SHA256_LINUX_AMD64 ;;
-          aarch64|arm64) plat=linux-arm64; srv_sha=$MINIO_SHA256_LINUX_ARM64; cli_sha=$MC_SHA256_LINUX_ARM64 ;;
-          *) echo "Unsupported arch: $arch"; exit 1 ;;
-        esac
-        srv_url=https://github.com/minio/minio/releases/download/$MINIO_RELEASE/minio.$plat.$MINIO_RELEASE
-        cli_url=https://github.com/minio/mc/releases/download/$MC_RELEASE/mc.$plat.$MC_RELEASE
-        curl -fsSL -o /usr/local/bin/minio "$srv_url"
-        curl -fsSL -o /usr/local/bin/mc "$cli_url"
-        echo "$srv_sha  /usr/local/bin/minio" | sha256sum -c -
-        echo "$cli_sha  /usr/local/bin/mc" | sha256sum -c -
-        sudo chmod +x /usr/local/bin/minio /usr/local/bin/mc
-        export PATH=/usr/local/bin:$PATH
-        # Start MinIO on :9000 with default credentials (minioadmin/minioadmin)
-        MINIO_DIR="$GITHUB_WORKSPACE/.minio-data"
-        MINIO_LOG="$GITHUB_WORKSPACE/.minio.log"
-        mkdir -p "$MINIO_DIR"
-        nohup minio server "$MINIO_DIR" --address ":9000" >"$MINIO_LOG" 2>&1 &
-        # Wait for MinIO port to be ready
+        pip install -r requirements.d/s3-test-server.txt
+        nohup moto_server -H 127.0.0.1 -p 9000 > "$GITHUB_WORKSPACE/.moto.log" 2>&1 &
+        # Wait for the moto port to be ready
         for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9000) >/dev/null 2>&1 && break; sleep 1; done
-        # Configure client and create bucket
-        mc alias set local http://127.0.0.1:9000 minioadmin minioadmin
-        mc mb --ignore-existing local/borg
+        # Create the bucket (boto3 is a moto dependency)
+        python -c 'import boto3; boto3.client("s3", endpoint_url="http://127.0.0.1:9000", aws_access_key_id="test", aws_secret_access_key="test").create_bucket(Bucket="borg")'
         # Export S3 test URL for tox via GITHUB_ENV
-        echo "BORG_TEST_S3_REPO=s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/s3-repo" >> $GITHUB_ENV
+        echo "BORG_TEST_S3_REPO=s3:test:test@http://127.0.0.1:9000/borg/s3-repo" >> $GITHUB_ENV
 
     - name: Enable store cache (test only)
       if: ${{ matrix.store_cache == '1' }}
@@ -744,27 +718,19 @@ jobs:
 
     - name: Smoke-test the binary against an S3 server (${{ matrix.binary }})
       # The spec bundles only the botocore models borg needs: exercise the s3
-      # model and the endpoint files of the frozen binary against a real S3
-      # server (MinIO, like the test suite's S3 test - which runs borg from the
-      # venv, not the binary).
+      # model and the endpoint files of the frozen binary against an S3 server
+      # (moto in server mode, like the test suite's S3 tests - which run borg
+      # from the venv, not the binary). moto gets installed into the venv only
+      # now, after the binary was built from it.
       run: |
         set -euxo pipefail
-        case "$(uname -m)" in
-          x86_64|amd64) plat=linux-amd64; srv_sha=$MINIO_SHA256_LINUX_AMD64 ;;
-          aarch64|arm64) plat=linux-arm64; srv_sha=$MINIO_SHA256_LINUX_ARM64 ;;
-          *) echo "Unsupported arch: $(uname -m)"; exit 1 ;;
-        esac
-        srv_url=https://github.com/minio/minio/releases/download/$MINIO_RELEASE/minio.$plat.$MINIO_RELEASE
-        curl -fsSL -o "$RUNNER_TEMP/minio" "$srv_url"
-        echo "$srv_sha  $RUNNER_TEMP/minio" | sha256sum -c -
-        chmod +x "$RUNNER_TEMP/minio"
-        mkdir -p "$RUNNER_TEMP/minio-data"
-        # default credentials: minioadmin / minioadmin
-        nohup "$RUNNER_TEMP/minio" server "$RUNNER_TEMP/minio-data" --address 127.0.0.1:9000 > "$RUNNER_TEMP/minio.log" 2>&1 &
+        pip install -r requirements.d/s3-test-server.txt
+        # moto accepts any credentials
+        nohup moto_server -H 127.0.0.1 -p 9000 > "$RUNNER_TEMP/moto.log" 2>&1 &
         for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9000) >/dev/null 2>&1 && break; sleep 1; done
         # the bucket has to exist - the venv has boto3 (s3 extra)
-        python -c 'import boto3; boto3.client("s3", endpoint_url="http://127.0.0.1:9000", aws_access_key_id="minioadmin", aws_secret_access_key="minioadmin").create_bucket(Bucket="borg")'
-        export BORG_REPO="s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/binary-repo"
+        python -c 'import boto3; boto3.client("s3", endpoint_url="http://127.0.0.1:9000", aws_access_key_id="test", aws_secret_access_key="test").create_bucket(Bucket="borg")'
+        export BORG_REPO="s3:test:test@http://127.0.0.1:9000/borg/binary-repo"
         export BORG_PASSPHRASE=test
         borg=dist/binary/borg-dir/borg.exe
         $borg repo-create -e aes256-ocb

@@ -2315,6 +2315,8 @@ class ArchiveChecker:
                 # dropped content is a check finding, with or without --repair.
                 on_drop=self.note_dropped_objects,
                 write_immediately=False,
+                # Ctrl-C ends the rebuild after the current pack and aborts the check, #10042.
+                interruptible=True,
             )
             # clear F_NEW (entry not in the index/ fragments yet), so Repository.close() does not store
             # this index; finish() stores it with --repair. Without --repair, a repository without index/
@@ -2805,6 +2807,8 @@ class ArchiveChecker:
                 self.repository.invalidate_chunk_index()
                 self.chunks = None
                 logger.info("Rebuilding and writing the repository chunks index.")
+                # Runs to completion, also after a Ctrl-C: delete_chunkindex_invalid() below declares
+                # the stored index to match the packs, which holds only once every pack was indexed.
                 build_chunkindex_from_repo(
                     self.repository,
                     slow_rebuild=True,

@@ -362,6 +362,19 @@ def test_runner_bounds_overlong_lines():
     ]
 
 
+def test_runner_disables_cockpit_for_borg(monkeypatch):
+    # the cockpit can be enabled via the environment (or the config file), that must not apply to the borg it runs.
+    monkeypatch.setenv("BORG_COCKPIT", "true")
+    assert Archiver().parse_args(["-r", "/some/repo", "check"]).cockpit
+    events = []
+    fake_borg = "import os; print(os.environ.get('BORG_COCKPIT'))"
+    runner = BorgRunner([], events.append, executable=[sys.executable, "-c", fake_borg])
+    asyncio.run(asyncio.wait_for(runner.start(), 30))
+    assert events == [RawLine(stream="stdout", line="false"), ProcessFinished(rc=0)]
+    monkeypatch.setenv("BORG_COCKPIT", "false")  # what the runner sets is a value borg accepts
+    assert not Archiver().parse_args(["-r", "/some/repo", "check"]).cockpit
+
+
 def test_runner_start_failure():
     events = []
     runner = BorgRunner([], events.append, executable=["/nonexistent/borg-binary"])

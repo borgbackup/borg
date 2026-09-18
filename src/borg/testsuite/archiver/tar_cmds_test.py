@@ -818,8 +818,9 @@ def test_export_tar_list_json(archivers, request):
     cmd(archiver, "create", "test", "input")
     # the text listing has the "+" prefix, like the listing of borg extract
     output = cmd(archiver, "export-tar", "test", "simple.tar", "--list", "--tar-format=GNU")
-    assert "+ input/file1\n" in output
-    assert "+ input/dir2\n" in output
+    lines = output.splitlines()  # the line ending depends on the platform
+    assert "+ input/file1" in lines
+    assert "+ input/dir2" in lines
     # with --log-json, the listing consists of file_status objects (one per item), no text lines
     output = cmd(archiver, "export-tar", "test", "simple2.tar", "--list", "--log-json", "--tar-format=GNU")
     messages = [json.loads(line) for line in output.splitlines()]

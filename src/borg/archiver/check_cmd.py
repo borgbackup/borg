@@ -3,7 +3,7 @@ import os
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
-from ..crypto.key import key_factory, RepositoryKeyInfoMissing
+from ..crypto.key import key_factory
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error
 from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
@@ -65,14 +65,13 @@ class CheckMixIn:
             # --max-duration limits only the repository check; the archives check has no max_duration
             # support.
             raise CommandError("--repository-only is required for --max-duration support.")
+        # every check needs the key, a --repository-only one included. ask NOW for the passphrase, not
+        # after a repository check that can take hours, #1931. the key class comes from the repository
+        # config, so loading the key reads no object.
+        key = key_factory(repository)
         if not args.repo_only:
-            # if we need the key later for the archives check, ask NOW for the passphrase! #1931
             archive_checker = ArchiveChecker()
-            try:
-                archive_checker.key = archive_checker.make_key(repository)
-            except RepositoryKeyInfoMissing:
-                if args.repair:
-                    raise  # repair needs the key to validate the index rebuild
+            archive_checker.key = key
             if args.format is not None:
                 format = args.format
             else:
@@ -81,17 +80,13 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
-            validate = None  # the object validator for the index rebuild, which only a repair does
-            if args.repair:
-                # the key class comes from the repository config, so loading the key reads no object.
-                key = archive_checker.key if not args.repo_only else key_factory(repository)
-                validate = object_validator(RepoObj(key))
             if not repository.check(
                 repair=args.repair,
                 max_duration=args.max_duration,
                 max_age=max_age,
                 repo_only=args.repo_only,
-                validate=validate,
+                # the object validator for the index rebuild, which only a repair does.
+                validate=object_validator(RepoObj(key)),
             ):
                 set_ec(EXIT_WARNING)
             if sig_int:  # repository check interrupted; skip the archive check
@@ -154,6 +149,10 @@ class CheckMixIn:
         Both steps can also be run independently. Pass ``--repository-only`` to run the
         repository checks only, or pass ``--archives-only`` to run the archive checks
         only.
+
+        ``borg check`` always needs the key, ``--repository-only`` included: it loads
+        the key (asking for the passphrase, if needed) before it checks anything and
+        aborts if the key can not be loaded.
 
         The ``--max-age`` option makes the check reuse the results of previous
         repository checks: packs whose intact result is younger than the given
@@ -261,9 +260,7 @@ class CheckMixIn:
            index and the packs untouched and reports it; salvaging the intact objects of
            such a pack is not implemented yet (refs #8572). The rebuild authenticates
            each object's header and metadata with the key, leaves an object that fails
-           this out of the index and reports it as an error. Repair therefore always
-           needs the key, ``--repository-only`` included, and aborts if the key can not
-           be read.
+           this out of the index and reports it as an error.
 
         2. When checking the consistency and correctness of archives, repair mode might
            remove whole archives from the manifest if their archive metadata chunk is

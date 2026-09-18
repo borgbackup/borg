@@ -2265,14 +2265,11 @@ class ArchiveChecker:
         # The rebuild validates every object header it walks, because a corrupt data_size parses fine
         # and points the walk into the middle of the pack. That costs one metadata slot read and one
         # decryption per object and it needs the key, so read the key here if we do not have it yet.
-        if repair and self.key is None:
+        if self.key is None:
             self.key = self.make_key(repository)
-        if self.key is not None:
-            # the validator decrypts metadata slots, so it needs a RepoObj built from the key.
-            self.repo_objs = RepoObj(self.key)
-            validate = object_validator(self.repo_objs)
-        else:
-            validate = None
+        # the validator decrypts metadata slots, so it needs a RepoObj built from the key.
+        self.repo_objs = RepoObj(self.key)
+        validate = object_validator(self.repo_objs)
         # store the chunks buffered in the pack writer, so the index below has their pack locations
         # (pack id, offset and size in the pack).
         self.repository.flush()
@@ -2285,8 +2282,6 @@ class ArchiveChecker:
             self.chunks = build_chunkindex_from_repo(
                 self.repository,
                 slow_rebuild=repair,
-                # validate is None only without --repair and without the key: a corrupt object header then
-                # raises CorruptPack.
                 validate=validate,
                 # dropped content is a check finding, with or without --repair.
                 on_drop=self.note_dropped_objects,
@@ -2299,9 +2294,6 @@ class ArchiveChecker:
             self.chunks.clear_new()
             # get(), put() and delete() use the repository's index.
             self.repository.chunks = self.chunks
-        if self.key is None:
-            self.key = self.make_key(repository)
-            self.repo_objs = RepoObj(self.key)
         if repair:
             # --repair re-anchors content: it re-packs the item metadata stream it reads into new chunks
             # with freshly computed ids (see add_callback in rebuild_archives) and it recreates archives

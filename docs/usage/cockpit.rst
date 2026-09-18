@@ -87,7 +87,8 @@ Keys
 
 ``q`` (or Ctrl-C)
     Quit. If borg is still running, it is asked to terminate (SIGTERM) and the cockpit
-    waits until it has exited.
+    waits until it has exited. The cockpit does the same when it gets a SIGTERM, SIGHUP
+    or SIGINT signal, e.g. because its terminal window gets closed.
 
 ``t``
     Toggle the universal translator: the labels are shown in Borg speak. Resistance is

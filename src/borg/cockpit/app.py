@@ -3,6 +3,7 @@ Borg Cockpit - Application Entry Point.
 """
 
 import asyncio
+import signal
 
 from textual.app import App
 from textual.css.query import NoMatches
@@ -25,6 +26,8 @@ class BorgCockpitApp(App):
     REFRESH_INTERVAL = 0.2  # seconds between two refreshes of the widgets from the session
     # These commands output the statistics of the new archive as JSON on stdout when given --json.
     FINAL_STATS_COMMANDS = ("create", "import-tar")
+    # The signals asking the cockpit to end, see handle_signals().
+    SIGNALS = ("SIGTERM", "SIGHUP", "SIGINT")
 
     def __init__(self, borg_args=None, command=None, runner_factory=None, **kwargs):
         """
@@ -41,6 +44,8 @@ class BorgCockpitApp(App):
         self.main_screen = None
         self.runner = None
         self.runner_task = None
+        self.handled_signals = []  # the names of the signals handled by on_signal()
+        self.terminate_task = None
 
     def get_default_screen(self):
         """The screen for the command that runs (Textual calls this when the app starts)."""
@@ -78,6 +83,35 @@ class BorgCockpitApp(App):
         self.runner_task = asyncio.create_task(self.runner.start())
         self.speed_timer = self.set_interval(self.SPEED_INTERVAL, self.sample_speed)
         self.refresh_timer = self.set_interval(self.REFRESH_INTERVAL, self.refresh_from_session)
+        self.handle_signals()
+
+    def handle_signals(self) -> None:
+        """
+        End in an orderly way when a signal asks the cockpit to end (e.g. the terminal window gets closed).
+
+        borg's main() has installed handlers raising an exception for these signals. Raised at some random
+        place inside the event loop, it would end the app with a traceback, without waiting for borg.
+        The event loop's signal handlers replace them while the app runs.
+        """
+        loop = asyncio.get_running_loop()
+        for name in self.SIGNALS:
+            signum = getattr(signal, name, None)
+            if signum is None:
+                continue  # no such signal on this platform
+            try:
+                loop.add_signal_handler(signum, self.on_signal, name)
+            except (NotImplementedError, ValueError, RuntimeError):
+                continue  # not supported by this event loop (Windows) or not running in the main thread
+            self.handled_signals.append(name)
+
+    def on_signal(self, name) -> None:
+        """Got a signal: terminate borg, wait for it and exit; main() then exits with borg's exit code."""
+        if self.terminate_task is None:
+            self.terminate_task = asyncio.create_task(self.terminate())
+
+    async def terminate(self) -> None:
+        await self.stop_borg()
+        self.exit()
 
     @property
     def process_running(self):
@@ -116,14 +150,18 @@ class BorgCockpitApp(App):
         if self.runner is not None:
             await self.runner.stop()
 
-    async def action_quit(self) -> None:
-        """Handle quit action."""
-        if hasattr(self, "speed_timer"):
-            self.speed_timer.stop()
+    async def stop_borg(self) -> None:
+        """Terminate borg if it still runs, and wait until it has exited."""
         if self.runner is not None:
             await self.runner.stop()
         if self.runner_task is not None:
             await self.runner_task
+
+    async def action_quit(self) -> None:
+        """Handle quit action."""
+        if hasattr(self, "speed_timer"):
+            self.speed_timer.stop()
+        await self.stop_borg()
         self.main_screen.fade_out()
         await asyncio.sleep(2)  # give the user a chance the see the borg RC
         self.exit()

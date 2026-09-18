@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import os
+import signal
 import subprocess
 import time
 
@@ -294,6 +296,42 @@ def test_app_answers_prompt():
             assert "Doing it." in log_text(app)
 
     asyncio.run(run())
+
+
+class EndlessRunner:
+    """A fake borg that runs until it gets terminated."""
+
+    def __init__(self, args, callback, json_stdout=False):
+        self.callback = callback
+        self.stopped = asyncio.Event()
+
+    async def start(self):
+        await self.stopped.wait()
+        self.callback(ProcessFinished(rc=143))  # what borg exits with after a SIGTERM
+
+    async def answer(self, text):
+        pass
+
+    async def stop(self):
+        self.stopped.set()
+
+
+@pytest.mark.skipif(is_win32, reason="the event loop does not support signal handlers on Windows")
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGHUP", "SIGINT"])
+def test_app_ends_orderly_on_signal(name):
+    async def run():
+        app = BorgCockpitApp(borg_args=["create"], command="create", runner_factory=EndlessRunner)
+        async with app.run_test() as pilot:
+            # only send the signal if the app handles it, it would end the test process otherwise.
+            await wait_until(pilot, lambda: name in app.handled_signals)
+            assert app.session.running
+            os.kill(os.getpid(), getattr(signal, name))
+            await wait_until(pilot, lambda: not app.is_running)
+        return app
+
+    app = asyncio.run(run())
+    assert app.runner.stopped.is_set()  # borg was terminated ...
+    assert app.session.rc == 143  # ... and waited for, main() exits with this exit code
 
 
 def test_cockpit_app_create_archive(tmp_path, monkeypatch):

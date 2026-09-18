@@ -166,6 +166,20 @@ Change Log 2.x
 Version 2.0.0b25 (not released yet)
 -----------------------------------
 
+Breaking changes (you must create new repos for b25):
+
+- cli: remove the none-sha256 and none-blake3 encryption modes, just use the
+  authenticated modes from now on.
+- repository: ini-style config/config text object (repo version 5) instead of
+  manifest, id, version, readme objects. The encryption and id-hash algorithms
+  are also given there as plain text.
+- store hash: use the much faster pure software blake3 hash instead of sha256
+  to name content-addressed objects in the store.
+- append blake3 instead of sha256 integrity checksums to
+  not-content-addressed objects in the store
+- drop OBJ_VERSION_NO_HEADER_AAD (pack object format v1) support, #9973
+- KeyType: renumber the authenticated-* key types to 0x50 / 0x60
+
 New features:
 
 - create/import-tar --json: report the deduplicated size of the new archive, #10335
@@ -177,20 +191,34 @@ New features:
 
 Fixes:
 
+- repository: raise DoesNotExist for a missing rest:// repo, #10365
+- extract: do not abort on corrupted chunks, replace them by all-zero data with a warning, #840
+- compact:
+
+  - build the chunk index once, not three times
+  - validate a gap object before dropping its bytes, #10093
+- check:
+
+  - use one chunk index for the checker and the repository, #10364
+  - --repair: validate the repository index rebuild with the key, #9901
+  - --repair: misc. other improvements and fixes, #8476
+- Repository: don't mask the original exception when unwinding with buffered
+  chunks
 - treat an empty BORG_ZSTD_MT_WORKERS as unset (an empty value made borg fail)
 - extract: report a failing close() of an extracted file as a warning
 - prepare_subprocess_env: remove all passphrase-related env vars, #6480
 - mount: mfusepy: pass the libfuse options as keyword arguments, fix getattr with a file handle
 - index rebuild: abort cleanly on a corrupt object header, #10122
-- check --repair: misc. improvements and fixes, #8476
 - diff:
 
-  - do not report a merely touched file as modified when the chunker params differ, #10351
+  - align the chunk lists to count added/removed bytes
+  - do not report a merely touched file as modified when the chunker params
+    differ, #10351
   - report a file as modified when chunks were reordered or duplicated
 
 Other changes:
 
-- update pyinstaller to 6.22.0
+- update pyinstaller to 6.22.3
 - Linux binaries:
 
   - build binaries for older CPUs and older glibc on Ubuntu 24.04, #10342
@@ -204,11 +232,24 @@ Other changes:
   for big chunks at high-speed, low-compression zstd levels
 - add_warning: store exceptions given as args as text, not the exception object -
   reduces memory usage when there are many warnings
+- check:
+
+  - do not reject items with unknown keys, drop item_keys from the manifest
+  - resync on any item-key-like first key, not only on known keys
+- remove the repository feature flags mechanism (used to be in the manifest,
+  but was never really used)
+- security: drop the manifest timestamp replay check (not needed any more)
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088
   - fix two inaccuracies in the borg diff JSON docs, #7486
   - an empty passphrase can be replaced later with ``borg key change-passphrase``, #9072
+  - FAQ about deduplicating related repositories on the filesystem, see #9104
+- tests:
+
+  - add an archiver level test for BORG_WORKAROUNDS=authenticated_no_key
+    (make sure an authenticated mode repository can be read using this
+    workaround, even if the key or passphrase is lost)
 
 
 Version 2.0.0b24 (2026-09-02)

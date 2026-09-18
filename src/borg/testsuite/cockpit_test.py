@@ -210,13 +210,59 @@ def test_app_generic_screen():
     shown, text, _ = asyncio.run(run_to_the_end(app))
     assert isinstance(app.main_screen, GenericScreen)
     assert shown["phases-title"] == "Phases"
-    assert shown["phases"].splitlines() == [
-        "[green]✔ ██████████ Checking index[/]",  # finished: without the last percentage
-        "[bold white]▶ ░░░░░░░░░░ Saving files cache[/]",
+    assert shown["phases"].plain.splitlines() == [
+        "✔ ██████████ Checking index",  # finished: without the last percentage
+        "▶ ░░░░░░░░░░ Saving files cache",
     ]
+    assert [str(span.style) for span in shown["phases"].spans] == ["green", "bold white"]
     assert shown["status-warnings"] == "Warnings: 0" and shown["status-rc"] == "RC: 0"
     assert shown["status-archives"] == "Archives: 1 kept, 1 pruned"
     assert "no problems found" in text and "Would prune: old" in text
+
+
+# Texts that mean something to a markup parser. They can be part of a path, an archive name or a message,
+# and the cockpit must show them as they are (a MarkupError would end the app and thus the borg run).
+MARKUP_LIKE_TEXTS = [
+    "a[/b",
+    "[/",
+    "[red]x[/red]",
+    "[bold",
+    "back\\slash\\",
+    "a\\[b",
+    "[@click=app.quit]x[/]",
+    "$x [link=y]z[/]",
+]
+
+
+def test_app_shows_text_from_borg_as_it_is():
+    events = []
+    for number, text in enumerate(MARKUP_LIKE_TEXTS):
+        events += [
+            FileStatus(status="A", path=text),
+            LogMessage(message=f"log {text}", levelname="WARNING"),
+            ArchiveStatus(name=text, status="kept", message=f"Keeping {text}"),
+            ProgressMessage(operation=number, msgid="test", message=f"phase {text}"),
+        ]
+    factory, runners = make_runner_factory(events)
+    app = BorgCockpitApp(borg_args=["prune"], command="prune", runner_factory=factory)
+
+    def rendered(app):
+        panel = app.query_one("#status")
+        lines = []
+        for text in MARKUP_LIKE_TEXTS:  # a line of the panel, like the one showing the current path
+            panel.show_value("status-archives", "Archives: ", text, truncate=True)
+            lines.append(panel.query_one("#status-archives").render_line(0).text.rstrip())
+        phases = [panel.query_one("#phases").render_line(y).text.rstrip() for y in range(len(MARKUP_LIKE_TEXTS))]
+        return lines, phases
+
+    shown, text, (lines, phases) = asyncio.run(run_to_the_end(app, inspect=rendered))
+    assert lines == [f"Archives: {text}" for text in MARKUP_LIKE_TEXTS]
+    assert phases == [f"▶ ░░░░░░░░░░ phase {text}" for text in MARKUP_LIKE_TEXTS]
+    log_lines = [line.rstrip() for line in text.splitlines()]
+    for text in MARKUP_LIKE_TEXTS:
+        assert f"A {text}" in log_lines
+        assert f"log {text}" in log_lines
+        assert f"Keeping {text}" in log_lines
 
 
 def test_app_answers_prompt():

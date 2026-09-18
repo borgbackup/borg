@@ -8,6 +8,7 @@ import time
 from datetime import timedelta
 
 from rich.markup import escape
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.widgets import ProgressBar, RichLog, Static
 from textual.containers import Vertical, Container
@@ -23,6 +24,9 @@ class StatusPanelBase(Static):
     Subclasses compose their lines (Static widgets with an id) and implement show_session(), which
     shows the state of a Session in them; HEIGHT is the number of lines they need, the screen sizes
     the top row accordingly. A line is only updated when its text changes.
+
+    The lines show text that comes from borg (paths, archive names, messages), so they never
+    interpret their content as markup: any text must be shown as it is.
     """
 
     HEIGHT = 0
@@ -35,10 +39,10 @@ class StatusPanelBase(Static):
     @staticmethod
     def _line(widget_id, label, value="", classes="status"):
         """A Static for one "Label: value" line, for compose()."""
-        return Static(T(label) + value, classes=classes, id=widget_id)
+        return Static(T(label) + value, classes=classes, id=widget_id, markup=False)
 
     def show(self, widget_id, text):
-        """Show <text> in the widget with <widget_id>, if it is not shown already."""
+        """Show <text> (a str or a rich Text) in the widget with <widget_id>, if it is not shown already."""
         if self.shown.get(widget_id) != text:
             self.shown[widget_id] = text
             self.query_one(f"#{widget_id}").update(text)
@@ -50,7 +54,7 @@ class StatusPanelBase(Static):
         if truncate and value:
             space = (self.size.width or 60) - len(label) - 1
             value = ellipsis_truncate(value, space).rstrip()
-        self.show(widget_id, label + escape(value))
+        self.show(widget_id, label + value)
 
     def update_from_session(self, session):
         """Show the current state of the session."""
@@ -257,7 +261,7 @@ class GenericStatusPanel(StatusPanelBase):
                 yield self._line("status-archives", "Archives: ", "-")
                 yield self._line("status-rc", "RC: ", "RUNNING")
             yield Static(T("Phases"), classes="panel-title", id="phases-title")
-            yield Static("", id="phases")
+            yield Static("", id="phases", markup=False)
 
     def show_session(self, session):
         self.show_elapsed(session)
@@ -270,7 +274,7 @@ class GenericStatusPanel(StatusPanelBase):
         self.show_rc(session)
         self.show("phases-title", T("Phases"))
         space = (self.size.width or 60) - self.BAR_WIDTH - 3
-        lines = []
+        lines = []  # rich Text objects, so that the messages are not interpreted as markup
         for phase in list(session.phases.values())[-self.PHASE_LINES :]:
             if phase.finished:
                 mark, filled, style = "✔", self.BAR_WIDTH, "green"
@@ -282,8 +286,8 @@ class GenericStatusPanel(StatusPanelBase):
             if phase.finished:  # the last percentage borg reported before finishing is not the final one
                 message = self.PERCENTAGE.sub("", message)
             text = ellipsis_truncate(message, space).rstrip()
-            lines.append(f"[{style}]{mark} {bar} {escape(text)}[/]")
-        self.show("phases", "\n".join(lines))
+            lines.append(Text(f"{mark} {bar} {text}", style=style))
+        self.show("phases", Text("\n").join(lines))
 
 
 class StandardLog(Vertical):
@@ -315,7 +319,7 @@ class StandardLog(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(T("Log"), classes="panel-title", id="standard-log-title")
         yield RichLog(
-            id="standard-log-content", highlight=False, markup=True, auto_scroll=True, max_lines=self.MAX_LINES
+            id="standard-log-content", highlight=False, markup=False, auto_scroll=True, max_lines=self.MAX_LINES
         )
 
     def update_title(self):
@@ -335,16 +339,19 @@ class StandardLog(Vertical):
         return None
 
     def add_lines(self, lines, dropped=0):
-        """Append the lines taken from Session.drain(); dropped lines are only mentioned."""
+        """
+        Append the lines taken from Session.drain(); dropped lines are only mentioned.
+
+        The lines are written as rich Text objects: their text comes from borg (paths, messages) and
+        must be shown as it is, not interpreted as markup.
+        """
         if not lines and not dropped:
             return
         log_widget = self.query_one("#standard-log-content")
         if dropped:
-            log_widget.write(f"[dim]... {dropped} more lines not shown ...[/]")
+            log_widget.write(Text(f"... {dropped} more lines not shown ...", style="dim"))
         for line in lines:
-            text = escape(line.text)
-            style = self.style_for(line)
-            log_widget.write(f"[{style}]{text}[/]" if style else text)
+            log_widget.write(Text(line.text, style=self.style_for(line) or ""))
 
 
 class Starfield(Static):

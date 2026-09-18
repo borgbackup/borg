@@ -220,10 +220,10 @@ class CheckMixIn:
         interrupted archive check may leave some archives already repaired and others not yet
         processed, so run ``borg check --repair`` again to finish.
 
-        During a ``--repair`` run, the archive check first rebuilds the chunk index from the
-        packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
-        respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
-        effect until they finish.
+        ``borg check`` rebuilds the chunk index from the packs when ``--repair`` is given or when
+        the stored index cannot be used. Ctrl-C ends that rebuild after the current pack and
+        discards it: a partial index lacks chunks that are still in the repository and would report
+        them as lost. The stored index is left unchanged, so a later run rebuilds it from scratch.
 
         About repair mode
         +++++++++++++++++

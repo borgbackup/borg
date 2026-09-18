@@ -33,6 +33,7 @@ from .helpers import hex_to_bin, bin_to_hex
 from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
 from .helpers import ProgressIndicatorMessage, ProgressIndicatorPercent
+from .helpers import sig_int
 from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
@@ -798,6 +799,10 @@ class CorruptChunkIndexFragment(Exception):
     """A chunk index fragment's name matches its content hash, but the content does not deserialize."""
 
 
+class ChunkIndexRebuildInterrupted(Error):
+    """Got Ctrl-C / SIGINT: the chunk index rebuild was interrupted; the stored chunk index was left unchanged."""
+
+
 def read_chunkindex_from_repo(repository, hash):
     index_name = f"index/{hash}"
     logger.debug(f"trying to load {index_name} from the repo...")
@@ -887,6 +892,7 @@ def build_chunkindex_from_repo(
     drop_corrupt_tail=False,
     write_immediately=False,
     init_flags=ChunkIndex.F_USED,
+    interruptible=False,
 ):
     # fragments_only: build the index from the index/ fragments only, returning None if they cannot be
     # read completely, and never write to the repo.
@@ -898,6 +904,8 @@ def build_chunkindex_from_repo(
     # header and drop the rest of it, instead of raising, see PackReader.iter_headers.
     # With neither of the two, a corrupt object header aborts the rebuild with CorruptPack: the
     # index would be missing every object after it.
+    # interruptible: on Ctrl-C / SIGINT, end the rebuild after the current pack and raise
+    # ChunkIndexRebuildInterrupted instead of returning an index.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
@@ -987,7 +995,14 @@ def build_chunkindex_from_repo(
         total=len(pack_infos), msg="Rebuilding chunk index %3.0f%%", msgid="cache.build_chunkindex_from_repo"
     )
     headers_parsed = 0
-    for info in pack_infos:
+    for packs_done, info in enumerate(pack_infos):
+        if interruptible and sig_int:
+            # A partial index lacks chunks that are still in the packs: a check would report them as
+            # lost and --repair would drop the archives' references to them.
+            logger.info(f"Chunk index rebuild interrupted after {packs_done} of {len(pack_infos)} packs.")
+            chunks.clear()
+            pi.finish()
+            raise ChunkIndexRebuildInterrupted
         # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
         repository._lock_refresh()
         pi.show(increase=1)

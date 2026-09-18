@@ -37,12 +37,17 @@ def borg_command(args, executable=None, json_stdout=False):
     return list(executable) + injected + args
 
 
-def unsupported_reason(args):
+def unsupported_reason(args, streams=None):
     """
     Why the cockpit can not run the borg command given by the parsed command line <args>; None if it can.
 
     borg's stdin is a pipe from the cockpit (for the answers to borg's prompts) that stays open as long
     as borg runs, and the terminal is used by the TUI: a command waiting for data on stdin would wait forever.
+
+    The TUI reads the keys from stdin and draws to stderr (on Windows: to stdout). Without a terminal, it
+    would write its escape sequences to wherever the output goes and wait forever for the key that quits it.
+
+    :param streams: the stdin, stdout and stderr of the cockpit [sys.stdin, sys.stdout, sys.stderr], for tests.
     """
     command = getattr(args, "subcommand", None)
     reads_stdin = (
@@ -56,6 +61,10 @@ def unsupported_reason(args):
     )
     if reads_stdin:
         return "this command reads from stdin, that does not work in the cockpit."
+    if streams is None:
+        streams = (sys.stdin, sys.stdout, sys.stderr)
+    if not all(stream is not None and stream.isatty() for stream in streams):
+        return "it needs a terminal: stdin, stdout and stderr must not be redirected."
     return None
 
 

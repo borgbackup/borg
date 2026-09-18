@@ -494,6 +494,14 @@ def test_parse_archive_status():
     )
 
 
+class FakeStream:
+    def __init__(self, is_terminal):
+        self.is_terminal = is_terminal
+
+    def isatty(self):
+        return self.is_terminal
+
+
 @pytest.mark.parametrize(
     "argv, reason",
     [
@@ -514,8 +522,20 @@ def test_parse_archive_status():
 def test_unsupported_reason(argv, reason):
     # the real parser gives the args, so this also checks the names of the options.
     args = Archiver().parse_args(["-r", "/some/repo"] + argv)
-    result = unsupported_reason(args)
+    result = unsupported_reason(args, streams=(FakeStream(True),) * 3)
     if reason is None:
         assert result is None
     else:
         assert reason in result
+
+
+@pytest.mark.parametrize("redirected", [0, 1, 2])
+def test_unsupported_reason_no_terminal(redirected):
+    args = Archiver().parse_args(["-r", "/some/repo", "check"])
+    streams = [FakeStream(True), FakeStream(True), FakeStream(True)]
+    streams[redirected] = FakeStream(False)
+    assert "needs a terminal" in unsupported_reason(args, streams=streams)
+    streams[redirected] = None  # e.g. a closed stdin
+    assert "needs a terminal" in unsupported_reason(args, streams=streams)
+    # pytest captures the output, so the default streams are not terminals either.
+    assert "needs a terminal" in unsupported_reason(args)

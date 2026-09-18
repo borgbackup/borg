@@ -14,7 +14,9 @@ updated live. To use it, put ``--cockpit`` in front of the command::
 
 The cockpit needs the ``textual`` package: ``pip install borgbackup[cockpit]`` installs
 it, the binary releases include it (see :ref:`installation`). It needs a terminal of at
-least 80x24 characters, a taller terminal gives the log more room.
+least 80x24 characters, a taller terminal gives the log more room. It does not start if
+stdin, stdout or stderr is not a terminal (e.g. when run by cron or with redirected
+output): it is an interactive display and stays on the screen until you quit it.
 
 How it works
 ~~~~~~~~~~~~

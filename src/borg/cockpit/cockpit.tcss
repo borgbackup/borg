@@ -200,8 +200,11 @@ Pulsar.dim {
 }
 
 /* The dialog for borg's yes/no prompts */
-PromptModal {
+/* The dialogs. Their background is translucent (unlike the one of the other screens, see Screen above),
+   so the cockpit stays visible behind them. */
+PromptModal, ConfirmQuitModal {
     align: center middle;
+    background: $background 60%;
 }
 
 #prompt-dialog {

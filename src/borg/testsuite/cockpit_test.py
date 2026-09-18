@@ -24,7 +24,7 @@ from borg.platformflags import is_freebsd, is_win32
 
 try:
     from borg.cockpit.app import BorgCockpitApp
-    from borg.cockpit.prompt import PromptModal
+    from borg.cockpit.prompt import ConfirmQuitModal, PromptModal
     from borg.cockpit.screens import CreateScreen, ExtractScreen, GenericScreen, screen_for_command
     from borg.cockpit.widgets import printable
 
@@ -372,6 +372,56 @@ def test_app_ends_orderly_on_signal(name):
     app = asyncio.run(run())
     assert app.runner.stopped.is_set()  # borg was terminated ...
     assert app.session.rc == 143  # ... and waited for, main() exits with this exit code
+
+
+def press(app, key):
+    """
+    Press a key. pilot.press() can not be used with this app: it waits until no animation runs anymore,
+    but the pulsar and the slogan of the logo panel keep changing their color all the time.
+    """
+    app.simulate_key(key)
+
+
+def test_app_quit_needs_confirmation_while_borg_runs(monkeypatch):
+    monkeypatch.setattr(BorgCockpitApp, "QUIT_DELAY", 0)
+
+    async def run():
+        app = BorgCockpitApp(borg_args=["create"], command="create", runner_factory=EndlessRunner)
+        async with app.run_test() as pilot:
+            await wait_until(pilot, lambda: app.runner is not None)
+            # not confirmed: borg keeps running. Enter selects the button that has the focus, the harmless one.
+            for key in "n", "escape", "enter":
+                press(app, "q")
+                await wait_until(pilot, lambda: isinstance(app.screen, ConfirmQuitModal) and app.screen.focused)
+                assert app.screen.focused.id == "quit-no"
+                press(app, key)
+                await wait_until(pilot, lambda: not isinstance(app.screen, ConfirmQuitModal))
+                await pilot.pause(0.1)
+                assert app.is_running and app.session.running and not app.runner.stopped.is_set()
+            press(app, "q")
+            await wait_until(pilot, lambda: isinstance(app.screen, ConfirmQuitModal))
+            press(app, "y")
+            await wait_until(pilot, lambda: not app.is_running)
+        return app
+
+    app = asyncio.run(run())
+    assert app.runner.stopped.is_set()  # borg was terminated ...
+    assert app.session.rc == 143  # ... and waited for
+
+
+def test_app_quits_without_confirmation_when_borg_has_finished(monkeypatch):
+    monkeypatch.setattr(BorgCockpitApp, "QUIT_DELAY", 0)
+    factory, runners = make_runner_factory([LogMessage(message="done", levelname="INFO")])
+
+    async def run():
+        app = BorgCockpitApp(borg_args=["check"], command="check", runner_factory=factory)
+        async with app.run_test() as pilot:
+            await wait_until(pilot, lambda: not app.session.running)
+            press(app, "q")
+            await wait_until(pilot, lambda: not app.is_running)  # a dialog would keep the app running
+        return app
+
+    assert asyncio.run(run()).session.rc == 0
 
 
 def test_cockpit_app_create_archive(tmp_path, monkeypatch):

@@ -494,7 +494,7 @@ class PackReader:
             offset += max(len(buf) - (hdr_size - 1), 1)
         return None
 
-    def iter_headers(self, validate=None, on_drop=None, drop_corrupt_tail=False):
+    def iter_headers(self, validate=None, on_drop=None):
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
         The walk reads one range per object (or a slice, for a pack in memory), plus one store
@@ -510,13 +510,11 @@ class PackReader:
         validates, the walk yields nothing and raises nothing.
 
         Without a validator a resync is impossible, because payload bytes can look like a header.
-        A header that _parse_header rejects then raises IntegrityError naming what is wrong with
-        it, or, with drop_corrupt_tail, ends the walk there and drops the rest of the pack.
+        A header that _parse_header rejects then raises IntegrityError naming what is wrong with it.
 
-        on_drop, if given, is called once per place where the walk discards content: once for the
-        object with the failed header plus whatever the resync scan skips before the object it
-        resumes at, once for a tail dropped because the scan found no such object or because there
-        was no validator to scan with. It only reports, it does not change what the walk does.
+        on_drop, if given, is called once per byte range a validating walk skips: the object with
+        the failed header plus the bytes up to the next object validate accepts, or up to the end of
+        the pack if there is none.
 
         headers_parsed is set to the number of headers _parse_header accepted in this walk, the
         candidates the resync scan tried included. A pack whose bytes hold no object header at all
@@ -542,19 +540,9 @@ class PackReader:
                     problem = self._validation_problem(hdr, offset, buf, offset, validate)
             if problem is not None:
                 if validate is None:
-                    # no validator, so payload bytes that look like a header can not be told from
-                    # an object: there is no way to resync past this header.
-                    if not drop_corrupt_tail:
-                        # the callers that can say something more useful than "there is corruption
-                        # here" wrap this, see build_chunkindex_from_repo.
-                        raise IntegrityError(f"pack {pack_hex}: {problem} at offset {offset} (pack corruption)")
-                    if on_drop is not None:
-                        on_drop()
-                    logger.warning(
-                        f"pack {pack_hex}: {problem} at offset {offset}, no validator to resync with, "
-                        f"skipping the remaining {pack_size - offset} bytes."
-                    )
-                    break
+                    # without a validator, payload bytes that look like a header can not be told
+                    # apart from an object, so the walk can not continue past this header.
+                    raise IntegrityError(f"pack {pack_hex}: {problem} at offset {offset} (pack corruption)")
                 if on_drop is not None:
                     on_drop()  # content is discarded either way below: this object, or the tail.
                 found = self._find_header(offset + 1, pack_size, validate)
@@ -976,12 +964,6 @@ class Repository:
         self.exclusive = exclusive
         self._pack_writer = None
         self._chunks = None  # ChunkIndex; loaded lazily on first access to .chunks
-        # corrupt-header handling for the lazy .chunks rebuild (see PackReader.iter_headers): a
-        # validate callable makes the rebuild resync past a corrupt object header, drop_corrupt_tail
-        # makes it index the pack up to that header and drop the rest. Without either, such a header
-        # aborts the rebuild. TODO(#10378): nothing sets them, remove both.
-        self.chunkindex_validate = None
-        self.chunkindex_drop_corrupt_tail = False
         # pack_id -> PackReader holding the whole pack; get_many loads into it, get() reuses it
         self._pack_cache = LRUCache(capacity=self.PACK_READER_CACHE_SIZE)
 
@@ -1277,9 +1259,7 @@ class Repository:
         if self._chunks is None:
             from .cache import build_chunkindex_from_repo
 
-            self._chunks = build_chunkindex_from_repo(
-                self, validate=self.chunkindex_validate, drop_corrupt_tail=self.chunkindex_drop_corrupt_tail
-            )
+            self._chunks = build_chunkindex_from_repo(self)
         return self._chunks
 
     @chunks.setter

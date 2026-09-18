@@ -1010,6 +1010,38 @@ def test_extract_continue(archivers, request):
             assert f.read() == CONTENTS3
 
 
+@requires_hardlinks
+@pytest.mark.parametrize("missing", ["first", "last"])
+def test_extract_continue_hardlinks(archivers, request, missing):
+    # --continue must not break up a group of hard links, no matter whether the first item of the
+    # group is skipped (it was already extracted) or extracted again.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", contents=b"123456")
+    os.link("input/file1", "input/file2")
+    os.link("input/file1", "input/file3")
+    cmd(archiver, "create", "arch", "input")
+    # the order of the hard links within the archive depends on the filesystem, so ask for it:
+    paths = [path for path in cmd(archiver, "list", "arch", "--format={path}{NL}").splitlines() if "file" in path]
+    assert len(paths) == 3
+    first, missing_path = paths[0], paths[0] if missing == "first" else paths[-1]
+
+    with changedir("output"):
+        cmd(archiver, "extract", "arch")
+        old_ino = os.stat(first).st_ino
+        # simulate an incomplete extraction: one of the hard links is missing
+        os.remove(missing_path)
+        cmd(archiver, "extract", "arch", "--continue")
+        sts = [os.stat(path) for path in paths]
+        assert len({st.st_ino for st in sts}) == 1  # they all are hard links to the same inode
+        assert all(st.st_nlink == 3 for st in sts)
+        if missing == "last":
+            assert sts[0].st_ino == old_ino  # the already extracted files were NOT extracted again
+        for path in paths:
+            with open(path, "rb") as f:
+                assert f.read() == b"123456"
+
+
 def test_dry_run_extraction_flags(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

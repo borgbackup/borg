@@ -79,6 +79,8 @@ the answers to prompts get to borg). Thus, the cockpit refuses to run:
 - commands reading from stdin: ``create`` with ``-`` as a path or with
   ``--paths-from-stdin``, ``import-tar`` reading from ``-``, ``key import`` reading from
   ``-`` or with ``--paper``, and ``serve``.
+- commands writing their data to stdout: ``extract --stdout`` and ``export-tar`` writing
+  to ``-``.
 
 Keys
 ~~~~

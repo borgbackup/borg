@@ -677,6 +677,12 @@ def main():  # pragma: no cover
 
         if args.cockpit:
             # Cockpit TUI operation
+            from ..cockpit.runner import unsupported_reason  # does not need textual
+
+            reason = unsupported_reason(args)
+            if reason is not None:
+                print(f"borg --cockpit: {reason}", file=sys.stderr)
+                sys.exit(CommandError.exit_mcode if modern_ec else EXIT_ERROR)
             try:
                 from ..cockpit.app import BorgCockpitApp
             except ImportError as err:

@@ -37,6 +37,28 @@ def borg_command(args, executable=None, json_stdout=False):
     return list(executable) + injected + args
 
 
+def unsupported_reason(args):
+    """
+    Why the cockpit can not run the borg command given by the parsed command line <args>; None if it can.
+
+    borg's stdin is a pipe from the cockpit (for the answers to borg's prompts) that stays open as long
+    as borg runs, and the terminal is used by the TUI: a command waiting for data on stdin would wait forever.
+    """
+    command = getattr(args, "subcommand", None)
+    reads_stdin = (
+        (
+            command == "create"
+            and ("-" in (getattr(args, "paths", None) or []) or getattr(args, "paths_from_stdin", False))
+        )
+        or (command == "import-tar" and getattr(args, "tarfile", None) == "-")
+        or (command == "key import" and (getattr(args, "path", None) == "-" or getattr(args, "paper", False)))
+        or command == "serve"
+    )
+    if reads_stdin:
+        return "this command reads from stdin, that does not work in the cockpit."
+    return None
+
+
 class BorgRunner:
     """
     Runs borg as a subprocess, parses its output into events and hands them to a callback, one at a time.

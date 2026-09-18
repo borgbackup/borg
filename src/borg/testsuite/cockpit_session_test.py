@@ -20,7 +20,8 @@ from borg.cockpit.events import (
     UnknownJson,
     parse_json_line,
 )
-from borg.cockpit.runner import INJECTED_OPTIONS, BorgRunner, borg_command
+from borg.archiver import Archiver
+from borg.cockpit.runner import INJECTED_OPTIONS, BorgRunner, borg_command, unsupported_reason
 from borg.cockpit.session import NO_TERMINAL_WARNING, NO_TERMINAL_HINT, Session
 
 # JSON lines as documented in docs/internals/frontends.rst
@@ -491,3 +492,30 @@ def test_parse_archive_status():
     assert parse_json_line(line) == ArchiveStatus(
         name="old", status="deleted", message="Deleted archive: old (1/1)", data=json.loads(line)
     )
+
+
+@pytest.mark.parametrize(
+    "argv, reason",
+    [
+        (["create", "archive", "-"], "stdin"),
+        (["create", "archive", "input", "-"], "stdin"),
+        (["create", "--paths-from-stdin", "archive"], "stdin"),
+        (["import-tar", "archive", "-"], "stdin"),
+        (["key", "import", "-"], "stdin"),
+        (["key", "import", "--paper"], "stdin"),
+        (["serve"], "stdin"),
+        (["create", "archive", "input"], None),
+        (["create", "--paths-from-command", "archive", "--", "find", "."], None),
+        (["import-tar", "archive", "file.tar"], None),
+        (["key", "import", "keyfile"], None),
+        (["check", "--repair"], None),
+    ],
+)
+def test_unsupported_reason(argv, reason):
+    # the real parser gives the args, so this also checks the names of the options.
+    args = Archiver().parse_args(["-r", "/some/repo"] + argv)
+    result = unsupported_reason(args)
+    if reason is None:
+        assert result is None
+    else:
+        assert reason in result

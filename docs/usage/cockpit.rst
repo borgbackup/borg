@@ -68,6 +68,16 @@ setting ``BORG_PASSPHRASE`` or ``BORG_PASSCOMMAND`` (see :ref:`env_vars`). Other
 cockpit shows a hint that borg is waiting for a passphrase, and you have to quit and try
 again.
 
+Commands the cockpit can not run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The cockpit uses the terminal and borg's stdin is connected to the cockpit (that is how
+the answers to prompts get to borg). Thus, the cockpit refuses to run:
+
+- commands reading from stdin: ``create`` with ``-`` as a path or with
+  ``--paths-from-stdin``, ``import-tar`` reading from ``-``, ``key import`` reading from
+  ``-`` or with ``--paper``, and ``serve``.
+
 Keys
 ~~~~
 

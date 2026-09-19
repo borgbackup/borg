@@ -869,6 +869,8 @@ Errors
         Archive {} already exists
     Archive.DoesNotExist rc: 31 traceback: no
         Archive {} does not exist
+    Archive.ExtractionDirNotEmpty rc: 33 traceback: no
+        Extraction directory {} is not empty. Use --continue to extract into a non-empty directory: existing files that differ from the archived files will be replaced and the result will be a mix of existing and extracted files.
     Archive.IncompatibleFilesystemEncodingError rc: 32 traceback: no
         Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable.
 

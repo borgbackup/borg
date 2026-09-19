@@ -20,14 +20,15 @@ def test_return_codes(archivers, request):
     cmd(archiver, "create", "archive", "input")
     with changedir("output"):
         cmd(archiver, "extract", "archive")
-    cmd(
-        archiver,
-        "extract",
-        "archive",
-        "does/not/match",
-        fork=True,
-        exit_code=IncludePatternNeverMatchedWarning().exit_code,
-    )
+        cmd(
+            archiver,
+            "extract",
+            "archive",
+            "does/not/match",
+            "--continue",
+            fork=True,
+            exit_code=IncludePatternNeverMatchedWarning().exit_code,
+        )
 
 
 def test_exit_codes(archivers, request, monkeypatch):

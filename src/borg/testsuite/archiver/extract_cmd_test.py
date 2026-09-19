@@ -469,7 +469,7 @@ def test_unusual_filenames(archivers, request):
     cmd(archiver, "create", "test", "input")
     for filename in filenames:
         with changedir("output"):
-            cmd(archiver, "extract", "test", os.path.join("input", filename))
+            cmd(archiver, "extract", "test", os.path.join("input", filename), "--continue")
         assert os.path.exists(os.path.join("output", "input", filename))
 
 
@@ -484,9 +484,9 @@ def test_strip_components(archivers, request):
         with assert_creates_file("file"):
             cmd(archiver, "extract", "test", "--strip-components", "2")
         with assert_creates_file("dir/file"):
-            cmd(archiver, "extract", "test", "--strip-components", "1")
+            cmd(archiver, "extract", "test", "--continue", "--strip-components", "1")
         with assert_creates_file("input/dir/file"):
-            cmd(archiver, "extract", "test", "--strip-components", "0")
+            cmd(archiver, "extract", "test", "--continue", "--strip-components", "0")
 
 
 @requires_hardlinks
@@ -516,7 +516,7 @@ def test_extract_hardlinks2(archivers, request):
         assert os.stat("source2").st_nlink == 2
 
     with changedir("output"):
-        cmd(archiver, "extract", "test", "input/dir1")
+        cmd(archiver, "extract", "test", "input/dir1", "--continue")
         assert os.stat("input/dir1/hardlink").st_nlink == 2
         assert os.stat("input/dir1/subdir/hardlink").st_nlink == 2
         assert open("input/dir1/subdir/hardlink", "rb").read() == b"123456"
@@ -563,11 +563,11 @@ def test_extract_include_exclude(archivers, request):
     assert sorted(os.listdir("output/input")) == ["file1"]
 
     with changedir("output"):
-        cmd(archiver, "extract", "test", "--exclude=input/file2")
+        cmd(archiver, "extract", "test", "--continue", "--exclude=input/file2")
     assert sorted(os.listdir("output/input")) == ["file1", "file3"]
 
     with changedir("output"):
-        cmd(archiver, "extract", "test", "--exclude-from=" + archiver.exclude_file_path)
+        cmd(archiver, "extract", "test", "--continue", "--exclude-from=" + archiver.exclude_file_path)
     assert sorted(os.listdir("output/input")) == ["file1", "file3"]
 
 
@@ -887,7 +887,7 @@ def test_overwrite(archivers, request):
     os.mkdir("output/input/file1")
     os.mkdir("output/input/dir2")
     with changedir("output"):
-        cmd(archiver, "extract", "test")
+        cmd(archiver, "extract", "test", "--continue")
     assert_dirs_equal("input", "output/input")
 
     # But non-empty dirs should fail
@@ -898,7 +898,7 @@ def test_overwrite(archivers, request):
     if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
         expected_ec = EXIT_WARNING
     with changedir("output"):
-        cmd(archiver, "extract", "test", exit_code=expected_ec)
+        cmd(archiver, "extract", "test", "--continue", exit_code=expected_ec)
 
 
 # derived from test_extract_xattrs_errors()
@@ -939,6 +939,43 @@ def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
     with changedir("output"):
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
             cmd(archiver, "extract", "test", exit_code=EXIT_WARNING)
+
+
+def test_extract_non_empty_dir(archivers, request):
+    # extracting replaces existing files, thus borg refuses to extract into a non-empty directory
+    # unless --continue is given, see #10057.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"archived")
+    create_regular_file(archiver.input_path, "file2", contents=b"archived")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    # different size than the archived file1, so --continue never considers it as already extracted:
+    create_regular_file(archiver.output_path, "input/file1", contents=b"current")
+
+    def assert_refused(*args):
+        if archiver.FORK_DEFAULT:
+            output = cmd(archiver, "extract", "test", *args, exit_code=Archive.ExtractionDirNotEmpty("x").exit_code)
+            assert "--continue" in output
+        else:
+            with pytest.raises(Archive.ExtractionDirNotEmpty, match="--continue"):
+                cmd(archiver, "extract", "test", *args)
+        # nothing was replaced, nothing was extracted:
+        assert os.listdir("input") == ["file1"]
+        with open("input/file1", "rb") as f:
+            assert f.read() == b"current"
+
+    with changedir("output"):
+        assert_refused()
+        assert_refused("input/file2")  # same for extracting only a part of the archive
+        # these do not write into the directory:
+        cmd(archiver, "extract", "test", "--dry-run")
+        assert cmd(archiver, "extract", "test", "input/file2", "--stdout", binary_output=True) == b"archived"
+        assert_refused()
+        # with --continue, borg extracts into the non-empty directory and replaces the existing file:
+        cmd(archiver, "extract", "test", "--continue")
+        for name in "file1", "file2":
+            with open(f"input/{name}", "rb") as f:
+                assert f.read() == b"archived"
 
 
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
@@ -1131,7 +1168,7 @@ def test_extract_existing_directory(archivers, request):
         os.makedirs("input/dir", exist_ok=True)
         st1 = os.stat("input/dir")
         # extract
-        cmd(archiver, "extract", "test")
+        cmd(archiver, "extract", "test", "--continue")
         st2 = os.stat("input/dir")
     assert st1.st_ino == st2.st_ino
 

@@ -128,8 +128,11 @@ Are there other known limitations?
 
 - borg extract supports restoring only into an empty destination. After extraction,
   the destination will have exactly the contents of the extracted archive.
-  If you extract into a non-empty destination, borg will (for example) not
-  remove files which are in the destination, but not in the archive.
+  borg refuses to extract into a non-empty destination unless ``--continue`` is
+  given. If you extract into a non-empty destination, borg replaces existing files
+  by the archived files, but it will (for example) not remove files which are in
+  the destination, but not in the archive: the result is a mix of existing and
+  extracted files.
   See :issue:`4598` for a workaround and more details.
 
 Why are the extracted files owned by me and not by the original owner?
@@ -876,8 +879,11 @@ How can I deal with my very unstable SSH connection?
 If you have issues with lost connections during long-running borg commands, you
 could try to work around:
 
-- Make partial extracts like ``borg extract ARCHIVE PATTERN`` to do multiple
-  smaller extraction runs that complete before your connection has issues.
+- Use ``borg extract --continue ARCHIVE`` to continue an interrupted extraction
+  (in the same directory): it skips the files that are fully extracted already.
+- Make partial extracts like ``borg extract --continue ARCHIVE PATTERN`` to do
+  multiple smaller extraction runs that complete before your connection has issues
+  (``--continue`` is needed as soon as the extraction directory is not empty).
 - Try using ``borg mount MOUNTPOINT`` and ``rsync -avH`` from
   ``MOUNTPOINT`` to your desired extraction directory. If the connection breaks
   down, just repeat that over and over again until rsync does not find anything

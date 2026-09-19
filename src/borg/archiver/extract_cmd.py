@@ -1,11 +1,13 @@
+import os
 import sys
 import logging
 import stat
 
 from ._common import with_repository, with_archive
 from ._common import build_filter, build_matcher
-from ..archive import BackupError, format_store_stats
+from ..archive import Archive, BackupError, format_store_stats
 from ..constants import *  # NOQA
+from ..helpers import Error
 from ..helpers import archivename_validator, PathSpec
 from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
@@ -43,6 +45,16 @@ class ExtractMixIn:
         sparse = args.sparse
         strip_components = args.strip_components
         continue_extraction = args.continue_extraction
+        if not (dry_run or stdout or continue_extraction):
+            # Extracting into a non-empty directory (like a home directory that is in use) replaces existing
+            # files and results in a mix of existing and extracted files, so it must be asked for explicitly,
+            # see #10057.
+            try:
+                is_empty = not os.listdir(archive.cwd)
+            except OSError as e:
+                raise Error(f"Cannot check whether the extraction directory {archive.cwd} is empty: {e}") from None
+            if not is_empty:
+                raise Archive.ExtractionDirNotEmpty(archive.cwd)
         dirs = []
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
@@ -146,6 +158,25 @@ class ExtractMixIn:
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
 
+        Extracting into a non-empty directory replaces existing files that are in the way and
+        leaves all other existing files as they are. The result is a mix of the files that were
+        there before and the extracted files, which might not be what you want - especially not
+        by accident in a directory that is in use (e.g. your home directory). Thus, borg refuses
+        to extract into a non-empty directory unless ``--continue`` is given (``--dry-run`` and
+        ``--stdout`` do not write into the directory, so they always work). The usual way to
+        restore is to extract into a new, empty directory: after that, the directory has exactly
+        the contents of the extracted archive (or of the selected part of it).
+
+        ``--continue`` extracts into a non-empty directory. It is made for continuing a previously
+        interrupted extraction of the same archive into the same directory: an existing regular
+        file that has the same type, permissions (mode), size and modification time as the
+        archived file is considered to be fully extracted already and is skipped. Everything else
+        is extracted, replacing existing files. Files that are in the directory, but not in the
+        archive, are left as they are. ``--continue`` is thus also needed to restore files into an
+        existing directory tree. Note that a file that was damaged without a change of its size
+        and modification time (e.g. by bit rot) is skipped, not replaced: remove it before
+        extracting it.
+
         If a file's content chunks are missing from the repository or are corrupted (they fail
         authentication, decryption or decompression), the extraction does not abort: each such
         chunk is written as all-zero data of the correct size, an error naming the chunk is logged,
@@ -216,7 +247,8 @@ class ExtractMixIn:
             "--continue",
             dest="continue_extraction",
             action="store_true",
-            help="continue a previously interrupted extraction of the same archive",
+            help="extract into a non-empty directory, e.g. to continue a previously interrupted extraction of "
+            "the same archive: skip files that are fully extracted already, replace other existing files",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

@@ -4,8 +4,11 @@ Examples
 ~~~~~~~~
 ::
 
-    # Extract entire archive
+    # Extract entire archive (into the current directory, which must be empty)
     $ borg extract my-files
+
+    # Continue an interrupted extraction (or extract into a non-empty directory)
+    $ borg extract --continue my-files
 
     # Extract entire archive and list files while processing
     $ borg extract --list my-files

@@ -29,6 +29,7 @@ from ...item import Item
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
 from ...repository import PackTracker, Repository
+from .. import changedir
 from ..repoobj_test import DATA_SIZE_OFFSET
 from ..repository_test import fchunk, corrupt_chunk_on_disk
 from . import (
@@ -1154,7 +1155,8 @@ def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):
 
     # by default, reads do not check the id/content invariant, so this is not noticed:
     monkeypatch.delenv("BORG_ASSERT_ID", raising=False)
-    cmd(archiver, "extract", "archive1", exit_code=0)
+    with changedir("output"):
+        cmd(archiver, "extract", "archive1", exit_code=0)
     # ... but check --verify-data always checks it:
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
@@ -1163,7 +1165,9 @@ def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):
     # with "read" in BORG_ASSERT_ID, reads check it too: extract treats the chunk as corrupted, i.e.
     # it extracts all-zero data instead and reports the file with a warning.
     monkeypatch.setenv("BORG_ASSERT_ID", "read")
-    output = cmd(archiver, "extract", "archive1", exit_code=BackupDamagedChunksError.exit_mcode)
+    Path("output2").mkdir()
+    with changedir("output2"):
+        output = cmd(archiver, "extract", "archive1", exit_code=BackupDamagedChunksError.exit_mcode)
     assert "id verification failed" in output
     assert "1 chunk(s) missing or corrupted in the repository, replaced by all-zero data" in output
 

@@ -591,6 +591,11 @@ class Archive:
 
         exit_mcode = 32
 
+    class ExtractionDirNotEmpty(Error):
+        """Extraction directory {} is not empty. Use --continue to extract into a non-empty directory: existing files that differ from the archived files will be replaced and the result will be a mix of existing and extracted files."""
+
+        exit_mcode = 33
+
     def __init__(
         self,
         manifest,

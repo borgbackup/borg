@@ -546,9 +546,11 @@ Example with **borg extract**:
 
 ::
 
-    # borg extract always extracts into current directory and that directory
-    # should be empty (borg does not support transforming a non-empty dir to
-    # the state as present in your backup archive).
+    # borg extract always extracts into the current directory and that directory
+    # must be empty: extracting into a non-empty directory replaces existing files
+    # and results in a mix of existing and extracted files, so borg refuses to do
+    # that unless --continue is given (and borg does not support transforming a
+    # non-empty dir to the state as present in your backup archive).
     mkdir borg_restore
     cd borg_restore
 

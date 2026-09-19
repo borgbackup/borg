@@ -250,6 +250,8 @@ class CreateMixIn:
                         raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
             else:
                 paths = list(args.pattern_roots) + list(args.paths)
+                # a root can be inside a directory root given before it, _rec_walk needs to know the roots.
+                root_paths = {posixpath.normpath(path) for path in paths}
                 for path in paths:
                     if path == "":  # issue #5637
                         self.print_warning("An empty string was given as PATH, ignoring.")
@@ -292,6 +294,7 @@ class CreateMixIn:
                             exclude_if_present=args.exclude_if_present,
                             keep_exclude_tags=args.keep_exclude_tags,
                             skip_inodes=skip_inodes,
+                            root_paths=root_paths,
                             restrict_dev=restrict_dev,
                             read_special=args.read_special,
                             dry_run=dry_run,
@@ -601,6 +604,7 @@ class CreateMixIn:
         exclude_if_present,
         keep_exclude_tags,
         skip_inodes,
+        root_paths,
         restrict_dev,
         read_special,
         dry_run,
@@ -708,6 +712,7 @@ class CreateMixIn:
                                             exclude_if_present=exclude_if_present,
                                             keep_exclude_tags=keep_exclude_tags,
                                             skip_inodes=skip_inodes,
+                                            root_paths=root_paths,
                                             restrict_dev=restrict_dev,
                                             read_special=read_special,
                                             dry_run=dry_run,
@@ -742,11 +747,17 @@ class CreateMixIn:
                                 exclude_if_present=exclude_if_present,
                                 keep_exclude_tags=keep_exclude_tags,
                                 skip_inodes=skip_inodes,
+                                root_paths=root_paths,
                                 restrict_dev=restrict_dev,
                                 read_special=read_special,
                                 dry_run=dry_run,
                                 strip_prefix=strip_prefix,
                             )
+
+            if path in root_paths and (recurse or not stat.S_ISDIR(st.st_mode)):
+                # we are done with <path>, which also is a recursion root: do not process it again as a root.
+                # a directory we did not recurse into (other filesystem) is still processed as a root.
+                skip_inodes.add(skip_key(path, st))
 
         except BackupError as e:
             self.print_warning_instance(BackupWarning(path, e))

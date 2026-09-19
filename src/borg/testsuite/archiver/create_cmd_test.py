@@ -275,6 +275,45 @@ def test_create_duplicate_file_root(archivers, request):
     assert paths == ["input/file1", "input/file2"]
 
 
+@requires_hardlinks
+def test_create_dir_root_and_roots_inside_it(archivers, request):
+    # roots that were already archived while recursing into a directory root given before them must
+    # not be archived again. a duplicate hard link item made borg extract delete the file (#10393).
+    archiver = request.getfixturevalue(archivers)
+    _create_hardlinked_files(archiver)
+    create_regular_file(archiver.input_path, "dir/file", contents=b"abc")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input", "input/file1", "input/file2", "./input/file3", "input/dir")
+    paths = [item["path"] for item in _list_items(archiver, "test")]
+    assert sorted(paths) == ["input", "input/dir", "input/dir/file", "input/file1", "input/file2", "input/file3"]
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert all(os.stat(f"input/{name}").st_nlink == 3 for name in ("file1", "file2", "file3"))
+
+
+def test_create_dir_root_and_not_archived_roots_inside_it(archivers, request):
+    # roots inside a directory root given before them, which were not archived while recursing into
+    # that directory, because it did not recurse into their parent directory.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file", contents=b"abc")
+    create_regular_file(archiver.input_path, "tagged/.nobackup")
+    create_regular_file(archiver.input_path, "tagged/file", contents=b"abc")
+    create_regular_file(archiver.input_path, "tagged/dir/file", contents=b"abc")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(
+        archiver,
+        "create",
+        "--exclude-if-present=.nobackup",
+        "test",
+        "input",
+        "input/tagged/file",
+        "input/tagged/dir",
+        "input/file",
+    )
+    paths = [item["path"] for item in _list_items(archiver, "test")]
+    assert sorted(paths) == ["input", "input/file", "input/tagged/dir", "input/tagged/dir/file", "input/tagged/file"]
+
+
 def test_create_unreadable_parent(archiver):
     parent_dir = os.path.join(archiver.input_path, "parent")
     root_dir = os.path.join(archiver.input_path, "parent", "root")

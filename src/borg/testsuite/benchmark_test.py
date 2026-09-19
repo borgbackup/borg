@@ -6,6 +6,7 @@ Usage:
     py.test --benchmark-only
 """
 
+import itertools
 import os
 
 import pytest
@@ -81,8 +82,14 @@ def test_create_lz4(benchmark, cmd_fixture, repo, testdata):
 
 def test_extract(benchmark, cmd_fixture, repo_archive, tmpdir):
     repo, archive = repo_archive
+    counter = itertools.count()
+
+    def setup():
+        # extract refuses a non-empty directory, so give each round a fresh empty one, see #10057
+        os.chdir(str(tmpdir.mkdir(f"extract{next(counter)}")))
+
     with changedir(str(tmpdir)):
-        result, out = benchmark.pedantic(cmd_fixture, (f"--repo={repo}", "extract", archive))
+        result, out = benchmark.pedantic(cmd_fixture, (f"--repo={repo}", "extract", archive), setup=setup)
     assert result == 0
 
 

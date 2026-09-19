@@ -349,6 +349,22 @@ def test_recreate_progress_json(archivers, request):
     assert not any(re.search(r" O .* U \d+ N ", line) for line in lines if not line.startswith("{"))
 
 
+def test_recreate_files_stats(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "1000000")  # no rate limit: the progress is reported after each item
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    create_regular_file(archiver.input_path, "dir/file3", size=1024)
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "recreate", "-a", "test", "--log-json", "--progress", "-e", "input/file2")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    progress = [msg for msg in messages if msg["type"] == "archive_progress" and not msg["finished"]]
+    # the items of the new archive are counted by their status (as --list shows it), the excluded one is not.
+    assert progress[-1]["files_stats"] == {"A": 2, "d": 2}
+    assert progress[-1]["nfiles"] == 2
+
+
 def test_comment(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

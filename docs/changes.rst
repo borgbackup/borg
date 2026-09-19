@@ -242,6 +242,8 @@ Fixes:
 
 - recreate/transfer --log-json --progress: output archive_progress JSON objects (as
   documented), not text progress lines
+- import-tar/recreate: count the items by their status, like create does. The counts
+  were always 0: "Added files" of import-tar --stats, files_stats in the JSON output.
 
 Other changes:
 

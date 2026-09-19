@@ -48,9 +48,9 @@ terminal. The panel in the upper right depends on the command:
 
     These numbers are the statistics borg reports. They do not depend on ``--list`` and
     ``--filter``, which only determine what the log shows. A ``-`` means that borg does
-    not report that number: only ``create`` reports the counts by status, and a
-    ``--dry-run`` reports the number of files and the original size when it has finished
-    (and nothing else).
+    not report that number: ``transfer`` has no counts by status, and a ``--dry-run``
+    reports the number of files and the original size when it has finished (and nothing
+    else).
 
 ``extract``, ``export-tar``
     A progress bar with the percentage and the estimated remaining time, the amount of

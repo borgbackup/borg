@@ -105,7 +105,8 @@ archive_progress
         Seconds spent chunking file contents so far (float)
     files_stats
         Object mapping the single-character file status (as used by ``--list``) to the number of
-        files that got that status so far, e.g. ``{"A": 3, "d": 3}``
+        items that got that status so far, e.g. ``{"A": 3, "d": 3}``. It is empty for
+        :ref:`borg_transfer`, which has no file status.
     store_stats
         Object with the storage backend statistics. It is empty here, it is only filled in for the
         final :ref:`borg_create` ``--json`` output on *stdout*, see `Archive formats`_.

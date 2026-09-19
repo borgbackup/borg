@@ -286,8 +286,18 @@ def test_import_tar_strip_components_links(archivers, request):
         tarinfo.type = tarfile.SYMTYPE
         tarinfo.linkname = "file1"
         tar.addfile(tarinfo)
+        # file0 has too few path elements, so it is skipped - and so is the hard link pointing to it.
+        tarinfo = tarfile.TarInfo("file0")
+        tarinfo.size = len(data)
+        tar.addfile(tarinfo, io.BytesIO(data))
+        tarinfo = tarfile.TarInfo("toplevel/hardlink0")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "file0"
+        tar.addfile(tarinfo)
     cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     cmd(archiver, "import-tar", "--strip-components=1", "dst", "input.tar")
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"file1", "hardlink1", "symlink1"}
     with changedir(archiver.output_path):
         cmd(archiver, "extract", "dst")
     with open("output/file1", "rb") as f:

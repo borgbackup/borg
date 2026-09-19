@@ -1172,6 +1172,9 @@ class Repository:
             # the store exists, but has no repository config: a repository that lost its config, something
             # that never was a borg 2 repository, or the leftover of an interrupted repo-create (see create()).
             raise _ConfigMissing() from None
+        except OSError as exc:
+            # a config we could not read is not a missing one: do not let it look like "no repository", #3509.
+            raise self.StoreReadError("config/config", exc) from exc
         except UnicodeDecodeError:
             raise self.InvalidRepository(str(self._location)) from None
         config = configparser.ConfigParser(interpolation=None)

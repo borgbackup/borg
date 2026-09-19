@@ -248,10 +248,14 @@ by definition, a potentially lossy task.
 In practice, repair mode hooks into both the repository and archive checks:
 
 1. When checking the repository's consistency, repair mode rebuilds the repository
-   index from the packs if the index is corrupt, provided every pack is intact. If
-   any pack is corrupt, the repository check leaves the index and the packs untouched
-   and reports the corruption; salvaging a corrupt pack's still-intact objects is not
-   implemented yet (refs #8572).
+   index from the packs if the index is corrupt, provided every pack matches its
+   store hash. If any pack fails its store hash, the repository check leaves the
+   index and the packs untouched and reports it; salvaging the intact objects of
+   such a pack is not implemented yet (refs #8572). The rebuild authenticates
+   each object's header and metadata with the key, leaves an object that fails
+   this out of the index and reports it as an error. Repair therefore always
+   needs the key, ``--repository-only`` included, and aborts if the key can not
+   be read.
 
 2. When checking the consistency and correctness of archives, repair mode might
    remove whole archives from the manifest if their archive metadata chunk is

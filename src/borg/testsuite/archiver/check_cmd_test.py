@@ -2140,3 +2140,19 @@ def test_check_repair_stops_at_unreadable_archive_metadata(archivers, request, m
     state["failing"] = False
     assert "archive1" in cmd(archiver, "repo-list")
     cmd(archiver, "check", exit_code=0)
+
+
+def test_unreadable_repo_config_is_not_a_missing_repository(archivers, request, monkeypatch):
+    # config/config is what makes the store a repository. if it can not be read, that must not look like
+    # "no repository here" or like a lost config - both are conclusions we did not earn, refs #3509.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+    check_cmd_setup(archiver)
+    state = make_store_reads_fail(monkeypatch, lambda name, offset, size: name == "config/config")
+    with pytest.raises(Repository.StoreReadError):  # local (not forked): the Error propagates
+        cmd(archiver, "check")
+
+    state["failing"] = False
+    assert "archive1" in cmd(archiver, "repo-list")  # the repository was fine all along
+    cmd(archiver, "check", exit_code=0)

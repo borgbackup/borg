@@ -389,14 +389,14 @@ def test_timestamps_win32(archivers, request):
     platform.set_times("input/file", atime_ns=atime_ns, mtime_ns=mtime_ns, birthtime_ns=birthtime_ns)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "--atime", "test", "input")
-    sti = os.stat("input/file")
     with changedir("output"):
         cmd(archiver, "extract", "test")
     sto = os.stat("output/input/file")
     assert sto.st_mtime_ns == mtime_ns
-    # reading the input file for the backup might have updated its atime, so compare with the input file.
-    assert sto.st_atime_ns == sti.st_atime_ns
-    if hasattr(sti, "st_birthtime_ns"):  # Python >= 3.12
+    # borg archives the atime the input file had before borg opened it (see #6194), so do not compare with
+    # the input file: NTFS updates its atime when borg reads it, if last access time updates are enabled.
+    assert sto.st_atime_ns == atime_ns
+    if hasattr(sto, "st_birthtime_ns"):  # Python >= 3.12
         assert sto.st_birthtime_ns == birthtime_ns
 
 

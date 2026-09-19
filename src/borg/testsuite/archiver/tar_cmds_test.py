@@ -337,8 +337,9 @@ def test_import_tar_strip_components_list(archivers, request):
 
 def test_import_tar_strip_components_borg_format(archivers, request):
     # the BORG tar format restores the items from pax headers, stripping must work for that path, too.
+    # that includes hard links: the BORG format transfers the hlid, so they are hard links again after the import.
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
+    create_test_files(archiver.input_path)
     os.unlink("input/flagfile")
     cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     cmd(archiver, "create", "src", "input")

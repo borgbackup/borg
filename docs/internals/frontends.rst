@@ -90,7 +90,8 @@ it is not produced unless ``--progress`` is specified.
 archive_progress
     Output during operations creating archives (:ref:`borg_create`, :ref:`borg_import-tar`,
     :ref:`borg_recreate` and :ref:`borg_transfer`).
-    The following keys exist, each represents the current progress.
+    The following keys exist, each represents the current progress. The output is rate limited, so
+    only the last object (*finished* is *true*) tells about everything that was processed.
 
     original_size
         Original size of the data processed so far (before compression and deduplication)
@@ -116,8 +117,8 @@ archive_progress
         Unix timestamp (float)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
-        can have this property set to *true*. That last object has no keys besides *time*, *type*
-        and *finished*.
+        can have this property set to *true*. That last object has the final statistics of the
+        archive and no *path*.
 
 progress_message
     A message-based progress information with no concrete progress information, just a message
@@ -241,7 +242,9 @@ See Prompts_ for the types used by prompts.
     {"type": "file_status", "status": "A", "path": "src/linux/file1"}
     {"type": "file_status", "status": "d", "path": "src/linux"}
     {"type": "file_status", "status": "d", "path": "src"}
-    {"time": 1787900398.686938, "type": "archive_progress", "finished": true}
+    {"original_size": 250012, "deduplicated_size": 250012, "nfiles": 3, "hashing_time": 0.002,
+     "chunking_time": 0.001, "files_stats": {"A": 3, "d": 3}, "store_stats": {}, "time": 1787900398.686938,
+     "type": "archive_progress", "finished": true}
 
 :ref:`borg_extract` file listing, with ``--exclude src/linux/baz/file3``::
 

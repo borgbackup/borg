@@ -345,6 +345,8 @@ def test_recreate_progress_json(archivers, request):
     assert len(progress) >= 2
     assert not progress[0]["finished"] and progress[-1]["finished"]
     assert {"nfiles", "original_size", "deduplicated_size", "path"} <= set(progress[0])
+    # the final object has the final statistics: file2 was excluded.
+    assert progress[-1]["nfiles"] == 1 and progress[-1]["files_stats"] == {"A": 1, "d": 1}
     # ... and not of text lines like "1.02 kB O 0 B U 1 N input/file1".
     assert not any(re.search(r" O .* U \d+ N ", line) for line in lines if not line.startswith("{"))
 

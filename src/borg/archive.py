@@ -209,12 +209,11 @@ Files changed while reading: {files_changed_while_reading}
             stream = stream or sys.stderr
             self.last_progress = now
             if self.output_json:
-                if not final:
-                    data = self.as_dict()
-                    if item:
-                        data |= text_to_json("path", item.path)
-                else:
-                    data = {}
+                # the progress is rate limited, so the final object must have the final statistics: nothing
+                # else reports what was processed since the previous object (or all of a short operation).
+                data = self.as_dict()
+                if item and not final:
+                    data |= text_to_json("path", item.path)
                 data |= {"time": time.time(), "type": "archive_progress", "finished": final}
                 msg = json.dumps(data)
                 end = "\n"

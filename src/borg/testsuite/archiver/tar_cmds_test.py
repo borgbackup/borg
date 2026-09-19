@@ -214,6 +214,12 @@ def test_import_tar_files_stats(archivers, request):
     assert stats["files_stats"] == {"A": 2, "h": 1, "d": 1, "s": 1}
     output = cmd(archiver, "import-tar", "--stats", "dst2", "input.tar")
     assert "Added files: 2" in output
+    # the final archive_progress object has the final statistics
+    output = cmd(archiver, "import-tar", "--log-json", "--progress", "dst3", "input.tar")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    final = [msg for msg in messages if msg["type"] == "archive_progress"][-1]
+    assert final["finished"] and final["nfiles"] == 3
+    assert final["files_stats"] == {"A": 2, "h": 1, "d": 1, "s": 1}
 
 
 def test_import_tar_json(archivers, request):

@@ -244,6 +244,9 @@ Fixes:
   documented), not text progress lines
 - import-tar/recreate: count the items by their status, like create does. The counts
   were always 0: "Added files" of import-tar --stats, files_stats in the JSON output.
+- --log-json: the final archive_progress object (finished: true) has the final statistics.
+  The progress output is rate limited, so a frontend could not know what was processed
+  after the previous object (or at all, for a short operation), see also #6570.
 
 Other changes:
 

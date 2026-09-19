@@ -608,6 +608,8 @@ class TarMixIn:
                 status = "E"
                 self.print_warning("%s: Unsupported tarinfo type %s", tarinfo.name, tarinfo.type)
             self.print_file_status(status, name)
+            if status is not None:  # None: process_file already printed and counted the status
+                tfo.stats.files_stats[status] += 1
 
         # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
         tar.close()

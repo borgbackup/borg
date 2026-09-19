@@ -189,6 +189,33 @@ def test_import_tar_nfiles(archivers, request):
     assert info["archives"][0]["stats"]["nfiles"] == 3
 
 
+def test_import_tar_files_stats(archivers, request):
+    """import-tar counts the items by their status, like create does."""
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w") as tar:
+        for name in ("dir/file1", "dir/file2"):
+            data = name.encode()
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.size = len(data)
+            tar.addfile(tarinfo, io.BytesIO(data))
+        tarinfo = tarfile.TarInfo("dir/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/subdir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    stats = json.loads(cmd(archiver, "import-tar", "--json", "dst", "input.tar"))["archive"]["stats"]
+    assert stats["files_stats"] == {"A": 2, "h": 1, "d": 1, "s": 1}
+    output = cmd(archiver, "import-tar", "--stats", "dst2", "input.tar")
+    assert "Added files: 2" in output
+
+
 def test_import_tar_json(archivers, request):
     """import-tar --json reports the stats of the new archive like create --json does, see #10335."""
     archiver = request.getfixturevalue(archivers)

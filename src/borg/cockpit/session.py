@@ -153,7 +153,7 @@ class Session:
     # than the update interval).
     # The --list lines are no source for them: they only exist if the user asked for the listing, and --filter
     # reduces them to some status characters, so counting them would give wrong numbers.
-    # What borg does not tell is unknown: there is no archive_progress for a dry-run, and only create fills
+    # What borg does not tell is unknown: there is no archive_progress for a dry-run, and transfer has no
     # files_stats.
 
     @property

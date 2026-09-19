@@ -2122,7 +2122,8 @@ class TarfileObjectProcessors:
     def process_file(self, *, tarinfo, status, type, tar):
         with self.create_helper(tarinfo, status, type) as (item, status):
             self.print_file_status(status, item.path)
-            status = None  # we already printed the status
+            self.stats.files_stats[status] += 1
+            status = None  # we already printed and counted the status
             fd = tar.extractfile(tarinfo)
             self.digester.start()
             self.process_file_chunks(
@@ -3062,6 +3063,7 @@ class ArchiveRecreater:
 
     def process_item(self, archive, target, item):
         status = file_status(item.mode)
+        target.stats.files_stats[status] += 1
         if "chunks" in item:
             self.print_file_status(status, item.path)
             status = None

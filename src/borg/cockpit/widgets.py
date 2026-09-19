@@ -177,8 +177,8 @@ class CreateStatusPanel(StatusPanelBase):
         self.show_value("status-original", "Original: ", self._format_size(original))
         ratio = f" ({deduplicated * 100 / original:.1f}%)" if deduplicated is not None and original else ""
         self.show_value("status-deduplicated", "Deduplicated: ", self._format_size(deduplicated) + ratio)
-        # the counts by status are unknown (shown as "-") while borg does not tell them: only create has them,
-        # and not for a dry-run. They are borg's statistics, not the counts of the --list lines.
+        # the counts by status are unknown (shown as "-") while borg does not tell them: transfer has none,
+        # neither has a dry-run. They are borg's statistics, not the counts of the --list lines.
         stats = session.files_stats
         unchanged, modified, added, errors = (session.count(status) if stats else None for status in "UMAE")
         other = sum(stats.values()) - unchanged - modified - added - errors if stats else None

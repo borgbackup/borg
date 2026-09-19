@@ -1007,6 +1007,10 @@ Duration: {0.duration}
         # overwrite files outside the extraction directory (e.g. /etc/passwd).
         self.safe_dirs.discard(path)  # path is about to be (re)created; never trust a stale entry for it
         self._check_safe_parent(item.path)
+        if "hlid" in item and hlm.retrieve(id=item.hlid) == path:
+            # duplicate item: path was extracted already and is the link target of its hard link group,
+            # removing it would lose the file (and hard linking it to itself can not work).
+            return
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.stat(path, follow_symlinks=False)

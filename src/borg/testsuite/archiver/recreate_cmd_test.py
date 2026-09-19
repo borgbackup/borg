@@ -132,7 +132,8 @@ def test_recreate_subtree_hardlinks(archivers, request):
         assert os.stat("input/dir1/subdir/hardlink").st_nlink == 2
         assert os.stat("input/dir1/aaaa").st_nlink == 2
         assert os.stat("input/dir1/source2").st_nlink == 2
-    with changedir("output"):
+    os.mkdir("output2")
+    with changedir("output2"):
         cmd(archiver, "extract", "test2")
         assert os.stat("input/dir1/hardlink").st_nlink == 4
 

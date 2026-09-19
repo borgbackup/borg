@@ -231,10 +231,10 @@ def test_remote_repo_strip_components_doesnt_leak(remote_archiver):
             res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "2")
             assert marker not in res
         with assert_creates_file("dir/file"):
-            res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "1")
+            res = cmd(remote_archiver, "extract", "test", "--debug", "--continue", "--strip-components", "1")
             assert marker not in res
         with assert_creates_file("input/dir/file"):
-            res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "0")
+            res = cmd(remote_archiver, "extract", "test", "--debug", "--continue", "--strip-components", "0")
             assert marker not in res
 
 

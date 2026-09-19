@@ -662,11 +662,11 @@ def test_exclude_sanitation(archivers, request):
     with changedir("input"):
         cmd(archiver, "create", "test2", ".", "--exclude=./file1")
     with changedir("output"):
-        cmd(archiver, "extract", "test2")
+        cmd(archiver, "extract", "test2", "--continue")
     assert sorted(os.listdir("output")) == ["file2"]
     cmd(archiver, "create", "test3", "input", "--exclude=input/./file1")
     with changedir("output"):
-        cmd(archiver, "extract", "test3")
+        cmd(archiver, "extract", "test3", "--continue")
     assert sorted(os.listdir("output/input")) == ["file2"]
 
 

@@ -577,11 +577,14 @@ class TarMixIn:
         tar = tarfile.open(fileobj=tarstream, mode="r|", ignore_zeros=args.ignore_zeros)
 
         while tarinfo := tar.next():
+            name = tarinfo.name  # the path we show in the file status output
             if strip_components:
-                if len(path_components(tarinfo.name)) <= strip_components:
+                components = path_components(tarinfo.name)
+                if len(components) <= strip_components:
                     continue  # too few path elements: silently skip this member
                 if tarinfo.islnk() and len(path_components(tarinfo.linkname)) <= strip_components:
                     continue  # hard link pointing to a skipped member: skip it, too
+                name = "/".join(components[strip_components:])  # same as the stored item path
             if tarinfo.isreg():
                 status = tfo.process_file(tarinfo=tarinfo, status="A", type=stat.S_IFREG, tar=tar)
             elif tarinfo.isdir():
@@ -601,7 +604,7 @@ class TarMixIn:
             else:
                 status = "E"
                 self.print_warning("%s: Unsupported tarinfo type %s", tarinfo.name, tarinfo.type)
-            self.print_file_status(status, tarinfo.name)
+            self.print_file_status(status, name)
 
         # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
         tar.close()

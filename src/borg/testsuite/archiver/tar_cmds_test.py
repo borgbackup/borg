@@ -299,6 +299,32 @@ def test_import_tar_strip_components_links(archivers, request):
     assert os.readlink("output/symlink1") == "file1"
 
 
+def test_import_tar_strip_components_list(archivers, request):
+    # the file status output shows the stripped paths, for all member types.
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w") as tar:
+        tarinfo = tarfile.TarInfo("toplevel/dir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("toplevel/dir/file1")
+        tar.addfile(tarinfo, io.BytesIO(b""))
+        tarinfo = tarfile.TarInfo("toplevel/dir/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "toplevel/dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("toplevel/dir/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "--list", "--strip-components=1", "dst", "input.tar")
+    assert "d dir" in output.splitlines()
+    assert "A dir/file1" in output.splitlines()
+    assert "h dir/hardlink1" in output.splitlines()
+    assert "s dir/symlink1" in output.splitlines()
+    assert "toplevel" not in output
+
+
 def test_import_tar_strip_components_borg_format(archivers, request):
     # the BORG tar format restores the items from pax headers, stripping must work for that path, too.
     archiver = request.getfixturevalue(archivers)

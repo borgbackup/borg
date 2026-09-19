@@ -1011,7 +1011,18 @@ Duration: {0.duration}
         try:
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
-                return  # done! we already have fully extracted this file in a previous run.
+                # we already have fully extracted this file in a previous run.
+                if "hlid" not in item or not has_link:
+                    return  # done!
+                # it is part of a group of hard links, keep the group together:
+                link_target = hlm.retrieve(id=item.hlid)
+                if link_target is None:
+                    # first item of the group: the following items of the group get hard linked to it.
+                    hlm.remember(id=item.hlid, info=path)
+                    return
+                if os.path.samestat(st, os.stat(link_target, follow_symlinks=False)):
+                    return  # done! it already is a hard link to the first item of the group.
+                # it is a separate file: replace it by a hard link to the first item of the group.
             if not stat.S_ISDIR(st.st_mode):
                 os.unlink(path)
             elif stat.S_ISDIR(item.mode):

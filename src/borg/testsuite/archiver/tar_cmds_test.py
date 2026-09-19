@@ -335,6 +335,32 @@ def test_import_tar_strip_components_list(archivers, request):
     assert "toplevel" not in output
 
 
+def test_import_tar_list_normalized_paths(archivers, request):
+    # the file status output shows the paths as they are stored in the archive, for all member types.
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w") as tar:
+        tarinfo = tarfile.TarInfo("./dir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("./dir/file1")
+        tar.addfile(tarinfo, io.BytesIO(b""))
+        tarinfo = tarfile.TarInfo("./dir/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "./dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("./dir/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "--list", "dst", "input.tar")
+    assert "d dir" in output.splitlines()
+    assert "A dir/file1" in output.splitlines()
+    assert "h dir/hardlink1" in output.splitlines()
+    assert "s dir/symlink1" in output.splitlines()
+    assert "./" not in output
+
+
 def test_import_tar_strip_components_borg_format(archivers, request):
     # the BORG tar format restores the items from pax headers, stripping must work for that path, too.
     # that includes hard links: the BORG format transfers the hlid, so they are hard links again after the import.

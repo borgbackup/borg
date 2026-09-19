@@ -577,14 +577,16 @@ class TarMixIn:
         tar = tarfile.open(fileobj=tarstream, mode="r|", ignore_zeros=args.ignore_zeros)
 
         while tarinfo := tar.next():
-            name = tarinfo.name  # the path we show in the file status output
             if strip_components:
                 components = path_components(tarinfo.name)
                 if len(components) <= strip_components:
                     continue  # too few path elements: silently skip this member
                 if tarinfo.islnk() and len(path_components(tarinfo.linkname)) <= strip_components:
                     continue  # hard link pointing to a skipped member: skip it, too
-                name = "/".join(components[strip_components:])  # same as the stored item path
+                name = "/".join(components[strip_components:])
+            else:
+                name = make_path_safe(posixpath.normpath(tarinfo.name))
+            # name is the same as the stored item path now, we show it in the file status output.
             if tarinfo.isreg():
                 status = tfo.process_file(tarinfo=tarinfo, status="A", type=stat.S_IFREG, tar=tar)
             elif tarinfo.isdir():

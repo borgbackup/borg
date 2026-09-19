@@ -753,6 +753,11 @@ class TarMixIn:
         has fewer or equally many elements are silently skipped. Hard link targets are
         stripped accordingly, symbolic link targets are left unchanged.
 
+        The path elements are counted after normalizing the member name the same way it
+        is stored in the archive, so a leading ``./`` is not a path element. This differs
+        from ``tar``, which counts it: to import ``./top/dir/file`` as ``dir/file``, use
+        ``--strip-components=1`` here, while ``tar`` needs ``--strip-components=2``.
+
         A ``--sparse`` option (as found in borg create) is not needed: sparse members in
         input tarballs (old GNU and PAX sparse formats) are read correctly and their
         holes are stored as deduplicated all-zero chunks.

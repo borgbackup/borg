@@ -122,7 +122,7 @@ it.
 
 .. note:: ``borg mount`` only works if the binary was built with FUSE support
           (third-party binaries might lack it) and your OS has FUSE installed
-          (e.g. the ``fuse3`` package on Linux, macFUSE on macOS).
+          (e.g. the ``fuse3`` package on Linux, macFUSE on macOS, WinFsp on Windows).
           If ``borg mount`` fails, the error message will tell for each FUSE
           implementation why it could not be loaded.
 
@@ -343,6 +343,10 @@ Windows
 Install the dependencies with the provided script::
 
     ./scripts/msys2-install-deps
+
+For FUSE support to mount the backup archives, you need `WinFsp <https://winfsp.dev/>`_
+(e.g. ``winget install WinFsp.WinFsp``) and, when installing Borg via ``pip``, the
+``mfusepy`` extra (``pip install borgbackup[mfusepy]``).
 
 .. _msys2_path_translation:
 

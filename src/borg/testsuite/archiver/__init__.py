@@ -4,6 +4,7 @@ import io
 import os
 import re
 import shlex
+import signal
 import stat
 import subprocess
 import sys
@@ -444,8 +445,8 @@ def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore
         # Assume path2 is on FUSE if st_dev is different
         fuse = s1.st_dev != s2.st_dev
         attrs = ["st_uid", "st_gid", "st_rdev"]
-        if not fuse or not os.path.isdir(path1):
-            # dir nlink is always 1 on our FUSE filesystem
+        if not fuse or not (os.path.isdir(path1) or is_win32):
+            # dir nlink is always 1 on our FUSE filesystem, WinFsp does not support hard link counts at all.
             attrs.append("st_nlink")
         d1 = [filename] + [getattr(s1, a) for a in attrs]
         d2 = [filename] + [getattr(s2, a) for a in attrs]
@@ -532,6 +533,51 @@ def wait_for_mountstate(mountpoint, *, mounted, timeout=5):
 
 
 @contextmanager
+def winfsp_mount(archiver, mountpoint=None, *options, exit_code=EXIT_SUCCESS):
+    """fuse_mount for Windows (WinFsp).
+
+    WinFsp creates the mountpoint directory when mounting and removes it when unmounting. borg mount
+    always stays in the foreground and there is no borg umount, so we run it as a child process that
+    we stop like Ctrl-Break would do (which unmounts).
+    """
+    if mountpoint is None:
+        mountpoint = os.path.join(tempfile.mkdtemp(), "mountpoint")
+    borg = (sys.executable, "-m", "borg") if archiver.EXE is None else (archiver.EXE,)
+    args = [*borg, f"--repo={archiver.repository_location}", "mount", "--foreground", mountpoint, *options]
+    # own process group, so that the Ctrl-Break only goes to borg mount. the output goes to a file, as
+    # nobody reads from a pipe while the mount is in use.
+    with tempfile.TemporaryFile() as output:
+        proc = subprocess.Popen(
+            args, stdout=output, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+        try:
+            timeout = time.time() + 30
+            while proc.poll() is None and time.time() < timeout:
+                try:
+                    os.listdir(mountpoint)  # the directory exists slightly before it can be used
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            if exit_code == EXIT_SUCCESS and proc.poll() is None:
+                yield
+        finally:
+            if proc.poll() is None:
+                proc.send_signal(signal.CTRL_BREAK_EVENT)
+            try:
+                ret = proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                ret = proc.wait()
+            output.seek(0)
+            if ret != exit_code:
+                print(os.fsdecode(output.read()))
+        assert ret == exit_code
+        assert not os.path.exists(mountpoint)
+    if exit_code != EXIT_SUCCESS:
+        yield  # see fuse_mount: the test only wanted to see the mount fail.
+
+
+@contextmanager
 def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
     # For a successful mount, `fork = True` is required for
     # the borg mount daemon to work properly or the tests
@@ -547,6 +593,10 @@ def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **
     # example where we need `fork = False`, because the test case
     # needs an OS fork, not a spawning of the fuse mount.
     # `fork = False` is implied if `os_fork = True`.
+    if is_win32:
+        with winfsp_mount(archiver, mountpoint, *options, **kwargs):
+            yield
+        return
     if mountpoint is None:
         mountpoint = tempfile.mkdtemp()
     else:

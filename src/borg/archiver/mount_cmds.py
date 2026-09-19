@@ -7,6 +7,7 @@ from ..helpers import PathSpec, FilesystemDirSpec
 from ..helpers import location_validator
 from ..helpers import umount
 from ..helpers.argparsing import ArgumentParser
+from ..platformflags import is_win32
 
 from ..logger import create_logger
 
@@ -25,11 +26,23 @@ class MountMixIn:
             msg += "".join(f"\nimport of {impl} failed: {err}" for impl, err in fuse_import_errors.items())
             raise RTError(msg)
 
-        if not os.path.isdir(args.mountpoint):
-            raise RTError(f"{args.mountpoint}: Mountpoint must be an **existing directory**")
+        if is_win32:
+            # WinFsp either mounts on an unused drive or it creates (and later removes) the mountpoint directory.
+            drive, tail = os.path.splitdrive(args.mountpoint)
+            if drive and tail in ("", "/"):
+                args.mountpoint = drive  # WinFsp wants X: (not X:/).
+                if os.path.exists(drive + "/"):
+                    raise RTError(f"{args.mountpoint}: Mountpoint must be an **unused** drive")
+            elif os.path.lexists(args.mountpoint):
+                raise RTError(f"{args.mountpoint}: Mountpoint must be an unused drive or a **not existing** directory")
+            elif not os.path.isdir(os.path.dirname(os.path.abspath(args.mountpoint))):
+                raise RTError(f"{args.mountpoint}: Mountpoint must be in an **existing directory**")
+        else:
+            if not os.path.isdir(args.mountpoint):
+                raise RTError(f"{args.mountpoint}: Mountpoint must be an **existing directory**")
 
-        if not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
-            raise RTError(f"{args.mountpoint}: Mountpoint must be a **writable** directory")
+            if not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
+                raise RTError(f"{args.mountpoint}: Mountpoint must be a **writable** directory")
 
         self._do_mount(args)
 
@@ -52,6 +65,9 @@ class MountMixIn:
 
     def do_umount(self, args):
         """Unmounts the FUSE filesystem."""
+        if is_win32:
+            # there is no fusermount / umount for WinFsp.
+            raise RTError("borg umount is not supported on Windows: to unmount, stop borg mount (e.g. using Ctrl-C).")
         umount(args.mountpoint)
 
     def build_parser_mount_umount(self, subparsers, common_parser, mid_common_parser):
@@ -151,6 +167,15 @@ class MountMixIn:
         - ``ignore_permissions``: for security reasons the ``default_permissions`` mount
           option is internally enforced by Borg. ``ignore_permissions`` can be given to
           not enforce ``default_permissions``.
+
+        On Windows, ``borg mount`` needs `WinFsp <https://winfsp.dev/>`_ and mfusepy.
+        MOUNTPOINT must either be an unused drive (like ``X:``) or a not yet existing
+        directory (WinFsp creates it when mounting and removes it when unmounting).
+        ``borg mount`` always stays in the foreground there and ``borg umount`` is not
+        supported: to unmount, stop ``borg mount`` using Ctrl-C or Ctrl-Break. All files
+        belong to the user who mounts, unless the ``uid`` / ``gid`` mount options (which
+        are implemented by WinFsp there, not by Borg) say otherwise. ``ignore_permissions``
+        has no effect. WinFsp does not support hard link counts (they are always 1).
 
         The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is intended for advanced users
         to tweak performance. It sets the number of cached data chunks; additional

@@ -1212,6 +1212,11 @@ jobs:
       - name: Install system packages
         run: ./scripts/msys2-install-deps development
 
+      # needed by borg mount (via mfusepy)
+      - name: Install WinFsp
+        shell: pwsh
+        run: choco install winfsp -y --no-progress
+
       - name: Build python venv
         run: |
           # building native extensions in the venv fails, so we try to use the system packages
@@ -1225,7 +1230,7 @@ jobs:
         run: |
           # build borg.exe
           . env/bin/activate
-          pip install -e ".[cockpit,s3,sftp,rclone]"
+          pip install -e ".[mfusepy,cockpit,s3,sftp,rclone]"
           ./scripts/build-borg-using-pyinstaller.sh
           # build sdist and wheel in dist/...
           python -m build

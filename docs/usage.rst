@@ -42,6 +42,7 @@ Usage
    usage/repo-info
    usage/repo-compress
    usage/repo-delete
+   usage/monitor
    usage/serve
    usage/version
    usage/compact

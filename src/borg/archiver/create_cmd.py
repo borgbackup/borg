@@ -291,9 +291,9 @@ class CreateMixIn:
                         self.print_warning_instance(BackupWarning(path, e))
                         continue
             if not dry_run:
+                archive.stats += fso.stats  # before the final progress, it reports the final statistics
                 if args.progress:
                     archive.stats.show_progress(final=True)
-                archive.stats += fso.stats
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed.
                     raise Error("Got Ctrl-C / SIGINT.")

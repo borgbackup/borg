@@ -170,8 +170,10 @@ def test_stats_progress_json(stats):
     assert isinstance(result["time"], float)
     assert result["finished"] is True  # see #6570
     assert "path" not in result
-    assert "original_size" not in result
-    assert "nfiles" not in result
+    # the final object has the final statistics
+    assert result["original_size"] == 20
+    assert result["deduplicated_size"] == 20
+    assert result["nfiles"] == 1
 
 
 def test_stats_as_dict(stats):

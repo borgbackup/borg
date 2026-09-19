@@ -84,7 +84,7 @@ class Session:
         self.finished_at = None
         self.rc = None  # exit code of borg, None while it runs
         self.error = None  # why borg could not be run, if so
-        self.archive_progress = None  # the latest ArchiveProgress carrying statistics
+        self.archive_progress = None  # the latest ArchiveProgress
         self.archive_finished = False
         # status char -> count of the --list lines. They only tell about the listing (which --filter reduces),
         # the statistics of an archive being created never come from here, see nfiles and files_stats.
@@ -147,10 +147,9 @@ class Session:
         value = stats.get(key) if stats else None
         return value if isinstance(value, types) and not isinstance(value, bool) else None
 
-    # The statistics come from borg's statistics only: the final ones (exact) are preferred over the latest
-    # archive_progress. That one is rate limited and its final object carries no statistics, so without final
-    # statistics the numbers can be a little behind at the end of a run (and stay at zero for a run shorter
-    # than the update interval).
+    # The statistics come from borg's statistics only: the ones of the final --json output (they also have
+    # the store statistics) are preferred over the latest archive_progress. That one is rate limited, so its
+    # numbers can be a little behind while borg runs; its final object has the final statistics.
     # The --list lines are no source for them: they only exist if the user asked for the listing, and --filter
     # reduces them to some status characters, so counting them would give wrong numbers.
     # What borg does not tell is unknown: there is no archive_progress for a dry-run, and transfer has no
@@ -217,13 +216,9 @@ class Session:
                 self.archive_counts[event.status] += 1
                 self._add_line(Line(event.message, "archive", event.status))
             case ArchiveProgress():
-                if event.finished:
-                    # the final object carries no statistics, keep the previous ones.
-                    self.archive_finished = True
-                    self.progress_text = ""
-                else:
-                    self.archive_progress = event
-                    self.progress_text = event.path or ""
+                self.archive_progress = event  # the final object has the final statistics (and no path)
+                self.archive_finished = event.finished
+                self.progress_text = event.path or ""
             case ProgressPercent() | ProgressMessage():
                 self._feed_phase(event)
             case Question():

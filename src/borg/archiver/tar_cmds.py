@@ -614,9 +614,9 @@ class TarMixIn:
         # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
         tar.close()
 
+        archive.stats += tfo.stats  # before the final progress, it reports the final statistics
         if args.progress:
             archive.stats.show_progress(final=True)
-        archive.stats += tfo.stats
         archive.save(comment=args.comment, timestamp=args.timestamp)
         args.stats |= args.json
         if args.stats:

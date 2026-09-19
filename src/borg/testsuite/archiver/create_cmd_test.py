@@ -739,6 +739,20 @@ def test_progress_on(archivers, request):
     assert "0 B O 0 B U 0 N" in output
 
 
+def test_progress_json_final_statistics(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "create", "test", "input", "--progress", "--log-json")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    final = [msg for msg in messages if msg["type"] == "archive_progress"][-1]
+    # the progress is rate limited, so only the final object tells about everything that was processed.
+    assert final["finished"] and "path" not in final
+    assert final["nfiles"] == 2 and final["original_size"] == 1024 * 81
+    assert final["files_stats"] == {"A": 2, "d": 1}
+
+
 def test_progress_off(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

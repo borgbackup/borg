@@ -152,7 +152,9 @@ def test_app_create_screen():
         ArchiveProgress(
             original_size=2900, deduplicated_size=290, nfiles=3, files_stats={"A": 2, "M": 1, "d": 1}, path="src/c"
         ),
-        ArchiveProgress(finished=True),
+        ArchiveProgress(
+            original_size=2950, deduplicated_size=295, nfiles=3, files_stats={"A": 2, "M": 1, "d": 1}, finished=True
+        ),
     ]
     events += [RawLine(stream="stdout", line=line) for line in json.dumps(FINAL_JSON, indent=4).splitlines()]
     factory, runners = make_runner_factory(events, rc=1)

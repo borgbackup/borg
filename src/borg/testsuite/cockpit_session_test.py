@@ -30,7 +30,11 @@ ARCHIVE_PROGRESS = (
     '"files_stats": {"A": 3, "d": 3}, "store_stats": {}, "path": "src/linux/file1", "time": 1787900398.684961, '
     '"type": "archive_progress", "finished": false}'
 )
-ARCHIVE_PROGRESS_FINISHED = '{"time": 1787900398.686938, "type": "archive_progress", "finished": true}'
+ARCHIVE_PROGRESS_FINISHED = (
+    '{"original_size": 250999, "deduplicated_size": 250999, "nfiles": 4, "hashing_time": 0.5, "chunking_time": 0.25, '
+    '"files_stats": {"A": 4, "d": 3}, "store_stats": {}, "time": 1787900398.686938, "type": "archive_progress", '
+    '"finished": true}'
+)
 FILE_STATUS = '{"type": "file_status", "status": "A", "path": "src/linux/baz/file2"}'
 PROGRESS_PERCENT = (
     '{"message": " 20.0% Extracting: src/linux/baz/file3", "current": 50012, "total": 250012, '
@@ -100,7 +104,7 @@ def test_parse_archive_progress():
     assert not event.finished
     finished = parse_json_line(ARCHIVE_PROGRESS_FINISHED)
     assert isinstance(finished, ArchiveProgress)
-    assert finished.finished and finished.path is None and finished.nfiles == 0
+    assert finished.finished and finished.path is None and finished.nfiles == 4
 
 
 def test_parse_file_status():
@@ -151,9 +155,10 @@ def test_session_archive_progress():
     assert session.count("A") == 3 and session.count("dbcs") == 3 and session.count("U") == 0
     assert session.progress_text == "src/linux/file1"
     feed_lines(session, [ARCHIVE_PROGRESS_FINISHED])
-    # the final object carries no statistics, the previous ones stay
+    # the final object has the final statistics: what was processed after the previous (rate limited) object counts
     assert session.archive_finished
-    assert session.nfiles == 3 and session.original_size == 250012
+    assert session.nfiles == 4 and session.original_size == 250999
+    assert session.files_stats == {"A": 4, "d": 3}
     assert session.progress_text == ""
 
 

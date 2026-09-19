@@ -62,6 +62,21 @@ def stat_root(path):
         raise BackupBrokenSymlinkError("stat", "broken symlink, skipping it") from None
 
 
+def skip_key(path, st):
+    """
+    Return the key that identifies the fs object at *path* (with stat result *st*) in the skip_inodes set.
+
+    A directory is identified by its inode alone: borg does not support hard links to directories, so an
+    identical directory inode is the same directory, even if it is reached via a different path.
+
+    Any other fs object is identified by its inode and its path: hard links are different paths pointing
+    to the same inode and each of them must be archived, only the very same path must not be archived twice.
+    """
+    if stat.S_ISDIR(st.st_mode):
+        return st.st_ino, st.st_dev
+    return st.st_ino, st.st_dev, path
+
+
 class CreateMixIn:
     @with_repository()
     def do_create(self, args, repository, manifest):
@@ -284,8 +299,9 @@ class CreateMixIn:
                             follow_symlink=followed,
                         )
                         # if we get back here, we've finished recursing into <path>,
-                        # we do not ever want to get back in there (even if path is given twice as recursion root)
-                        skip_inodes.add((st.st_ino, st.st_dev))
+                        # we do not ever want to get back in there (even if path is given twice as recursion root).
+                        # other hard links of a non-directory <path> are not skipped, see skip_key.
+                        skip_inodes.add(skip_key(path, st))
                     except BackupError as e:
                         # this comes from os.stat, self._rec_walk has own exception handler
                         self.print_warning_instance(BackupWarning(path, e))
@@ -624,7 +640,7 @@ class CreateMixIn:
                 if not stat.S_ISDIR(st.st_mode):
                     return
 
-            if (st.st_ino, st.st_dev) in skip_inodes:
+            if skip_key(path, st) in skip_inodes:
                 return
             # if restrict_dev is given, we do not want to recurse into a new filesystem,
             # but we WILL save the mountpoint directory (or more precise: the root
@@ -772,8 +788,11 @@ class CreateMixIn:
         but let borg find it while recursing (symlinks found that way are never followed).
         A recursion root that is a symlink with a non-existing target is skipped with a warning.
 
-        If you give both a symlink and its target as recursion roots, borg archives the fs
-        objects only once, under the path given first (like for any other root given twice).
+        If you give the same recursion root twice, borg archives it only once. That also
+        applies if you give both a symlink to a directory and that directory as recursion
+        roots: borg archives the fs objects only once, under the path given first.
+        Different paths pointing to the same non-directory fs object (hard links, or a symlink
+        and the file it points to) are all archived if you give them as recursion roots.
 
         When specifying '-' as a path, borg will read data from standard input and create a
         file named 'stdin' in the created archive from that data. In some cases, it is more

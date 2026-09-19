@@ -124,8 +124,8 @@ rebuilt the index from it. Rewriting such a pack is repository-level repair, see
 :issue:`10026`.
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
-only when it validates like any walked header. Validating needs the key, so a
-repair that cannot load the key walks without it.
+only when it validates like any walked header. Validating needs the key, which
+``borg check`` always loads: it aborts if it can not.
 
 In the ``authenticated-*`` modes the tag binds a blob to its chunk id and nothing
 else (see :ref:`security_structural_auth`), so validating does not establish there

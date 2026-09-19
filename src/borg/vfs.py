@@ -491,8 +491,15 @@ class ArchiveVFS:
         return item_getxattr(self.get_item(ino), name, numeric_ids=self.options.numeric_ids)
 
     def readlink(self, ino):
-        """Return the target of the symlink with inode number *ino*."""
-        return self.get_item(ino).target
+        """Return the target of the symlink with inode number *ino*.
+
+        Raises ValueError if the node is not a symlink.
+        """
+        item = self.get_item(ino)
+        try:
+            return item.target
+        except AttributeError:  # only symlinks have a target
+            raise ValueError("not a symlink") from None
 
     def log_stats(self):
         """Log some statistics about this file system (used by the SIGUSR1/SIGINFO handler)."""
@@ -691,14 +698,24 @@ def parse_mount_options(args, mountpoint, mount_options):
     # When not using allow_other or allow_root, access is limited to the
     # mounting user anyway.
     options = ["fsname=borgfs", "ro", "default_permissions"]
+    if is_win32:
+        # WinFsp builds the Windows security descriptor of a file from its uid, gid and mode and checks
+        # all access against it. The archived uids / gids do not refer to anybody on a Windows machine,
+        # thus we leave the uid and gid options to WinFsp (which then overrides the owner / group of
+        # all files) and default them to -1, meaning the user who mounts. If the user gives these
+        # options (or UserName / GroupName), they come later in the list and WinFsp uses the later ones.
+        options += ["uid=-1", "gid=-1"]
     if mount_options:
         options.extend(mount_options.split(","))
-    if is_darwin:
-        # macFUSE supports a volname mount option to give what finder displays on desktop / in directory list.
+    if is_darwin or is_win32:
+        # macFUSE and WinFsp support a volname mount option: the volume name that the Finder (on the
+        # desktop / in the directory list) respectively the Explorer (as the label of a drive) displays.
         volname = pop_option(options, "volname", "", "", str)
         # if the user did not specify it, we make something up,
         # because otherwise it would be "macFUSE Volume 0 (Python)", #7690.
-        volname = volname or f"{os.path.basename(mountpoint)} (borgfs)"
+        # note: a Windows drive mountpoint like "X:" has no basename.
+        basename = os.path.basename(mountpoint)
+        volname = volname or (f"{basename} (borgfs)" if basename else "borgfs")
         options.append(f"volname={volname}")
     ignore_permissions = pop_option(options, "ignore_permissions", True, False, bool)
     if ignore_permissions:
@@ -706,18 +723,26 @@ def parse_mount_options(args, mountpoint, mount_options):
         # this is enabled by the custom "ignore_permissions" mount option which just
         # removes "default_permissions" again:
         pop_option(options, "default_permissions", True, False, bool)
+    if is_win32:
+        # uid / gid are left to WinFsp (see above). there is no os.getuid / os.getgid, see also platform.windows_ug.
+        uid_forced = gid_forced = None
+        default_dir_uid = default_dir_gid = 0
+    else:
+        uid_forced = pop_option(options, "uid", None, None, int)
+        gid_forced = pop_option(options, "gid", None, None, int)
+        default_dir_uid, default_dir_gid = os.getuid(), os.getgid()
     vfs_options = VFSOptions(
         allow_damaged_files=pop_option(options, "allow_damaged_files", True, False, bool),
         versions=pop_option(options, "versions", True, False, bool),
-        uid_forced=pop_option(options, "uid", None, None, int),
-        gid_forced=pop_option(options, "gid", None, None, int),
+        uid_forced=uid_forced,
+        gid_forced=gid_forced,
         umask=pop_option(options, "umask", 0, 0, int, int_base=8),  # umask is octal, e.g. 222 or 0222
         numeric_ids=getattr(args, "numeric_ids", False),
         strip_components=getattr(args, "strip_components", 0),
         item_filter=build_item_filter(args),
     )
-    dir_uid = vfs_options.uid_forced if vfs_options.uid_forced is not None else os.getuid()
-    dir_gid = vfs_options.gid_forced if vfs_options.gid_forced is not None else os.getgid()
+    dir_uid = vfs_options.uid_forced if vfs_options.uid_forced is not None else default_dir_uid
+    dir_gid = vfs_options.gid_forced if vfs_options.gid_forced is not None else default_dir_gid
     dir_user = uid2user(dir_uid)
     dir_group = gid2group(dir_gid)
     if not isinstance(dir_user, str):

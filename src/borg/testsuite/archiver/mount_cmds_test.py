@@ -15,7 +15,8 @@ import pytest
 from ... import xattr, platform
 from ...constants import *  # NOQA
 from ...storelocking import Lock
-from ...helpers import flags_noatime, flags_normal, Location
+from ...helpers import flags_noatime, flags_normal, Location, RTError
+from ...platformflags import is_win32
 from .. import has_lchflags, has_any_fuse, ENOATTR
 from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
@@ -27,6 +28,36 @@ from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_t
 from . import Archiver
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
+
+
+def assert_nlink(path, nlink):
+    # WinFsp does not support hard link counts, they are always 1 there.
+    assert os.stat(path).st_nlink == (1 if is_win32 else nlink)
+
+
+def fuse_symlinks_supported():
+    """Does a mount show symlinks as symlinks?"""
+    if is_win32:
+        # WinFsp has getdir before readlink in its struct fuse_operations. If mfusepy has them the other way
+        # round (like libfuse has them), WinFsp does not find our readlink and shows symlinks as regular files.
+        import mfusepy
+
+        names = [field[0] for field in mfusepy.fuse_operations._fields_]
+        return names.index("getdir") < names.index("readlink")
+    return True
+
+
+def is_readonly_mount(mountpoint):
+    if is_win32:  # there is no os.statvfs
+        import ctypes
+        from ctypes import wintypes
+
+        FILE_READ_ONLY_VOLUME = 0x00080000
+        flags = wintypes.DWORD()
+        root = mountpoint.replace("/", "\\") + "\\"
+        assert ctypes.windll.kernel32.GetVolumeInformationW(root, None, 0, None, None, ctypes.byref(flags), None, 0)
+        return bool(flags.value & FILE_READ_ONLY_VOLUME)
+    return bool(os.statvfs(mountpoint).f_flag & os.ST_RDONLY)
 
 
 @requires_hardlinks
@@ -46,25 +77,25 @@ def test_fuse_mount_hardlinks(archivers, request):
         fuse_mount(archiver, mountpoint, "-a", "test", "--strip-components=2", *ignore_perms),
         changedir(os.path.join(mountpoint, "test")),
     ):
-        assert os.stat("hardlink").st_nlink == 2
-        assert os.stat("subdir/hardlink").st_nlink == 2
+        assert_nlink("hardlink", 2)
+        assert_nlink("subdir/hardlink", 2)
         assert open("subdir/hardlink", "rb").read() == b"123456"
-        assert os.stat("aaaa").st_nlink == 2
-        assert os.stat("source2").st_nlink == 2
+        assert_nlink("aaaa", 2)
+        assert_nlink("source2", 2)
     with (
         fuse_mount(archiver, mountpoint, "input/dir1", "-a", "test", *ignore_perms),
         changedir(os.path.join(mountpoint, "test")),
     ):
-        assert os.stat("input/dir1/hardlink").st_nlink == 2
-        assert os.stat("input/dir1/subdir/hardlink").st_nlink == 2
+        assert_nlink("input/dir1/hardlink", 2)
+        assert_nlink("input/dir1/subdir/hardlink", 2)
         assert open("input/dir1/subdir/hardlink", "rb").read() == b"123456"
-        assert os.stat("input/dir1/aaaa").st_nlink == 2
-        assert os.stat("input/dir1/source2").st_nlink == 2
+        assert_nlink("input/dir1/aaaa", 2)
+        assert_nlink("input/dir1/source2", 2)
     with fuse_mount(archiver, mountpoint, "-a", "test", *ignore_perms), changedir(os.path.join(mountpoint, "test")):
-        assert os.stat("input/source").st_nlink == 4
-        assert os.stat("input/abba").st_nlink == 4
-        assert os.stat("input/dir1/hardlink").st_nlink == 4
-        assert os.stat("input/dir1/subdir/hardlink").st_nlink == 4
+        assert_nlink("input/source", 4)
+        assert_nlink("input/abba", 4)
+        assert_nlink("input/dir1/hardlink", 4)
+        assert_nlink("input/dir1/subdir/hardlink", 4)
         assert open("input/dir1/subdir/hardlink", "rb").read() == b"123456"
 
 
@@ -87,6 +118,8 @@ def test_fuse(archivers, request):
 
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_test_files(archiver.input_path)
+    if are_symlinks_supported() and not fuse_symlinks_supported():
+        os.remove("input/link1")  # the mount would not be equal to the input
     have_noatime = has_noatime("input/file1")
     cmd(archiver, "create", "--atime", "archive", "input")
     cmd(archiver, "create", "--atime", "archive2", "input")
@@ -124,7 +157,8 @@ def test_fuse(archivers, request):
         assert same_ts_ns(sti1.st_mtime * 1e9, sto1.st_mtime * 1e9)
         if are_hardlinks_supported():
             # note: there is another hard link to this, see below
-            assert sti1.st_nlink == sto1.st_nlink == 2
+            assert sti1.st_nlink == 2
+            assert_nlink(out_fn, 2)
         # read
         with open(in_fn, "rb") as in_f, open(out_fn, "rb") as out_f:
             assert in_f.read() == out_f.read()
@@ -134,15 +168,17 @@ def test_fuse(archivers, request):
             out_fn = os.path.join(mountpoint, "archive", "input", "hardlink")
             sti2 = os.stat(in_fn)
             sto2 = os.stat(out_fn)
-            assert sti2.st_nlink == sto2.st_nlink == 2
+            assert sti2.st_nlink == 2
+            assert_nlink(out_fn, 2)
             assert sto1.st_ino == sto2.st_ino
         # symlink
-        if are_symlinks_supported():
+        if are_symlinks_supported() and fuse_symlinks_supported():
             in_fn = "input/link1"
             out_fn = os.path.join(mountpoint, "archive", "input", "link1")
             sti = os.stat(in_fn, follow_symlinks=False)
             sto = os.stat(out_fn, follow_symlinks=False)
-            assert sti.st_size == len("somewhere")
+            if not is_win32:  # NTFS: st_size of a symlink is 0.
+                assert sti.st_size == len("somewhere")
             assert sto.st_size == len("somewhere")
             assert stat.S_ISLNK(sti.st_mode)
             assert stat.S_ISLNK(sto.st_mode)
@@ -329,7 +365,8 @@ def test_fuse_allow_damaged_files(archivers, request, damage):
         with open(os.path.join(mountpoint, "archive", path), "rb") as f:
             with pytest.raises(OSError) as excinfo:
                 f.read()
-            assert excinfo.value.errno == errno.EIO
+            # Windows: the C runtime does not map the I/O error that Windows makes of our EIO back to EIO.
+            assert excinfo.value.errno == (errno.EINVAL if is_win32 else errno.EIO)
 
     with fuse_mount(archiver, mountpoint, "-a", "archive", "-o", "allow_damaged_files"):
         with open(os.path.join(mountpoint, "archive", path), "rb") as f:
@@ -353,13 +390,37 @@ def test_fuse_read_to_eof_after_attr_timeout(archivers, request):
     cmd(archiver, "create", "archive", "input")
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     with fuse_mount(archiver, mountpoint, "-a", "archive"):
-        assert os.statvfs(mountpoint).f_flag & os.ST_RDONLY, "libfuse options (ro) not applied"
+        assert is_readonly_mount(mountpoint), "libfuse options (ro) not applied"
         with open(os.path.join(mountpoint, "archive", "input", "file"), "rb", buffering=0) as f:
             assert len(f.read(4096)) == 4096
             time.sleep(1.5)  # longer than the default attr_timeout of 1 s
             # a read reaching EOF makes the kernel revalidate the size of the *open* file (fgetattr).
             # use a raw read: an fstat (as f.read() does) would refresh the attributes without a handle.
             assert len(os.read(f.fileno(), 64 * 1024)) == 64 * 1024 - 4096
+
+
+@pytest.mark.skipif(not is_win32, reason="Windows-only test")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+def test_mount_umount_errors_win32(archivers, request):
+    """WinFsp wants an unused drive or a not existing directory (in an existing one) - and there is no borg umount."""
+    archiver = request.getfixturevalue(archivers)
+    existing_dir = os.path.join(archiver.tmpdir, "existing")
+    os.mkdir(existing_dir)
+    system_drive = os.path.splitdrive(existing_dir)[0]  # like C: - surely in use
+    for args, expected_msg in (
+        (("mount", existing_dir), "not existing"),
+        (("mount", os.path.join(archiver.tmpdir, "missing", "mountpoint")), "existing directory"),
+        (("mount", system_drive), "unused"),
+        (("mount", system_drive + "\\"), "unused"),
+        (("umount", existing_dir), "not supported"),
+    ):
+        if archiver.FORK_DEFAULT:
+            output = cmd(archiver, *args, exit_code=EXIT_ERROR)
+            assert expected_msg in output
+        else:
+            with pytest.raises(RTError) as excinfo:
+                cmd(archiver, *args)
+            assert expected_msg in str(excinfo.value)
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
@@ -386,6 +447,7 @@ def test_fuse_mount_options(archivers, request):
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+@pytest.mark.skipif(is_win32, reason="borg mount does not daemonize on Windows")
 def test_migrate_lock_alive(archivers, request):
     """Both old_id and new_id must not be stale during lock migration / daemonization."""
     archiver = request.getfixturevalue(archivers)

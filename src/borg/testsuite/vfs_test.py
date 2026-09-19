@@ -1,5 +1,6 @@
 """Tests for the archive VFS core (vfs.py) that do not need a repository."""
 
+import ntpath
 import unicodedata
 
 import pytest
@@ -7,7 +8,8 @@ import pytest
 from ..helpers import StableDict
 from ..item import Item
 from ..platform import acl_text_to_xattr
-from ..vfs import VFSNode, item_getxattr, item_listxattr, lookup_child, versioned_name
+from ..platformflags import is_win32
+from ..vfs import VFSNode, item_getxattr, item_listxattr, lookup_child, parse_mount_options, versioned_name
 from .platform.platform_test import skipif_not_linux
 
 ACCESS_ACL = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:0\ngroup:root:rw-:0\n"
@@ -112,3 +114,48 @@ def test_getxattr_acl_broken():
 def test_getxattr_missing():
     with pytest.raises(KeyError):
         item_getxattr(make_item(), b"user.nope")
+
+
+class MountArgs:
+    """Minimal stand-in for the parsed borg mount arguments."""
+
+
+@pytest.mark.skipif(is_win32, reason="needs os.getuid / os.getgid")
+def test_parse_mount_options_posix(monkeypatch):
+    monkeypatch.setattr("borg.vfs.is_win32", False)
+    monkeypatch.setattr("borg.vfs.is_darwin", False)
+    options, vfs_options = parse_mount_options(MountArgs(), "/mnt/point", "uid=0,gid=0,allow_other")
+    # uid and gid are implemented by borg, so they are not passed on to libfuse.
+    assert options == ["fsname=borgfs", "ro", "default_permissions", "allow_other"]
+    assert (vfs_options.uid_forced, vfs_options.gid_forced) == (0, 0)
+
+
+@pytest.mark.parametrize(
+    "mount_options, expected",
+    [
+        (None, ["uid=-1", "gid=-1"]),  # default: everything belongs to the user who mounts
+        # what the user gives comes after the defaults, WinFsp uses the later ones:
+        ("uid=1234", ["uid=-1", "gid=-1", "uid=1234"]),
+        ("UserName=foo,GroupName=bar", ["uid=-1", "gid=-1", "UserName=foo", "GroupName=bar"]),
+    ],
+)
+def test_parse_mount_options_win32_uid_gid(monkeypatch, mount_options, expected):
+    monkeypatch.setattr("borg.vfs.is_win32", True)
+    monkeypatch.setattr("borg.vfs.is_darwin", False)
+    options, vfs_options = parse_mount_options(MountArgs(), "X:", mount_options)
+    # uid and gid are left to WinFsp, borg does not force them.
+    assert [option for option in options if option.startswith(("uid=", "gid=", "UserName=", "GroupName="))] == expected
+    assert (vfs_options.uid_forced, vfs_options.gid_forced) == (None, None)
+    assert (vfs_options.dir_item.uid, vfs_options.dir_item.gid) == (0, 0)
+
+
+@pytest.mark.parametrize(
+    "mountpoint, mount_options, volname",
+    [("X:", None, "borgfs"), ("C:/mnt/point", None, "point (borgfs)"), ("X:", "volname=backup", "backup")],
+)
+def test_parse_mount_options_win32_volname(monkeypatch, mountpoint, mount_options, volname):
+    monkeypatch.setattr("borg.vfs.is_win32", True)
+    monkeypatch.setattr("borg.vfs.is_darwin", False)
+    monkeypatch.setattr("borg.vfs.os.path.basename", ntpath.basename)
+    options, _ = parse_mount_options(MountArgs(), mountpoint, mount_options)
+    assert [option for option in options if option.startswith("volname=")] == [f"volname={volname}"]

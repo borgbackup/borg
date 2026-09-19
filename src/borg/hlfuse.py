@@ -4,6 +4,8 @@
 This is a protocol adapter only: what an archive looks like as a file system is
 defined in vfs.py, here we just translate between that and the mfusepy operations
 interface (paths and stat dicts in, errnos out).
+
+On Windows, mfusepy uses the FUSE 2 API of WinFsp (https://winfsp.dev/).
 """
 
 import errno
@@ -23,11 +25,15 @@ from .logger import create_logger
 logger = create_logger()
 
 from .helpers import daemonizing, signal_handler
+from .platformflags import is_win32
 from .storelocking import LockRefresher
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .vfs import ArchiveVFS, ChunkMissing, parse_mount_options
 
 BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
+
+# WinFsp: if the file system wants this capability (see fuse_conn_info.want), the volume is read-only.
+FSP_FUSE_CAP_READ_ONLY = 1 << 22
 
 
 def fuse_options(options):
@@ -63,7 +69,7 @@ class borgfs(hlfuse.Operations):
         self.vfs.create_filesystem()
 
         # hlfuse.FUSE will block if foreground=True, otherwise it returns immediately
-        if not foreground:
+        if not foreground and not is_win32:  # Windows: can not daemonize (no fork), always stays in foreground.
             # Background mode: daemonize first, then start FUSE (blocking)
             with daemonizing(show_rc=show_rc) as (old_id, new_id):
                 logger.debug("fuse: mount repo, going to background: migrating lock.")
@@ -117,17 +123,25 @@ class borgfs(hlfuse.Operations):
             "st_size": attrs.size,
             "st_blocks": (attrs.size + BLOCK_SIZE - 1) // BLOCK_SIZE,
         }
+        # st_birthtime: mfusepy only uses it if the platform's struct stat has it (Linux does not have it).
         if self.use_ns:
             st["st_mtime"] = attrs.mtime_ns
             st["st_atime"] = attrs.atime_ns
             st["st_ctime"] = attrs.ctime_ns
+            st["st_birthtime"] = attrs.birthtime_ns
         else:
             st["st_mtime"] = attrs.mtime_ns / 1e9
             st["st_atime"] = attrs.atime_ns / 1e9
             st["st_ctime"] = attrs.ctime_ns / 1e9
+            st["st_birthtime"] = attrs.birthtime_ns / 1e9
         return st
 
     # -- filesystem operations -------------------------------------------------
+
+    def init_with_config(self, conn_info, config_3):
+        if is_win32 and conn_info is not None:
+            # WinFsp ignores the "ro" mount option, a read-only volume must be requested here.
+            conn_info.want |= FSP_FUSE_CAP_READ_ONLY
 
     def statfs(self, path):
         return {
@@ -200,4 +214,8 @@ class borgfs(hlfuse.Operations):
 
     def readlink(self, path):
         node = self._find_node(path)
-        return self.vfs.readlink(node.ino)
+        try:
+            return self.vfs.readlink(node.ino)
+        except ValueError:
+            # not a symlink: like readlink(2). WinFsp calls this for "/" to find out whether we support symlinks.
+            raise hlfuse.FuseOSError(errno.EINVAL) from None

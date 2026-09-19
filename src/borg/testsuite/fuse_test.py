@@ -132,6 +132,30 @@ def test_mfusepy_getxattr_broken_acl():
     assert excinfo.value.errno == errno.EIO
 
 
+@skipif_no_mfusepy
+def test_mfusepy_readlink():
+    from ..fuse_impl import hlfuse
+    from ..hlfuse import borgfs
+
+    class VFS:
+        def __init__(self, target):
+            self.target = target
+
+        def readlink(self, ino):
+            if self.target is None:
+                raise ValueError("not a symlink")
+            return self.target
+
+    ops, _, _ = mfusepy_ops()
+    ops.vfs = VFS("somewhere")
+    assert borgfs.readlink(ops, "/link") == "somewhere"
+    # not a symlink: EINVAL, like readlink(2). WinFsp tries this for "/" when mounting.
+    ops.vfs = VFS(None)
+    with pytest.raises(hlfuse.FuseOSError) as excinfo:
+        borgfs.readlink(ops, "/")
+    assert excinfo.value.errno == errno.EINVAL
+
+
 def test_fuse_import_errors_recorded():
     """A FUSE impl failing to import must not crash borg and must record why, see #8657."""
     import borg.fuse_impl

@@ -247,6 +247,135 @@ def test_import_tar_digests(archivers, request):
     assert tar_item_digests(archiver, "dst-default")["dir/file1"] is None
 
 
+def test_import_tar_strip_components(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # use "./"-prefixed member names, as e.g. GNU tar creates them for ./-relative archives.
+    with tarfile.open("input.tar", "w") as tar:
+        for name in ("./toplevel", "./toplevel/dir"):
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.type = tarfile.DIRTYPE
+            tar.addfile(tarinfo)
+        for name in ("./toplevel/dir/file", "./toplevel/file2"):
+            data = name.encode()
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.size = len(data)
+            tar.addfile(tarinfo, io.BytesIO(data))
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "import-tar", "--strip-components=1", "dst", "input.tar")
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    # the toplevel directory member itself has too few path elements and is skipped
+    assert set(files) == {"dir", "dir/file", "file2"}
+    # stripping more components than any member has imports an empty archive
+    cmd(archiver, "import-tar", "--strip-components=10", "empty", "input.tar")
+    files = cmd(archiver, "list", "empty", "--format", "{path}{NL}").splitlines()
+    assert files == []
+
+
+def test_import_tar_strip_components_links(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    data = b"file content"
+    with tarfile.open("input.tar", "w") as tar:
+        tarinfo = tarfile.TarInfo("toplevel/file1")
+        tarinfo.size = len(data)
+        tar.addfile(tarinfo, io.BytesIO(data))
+        tarinfo = tarfile.TarInfo("toplevel/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "toplevel/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("toplevel/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+        # file0 has too few path elements, so it is skipped - and so is the hard link pointing to it.
+        tarinfo = tarfile.TarInfo("file0")
+        tarinfo.size = len(data)
+        tar.addfile(tarinfo, io.BytesIO(data))
+        tarinfo = tarfile.TarInfo("toplevel/hardlink0")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "file0"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "import-tar", "--strip-components=1", "dst", "input.tar")
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
+    assert set(files) == {"file1", "hardlink1", "symlink1"}
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+    with open("output/file1", "rb") as f:
+        assert f.read() == data
+    # the hard link references the stripped path of file1, so it reuses file1's content chunks
+    with open("output/hardlink1", "rb") as f:
+        assert f.read() == data
+    # symbolic link targets are not stripped
+    assert os.readlink("output/symlink1") == "file1"
+
+
+def test_import_tar_strip_components_list(archivers, request):
+    # the file status output shows the stripped paths, for all member types.
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w") as tar:
+        tarinfo = tarfile.TarInfo("toplevel/dir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("toplevel/dir/file1")
+        tar.addfile(tarinfo, io.BytesIO(b""))
+        tarinfo = tarfile.TarInfo("toplevel/dir/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "toplevel/dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("toplevel/dir/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "--list", "--strip-components=1", "dst", "input.tar")
+    assert "d dir" in output.splitlines()
+    assert "A dir/file1" in output.splitlines()
+    assert "h dir/hardlink1" in output.splitlines()
+    assert "s dir/symlink1" in output.splitlines()
+    assert "toplevel" not in output
+
+
+def test_import_tar_list_normalized_paths(archivers, request):
+    # the file status output shows the paths as they are stored in the archive, for all member types.
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w") as tar:
+        tarinfo = tarfile.TarInfo("./dir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("./dir/file1")
+        tar.addfile(tarinfo, io.BytesIO(b""))
+        tarinfo = tarfile.TarInfo("./dir/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "./dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("./dir/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "--list", "dst", "input.tar")
+    assert "d dir" in output.splitlines()
+    assert "A dir/file1" in output.splitlines()
+    assert "h dir/hardlink1" in output.splitlines()
+    assert "s dir/symlink1" in output.splitlines()
+    assert "./" not in output
+
+
+def test_import_tar_strip_components_borg_format(archivers, request):
+    # the BORG tar format restores the items from pax headers, stripping must work for that path, too.
+    # that includes hard links: the BORG format transfers the hlid, so they are hard links again after the import.
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    os.unlink("input/flagfile")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "simple.tar", "--tar-format=BORG")
+    cmd(archiver, "import-tar", "--strip-components=1", "dst", "simple.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+    assert_dirs_equal("input", "output", ignore_ns=True, ignore_xattrs=True)
+
+
 def test_import_unusual_tar(archivers, request):
     archiver = request.getfixturevalue(archivers)
 

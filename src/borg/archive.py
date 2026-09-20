@@ -222,7 +222,7 @@ Files changed while reading: {files_changed_while_reading}
                 if not final:
                     # no width limit here, so always show the sizes precisely, see #3559.
                     osize_fmt = format_file_size(self.osize, fine=True)
-                    usize_fmt = format_file_size(self.usize, fine=True)
+                    usize_fmt = format_file_size(self.usize or 0, fine=True)  # None: unknown (dry-run)
                     msg = f"{osize_fmt} O {usize_fmt} U {self.nfiles} N "
                     msg += remove_surrogates(item.path) if item else ""
                 else:
@@ -235,7 +235,7 @@ Files changed while reading: {files_changed_while_reading}
                     # if the terminal is clearly wider than the classic 80 columns, see #3559.
                     fine = columns >= 110
                     osize_fmt = format_file_size(self.osize, fine=fine)
-                    usize_fmt = format_file_size(self.usize, fine=fine)
+                    usize_fmt = format_file_size(self.usize or 0, fine=fine)  # None: unknown (dry-run)
                     msg = f"{osize_fmt} O {usize_fmt} U {self.nfiles} N "
                     path = remove_surrogates(item.path) if item else ""
                     space = columns - swidth(msg)

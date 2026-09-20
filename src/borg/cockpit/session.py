@@ -152,8 +152,8 @@ class Session:
     # numbers can be a little behind while borg runs; its final object has the final statistics.
     # The --list lines are no source for them: they only exist if the user asked for the listing, and --filter
     # reduces them to some status characters, so counting them would give wrong numbers.
-    # What borg does not tell is unknown: there is no archive_progress for a dry-run, and transfer has no
-    # files_stats.
+    # What borg does not tell is unknown: a dry-run only tells the number of files and the original size,
+    # and transfer has no files_stats.
 
     @property
     def nfiles(self):

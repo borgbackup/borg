@@ -12,6 +12,7 @@ from ._common import with_repository, Highlander
 from .. import helpers
 from ..archive import Archive, Statistics, is_special, SF_DATALESS
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
+from ..item import Item
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -23,7 +24,7 @@ from ..helpers import octal_int, nonnegative_seconds
 from ..helpers import read_input_map
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
-from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
+from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify, make_path_safe
 from ..helpers import BackupBrokenSymlinkError
 from ..helpers import dir_is_tagged
 from ..helpers import log_multi
@@ -176,6 +177,7 @@ class CreateMixIn:
                 else:
                     status = "+"  # included
                     self.dry_run_stats.nfiles += 1  # size unknown without running the command
+                    self._dry_run_progress(path)
                 self.print_file_status(status, path)
             elif args.paths_from_command or args.paths_from_shell_command or args.paths_from_stdin:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
@@ -255,6 +257,7 @@ class CreateMixIn:
                         else:
                             status = "+"  # included
                             self.dry_run_stats.nfiles += 1  # size unknown without reading stdin
+                            self._dry_run_progress(path)
                         self.print_file_status(status, path)
                         if not dry_run and status is not None:
                             fso.stats.files_stats[status] += 1
@@ -308,7 +311,12 @@ class CreateMixIn:
         self.noxattrs = args.noxattrs
         self.exclude_dataless = args.exclude_dataless
         dry_run = args.dry_run
-        self.dry_run_stats = Statistics() if dry_run else None
+        # A dry-run has no archive: its statistics are what would be backed up. The deduplicated size is
+        # unknown then (None), see Statistics.as_dict().
+        self.dry_run_stats = Statistics(output_json=args.log_json) if dry_run else None
+        if dry_run:
+            self.dry_run_stats.usize = None
+        self.dry_run_show_progress = dry_run and args.progress
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
         logger.info('Creating archive "%s" in repository %s' % (args.name, args.location.processed))
@@ -379,6 +387,8 @@ class CreateMixIn:
                     log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
         else:
             create_inner(None, None, None)
+            if args.progress:
+                self.dry_run_stats.show_progress(final=True)
             args.stats |= args.json
             if args.stats:
                 stats = self.dry_run_stats
@@ -397,6 +407,11 @@ class CreateMixIn:
                         f"Original size: {stats.osize_fmt}",
                         logger=logging.getLogger("borg.output.stats"),
                     )
+
+    def _dry_run_progress(self, path):
+        """Report the progress of a dry-run (rate limited), like Archive.add_item() does it for a real run."""
+        if self.dry_run_show_progress:
+            self.dry_run_stats.show_progress(item=Item(path=make_path_safe(path)))
 
     def _process_any(
         self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix, followed_symlink=False
@@ -425,6 +440,7 @@ class CreateMixIn:
                     special = is_special(st.st_mode)
                 if special:
                     stats.nfiles += 1  # size unknown without reading the special file
+            self._dry_run_progress(path)
             return "+"  # included
         MAX_RETRIES = 10  # count includes the initial try (initial try == "retry 0")
         # if we followed a symlink, we must not refuse to open its target via the symlink:

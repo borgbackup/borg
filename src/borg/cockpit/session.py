@@ -90,6 +90,7 @@ class Session:
         # the statistics of an archive being created never come from here, see nfiles and files_stats.
         self.status_counts = Counter()
         self.archive_counts = Counter()  # status -> count, the archives listed by prune / delete / undelete
+        self.archives_dry_run = False  # the archive_counts are what would be done
         self.phases = {}  # operation id -> Phase, in order of appearance
         self._active_phase = None  # operation id of the phase updated last
         self.progress_text = ""  # what borg works on right now: the current path or progress message
@@ -214,6 +215,7 @@ class Session:
                 self._add_status(event.status, event.path)
             case ArchiveStatus():
                 self.archive_counts[event.status] += 1
+                self.archives_dry_run = event.dry_run
                 self._add_line(Line(event.message, "archive", event.status))
             case ArchiveProgress():
                 self.archive_progress = event  # the final object has the final statistics (and no path)

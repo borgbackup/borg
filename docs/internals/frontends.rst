@@ -180,6 +180,8 @@ archive_status
     status
         *kept* or *pruned* (:ref:`borg_prune`), *deleted* (:ref:`borg_delete`) or *undeleted*
         (:ref:`borg_undelete`). With ``--dry-run``, this is what would be done.
+    dry_run
+        *true* for a ``--dry-run``: *status* tells what would be done, nothing was changed
     name, archive
         Name of the archive
     id
@@ -260,17 +262,17 @@ See Prompts_ for the types used by prompts.
 
     {"name": "daily", "archive": "daily", "id": "2c77c68a...", "time": "2026-09-09T02:00:00.000000+02:00",
      "group": {"name": "daily", "host": "host"}, "kept": true, "keep_rule": "daily", "kept_oldest": false,
-     "kept_archive_number": 1, "status": "kept", "type": "archive_status",
+     "kept_archive_number": 1, "status": "kept", "dry_run": true, "type": "archive_status",
      "message": "Keeping archive (rule: daily #1):            daily   Wed, 2026-09-09 02:00:00 +0200 [2c77c68a...]"}
     {"name": "daily", "archive": "daily", "id": "99a5671a...", "time": "2026-09-08T02:00:00.000000+02:00",
      "group": {"name": "daily", "host": "host"}, "kept": false, "deleted_archive_number": 1, "status": "pruned",
-     "type": "archive_status",
+     "dry_run": true, "type": "archive_status",
      "message": "Would prune:                                 daily   Tue, 2026-09-08 02:00:00 +0200 [99a5671a...]"}
 
 :ref:`borg_delete` archive listing, with ``--list``::
 
     {"name": "daily", "archive": "daily", "id": "99a5671a...", "time": "2026-09-08T02:00:00.000000+02:00",
-     "status": "deleted", "type": "archive_status",
+     "status": "deleted", "dry_run": false, "type": "archive_status",
      "message": "Deleted archive: daily   Tue, 2026-09-08 02:00:00 +0200 [99a5671a...] (1/1)"}
 
 Saving the local cache at the end of :ref:`borg_create`::

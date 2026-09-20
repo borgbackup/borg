@@ -300,7 +300,8 @@ class PruneMixIn:
                 or (args.list_kept and archive_info not in archives_to_prune)
             ):
                 message = f"{log_message:<44} {archive_formatted}"
-                self.print_archive_status(status, archive_info, message, archive_data if self.log_json else None)
+                data = archive_data if self.log_json else None
+                self.print_archive_status(status, archive_info, message, data, dry_run=args.dry_run)
         if not args.json:
             pi.finish()
         if args.json:

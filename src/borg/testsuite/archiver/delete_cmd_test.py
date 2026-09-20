@@ -152,9 +152,10 @@ def test_delete_list_json(archivers, request):
     assert {(msg["name"], msg["status"]) for msg in statuses} == {("test1", "deleted"), ("test2", "deleted")}
     for msg in statuses:
         assert msg["message"].startswith("Would delete: ") and msg["name"] in msg["message"]
+        assert msg["dry_run"] is True  # the status is what would be done
         assert msg["archive"] == msg["name"] and len(msg["id"]) == 64 and "T" in msg["time"]
     output = cmd(archiver, "delete", "--list", "--log-json", "test1")
     statuses = [msg for msg in map(json.loads, output.splitlines()) if msg["type"] == "archive_status"]
-    assert [(msg["name"], msg["status"]) for msg in statuses] == [("test1", "deleted")]
+    assert [(msg["name"], msg["status"], msg["dry_run"]) for msg in statuses] == [("test1", "deleted", False)]
     assert statuses[0]["message"].startswith("Deleted archive: ") and statuses[0]["message"].endswith("(1/1)")
     assert "test1" not in cmd(archiver, "repo-list")

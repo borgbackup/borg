@@ -294,7 +294,8 @@ class GenericStatusPanel(StatusPanelBase):
         statuses = [status for status in ("kept", "pruned", "deleted", "undeleted") if counts[status]]
         statuses += [status for status in counts if status not in statuses]
         parts = [f"{counts[status]} {status}" for status in statuses]
-        self.show_value("status-archives", "Archives: ", ", ".join(parts) if parts else "-")
+        dry_run = " (dry-run)" if session.archives_dry_run else ""
+        self.show_value("status-archives", "Archives: ", ", ".join(parts) + dry_run if parts else "-")
         self.show_rc(session)
         self.show("phases-title", T("Phases"))
         space = (self.size.width or 60) - self.BAR_WIDTH - 3

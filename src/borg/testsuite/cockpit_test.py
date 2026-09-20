@@ -240,8 +240,8 @@ def test_app_generic_screen():
         ProgressMessage(operation=2, msgid="cache.close", message="Saving files cache"),
         ProgressPercent(operation=1, msgid="check.index", finished=True, message=""),
         LogMessage(message="Archive consistency check complete, no problems found.", levelname="INFO"),
-        ArchiveStatus(name="old", status="pruned", message="Would prune: old"),
-        ArchiveStatus(name="new", status="kept", message="Keeping archive (rule: daily #1): new"),
+        ArchiveStatus(name="old", status="pruned", message="Would prune: old", dry_run=True),
+        ArchiveStatus(name="new", status="kept", message="Keeping archive (rule: daily #1): new", dry_run=True),
     ]
     factory, runners = make_runner_factory(events)
     app = BorgCockpitApp(borg_args=["check"], command="check", runner_factory=factory)
@@ -254,7 +254,7 @@ def test_app_generic_screen():
     ]
     assert [str(span.style) for span in shown["phases"].spans] == ["green", "bold white"]
     assert shown["status-warnings"] == "Warnings: 0" and shown["status-rc"] == "RC: 0"
-    assert shown["status-archives"] == "Archives: 1 kept, 1 pruned"
+    assert shown["status-archives"] == "Archives: 1 kept, 1 pruned (dry-run)"
     assert "no problems found" in text and "Would prune: old" in text
 
 

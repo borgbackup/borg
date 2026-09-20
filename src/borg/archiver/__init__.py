@@ -175,12 +175,13 @@ class Archiver(
             else:
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))
 
-    def print_archive_status(self, status, archive_info, message, data=None):
+    def print_archive_status(self, status, archive_info, message, data=None, dry_run=False):
         """
         List an archive a command processed, like print_file_status() lists the items of a file listing.
 
         With --log-json, an archive_status JSON object is printed: name, id and time of the archive, the
         <status> (e.g. "kept", "pruned", "deleted"), the <message> (the text line) and the keys of <data>.
+        <dry_run> tells that the status is what would be done: nothing was changed.
         Without it, the text line goes to the "borg.output.list" logger. The callers check the --list options.
         """
         if self.log_json:
@@ -191,7 +192,7 @@ class Archiver(
                 "time": OutputTimestamp(archive_info.ts),
             }
             json_data |= data or {}
-            json_data |= {"status": status, "type": "archive_status", "message": message}
+            json_data |= {"status": status, "dry_run": dry_run, "type": "archive_status", "message": message}
             print(json.dumps(json_data, cls=BorgJsonEncoder), file=sys.stderr)
         else:
             logging.getLogger("borg.output.list").info(message)

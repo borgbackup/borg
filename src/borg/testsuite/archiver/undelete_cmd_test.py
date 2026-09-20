@@ -144,9 +144,10 @@ def test_undelete_list_json(archivers, request):
     assert {(msg["name"], msg["status"]) for msg in statuses} == {("deleted1", "undeleted"), ("deleted2", "undeleted")}
     for msg in statuses:
         assert msg["message"].startswith("Would undelete: ") and msg["name"] in msg["message"]
+        assert msg["dry_run"] is True  # the status is what would be done
         assert msg["archive"] == msg["name"] and len(msg["id"]) == 64 and "T" in msg["time"]
     output = cmd(archiver, "undelete", "--list", "--log-json", "-a", "sh:deleted1")
     statuses = [msg for msg in map(json.loads, output.splitlines()) if msg["type"] == "archive_status"]
-    assert [(msg["name"], msg["status"]) for msg in statuses] == [("deleted1", "undeleted")]
+    assert [(msg["name"], msg["status"], msg["dry_run"]) for msg in statuses] == [("deleted1", "undeleted", False)]
     assert statuses[0]["message"].startswith("Undeleted archive: ") and statuses[0]["message"].endswith("(1/1)")
     assert "deleted1" in cmd(archiver, "repo-list")

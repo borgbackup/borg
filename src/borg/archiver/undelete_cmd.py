@@ -44,9 +44,8 @@ class UnDeleteMixIn:
                 undeleted = True
                 if self.output_list:
                     msg = "Would undelete: {} ({}/{})" if dry_run else "Undeleted archive: {} ({}/{})"
-                    self.print_archive_status(
-                        "undeleted", archive_info, msg.format(format_archive(archive_info), i, count)
-                    )
+                    message = msg.format(format_archive(archive_info), i, count)
+                    self.print_archive_status("undeleted", archive_info, message, dry_run=dry_run)
         if dry_run:
             logger.info("Finished dry-run.")
         elif undeleted:

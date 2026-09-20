@@ -57,8 +57,9 @@ terminal. The panel in the upper right depends on the command:
 
 All other commands
     The phases of the operation borg reports progress for, e.g. "Checking index" and
-    "Checking archives" for ``check``, each with a progress bar. For ``prune``, also the
-    numbers of kept and pruned archives.
+    "Checking archives" for ``check``, each with a progress bar. For ``prune``, ``delete``
+    and ``undelete`` with ``--list``, also the numbers of kept, pruned, deleted or undeleted
+    archives (marked as "dry-run" if nothing was changed).
 
 Every panel also shows the elapsed time, the number of warnings and errors and, when
 borg has finished, its exit code. The cockpit stays on the screen until you press ``q``,

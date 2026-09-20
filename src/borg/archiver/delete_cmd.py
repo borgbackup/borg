@@ -51,7 +51,8 @@ class DeleteMixIn:
                 deleted = True
                 if self.output_list:
                     msg = "Would delete: {} ({}/{})" if dry_run else "Deleted archive: {} ({}/{})"
-                    self.print_archive_status("deleted", archive_info, msg.format(archive_formatted, i, count))
+                    message = msg.format(archive_formatted, i, count)
+                    self.print_archive_status("deleted", archive_info, message, dry_run=dry_run)
         if dry_run:
             logger.info("Finished dry-run.")
         elif deleted:

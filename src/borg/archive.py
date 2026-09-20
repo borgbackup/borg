@@ -3012,6 +3012,10 @@ class ArchiveRecreater:
 
     def process_items(self, archive, target):
         matcher = self.matcher
+        if self.dry_run:
+            # the statistics of a dry-run are what would be in the new archive. what would be new to the
+            # repository (the deduplicated size) is unknown, see Statistics.as_dict().
+            target.stats.usize = None
 
         for item in archive.iter_items():
             if not matcher.match(item.path):
@@ -3019,6 +3023,11 @@ class ArchiveRecreater:
                 continue
             if self.dry_run:
                 self.print_file_status("+", item.path)  # included
+                if "chunks" in item:
+                    target.stats.nfiles += 1
+                    target.stats.osize += item.get_size()
+                if self.progress:
+                    target.stats.show_progress(item=item)
             else:
                 self.process_item(archive, target, item)
         if self.progress:

@@ -97,8 +97,8 @@ archive_progress
         Original size of the data processed so far (before compression and deduplication)
     deduplicated_size
         Deduplicated size of the data processed so far (before compression): the size of the
-        chunks that were new to the repository. Absent for ``borg create --dry-run``: it does
-        not read the files, so it only knows the number of files and the original size.
+        chunks that were new to the repository. Absent for a ``--dry-run`` of :ref:`borg_create`
+        or :ref:`borg_recreate`: it only knows the number of files and the original size.
     nfiles
         Number of (regular) files processed so far
     hashing_time

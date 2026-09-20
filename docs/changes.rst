@@ -199,8 +199,8 @@ New features:
   like create does. The text listing of export-tar has the same "+" prefix as extract's now.
   prune/delete/undelete --list --log-json: output an archive_status JSON object per listed
   archive, #9454.
-- create --dry-run --progress: show the progress (also as archive_progress JSON objects with
-  --log-json), it showed nothing
+- create/recreate --dry-run --progress: show the progress (also as archive_progress JSON
+  objects with --log-json), it showed nothing
 
 Fixes:
 

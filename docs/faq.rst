@@ -811,9 +811,11 @@ What a FIDO2 borg key protects against - the threat model, honestly:
 
 ``borg key add --fido2-touch=no`` stores a key that unlocks without a touch,
 for unattended backups: that key is bound to the plugged-in device (an
-uncopyable keyfile, in effect), but not presence-gated. Many tokens enforce
-the touch in firmware and refuse this; borg verifies it at enrollment and
-fails cleanly in that case.
+uncopyable keyfile, in effect), but not presence-gated. Note that the CTAP
+specification requires tokens to *refuse* touchless hmac-secret derivation
+and most (e.g. YubiKeys, on all firmware versions) do - only tokens that
+deviate from the spec on this point support it. borg verifies this at
+enrollment and fails cleanly, storing nothing, when the token refuses.
 
 FIDO2 support needs the ``fido2`` python package (``pip install
 'borgbackup[fido2]'``).

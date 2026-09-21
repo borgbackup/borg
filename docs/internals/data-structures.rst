@@ -1082,7 +1082,8 @@ fido2_up_required
   fido2 borg keys only, optional (absent means true): whether unlocking
   requests a touch (user presence) on the token. This records what enrollment
   did; it is a UX flag, not a security boundary - tokens that enforce the
-  touch in firmware do so regardless of it.
+  touch for hmac-secret (as the CTAP spec requires; most do) do so regardless
+  of it.
 
 fido2_uv_required
   fido2 borg keys only, optional (absent means false): whether user

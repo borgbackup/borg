@@ -297,10 +297,20 @@ class Fido2Operations:
                 pin_uv_protocol=pin_uv_protocol,
             )
         except CtapError as exc:
-            if exc.code == CtapError.ERR.UP_REQUIRED and not up:
+            # CTAP 2.1 (section 12.5, hmac-secret) requires authenticators to reject up=false
+            # ("If \"up\" is set to false, authenticator returns CTAP2_ERR_UNSUPPORTED_OPTION");
+            # YubiKeys answer CTAP2_ERR_UP_REQUIRED instead. Only tokens deviating from the
+            # spec on this point support touchless derivation at all.
+            touchless_refusals = (
+                CtapError.ERR.UP_REQUIRED,
+                CtapError.ERR.UNSUPPORTED_OPTION,
+                CtapError.ERR.INVALID_OPTION,
+            )
+            if exc.code in touchless_refusals and not up:
                 raise Fido2Error(
-                    f"FIDO2 device {self.device_name} requires a touch (user presence) for "
-                    "hmac-secret and thus does not support touchless borg keys"
+                    f"FIDO2 device {self.device_name} refuses touchless (no user presence) "
+                    "hmac-secret derivation, as the CTAP spec requires, and thus does not "
+                    "support touchless borg keys"
                 ) from None
             if exc.code in (CtapError.ERR.USER_ACTION_TIMEOUT, CtapError.ERR.ACTION_TIMEOUT):
                 raise Fido2Error(f"FIDO2 device {self.device_name} was not touched within the timeout") from None
@@ -324,9 +334,10 @@ class Fido2Operations:
         stores the flag in the key blob.
 
         With up_required=False, the touchless derivation is verified right here at enrollment:
-        many tokens (e.g. YubiKey firmware 5.4) enforce the touch for hmac-secret and answer
-        CTAP2_ERR_UP_REQUIRED - better to fail now than to store a key that can never unlock
-        touchlessly.
+        the CTAP spec (2.1 section 12.5) requires tokens to reject up=false for hmac-secret
+        (CTAP2_ERR_UNSUPPORTED_OPTION per spec; YubiKeys answer CTAP2_ERR_UP_REQUIRED), so
+        only tokens deviating from the spec on this point support it at all - better to fail
+        now than to store a key that can never unlock touchlessly.
         """
         permissions = ClientPin.PERMISSION.MAKE_CREDENTIAL | ClientPin.PERMISSION.GET_ASSERTION
         pin_uv_token = self._get_pin_uv_token(permissions)

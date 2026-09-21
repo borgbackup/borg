@@ -12,19 +12,19 @@ borg key add
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+---------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **options**                                                                                                                                                                                                                                                                                       |
-    +-------------------------------------------------------+---------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--label LABEL``         | label for the new borg key (must be unique)                                                                                                                                                                   |
-    +-------------------------------------------------------+---------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--fido2-device DEVICE`` | protect the new borg key with a FIDO2 token's hmac-secret instead of a passphrase. DEVICE is a platform device identifier (see ``fido2-token -L``); when omitted, the single plugged-in FIDO2 device is used. |
-    +-------------------------------------------------------+---------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--fido2-touch``         | whether unlocking with the new FIDO2 borg key requires a touch (user presence) on the token (default: yes). Requires a token that supports touchless hmac-secret derivation; this is verified at enrollment.  |
-    +-------------------------------------------------------+---------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                    |
-    |                                                                                                                                                                                                                                                                                                   |
-    | :ref:`common_options`                                                                                                                                                                                                                                                                             |
-    +-------------------------------------------------------+---------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    +-------------------------------------------------------+---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **options**                                                                                                                                                                                                                                                                                                                                                             |
+    +-------------------------------------------------------+---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--label LABEL``         | label for the new borg key (must be unique)                                                                                                                                                                                                                                         |
+    +-------------------------------------------------------+---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--fido2-device DEVICE`` | protect the new borg key with a FIDO2 token's hmac-secret instead of a passphrase. DEVICE is a platform device identifier (see ``fido2-token -L``); when omitted, the single plugged-in FIDO2 device is used.                                                                       |
+    +-------------------------------------------------------+---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--fido2-touch``         | whether unlocking with the new FIDO2 borg key requires a touch (user presence) on the token (default: yes). 'no' requires a token that supports touchless hmac-secret derivation (the CTAP spec forbids it, so most tokens, e.g. YubiKeys, refuse); this is verified at enrollment. |
+    +-------------------------------------------------------+---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                                                          |
+    |                                                                                                                                                                                                                                                                                                                                                                         |
+    | :ref:`common_options`                                                                                                                                                                                                                                                                                                                                                   |
+    +-------------------------------------------------------+---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -41,7 +41,7 @@ borg key add
     options
         --label LABEL     label for the new borg key (must be unique)
         --fido2-device DEVICE    protect the new borg key with a FIDO2 token's hmac-secret instead of a passphrase. DEVICE is a platform device identifier (see ``fido2-token -L``); when omitted, the single plugged-in FIDO2 device is used.
-        --fido2-touch     whether unlocking with the new FIDO2 borg key requires a touch (user presence) on the token (default: yes). Requires a token that supports touchless hmac-secret derivation; this is verified at enrollment.
+        --fido2-touch     whether unlocking with the new FIDO2 borg key requires a touch (user presence) on the token (default: yes). 'no' requires a token that supports touchless hmac-secret derivation (the CTAP spec forbids it, so most tokens, e.g. YubiKeys, refuse); this is verified at enrollment.
 
 
     :ref:`common_options`
@@ -72,8 +72,10 @@ found automatically among the plugged-in devices (``BORG_FIDO2_DEVICE`` pins one
 
 ``--fido2-touch=no`` stores a borg key that unlocks without a touch on the token
 (useful for unattended backups; the key is then bound to the plugged-in device, but
-not presence-gated). Many tokens enforce the touch in firmware and cannot do this -
-that is verified at enrollment, which fails cleanly in that case.
+not presence-gated). Note that the CTAP specification requires tokens to refuse
+touchless hmac-secret derivation and most (e.g. YubiKeys) do - only tokens deviating
+from the spec on this point support it. That is verified at enrollment, which fails
+cleanly in that case.
 
 Note that a repository is only as secure as its *weakest* borg key: adding a FIDO2 key
 does not strengthen a weak or empty admin passphrase. The admin key is the recovery

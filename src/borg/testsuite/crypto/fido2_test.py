@@ -35,6 +35,8 @@ class FakeErr(enum.IntEnum):
     ACTION_TIMEOUT = 0x3A
     PUAT_REQUIRED = 0x36
     OPERATION_DENIED = 0x27
+    UNSUPPORTED_OPTION = 0x2B
+    INVALID_OPTION = 0x2C
 
 
 class FakeCtapError(Exception):
@@ -114,6 +116,7 @@ class FakeDevice:
         hmac_secret_on_create=True,
         up=True,
         enforce_up=True,
+        enforce_up_error=FakeErr.UP_REQUIRED,
         rk=True,
         client_pin=None,
         uv=None,
@@ -128,6 +131,7 @@ class FakeDevice:
         self.hmac_secret_on_create = hmac_secret_on_create
         self.up = up
         self.enforce_up = enforce_up
+        self.enforce_up_error = enforce_up_error
         self.rk = rk
         self.client_pin = client_pin
         self.uv = uv
@@ -233,8 +237,9 @@ class FakeCtap2:
         up = not (options and options.get("up") is False)
         uv = self._check_pin_uv(pin_uv_param, client_data_hash)
         if extensions and not up and device.enforce_up:
-            # e.g. YubiKey firmware 5.4 refuses touchless hmac-secret derivation.
-            raise FakeCtapError(FakeErr.UP_REQUIRED)
+            # the CTAP spec requires refusing touchless hmac-secret derivation: with
+            # UNSUPPORTED_OPTION per CTAP 2.1 section 12.5; YubiKeys send UP_REQUIRED.
+            raise FakeCtapError(device.enforce_up_error)
         if extensions and "hmac-secret" in extensions:
             protocol = FakeProtocol()
             salt = protocol.decrypt(SHARED_SECRET, extensions["hmac-secret"][2])
@@ -309,10 +314,12 @@ def test_enroll_and_derive_roundtrip(fake_fido2):
     assert ops2.derive_secret(credential_id, os.urandom(32)) != secret
 
 
-def test_enroll_touchless_refused_by_token(fake_fido2):
-    # a UP-enforcing token (e.g. YubiKey fw 5.4) must fail --fido2-touch=no at enrollment,
-    # instead of storing a key that can never unlock touchlessly.
-    device = FakeDevice(enforce_up=True)
+@pytest.mark.parametrize("error_code", [FakeErr.UP_REQUIRED, FakeErr.UNSUPPORTED_OPTION, FakeErr.INVALID_OPTION])
+def test_enroll_touchless_refused_by_token(fake_fido2, error_code):
+    # a UP-enforcing token must fail --fido2-touch=no at enrollment instead of storing a key
+    # that can never unlock touchlessly. The CTAP spec mandates the refusal and prescribes
+    # UNSUPPORTED_OPTION; YubiKeys send UP_REQUIRED - all variants get the clear message.
+    device = FakeDevice(enforce_up=True, enforce_up_error=error_code)
     fake_fido2.append(device)
     with pytest.raises(Fido2Error, match="touchless"):
         Fido2Operations(device).enroll(REPO_ID, up_required=False)

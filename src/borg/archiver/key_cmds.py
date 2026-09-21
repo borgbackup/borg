@@ -25,10 +25,15 @@ class KeysMixIn:
 
     @with_repository(manifest=True)
     def do_key_add(self, args, repository, manifest):
-        """Add a new borg key (protected by an independent passphrase) to the repository."""
+        """Add a new borg key (protected by an independent passphrase or a FIDO2 token) to the repository."""
+        if args.fido2_touch == "no" and args.fido2_device is None:
+            raise CommandError("--fido2-touch=no only makes sense together with --fido2-device.")
         key = manifest.key
-        key.add_key(label=args.label)
-        logger.info("Borg key with label %r added.", args.label)
+        key.add_key(label=args.label, fido2_device=args.fido2_device, fido2_touch=args.fido2_touch == "yes")
+        if args.fido2_device is not None:
+            logger.info("FIDO2-protected borg key with label %r added.", args.label)
+        else:
+            logger.info("Borg key with label %r added.", args.label)
         logger.info("Key location: %s", key.find_key())
 
     @with_repository(manifest=True)
@@ -55,6 +60,14 @@ class KeysMixIn:
         new_storage = KEY_LOCATIONS[args.key_mode]
         if key.storage == new_storage:
             print(f"The borg key is already stored as {args.key_mode}, nothing to do.")
+            return
+
+        if key._encrypted_key_algorithm == KEY_ALGORITHMS["fido2"]:
+            # a FIDO2-protected borg key blob is moved verbatim: re-encrypting (like the
+            # passphrase path below does) would silently mint a new credential on the token.
+            key.change_blob_location(args, new_storage, keep=args.keep)
+            loc = key.find_key()
+            logger.info(f"Key {'copied' if args.keep else 'moved'} to {loc}")
             return
 
         # the crypto class / manifest key-type byte does not change - only the storage location does.
@@ -92,6 +105,11 @@ class KeysMixIn:
         """Exports a borg key of the repository for backup."""
         manager = KeyManager(repository)
         manager.load_keyblob(label=args.label, key_id=args.key)
+        if manager.loaded_algorithm == KEY_ALGORITHMS["fido2"]:
+            logger.warning(
+                "This is a FIDO2-protected borg key: the exported backup is useless without "
+                "the FIDO2 token it was enrolled with."
+            )
         try:
             if args.path is not None and os.path.isdir(args.path):
                 # on Windows, Python raises PermissionError instead of IsADirectoryError
@@ -263,14 +281,33 @@ class KeysMixIn:
         add_epilog = process_epilog(
             """
         A repository can be protected by more than one borg key. Each borg key contains the
-        same secret key material, but is protected by an independent (potentially different)
-        passphrase, and any of them can be used to unlock the same repository. This is useful
-        e.g. to give individual users their own passphrase while keeping a separate
-        admin/recovery passphrase.
+        same secret key material, but is protected independently - by its own passphrase, or
+        by a FIDO2 hardware token - and any of them can be used to unlock the same repository.
+        This is useful e.g. to give individual users their own passphrase while keeping a
+        separate admin/recovery passphrase.
 
         This command adds an additional borg key. It does not re-encrypt any repository data
         and does not change the existing borg keys. The new passphrase is read from
         ``BORG_NEW_PASSPHRASE`` or queried interactively.
+
+        With ``--fido2-device``, the new borg key is protected by a FIDO2 token's hmac-secret
+        instead of a passphrase: the token holds a device-bound secret that is needed to
+        unlock this borg key, so the key blob is useless without the plugged-in token.
+        Enrollment needs two touches on the token (create the credential, then derive the
+        secret once). If the token has a PIN or built-in user verification configured, it is
+        also required - both at enrollment and at every unlock. Without ``DEVICE``, the single
+        plugged-in FIDO2 device is used; with several devices plugged in, one must be selected
+        explicitly (``fido2-token -L`` lists devices). At unlock time, the matching token is
+        found automatically among the plugged-in devices (``BORG_FIDO2_DEVICE`` pins one).
+
+        ``--fido2-touch=no`` stores a borg key that unlocks without a touch on the token
+        (useful for unattended backups; the key is then bound to the plugged-in device, but
+        not presence-gated). Many tokens enforce the touch in firmware and cannot do this -
+        that is verified at enrollment, which fails cleanly in that case.
+
+        Note that a repository is only as secure as its *weakest* borg key: adding a FIDO2 key
+        does not strengthen a weak or empty admin passphrase. The admin key is the recovery
+        path if the token is lost - treat it like one.
 
         Each borg key has a label. The first borg key, created at repository creation time, has
         the reserved label ``admin`` and is protected from deletion. Additionally added borg
@@ -278,9 +315,29 @@ class KeysMixIn:
         """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_key_add.__doc__, epilog=add_epilog)
-        key_parsers.add_subcommand("add", subparser, help="add a borg key (independent passphrase)")
+        key_parsers.add_subcommand("add", subparser, help="add a borg key (passphrase or FIDO2 token)")
         subparser.add_argument(
             "--label", metavar="LABEL", dest="label", required=True, help="label for the new borg key (must be unique)"
+        )
+        subparser.add_argument(
+            "--fido2-device",
+            metavar="DEVICE",
+            dest="fido2_device",
+            nargs="?",
+            const=True,
+            default=None,
+            help="protect the new borg key with a FIDO2 token's hmac-secret instead of a passphrase. "
+            "DEVICE is a platform device identifier (see ``fido2-token -L``); when omitted, the "
+            "single plugged-in FIDO2 device is used.",
+        )
+        subparser.add_argument(
+            "--fido2-touch",
+            dest="fido2_touch",
+            choices=("yes", "no"),
+            default="yes",
+            help="whether unlocking with the new FIDO2 borg key requires a touch (user presence) "
+            "on the token (default: yes). Requires a token that supports touchless hmac-secret "
+            "derivation; this is verified at enrollment.",
         )
 
         remove_epilog = process_epilog(

@@ -48,9 +48,10 @@ class KeyManager:
         self.repository = repository
         self.keyblob = None
         self.keyblob_storage = None
-        # id / label of the borg key that load_keyblob() selected (for logging by the caller):
+        # id / label / algorithm of the borg key that load_keyblob() selected (for the caller):
         self.loaded_key_id = None
         self.loaded_label = None
+        self.loaded_algorithm = None
 
         self.key_cls = key_class_of(repository)
         self.keyblob_storage = self.key_cls.STORAGE
@@ -69,10 +70,11 @@ class KeyManager:
             else:
                 b64 = blob_text  # borg 1.x repokey: raw base64, no BORG_KEY header
             try:
-                label = flexikey._key_envelope(blob_text).get("label")
+                envelope = flexikey._key_envelope(blob_text)
+                label, algorithm = envelope.get("label"), envelope.get("algorithm")
             except Exception:  # noqa: BLE001 - best-effort: a borg key without a parseable envelope has no label
-                label = None
-            result.append({"id": key_id, "label": label, "b64": b64})
+                label = algorithm = None
+            result.append({"id": key_id, "label": label, "algorithm": algorithm, "b64": b64})
         return result
 
     def load_keyblob(self, *, label=None, key_id=None):
@@ -98,6 +100,7 @@ class KeyManager:
         self.keyblob = selected["b64"]
         self.loaded_key_id = selected["id"]
         self.loaded_label = selected["label"]
+        self.loaded_algorithm = selected["algorithm"]
 
     def store_keyblob(self, args):
         # storage location for the imported key: --key-location wins, else the class default.

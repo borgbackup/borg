@@ -326,8 +326,8 @@ def is_terminal(fd=sys.stdout):
 
 
 # Environment variables that prepare_subprocess_env() removes from the environment of subprocesses.
-# The passphrases and the borgstore REST password are secrets, the commands given in BORG_PASSCOMMAND /
-# BORG_OTHER_PASSCOMMAND often embed secrets or paths to them. The *_FD variables refer to file
+# The passphrases and the borgstore REST password are secrets, the commands given in the
+# *_PASSCOMMAND variables often embed secrets or paths to them. The *_FD variables refer to file
 # descriptors that the subprocess does not inherit (Popen closes them), so they would be dangling and
 # misleading there.
 SUBPROCESS_ENV_REMOVE = (
@@ -335,8 +335,10 @@ SUBPROCESS_ENV_REMOVE = (
     "BORG_NEW_PASSPHRASE",
     "BORG_OTHER_PASSPHRASE",
     "BORG_PASSCOMMAND",
+    "BORG_NEW_PASSCOMMAND",
     "BORG_OTHER_PASSCOMMAND",
     "BORG_PASSPHRASE_FD",
+    "BORG_NEW_PASSPHRASE_FD",
     "BORG_OTHER_PASSPHRASE_FD",
     "BORGSTORE_REST_PASSWORD",
 )

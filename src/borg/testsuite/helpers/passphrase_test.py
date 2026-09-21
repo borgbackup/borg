@@ -1,8 +1,12 @@
 import getpass
+import os
+import shlex
 import signal
+import sys
 
 import pytest
 
+from ...helpers import Error
 from ...helpers.parseformat import bin_to_hex
 from ...helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ...helpers.process import SigIntManager, signal_handler
@@ -86,6 +90,84 @@ class TestPassphrase:
         out, err = capsys.readouterr()
         assert passphrase in err
         assert hex_value in err
+
+
+def print_command(text):
+    """Return a BORG_*_PASSCOMMAND printing *text* (shlex syntax, run without a shell)."""
+    return f"{shlex.quote(sys.executable)} -c \"print('{text}')\""
+
+
+class TestPassphraseEnvVarGroups:
+    """The BORG_*, BORG_NEW_* and BORG_OTHER_* passphrase environment variable groups are independent."""
+
+    @pytest.fixture(autouse=True)
+    def clean_env(self, monkeypatch):
+        for prefix in ("BORG_", "BORG_NEW_", "BORG_OTHER_"):
+            for name in ("PASSPHRASE", "PASSCOMMAND", "PASSPHRASE_FD"):
+                monkeypatch.delenv(prefix + name, raising=False)
+
+    def test_other_and_new_are_mutually_exclusive(self):
+        with pytest.raises(ValueError):
+            Passphrase.env_passphrase(other=True, new=True)
+        with pytest.raises(ValueError):
+            Passphrase.env_passcommand(other=True, new=True)
+        with pytest.raises(ValueError):
+            Passphrase.fd_passphrase(other=True, new=True)
+
+    def test_env_passphrase_selects_the_group(self, monkeypatch):
+        monkeypatch.setenv("BORG_PASSPHRASE", "base-secret")
+        monkeypatch.setenv("BORG_NEW_PASSPHRASE", "new-secret")
+        monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "other-secret")
+        assert Passphrase.env_passphrase() == "base-secret"
+        assert Passphrase.env_passphrase(new=True) == "new-secret"
+        assert Passphrase.env_passphrase(other=True) == "other-secret"
+
+    def test_env_passcommand_selects_the_group(self, monkeypatch):
+        # regression test: an early version selected BORG_NEW_PASSCOMMAND based on the "other" flag,
+        # which both broke BORG_OTHER_PASSCOMMAND and never used BORG_NEW_PASSCOMMAND.
+        monkeypatch.setenv("BORG_PASSCOMMAND", print_command("base-cmd"))
+        monkeypatch.setenv("BORG_NEW_PASSCOMMAND", print_command("new-cmd"))
+        monkeypatch.setenv("BORG_OTHER_PASSCOMMAND", print_command("other-cmd"))
+        assert Passphrase.env_passcommand() == "base-cmd"
+        assert Passphrase.env_passcommand(new=True) == "new-cmd"
+        assert Passphrase.env_passcommand(other=True) == "other-cmd"
+
+    @pytest.mark.parametrize("new,other", [(False, False), (True, False), (False, True)])
+    def test_fd_passphrase_selects_the_group(self, monkeypatch, new, other):
+        env_var = ("BORG_NEW_" if new else "BORG_OTHER_" if other else "BORG_") + "PASSPHRASE_FD"
+        read_fd, write_fd = os.pipe()
+        os.write(write_fd, b"fd-secret\n")
+        os.close(write_fd)
+        monkeypatch.setenv(env_var, str(read_fd))
+        assert Passphrase.fd_passphrase(new=new, other=other) == "fd-secret"
+
+    def test_ambiguity_is_checked_per_group(self, monkeypatch):
+        # more than one variable inside a group is ambiguous ...
+        monkeypatch.setenv("BORG_NEW_PASSPHRASE", "new-secret")
+        monkeypatch.setenv("BORG_NEW_PASSCOMMAND", print_command("new-cmd"))
+        with pytest.raises(Error):
+            Passphrase.env_passphrase(new=True)
+        # ... but variables of different groups do not conflict.
+        monkeypatch.delenv("BORG_NEW_PASSCOMMAND")
+        monkeypatch.setenv("BORG_PASSPHRASE", "base-secret")
+        monkeypatch.setenv("BORG_OTHER_PASSCOMMAND", print_command("other-cmd"))
+        assert Passphrase.env_passphrase() == "base-secret"
+        assert Passphrase.env_passphrase(new=True) == "new-secret"
+        assert Passphrase.env_passphrase(other=True) == "other-cmd"
+
+    def test_new_prefers_the_new_group(self, monkeypatch):
+        monkeypatch.setenv("BORG_PASSPHRASE", "base-secret")
+        monkeypatch.setenv("BORG_NEW_PASSPHRASE", "new-secret")
+        assert Passphrase.new() == "new-secret"
+        monkeypatch.delenv("BORG_NEW_PASSPHRASE")
+        monkeypatch.setenv("BORG_NEW_PASSCOMMAND", print_command("new-cmd"))
+        assert Passphrase.new() == "new-cmd"
+
+    def test_new_falls_back_to_the_base_group(self, monkeypatch):
+        # documented behavior: without any BORG_NEW_* variable, the new passphrase comes from
+        # the regular variables, see the BORG_NEW_PASSPHRASE docs.
+        monkeypatch.setenv("BORG_PASSPHRASE", "base-secret")
+        assert Passphrase.new() == "base-secret"
 
 
 def test_getpass_sigint_aborts(monkeypatch):

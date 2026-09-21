@@ -47,6 +47,16 @@ class Passphrase(str):
         if len(set_vars) > 1:
             raise Error("More than one passphrase environment variable is set: " + ", ".join(set_vars))
 
+    @staticmethod
+    def _env_var_name(name, other=False, new=False):
+        # There are three independent groups of passphrase environment variables:
+        # BORG_* (the repository's passphrase), BORG_OTHER_* (the --other-repo passphrase) and
+        # BORG_NEW_* (a new passphrase to be set, e.g. by "borg key change-passphrase").
+        if other and new:
+            raise ValueError("Only one of 'other' and 'new' may be true.")
+        prefix = "BORG_OTHER_" if other else "BORG_NEW_" if new else "BORG_"
+        return prefix + name
+
     @classmethod
     def _env_passphrase(cls, env_var, default=None):
         passphrase = os.environ.get(env_var, default)
@@ -54,25 +64,24 @@ class Passphrase(str):
             return cls(passphrase)
 
     @classmethod
-    def env_passphrase(cls, default=None, other=False):
-        if other:
-            cls._check_ambiguity(["BORG_OTHER_PASSPHRASE", "BORG_OTHER_PASSCOMMAND", "BORG_OTHER_PASSPHRASE_FD"])
-        else:
-            cls._check_ambiguity(["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"])
-        env_var = "BORG_OTHER_PASSPHRASE" if other else "BORG_PASSPHRASE"
-        passphrase = cls._env_passphrase(env_var, default)
+    def env_passphrase(cls, default=None, other=False, new=False):
+        # the group's variables are mutually exclusive (but independent of the other groups).
+        cls._check_ambiguity(
+            [cls._env_var_name(name, other=other, new=new) for name in ("PASSPHRASE", "PASSCOMMAND", "PASSPHRASE_FD")]
+        )
+        passphrase = cls._env_passphrase(cls._env_var_name("PASSPHRASE", other=other, new=new), default)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.env_passcommand(other=other)
+        passphrase = cls.env_passcommand(other=other, new=new)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.fd_passphrase(other=other)
+        passphrase = cls.fd_passphrase(other=other, new=new)
         if passphrase is not None:
             return passphrase
 
     @classmethod
-    def env_passcommand(cls, default=None, other=False):
-        env_var = "BORG_OTHER_PASSCOMMAND" if other else "BORG_PASSCOMMAND"
+    def env_passcommand(cls, default=None, other=False, new=False):
+        env_var = cls._env_var_name("PASSCOMMAND", other=other, new=new)
         passcommand = os.environ.get(env_var, None)
         if passcommand is not None:
             # passcommand is a system command (not inside pyinstaller env)
@@ -84,8 +93,8 @@ class Passphrase(str):
             return cls(passphrase.rstrip("\n"))
 
     @classmethod
-    def fd_passphrase(cls, other=False):
-        env_var = "BORG_OTHER_PASSPHRASE_FD" if other else "BORG_PASSPHRASE_FD"
+    def fd_passphrase(cls, other=False, new=False):
+        env_var = cls._env_var_name("PASSPHRASE_FD", other=other, new=new)
         try:
             fd = int(os.environ.get(env_var))
         except (ValueError, TypeError):
@@ -93,10 +102,6 @@ class Passphrase(str):
         with os.fdopen(fd, mode="r") as f:
             passphrase = f.read()
         return cls(passphrase.rstrip("\n"))
-
-    @classmethod
-    def env_new_passphrase(cls, default=None):
-        return cls._env_passphrase("BORG_NEW_PASSPHRASE", default)
 
     @classmethod
     def getpass(cls, prompt):
@@ -158,6 +163,9 @@ class Passphrase(str):
                 {fmt_var("BORG_PASSPHRASE")}
                 {fmt_var("BORG_PASSCOMMAND")}
                 {fmt_var("BORG_PASSPHRASE_FD")}
+                {fmt_var("BORG_NEW_PASSPHRASE")}
+                {fmt_var("BORG_NEW_PASSCOMMAND")}
+                {fmt_var("BORG_NEW_PASSPHRASE_FD")}
                 {fmt_var("BORG_OTHER_PASSPHRASE")}
                 {fmt_var("BORG_OTHER_PASSCOMMAND")}
                 {fmt_var("BORG_OTHER_PASSPHRASE_FD")}
@@ -167,7 +175,9 @@ class Passphrase(str):
 
     @classmethod
     def new(cls, allow_empty=False):
-        passphrase = cls.env_new_passphrase()
+        # the BORG_NEW_* group is checked first; if none of its variables is set, fall back to the
+        # regular BORG_* group (documented behavior, see the environment variable docs).
+        passphrase = cls.env_passphrase(new=True)
         if passphrase is not None:
             return passphrase
         passphrase = cls.env_passphrase()

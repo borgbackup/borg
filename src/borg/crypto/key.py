@@ -191,6 +191,24 @@ class UnsupportedKeyFormatError(Error):
     exit_mcode = 49
 
 
+class Fido2Error(Error):
+    """FIDO2 error: {}"""
+
+    exit_mcode = 55
+
+
+class Fido2DeviceNotFoundError(Fido2Error):
+    """FIDO2 device not found: {}"""
+
+    exit_mcode = 56
+
+
+class Fido2PinError(Fido2Error):
+    """FIDO2 PIN / user verification error: {}"""
+
+    exit_mcode = 57
+
+
 # map the user-facing key location names ("borg repo-create --key-location", "borg key change-location")
 # to the internal KeyBlobStorage values. Note "repokey" != KeyBlobStorage.REPO's string value.
 KEY_LOCATIONS = {"keyfile": KeyBlobStorage.KEYFILE, "repokey": KeyBlobStorage.REPO}

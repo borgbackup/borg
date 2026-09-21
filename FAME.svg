@@ -19,7 +19,7 @@
 <text class="subtitle" x="14" y="44">top 20 of 374 by commits on the master branch</text>
 <text class="name" x="14" y="73">Thomas Waldmann</text>
 <rect class="bar" x="240" y="63" width="436" height="12" rx="2"/>
-<text class="count" x="746" y="73">7,622</text>
+<text class="count" x="746" y="73">7,693</text>
 <text class="name" x="14" y="95">Marian Beermann</text>
 <rect class="bar" x="240" y="85" width="65" height="12" rx="2"/>
 <text class="count" x="746" y="95">1,140</text>
@@ -30,8 +30,8 @@
 <rect class="bar" x="240" y="129" width="16" height="12" rx="2"/>
 <text class="count" x="746" y="139">285</text>
 <text class="name" x="14" y="161">Mrityunjay Raj</text>
-<rect class="bar" x="240" y="151" width="14" height="12" rx="2"/>
-<text class="count" x="746" y="161">252</text>
+<rect class="bar" x="240" y="151" width="15" height="12" rx="2"/>
+<text class="count" x="746" y="161">260</text>
 <text class="name" x="14" y="183">Andrey Bienkowski</text>
 <rect class="bar" x="240" y="173" width="4" height="12" rx="2"/>
 <text class="count" x="746" y="183">72</text>

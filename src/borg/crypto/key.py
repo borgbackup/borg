@@ -17,6 +17,7 @@ from blake3 import blake3
 from ..constants import *  # NOQA
 from ..helpers import StableDict
 from ..helpers import Error, IntegrityError
+from ..helpers.errors import RTError
 from ..helpers import get_keys_dir, secure_erase
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
@@ -147,6 +148,17 @@ def keyfile_parse(data: str | bytes, repoid: str | None = None) -> tuple[str, st
 
 # workaround for lost passphrase or key in "authenticated*" modes
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
+
+
+def fido2_kek(secret: bytes, salt: bytes) -> bytes:
+    """Derive the borg key KEK from a FIDO2 token's hmac-secret output (HKDF-SHA256, RFC 5869).
+
+    The raw hmac-secret output is never used as the KEK directly: the versioned info string
+    gives domain separation, and it leaves room for a future v2 scheme (e.g. mixing an
+    optional passphrase into the derivation) without an on-disk format break.
+    """
+    prk = hmac.new(salt, secret, sha256).digest()  # HKDF-Extract(salt, IKM)
+    return hmac.new(prk, b"borg fido2 kek v1" + b"\x01", sha256).digest()  # HKDF-Expand, L = 32
 
 
 class UnsupportedPayloadError(Error):
@@ -585,11 +597,21 @@ class FlexiKey:
         target = key.find_key()
         prompt = "Enter passphrase for key %s: " % target
         passphrase = Passphrase.env_passphrase(other=other)
-        # a repository may have multiple borg keys, one per passphrase; try the
-        # passphrase against all of them.
+        # a repository may have multiple borg keys: passphrase-protected ones (one per
+        # passphrase) and FIDO2-protected ones. The passphrase flow only ever touches the
+        # passphrase-protected borg keys; the FIDO2-protected ones are attempted exactly once
+        # (each attempt is a physical touch and no passphrase can change its outcome).
+        # Order: env passphrase -> fido2 -> interactive passphrase retries.
         if passphrase is None:
             passphrase = Passphrase()
-            if not key.load_any(passphrase):
+            if not key.load_any(passphrase) and not key.load_any_fido2():
+                if not key._has_passphrase_keys():
+                    # only FIDO2-protected borg keys exist and unlocking via them did not
+                    # work - prompting for a passphrase could never succeed.
+                    raise Fido2Error(
+                        "could not unlock via a FIDO2-protected borg key and this repository "
+                        "has no passphrase-protected borg key (is the FIDO2 device plugged in?)"
+                    )
                 for retry in range(0, 3):
                     passphrase = Passphrase.getpass(prompt)
                     if key.load_any(passphrase):
@@ -598,14 +620,14 @@ class FlexiKey:
                 else:
                     raise PasswordRetriesExceeded
         else:
-            if not key.load_any(passphrase):
+            if not key.load_any(passphrase) and not key.load_any_fido2():
                 Passphrase.display_debug_info(passphrase)
                 raise PassphraseWrong
         key.init_ciphers(manifest_data)
         key._passphrase = passphrase
         return key
 
-    def _load(self, key_data, passphrase):
+    def _load(self, key_data, passphrase, fido2=False):
         try:
             key = binascii.a2b_base64(key_data)
         except (ValueError, binascii.Error):
@@ -613,7 +635,9 @@ class FlexiKey:
         if len(key) < 20:
             # this is in no way a precise check, usually we have about 400b key data.
             raise KeyfileInvalidError(self.repository._location.canonical_path(), "(repokey)")
-        data = self.decrypt_key_file(key, passphrase)
+        # only pass fido2 in FIDO2 mode: the legacy borg 1.x key classes override
+        # decrypt_key_file with the two-argument signature (borg 1.x keys cannot be FIDO2).
+        data = self.decrypt_key_file(key, passphrase, fido2=True) if fido2 else self.decrypt_key_file(key, passphrase)
         if data:
             data = msgpack.unpackb(data)
             key = Key(internal_dict=data)
@@ -626,7 +650,11 @@ class FlexiKey:
             return True
         return False
 
-    def decrypt_key_file(self, data, passphrase):
+    def decrypt_key_file(self, data, passphrase, fido2=False):
+        # fido2=False: passphrase mode, only passphrase-protected borg keys are decrypted.
+        # fido2=True: FIDO2 mode, only FIDO2-protected borg keys are decrypted (the token is
+        # never driven from the passphrase flow: each attempt costs a physical touch and the
+        # passphrase can not change its outcome).
         unpacker = get_limited_unpacker("key")
         unpacker.feed(data)
         data = unpacker.unpack()
@@ -637,7 +665,9 @@ class FlexiKey:
             self._encrypted_key_algorithm = encrypted_key.algorithm
             self._encrypted_key_label = encrypted_key.get("label")
             if encrypted_key.algorithm == "argon2 chacha20-poly1305":
-                return self.decrypt_key_file_argon2(encrypted_key, passphrase)
+                return None if fido2 else self.decrypt_key_file_argon2(encrypted_key, passphrase)
+            elif encrypted_key.algorithm == KEY_ALGORITHMS["fido2"]:
+                return self.decrypt_key_file_fido2(encrypted_key) if fido2 else None
             else:
                 raise UnsupportedKeyFormatError()
 
@@ -676,9 +706,36 @@ class FlexiKey:
         except low_level.IntegrityError:
             return None
 
-    def encrypt_key_file(self, data, passphrase, algorithm, label=None):
+    def decrypt_key_file_fido2(self, encrypted_key):
+        from .fido2 import Fido2Operations  # lazy import, see the fido2 module docstring
+
+        credential_id = encrypted_key.get("fido2_credential_id")
+        if credential_id is None:
+            raise KeyfileInvalidError(self.repository._location.canonical_path(), "(fido2 borg key)")
+        up_required = encrypted_key.get("fido2_up_required", True)
+        uv_required = encrypted_key.get("fido2_uv_required", False)
+        operations = Fido2Operations.find_device(credential_id)
+        try:
+            secret = operations.derive_secret(
+                credential_id, encrypted_key.salt, up_required=up_required, uv_required=uv_required
+            )
+        finally:
+            operations.close()
+        kek = fido2_kek(secret, encrypted_key.salt)
+        ae_cipher = CHACHA20_POLY1305(key=kek, iv=0, header_len=0, aad_offset=0)
+        try:
+            return ae_cipher.decrypt(encrypted_key.data)
+        except low_level.IntegrityError:
+            return None
+
+    def encrypt_key_file(self, data, passphrase, algorithm, label=None, *, fido2_ops=None, fido2_touch=True):
         if algorithm == "argon2 chacha20-poly1305":
             return self.encrypt_key_file_argon2(data, passphrase, label=label)
+        elif algorithm == KEY_ALGORITHMS["fido2"]:
+            if fido2_ops is None:
+                # e.g. an attempt to re-encrypt a FIDO2-protected borg key outside "borg key add".
+                raise Error("Re-encrypting a FIDO2-protected borg key is not possible (use borg key add/remove).")
+            return self.encrypt_key_file_fido2(data, label=label, fido2_ops=fido2_ops, fido2_touch=fido2_touch)
         else:
             raise ValueError(f"Unexpected algorithm: {algorithm}")
 
@@ -698,7 +755,29 @@ class FlexiKey:
         encrypted_key = EncryptedKey(**kw)
         return msgpack.packb(encrypted_key.as_dict())
 
-    def _save(self, passphrase, algorithm, label=None):
+    def encrypt_key_file_fido2(self, data, label=None, *, fido2_ops, fido2_touch=True):
+        # enroll fully (credential, assertion, encryption) before anything is stored: any
+        # failure here (missed touch, wrong PIN, CTAP error) leaves the repository's key set
+        # unchanged. iv=0 is safe: every save mints a fresh credential and salt and thus a
+        # fresh secret and KEK, mirroring the argon2 fresh-salt pattern.
+        credential_id, salt, secret, uv_required = fido2_ops.enroll(self.repository_id, up_required=fido2_touch)
+        kek = fido2_kek(secret, salt)
+        ae_cipher = CHACHA20_POLY1305(key=kek, iv=0, header_len=0, aad_offset=0)
+        kw = dict(
+            version=1,
+            algorithm=KEY_ALGORITHMS["fido2"],
+            salt=salt,
+            data=ae_cipher.encrypt(data),
+            fido2_credential_id=credential_id,
+            fido2_up_required=fido2_touch,
+            fido2_uv_required=uv_required,
+        )
+        if label is not None:
+            kw["label"] = label
+        encrypted_key = EncryptedKey(**kw)
+        return msgpack.packb(encrypted_key.as_dict())
+
+    def _save(self, passphrase, algorithm, label=None, *, fido2_ops=None, fido2_touch=True):
         key = Key(
             version=2,
             repository_id=self.repository_id,
@@ -706,11 +785,21 @@ class FlexiKey:
             id_key=self.id_key,
             chunk_seed=self.chunk_seed,
         )
-        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm, label=label)
+        # only pass the fido2 arguments when enrolling: the legacy borg 1.x key classes
+        # override encrypt_key_file without them (borg 1.x keys cannot be FIDO2).
+        fido2_kw = {} if fido2_ops is None else dict(fido2_ops=fido2_ops, fido2_touch=fido2_touch)
+        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm, label=label, **fido2_kw)
         key_data = "\n".join(textwrap.wrap(binascii.b2a_base64(data).decode("ascii")))
         return key_data
 
     def change_passphrase(self, passphrase=None):
+        if self._encrypted_key_algorithm == KEY_ALGORITHMS["fido2"]:
+            # the unlocked borg key is FIDO2-protected: there is no passphrase to change, and
+            # re-encrypting it would mint a new credential behind the user's back.
+            raise Error(
+                "The current borg key is FIDO2-protected and has no passphrase. "
+                "To rotate it, add a new borg key (borg key add) and remove this one (borg key remove)."
+            )
         if passphrase is None:
             passphrase = Passphrase.new(allow_empty=True)
         # replace the borg key we unlocked with: keep its label, write the new borg key, then
@@ -897,8 +986,9 @@ class FlexiKey:
         unpacker.feed(raw)
         return EncryptedKey(internal_dict=unpacker.unpack())
 
-    def _try_key(self, key_id, blob_text, keyfile_path, passphrase):
-        # try to unlock a single borg key with the given passphrase; on success, remember it.
+    def _try_key(self, key_id, blob_text, keyfile_path, passphrase, fido2=False):
+        # try to unlock a single borg key with the given passphrase (or, with fido2=True, via
+        # a FIDO2 token); on success, remember it.
         if is_keyfile(blob_text):
             # keyfile / modern repokey: data is wrapped in keyfile_format (BORG_KEY header).
             try:
@@ -909,7 +999,12 @@ class FlexiKey:
             # borg 1.x repokey: stored as raw base64 without the BORG_KEY header.
             key_data = blob_text
         try:
-            loaded = self._load(key_data, passphrase)
+            # only pass fido2 in FIDO2 mode: the legacy borg 1.x classes override _load with
+            # the two-argument signature (borg 1.x keys cannot be FIDO2).
+            loaded = self._load(key_data, passphrase, fido2=True) if fido2 else self._load(key_data, passphrase)
+        except Fido2Error:
+            # a token / PIN / touch problem is not a corrupted borg key - report it.
+            raise
         except Exception as exc:  # noqa: BLE001 - a corrupted borg key must not break unlocking via the others
             logger.debug("Borg key %s could not be loaded (corrupted?), skipping it: %s", key_id[:12], exc)
             return False
@@ -918,21 +1013,71 @@ class FlexiKey:
             # the manifest key-type byte, so save/remove/list operate on the right storage afterwards.
             self.storage = KeyBlobStorage.KEYFILE if keyfile_path is not None else KeyBlobStorage.REPO
             self.target = keyfile_path if self.storage == KeyBlobStorage.KEYFILE else self.repository
-            self.empty_passphrase = passphrase == ""  # nosec B105
-            if self.storage == KeyBlobStorage.REPO:
-                # While the repository is encrypted, we consider a repokey repository with a blank
-                # passphrase an unencrypted repository.
-                self.logically_encrypted = passphrase != ""  # nosec B105
+            if fido2:
+                # a FIDO2-protected borg key counts as encrypted with a non-empty secret: the
+                # KEK comes from the token, not from a (possibly empty) passphrase. Otherwise a
+                # FIDO2 repokey repository would be treated like a "previously unknown
+                # unencrypted repository" (see cache assert_access_unknown) on a new machine.
+                self.empty_passphrase = False
+                if self.storage == KeyBlobStorage.REPO:
+                    self.logically_encrypted = True
+            else:
+                self.empty_passphrase = passphrase == ""  # nosec B105
+                if self.storage == KeyBlobStorage.REPO:
+                    # While the repository is encrypted, we consider a repokey repository with a blank
+                    # passphrase an unencrypted repository.
+                    self.logically_encrypted = passphrase != ""  # nosec B105
             self._loaded_key_id = key_id
             self._loaded_label = self._encrypted_key_label
             return True
         return False
 
     def load_any(self, passphrase):
-        """Try the passphrase against every borg key of this repository."""
+        """Try the passphrase against every passphrase-protected borg key of this repository.
+
+        FIDO2-protected borg keys are skipped here (their decryption returns None without
+        driving the token), see load_any_fido2.
+        """
         for key_id, blob_text, keyfile_path in self._iter_keys():
             if self._try_key(key_id, blob_text, keyfile_path, passphrase):
                 return True
+        return False
+
+    def _keys_with_algorithm(self, algorithm):
+        # [(key_id, blob_text, keyfile_path)] of the borg keys using the given EncryptedKey
+        # algorithm; borg keys with an unreadable envelope are left out.
+        result = []
+        for key_id, blob_text, keyfile_path in self._iter_keys():
+            try:
+                env = self._key_envelope(blob_text)
+            except Exception:  # noqa: BLE001 - a corrupted borg key is not of the wanted algorithm  # nosec B112
+                continue
+            if env.get("algorithm") == algorithm:
+                result.append((key_id, blob_text, keyfile_path))
+        return result
+
+    def _has_passphrase_keys(self):
+        # does this repository have any borg key that a passphrase could possibly unlock?
+        return any(
+            self._keys_with_algorithm(algorithm) for algorithm in (KEY_ALGORITHMS["argon2"], KEY_ALGORITHMS["pbkdf2"])
+        )
+
+    def load_any_fido2(self):
+        """Try to unlock via the FIDO2-protected borg keys of this repository, each at most once.
+
+        Kept separate from load_any(): each FIDO2 attempt costs a physical touch and no
+        passphrase can change its outcome, so the passphrase retry loop must never drive the
+        token. Missing prerequisites (python-fido2 not installed, no matching token plugged
+        in) only skip the borg key with a debug message, so a mixed passphrase+fido2
+        repository still falls back to the passphrase flow; errors from a present token
+        (wrong PIN, missed touch, ...) propagate.
+        """
+        for key_id, blob_text, keyfile_path in self._keys_with_algorithm(KEY_ALGORITHMS["fido2"]):
+            try:
+                if self._try_key(key_id, blob_text, keyfile_path, Passphrase(), fido2=True):
+                    return True
+            except (Fido2DeviceNotFoundError, RTError) as exc:
+                logger.debug("Borg key %s: FIDO2 unlock not possible: %s", key_id[:12], exc)
         return False
 
     def load(self, target, passphrase):
@@ -948,11 +1093,15 @@ class FlexiKey:
         else:
             return self.load_any(passphrase)
 
-    def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
+    def save(
+        self, target, passphrase, algorithm, create=False, label=None, replace=True, *, fido2_ops=None, fido2_touch=True
+    ):
         # replace=True replaces the previously-loaded borg key (change-passphrase semantics);
         # replace=False adds an additional borg key, keeping the existing ones (key add).
-        key_data = self._save(passphrase, algorithm, label=label)
-        self.empty_passphrase = passphrase == ""  # nosec B105
+        key_data = self._save(passphrase, algorithm, label=label, fido2_ops=fido2_ops, fido2_touch=fido2_touch)
+        # a FIDO2-protected borg key has no passphrase; its KEK comes from the token.
+        is_fido2 = algorithm == KEY_ALGORITHMS["fido2"]
+        self.empty_passphrase = False if is_fido2 else passphrase == ""  # nosec B105
         if self.storage == KeyBlobStorage.KEYFILE:
             old_target = getattr(self, "target", None)
             keys_dir = get_keys_dir()
@@ -981,7 +1130,7 @@ class FlexiKey:
                         logger.debug('Could not remove previous keyfile "%s": %s', old_target, exc)
             self._loaded_key_id = store_hash(keyfile_data.encode()).hexdigest()
         elif self.storage == KeyBlobStorage.REPO:
-            self.logically_encrypted = passphrase != ""  # nosec B105
+            self.logically_encrypted = True if is_fido2 else passphrase != ""  # nosec B105
             key_data = keyfile_format(bin_to_hex(self.repository_id), key_data)
             key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes
             # additive store: keeps the other borg keys of this repository.
@@ -1035,8 +1184,13 @@ class FlexiKey:
             )
         return result
 
-    def add_key(self, passphrase=None, label=None):
-        """Add an additional borg key protecting the same key material with a new passphrase."""
+    def add_key(self, passphrase=None, label=None, fido2_device=None, fido2_touch=True):
+        """Add an additional borg key protecting the same key material.
+
+        By default the new borg key is protected by a new passphrase. With fido2_device given
+        (True: auto-select the single plugged-in token; str: a platform device identifier),
+        it is protected by a FIDO2 token's hmac-secret instead.
+        """
         if self.storage == KeyBlobStorage.REPO and not hasattr(self.repository, "store_key"):
             raise Error("This repository type does not support multiple borg keys.")
         if self.storage == KeyBlobStorage.KEYFILE and os.environ.get("BORG_KEY_FILE"):
@@ -1050,9 +1204,38 @@ class FlexiKey:
             raise Error('The "%s" label is reserved for the borg key created at repository creation.' % ADMIN_LABEL)
         if label in {bk["label"] for bk in self.list_keys()}:
             raise Error("A borg key with label %r already exists." % label)
-        if passphrase is None:
-            passphrase = Passphrase.new(allow_empty=True)
-        self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm, label=label, replace=False)
+        if fido2_device is not None:
+            from .fido2 import Fido2Operations, require_fido2  # lazy import, see the fido2 module docstring
+
+            require_fido2()
+            if fido2_device is True:
+                # no device given: use the single plugged-in token, else require a choice.
+                devices = Fido2Operations.list_devices()
+                if not devices:
+                    raise Fido2DeviceNotFoundError("no FIDO2 device with hmac-secret support is plugged in")
+                if len(devices) > 1:
+                    candidates = ", ".join(f"{path} ({name})" for path, name in devices)
+                    raise Fido2Error(f"multiple FIDO2 devices found, select one with --fido2-device: {candidates}")
+                fido2_device = devices[0][0]
+            fido2_ops = Fido2Operations.from_path(fido2_device)
+            try:
+                # enrollment happens inside save()/_save() and completes before anything is
+                # stored - a failure leaves the repository's key set unchanged.
+                self.save(
+                    self.target,
+                    Passphrase(),
+                    algorithm=KEY_ALGORITHMS["fido2"],
+                    label=label,
+                    replace=False,
+                    fido2_ops=fido2_ops,
+                    fido2_touch=fido2_touch,
+                )
+            finally:
+                fido2_ops.close()
+        else:
+            if passphrase is None:
+                passphrase = Passphrase.new(allow_empty=True)
+            self.save(self.target, passphrase, algorithm=KEY_ALGORITHMS["argon2"], label=label, replace=False)
 
     def remove_key(self, *, label=None, key_id=None, current=False):
         """Remove a borg key. Selects by label, by key id prefix, or the current one."""
@@ -1078,6 +1261,42 @@ class FlexiKey:
         else:
             secure_erase(victim["path"], avoid_collateral_damage=True)  # overwrite the keyfile before unlinking
         return victim
+
+    def change_blob_location(self, args, new_storage, keep=False):
+        """Move (or with keep=True, copy) the unlocked borg key's blob verbatim to new_storage.
+
+        Used by "borg key change-location" for FIDO2-protected borg keys: unlike the
+        passphrase path (which re-encrypts with a fresh salt), the blob must be copied
+        byte-for-byte - re-encrypting a fido2 blob would silently mint a new credential
+        (costing touches and invalidating exported backups of the key). The key id is
+        content-derived, so it stays the same at the new location.
+        """
+        blob_text = None
+        for key_id, text, keyfile_path in self._iter_keys():
+            if key_id == self._loaded_key_id:
+                blob_text = text
+                break
+        if blob_text is None:
+            raise Error("Cannot find the unlocked borg key's blob.")
+        old_storage, old_target = self.storage, self.target
+        self.storage = new_storage
+        if new_storage == KeyBlobStorage.KEYFILE:
+            target = self.get_new_target(args)
+            if os.path.isdir(target):
+                target = os.path.join(target, keyfile_name_for(blob_text.encode()))
+            with SaveFile(target, binary=True) as fd:
+                fd.write(blob_text.encode())
+            self.target = target
+        elif new_storage == KeyBlobStorage.REPO:
+            self.repository.store_key(blob_text.encode())
+            self.target = self.repository
+        else:
+            raise TypeError("Unsupported borg key storage type")
+        if not keep:
+            if old_storage == KeyBlobStorage.KEYFILE:
+                secure_erase(old_target, avoid_collateral_damage=True)
+            elif old_storage == KeyBlobStorage.REPO:
+                self.repository.delete_key(self._loaded_key_id)
 
 
 # ------------ not encrypted, but tagged: the "authenticated-*" modes ------------
@@ -1220,12 +1439,12 @@ class AuthenticatedKeyBase(MACKeyBase, FlexiKey):
             key._passphrase = Passphrase()
             return key
 
-    def _load(self, key_data, passphrase):
+    def _load(self, key_data, passphrase, fido2=False):
         if AUTHENTICATED_NO_KEY:
             # fake _load if we have no key or passphrase, see _set_fake_key_material.
             self._set_fake_key_material()
             return True
-        return super()._load(key_data, passphrase)
+        return super()._load(key_data, passphrase, fido2=fido2)
 
     def load(self, target, passphrase):
         success = super().load(target, passphrase)
@@ -1237,8 +1456,24 @@ class AuthenticatedKeyBase(MACKeyBase, FlexiKey):
         self.logically_encrypted = False
         return success
 
-    def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
-        super().save(target, passphrase, algorithm, create=create, label=label, replace=replace)
+    def load_any_fido2(self):
+        success = super().load_any_fido2()
+        self.logically_encrypted = False
+        return success
+
+    def save(
+        self, target, passphrase, algorithm, create=False, label=None, replace=True, *, fido2_ops=None, fido2_touch=True
+    ):
+        super().save(
+            target,
+            passphrase,
+            algorithm,
+            create=create,
+            label=label,
+            replace=replace,
+            fido2_ops=fido2_ops,
+            fido2_touch=fido2_touch,
+        )
         self.logically_encrypted = False
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):

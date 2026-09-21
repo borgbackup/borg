@@ -408,7 +408,7 @@ cdef class EncryptedKey(PropDict):
 
     VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
                   'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type',
-                  'label'}
+                  'label', 'fido2_credential_id', 'fido2_up_required', 'fido2_uv_required'}
 
     version = PropDictProperty(int)
     algorithm = PropDictProperty(str)
@@ -421,6 +421,15 @@ cdef class EncryptedKey(PropDict):
     argon2_parallelism = PropDictProperty(int)
     argon2_type = PropDictProperty(str)
     label = PropDictProperty(str)  # optional human-readable borg key label, e.g. "admin"
+    # fido2 hmac-secret keys ("fido2 hmac-secret chacha20-poly1305" algorithm) only. The
+    # credential id and the salt (reused for the hmac-secret salt) are stored in plaintext -
+    # they are useless without the token. The two flags record what enrollment did, so that
+    # unlock repeats it: whether user presence (a touch) is requested (absent = True) and
+    # whether user verification (PIN / biometrics) is performed (absent = False; the
+    # hmac-secret output differs with and without UV).
+    fido2_credential_id = PropDictProperty(bytes)
+    fido2_up_required = PropDictProperty(bool)
+    fido2_uv_required = PropDictProperty(bool)
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -430,7 +439,7 @@ cdef class EncryptedKey(PropDict):
                 assert isinstance(v, int)
             if k in ('algorithm', 'argon2_type', 'label'):
                 v = fix_str_value(d, k)
-            if k in ('salt', 'hash', 'data'):
+            if k in ('salt', 'hash', 'data', 'fido2_credential_id'):
                 v = fix_bytes_value(d, k)
             self._dict[k] = v
 

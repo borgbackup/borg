@@ -95,12 +95,13 @@ all clients); it is not the client-local cache described in
 :ref:`the files cache <cache>`.
 
 keys/
-    When using repokey mode, the encrypted, passphrase protected borg keys are
-    stored here as a base64 encoded text. The store hash of the
-    stored borg key is used for the name.
+    When using repokey mode, the encrypted borg keys (protected by a
+    passphrase or a FIDO2 token) are stored here as a base64 encoded text.
+    The store hash of the stored borg key is used for the name.
 
-    A repository may contain *multiple* such borg keys (one per passphrase) to
-    support the :ref:`multiple borg keys <borgcrypto_multiple_keys>` feature.
+    A repository may contain *multiple* such borg keys (one per passphrase or
+    token) to support the :ref:`multiple borg keys <borgcrypto_multiple_keys>`
+    feature.
     keyfile and repokey borg keys use the same format and naming (only the
     storage location differs).
 
@@ -987,12 +988,14 @@ the client ('keyfile' mode) or under the keys/ namespace in the repository
 ('repokey' mode) using the store hash of the borg key content as the name.
 
 In both cases, the secrets are generated from random and then encrypted by a
-key derived from your passphrase (this happens on the client before the key
-is stored as keyfile or repokey).
+key derived from your passphrase - or, for a borg key added with
+``borg key add --fido2-device``, from a FIDO2 token's hmac-secret (this
+happens on the client before the key is stored as keyfile or repokey).
 
 keyfile and repokey borg keys use the **same** format; only the storage location
-differs. Borg finds the correct key by trying each key against the supplied
-passphrase. See :ref:`borgcrypto_multiple_keys`.
+differs. Borg finds the correct key by trying each passphrase-protected key
+against the supplied passphrase; FIDO2-protected keys are unlocked via the
+matching plugged-in token instead. See :ref:`borgcrypto_multiple_keys`.
 
 The passphrase is passed through the ``BORG_PASSPHRASE`` environment variable
 or prompted for interactive usage.
@@ -1030,8 +1033,16 @@ chunk_seed
   the seed for the buzhash chunking table (signed 32 bit integer), only used
   by the "buzhash" chunker
 
-These fields are packed using msgpack_. The utf-8 encoded passphrase
-is processed with argon2_ to derive a 256 bit key encryption key (KEK).
+These fields are packed using msgpack_. A 256 bit key encryption key (KEK)
+is derived, depending on how this borg key is protected:
+
+- passphrase (algorithm ``argon2 chacha20-poly1305``): the utf-8 encoded
+  passphrase is processed with argon2_ to derive the KEK.
+- FIDO2 hardware token (algorithm ``fido2 hmac-secret chacha20-poly1305``,
+  see ``borg key add --fido2-device``): the token reproduces a device-bound
+  32 byte secret for the stored credential id and salt (CTAP2 ``hmac-secret``
+  extension); the KEK is derived from that secret via HKDF-SHA256 with the
+  stored salt and the info string ``borg fido2 kek v1``.
 
 Then the KEK is used to encrypt and authenticate the packed data using
 the chacha20-poly1305 AEAD cipher.
@@ -1042,15 +1053,17 @@ version
   currently always an integer, 1
 
 salt
-  random 128 bits (``ARGON2_SALT_BYTES`` == 16) salt used to process the
-  passphrase
+  passphrase borg keys: random 128 bits (``ARGON2_SALT_BYTES`` == 16) salt
+  used to process the passphrase.
+  fido2 borg keys: random 256 bits salt, used both as the hmac-secret salt
+  given to the token and as the HKDF salt.
 
 argon2_*
-  some parameters for the argon2 kdf
+  passphrase borg keys only: some parameters for the argon2 kdf
 
 algorithm
-  the algorithms used to process the passphrase
-  (currently the string ``argon2 chacha20-poly1305``)
+  the algorithms used to derive the KEK: the string
+  ``argon2 chacha20-poly1305`` or ``fido2 hmac-secret chacha20-poly1305``
 
 data
   The encrypted, packed fields.
@@ -1059,6 +1072,24 @@ label
   optional: a human-readable label for this borg key, e.g. ``admin`` for the
   borg key created by ``borg repo-create``. See
   :ref:`multiple borg keys <borgcrypto_multiple_keys>`.
+
+fido2_credential_id
+  fido2 borg keys only: the FIDO2 credential id the token needs to reproduce
+  the secret. Stored in plaintext - like the salt, it is useless without the
+  enrolled token.
+
+fido2_up_required
+  fido2 borg keys only, optional (absent means true): whether unlocking
+  requests a touch (user presence) on the token. This records what enrollment
+  did; it is a UX flag, not a security boundary - tokens that enforce the
+  touch in firmware do so regardless of it.
+
+fido2_uv_required
+  fido2 borg keys only, optional (absent means false): whether user
+  verification (PIN or built-in biometrics) was performed at enrollment and
+  thus must be performed at unlock - the token's hmac-secret output differs
+  between assertions with and without UV, so unlock has to repeat what
+  enrollment did.
 
 The resulting msgpack_ is then encoded using base64 and written to the
 key file, wrapped using the standard ``textwrap`` module with a header.

@@ -646,6 +646,21 @@ class HelpMixIn:
                 When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
             BORG_DEBUG_PASSPHRASE
                 When set to YES, display debugging information that includes passphrases used and passphrase related env vars set.
+            BORG_FIDO2_DEVICE
+                When set, unlocking a FIDO2-protected borg key (see ``borg key add --fido2-device``)
+                uses exactly this FIDO2 device, instead of probing all plugged-in devices for the
+                matching one (useful on machines with several tokens and for scripting).
+                The value is a platform device identifier as listed by ``fido2-token -L``:
+                e.g. ``/dev/hidrawN`` on Linux, a decimal IOKit registry entry id on macOS, or a
+                ``\\\\?\\hid#...`` interface string on Windows.
+                Like there being no ``--passphrase`` option, unlock-time device pinning is
+                deliberately env-only; the device used for *enrollment* is selected with
+                ``borg key add --fido2-device DEVICE``.
+            BORG_FIDO2_PIN
+                When set, use the value as the FIDO2 token's PIN instead of prompting for it
+                (for automation). Careful: a wrong PIN burns one of the token's few CTAP retries
+                (3 consecutive failures block the token until re-insert, 8 block the PIN entirely).
+                The PIN is never taken from BORG_PASSPHRASE or BORG_PASSCOMMAND.
             BORG_EXIT_CODES
                 When set to "modern", the borg process will return more specific exit codes (rc).
                 When set to "legacy", the borg process will return rc 2 for all errors, 1 for all warnings, 0 for success.

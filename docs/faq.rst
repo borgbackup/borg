@@ -760,6 +760,64 @@ Using ``BORG_PASSCOMMAND`` with KWallet
 
     export BORG_PASSCOMMAND="kwalletcli -e borg-passphrase -f Passwords"
 
+.. _fido2_faq:
+
+How do I protect my borg key with a FIDO2 hardware token (YubiKey etc.)?
+------------------------------------------------------------------------
+
+A FIDO2 authenticator with the ``hmac-secret`` extension (most modern security
+keys have it, run ``fido2-token -I`` to check) can protect a borg key instead
+of a passphrase: the token holds a device-bound secret and reproduces a stable
+32 byte value from a salt stored in the key blob; borg derives the key
+encryption key from that. The key blob (keyfile or repokey) is useless without
+the physical token.
+
+Add a FIDO2-protected borg key to an existing repository with::
+
+    borg key add --fido2-device --label mytoken
+
+Enrollment needs two touches on the token (one to create the credential, one
+to derive the secret). If the token has a PIN or built-in user verification
+(e.g. a fingerprint reader) configured, that is required as well - at
+enrollment and at every unlock. Afterwards, borg unlocks the repository with
+the plugged-in token automatically whenever no matching passphrase was
+supplied; no option is needed at unlock time (``BORG_FIDO2_DEVICE`` can pin a
+specific device on machines with several tokens).
+
+The admin key created by ``borg repo-create`` always remains a
+passphrase-protected key and cannot be removed - so a repository with a FIDO2
+key always keeps a passphrase fallback, by construction. If the token is
+lost or breaks, unlock with the admin passphrase, remove the old FIDO2 borg
+key (``borg key remove --label mytoken``) and enroll a replacement token.
+
+What a FIDO2 borg key protects against - the threat model, honestly:
+
+- A stolen key blob (keyfile or repokey) alone is useless without the token;
+  unlike a passphrase, the token's secret cannot be guessed, phished or
+  shoulder-surfed. With a PIN / user verification configured on the token,
+  even blob *plus* stolen token is not enough.
+- On tokens that enforce the touch (most do, e.g. YubiKeys), malware on the
+  client cannot silently unlock the repository while the token is plugged in -
+  each unlock needs a physical touch.
+- It does **not** protect against a compromised client at unlock time: once
+  you touch the token, the client obtains the decrypted key material, exactly
+  as with a passphrase. The hmac-secret for a given credential and salt is
+  also static, so a leaked derived secret stays valid until the borg key is
+  re-enrolled (remove and re-add it).
+- A repository is only as secure as its *weakest* borg key: adding a FIDO2 key
+  does not strengthen a weak or empty admin passphrase. Treat the admin key as
+  what it is - the recovery path - and give it a strong passphrase, stored
+  safely (e.g. printed, via ``borg key export --paper``).
+
+``borg key add --fido2-touch=no`` stores a key that unlocks without a touch,
+for unattended backups: that key is bound to the plugged-in device (an
+uncopyable keyfile, in effect), but not presence-gated. Many tokens enforce
+the touch in firmware and refuse this; borg verifies it at enrollment and
+fails cleanly in that case.
+
+FIDO2 support needs the ``fido2`` python package (``pip install
+'borgbackup[fido2]'``).
+
 When backing up to remote encrypted repos, is encryption done locally?
 ----------------------------------------------------------------------
 

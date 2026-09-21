@@ -182,6 +182,17 @@ Breaking changes (you must create new repos for b25):
 
 New features:
 
+- key add --fido2-device: protect a borg key with a FIDO2 hardware token's
+  hmac-secret (e.g. a YubiKey) instead of a passphrase, #8995.
+  Unlocking finds the matching plugged-in token automatically
+  (BORG_FIDO2_DEVICE pins one); the token's PIN or built-in user verification
+  is enforced when configured; --fido2-touch=no allows touchless keys for
+  unattended backups on tokens that support it. The admin key created by
+  repo-create always stays a passphrase key, so there is a built-in recovery
+  path if the token is lost. Requires the "fido2" python package (install
+  with: pip install 'borgbackup[fido2]').
+- new-passphrase input: BORG_NEW_PASSCOMMAND and BORG_NEW_PASSPHRASE_FD
+  complement BORG_NEW_PASSPHRASE (a group like BORG_* / BORG_OTHER_*), #8995
 - create/import-tar --json: report the deduplicated size of the new archive, #10335
 - diff --stats: show a summary of the differences, #796
 - repo-info: show whether the key uses an empty passphrase, #9072

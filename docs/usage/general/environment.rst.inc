@@ -11,16 +11,22 @@ General:
         Use this so you do not need to type ``--repo /path/to/my/repo`` all the time.
     BORG_OTHER_REPO
         Similar to BORG_REPO, but gives the default for ``--other-repo``.
-    BORG_PASSPHRASE (and BORG_OTHER_PASSPHRASE)
+    BORG_PASSPHRASE (and BORG_NEW_PASSPHRASE, BORG_OTHER_PASSPHRASE)
         When set, use the value to answer the passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are mutually exclusive:
         if more than one of them is set, borg refuses to guess and aborts with
         "More than one passphrase environment variable is set". The same applies to the
-        ``BORG_OTHER_*`` variants (which are a separate, independent group).
+        ``BORG_NEW_*`` and ``BORG_OTHER_*`` variants (each of which is a separate,
+        independent group).
         See also BORG_NEW_PASSPHRASE.
-    BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
+        borg removes the passphrase-related variables (BORG_PASSPHRASE, BORG_PASSCOMMAND,
+        BORG_PASSPHRASE_FD and their ``BORG_NEW_*`` and ``BORG_OTHER_*`` variants) as well as
+        BORGSTORE_REST_PASSWORD from the environment of the subprocesses it starts (like the
+        command given in BORG_PASSCOMMAND, ``--paths-from-command`` / ``--content-from-command``
+        commands, tar filter commands and ``borg with-lock`` commands).
+    BORG_PASSCOMMAND (and BORG_NEW_PASSCOMMAND, BORG_OTHER_PASSCOMMAND)
         When set, use the standard output of the command (trailing newlines are stripped) to answer the
         passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
@@ -28,22 +34,39 @@ General:
         is executed without a shell. So variables, like ``$HOME`` will work, but ``~`` won't.
         Mutually exclusive with BORG_PASSPHRASE and BORG_PASSPHRASE_FD, see there.
         See also BORG_NEW_PASSPHRASE.
-    BORG_PASSPHRASE_FD (and BORG_OTHER_PASSPHRASE_FD)
+    BORG_PASSPHRASE_FD (and BORG_NEW_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD)
         When set, specifies a file descriptor to read a passphrase
         from. Programs starting borg may choose to open an anonymous pipe
         and use it to pass a passphrase. This is safer than passing via
         BORG_PASSPHRASE, because on some systems (e.g. Linux) environment
         can be examined by other processes.
         Mutually exclusive with BORG_PASSPHRASE and BORG_PASSCOMMAND, see there.
-    BORG_NEW_PASSPHRASE
-        When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
-        This variable is checked first. If it is not set, BORG_PASSPHRASE, BORG_PASSCOMMAND and
-        BORG_PASSPHRASE_FD are checked (in that order).
+    BORG_NEW_PASSPHRASE (and BORG_NEW_PASSCOMMAND, BORG_NEW_PASSPHRASE_FD)
+        When set, use these to answer the passphrase question when a **new** passphrase is
+        asked for: like BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD, but for
+        the new passphrase.
+        The ``BORG_NEW_*`` group is checked first. If none of its variables is set,
+        BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are checked (in that order).
         Main use case for this is to fully automate ``borg key change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_DEBUG_PASSPHRASE
         When set to YES, display debugging information that includes passphrases used and passphrase related env vars set.
+    BORG_FIDO2_DEVICE
+        When set, unlocking a FIDO2-protected borg key (see ``borg key add --fido2-device``)
+        uses exactly this FIDO2 device, instead of probing all plugged-in devices for the
+        matching one (useful on machines with several tokens and for scripting).
+        The value is a platform device identifier as listed by ``fido2-token -L``:
+        e.g. ``/dev/hidrawN`` on Linux, a decimal IOKit registry entry id on macOS, or a
+        ``\\?\hid#...`` interface string on Windows.
+        Like there being no ``--passphrase`` option, unlock-time device pinning is
+        deliberately env-only; the device used for *enrollment* is selected with
+        ``borg key add --fido2-device DEVICE``.
+    BORG_FIDO2_PIN
+        When set, use the value as the FIDO2 token's PIN instead of prompting for it
+        (for automation). Careful: a wrong PIN burns one of the token's few CTAP retries
+        (3 consecutive failures block the token until re-insert, 8 block the PIN entirely).
+        The PIN is never taken from BORG_PASSPHRASE or BORG_PASSCOMMAND.
     BORG_EXIT_CODES
         When set to "modern", the borg process will return more specific exit codes (rc).
         When set to "legacy", the borg process will return rc 2 for all errors, 1 for all warnings, 0 for success.
@@ -186,7 +209,7 @@ General:
         An unknown place name is an error. An empty value (``BORG_ASSERT_ID=``) verifies at none of
         these places, but still where borg always verifies (see below).
 
-        Why ``read`` is not in the default: in the keyed modes, the envelope already authenticates
+        Why ``read`` is not in the default: the envelope already authenticates
         every read - the AEAD tag for the encrypted ciphersuites, the MAC for the (unencrypted)
         ``authenticated-*`` modes - and the chunk id is part of what that tag is computed over. So
         a successful decryption resp. tag check already proves that a holder of the borg key
@@ -208,10 +231,8 @@ General:
 
         - in ``borg check --verify-data``. That audit is what makes not verifying elsewhere
           defensible, so it is not configurable (there is no ``verify_data`` place name).
-        - for ``none-*`` mode repositories: they have no key, so nothing authenticates a read
-          there and their unkeyed checksums only detect accidental corruption. The id check is
-          therefore not optional there: it happens at every place, whatever this variable says.
-          Same for reading borg 1.x repositories (``borg transfer``).
+        - when reading borg 1.x repositories (``borg transfer --from-borg1``): their envelope does
+          not cover the chunk id, so the id check is not optional there.
     BORG_BLAKE3_MT_THRESHOLD
         When set to a numeric value, chunks of at least that many KiB get their id computed by
         multi-threaded BLAKE3, smaller ones single-threaded (default: 256, i.e. 256KiB).
@@ -341,8 +362,7 @@ General:
             Without the key, borg can not verify anything that needs it: neither the
             authentication tag of the repository objects nor the chunk ids. It therefore
             reads the repository **unverified** - a corrupted or tampered repository will
-            not be detected. (This only concerns the ``authenticated-*`` modes; the
-            ``none-*`` modes need no key and keep verifying their checksums.)
+            not be detected.
 
             This workaround is **only** for emergencies and **only** to extract data
             from an affected repository (read-only access)::

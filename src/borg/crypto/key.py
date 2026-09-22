@@ -205,19 +205,23 @@ def key_creator(repository, args, *, other_key=None):
     # those names is only accepted if both agree.
     enc = args.encryption
     id_hash = getattr(args, "id_hash", None)  # None: not given, see the --id-hash argparse default
-    for key in AVAILABLE_KEY_TYPES:
-        if key.ENC_NAME != enc:
+    for key_cls in AVAILABLE_KEY_TYPES:
+        if key_cls.ENC_NAME != enc:
             continue
-        if key.IDHASH_IN_ENC_NAME:
-            if id_hash is not None and id_hash != key.IDHASH_NAME:
+        if key_cls.IDHASH_IN_ENC_NAME:
+            if id_hash is not None and id_hash != key_cls.IDHASH_NAME:
                 raise Error(
-                    f'The "{enc}" encryption mode always uses the "{key.IDHASH_NAME}" id-hash, '
+                    f'The "{enc}" encryption mode always uses the "{key_cls.IDHASH_NAME}" id-hash, '
                     f'thus --id-hash "{id_hash}" can not be used with it.'
                 )
-            return key.create(repository, args, other_key=other_key)
-        if key.IDHASH_NAME == (id_hash or "sha256"):
-            return key.create(repository, args, other_key=other_key)
-    raise Error(f'Unsupported --encryption "{enc}" / --id-hash "{id_hash}" combination.')
+            break
+        if key_cls.IDHASH_NAME == (id_hash or "sha256"):
+            break
+    else:
+        raise Error(f'Unsupported --encryption "{enc}" / --id-hash "{id_hash}" combination.')
+    key = key_cls.create(repository, args, other_key=other_key)
+    repository.set_key(key)  # the key protects the repository's index/ and cache/ store objects
+    return key
 
 
 def encryption_argument_names():
@@ -273,8 +277,14 @@ def key_class_of(repository):
 
 
 def key_factory(repository, *, other=False):
-    """Return the (loaded) key of repository, its class selected by the repository config."""
-    return key_class_of(repository).detect(repository, None, other=other)
+    """Return the (loaded) key of repository, its class selected by the repository config.
+
+    The key is also set as the repository's key (see Repository.set_key): it protects the repository's
+    index/ and cache/ store objects.
+    """
+    key = key_class_of(repository).detect(repository, None, other=other)
+    repository.set_key(key)
+    return key
 
 
 def legacy_key_factory(repository, manifest_chunk, *, other=False):

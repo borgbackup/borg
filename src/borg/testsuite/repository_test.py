@@ -20,9 +20,15 @@ from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
 from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
-from . import make_test_key
+from . import make_test_key, set_test_key_on_open
 from .hashindex_test import H
 from .repoobj_test import CHUNK_ID_OFFSET, DATA_SIZE_OFFSET, META_SIZE_OFFSET
+
+
+@pytest.fixture(autouse=True)
+def use_test_key_on_open(monkeypatch):
+    # the index/ and cache/ objects need a key, see Repository.set_key.
+    set_test_key_on_open(monkeypatch)
 
 
 def test_rest_serve_command_local():
@@ -1116,7 +1122,7 @@ def test_store_load_decrypt_detects_tampering(repository, key_class):
 
 def test_store_encrypt_store_without_a_key(repository):
     with repository:
-        assert repository.key is None
+        repository.set_key(None)  # undo use_test_key_on_open
         with pytest.raises(Repository.KeyRequired) as excinfo:
             repository.store_encrypt_store("cache/test", b"payload")
         assert excinfo.value.exit_mcode == 28
@@ -2987,14 +2993,13 @@ def test_open_refuses_bad_config(tmp_path):
 
 
 def test_create_failure_leaves_no_store_behind(tmp_path, monkeypatch):
-    # a failure inside create() after the store was created (e.g. disk full while writing the empty chunk
-    # index) must not leave a store without config behind.
-    from .. import cache as cache_module
+    # a failure inside create() after the store was created (e.g. disk full while writing the config)
+    # must not leave a store without config behind.
 
-    def failing_write(*args, **kwargs):
+    def failing_save_config(self, key=None):
         raise OSError("simulated disk full")
 
-    monkeypatch.setattr(cache_module, "write_chunkindex_to_repo", failing_write)
+    monkeypatch.setattr(Repository, "save_config", failing_save_config)
     location = os.fspath(tmp_path / "repo")
     with pytest.raises(OSError, match="simulated disk full"):
         with Repository(location, exclusive=True, create=True):

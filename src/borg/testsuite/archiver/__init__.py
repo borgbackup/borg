@@ -241,11 +241,30 @@ def write_wrong_content_chunk(archive, repository, chunk_id, *, ro_type=ROBJ_FIL
     repository.flush()
 
 
+class KeyedRepository(Repository):
+    """A Repository that loads its key when it is opened, as the index/ and cache/ objects need it.
+
+    Tests use it to access a repository created by "borg repo-create" directly. The key is loaded with
+    key_factory, using the BORG_PASSPHRASE and BORG_KEYS_DIR the archiver fixture sets.
+    """
+
+    def open(self, *args, **kwargs):
+        from ...crypto.key import key_factory, RepositoryKeyInfoMissing
+
+        result = super().open(*args, **kwargs)
+        if self.key is None:
+            try:
+                key_factory(self)  # sets the key
+            except RepositoryKeyInfoMissing:
+                pass  # no key yet, e.g. a repository created without "borg repo-create"
+        return result
+
+
 def open_repository(archiver):
     if archiver.get_kind() == "remote":
-        return Repository(Location(archiver.repository_location), exclusive=True)
+        return KeyedRepository(Location(archiver.repository_location), exclusive=True)
     else:
-        return Repository(archiver.repository_path, exclusive=True)
+        return KeyedRepository(archiver.repository_path, exclusive=True)
 
 
 def create_regular_file(input_path, name, size=0, contents=None):

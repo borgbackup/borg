@@ -33,6 +33,13 @@ from ..helpers import CorruptPack, Error, bin_to_hex, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import PackReader, Repository
+from . import set_test_key_on_open
+
+
+@pytest.fixture(autouse=True)
+def use_test_key_on_open(monkeypatch):
+    # the index/ and cache/ objects need a key, see Repository.set_key.
+    set_test_key_on_open(monkeypatch)
 
 
 class TestAdHocWithFilesCache:

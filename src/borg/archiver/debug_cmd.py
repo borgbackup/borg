@@ -3,8 +3,7 @@ import textwrap
 
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..crypto.key import key_factory, KeyfileInvalidError, RepoKeyNotFoundError, UnsupportedKeyFormatError
-from ..crypto.key import RepositoryKeyInfoMissing
+from ..crypto.key import key_factory
 from ..helpers import msgpack
 from ..helpers import FilesystemPathSpec
 from ..helpers import sysinfo
@@ -24,22 +23,6 @@ from ._common import process_epilog
 from ..logger import create_logger
 
 logger = create_logger()
-
-
-def gap_validator(repository):
-    """Return repoobj.object_validator for the key of repository, or None if there is no key to use.
-
-    The key is loaded with key_factory. There is no key to use if the repository config has no key info
-    (RepositoryKeyInfoMissing), no key is found (RepoKeyNotFoundError), or the key is invalid
-    (KeyfileInvalidError, UnsupportedKeyFormatError); a warning is logged then. Other errors, e.g. a
-    wrong passphrase, propagate.
-    """
-    try:
-        key = key_factory(repository)
-    except (RepositoryKeyInfoMissing, RepoKeyNotFoundError, KeyfileInvalidError, UnsupportedKeyFormatError) as err:
-        logger.warning(f"Could not set up the key, so rewritten packs keep their superseded gap bytes: {err}")
-        return None
-    return object_validator(RepoObj(key))
 
 
 class DebugMixIn:
@@ -202,6 +185,7 @@ class DebugMixIn:
             id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
+        key_factory(repository)  # sets the repository key, needed to load the chunk index from index/
         try:
             data = repository.get(id)
         except Repository.ObjectNotFound:
@@ -276,7 +260,7 @@ class DebugMixIn:
             id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
-
+        key_factory(repository)  # sets the repository key, needed to load and store the chunk index in index/
         repository.put(id, data)
         repository.flush()  # no cache wraps this command, so flush the buffered pack before close()
         print("object %s put." % hex_id)
@@ -290,7 +274,12 @@ class DebugMixIn:
                 ids.append((hex_id, hex_to_bin(hex_id, length=32)))
             except ValueError:
                 ids.append((hex_id, None))
-        validate = gap_validator(repository) if any(id is not None for _, id in ids) else None
+        if any(id is not None for _, id in ids):
+            # the key is needed to load and store the chunk index in index/, and to validate the objects
+            # next to a deleted one when its pack is rewritten.
+            validate = object_validator(RepoObj(key_factory(repository)))
+        else:
+            validate = None  # only invalid ids: the repository is not touched
         for hex_id, id in ids:
             if id is None:
                 print("object id %s is invalid." % hex_id)

@@ -1024,6 +1024,9 @@ class Repository:
 
         If anything fails after the store was created, the store is destroyed again, so a failure (e.g.
         disk full, permission denied) does not leave a store without config behind either.
+
+        No chunk index is written here, as the index/ objects need the key (see store_encrypt_store):
+        "borg repo-create" writes an empty one after creating the key.
         """
         try:
             self.store.create()
@@ -1039,14 +1042,6 @@ class Repository:
                 self.id = os.urandom(32)
                 if self._create_config:
                     self.save_config()
-                # we know repo/packs/ still does not have any chunks stored in it,
-                # but for some stores, there might be a lot of empty directories and
-                # listing them all might be rather slow, so we better cache an empty
-                # ChunkIndex from here so that the first repo operation does not have
-                # to build the ChunkIndex the slow way by listing all the directories.
-                from borg.cache import write_chunkindex_to_repo
-
-                write_chunkindex_to_repo(self, ChunkIndex(), clear=True, force_write=True)
             finally:
                 self.store.close()
         except BaseException:

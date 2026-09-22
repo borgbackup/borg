@@ -37,6 +37,11 @@ Under these circumstances Borg guarantees that the attacker cannot
    structural information such as the object graph (which archives
    refer to what chunks)
 
+Guarantees 3 and 4 need an encrypting mode (not ``authenticated-*``). For 4, this
+includes the store objects borg keeps next to the packs: the chunk index fragments
+and the per-archive reference caches are encrypted with the key, too, see
+:ref:`store object envelope <store_object_envelope>`.
+
 The attacker can always impose a denial of service by definition (they could
 block connections to the repository, or delete it partly or entirely).
 
@@ -352,8 +357,11 @@ used:
   object's metadata slot and data slot are encrypted and authenticated with the borg
   key (see :ref:`security_encryption`); its per-object header is unencrypted and
   carries the magic, the format version and the chunk id (see :ref:`pack-format`).
-- ``index/<store hash>`` -- the chunk id to pack location index. It is not encrypted,
-  but it only contains chunk ids and locations, which the pack headers expose anyway.
+- ``index/<store hash>`` -- the chunk id to pack location index, in the key's
+  :ref:`store object envelope <store_object_envelope>`: encrypted and authenticated
+  in the encrypting modes, authenticated only in the ``authenticated-*`` modes. It
+  contains chunk ids and locations, which the pack headers expose anyway; the
+  fragment names and sizes reveal a rough chunk count.
 - ``archives/<hex(archive_id)>`` -- one empty object per archive. The archive name,
   its timestamps, the item metadata and the chunk lists all live inside encrypted
   repository objects, so the pointer object itself only reveals the archive id (a MAC
@@ -381,10 +389,15 @@ used:
     client never ends up using key material of the attacker's choice.
 - ``keys/<store hash>`` -- in ``repokey`` mode, the borg key(s), encrypted with the
   passphrase-derived KEK (see :ref:`key_encryption`).
-- ``locks/*`` and ``cache/*``. Note that the per-archive reference caches
-  ``cache/referenced-by-archive.<hex(archive_id)>``, written by ``borg compact`` and
-  ``borg analyze``, are *not* encrypted: they list the object ids and plaintext sizes
-  an archive references.
+- ``cache/*``: ``cache/checked-packs`` (the ``borg check`` results per pack) and the
+  per-archive reference caches ``cache/referenced-by-archive.<hex(archive_id)>``
+  (written by ``borg compact`` and ``borg analyze``, they list the object ids and
+  plaintext sizes an archive references) are in the key's store object envelope, like
+  the index. The envelope binds each object to its name, so the store can not make
+  borg use the reference cache of one archive for another one. Their names still show
+  the archive ids that have a reference cache and that a check ran.
+  ``cache/chunkindex-invalid`` is an empty marker object.
+- ``locks/*`` -- the repository locks, not encrypted.
 
 Authorization and transport security come from the transport, not from borg.
 

@@ -275,13 +275,14 @@ Chunk-to-location mappings are stored as a separate set of objects under the
 
 A fragment is a serialized ``ChunkIndex`` (a ``borghash`` ``HashTableNT`` keyed on
 ``chunk_id``) holding only the pack location; the ``flags`` and the plaintext ``size``
-of each entry are zeroed before serializing. Fragments are **not** encrypted: they map
-``chunk_id`` to ``(pack_id, obj_offset, obj_size)``, which anyone with access to the
-repository could equally well read out of the unencrypted blob headers (see
-:ref:`pack-recovery`). A fragment's name is the store hash of its own content::
+of each entry are zeroed before serializing. The fragment is stored in the key's
+:ref:`store object envelope <store_object_envelope>`: encrypted and authenticated in
+the encrypting modes, authenticated only in the ``authenticated-*`` modes. A
+fragment's name is the store hash of the stored envelope, so ``borg check`` and
+borgstore can verify it without the key, like any other content-addressed object::
 
     index/
-      <store_hash_of_content_hex>
+      <store_hash_of_envelope_hex>
 
 An ordinary backup writes only the entries that are new in that session; a full
 rewrite (e.g. by ``borg compact``) writes all of them. In both cases the write is
@@ -291,17 +292,24 @@ first backup of a big dataset produces. The split selects and sorts the keys one
 leading-key-bits partition at a time, so the same set of entries always yields the
 same fragments, no matter in which order the entries were inserted.
 
-Content-addressed naming makes each fragment self-verifying and idempotent: writing
-the same index data twice produces the same name, and such a write is skipped.
+Content-addressed naming makes each fragment self-verifying. In the encrypting modes,
+the envelope is randomized, so writing the same entries twice produces two
+differently named fragments with the same content: the merge (see below) is
+idempotent, so this is harmless; e.g. two clients consolidating the same small
+fragments at the same time can leave a duplicate fragment behind until the next
+``borg compact``. In the ``authenticated-*`` modes, the envelope is deterministic, so
+the same entries produce the same name.
 
 Index fragments are write-once; an existing fragment is never modified. The in-memory
 ChunkIndex is built lazily, on the first access to ``Repository.chunks``: everything
-under ``index/`` is listed, loaded, checked against its content hash and merged
-(``build_chunkindex_from_repo``). The merge is commutative and idempotent; order does
-not matter. It has to succeed for *all* fragments or not at all, because a partially
-merged index would be missing chunks that do exist in the repository: a fragment that
-vanishes mid-merge (a concurrent consolidation replaced it) restarts the merge, and a
-persistently unreadable one falls back to the rebuild from the pack files.
+under ``index/`` is listed, loaded, checked against its name (store hash) and the
+envelope's authentication and merged (``build_chunkindex_from_repo``). The merge is
+commutative and idempotent; order does not matter. It has to succeed for *all*
+fragments or not at all, because a partially merged index would be missing chunks
+that do exist in the repository: a fragment that vanishes mid-merge (a concurrent
+consolidation replaced it) restarts the merge, and a corrupt one (it does not match
+its name, fails the authentication or does not deserialize) falls back to the rebuild
+from the pack files.
 
 Because every backup appends a fragment, small fragments would pile up over time.
 ``repack_chunkindex()`` (run at cache close, and by anything that loads the index and

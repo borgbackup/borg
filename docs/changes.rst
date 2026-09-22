@@ -175,10 +175,12 @@ Breaking changes (you must create new repos for b25):
   are also given there as plain text.
 - store hash: use the much faster pure software blake3 hash instead of sha256
   to name content-addressed objects in the store.
-- append blake3 instead of sha256 integrity checksums to
-  not-content-addressed objects in the store
 - drop OBJ_VERSION_NO_HEADER_AAD (pack object format v1) support, #9973
 - KeyType: renumber the authenticated-* key types to 0x50 / 0x60
+- the index/ fragments and the cache/checked-packs and cache/referenced-by-archive.*
+  store objects are protected by the repository key now, like the objects in the
+  packs: encrypted and authenticated in the encrypting modes, authenticated only in
+  the authenticated-* modes, #9819, #10235
 
 New features:
 
@@ -239,6 +241,7 @@ Other changes:
 - remove the repository feature flags mechanism (used to be in the manifest,
   but was never really used)
 - security: drop the manifest timestamp replay check (not needed any more)
+- debug get-obj, put-obj, delete-obj: need the key now (to access the chunk index)
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088

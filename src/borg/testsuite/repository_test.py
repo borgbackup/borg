@@ -1524,7 +1524,7 @@ def test_check_reports_invalid_pack_name(tmp_path, caplog):
             assert repository.check(repair=False) is False
 
         assert "packs/not-a-hex-name has an invalid name" in caplog.text
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # the valid pack was checked
 
 
@@ -1826,21 +1826,37 @@ def test_check_partial_still_detects_missing_pack(tmp_path, caplog):
 def test_check_checked_packs_roundtrip(tmp_path):
     # the set survives a store/load round-trip; a rotted blob loads as empty.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.table[H(1)] = PackTracker.Entry(timestamp=123, result=1)
         tracker.table[H(2)] = PackTracker.Entry(timestamp=456, result=0)
         tracker.save()
 
-        loaded = PackTracker.load(repository.store)
+        loaded = PackTracker.load(repository)
         assert len(loaded) == 2
         assert H(1) in loaded.table and H(2) in loaded.table
         assert tuple(loaded.table[H(2)]) == (456, 0)
 
         corrupted = bytearray(repository.store.load(PackTracker.NAME))
-        corrupted[0] ^= 0xFF  # break the appended store hash
+        corrupted[-1] ^= 0xFF  # fails the authentication of the key's envelope
         repository.store.store(PackTracker.NAME, bytes(corrupted))
-        rotted = PackTracker.load(repository.store)
+        rotted = PackTracker.load(repository)
         assert len(rotted) == 0
+
+
+def test_check_checked_packs_bound_to_its_name(tmp_path, caplog):
+    # an object in the key's envelope, copied from another name to cache/checked-packs, is ignored:
+    # the envelope binds the object to its name.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        tracker = PackTracker.new(repository)
+        tracker.table[H(1)] = PackTracker.Entry(timestamp=123, result=1)
+        with io.BytesIO() as f:
+            tracker.table.write(f)
+            data = f.getvalue()
+        repository.store_encrypt_store("cache/other", data)
+        repository.store_store(PackTracker.NAME, repository.store_load("cache/other"))
+        with caplog.at_level(logging.WARNING):
+            assert len(PackTracker.load(repository)) == 0
+        assert "Ignoring corrupted checked-packs set." in caplog.text
 
 
 def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
@@ -1851,7 +1867,7 @@ def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
         repository.store_store("packs/" + bin_to_hex(intact_id), intact)
 
         # mark the intact pack as recently checked.
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1869,7 +1885,7 @@ def test_check_partial_rechecks_pack_recorded_corrupt(tmp_path):
         corrupt_id = H(1)  # stored content does not hash to this name
         repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(corrupt_id, ok=False)
         tracker.save()
 
@@ -1903,7 +1919,7 @@ def test_check_partial_clears_recorded_corruption_when_intact(tmp_path, monkeypa
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=False)  # stale corrupt record
         tracker.save()
 
@@ -1918,7 +1934,7 @@ def test_check_partial_skips_pack_recorded_intact(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1933,7 +1949,7 @@ def test_check_without_max_age_verifies_all_but_keeps_records(tmp_path, monkeypa
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1942,7 +1958,7 @@ def test_check_without_max_age_verifies_all_but_keeps_records(tmp_path, monkeypa
         assert repository.check(repair=False) is True
         assert pack_key in hashed_keys  # verified despite the fresh intact record
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # record kept
 
 
@@ -1960,7 +1976,7 @@ def test_check_full_keeps_records_after_check(tmp_path):
 
         assert repository.check(repair=False) is False
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.corrupt_ids() == [corrupt_id]
         assert after.table[intact_id].result == 1
 
@@ -1981,7 +1997,7 @@ def test_check_full_reverifies_carried_over_corrupt_record(tmp_path, monkeypatch
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=False)  # recorded corrupt in an earlier check
         tracker.save()
 
@@ -1990,7 +2006,7 @@ def test_check_full_reverifies_carried_over_corrupt_record(tmp_path, monkeypatch
         assert repository.check(repair=False) is True
         assert pack_key in hashed_keys  # re-verified
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # verified intact, corrupt record replaced
 
 
@@ -1999,13 +2015,13 @@ def test_check_full_prunes_corrupt_record_of_vanished_pack(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, _ = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(H(9), ok=False)  # no such pack in packs/
         tracker.save()
 
         assert repository.check(repair=False) is True
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert H(9) not in after.table
         assert intact_id in after.table
 
@@ -2016,11 +2032,11 @@ def test_check_partial_keeps_corrupt_record_across_runs(tmp_path):
         corrupt_id = _store_corrupt_pack(repository, H(1))
 
         assert repository.check(repair=False, max_duration=3600, max_age=3600) is False
-        assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
+        assert PackTracker.load(repository).corrupt_ids() == [corrupt_id]
 
         # a second run re-verifies it and keeps reporting it.
         assert repository.check(repair=False, max_duration=3600, max_age=3600) is False
-        assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
+        assert PackTracker.load(repository).corrupt_ids() == [corrupt_id]
 
 
 def test_check_partial_break_reports_unreached_corrupt_record(tmp_path, monkeypatch, caplog):
@@ -2034,7 +2050,7 @@ def test_check_partial_break_reports_unreached_corrupt_record(tmp_path, monkeypa
         corrupt_key = "packs/" + bin_to_hex(corrupt_id)
         repository.store_store(corrupt_key, b"CORRUPT-does-not-match-name")
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(corrupt_id, ok=False)  # recorded corrupt by an earlier check
         tracker.save()
 
@@ -2065,7 +2081,7 @@ def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)  # fresh timestamp
         tracker.save()
 
@@ -2074,7 +2090,7 @@ def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
         assert repository.check(repair=False, max_age=3600) is True
         assert pack_key not in hashed_keys  # skipped, its record is fresh
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # record kept
 
 
@@ -2084,7 +2100,7 @@ def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
         intact_id, pack_key = _store_intact_pack(repository)
 
         max_age = 50
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         old_ts = int(time.time()) - (max_age + 100)  # clearly beyond max_age
         tracker.table[intact_id] = PackTracker.Entry(timestamp=old_ts, result=1)
         tracker.save()
@@ -2094,7 +2110,7 @@ def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
         assert repository.check(repair=False, max_age=max_age) is True
         assert pack_key in hashed_keys  # stale, re-verified
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].timestamp > old_ts  # record refreshed
 
 
@@ -2104,7 +2120,7 @@ def test_check_max_age_reverifies_stale_within_skew(tmp_path, monkeypatch):
         intact_id, pack_key = _store_intact_pack(repository)
 
         max_age = MAX_CLOCK_SKEW * 2  # window wider than MAX_CLOCK_SKEW
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         past_ts = int(time.time()) - (max_age + MAX_CLOCK_SKEW // 2)  # just past the window
         tracker.table[intact_id] = PackTracker.Entry(timestamp=past_ts, result=1)
         tracker.save()
@@ -2120,7 +2136,7 @@ def test_check_max_age_skips_near_future_ok(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         future_ts = int(time.time()) + MAX_CLOCK_SKEW // 2
         tracker.table[intact_id] = PackTracker.Entry(timestamp=future_ts, result=1)
         tracker.save()
@@ -2136,7 +2152,7 @@ def test_check_max_age_reverifies_far_future_ok(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         far_future_ts = int(time.time()) + MAX_CLOCK_SKEW + 3600
         tracker.table[intact_id] = PackTracker.Entry(timestamp=far_future_ts, result=1)
         tracker.save()
@@ -2154,7 +2170,7 @@ def test_check_max_age_reverifies_future_beyond_small_window(tmp_path, monkeypat
         intact_id, pack_key = _store_intact_pack(repository)
 
         small_window = MAX_CLOCK_SKEW // 4
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         future_ts = int(time.time()) + MAX_CLOCK_SKEW // 2  # ahead of us, but < MAX_CLOCK_SKEW
         tracker.table[intact_id] = PackTracker.Entry(timestamp=future_ts, result=1)
         tracker.save()
@@ -2170,7 +2186,7 @@ def test_check_max_age_reverifies_corrupt_even_when_fresh(tmp_path, monkeypatch)
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=False)  # fresh, but corrupt
         tracker.save()
 
@@ -2185,14 +2201,14 @@ def test_check_max_age_prunes_vanished_ok_record(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, _ = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.record(H(9), ok=True)  # no such pack in packs/
         tracker.save()
 
         assert repository.check(repair=False, max_age=3600) is True
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert intact_id in after.table
         assert H(9) not in after.table
 
@@ -2207,7 +2223,7 @@ def test_check_max_age_partial_progress(tmp_path, monkeypatch):
         repository.store_store("packs/" + bin_to_hex(pack_a_id), pack_a)
         repository.store_store("packs/" + bin_to_hex(pack_b_id), pack_b)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(pack_a_id, ok=True)  # fresh
         tracker.save()
 
@@ -2217,7 +2233,7 @@ def test_check_max_age_partial_progress(tmp_path, monkeypatch):
         assert "packs/" + bin_to_hex(pack_a_id) not in hashed_keys
         assert "packs/" + bin_to_hex(pack_b_id) in hashed_keys
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert pack_a_id in after.table and pack_b_id in after.table
 
 
@@ -2236,7 +2252,7 @@ def test_check_partial_orders_stale_oldest_first_and_skips_fresh(tmp_path, monke
         newer_key = "packs/" + bin_to_hex(newer_id)
 
         now = int(time.time())
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.table[fresh_id] = PackTracker.Entry(timestamp=now - 10, result=1)  # within max_age
         tracker.table[older_id] = PackTracker.Entry(timestamp=now - (max_age + 1000), result=1)
         tracker.table[newer_id] = PackTracker.Entry(timestamp=now - (max_age + 100), result=1)
@@ -2265,7 +2281,7 @@ def test_check_max_age_reuses_records_of_plain_check(tmp_path, monkeypatch):
 
 
 def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
-    # load() drops a set whose entries have a different layout than Entry, even though its store hash matches.
+    # load() drops a set whose entries have a different layout than Entry, even though its envelope is authentic.
     OtherEntry = namedtuple("OtherEntry", "timestamp result extra")
     OtherFormat = namedtuple("OtherFormat", "timestamp result extra")
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
@@ -2276,9 +2292,9 @@ def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
         with io.BytesIO() as f:
             table.write(f)
             data = f.getvalue()
-        repository.store_store(PackTracker.NAME, data + store_hash(data).digest())
+        repository.store_encrypt_store(PackTracker.NAME, data)
 
-        tracker = PackTracker.load(repository.store)
+        tracker = PackTracker.load(repository)
         assert len(tracker) == 0
 
 

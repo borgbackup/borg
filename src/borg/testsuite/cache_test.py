@@ -6,6 +6,7 @@ import time
 from datetime import UTC, datetime
 
 import pytest
+from borghash import HashTableNT
 
 from ..crypto.key import store_hash
 from .hashindex_test import H
@@ -924,3 +925,57 @@ def test_chunkindex_fragments_in_the_key_envelope(tmp_path, key_class):
         second_ci = read_chunkindex_from_repo(repository, second_hash)
         assert dict(first_ci.items()) == dict(second_ci.items())
         assert sorted(k for k, _ in first_ci.items()) == sorted(ids)
+
+
+def make_archive_references(ids):
+    table = HashTableNT(
+        key_size=32, value_type=cache_mod.ArchiveReferenceEntry, value_format=cache_mod.ArchiveReferenceEntryFormat
+    )
+    for id in ids:
+        table[id] = cache_mod.ArchiveReferenceEntry(size=len(id))
+    return cache_mod.ArchiveReferences(file_count=len(ids), content_size=32 * len(ids), ids=table)
+
+
+@pytest.mark.parametrize("key_class", [AESOCBKey, AuthenticatedKey])
+def test_archive_references_in_the_key_envelope(tmp_path, key_class):
+    ids = [H(i) for i in range(5)]
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        key = key_class(repository)
+        key.init_from_random_data()
+        key.init_ciphers()
+        repository.set_key(key)
+        cache_mod.store_archive_references(repository, H(100), make_archive_references(ids))
+        loaded = cache_mod.load_archive_references(repository, H(100))
+        assert (loaded.file_count, loaded.content_size) == (5, 5 * 32)
+        assert sorted(k for k, _ in loaded.ids.items()) == sorted(ids)
+        stored = repository.store_load(cache_mod.archive_reference_cache_name(H(100)))
+        if issubclass(key_class, AESOCBKey):
+            assert not any(id in stored for id in ids)
+        else:
+            assert all(id in stored for id in ids)
+
+
+@pytest.mark.parametrize("tamper", ["flipped_byte", "other_archive", "plaintext"])
+def test_archive_references_not_authentic(tmp_path, caplog, tamper):
+    # a corrupted cache, the cache of another archive (e.g. copied by a hostile store, which would make
+    # compact drop chunks this archive uses) and a plaintext cache of an older borg 2 beta are ignored.
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        name = cache_mod.archive_reference_cache_name(H(100))
+        if tamper == "flipped_byte":
+            cache_mod.store_archive_references(repository, H(100), make_archive_references([H(1)]))
+            data = bytearray(repository.store_load(name))
+            data[-1] ^= 0x01
+            repository.store_store(name, bytes(data))
+        elif tamper == "other_archive":
+            cache_mod.store_archive_references(repository, H(101), make_archive_references([H(1)]))
+            repository.store_store(name, repository.store_load(cache_mod.archive_reference_cache_name(H(101))))
+        else:
+            with io.BytesIO() as f:
+                references = make_archive_references([H(1)])
+                f.write((1).to_bytes(8, "little") + (32).to_bytes(8, "little"))
+                references.ids.write(f)
+                data = f.getvalue()
+            repository.store_store(name, data + store_hash(data).digest())
+        with caplog.at_level(logging.WARNING, logger="borg.cache"):
+            assert cache_mod.load_archive_references(repository, H(100)) is None
+        assert f"Ignoring corrupted references cache of archive {bin_to_hex(H(100))}." in caplog.text

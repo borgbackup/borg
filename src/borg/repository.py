@@ -30,7 +30,7 @@ from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
-from .crypto.key import is_keyfile, store_hash, STORE_HASH_NAME, STORE_HASH_SIZE
+from .crypto.key import is_keyfile, store_hash, STORE_HASH_NAME
 
 logger = create_logger(__name__)
 
@@ -667,47 +667,46 @@ class PackTracker:
     Records are kept across checks: intact records (result=1) are reused by checks run with
     max_age, corrupt records (result=0) are kept for repair and always re-verified. Records of
     packs no longer listed in packs/ are pruned when a check finishes scanning packs/.
-    Stored at cache/checked-packs as the serialized table with the store hash over it appended.
-    new() starts an empty tracker, load() reads the stored one.
+    Stored at cache/checked-packs as the serialized table in the repository key's envelope (see
+    Repository.store_encrypt_store). new() starts an empty tracker, load() reads the stored one.
     """
 
     NAME = "cache/checked-packs"
     KEY_SIZE = 32  # pack id
-    DIGEST_SIZE = STORE_HASH_SIZE  # of the appended store hash
     Entry = namedtuple("Entry", "timestamp result")
     EntryFormatT = namedtuple("EntryFormatT", "timestamp result")
     _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=corrupt
 
-    def __init__(self, store, table):
-        self.store = store
+    def __init__(self, repository, table):
+        self.repository = repository
         self.table = table
 
     @classmethod
-    def new(cls, store):
+    def new(cls, repository):
         """Return a tracker with an empty table."""
         table = HashTableNT(key_size=cls.KEY_SIZE, value_type=cls.Entry, value_format=cls._EntryFormat)
-        return cls(store, table)
+        return cls(repository, table)
 
     @classmethod
-    def load(cls, store):
+    def load(cls, repository):
         """Return a tracker holding the stored table.
 
-        Return an empty one if cache/checked-packs is missing, its appended store hash does not match,
-        it does not deserialize, or its entries do not have this class's key size and Entry layout.
+        Return an empty one if cache/checked-packs is missing, fails the authentication of the key's
+        envelope, does not deserialize, or its entries do not have this class's key size and Entry layout.
         """
         try:
-            data = store.load(cls.NAME)
+            data = repository.store_load_decrypt(cls.NAME)
         except StoreObjectNotFound:
-            return cls.new(store)
-        if len(data) < cls.DIGEST_SIZE or store_hash(data[: -cls.DIGEST_SIZE]).digest() != data[-cls.DIGEST_SIZE :]:
+            return cls.new(repository)
+        except IntegrityError:
             logger.warning("Ignoring corrupted checked-packs set.")
-            return cls.new(store)
+            return cls.new(repository)
         try:
-            with io.BytesIO(data[: -cls.DIGEST_SIZE]) as f:
+            with io.BytesIO(data) as f:
                 table = HashTableNT.read(f)
         except ValueError:
             logger.warning("Ignoring unreadable checked-packs set.")
-            return cls.new(store)
+            return cls.new(repository)
         # read() takes key size and value type from the blob itself, so the table needs a layout check
         # against Entry here. All entries in a table share one layout, so checking one entry suffices.
         sample = next(iter(table.items()), None)
@@ -715,8 +714,8 @@ class PackTracker:
             key, value = sample
             if len(key) != cls.KEY_SIZE or value._fields != cls.Entry._fields:
                 logger.warning("Ignoring checked-packs set with an unexpected layout.")
-                return cls.new(store)
-        return cls(store, table)
+                return cls.new(repository)
+        return cls(repository, table)
 
     def __len__(self):
         return len(self.table)
@@ -748,12 +747,12 @@ class PackTracker:
         with io.BytesIO() as f:
             self.table.write(f)
             data = f.getvalue()
-        self.store.store(self.NAME, data + store_hash(data).digest())
+        self.repository.store_encrypt_store(self.NAME, data)
 
     def clear(self):
         self.table.clear()
         try:
-            self.store.delete(self.NAME)
+            self.repository.store_delete(self.NAME)
         except StoreObjectNotFound:
             pass
 
@@ -1389,7 +1388,8 @@ class Repository:
         than a MAC, so that check detects accidental corruption but not tampering; the rebuild therefore
         checks every object with validate, see below, refs #9901, #10026. If any pack is corrupt the index
         is left unchanged, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs,
-        refs #9696.
+        refs #9696. That object is stored in the key's envelope, too, so check() needs the key (see
+        set_key).
 
         A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
         it. The record clears at the check that finds the pack intact again or gone (removed by
@@ -1443,7 +1443,7 @@ class Repository:
         assert not (repair and partial)
         mode = "partial" if partial else "full"
         logger.info(f"Starting {mode} repository check")
-        tracker = PackTracker.load(self.store)
+        tracker = PackTracker.load(self)
         if not len(tracker):
             logger.info("Starting from beginning.")
         elif max_age:

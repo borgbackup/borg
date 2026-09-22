@@ -38,7 +38,7 @@ from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
-from .crypto.key import store_hash, STORE_HASH_SIZE
+from .crypto.key import store_hash
 from .manifest import Manifest
 from .platform import SaveFile
 from .repository import Repository, StoreObjectNotFound, PackReader
@@ -1041,9 +1041,9 @@ def build_chunkindex_from_repo(
 
 # per-archive cache of the objects an archive references, stored in the repo as
 # cache/referenced-by-archive.<archive id hex>. it lets a following compact or analyze skip re-scanning
-# an unchanged archive's items. the blob is: file_count (uint64 LE), content_size (uint64 LE), a
-# serialized HashTableNT mapping object id (32 bytes) -> plaintext object size (uint32), and a
-# the store hash of all of that appended for integrity.
+# an unchanged archive's items. the blob is: file_count (uint64 LE), content_size (uint64 LE) and a
+# serialized HashTableNT mapping object id (32 bytes) -> plaintext object size (uint32). it is stored in
+# the repository key's envelope, which binds it to its name (see Repository.store_encrypt_store).
 REFERENCED_BY_ARCHIVE = "referenced-by-archive."  # name prefix within the "cache" store namespace
 ArchiveReferenceEntry = namedtuple("ArchiveReferenceEntry", "size")
 ArchiveReferenceEntryFormatT = namedtuple("ArchiveReferenceEntryFormatT", "size")
@@ -1070,19 +1070,21 @@ def list_archive_reference_caches(repository) -> set:
 
 def load_archive_references(repository, archive_id: bytes):
     """Load and verify an archive's references cache; return it, or None if it is missing/corrupted."""
+    hex_id = bin_to_hex(archive_id)
     try:
-        data = repository.store_load(archive_reference_cache_name(archive_id))
+        data = repository.store_load_decrypt(archive_reference_cache_name(archive_id))
     except StoreObjectNotFound:
         return None
-    # the serialized blob has the store hash of its content appended (the store name cannot also carry
-    # it, as borgstore's name length limit is too small for archive id hex + hash hex). a mismatch means
-    # the cache is corrupted; we then return None so the caller falls back to scanning the archive.
-    hex_id = bin_to_hex(archive_id)
-    if len(data) < 16 + STORE_HASH_SIZE or store_hash(data[:-STORE_HASH_SIZE]).digest() != data[-STORE_HASH_SIZE:]:
+    except IntegrityError:
+        # the cache is corrupted, or it is not the one of this archive (the envelope binds it to its name,
+        # so a cache copied to another archive's name fails, too). the caller then scans the archive.
+        logger.warning(f"Ignoring corrupted references cache of archive {hex_id}.")
+        return None
+    if len(data) < 16:
         logger.warning(f"Ignoring corrupted references cache of archive {hex_id}.")
         return None
     try:
-        with io.BytesIO(data[:-STORE_HASH_SIZE]) as f:
+        with io.BytesIO(data) as f:
             file_count = int.from_bytes(f.read(8), "little")
             content_size = int.from_bytes(f.read(8), "little")
             ids = HashTableNT.read(f)
@@ -1093,14 +1095,13 @@ def load_archive_references(repository, archive_id: bytes):
 
 
 def store_archive_references(repository, archive_id: bytes, references) -> None:
-    """Serialize the references (a small header plus the id->size table, with the store hash appended)."""
+    """Serialize the references (a small header plus the id->size table) and store them in the key's envelope."""
     with io.BytesIO() as f:
         f.write(references.file_count.to_bytes(8, "little"))
         f.write(references.content_size.to_bytes(8, "little"))
         references.ids.write(f)
         data = f.getvalue()
-    data += store_hash(data).digest()
-    repository.store_store(archive_reference_cache_name(archive_id), data)
+    repository.store_encrypt_store(archive_reference_cache_name(archive_id), data)
 
 
 def cleanup_archive_reference_caches(repository, stale_hex_ids: set) -> None:

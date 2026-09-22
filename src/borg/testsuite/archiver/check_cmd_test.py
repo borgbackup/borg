@@ -122,7 +122,7 @@ def test_check_soft_interrupt(archivers, request, monkeypatch):
             repository.check()
         finally:
             sig_int._sig_int_triggered = False
-        assert len(PackTracker.load(repository.store)) == 1  # the pack checked before the break persisted
+        assert len(PackTracker.load(repository)) == 1  # the pack checked before the break persisted
 
     # a partial check resumes from the saved record (the one pack checked before the interrupt).
     output = cmd(archiver, "check", "-v", "--repository-only", "--max-duration=600", exit_code=0)

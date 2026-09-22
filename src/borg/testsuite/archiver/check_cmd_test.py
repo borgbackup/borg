@@ -972,7 +972,9 @@ def test_check_aborts_on_wrong_passphrase(archivers, request, monkeypatch, mode)
     monkeypatch.setenv("BORG_PASSPHRASE", "definitely-not-the-passphrase")
     if archiver.FORK_DEFAULT:
         output = cmd(archiver, "check", "-v", *mode, exit_code=PassphraseWrong().exit_code)
-        assert "Starting" not in output  # neither the repository check nor the archives check started
+        assert "Passphrase supplied in BORG_PASSPHRASE" in output
+        assert "repository check" not in output  # the repository check did not start
+        assert "archive consistency check" not in output  # nor the archives check
     else:
         with pytest.raises(PassphraseWrong):
             cmd(archiver, "check", "-v", *mode)
@@ -989,7 +991,8 @@ def test_check_aborts_without_key_info(archivers, request, mode):
         expected_ec = RepositoryKeyInfoMissing("repo").exit_code
         output = cmd(archiver, "check", "-v", *mode, exit_code=expected_ec)
         assert "has no key information in its config" in output
-        assert "Starting" not in output  # neither the repository check nor the archives check started
+        assert "repository check" not in output  # the repository check did not start
+        assert "archive consistency check" not in output  # nor the archives check
     else:
         with pytest.raises(RepositoryKeyInfoMissing):
             cmd(archiver, "check", "-v", *mode)

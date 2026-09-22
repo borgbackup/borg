@@ -965,69 +965,38 @@ def test_check_repair_validates_index_rebuild(archivers, request):
         assert neighbour_id in repository.chunks
 
 
-def test_check_without_key_aborts_on_a_corrupt_pack_header(archivers, request, monkeypatch):
-    """A check without --repair and without the key raises CorruptPack at a corrupt object header.
-
-    Without the key there is no object validator, and without one the pack walk raises at a corrupt
-    object header.
-
-    The rebuild only walks the packs when the chunk index fragments are unusable, and it only walks
-    without a validator when the key can not be read, so the test arranges both.
-    """
+@pytest.mark.parametrize("mode", [[], ["--repository-only"], ["--archives-only"]])
+def test_check_aborts_on_wrong_passphrase(archivers, request, monkeypatch, mode):
+    """check always needs the key: it aborts on a wrong passphrase, before it checks anything."""
     archiver = request.getfixturevalue(archivers)
-    if archiver.get_kind() != "local":
-        pytest.skip("patches in-process archive internals")
     check_cmd_setup(archiver)
+    monkeypatch.setenv("BORG_PASSPHRASE", "definitely-not-the-passphrase")
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "check", "-v", *mode, exit_code=PassphraseWrong().exit_code)
+        assert "Passphrase supplied in BORG_PASSPHRASE" in output
+        assert "repository check" not in output  # the repository check did not start
+        assert "archive consistency check" not in output  # nor the archives check
+    else:
+        with pytest.raises(PassphraseWrong):
+            cmd(archiver, "check", "-v", *mode)
 
-    # two objects no archive references: they go into a pack of their own, so the damage below
-    # stays out of the objects the check reads back.
-    kept_id = b"kept-chunk".ljust(32, b".")  # object ids are 32 bytes long
-    damaged_id = b"damaged-chunk".ljust(32, b".")
-    with Repository(archiver.repository_location, exclusive=True) as repository:
-        repository.put(kept_id, fchunk(b"kept", chunk_id=kept_id))
-        repository.put(damaged_id, fchunk(b"damaged", chunk_id=damaged_id))
-        repository.flush()
-    with Repository(archiver.repository_location, exclusive=True) as repository:
-        kept, damaged = repository.chunks[kept_id], repository.chunks[damaged_id]
-        assert kept.pack_id == damaged.pack_id and kept.obj_offset < damaged.obj_offset
-        damaged_offset = damaged.obj_offset
-        key = "packs/" + bin_to_hex(damaged.pack_id)
-        repository.store_store(key, corrupt(repository.store_load(key), damaged_offset))
-        # the fragments are the fast path: without them the rebuild falls through to the pack walk,
-        # which is the only place the corrupt header is seen at all.
-        delete_chunkindex_from_repo(repository)
 
-    real_make_key = ArchiveChecker.make_key
-
-    def make_key(self, repository):
-        # fail the reads before the index rebuild (the one the rebuild's validator needs), as a
-        # repository config without key info would. the full read after the rebuild succeeds.
-        if getattr(self, "chunks", None) is None:
-            raise RepositoryKeyInfoMissing("no key")
-        return real_make_key(self, repository)
-
-    real_build = archive_module.build_chunkindex_from_repo
-    rebuilds = []
-
-    def build_chunkindex_from_repo(repository, **kwargs):
-        try:
-            index = real_build(repository, **kwargs)
-        except Exception as err:
-            rebuilds.append((kwargs.get("validate"), err))
-            raise
-        rebuilds.append((kwargs.get("validate"), index))
-        return index
-
-    monkeypatch.setattr(ArchiveChecker, "make_key", make_key)
-    monkeypatch.setattr(archive_module, "build_chunkindex_from_repo", build_chunkindex_from_repo)
-    # --archives-only: the repository check would stop at the damaged pack (a pack is named by the
-    # store hash of its content) before the archives check ever walks it.
-    with pytest.raises(CorruptPack) as excinfo:
-        cmd(archiver, "check", "--archives-only")
-    assert f"no object header at offset {damaged_offset} (pack corruption)" in str(excinfo.value)
-    validate, outcome = rebuilds[0]
-    assert validate is None
-    assert isinstance(outcome, CorruptPack)
+@pytest.mark.parametrize("mode", [[], ["--repository-only"], ["--archives-only"]])
+def test_check_aborts_without_key_info(archivers, request, mode):
+    """check always needs the key: it refuses a repository whose config has no key info."""
+    archiver = request.getfixturevalue(archivers)
+    # a repository created via the Python API has no key, so its config has no key info.
+    with Repository(archiver.repository_location, exclusive=True, create=True):
+        pass
+    if archiver.FORK_DEFAULT:
+        expected_ec = RepositoryKeyInfoMissing("repo").exit_code
+        output = cmd(archiver, "check", "-v", *mode, exit_code=expected_ec)
+        assert "has no key information in its config" in output
+        assert "repository check" not in output  # the repository check did not start
+        assert "archive consistency check" not in output  # nor the archives check
+    else:
+        with pytest.raises(RepositoryKeyInfoMissing):
+            cmd(archiver, "check", "-v", *mode)
 
 
 def test_repo_list_aborts_cleanly_on_corrupt_pack(archivers, request):

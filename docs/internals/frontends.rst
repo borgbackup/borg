@@ -859,6 +859,8 @@ Errors
         Object with key {} is indexed to pack {}, but that whole pack is missing from repository {}.
     Repository.PermissionDenied rc: 24 traceback: no
         Repository permission denied: {}
+    Repository.KeyRequired rc: 28 traceback: yes
+        Repository {} needs its key to access the store object {}, but no key was set.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
         Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.

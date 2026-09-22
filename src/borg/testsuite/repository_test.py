@@ -14,7 +14,7 @@ from .. import repository as repository_module
 from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_chunkindex_invalid
 from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
-from ..crypto.key import CHPOKey
+from ..crypto.key import AESOCBKey, AuthenticatedKey, Blake3AuthenticatedKey, CHPOKey
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
@@ -1035,6 +1035,106 @@ def test_assert_writable(repository):
         repository.permissions = {"": "lr"}  # neither namespace listed; "" fallback grants read only
         with pytest.raises(Repository.PermissionDenied):
             repository.assert_writable()
+
+
+STORE_OBJ_KEY_CLASSES = [AESOCBKey, CHPOKey, AuthenticatedKey, Blake3AuthenticatedKey]
+ENCRYPTING_KEY_CLASSES = (AESOCBKey, CHPOKey)
+
+
+def make_store_obj_key(key_class, repository):
+    key = key_class(repository)
+    key.init_from_random_data()
+    key.init_ciphers()
+    return key
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_encrypt_store_roundtrip(repository, key_class):
+    payload = b"some index or cache content " * 10
+    with repository:
+        repository.set_key(make_store_obj_key(key_class, repository))
+        assert repository.store_encrypt_store("cache/test", payload) == "cache/test"
+        assert bytes(repository.store_load_decrypt("cache/test")) == payload
+        name = repository.store_encrypt_store("index", payload, hashed_name=True)
+        namespace, hex_hash = name.split("/")
+        assert namespace == "index" and len(hex_hash) == 64
+        assert store_hash(repository.store_load(name)).hexdigest() == hex_hash
+        assert bytes(repository.store_load_decrypt(name, hashed_name=True)) == payload
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_encrypt_store_payload_visibility(repository, key_class):
+    # The encrypting modes hide the payload and give each envelope a new name, the authenticated-*
+    # modes store the payload in the clear and give the same payload the same name.
+    payload = b"a well-known payload " * 10
+    with repository:
+        repository.set_key(make_store_obj_key(key_class, repository))
+        name1 = repository.store_encrypt_store("index", payload, hashed_name=True)
+        name2 = repository.store_encrypt_store("index", payload, hashed_name=True)
+        stored = repository.store_load(name1)
+        if issubclass(key_class, ENCRYPTING_KEY_CLASSES):
+            assert payload not in stored
+            assert name1 != name2
+        else:
+            assert payload in stored
+            assert name1 == name2
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_load_decrypt_detects_tampering(repository, key_class):
+    payload = b"some cache content " * 10
+    with repository:
+        repository.set_key(make_store_obj_key(key_class, repository))
+        # a flipped byte fails the authentication.
+        repository.store_encrypt_store("cache/a", payload)
+        stored = bytearray(repository.store_load("cache/a"))
+        stored[-1] ^= 0x01
+        repository.store_store("cache/a", bytes(stored))
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("cache/a")
+        # an object moved to another name fails, the name is bound into the envelope.
+        repository.store_encrypt_store("cache/b", payload)
+        repository.store_move("cache/b", "cache/c")
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("cache/c")
+        # same for a copy stored under another name.
+        repository.store_encrypt_store("cache/d", payload)
+        repository.store_store("cache/e", repository.store_load("cache/d"))
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("cache/e")
+        # a hashed-name object in another namespace fails (the name check passes, the AAD does not).
+        name = repository.store_encrypt_store("index", payload, hashed_name=True)
+        other_name = "cache/" + name.split("/")[1]
+        repository.store_store(other_name, repository.store_load(name))
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt(other_name, hashed_name=True)
+        # a hashed-name object whose content does not match its name fails the name check.
+        repository.store_store(name, bytes(stored))
+        with pytest.raises(IntegrityError, match="does not match its name"):
+            repository.store_load_decrypt(name, hashed_name=True)
+
+
+def test_store_encrypt_store_without_a_key(repository):
+    with repository:
+        assert repository.key is None
+        with pytest.raises(Repository.KeyRequired) as excinfo:
+            repository.store_encrypt_store("cache/test", b"payload")
+        assert excinfo.value.exit_mcode == 28
+        with pytest.raises(Repository.KeyRequired):
+            repository.store_encrypt_store("index", b"payload", hashed_name=True)
+        assert repository.store_list("cache") == []
+        repository.store_store("cache/test", b"payload")
+        with pytest.raises(Repository.KeyRequired):
+            repository.store_load_decrypt("cache/test")
+
+
+def test_store_load_decrypt_missing_object(repository):
+    with repository:
+        repository.set_key(make_test_key(repository))
+        with pytest.raises(repository_module.StoreObjectNotFound):
+            repository.store_load_decrypt("cache/missing")
+        with pytest.raises(repository_module.StoreObjectNotFound):
+            repository.store_load_decrypt("index/" + "0" * 64, hashed_name=True)
 
 
 def test_list(repo_fixtures, request):

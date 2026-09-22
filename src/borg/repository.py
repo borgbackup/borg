@@ -48,6 +48,9 @@ META_READ_SIZE = 1024
 # and encrypted, i.e. some tens of bytes, so this is a generous bound and it keeps a corrupt
 # meta_size, which only MAX_DATA_SIZE bounds, from triggering a large read.
 MAX_VALIDATED_META_SIZE = 64 * 1024
+# AAD prefix of the store objects protected by the key (index/, cache/): keeps their envelopes apart
+# from the metadata and data slots of pack objects, whose AAD starts with OBJ_MAGIC (b"BORG_OBJ").
+STORE_OBJ_AAD = b"borg-store-object\0"
 
 
 def repo_lister(repository, *, limit=None):
@@ -855,6 +858,11 @@ class Repository:
 
         exit_mcode = 24
 
+    class KeyRequired(ErrorWithTraceback):
+        """Repository {} needs its key to access the store object {}, but no key was set."""
+
+        exit_mcode = 28
+
     # Whole packs kept in memory for reads; the least recently used is evicted first.
     # Memory use is this count times the pack size.
     PACK_READER_CACHE_SIZE = 3
@@ -941,6 +949,8 @@ class Repository:
         # the crypto suite of the repository's key, as recorded in the repository config (see save_config):
         self.encryption = None  # the "--encryption" name, e.g. "aes256-ocb"
         self.id_hash = None  # the "--id-hash" name, e.g. "sha256"
+        # the repository's key, see set_key(): the index/ and cache/ objects are stored in its envelope.
+        self.key = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client
         # in a timely manner, in case we have a RemoteRepository.
@@ -2188,6 +2198,57 @@ class Repository:
     def store_store(self, name, value):
         self._lock_refresh()
         return self.store.store(name, value)
+
+    def set_key(self, key):
+        """Set the key that protects the index/ and cache/ store objects, see store_encrypt_store()."""
+        self.key = key
+
+    def store_encrypt_store(self, name, value, *, hashed_name=False):
+        """Store value under name, wrapped in the key's envelope.
+
+        "encrypt" means "apply the key's envelope", exactly like for the objects in the packs (see
+        KeyBase.encrypt): encrypted and authenticated in the encrypting modes, authenticated only in
+        the authenticated-* modes.
+
+        hashed_name=False: name is the full object name and is bound into the envelope as AAD.
+        hashed_name=True: name is a namespace (e.g. "index"); the object is stored as
+        <name>/<hex store hash of the envelope> and the namespace is the AAD (the full name does not
+        exist before the envelope does).
+
+        Returns the full name the object was stored under. Raises KeyRequired if no key was set.
+        """
+        if self.key is None:
+            raise self.KeyRequired(str(self._location), name)
+        envelope = self.key.encrypt(b"", value, aad=STORE_OBJ_AAD + name.encode())
+        if hashed_name:
+            name = f"{name}/{store_hash(envelope).hexdigest()}"
+        self.store_store(name, envelope)
+        return name
+
+    def store_load_decrypt(self, name, *, hashed_name=False):
+        """Load an object stored by store_encrypt_store(), verify and unwrap its envelope.
+
+        hashed_name=True: name is <namespace>/<hex store hash>; the stored bytes must hash to the hex
+        part and the namespace is the AAD.
+
+        Returns the payload (bytes or a memoryview). Raises StoreObjectNotFound if the object is
+        missing, IntegrityError if the name check or the envelope authentication fails, KeyRequired
+        if no key was set.
+        """
+        if self.key is None:
+            raise self.KeyRequired(str(self._location), name)
+        envelope = self.store_load(name)
+        if hashed_name:
+            namespace, hex_hash = name.rsplit("/", 1)
+            if store_hash(envelope).hexdigest() != hex_hash:
+                raise IntegrityError(f"Store object {name}: content does not match its name (store hash)")
+            aad_name = namespace
+        else:
+            aad_name = name
+        try:
+            return self.key.decrypt(b"", envelope, aad=STORE_OBJ_AAD + aad_name.encode())
+        except IntegrityError as err:
+            raise IntegrityError(f"Store object {name}: {err}") from err
 
     def store_delete(self, name, *, deleted=False):
         self._lock_refresh()

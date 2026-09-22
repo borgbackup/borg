@@ -1596,8 +1596,8 @@ class Repository:
                         interruptible=True,
                     )
                 except ChunkIndexRebuildInterrupted:
-                    # the rebuild stores the index after its pack loop, so the corrupt fragments are
-                    # still there and the next use rebuilds from the packs.
+                    # nothing was stored: the corrupt fragments stay, so the next use rebuilds from the packs.
+                    drops = 0  # counted by the discarded rebuild, which covered only a part of the packs
                     logger.warning("Index rebuild interrupted; the index stays corrupt and is rebuilt on next use.")
                 else:
                     self.invalidate_chunk_index()  # the rebuilt index is persisted; drop the in-memory copy

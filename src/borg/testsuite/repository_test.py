@@ -1535,9 +1535,16 @@ def test_check_repair_leaves_index_when_interrupted(tmp_path, caplog, monkeypatc
         assert repository.check(repair=False) is False  # repair left the index corrupt
 
 
-def test_check_repair_index_rebuild_interrupted(tmp_path, caplog, monkeypatch):
+def reject_any(chunk_id, obj):
+    # A validator that rejects every object, so the index rebuild skips (drops) every object it reads.
+    return False
+
+
+@pytest.mark.parametrize("validate", [validate_any, reject_any], ids=["accept", "reject"])
+def test_check_repair_index_rebuild_interrupted(tmp_path, caplog, monkeypatch, validate):
     # a Ctrl-C after the packs were verified, while the repair rebuilds the index from them: the rebuild
-    # ends at the pack boundary, the corrupt fragments stay, and the check reports the index as corrupt.
+    # stops, the corrupt fragments stay, and the check reports the index as corrupt, also when the
+    # rebuild skipped objects before the Ctrl-C.
     from .. import cache as cache_module
 
     location = os.fspath(tmp_path / "repo")
@@ -1558,9 +1565,8 @@ def test_check_repair_index_rebuild_interrupted(tmp_path, caplog, monkeypatch):
 
     def iter_headers_then_interrupt(self, **kwargs):
         packs_read.append(self.pack_id)
-        headers = list(orig_iter_headers(self, **kwargs))
-        interrupter.triggered = True  # one Ctrl-C after the rebuild indexed the first pack
-        return iter(headers)
+        yield from orig_iter_headers(self, **kwargs)
+        interrupter.triggered = True  # one Ctrl-C after the rebuild walked the first pack
 
     # check() and the rebuild each read sig_int through their own module namespace.
     monkeypatch.setattr(repository_module, "sig_int", interrupter)
@@ -1570,9 +1576,10 @@ def test_check_repair_index_rebuild_interrupted(tmp_path, caplog, monkeypatch):
         assert len(repository.store_list("packs")) > 1  # there is a pack boundary to stop at
         index_before = set(info.name for info in repository.store_list("index"))
         with caplog.at_level(logging.WARNING, logger="borg.repository"):
-            assert repository.check(repair=True, validate=validate_any) is False
+            assert repository.check(repair=True, validate=validate) is False
         assert "Index rebuild interrupted" in caplog.text
         assert "Interrupted full repository check, index still corrupt so far." in caplog.text
+        assert "index rebuilt" not in caplog.text
         assert len(packs_read) == 1  # the rebuild stopped at the pack boundary
         assert set(info.name for info in repository.store_list("index")) == index_before  # nothing stored
     monkeypatch.setattr(PackReader, "iter_headers", orig_iter_headers)

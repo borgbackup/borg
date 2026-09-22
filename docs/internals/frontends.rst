@@ -814,6 +814,8 @@ Errors
 
     Buffer.MemoryLimitExceeded rc: 2 traceback: no
         Requested buffer size {} is above the limit of {}.
+    ChunkIndexRebuildInterrupted rc: 2 traceback: no
+        Got Ctrl-C / SIGINT: the chunk index rebuild was interrupted.
     EfficientCollectionQueue.SizeUnderflow rc: 2 traceback: no
         Could not pop the first {} elements; collection only has {} elements.
     RTError rc: 2 traceback: no

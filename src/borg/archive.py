@@ -2315,7 +2315,7 @@ class ArchiveChecker:
                 # dropped content is a check finding, with or without --repair.
                 on_drop=self.note_dropped_objects,
                 write_immediately=False,
-                # Ctrl-C ends the rebuild after the current pack and aborts the check, #10042.
+                # Ctrl-C aborts the rebuild and with it the check, #10042.
                 interruptible=True,
             )
             # clear F_NEW (entry not in the index/ fragments yet), so Repository.close() does not store
@@ -2734,7 +2734,7 @@ class ArchiveChecker:
         try:
             for i, info in enumerate(archive_infos):
                 if sig_int:
-                    # Break only between archives, as --repair rewrites each archive as a whole.
+                    # --repair rewrites each archive as a whole, so with --repair the check stops only here.
                     break
                 pi.show(i)
                 archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
@@ -2773,6 +2773,9 @@ class ArchiveChecker:
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 for item in robust_iterator(archive):
+                    if sig_int and not self.repair:
+                        # without --repair the archive is only read, so the check also stops within it.
+                        break
                     if "chunks" in item:
                         verify_file_chunks(info.name, item)
                     items_buffer.add(item)
@@ -2806,9 +2809,15 @@ class ArchiveChecker:
                 write_chunkindex_invalid(self.repository)
                 self.repository.invalidate_chunk_index()
                 self.chunks = None
-                logger.info("Rebuilding and writing the repository chunks index.")
                 # Runs to completion, also after a Ctrl-C: delete_chunkindex_invalid() below declares
                 # the stored index to match the packs, which holds only once every pack was indexed.
+                if sig_int:
+                    logger.warning(
+                        "Rebuilding and writing the repository chunks index. "
+                        "This reads every pack and can not be interrupted."
+                    )
+                else:
+                    logger.info("Rebuilding and writing the repository chunks index.")
                 build_chunkindex_from_repo(
                     self.repository,
                     slow_rebuild=True,

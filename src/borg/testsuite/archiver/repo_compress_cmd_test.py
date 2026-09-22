@@ -11,7 +11,8 @@ from ...manifest import Manifest
 from ...compress import ZSTD, ZLIB, LZ4, CNONE
 from ...archiver.repo_compress_cmd import PackRecompressor
 
-from . import create_regular_file, cmd, RK_ENCRYPTION
+from .. import make_test_key
+from . import create_regular_file, cmd, open_repository, RK_ENCRYPTION
 from ..repository_test import H, accept_all, fchunk, pdchunk
 
 
@@ -226,7 +227,7 @@ def test_repo_compress_soft_interrupt_persists_valid_index(archiver, monkeypatch
             sig_int._sig_int_triggered = False  # reset the global flag for the following tests
 
     # a valid chunk index was persisted and every entry points at a pack that still exists
-    with Repository(archiver.repository_path, exclusive=True) as repository:
+    with open_repository(archiver) as repository:
         assert list_chunkindex_hashes(repository) != []
         pack_names_after = {info.name for info in repository.store_list("packs")}
         # one pack was rewritten before the stop, the remaining old packs are still there
@@ -254,6 +255,7 @@ def test_transform_pack_keeps_unindexed_gap(tmp_path):
     # job. also, the objects around them must be repointed correctly although their sizes changed.
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
+        repository.set_key(make_test_key(repository))  # the index/ objects need a key
         repository._pack_writer.max_count = 3  # one flush() -> one pack
         for cid, data in [(H(0), b"WWWW"), (H(1), b"XXXX"), (H(2), b"YYYY")]:
             repository.put(cid, fchunk(data, chunk_id=cid))
@@ -290,6 +292,7 @@ def test_transform_pack_drops_superseded_gap(tmp_path):
     # duplicate (equal ids mean equal content) - a transformed pack must not carry it forward.
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
+        repository.set_key(make_test_key(repository))  # the index/ objects need a key
         repository._pack_writer.max_count = 2  # one flush() -> one pack
         # pack A: W and X; pack B: a second copy of X, which repoints the index to pack B,
         # leaving X's bytes in pack A as a superseded gap.
@@ -318,6 +321,7 @@ def test_transform_pack_unchanged_pack_untouched(tmp_path):
     # no pack write, no pack delete, no before_change call.
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
+        repository.set_key(make_test_key(repository))  # the index/ objects need a key
         repository._pack_writer.max_count = 2  # one flush() -> one pack
         for cid, data in [(H(0), b"WWWW"), (H(1), b"XXXX")]:
             repository.put(cid, fchunk(data, chunk_id=cid))

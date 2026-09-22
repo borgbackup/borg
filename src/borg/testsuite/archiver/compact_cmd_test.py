@@ -25,8 +25,13 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 
 def gc_manifest(repository):
-    """Return a manifest stand-in for ArchiveGarbageCollector, whose repo_objs use a test key."""
-    return SimpleNamespace(repo_objs=RepoObj(make_test_key(repository)))
+    """Return a manifest stand-in for ArchiveGarbageCollector, whose repo_objs use a test key.
+
+    The test key also becomes the repository key, which the index/ and cache/ objects need.
+    """
+    key = make_test_key(repository)
+    repository.set_key(key)
+    return SimpleNamespace(repo_objs=RepoObj(key))
 
 
 @pytest.mark.parametrize("stats", (True, False))

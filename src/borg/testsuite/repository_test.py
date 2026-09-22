@@ -1475,8 +1475,9 @@ def test_flush_store_failure_drops_pending_entries(tmp_path):
 
 
 def _serialized_chunkindex():
-    # Serialize an empty ChunkIndex to bytes, as stored under index/<store_hash(content)>. check() parses
-    # index fragments, so a fragment must be a real ChunkIndex serialization.
+    # Serialize an empty ChunkIndex to bytes, the plaintext of an index/ fragment (see
+    # store_encrypt_store). check() parses index fragments, so a fragment must be a real ChunkIndex
+    # serialization.
     with io.BytesIO() as f:
         ChunkIndex().write(f)
         return f.getvalue()
@@ -1502,13 +1503,11 @@ def test_check_detects_corruption_in_later_object(tmp_path):
 
 def test_check_detects_index_corruption(tmp_path):
     # index/ objects are named by store_hash(content) like packs, so check verifies them the same way.
-    content = _serialized_chunkindex()
-    index_name = "index/" + store_hash(content).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        repository.store_store(index_name, content)
+        index_name = repository.store_encrypt_store("index", _serialized_chunkindex(), hashed_name=True)
         assert repository.check(repair=False) is True  # index object intact (name == store_hash(content))
 
-        corrupted = bytearray(content)
+        corrupted = bytearray(repository.store_load(index_name))
         corrupted[0] ^= 0xFF
         repository.store_store(index_name, bytes(corrupted))  # same name, rotted content
         assert repository.check(repair=False) is False  # mismatch between content hash and name detected
@@ -1790,9 +1789,9 @@ def test_check_reports_orphan_pack_not_referenced_by_index(tmp_path, caplog):
 
 
 def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, caplog):
-    # an index/ fragment whose name matches its content hash but whose content does not deserialize
-    # into a ChunkIndex makes the fragment set unreadable; check skips the cross-check (and still
-    # passes) instead of crashing or rebuilding from the packs (refs #9898).
+    # an index/ fragment whose name matches its content hash and whose envelope is authentic, but whose
+    # content does not deserialize into a ChunkIndex, makes the fragment set unreadable; check skips the
+    # cross-check (and still passes) instead of crashing or rebuilding from the packs (refs #9898).
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         for x in range(3):
@@ -1801,8 +1800,7 @@ def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, ca
     with Repository(location, exclusive=True) as repository:
         pack_id = repository.chunks[H(0)].pack_id
         repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
-        content = b"not a serialized chunk index"
-        repository.store_store("index/" + store_hash(content).hexdigest(), content)
+        repository.store_encrypt_store("index", b"not a serialized chunk index", hashed_name=True)
         with caplog.at_level(logging.WARNING):
             assert repository.check(repair=False) is True
         assert "Missing pack" not in caplog.text
@@ -2305,12 +2303,10 @@ def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):
     monkeypatch.setattr("borg.repository.ProgressIndicatorPercent", FakePI)
     pack = fchunk(b"A", chunk_id=H(1))
     pack_name = "packs/" + store_hash(pack).hexdigest()
-    index_content = _serialized_chunkindex()
-    index_name = "index/" + store_hash(index_content).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
-        repository.store_store(index_name, index_content)
-        # create() already wrote a chunk index, so don't assume a count: derive it from the store.
+        repository.store_encrypt_store("index", _serialized_chunkindex(), hashed_name=True)
+        # don't assume a count: derive it from the store.
         n_packs = len(repository.store_list("packs"))
         n_index = len(repository.store_list("index"))
         assert repository.check(repair=False) is True

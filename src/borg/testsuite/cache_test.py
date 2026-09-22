@@ -1,4 +1,5 @@
 import hashlib
+import io
 import logging
 import os
 import time
@@ -28,7 +29,7 @@ from ..cache import (
     write_chunkindex_to_repo,
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
-from ..crypto.key import AESOCBKey
+from ..crypto.key import AESOCBKey, AuthenticatedKey
 from ..helpers import CorruptPack, Error, bin_to_hex, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
@@ -155,27 +156,65 @@ def test_read_chunkindex_from_repo_missing(tmp_path):
 
 
 def test_read_chunkindex_from_repo_corrupt(tmp_path):
-    """A fragment whose name matches its content hash but does not deserialize raises."""
+    """A fragment that matches its name and is authentic, but does not deserialize, raises."""
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
         content = b"not a serialized chunk index"
-        name = store_hash(content).hexdigest()  # valid name, so the name check passes
-        repository.store_store(f"index/{name}", content)
+        index_name = repository.store_encrypt_store("index", content, hashed_name=True)
+        with pytest.raises(CorruptChunkIndexFragment):
+            read_chunkindex_from_repo(repository, index_name.removeprefix("index/"))
+
+
+@pytest.mark.parametrize("tamper", ["plaintext", "flipped_byte", "other_name"])
+def test_read_chunkindex_from_repo_not_authentic(tmp_path, tamper):
+    """A fragment that is not the key's envelope of its content raises, although its name may match.
+
+    "plaintext" is the fragment format of older borg 2 betas: the serialized index, stored raw under its store hash.
+    """
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        ci = ChunkIndex()
+        ci[H(1)] = ChunkIndexEntry(ChunkIndex.F_NONE, 0, H(1), 0, 4)
+        with io.BytesIO() as f:
+            ci.write(f)
+            content = f.getvalue()
+        if tamper == "plaintext":
+            name = store_hash(content).hexdigest()  # valid name, so the name check passes
+            repository.store_store(f"index/{name}", content)
+        elif tamper == "flipped_byte":
+            index_name = repository.store_encrypt_store("index", content, hashed_name=True)
+            data = bytearray(repository.store_load(index_name))
+            data[-1] ^= 0x01
+            repository.store_delete(index_name)
+            name = store_hash(bytes(data)).hexdigest()  # valid name, so the name check passes
+            repository.store_store(f"index/{name}", bytes(data))
+        else:  # an envelope made for a different object name
+            data = repository.store_load(repository.store_encrypt_store("cache/other", content))
+            name = store_hash(data).hexdigest()
+            repository.store_store(f"index/{name}", data)
         with pytest.raises(CorruptChunkIndexFragment):
             read_chunkindex_from_repo(repository, name)
 
 
-def test_build_chunkindex_rebuilds_on_corrupt_fragment(tmp_path):
-    """A corrupt fragment (valid name, unreadable content) triggers a rebuild from the packs, no retry."""
+@pytest.mark.parametrize("plaintext", [False, True])
+def test_build_chunkindex_rebuilds_on_corrupt_fragment(tmp_path, caplog, plaintext):
+    """A corrupt fragment (valid name, unreadable content) triggers a rebuild from the packs, no retry.
+
+    plaintext: the fragment is stored raw, as older borg 2 betas did, so it fails the authentication.
+    """
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
         ci = ChunkIndex()
         ci[H(1)] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, H(1), 0, 4)
         write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
         content = b"not a serialized chunk index"
-        name = store_hash(content).hexdigest()
-        repository.store_store(f"index/{name}", content)
-        chunks = build_chunkindex_from_repo(repository)
+        if plaintext:
+            repository.store_store(f"index/{store_hash(content).hexdigest()}", content)
+        else:
+            repository.store_encrypt_store("index", content, hashed_name=True)
+        with caplog.at_level(logging.WARNING, logger="borg.cache"):
+            chunks = build_chunkindex_from_repo(repository)
+        assert "is corrupt, rebuilding the chunk index from the packs" in caplog.text
         # the rebuild reads the (empty) packs namespace, so H(1) from the corrupt fragment is absent
         assert H(1) not in chunks
         assert len(chunks) == 0
@@ -232,7 +271,7 @@ def test_build_chunkindex_retries_on_vanished_fragment(tmp_path):
 
 
 def test_build_chunkindex_no_partial_merge(tmp_path):
-    """A persistently unreadable fragment must cause a rebuild from the packs, never a partial index."""
+    """An unreadable fragment must cause a rebuild from the packs, never a partial index."""
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
         # a valid fragment ...
@@ -257,7 +296,7 @@ def test_chunkindex_cache_not_consolidated_on_access(tmp_path):
     """
     repository_location = os.fspath(tmp_path / "repository")
     with Repository(repository_location, exclusive=True, create=True) as repository:
-        # seed extra fragments on top of the empty one written at repo creation
+        # seed two fragments
         for h in (H(1), H(2)):
             ci = ChunkIndex()
             ci[h] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, h, 0, 4)
@@ -501,8 +540,9 @@ def test_close_consolidates_fragments_across_sessions(tmp_path, monkeypatch):
             repository.flush()
 
     with Repository(loc, exclusive=True) as repository:
+        repository.set_key(key)  # the fragments were written with the real key
         frags = list_chunkindex_fragments(repository)
-        # without repack there would be one incremental fragment per session (plus creation's empty);
+        # without repack there would be one incremental fragment per session;
         # repack consolidates the small ones as they accumulate, so we end up with fewer.
         assert len(frags) < 5
         assert any(approx >= 200 for _, approx in frags)  # at least one sealed (>= MIN) fragment
@@ -847,3 +887,40 @@ def test_files_cache_group_by_spec():
     for text in ("", "none"):
         with pytest.raises(ArgumentTypeError, match="At least one group-by key is required"):
             FilesCacheGroupBySpec(text)
+
+
+@pytest.mark.parametrize("key_class", [AESOCBKey, AuthenticatedKey])
+def test_chunkindex_fragments_in_the_key_envelope(tmp_path, key_class):
+    """The index/ fragments are protected like the objects in the packs, see Repository.store_encrypt_store.
+
+    The encrypting modes hide the chunk ids and give each fragment a new name, even for identical entries.
+    The authenticated-* modes store the ids in the clear and give identical entries the same name.
+    """
+    repository_location = os.fspath(tmp_path / "repository")
+    ids = [H(i) for i in range(10)]
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        key = key_class(repository)
+        key.init_from_random_data()
+        key.init_ciphers()
+        repository.set_key(key)
+        ci = ChunkIndex()
+        for i, id in enumerate(ids):
+            ci[id] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, H(100), i * 10, 10)
+        first = write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
+        second = write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
+        (first_hash,) = first
+        (second_hash,) = second
+        stored = repository.store_load(f"index/{first_hash}")
+        if issubclass(key_class, AESOCBKey):
+            assert not any(id in stored for id in ids)
+            assert first_hash != second_hash
+            assert len(list_chunkindex_hashes(repository)) == 2
+        else:
+            assert all(id in stored for id in ids)
+            assert first_hash == second_hash
+            assert len(list_chunkindex_hashes(repository)) == 1
+        # whatever the names, the fragments hold the same entries.
+        first_ci = read_chunkindex_from_repo(repository, first_hash)
+        second_ci = read_chunkindex_from_repo(repository, second_hash)
+        assert dict(first_ci.items()) == dict(second_ci.items())
+        assert sorted(k for k, _ in first_ci.items()) == sorted(ids)

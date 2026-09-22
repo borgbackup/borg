@@ -1373,7 +1373,10 @@ class Repository:
 
         packs/ and index/ objects are named by the store hash of their content, so a pack or index
         file is intact iff store.hash(name) still equals name. The whole pack is hashed; the REST
-        backend computes the hash server-side, so for it nothing is downloaded.
+        backend computes the hash server-side, so for it nothing is downloaded. An index/ object's
+        content is the key's envelope around a chunk index fragment (see store_encrypt_store), so its
+        name is the store hash of the envelope and this check needs no key; reading the index for the
+        missing-pack cross-check below does.
 
         The index is hashed first and the packs only if it is intact. The packs could be hashed even
         with a corrupt index, but a corrupt index already means the user has to repair it, and that
@@ -2243,7 +2246,7 @@ class Repository:
         try:
             return self.key.decrypt(b"", envelope, aad=STORE_OBJ_AAD + aad_name.encode())
         except IntegrityError as err:
-            raise IntegrityError(f"Store object {name}: {err}") from err
+            raise IntegrityError(f"Store object {name}: {err.args[0] if err.args else err}") from err
 
     def store_delete(self, name, *, deleted=False):
         self._lock_refresh()

@@ -1,8 +1,15 @@
+import pytest
+
 from ...constants import *  # NOQA
+from ...platformflags import is_haiku
 
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
+
+# All tests here reserve space, which makes borg generate 64 MiB objects via os.urandom.
+# On Haiku, os.urandom is currently extremely slow, running into the test timeout, see #10400.
+pytestmark = pytest.mark.skipif(is_haiku, reason="os.urandom is too slow on Haiku OS")
 
 
 def test_repo_space_basics(archivers, request):

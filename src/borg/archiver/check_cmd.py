@@ -125,7 +125,10 @@ class CheckMixIn:
            all packs. It also cross-checks the chunk index against the packs present in the
            repository to detect referenced but missing packs. Bit rot and other types of
            accidental damage can be detected this way, but as content-addressing is
-           not a MAC, this step does not detect tampering. Running the repository check can
+           not a MAC, this step does not detect tampering of the packs. The index objects
+           are also authenticated with the key when they are loaded for that cross-check.
+           A corrupt index ends the check after this step, as the archives check needs it,
+           unless ``--repair`` is given (see below). Running the repository check can
            be split into multiple partial checks using ``--max-duration``.
            For rest:// repositories, the server computes the hashes, so the pack contents do
            not have to travel over the network. For other remote backends, borg usually has

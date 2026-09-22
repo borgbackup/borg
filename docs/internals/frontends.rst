@@ -966,6 +966,8 @@ Errors
         Decompression error: {}
     CorruptPack rc: 93 traceback: no
         {}. Run "borg check --repair" to recover the objects that are still readable.
+    CorruptChunkIndexFragment rc: 94 traceback: no
+        Chunk index fragment {} is corrupt. Run "borg check --repair" to rebuild the chunk index.
 
     Reading a legacy borg 1.x repository (e.g. ``borg transfer --from-borg1``) raises the
     ``LegacyRepository.*`` and ``LegacyRemoteRepository.*`` variants of the repository and RPC

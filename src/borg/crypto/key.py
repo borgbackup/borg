@@ -97,10 +97,9 @@ def _blake3_hasher(data: bytes = b""):
     return blake3(data, max_threads=max_threads)
 
 
-# The store hash is the hash function used wherever a store object or a local file is named by, or
-# carries a checksum over, its content: the packs/, index/, keys/ and locks/ objects, the checksum
-# appended to cache/checked-packs and to the per-archive reference caches, automatically named
-# keyfiles and the files cache suffix. It is unkeyed and the same for every repository, independent
+# The store hash is the hash function used wherever a store object or a local file is named by its
+# content: the packs/, index/, keys/ and locks/ objects, automatically named keyfiles and the files
+# cache suffix. It is unkeyed and the same for every repository, independent
 # of the key/encryption mode (unlike the chunk id hash).
 #
 # This is the one place defining which hash function it is: everything else calls store_hash() and

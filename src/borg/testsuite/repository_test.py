@@ -1108,16 +1108,57 @@ def test_store_load_decrypt_detects_tampering(repository, key_class):
         repository.store_store("cache/e", repository.store_load("cache/d"))
         with pytest.raises(IntegrityError):
             repository.store_load_decrypt("cache/e")
-        # a hashed-name object in another namespace fails (the name check passes, the AAD does not).
+        # a hashed-name object in another namespace fails (the namespace is the AAD).
         name = repository.store_encrypt_store("index", payload, hashed_name=True)
         other_name = "cache/" + name.split("/")[1]
         repository.store_store(other_name, repository.store_load(name))
         with pytest.raises(IntegrityError):
             repository.store_load_decrypt(other_name, hashed_name=True)
-        # a hashed-name object whose content does not match its name fails the name check.
-        repository.store_store(name, bytes(stored))
-        with pytest.raises(IntegrityError, match="does not match its name"):
-            repository.store_load_decrypt(name, hashed_name=True)
+
+
+def test_store_load_decrypt_error_message(repository):
+    with repository:
+        repository.set_key(make_store_obj_key(AESOCBKey, repository))
+        repository.store_store("cache/test", b"not an envelope")
+        with pytest.raises(IntegrityError) as excinfo:
+            repository.store_load_decrypt("cache/test")
+        assert str(excinfo.value) == "Data integrity error: Store object cache/test: authentication failed"
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_load_decrypt_bound_to_the_repository(tmp_path, key_class):
+    # an object copied from another repository with the same key fails: the repository id is in the AAD.
+    with Repository(os.fspath(tmp_path / "repo1"), exclusive=True, create=True) as repository1:
+        key = make_store_obj_key(key_class, repository1)
+        repository1.set_key(key)
+        cache_data = repository1.store_load(repository1.store_encrypt_store("cache/test", b"payload"))
+        index_name = repository1.store_encrypt_store("index", b"payload", hashed_name=True)
+        index_data = repository1.store_load(index_name)
+    with Repository(os.fspath(tmp_path / "repo2"), exclusive=True, create=True) as repository2:
+        repository2.set_key(key)
+        repository2.store_store("cache/test", cache_data)
+        repository2.store_store(index_name, index_data)
+        with pytest.raises(IntegrityError, match="authentication failed"):
+            repository2.store_load_decrypt("cache/test")
+        with pytest.raises(IntegrityError, match="authentication failed"):
+            repository2.store_load_decrypt(index_name, hashed_name=True)
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_obj_aad_keeps_names_and_namespaces_apart(repository, key_class):
+    # the envelope of a hashed-name object in the namespace "index" does not authenticate as the object
+    # named "index", and vice versa (the AAD tags them differently).
+    with repository:
+        key = make_store_obj_key(key_class, repository)
+        repository.set_key(key)
+        assert repository._store_obj_aad("index", True) != repository._store_obj_aad("index", False)
+        envelope = repository.store_load(repository.store_encrypt_store("index", b"payload", hashed_name=True))
+        with pytest.raises(IntegrityError):
+            key.decrypt(b"", envelope, aad=repository._store_obj_aad("index", False))
+        envelope = key.encrypt(b"", b"payload", aad=repository._store_obj_aad("index", False))
+        repository.store_store("index/" + store_hash(envelope).hexdigest(), envelope)
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("index/" + store_hash(envelope).hexdigest(), hashed_name=True)
 
 
 def test_store_encrypt_store_without_a_key(repository):
@@ -1528,7 +1569,7 @@ def test_check_reports_invalid_pack_name(tmp_path, caplog):
         assert after.table[intact_id].result == 1  # the valid pack was checked
 
 
-def test_check_repair_rebuilds_corrupt_index(tmp_path):
+def test_check_repair_rebuilds_corrupt_index(tmp_path, caplog):
     # check(repair=True) rebuilds a corrupt index from the packs' object headers.
     location = os.fspath(tmp_path / "repo")
     ids = [H(x) for x in range(10)]
@@ -1545,7 +1586,11 @@ def test_check_repair_rebuilds_corrupt_index(tmp_path):
             repository.store_store(name, bytes(data))
         assert repository.check(repair=False) is False  # read-only check reports the corrupt index
     with reopen(repository) as repository:
-        assert repository.check(repair=True, validate=validate_any) is True  # repair rebuilds the index from the packs
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger="borg.repository"):
+            assert repository.check(repair=True, validate=validate_any) is True  # repair rebuilds the index
+        # each rotted fragment is counted once (the cross-check does not load the known corrupt index).
+        assert f"Checked {len(index_names)} index files ({len(index_names)} errors)" in caplog.text
     with reopen(repository) as repository:
         assert repository.check(repair=False) is True  # the rebuilt index passes a read-only check
         for i, cid in enumerate(ids):
@@ -1790,8 +1835,9 @@ def test_check_reports_orphan_pack_not_referenced_by_index(tmp_path, caplog):
 
 def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, caplog):
     # an index/ fragment whose name matches its content hash and whose envelope is authentic, but whose
-    # content does not deserialize into a ChunkIndex, makes the fragment set unreadable; check skips the
-    # cross-check (and still passes) instead of crashing or rebuilding from the packs (refs #9898).
+    # content does not deserialize into a ChunkIndex, makes the fragment set unreadable; check reports it
+    # as an index error and skips the cross-check instead of crashing or rebuilding from the packs
+    # (refs #9898).
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         for x in range(3):
@@ -1800,11 +1846,41 @@ def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, ca
     with Repository(location, exclusive=True) as repository:
         pack_id = repository.chunks[H(0)].pack_id
         repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
-        repository.store_encrypt_store("index", b"not a serialized chunk index", hashed_name=True)
+        index_name = repository.store_encrypt_store("index", b"not a serialized chunk index", hashed_name=True)
         with caplog.at_level(logging.WARNING):
-            assert repository.check(repair=False) is True
+            assert repository.check(repair=False) is False
         assert "Missing pack" not in caplog.text
         assert "Cannot cross-check packs against the chunk index" in caplog.text
+        assert f"Store object {index_name} is corrupted" in caplog.text
+
+
+@pytest.mark.parametrize("tamper", ["plaintext", "other_key"])
+def test_check_repairs_index_fragment_failing_authentication(tmp_path, caplog, tamper):
+    # a fragment that matches its name, but fails the authentication (e.g. written by a hostile store
+    # without the key, or by an older borg 2 beta as plaintext) is an index error, and repair rebuilds
+    # the index from the packs, dropping that fragment.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()
+    with Repository(location, exclusive=True) as repository:
+        with io.BytesIO() as f:
+            ChunkIndex().write(f)
+            content = f.getvalue()
+        if tamper == "plaintext":
+            data = content
+        else:
+            data = make_store_obj_key(AESOCBKey, repository).encrypt(b"", content, aad=b"")
+        name = store_hash(data).hexdigest()
+        repository.store_store(f"index/{name}", data)
+        with caplog.at_level(logging.ERROR):
+            assert repository.check(repair=False) is False
+        assert f"Store object index/{name} is corrupted" in caplog.text
+        assert name in {info.name for info in repository.store_list("index")}  # a check does not write.
+        assert repository.check(repair=True, validate=accept_all) is True
+        assert name not in {info.name for info in repository.store_list("index")}
+        assert repository.check(repair=False) is True
 
 
 def test_check_partial_still_detects_missing_pack(tmp_path, caplog):

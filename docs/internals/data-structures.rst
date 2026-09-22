@@ -113,16 +113,21 @@ The index fragments, ``checked-packs`` and the ``referenced-by-archive.*`` objec
 are stored in the **store object envelope**: the repository key's ``encrypt()``,
 exactly as for the metadata and data slots of the objects in a pack (see
 :ref:`security_encryption`), with an empty id and an AAD of
-``b"borg-store-object\0"`` followed by the object name. For the index fragments,
-whose name is the store hash of the envelope and does not exist before it, the AAD
-holds the namespace (``index``) instead. So these objects are protected like the
-objects in the packs: encrypted and authenticated in the encrypting modes,
-authenticated only in the ``authenticated-*`` modes. The AAD binds an object to its
-name: an object copied to another name fails the authentication. Reading or writing
-them needs the key (``Repository.set_key()``); an object that fails the
-authentication is treated like a corrupted one (the chunks index is rebuilt from the
-packs, a corrupted cache is ignored and rebuilt). The ``chunkindex-invalid`` marker
-has no content and is stored as is.
+``b"borg-store-object\0"`` followed by the repository id, the tag ``b"n"`` and the
+object name. For the index fragments, whose name is the store hash of the envelope and
+does not exist before it, the AAD holds the tag ``b"h"`` and the namespace (``index``)
+instead: the tags keep a namespace and an object of the same name apart. So these
+objects are protected like the objects in the packs: encrypted and authenticated in
+the encrypting modes, authenticated only in the ``authenticated-*`` modes. The AAD
+binds an object to its repository and name: an object copied to another name, or
+from another repository using the same key material, fails the authentication.
+Reading or writing them needs the key (``Repository.set_key()``); an object that
+fails the authentication is treated like a corrupted one: ``borg check`` reports a
+corrupt index fragment and ``borg check --repair`` rebuilds the chunks index from the
+packs; any other command that needs the chunks index aborts, except ``borg compact``
+and ``borg repo-compress``, which rebuild it from the packs, as they rewrite the whole
+chunks index anyway (under an exclusive lock). A corrupted cache is ignored and
+rebuilt. The ``chunkindex-invalid`` marker has no content and is stored as is.
 
 
 Keys

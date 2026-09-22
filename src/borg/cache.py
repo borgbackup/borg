@@ -650,7 +650,7 @@ def delete_chunkindex_from_repo(repository):
     repository.invalidate_chunk_index()
 
 
-def _store_chunkindex_fragment(repository, batch):
+def _store_chunkindex_fragment(repository, batch, stored_hashes, *, force_write):
     """Serialize a temporary ChunkIndex `batch` and store it as an index/<store hash> fragment.
 
     We don't serialize the flags or the size, so callers pass entries with those zeroed. The serialized
@@ -659,14 +659,22 @@ def _store_chunkindex_fragment(repository, batch):
     verify it like any other content-addressed object. An incompatible format from a different borg
     version is rejected by borghash's own versioned header (MAGIC + VERSION) when read back.
 
-    Returns the fragment's hash.
+    Returns (new_hash, stored) where `stored` is True iff we actually wrote to the repository: unless
+    force_write is set, we skip the write if a fragment with the same content, read in this session (see
+    Repository.chunkindex_fragment_hashes), is still among stored_hashes.
     """
     with io.BytesIO() as f:
         batch.write(f)
         data = f.getvalue()
+    plaintext_hash = store_hash(data).digest()
+    known_hash = repository.chunkindex_fragment_hashes.get(plaintext_hash)
+    if not force_write and known_hash in stored_hashes:
+        return known_hash, False
     index_name = repository.store_encrypt_store("index", data, hashed_name=True)
     logger.debug(f"stored chunks index as {index_name} in repository.")
-    return index_name.removeprefix("index/")
+    new_hash = index_name.removeprefix("index/")
+    repository.chunkindex_fragment_hashes[plaintext_hash] = new_hash
+    return new_hash, True
 
 
 def write_chunkindex_to_repo(
@@ -706,11 +714,10 @@ def write_chunkindex_to_repo(
         # identical fragments (identical plaintext), no matter in which order the entries were
         # inserted into the hash table: partition membership and prefix_bits (chosen by entry count)
         # only depend on the selected entries. this makes writing/repacking idempotent and convergent
-        # across clients: no differently-partitioned duplicates of the same entries can pile up.
-        # in the authenticated-* modes, the envelope is deterministic, so identical plaintext also
-        # gives an identical fragment name. as the prefix compares the keys' leading bits, ascending
-        # prefixes yield the same globally sorted key sequence a single all-keys sort would have
-        # produced.
+        # across clients: a fragment whose content already exists in the repo is not stored again (see
+        # _store_chunkindex_fragment) and no differently-partitioned duplicates of the same entries
+        # can pile up. as the prefix compares the keys' leading bits, ascending prefixes yield the
+        # same globally sorted key sequence a single all-keys sort would have produced.
         for prefix in range(2**prefix_bits):
             keys = sorted(
                 key for key, _ in chunks.iteritems(only_new=incremental, prefix_bits=prefix_bits, prefix=prefix)
@@ -744,10 +751,11 @@ def write_chunkindex_to_repo(
             assert not (entry.flags & ChunkIndex.F_PENDING), f"chunk {bin_to_hex(key)} has no pack location yet"
             # for now, we don't want to serialize the flags or the size:
             batch[key] = entry._replace(flags=ChunkIndex.F_NONE, size=0)
-        new_hash = _store_chunkindex_fragment(repository, batch)
+        new_hash, stored = _store_chunkindex_fragment(repository, batch, stored_hashes, force_write=force_write)
         batch.clear()  # free memory of the temporary table
         new_hashes.add(new_hash)
-        fragments_written += 1
+        if stored:
+            fragments_written += 1
 
     logger.debug(f"cached {total} chunks (incremental={incremental}) in {fragments_written} fragment(s).")
     if clear:
@@ -757,10 +765,15 @@ def write_chunkindex_to_repo(
         # we have successfully stored to the repository, so we can clear all F_NEW flags now:
         chunks.clear_new()
 
-    # delete some no longer needed index objects, but never the ones we just wrote: in the
-    # authenticated-* modes, a fragment we just wrote can have the same name as one we are asked to
-    # delete (same entries -> same envelope). we gate this on new_hashes (the fragments that make up
-    # the index we just wrote): when there is nothing to write (new_hashes empty, e.g. an empty
+    # delete some no longer needed index objects, but never the ones we just wrote. we gate this on
+    # new_hashes (the fragments that make up the index we just wrote), not on whether we actually
+    # uploaded them: a fragment can be dedupe-skipped because its content already exists in the repo
+    # (see _store_chunkindex_fragment), and in that case the replacement is verifiably present, so
+    # deleting the superseded fragments is still safe. this also makes repack idempotent -- if a
+    # previous repack crashed after storing but before deleting, the next one re-derives the same
+    # fragments, dedupe-skips the uploads, and still deletes the small sources. in the authenticated-*
+    # modes, a fragment we just wrote can also have the same name as one we are asked to delete (same
+    # entries -> same envelope). when there is nothing to write (new_hashes empty, e.g. an empty
     # incremental index), we skip deletion so we never leave the repo without an index.
     if new_hashes and (delete_other or delete_these):
         if delete_other:
@@ -787,8 +800,11 @@ def write_chunkindex_to_repo(
     return new_hashes
 
 
-class CorruptChunkIndexFragment(Exception):
-    """A chunk index fragment does not match its name, fails the key's authentication or does not deserialize."""
+class CorruptChunkIndexFragment(Error):
+    """Chunk index fragment {} is corrupt. Run "borg check --repair" to rebuild the chunk index."""
+
+    # the fragment fails the authentication of the key's envelope or does not deserialize.
+    exit_mcode = 94
 
 
 class ChunkIndexRebuildInterrupted(Error):
@@ -798,8 +814,8 @@ class ChunkIndexRebuildInterrupted(Error):
 def read_chunkindex_from_repo(repository, hash):
     """Load the chunk index fragment index/<hash>; return it as a ChunkIndex, or None if it is not there.
 
-    Raises CorruptChunkIndexFragment if the fragment does not match its name (store hash), fails the
-    authentication of the key's envelope (see Repository.store_load_decrypt) or does not deserialize.
+    Raises CorruptChunkIndexFragment if the fragment fails the authentication of the key's envelope (see
+    Repository.store_load_decrypt) or does not deserialize.
     """
     index_name = f"index/{hash}"
     logger.debug(f"trying to load {index_name} from the repo...")
@@ -817,6 +833,7 @@ def read_chunkindex_from_repo(repository, hash):
     except (ValueError, KeyError, struct.error) as err:
         # the envelope is authentic, but its content does not deserialize into a ChunkIndex.
         raise CorruptChunkIndexFragment(index_name) from err
+    repository.chunkindex_fragment_hashes[store_hash(chunks_data).digest()] = hash
     return chunks
 
 
@@ -867,10 +884,11 @@ def repack_chunkindex(repository):
     if not merged_hashes:
         return
     # write the merged entries split into bounded (<= MAX) fragments and delete the small sources.
-    # every merged fragment is uploaded: in the encrypting modes, it gets a new name (the envelope is
-    # randomized), so the small sources are always deleted. in the authenticated-* modes, a merged
-    # fragment identical to a source keeps the source's name, and write_chunkindex_to_repo never
-    # deletes a hash it just wrote, so that fragment survives rather than being deleted.
+    # force_write=False so a merged fragment whose content already exists in the repo is dedupe-skipped
+    # rather than re-uploaded; write_chunkindex_to_repo still deletes the small sources because deletion
+    # is gated on the fragment set being present, not on a fresh upload (so repack is idempotent and
+    # avoids redundant uploads). write_chunkindex_to_repo also never deletes a hash it just wrote, so a
+    # fragment whose content is unchanged by the merge survives rather than being deleted and re-created.
     write_chunkindex_to_repo(
         repository, merged, incremental=False, clear=True, force_write=False, delete_these=merged_hashes
     )
@@ -889,6 +907,10 @@ def build_chunkindex_from_repo(
 ):
     # fragments_only: build the index from the index/ fragments only, returning None if they cannot be
     # read completely, and never write to the repo.
+    # write_immediately: store the index (all of it, deleting all other fragments) before returning it. The
+    # callers hold an exclusive lock (borg compact, borg repo-compress, borg check --repair).
+    # a corrupt fragment raises CorruptChunkIndexFragment: a corrupt index aborts the command. Only with
+    # write_immediately (the index is rewritten anyway), the index is rebuilt from the packs instead.
     # validate: a repo object validator or None, passed to PackReader.iter_headers. With a validator,
     # the rebuild skips the objects that fail it; without one, a corrupt object header raises CorruptPack.
     # on_drop: a callable or None, passed to PackReader.iter_headers, called once per byte range the
@@ -941,12 +963,12 @@ def build_chunkindex_from_repo(
                     chunks[k] = v
                 chunks_to_merge.clear()
             if corrupt_fragment is not None:
-                # retrying would re-read the same corrupt fragment; rebuild the whole index from
-                # the packs instead (or return None in fragments_only mode).
+                # retrying would re-read the same corrupt fragment. abort, unless the index gets rewritten
+                # anyway: then rebuild the whole index from the packs.
                 chunks.clear()
-                if fragments_only:
-                    return None
-                logger.warning(f"{corrupt_fragment} is corrupt, rebuilding the chunk index from the packs.")
+                if not write_immediately:
+                    raise corrupt_fragment
+                logger.warning(f"{corrupt_fragment.args[0]} is corrupt, rebuilding the chunk index from the packs.")
                 break
             if complete:
                 if len(hashes) > 1 and write_immediately:

@@ -252,11 +252,10 @@ class KeyedRepository(Repository):
         from ...crypto.key import key_factory, RepositoryKeyInfoMissing
 
         result = super().open(*args, **kwargs)
-        if self.key is None:
-            try:
-                key_factory(self)  # sets the key
-            except RepositoryKeyInfoMissing:
-                pass  # no key yet, e.g. a repository created without "borg repo-create"
+        try:
+            key_factory(self)  # sets the key, replacing a key set by Repository.open (e.g. a test key)
+        except RepositoryKeyInfoMissing:
+            pass  # no key yet, e.g. a repository created without "borg repo-create"
         return result
 
 

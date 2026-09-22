@@ -393,8 +393,9 @@ used:
   per-archive reference caches ``cache/referenced-by-archive.<hex(archive_id)>``
   (written by ``borg compact`` and ``borg analyze``, they list the object ids and
   plaintext sizes an archive references) are in the key's store object envelope, like
-  the index. The envelope binds each object to its name, so the store can not make
-  borg use the reference cache of one archive for another one. Their names still show
+  the index. The envelope binds each object to its repository and name, so the store
+  can not make borg use the reference cache of one archive for another one, or the
+  index or cache objects of another repository using the same key material. Their names still show
   the archive ids that have a reference cache and that a check ran.
   ``cache/chunkindex-invalid`` is an empty marker object.
 - ``locks/*`` -- the repository locks, not encrypted.

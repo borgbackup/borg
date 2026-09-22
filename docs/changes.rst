@@ -180,7 +180,10 @@ Breaking changes (you must create new repos for b25):
 - the index/ fragments and the cache/checked-packs and cache/referenced-by-archive.*
   store objects are protected by the repository key now, like the objects in the
   packs: encrypted and authenticated in the encrypting modes, authenticated only in
-  the authenticated-* modes, #9819, #10235
+  the authenticated-* modes, #9819, #10235. A corrupt chunk index (a fragment that
+  fails the authentication) aborts the commands that need it, run
+  "borg check --repair" to rebuild it (borg compact and borg repo-compress rebuild
+  it, too).
 
 New features:
 

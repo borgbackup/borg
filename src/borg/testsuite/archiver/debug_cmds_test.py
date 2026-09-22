@@ -179,16 +179,6 @@ def test_debug_delete_obj_with_a_wrong_passphrase_deletes_nothing(archivers, req
         assert repository.get(w_id, raise_missing=False) is not None
 
 
-def test_debug_delete_obj_with_invalid_ids_only_sets_up_no_key(archivers, request, monkeypatch):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    monkeypatch.setenv("BORG_PASSPHRASE", "wrong")
-
-    output = cmd(archiver, "debug", "delete-obj", "invalid")
-
-    assert "is invalid" in output
-
-
 @pytest.mark.parametrize("command", ["get-obj", "put-obj"])
 def test_debug_get_put_obj_with_a_wrong_passphrase_aborts(archivers, request, monkeypatch, command):
     # the chunk index in index/ needs the key, so get-obj and put-obj load it.

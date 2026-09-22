@@ -177,15 +177,14 @@ class DebugMixIn:
                 print("%d objects processed." % i)
         print("Done.")
 
-    @with_repository(manifest=False)
-    def do_debug_get_obj(self, args, repository):
+    @with_repository()
+    def do_debug_get_obj(self, args, repository, manifest):
         """Gets object contents from the repository and writes them to a file."""
         hex_id = args.id
         try:
             id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
-        key_factory(repository)  # sets the repository key, needed to load the chunk index from index/
         try:
             data = repository.get(id)
         except Repository.ObjectNotFound:
@@ -250,8 +249,8 @@ class DebugMixIn:
         with open(args.object_path, "wb") as f:
             f.write(data_encrypted)
 
-    @with_repository(manifest=False)
-    def do_debug_put_obj(self, args, repository):
+    @with_repository()
+    def do_debug_put_obj(self, args, repository, manifest):
         """Puts file contents into the repository."""
         with open(args.path, "rb") as f:
             data = f.read()
@@ -260,13 +259,13 @@ class DebugMixIn:
             id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
-        key_factory(repository)  # sets the repository key, needed to load and store the chunk index in index/
+
         repository.put(id, data)
         repository.flush()  # no cache wraps this command, so flush the buffered pack before close()
         print("object %s put." % hex_id)
 
-    @with_repository(manifest=False, exclusive=True)
-    def do_debug_delete_obj(self, args, repository):
+    @with_repository(exclusive=True)
+    def do_debug_delete_obj(self, args, repository, manifest):
         """Deletes the objects with the given IDs from the repository."""
         ids = []
         for hex_id in args.ids:
@@ -274,12 +273,8 @@ class DebugMixIn:
                 ids.append((hex_id, hex_to_bin(hex_id, length=32)))
             except ValueError:
                 ids.append((hex_id, None))
-        if any(id is not None for _, id in ids):
-            # the key is needed to load and store the chunk index in index/, and to validate the objects
-            # next to a deleted one when its pack is rewritten.
-            validate = object_validator(RepoObj(key_factory(repository)))
-        else:
-            validate = None  # only invalid ids: the repository is not touched
+        # validate the objects next to a deleted one when its pack is rewritten.
+        validate = object_validator(manifest.repo_objs)
         for hex_id, id in ids:
             if id is None:
                 print("object id %s is invalid." % hex_id)

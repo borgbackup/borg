@@ -13,6 +13,7 @@ from ... import archive as archive_module
 from ...archive import Archive, ArchiveChecker, ChunkBuffer
 from ...cache import (
     Cache,
+    CorruptChunkIndexFragment,
     chunkindex_is_invalid,
     delete_chunkindex_from_repo,
     list_chunkindex_hashes,
@@ -879,7 +880,12 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request):
             data = bytearray(repository.store_load(name))
             data[0] ^= 0xFF
             repository.store_store(name, bytes(data))
-    cmd(archiver, "check", exit_code=1)  # read-only check reports the corrupt index
+    # a read-only check reports the corrupt index, then the archives check aborts: it needs the index.
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "check", exit_code=CorruptChunkIndexFragment.exit_mcode)
+    else:
+        with pytest.raises(CorruptChunkIndexFragment):
+            cmd(archiver, "check")
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "rebuilt" in output.lower()
     # item 6: repair persisted a fresh index instead of leaving it for a slow rebuild on the next

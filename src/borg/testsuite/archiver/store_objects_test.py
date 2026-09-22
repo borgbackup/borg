@@ -2,7 +2,8 @@ import io
 
 import pytest
 
-from ...cache import REFERENCED_BY_ARCHIVE, archive_reference_cache_name, load_archive_references
+from ...cache import REFERENCED_BY_ARCHIVE, CorruptChunkIndexFragment
+from ...cache import archive_reference_cache_name, load_archive_references
 from ...constants import *  # NOQA
 from ...crypto.key import store_hash
 from ...hashindex import ChunkIndex
@@ -78,14 +79,10 @@ def test_references_cache_of_another_archive(archivers, request):
     assert references2.file_count == references1.file_count + 1  # rebuilt from archive2, which has file2, too
 
 
-def test_plaintext_index_fragment_of_an_older_beta(archivers, request):
-    # older borg 2 betas stored the serialized chunk index as it is. such a fragment fails the
-    # authentication: check still passes (without the index cross-check), a create rebuilds the index
-    # from the packs, and afterwards the fragment is gone.
-    archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path)
-    cmd(archiver, "repo-create", "--encryption=aes256-ocb")
-    cmd(archiver, "create", "test", "input")
+def replace_index_by_plaintext_fragment(archiver):
+    """Replace the index/ fragments by one that holds the whole index as plaintext, as older borg 2 betas
+    stored it. It fails the authentication. Return its name.
+    """
     with open_repository(archiver) as repository:
         chunks = ChunkIndex()
         for id, entry in repository.chunks.iteritems():
@@ -97,16 +94,60 @@ def test_plaintext_index_fragment_of_an_older_beta(archivers, request):
             repository.store_delete(f"index/{name}")
         plaintext_name = store_hash(data).hexdigest()
         repository.store_store(f"index/{plaintext_name}", data)
+    return plaintext_name
 
-    output = cmd(archiver, "check")
-    assert "Cannot cross-check packs against the chunk index" in output
 
-    output = cmd(archiver, "create", "test2", "input")
-    assert "is corrupt, rebuilding the chunk index from the packs" in output
+def assert_aborts_on_corrupt_index(archiver, *args):
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, *args, exit_code=CorruptChunkIndexFragment.exit_mcode)
+        assert 'is corrupt. Run "borg check --repair"' in output
+    else:
+        with pytest.raises(CorruptChunkIndexFragment):
+            cmd(archiver, *args)
 
-    cmd(archiver, "compact")
+
+def test_plaintext_index_fragment_of_an_older_beta(archivers, request):
+    # older borg 2 betas stored the serialized chunk index as it is. such a fragment fails the
+    # authentication: check reports it, the commands that need the index abort, and check --repair
+    # rebuilds the index from the packs.
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    cmd(archiver, "repo-create", "--encryption=aes256-ocb")
+    cmd(archiver, "create", "test", "input")
+    plaintext_name = replace_index_by_plaintext_fragment(archiver)
+
+    output = cmd(archiver, "check", "--repository-only", exit_code=EXIT_WARNING)
+    assert f"Store object index/{plaintext_name} is corrupted" in output
+    assert_aborts_on_corrupt_index(archiver, "create", "test2", "input")
+    with open_repository(archiver) as repository:
+        assert plaintext_name in raw_store_objects(repository, "index")  # nothing wrote the index.
+
+    cmd(archiver, "check", "--repair", exit_code=0)
     with open_repository(archiver) as repository:
         assert plaintext_name not in raw_store_objects(repository, "index")
+    output = cmd(archiver, "create", "test2", "input")
+    assert "is corrupt" not in output
     output = cmd(archiver, "check")
     assert "Cannot cross-check" not in output
     assert "is corrupt" not in output
+
+
+def test_compact_rebuilds_corrupt_index(archivers, request):
+    # borg compact rewrites the whole index anyway (under an exclusive lock), so it rebuilds a corrupt
+    # index from the packs instead of aborting. compact --dry-run does not write the index, so it aborts.
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    cmd(archiver, "repo-create", "--encryption=aes256-ocb")
+    cmd(archiver, "create", "test", "input")
+    plaintext_name = replace_index_by_plaintext_fragment(archiver)
+
+    assert_aborts_on_corrupt_index(archiver, "compact", "--dry-run")
+    with open_repository(archiver) as repository:
+        assert plaintext_name in raw_store_objects(repository, "index")  # the dry run wrote nothing.
+
+    output = cmd(archiver, "compact", "-v")
+    assert "is corrupt, rebuilding the chunk index from the packs" in output
+    with open_repository(archiver) as repository:
+        assert plaintext_name not in raw_store_objects(repository, "index")
+    cmd(archiver, "create", "test2", "input")
+    cmd(archiver, "check")

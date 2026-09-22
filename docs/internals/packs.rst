@@ -292,24 +292,30 @@ first backup of a big dataset produces. The split selects and sorts the keys one
 leading-key-bits partition at a time, so the same set of entries always yields the
 same fragments, no matter in which order the entries were inserted.
 
-Content-addressed naming makes each fragment self-verifying. In the encrypting modes,
-the envelope is randomized, so writing the same entries twice produces two
-differently named fragments with the same content: the merge (see below) is
-idempotent, so this is harmless; e.g. two clients consolidating the same small
-fragments at the same time can leave a duplicate fragment behind until the next
-``borg compact``. In the ``authenticated-*`` modes, the envelope is deterministic, so
-the same entries produce the same name.
+Content-addressed naming makes each fragment self-verifying. In the ``authenticated-*``
+modes, the envelope is deterministic, so the same entries produce the same name. In the
+encrypting modes, the envelope is randomized, so the same entries produce a
+differently named fragment each time they are stored. So that writing the same index
+data twice does not store it twice, the client remembers the plaintext store hash of
+every fragment it read in the session, and a write (unless forced) skips a fragment
+whose content is already present in the repository. Duplicate fragments that are
+left anyway (e.g. two clients consolidating the same small fragments at the same
+time) are harmless, as the merge (see below) is idempotent; the next ``borg compact``
+removes them.
 
 Index fragments are write-once; an existing fragment is never modified. The in-memory
 ChunkIndex is built lazily, on the first access to ``Repository.chunks``: everything
-under ``index/`` is listed, loaded, checked against its name (store hash) and the
-envelope's authentication and merged (``build_chunkindex_from_repo``). The merge is
-commutative and idempotent; order does not matter. It has to succeed for *all*
-fragments or not at all, because a partially merged index would be missing chunks
-that do exist in the repository: a fragment that vanishes mid-merge (a concurrent
-consolidation replaced it) restarts the merge, and a corrupt one (it does not match
-its name, fails the authentication or does not deserialize) falls back to the rebuild
-from the pack files.
+under ``index/`` is listed, loaded, authenticated and merged
+(``build_chunkindex_from_repo``). Loading does not hash a fragment to verify its name:
+the authentication of the envelope already proves its content (``borg check``
+verifies the names). The merge is commutative and idempotent; order does not matter.
+It has to succeed for *all* fragments or not at all, because a partially merged index
+would be missing chunks that do exist in the repository: a fragment that vanishes
+mid-merge (a concurrent consolidation replaced it) restarts the merge, and a corrupt
+one (it fails the authentication or does not deserialize) aborts the command: run
+``borg check --repair`` to rebuild the index from the pack files. Only the commands
+that rewrite the whole index anyway, under an exclusive lock (``borg compact``,
+``borg repo-compress``), rebuild it from the pack files instead of aborting.
 
 Because every backup appends a fragment, small fragments would pile up over time.
 ``repack_chunkindex()`` (run at cache close, and by anything that loads the index and

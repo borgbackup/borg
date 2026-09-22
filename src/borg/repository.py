@@ -49,7 +49,8 @@ META_READ_SIZE = 1024
 # meta_size, which only MAX_DATA_SIZE bounds, from triggering a large read.
 MAX_VALIDATED_META_SIZE = 64 * 1024
 # AAD prefix of the store objects protected by the key (index/, cache/): keeps their envelopes apart
-# from the metadata and data slots of pack objects, whose AAD starts with OBJ_MAGIC (b"BORG_OBJ").
+# from the metadata and data slots of pack objects, whose AAD starts with OBJ_MAGIC (b"BORG_OBJ"). The
+# repository id, a tag and the object name (or namespace) follow it, see Repository._store_obj_aad.
 STORE_OBJ_AAD = b"borg-store-object\0"
 
 
@@ -950,6 +951,9 @@ class Repository:
         self.id_hash = None  # the "--id-hash" name, e.g. "sha256"
         # the repository's key, see set_key(): the index/ and cache/ objects are stored in its envelope.
         self.key = None
+        # plaintext store hash -> fragment hash of the index/ fragments read in this session, so a
+        # fragment with the same content is not stored again, see cache._store_chunkindex_fragment.
+        self.chunkindex_fragment_hashes = {}
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client
         # in a timely manner, in case we have a RemoteRepository.
@@ -1398,10 +1402,12 @@ class Repository:
         It also reports missing packs (refs #9898): pack ids the chunk index references but that are
         absent from packs/. The index is read from its fragments only and its referenced pack ids are
         compared with the packs present in the store. This cross-check runs before the pack loop, so
-        max_duration bounds it and it runs on partial runs too. It is skipped, and the check still
-        passes, when the index cannot be read from its fragments (an invalid index is regenerated from
-        the packs on next use, so it can never reference a missing pack; a pack that is truly gone then
-        surfaces as missing chunks in the archives check).
+        max_duration bounds it and it runs on partial runs too. It is skipped when the index cannot be
+        read from its fragments (an invalid index is regenerated from the packs on next use, so it can
+        never reference a missing pack; a pack that is truly gone then surfaces as missing chunks in the
+        archives check). A fragment that matches its name, but fails the authentication of the key's
+        envelope or does not deserialize, is an index error: with repair=True, the index is rebuilt
+        from the packs.
 
         max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
         max_age, accepting a future timestamp up to MAX_CLOCK_SKEW (clock skew). Results are recorded
@@ -1468,7 +1474,8 @@ class Repository:
         index_infos = store_list("index")
         # with the invalid marker set, the index/ fragments may be missing entries or point at deleted
         # packs (see write_chunkindex_invalid). The next use rebuilds the index from the packs, so warn.
-        from .cache import chunkindex_is_invalid, build_chunkindex_from_repo, ChunkIndexRebuildInterrupted
+        from .cache import chunkindex_is_invalid, build_chunkindex_from_repo
+        from .cache import ChunkIndexRebuildInterrupted, CorruptChunkIndexFragment
 
         index_invalid = chunkindex_is_invalid(self)
         if index_invalid:
@@ -1509,9 +1516,20 @@ class Repository:
             # cross-check the chunk index against packs/ to find referenced-but-absent packs (refs #9898).
             # run before the pack loop so max_duration bounds it and partial checks cover it too. read
             # the index from its fragments only: a full rebuild reads every pack (too slow) and writes
-            # to the repo (a check must not).
-            if not index_invalid and not sig_int:
-                chunks = build_chunkindex_from_repo(self, fragments_only=True)
+            # to the repo (a check must not). skip it if the index is known to be corrupt (see above): its
+            # fragments can not be loaded completely then, and the repair rebuilds it from the packs.
+            if not index_invalid and not index_errors and not sig_int:
+                try:
+                    chunks = build_chunkindex_from_repo(self, fragments_only=True)
+                except CorruptChunkIndexFragment as err:
+                    # the fragment matches its name, but it fails the authentication of the key's envelope
+                    # (tampered, or not written with this key) or does not deserialize.
+                    logger.error(
+                        f"Store object {err.args[0]} is corrupted: it fails the authentication or does not "
+                        "deserialize."
+                    )
+                    index_errors += 1
+                    chunks = None
                 if chunks is None:
                     logger.warning(
                         "Cannot cross-check packs against the chunk index: the index could not be loaded "
@@ -1582,10 +1600,10 @@ class Repository:
                 logger.info("Finished checking packs.")
             tracker.prune(present_pack_ids)
             pack_pi.finish()
-            # rebuild only if the index was the sole problem and every pack was verified intact this
-            # run: sig_int breaks the loop early, so "no pack errors" must be paired with "all packs
+            # rebuild only on repair, if the index was the sole problem and every pack was verified intact
+            # this run: sig_int breaks the loop early, so "no pack errors" must be paired with "all packs
             # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs.
-            if index_errors and pack_errors == 0 and not sig_int and pack_files == len(pack_infos):
+            if repair and index_errors and pack_errors == 0 and not sig_int and pack_files == len(pack_infos):
 
                 def note_drop():
                     nonlocal drops
@@ -2201,6 +2219,11 @@ class Repository:
         """Set the key that protects the index/ and cache/ store objects, see store_encrypt_store()."""
         self.key = key
 
+    def _store_obj_aad(self, name, hashed_name):
+        # the AAD of a store object's envelope: the repository id and the full object name, or for a hashed-name
+        # object its namespace. the tag keeps these two apart, e.g. the namespace "index" and an object named "index".
+        return STORE_OBJ_AAD + self.id + (b"h" if hashed_name else b"n") + name.encode()
+
     def store_encrypt_store(self, name, value, *, hashed_name=False):
         """Store value under name, wrapped in the key's envelope.
 
@@ -2208,6 +2231,7 @@ class Repository:
         KeyBase.encrypt): encrypted and authenticated in the encrypting modes, authenticated only in
         the authenticated-* modes.
 
+        The repository id is bound into the envelope as AAD (see _store_obj_aad), and:
         hashed_name=False: name is the full object name and is bound into the envelope as AAD.
         hashed_name=True: name is a namespace (e.g. "index"); the object is stored as
         <name>/<hex store hash of the envelope> and the namespace is the AAD (the full name does not
@@ -2217,7 +2241,7 @@ class Repository:
         """
         if self.key is None:
             raise self.KeyRequired(str(self._location), name)
-        envelope = self.key.encrypt(b"", value, aad=STORE_OBJ_AAD + name.encode())
+        envelope = self.key.encrypt(b"", value, aad=self._store_obj_aad(name, hashed_name))
         if hashed_name:
             name = f"{name}/{store_hash(envelope).hexdigest()}"
         self.store_store(name, envelope)
@@ -2226,27 +2250,21 @@ class Repository:
     def store_load_decrypt(self, name, *, hashed_name=False):
         """Load an object stored by store_encrypt_store(), verify and unwrap its envelope.
 
-        hashed_name=True: name is <namespace>/<hex store hash>; the stored bytes must hash to the hex
-        part and the namespace is the AAD.
+        hashed_name=True: name is <namespace>/<hex store hash> and the namespace is the AAD. The stored
+        bytes are not hashed to verify the name: the authentication of the envelope already proves that
+        the content is correct (borg check verifies the names, see check()).
 
         Returns the payload (bytes or a memoryview). Raises StoreObjectNotFound if the object is
-        missing, IntegrityError if the name check or the envelope authentication fails, KeyRequired
-        if no key was set.
+        missing, IntegrityError if the envelope authentication fails, KeyRequired if no key was set.
         """
         if self.key is None:
             raise self.KeyRequired(str(self._location), name)
         envelope = self.store_load(name)
-        if hashed_name:
-            namespace, hex_hash = name.rsplit("/", 1)
-            if store_hash(envelope).hexdigest() != hex_hash:
-                raise IntegrityError(f"Store object {name}: content does not match its name (store hash)")
-            aad_name = namespace
-        else:
-            aad_name = name
+        aad_name = name.rsplit("/", 1)[0] if hashed_name else name
         try:
-            return self.key.decrypt(b"", envelope, aad=STORE_OBJ_AAD + aad_name.encode())
+            return self.key.decrypt(b"", envelope, aad=self._store_obj_aad(aad_name, hashed_name))
         except IntegrityError as err:
-            raise IntegrityError(f"Store object {name}: {err.args[0] if err.args else err}") from err
+            raise IntegrityError(f"Store object {name}: authentication failed") from err
 
     def store_delete(self, name, *, deleted=False):
         self._lock_refresh()

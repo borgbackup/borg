@@ -406,14 +406,16 @@ class PackWriter:
 class PackReader:
     """Reads pack files, the read-side counterpart to PackWriter.
 
-    Pass pack_id to read from the store, or pack_contents for a pack already in memory.
+    Pass pack_id to read from the store, or pack_contents for a pack already in memory. pack_size, if given,
+    is the size of the pack in the store, so size() does not look it up.
     """
 
-    def __init__(self, store=None, pack_id=None, pack_contents=None):
+    def __init__(self, store=None, pack_id=None, pack_contents=None, pack_size=None):
         self.store = store
         self.pack_id = pack_id
         self.key = "packs/" + bin_to_hex(pack_id) if pack_id is not None else None
         self.pack_contents = pack_contents
+        self.pack_size = pack_size
         self.headers_parsed = 0  # headers _parse_header accepted in the last iter_headers walk
 
     def read(self, offset, size):
@@ -423,9 +425,11 @@ class PackReader:
         return self.store.load(self.key, offset=offset, size=size)
 
     def size(self):
-        """Return the pack size in bytes (a store metadata lookup, unless the pack is in memory)."""
+        """Return the pack size in bytes (a store metadata lookup, unless the pack is in memory or pack_size is set)."""
         if self.pack_contents is not None:
             return len(self.pack_contents)
+        if self.pack_size is not None:
+            return self.pack_size
         return self.store.info(self.key).size
 
     @staticmethod
@@ -498,8 +502,8 @@ class PackReader:
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
         The walk reads one range per object (or a slice, for a pack in memory), plus one store
-        metadata lookup for the pack size. Fewer than a header's bytes left ends the walk: that is
-        the end of the pack.
+        metadata lookup for the pack size unless pack_size is set. Fewer than a header's bytes left
+        ends the walk: that is the end of the pack.
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
         repo object with id chunk_id. Given one, the walk validates every header, reading the
@@ -1381,10 +1385,12 @@ class Repository:
         continuing. A read-only check never rebuilds the index: reading every pack to do so would be
         far too slow and expensive for a routine (e.g. cron) check. With repair=True and a corrupt
         index, and if every pack is intact, the index is rebuilt from the packs' object headers and
-        persisted. Packs are verified by the store hash, which is content-addressing rather than a MAC, so
-        that check detects accidental corruption but not tampering; the rebuild therefore checks every
-        object with validate, see below, refs #9901, #10026. If any pack is corrupt the index is left
-        unchanged, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs, refs #9696.
+        persisted; on a full check the archives phase rebuilds and re-persists it afterwards, see
+        ArchiveChecker.finish. Packs are verified by the store hash, which is content-addressing rather
+        than a MAC, so that check detects accidental corruption but not tampering; the rebuild therefore
+        checks every object with validate, see below, refs #9901, #10026. If any pack is corrupt the index
+        is left unchanged, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs,
+        refs #9696.
 
         A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
         it. The record clears at the check that finds the pack intact again or gone (removed by

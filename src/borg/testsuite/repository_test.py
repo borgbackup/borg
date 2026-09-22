@@ -2272,6 +2272,18 @@ def test_pack_reader_iter_headers_reads_through_store(tmp_path):
         assert list(reader.iter_headers()) == [(H(47), 0, len(obj1)), (H(48), len(obj1), len(obj2))]
 
 
+def test_pack_reader_with_pack_size_does_not_look_up_the_size(tmp_path, monkeypatch):
+    obj1 = fchunk(b"FIRST", chunk_id=H(47))
+    obj2 = fchunk(b"SECOND", chunk_id=H(48))
+    pack = obj1 + obj2
+    pack_id = H(43)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
+        reader = PackReader(repository.store, pack_id, pack_size=len(pack))
+        monkeypatch.setattr(repository.store, "info", None)  # a size lookup would raise TypeError
+        assert list(reader.iter_headers()) == [(H(47), 0, len(obj1)), (H(48), len(obj1), len(obj2))]
+
+
 def test_pack_reader_raises_on_bad_magic():
     # a header without OBJ_MAGIC means the walk desynced onto payload bytes: corruption, not EOF.
     obj1 = fchunk(b"payload-one", meta=b"meta1", chunk_id=H(1))

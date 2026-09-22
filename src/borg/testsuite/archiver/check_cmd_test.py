@@ -1246,7 +1246,7 @@ def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
     monkeypatch.setenv("BORG_PACK_MAX_COUNT", "2")  # many packs, so a full walk would be noticed
     check_cmd_setup(archiver)
     # a defect chunk that no archive references, so the check after the repair finds nothing missing.
-    # delete() rewrites its pack, keeping the bystander.
+    # delete() rewrites its pack, keeping the other object in it (the bystander).
     (bystander_id, defect_id), pack_id = put_objects_in_one_pack(archiver, [b"bystander", b"defect"])
     with Repository(archiver.repository_location, exclusive=True) as repository:
         corrupt_chunk_on_disk(repository, defect_id)
@@ -1257,8 +1257,9 @@ def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
     # the BUFFER_SIZE check_cmd_setup used: rebuild_archives re-chunks the item metadata into the same
     # chunks, so it stores nothing and the rewritten pack is the only pack the repair writes.
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
-        output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
+        output = cmd(archiver, "check", "--repair", "--verify-data", "--info", exit_code=0)
     assert f"{bin_to_hex(defect_id)}, integrity error" in output
+    assert "Re-reading 1 pack(s) written by the repair." in output
 
     new_packs = list_packs(archiver) - packs_before
     assert packs_before - list_packs(archiver) == {bin_to_hex(pack_id)}
@@ -1288,7 +1289,7 @@ def test_repair_finish_reads_no_pack_after_deleting_a_whole_pack(archiver, monke
         output = cmd(archiver, "check", "--repair", "--verify-data", "--info", exit_code=0)
     assert f"{bin_to_hex(defect_id)}, integrity error" in output
     assert findings == [False]
-    assert "Re-reading the packs written by the repair" not in output
+    assert "pack(s) written by the repair." not in output
     assert walked == []
     assert list_packs(archiver) == packs_before - {bin_to_hex(pack_id)}
     with Repository(archiver.repository_location, exclusive=True) as repository:
@@ -1353,10 +1354,10 @@ def test_repair_finish_reads_a_rewritten_pack_no_index_entry_names(archiver, mon
     check_cmd_setup(archiver)
     (dropped_id, defect_id), pack_id = put_objects_in_one_pack(archiver, [b"dropped", b"defect"])
     with Repository(archiver.repository_location, exclusive=True) as repository:
-        corrupt_chunk_on_disk(repository, defect_id)  # the payload: the header still validates
+        corrupt_chunk_on_disk(repository, defect_id)  # corrupts the payload, the header still validates
         key = "packs/" + bin_to_hex(pack_id)
         dropped = repository.chunks[dropped_id]
-        repository.store_store(key, corrupt(repository.store_load(key), dropped.obj_offset))  # the magic
+        repository.store_store(key, corrupt(repository.store_load(key), dropped.obj_offset))  # corrupts the magic
     packs_before = list_packs(archiver)
 
     walked = record_finish_walks(monkeypatch)
@@ -1389,10 +1390,10 @@ def test_repair_finish_accepts_a_superseded_duplicate_in_a_rewritten_pack(archiv
         archiver, [b"dropped", b"duplicate", b"duplicate", b"defect"]
     )
     with Repository(archiver.repository_location, exclusive=True) as repository:
-        corrupt_chunk_on_disk(repository, defect_id)  # the payload: the header still validates
+        corrupt_chunk_on_disk(repository, defect_id)  # corrupts the payload, the header still validates
         key = "packs/" + bin_to_hex(pack_id)
         dropped = repository.chunks[dropped_id]
-        repository.store_store(key, corrupt(repository.store_load(key), dropped.obj_offset))  # the magic
+        repository.store_store(key, corrupt(repository.store_load(key), dropped.obj_offset))  # corrupts the magic
 
     walked = record_finish_walks(monkeypatch)
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):  # see test_repair_finish_reads_only_the_rewritten_pack
@@ -1488,6 +1489,48 @@ def test_repair_finish_reports_a_missing_written_pack(archiver, monkeypatch):
     assert "Archive consistency check complete, problems found." in output
     with Repository(archiver.repository_location, exclusive=True) as repository:
         assert not any(entry.pack_id == pack_id for _, entry in repository.chunks.iteritems())
+
+
+@pytest.mark.parametrize("holder", ["first", "second"])
+def test_verify_written_packs_does_not_depend_on_the_pack_order(archiver, monkeypatch, holder):
+    """A chunk in one written pack, indexed at a bogus location in the other one, is indexed where it is.
+
+    holder: which of the two written packs, in the order verify_written_packs reads them, holds the chunk.
+    """
+    # local-only: this patches in-process archive and repository internals.
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1")  # a pack per object
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        manifest = Manifest.load(repository)
+        ids = []
+        for data in [b"aaa", b"bbb"]:
+            chunk_id = manifest.key.id_hash(data)
+            repository.put(chunk_id, manifest.repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM))
+            ids.append(chunk_id)
+        repository.flush()
+        entries = {chunk_id: repository.chunks[chunk_id] for chunk_id in ids}
+        first_id, second_id = sorted(ids, key=lambda chunk_id: entries[chunk_id].pack_id)
+        chunk_id, other_id = (first_id, second_id) if holder == "first" else (second_id, first_id)
+
+        checker = ArchiveChecker()
+        checker.repair = True
+        checker.repository = repository
+        checker.key = manifest.key
+        checker.repo_objs = manifest.repo_objs
+        checker.chunks = repository.chunks
+        checker.written_packs = {entry.pack_id for entry in entries.values()}
+        checker.chunks[chunk_id] = entries[chunk_id]._replace(pack_id=entries[other_id].pack_id, obj_offset=1)
+
+        checker.verify_written_packs()
+
+        assert checker.error_found
+        fixed = checker.chunks[chunk_id]
+        expected = entries[chunk_id]
+        assert (fixed.pack_id, fixed.obj_offset, fixed.obj_size) == (
+            expected.pack_id,
+            expected.obj_offset,
+            expected.obj_size,
+        )
 
 
 @pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "authenticated-sha256"]])

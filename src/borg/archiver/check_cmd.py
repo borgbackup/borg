@@ -213,16 +213,18 @@ class CheckMixIn:
         If the ``borg check`` process receives a SIGINT signal (Ctrl-C), it stops at the
         next safe boundary, leaving the repository and its chunk index in a consistent state.
         The repository check stops after the current pack; ``--verify-data`` and
-        ``--find-lost-archives`` stop after the current chunk; a ``--repair`` archive check
-        stops between whole archives. Results recorded before the interrupt are kept, so a later
-        check does not re-verify those packs until they are due again. With ``--repair``, an
-        interrupted archive check may leave some archives already repaired and others not yet
-        processed, so run ``borg check --repair`` again to finish.
+        ``--find-lost-archives`` stop after the current chunk; the archive check stops after the
+        current archive item, with ``--repair`` between whole archives. Results recorded before
+        the interrupt are kept, so a later check does not re-verify those packs until they are
+        due again. With ``--repair``, an interrupted archive check may leave some archives already
+        repaired and others not yet processed, so run ``borg check --repair`` again to finish.
 
-        During a ``--repair`` run, the archive check first rebuilds the chunk index from the
-        packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
-        respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
-        effect until they finish.
+        ``borg check`` rebuilds the chunk index from the packs when ``--repair`` is given or when
+        the stored index cannot be used. Ctrl-C stops that rebuild after the current object and
+        discards the partial index: it lacks chunks that are still in the repository, so the check
+        would report them as lost. After a ``--repair`` that stored or deleted chunks, borg rebuilds and
+        stores the chunk index once more; that rebuild always runs to completion, also after a
+        Ctrl-C, and reads every pack.
 
         About repair mode
         +++++++++++++++++

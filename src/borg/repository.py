@@ -1460,7 +1460,7 @@ class Repository:
         index_infos = store_list("index")
         # with the invalid marker set, the index/ fragments may be missing entries or point at deleted
         # packs (see write_chunkindex_invalid). The next use rebuilds the index from the packs, so warn.
-        from .cache import chunkindex_is_invalid, build_chunkindex_from_repo
+        from .cache import chunkindex_is_invalid, build_chunkindex_from_repo, ChunkIndexRebuildInterrupted
 
         index_invalid = chunkindex_is_invalid(self)
         if index_invalid:
@@ -1586,11 +1586,22 @@ class Repository:
                 # the exclusive check lock keeps the pack set fixed, so re-listing packs/ inside
                 # build_chunkindex_from_repo matches this verification. write_immediately persists the
                 # index and drops the corrupt fragments.
-                build_chunkindex_from_repo(
-                    self, slow_rebuild=True, validate=validate, on_drop=note_drop, write_immediately=True
-                )
-                self.invalidate_chunk_index()  # the rebuilt index is persisted; drop the in-memory copy
-                index_repaired = True
+                try:
+                    build_chunkindex_from_repo(
+                        self,
+                        slow_rebuild=True,
+                        validate=validate,
+                        on_drop=note_drop,
+                        write_immediately=True,
+                        interruptible=True,
+                    )
+                except ChunkIndexRebuildInterrupted:
+                    # nothing was stored: the corrupt fragments stay, so the next use rebuilds from the packs.
+                    drops = 0  # counted by the discarded rebuild, which covered only a part of the packs
+                    logger.warning("Index rebuild interrupted; the index stays corrupt and is rebuilt on next use.")
+                else:
+                    self.invalidate_chunk_index()  # the rebuilt index is persisted; drop the in-memory copy
+                    index_repaired = True
         else:
             logger.error("Repository index is corrupted and must be repaired; skipping the pack check.")
         objs_errors = index_errors + pack_errors + len(missing_pack_ids) + drops

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import time
 from datetime import UTC, datetime
@@ -12,6 +13,7 @@ from ..archive import Statistics
 from .. import cache as cache_mod
 from ..cache import (
     AdHocWithFilesCache,
+    ChunkIndexRebuildInterrupted,
     ChunksMixin,
     CorruptChunkIndexFragment,
     FileCacheEntry,
@@ -30,7 +32,7 @@ from ..crypto.key import AESOCBKey
 from ..helpers import CorruptPack, Error, bin_to_hex, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
-from ..repository import Repository
+from ..repository import PackReader, Repository
 
 
 class TestAdHocWithFilesCache:
@@ -562,6 +564,76 @@ def test_build_chunkindex_drops_a_pack_that_validates_nothing_when_others_do(tmp
         index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_good)
         assert H(93) in index
         assert H(94) not in index
+
+
+def two_pack_repo(tmp_path):
+    """A repository with two packs of two objects each: H(90) and H(92) in one, H(91) and H(93) in the other."""
+    from .repository_test import fchunk
+
+    repository = Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True)
+    with repository:
+        pack1 = fchunk(b"one", chunk_id=H(90)) + fchunk(b"three", chunk_id=H(92))
+        pack2 = fchunk(b"two", chunk_id=H(91)) + fchunk(b"four", chunk_id=H(93))
+        repository.store_store("packs/" + bin_to_hex(H(95)), pack1)
+        repository.store_store("packs/" + bin_to_hex(H(96)), pack2)
+    return repository
+
+
+def interrupt_after(monkeypatch, interrupter, objects):
+    """Trip interrupter once the walk yielded that many objects of a pack, or at the end of the pack if
+    objects is None. Return the list the walk appends each pack id to."""
+    packs_read = []
+    orig_iter_headers = PackReader.iter_headers
+
+    def iter_headers(self, **kwargs):
+        packs_read.append(self.pack_id)
+        for n, header in enumerate(orig_iter_headers(self, **kwargs)):
+            if n == objects:
+                interrupter.triggered = True
+            yield header
+        interrupter.triggered = True
+
+    monkeypatch.setattr(PackReader, "iter_headers", iter_headers)
+    return packs_read
+
+
+def test_build_chunkindex_slow_rebuild_ignores_sigint_by_default(tmp_path, monkeypatch):
+    """Without interruptible, the rebuild walks every pack and returns a complete index, also after a
+    Ctrl-C. ArchiveChecker.finish() relies on that, #9850."""
+    from .repository_test import Interrupter
+
+    interrupter = Interrupter()
+    monkeypatch.setattr(cache_mod, "sig_int", interrupter)
+    packs_read = interrupt_after(monkeypatch, interrupter, objects=1)
+    with two_pack_repo(tmp_path) as repository:
+        index = build_chunkindex_from_repo(repository, slow_rebuild=True)
+    assert len(packs_read) == 2  # the interrupt did not stop the walk
+    assert all(H(i) in index for i in (90, 91, 92, 93))
+
+
+@pytest.mark.parametrize(
+    "objects, packs_done",
+    [(None, 1), (1, 0)],  # a Ctrl-C at the end of the first pack, or after its first object
+    ids=["between-packs", "within-pack"],
+)
+def test_build_chunkindex_slow_rebuild_interruptible_discards_the_partial_index(
+    tmp_path, monkeypatch, caplog, objects, packs_done
+):
+    """With interruptible, a Ctrl-C stops the rebuild before the next object and raises; the index built
+    so far reaches neither the caller nor the repo, #10042."""
+    from .repository_test import Interrupter
+
+    interrupter = Interrupter()
+    monkeypatch.setattr(cache_mod, "sig_int", interrupter)
+    packs_read = interrupt_after(monkeypatch, interrupter, objects=objects)
+    with two_pack_repo(tmp_path) as repository:
+        stored_before = set(list_chunkindex_hashes(repository))
+        with caplog.at_level(logging.INFO, logger="borg.cache"):
+            with pytest.raises(ChunkIndexRebuildInterrupted, match="Got Ctrl-C"):
+                build_chunkindex_from_repo(repository, slow_rebuild=True, write_immediately=True, interruptible=True)
+        assert f"Chunk index rebuild interrupted after {packs_done} of 2 packs." in caplog.text
+        assert len(packs_read) == 1  # the second pack was not read
+        assert set(list_chunkindex_hashes(repository)) == stored_before  # nothing was stored
 
 
 def test_repack_leaves_sealed_untouched_and_reconstructs(tmp_path, monkeypatch):

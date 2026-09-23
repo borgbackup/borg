@@ -86,9 +86,9 @@ cache/
     a marker object: while it is present, the chunks index in ``index/`` is considered
     invalid, because its fragments may be missing entries or point at deleted packs.
     It is written before deleting index fragments, before a single-object delete removes
-    the old pack, and before ``borg check --repair`` rebuilds the index after changing
-    the packs. It is removed after the last fragment is deleted or once the complete
-    current index is stored.
+    the old pack, and by ``borg check --repair`` after storing packs, before it re-reads
+    them and stores the index. It is removed after the last fragment is deleted or once
+    the complete current index is stored.
 
 Note that this ``cache/`` namespace is inside the repository (and thus shared by
 all clients); it is not the client-local cache described in

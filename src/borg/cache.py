@@ -609,7 +609,7 @@ def write_chunkindex_invalid(repository):
     """Store the invalid marker, cache/chunkindex-invalid.
 
     Store it before deleting index/ fragments whose entries no other fragment holds, before deleting a pack
-    the fragments point at, and before rebuilding the index after pack changes the fragments do not record.
+    the fragments point at, and after storing packs the fragments do not record.
     While it is present, build_chunkindex_from_repo rebuilds the index from the packs instead of merging the
     fragments.
     """

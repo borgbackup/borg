@@ -421,6 +421,18 @@ def test_read_data(repo_fixtures, request):
         assert repository.get(H(0), read_data=False) == chunk_short
 
 
+def test_flush_returns_the_stored_objects(repository):
+    assert repository.flush() is None  # not opened, no pack writer
+    with repository:
+        assert repository.flush() is None  # nothing buffered
+        repository.put(H(0), fchunk(b"foo"))
+        ((chunk_id, pack_id, obj_offset, obj_size),) = repository.flush()
+        entry = repository.chunks[H(0)]
+        assert (chunk_id, pack_id, obj_offset, obj_size) == (H(0), entry.pack_id, entry.obj_offset, entry.obj_size)
+        assert repository.flush() is None
+    assert repository.flush() is None  # closed
+
+
 def test_consistency(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
@@ -2257,6 +2269,18 @@ def test_pack_reader_iter_headers_reads_through_store(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store("packs/" + bin_to_hex(pack_id), pack)
         reader = PackReader(repository.store, pack_id)
+        assert list(reader.iter_headers()) == [(H(47), 0, len(obj1)), (H(48), len(obj1), len(obj2))]
+
+
+def test_pack_reader_with_pack_size_does_not_look_up_the_size(tmp_path, monkeypatch):
+    obj1 = fchunk(b"FIRST", chunk_id=H(47))
+    obj2 = fchunk(b"SECOND", chunk_id=H(48))
+    pack = obj1 + obj2
+    pack_id = H(43)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
+        reader = PackReader(repository.store, pack_id, pack_size=len(pack))
+        monkeypatch.setattr(repository.store, "info", None)  # a size lookup would raise TypeError
         assert list(reader.iter_headers()) == [(H(47), 0, len(obj1)), (H(48), len(obj1), len(obj2))]
 
 

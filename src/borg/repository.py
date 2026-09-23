@@ -406,14 +406,16 @@ class PackWriter:
 class PackReader:
     """Reads pack files, the read-side counterpart to PackWriter.
 
-    Pass pack_id to read from the store, or pack_contents for a pack already in memory.
+    Pass pack_id to read from the store, or pack_contents for a pack already in memory. pack_size, if given,
+    is the size of the pack in the store, so size() does not look it up.
     """
 
-    def __init__(self, store=None, pack_id=None, pack_contents=None):
+    def __init__(self, store=None, pack_id=None, pack_contents=None, pack_size=None):
         self.store = store
         self.pack_id = pack_id
         self.key = "packs/" + bin_to_hex(pack_id) if pack_id is not None else None
         self.pack_contents = pack_contents
+        self.pack_size = pack_size
         self.headers_parsed = 0  # headers _parse_header accepted in the last iter_headers walk
 
     def read(self, offset, size):
@@ -423,9 +425,11 @@ class PackReader:
         return self.store.load(self.key, offset=offset, size=size)
 
     def size(self):
-        """Return the pack size in bytes (a store metadata lookup, unless the pack is in memory)."""
+        """Return the pack size in bytes (a store metadata lookup, unless the pack is in memory or pack_size is set)."""
         if self.pack_contents is not None:
             return len(self.pack_contents)
+        if self.pack_size is not None:
+            return self.pack_size
         return self.store.info(self.key).size
 
     @staticmethod
@@ -498,8 +502,8 @@ class PackReader:
         """Yield (chunk_id, offset, size) for each object by walking the fixed object headers.
 
         The walk reads one range per object (or a slice, for a pack in memory), plus one store
-        metadata lookup for the pack size. Fewer than a header's bytes left ends the walk: that is
-        the end of the pack.
+        metadata lookup for the pack size unless pack_size is set. Fewer than a header's bytes left
+        ends the walk: that is the end of the pack.
 
         validate(chunk_id, obj) tells whether obj - an object's header and metadata slot - is the
         repo object with id chunk_id. Given one, the walk validates every header, reading the
@@ -1290,10 +1294,15 @@ class Repository:
         return self._chunks is not None
 
     def flush(self):
-        """Flush any buffered pack writer chunks."""
+        """Store the pack writer buffer as a pack, after waiting for the pack the background store-thread is storing.
+
+        Returns the (chunk_id, pack_id, obj_offset, obj_size) tuples of the objects in the packs this call
+        stored or waited for, or None if there were none.
+        """
         if self._pack_writer is not None:
             self._lock_refresh()
-            self._pack_writer.flush()  # PackWriter updates _chunks internally
+            return self._pack_writer.flush()  # PackWriter updates _chunks internally
+        return None
 
     def close(self, *, aborting=False):
         """Close the repository: join an in-flight pack store, persist the chunk index, tear down.
@@ -1820,9 +1829,12 @@ class Repository:
         Raises PermissionDenied before any store change unless the repo permissions grant write and delete
         on packs/ and index/ (see assert_writable).
 
+        validate: passed to compact_pack.
         update_index: True: store the full chunk index and delete the invalid marker. False: update the
             in-memory index only; the marker stays until the index is stored and the marker deleted.
-        validate: passed to compact_pack.
+
+        Returns compact_pack's (new_pack_id, dropped_bytes): the id of the pack holding the other objects
+        of the old pack (None if there were none), and the number of bytes the rewrite dropped.
         """
         from .cache import write_chunkindex_to_repo, write_chunkindex_invalid, delete_chunkindex_invalid
 
@@ -1835,7 +1847,7 @@ class Repository:
         # keep every object the chunk index lists for this pack, except the one being deleted.
         keep_ids = {cid for cid, e in self.chunks.iteritems() if e.pack_id == pack_id}
         keep_ids.discard(id)
-        self.compact_pack(
+        result = self.compact_pack(
             pack_id,
             keep_ids=keep_ids,
             drop_ids={id},
@@ -1847,6 +1859,7 @@ class Repository:
             # the removal for the next borg process.
             write_chunkindex_to_repo(self, self.chunks, incremental=False, force_write=True, delete_other=True)
             delete_chunkindex_invalid(self)
+        return result
 
     def compact_pack(
         self, pack_id, *, keep_ids: set, drop_ids: set, validate, chunks=None, before_old_pack_delete=None

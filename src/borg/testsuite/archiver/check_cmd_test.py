@@ -131,24 +131,25 @@ def test_check_soft_interrupt(archivers, request, monkeypatch):
 
     # archive check: interrupt verify_data after 3 chunks.
     with Repository(archiver.repository_path, exclusive=True) as repository:
-        orig_get = repository.get
-        get_calls = 0
+        orig_get_many = repository.get_many
+        chunks_read = 0
 
-        def get_then_interrupt(*args, **kwargs):
-            nonlocal get_calls
-            get_calls += 1
-            if get_calls == 3:  # trip mid-loop, after 3 chunks
-                sig_int._sig_int_triggered = True
-            return orig_get(*args, **kwargs)
+        def get_many_then_interrupt(ids, **kwargs):
+            nonlocal chunks_read
+            for data in orig_get_many(ids, **kwargs):
+                chunks_read += 1
+                if chunks_read == 3:  # trip mid-loop, after 3 chunks
+                    sig_int._sig_int_triggered = True
+                yield data
 
-        monkeypatch.setattr(repository, "get", get_then_interrupt)
+        monkeypatch.setattr(repository, "get_many", get_many_then_interrupt)
         try:
             with pytest.raises(Error, match="Got Ctrl-C"):
                 ArchiveChecker().check(repository, verify_data=True, sort_by="ts", format="{archive} {time} {id}")
         finally:
             sig_int._sig_int_triggered = False
-        # verify_data breaks at the chunk it interrupted on, and the skipped scans issue no more get()s.
-        assert get_calls == 3
+        # verify_data breaks at the chunk it interrupted on, and the skipped scans read nothing more.
+        assert chunks_read == 3
 
     # nothing changed, so a normal check passes.
     cmd(archiver, "check", exit_code=0)
@@ -1575,6 +1576,78 @@ def test_verify_data(archivers, request, init_args):
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
     assert "The following chunks are missing in the repository:" in output
     assert bin_to_hex(chunk.id) in output
+
+
+def _archive_checker(repository):
+    """An ArchiveChecker wired to repository, for calling a single check step directly."""
+    checker = ArchiveChecker()
+    checker.repair = False
+    checker.repository = repository
+    checker.key = checker.make_key(repository)
+    checker.repo_objs = RepoObj(checker.key)
+    checker.chunks = repository.chunks
+    return checker
+
+
+def _watch_pack_loads(monkeypatch, repository):
+    """Record which packs get loaded as a whole (size=None: no range read, the full object)."""
+    loaded = []
+    orig_load = repository.store.load
+
+    def load(key, **kwargs):
+        if key.startswith("packs/") and kwargs.get("size") is None:
+            loaded.append(key)
+        return orig_load(key, **kwargs)
+
+    monkeypatch.setattr(repository.store, "load", load)
+    return loaded
+
+
+def test_verify_data_reads_each_pack_once(archivers, request, monkeypatch):
+    """verify_data() walks the chunk index pack by pack, so it fetches every pack exactly once."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+        packs = {entry.pack_id for _, entry in repository.chunks.iteritems()}
+        assert len(packs) > Repository.PACK_READER_CACHE_SIZE  # more packs than the pack cache holds
+        loaded = _watch_pack_loads(monkeypatch, repository)
+
+        checker.verify_data()
+
+        assert not checker.error_found
+        assert sorted(loaded) == sorted("packs/" + bin_to_hex(pack_id) for pack_id in packs)
+
+
+def test_verify_data_reports_a_missing_pack(archivers, request, monkeypatch):
+    """A pack that is gone is reported once, with the chunks it holds counted as lost, and the check goes on."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+        # the fullest pack, so it holds more chunks than just the one that is read first
+        gone, gone_chunks = max(repository.chunks.iter_packs(), key=lambda pack: len(pack[1]))
+        assert len(gone_chunks) > 1
+        repository.store_delete("packs/" + bin_to_hex(gone))
+        repository.clear_pack_cache()
+        loaded = _watch_pack_loads(monkeypatch, repository)
+
+        logged = []
+        monkeypatch.setattr(archive_module.logger, "error", lambda msg, *args: logged.append(msg % args))
+
+        checker.verify_data()
+
+        assert checker.error_found
+        # one line for the pack, not one per chunk, then the summary: the other packs verify fine.
+        assert len(logged) == 2
+        assert logged[0] == f"pack {bin_to_hex(gone)} is missing, {len(gone_chunks)} chunks are lost."
+        # the lost chunks count as verified and as errors, as if each had been read and failed.
+        assert logged[-1].endswith(
+            f"verified {len(repository.chunks)} chunks with {len(gone_chunks)} integrity errors."
+        )
+        # each pack was loaded once, the missing one included, and the scan continued past it.
+        packs = {entry.pack_id for _, entry in repository.chunks.iteritems()}
+        assert sorted(loaded) == sorted("packs/" + bin_to_hex(pack_id) for pack_id in packs)
 
 
 def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):

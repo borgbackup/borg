@@ -176,3 +176,51 @@ def test_iteritems_prefix():
     for prefix in range(2**prefix_bits):
         part = [key for key, _ in chunks.iteritems(only_new=True, prefix_bits=prefix_bits, prefix=prefix)]
         assert part == ([new_key] if prefix == new_prefix else [])
+
+
+def _packed_index(n_chunks, n_packs):
+    """A ChunkIndex of n_chunks entries spread over n_packs packs, plus the expected iter_packs result."""
+    chunks = ChunkIndex()
+    expected = {}  # pack_id -> chunk ids, ordered by their offset in the pack
+    for i in range(n_chunks):
+        key = H2(i)
+        pack_id = H2(1000000 + i % n_packs)
+        obj_offset = (n_chunks - i) * 4096  # descending, so the offset order is not the insertion order
+        chunks[key] = ChunkIndexEntry(
+            flags=ChunkIndex.F_USED, size=4096, pack_id=pack_id, obj_offset=obj_offset, obj_size=4096
+        )
+        expected.setdefault(pack_id, []).append((obj_offset, key))
+    return chunks, {pack_id: [key for _, key in sorted(entries)] for pack_id, entries in expected.items()}
+
+
+# max_entries=1 forces 512 partitions, i.e. more than the 8 prefix bits the first pack id byte holds.
+@pytest.mark.parametrize("max_entries", [1, 7, 100, 1000000])
+def test_iter_packs(max_entries):
+    chunks, expected = _packed_index(500, 20)
+    result = list(chunks.iter_packs(max_entries=max_entries))
+    # every pack once, in ascending pack_id order, with all of its chunk ids in offset order
+    assert [pack_id for pack_id, _ in result] == sorted(expected)
+    assert dict(result) == expected
+
+
+def test_iter_packs_empty():
+    assert list(ChunkIndex().iter_packs()) == []
+
+
+def test_iter_packs_skips_pending():
+    """An entry with F_PENDING has no pack location yet, thus it is in no pack and not yielded."""
+    chunks, expected = _packed_index(100, 5)
+    pending_key = H2(5000)
+    chunks[pending_key] = ChunkIndexEntry(
+        flags=ChunkIndex.F_USED | ChunkIndex.F_PENDING,
+        size=4096,
+        pack_id=UNKNOWN_BYTES32,
+        obj_offset=UNKNOWN_INT32,
+        obj_size=UNKNOWN_INT32,
+    )
+    assert dict(chunks.iter_packs(max_entries=10)) == expected
+
+
+def test_iter_packs_bad_max_entries():
+    with pytest.raises(ValueError):
+        list(ChunkIndex().iter_packs(max_entries=0))

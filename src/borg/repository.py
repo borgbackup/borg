@@ -1797,6 +1797,10 @@ class Repository:
             else:
                 return None
 
+    def clear_pack_cache(self):
+        """Drop all cached packs, so the next read fetches from the store."""
+        self._pack_cache.clear()
+
     def _cached_pack_reader(self, pack_id):
         """Return a PackReader holding the whole pack, loading it into the cache on a miss."""
         reader = self._pack_cache.get(pack_id)

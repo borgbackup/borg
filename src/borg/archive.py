@@ -2392,32 +2392,48 @@ class ArchiveChecker:
         pi = ProgressIndicatorPercent(
             total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
-        for chunk_id, _ in self.chunks.iteritems():
+        # pack by pack, each pack's chunks in offset order: get_many() loads a whole pack and serves
+        # all requested chunks from that copy, so each pack is fetched once and read front to back.
+        for pack_id, chunk_ids in self.chunks.iter_packs():
+            try:
+                for chunk_id, encrypted_data in zip(chunk_ids, self.repository.get_many(chunk_ids)):
+                    if sig_int:
+                        break
+                    pi.show()
+                    verified += 1
+                    try:
+                        # we must decompress, so it'll call assert_id() in there.
+                        # this is the audit that re-certifies the id/content invariant, so it reads at its
+                        # own place, which always verifies and can not be switched off, see BORG_ASSERT_ID.
+                        self.repo_objs.parse(
+                            chunk_id,
+                            encrypted_data,
+                            decompress=True,
+                            ro_type=ROBJ_DONTCARE,
+                            assert_id_place="verify_data",
+                        )
+                    except IntegrityErrorBase as integrity_error:
+                        self.error_found = True
+                        errors += 1
+                        logger.error("chunk %s, integrity error: %s", bin_to_hex(chunk_id), integrity_error)
+                        defect_chunks.append(chunk_id)
+            except Repository.PackNotFound:
+                # the pack is gone, thus every chunk the index places in it is lost. get_many() loads the
+                # whole pack for the first chunk, so it raises before any chunk of this pack was read.
+                # one error line for the pack, the chunk ids at debug level: a pack holds thousands of them.
+                self.error_found = True
+                lost = len(chunk_ids)
+                errors += lost
+                verified += lost  # they are not read, but they are accounted for, like a failed read
+                logger.error("pack %s is missing, %d chunks are lost.", bin_to_hex(pack_id), lost)
+                for missing_id in chunk_ids:
+                    logger.debug("chunk %s: pack %s is missing.", bin_to_hex(missing_id), bin_to_hex(pack_id))
+                pi.show(increase=lost)
+            # this pack is done: drop it, the cache would else keep PACK_READER_CACHE_SIZE whole packs
+            # of which none is read again, and the retries below must really re-read from the store.
+            self.repository.clear_pack_cache()
             if sig_int:
                 break
-            pi.show()
-            verified += 1
-            try:
-                encrypted_data = self.repository.get(chunk_id)
-            except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
-                self.error_found = True
-                errors += 1
-                logger.error("chunk %s: %s", bin_to_hex(chunk_id), err)
-                if isinstance(err, IntegrityErrorBase):
-                    defect_chunks.append(chunk_id)
-            else:
-                try:
-                    # we must decompress, so it'll call assert_id() in there.
-                    # this is the audit that re-certifies the id/content invariant, so it reads at its own
-                    # place, which always verifies and can not be switched off, see BORG_ASSERT_ID.
-                    self.repo_objs.parse(
-                        chunk_id, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE, assert_id_place="verify_data"
-                    )
-                except IntegrityErrorBase as integrity_error:
-                    self.error_found = True
-                    errors += 1
-                    logger.error("chunk %s, integrity error: %s", bin_to_hex(chunk_id), integrity_error)
-                    defect_chunks.append(chunk_id)
         pi.finish()
         if defect_chunks:
             if self.repair:
@@ -2426,7 +2442,7 @@ class ArchiveChecker:
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
-                    # local repo (fs): as chunks.iteritems loop usually pumps a lot of data through,
+                    # local repo (fs): as the loop above usually pumps a lot of data through,
                     # a defect chunk is likely not in the fs cache any more and really gets re-read
                     # from the underlying media.
                     try:

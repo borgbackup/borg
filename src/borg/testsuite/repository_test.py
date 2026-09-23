@@ -620,6 +620,25 @@ def test_get_many_keeps_request_order(repo_fixtures, request):
         assert repository.store.stats["load_calls"] - loads_before == 2  # each pack loaded once
 
 
+def test_clear_pack_cache(repo_fixtures, request):
+    # clear_pack_cache() drops the packs get_many() cached, so the next read loads them again.
+    objects = [(H(i), fchunk(b"payload-%02d" % i, chunk_id=H(i))) for i in range(2)]
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # one pack: {H0, H1}
+        for chunk_id, chunk in objects:
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        assert len(list(repository.get_many([H(0)]))) == 1  # loads the pack into the cache
+
+        loads_before = repository.store.stats["load_calls"]
+        assert repository.get(H(1)) == objects[1][1]  # sliced out of the cached pack
+        assert repository.store.stats["load_calls"] == loads_before
+
+        repository.clear_pack_cache()
+        assert repository.get(H(1)) == objects[1][1]  # same bytes, read from the store again
+        assert repository.store.stats["load_calls"] > loads_before
+
+
 def test_get_many_missing_id_yields_none(repo_fixtures, request):
     # With raise_missing=False, an id that was never stored yields None in its position; the ids
     # before and after it read back unchanged.

@@ -265,7 +265,10 @@ class CheckMixIn:
            index and the packs untouched and reports it; salvaging the intact objects of
            such a pack is not implemented yet (refs #8572). The rebuild authenticates
            each object's header and metadata with the key, leaves an object that fails
-           this out of the index and reports it as an error.
+           this out of the index and reports it as an error. Repair mode also removes the
+           index entries of the chunks stored in missing packs (packs the index references,
+           but that are absent from the repository). Only a full ``borg check --repair``
+           repairs the archives that reference these chunks, ``--repository-only`` does not.
 
         2. When checking the consistency and correctness of archives, repair mode might
            remove whole archives from the manifest if their archive metadata chunk is

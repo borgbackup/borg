@@ -666,6 +666,25 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
     return drop_ranges
 
 
+def remove_missing_pack_entries(chunks, missing_pack_ids):
+    """Remove the entries of the chunks stored in the given packs from chunks.
+
+    chunks: ChunkIndex, modified in place.
+    missing_pack_ids: ids of packs that are absent from the store.
+
+    Entries with F_PENDING set have no pack location yet and are kept. Return the number of removed entries.
+    """
+    missing = set(missing_pack_ids)
+    stale_ids = [
+        chunk_id
+        for chunk_id, entry in chunks.iteritems()
+        if not (entry.flags & ChunkIndex.F_PENDING) and entry.pack_id in missing
+    ]
+    for chunk_id in stale_ids:
+        del chunks[chunk_id]
+    return len(stale_ids)
+
+
 class PackTracker:
     """Pack verification results, mapping pack_id -> (timestamp, result).
 
@@ -1400,7 +1419,7 @@ class Repository:
         ArchiveChecker.finish. Packs are verified by the store hash, which is content-addressing rather
         than a MAC, so that check detects accidental corruption but not tampering; the rebuild therefore
         checks every object with validate, see below, refs #9901, #10026. If any pack is corrupt the index
-        is left unchanged, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs,
+        is not rebuilt, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs,
         refs #9696. That object is stored in the key's envelope, too, so check() needs the key (see
         set_key).
 
@@ -1410,8 +1429,11 @@ class Repository:
 
         It also reports missing packs (refs #9898): pack ids the chunk index references but that are
         absent from packs/. The index is read from its fragments only and its referenced pack ids are
-        compared with the packs present in the store. This cross-check runs before the pack loop, so
-        max_duration bounds it and it runs on partial runs too. It is skipped when the index cannot be
+        compared with the packs present in the store; store.info() confirms that each pack the listing
+        lacks is missing. This cross-check runs before the pack loop, so max_duration bounds it and it
+        runs on partial runs too. The entries of the chunks in the missing packs are removed from
+        self.chunks; with repair=True, the index is also stored to index/, else the stored index is
+        unchanged. It is skipped when the index cannot be
         read from its fragments (an invalid index is regenerated from the packs on next use, so it can
         never reference a missing pack; a pack that is truly gone then surfaces as missing chunks in the
         archives check). A fragment that matches its name, but fails the authentication of the key's
@@ -1423,10 +1445,10 @@ class Repository:
         regardless of max_age.
 
         repo_only: whether this is a repository-only run. In repair mode it sets the return value for
-        damage repair does not fix, i.e. a corrupt pack or a skipped pack byte range (see validate):
-        fail if repo_only, else defer (a full check's archives phase can repair a corrupt pack holding
-        metadata, or file content with --verify-data, and reports chunks the archives reference but the
-        index lacks).
+        damage repair does not fix, i.e. a corrupt pack, a missing pack or a skipped pack byte range (see
+        validate): fail if repo_only, else defer (a full check's archives phase can repair a corrupt pack
+        holding metadata, or file content with --verify-data, and reports and repairs the archives that
+        reference chunks the index lacks).
 
         validate: validate(chunk_id, obj) -> bool, True if obj (an object's header plus its metadata
         slot) is the repo object with id chunk_id, see repoobj.object_validator. Required if repair.
@@ -1474,6 +1496,7 @@ class Repository:
         index_files = index_errors = 0
         pack_files = pack_errors = pack_skipped = 0
         missing_pack_ids = []  # packs referenced by the index but absent from packs/ (refs #9898)
+        stale_entries = 0  # number of index entries removed for missing_pack_ids
         index_repaired = False
         drops = 0  # number of pack byte ranges the index rebuild skipped
         packs_scanned = False
@@ -1483,7 +1506,7 @@ class Repository:
         index_infos = store_list("index")
         # with the invalid marker set, the index/ fragments may be missing entries or point at deleted
         # packs (see write_chunkindex_invalid). The next use rebuilds the index from the packs, so warn.
-        from .cache import chunkindex_is_invalid, build_chunkindex_from_repo
+        from .cache import chunkindex_is_invalid, build_chunkindex_from_repo, write_chunkindex_to_repo
         from .cache import ChunkIndexRebuildInterrupted, CorruptChunkIndexFragment
 
         index_invalid = chunkindex_is_invalid(self)
@@ -1555,8 +1578,21 @@ class Repository:
                     # set the session chunk index (.chunks) so later reads reuse it; clear_new() has
                     # run, so close() does not write it back.
                     self.chunks = chunks
-                    # index entries pointing to a pack absent from packs/: data loss.
-                    missing_pack_ids = sorted(referenced_pack_ids - present_pack_ids)
+                    # packs the index references, but that are absent from packs/ (store.info() confirms
+                    # each one): data loss.
+                    missing_pack_ids = sorted(
+                        pack_id
+                        for pack_id in referenced_pack_ids - present_pack_ids
+                        if not self.store.info("packs/" + bin_to_hex(pack_id)).exists
+                    )
+                    if missing_pack_ids:
+                        stale_entries = remove_missing_pack_entries(chunks, missing_pack_ids)
+                        if repair:
+                            # incremental=False: store all entries. force_write: store the index even if
+                            # it is empty. delete_other: delete the old index/ fragments.
+                            write_chunkindex_to_repo(
+                                self, chunks, incremental=False, force_write=True, delete_other=True
+                            )
                     # packs no index entry references: not an error, so info + ids at debug only.
                     orphan_pack_ids = sorted(present_pack_ids - referenced_pack_ids)
                     if orphan_pack_ids:
@@ -1652,10 +1688,11 @@ class Repository:
             logger.error(f"{len(missing_pack_ids)} pack(s) referenced by the index are missing:")
             for pack_id in missing_pack_ids:
                 logger.error(f"Missing pack: {bin_to_hex(pack_id)}")
-            logger.error(
-                "The chunks stored in these packs are lost. Repairing the index (dropping the "
-                "stale references) is tracked in https://github.com/borgbackup/borg/issues/8572."
-            )
+            logger.error("The chunks stored in these packs are lost.")
+            if repair:
+                logger.warning(f"Removed the index entries of their {stale_entries} chunk(s).")
+            else:
+                logger.error('Run "borg check --repair" to remove their entries from the repository index.')
         if index_repaired:
             logger.info("Repository index was corrupted and has been rebuilt from the packs.")
         if drops:
@@ -1701,9 +1738,15 @@ class Repository:
             # the index is corrupt but was not rebuilt, e.g. the pack verification was interrupted
             # before every pack was confirmed intact; the corrupt index is left in place.
             logger.error(f"{done} {mode} repository check, index still corrupt{so_far}.")
+        elif repo_only:
+            # missing packs: archives may still reference their chunks, a full check repairs these archives.
+            logger.error(
+                f'{done} {mode} repository check, missing pack(s) found{so_far}; run "borg check --repair" '
+                "without --repository-only to repair the archives that reference their chunks."
+            )
         else:
-            # index-referenced packs are missing, so their chunks are lost.
-            logger.error(f"{done} {mode} repository check, errors found{so_far}.")
+            # missing packs: the archives phase repairs the archives that reference their chunks.
+            logger.warning(f"{done} {mode} repository check, missing pack(s) found{so_far}.")
         # in repair mode a corrupt index left unrebuilt is a failure; a corrupt or missing pack, or a
         # skipped pack byte range, fails only a repository-only run, while a full check defers it to the
         # archives phase.

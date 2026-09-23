@@ -93,12 +93,10 @@ class PackRecompressor:
 
         stale_packs = set(per_pack) - {pack_id for pack_id, _ in packs}
         if stale_packs:
-            # keep these entries: they may be an archive's only pointer to a chunk. dropping them
-            # (repairing the index) is not implemented yet, refs #8572.
+            # stale entries reference a pack absent from the store. they are kept, borg check --repair removes them.
             stale = sum(len(per_pack[pack_id]) for pack_id in stale_packs)
             logger.warning(
-                f"index entries referencing a missing pack file: {stale}. Repairing the index "
-                "(dropping the stale references) is tracked in https://github.com/borgbackup/borg/issues/8572."
+                f'index entries referencing a missing pack file: {stale}. Run "borg check --repair" to remove them.'
             )
 
         pi = ProgressIndicatorPercent(

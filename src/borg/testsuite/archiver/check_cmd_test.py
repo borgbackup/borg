@@ -1747,11 +1747,6 @@ def test_corrupted_file_chunk(archivers, request, init_args):
     assert src_file in output
 
 
-@pytest.mark.skip(
-    reason="TODO: a non-repair check verifies index and packs by content hash and uses that verified index (it does "
-    "not rebuild it); after dropping all packs the index still lists their chunks, so reading them raises "
-    "ObjectNotFound instead of being reported as missing. Needs the index/repair redesign, refs #8572."
-)
 def test_empty_repository(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() == "remote":
@@ -1763,7 +1758,31 @@ def test_empty_repository(archivers, request):
         # yields.
         for info in repository.store_list("packs"):
             repository.store_delete("packs/" + info.name)
-    cmd(archiver, "check", exit_code=1)
+    # the archive metadata was stored in the deleted packs.
+    output = cmd(archiver, "check", exit_code=1)
+    assert "pack(s) referenced by the index are missing" in output
+    assert "Archive metadata block" in output and "is missing!" in output
+
+
+def test_repair_repository_only_removes_missing_pack_entries(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() == "remote":
+        pytest.skip("only works locally")
+    check_cmd_setup(archiver)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        for info in repository.store_list("packs"):
+            repository.store_delete("packs/" + info.name)
+    output = cmd(archiver, "check", "--repair", "--repository-only", exit_code=1)
+    assert "Removed the index entries of their" in output
+    assert "without --repository-only" in output
+    # the stored index lacks the entries of the missing packs now.
+    output = cmd(archiver, "check", "--repository-only", exit_code=0)
+    assert "Missing pack" not in output
+    # the archives still reference the lost chunks: a full repair removes them.
+    output = cmd(archiver, "check", exit_code=1)
+    assert "Archive metadata block" in output and "is missing!" in output
+    cmd(archiver, "check", "--repair", exit_code=0)
+    cmd(archiver, "check", exit_code=0)
 
 
 def test_items_with_unknown_keys_are_kept(archivers, request):

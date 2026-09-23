@@ -1750,27 +1750,116 @@ def test_check_repair_index_rebuild_interrupted(tmp_path, caplog, monkeypatch, v
         assert repository.check(repair=False) is False  # the interrupted repair left the index corrupt
 
 
-def test_check_repair_reports_missing_pack_as_error(tmp_path, caplog):
-    # a repair with an intact index but a pack the index references missing from packs/ reports the
-    # loss and fails a repository-only run; a full check defers it to the archives phase (refs #9898,
-    # #8572).
-    location = os.fspath(tmp_path / "repo")
+def create_repo_one_pack_per_chunk(location, count=3):
+    # H(0) .. H(count - 1), each in its own pack; the index is persisted at close.
     with Repository(location, exclusive=True, create=True) as repository:
-        for x in range(3):
+        for x in range(count):
             repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
-        repository.flush()  # flush before close persists the index
-    with reopen(repository) as repository:
-        pack_id = repository.chunks[H(0)].pack_id
-        repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
-    with reopen(repository) as repository:
-        # a repository-only repair cannot recover the lost chunks, so it fails and reports the error.
+            repository.flush()  # seal a separate pack per chunk
+        return {x: repository.chunks[H(x)].pack_id for x in range(count)}
+
+
+def delete_pack(repository, pack_id):
+    repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entries kept
+
+
+@pytest.mark.parametrize("repo_only", [True, False])
+def test_check_repair_removes_missing_pack_entries(tmp_path, caplog, repo_only):
+    # a repair removes the index entries of the chunks in a missing pack and stores the index. It fails
+    # a repository-only run, as the chunks are lost; a full check defers them to the archives phase
+    # (refs #9898, #8572).
+    location = os.fspath(tmp_path / "repo")
+    pack_ids = create_repo_one_pack_per_chunk(location)
+    with Repository(location, exclusive=True) as repository:
+        delete_pack(repository, pack_ids[0])
+    with Repository(location, exclusive=True) as repository:
+        with caplog.at_level(logging.WARNING, logger="borg.repository"):
+            assert repository.check(repair=True, repo_only=repo_only, validate=validate_any) is not repo_only
+        assert f"Missing pack: {bin_to_hex(pack_ids[0])}" in caplog.text
+        assert "Removed the index entries of their 1 chunk(s)." in caplog.text
+        assert "missing pack(s) found" in caplog.text
+    with Repository(location, exclusive=True) as repository:
+        assert H(0) not in repository.chunks  # the stored index lacks the entry of the missing pack
+        assert H(1) in repository.chunks and H(2) in repository.chunks
+        caplog.clear()
+        assert repository.check(repair=False) is True
+        assert "Missing pack" not in caplog.text
+
+
+def test_check_without_repair_does_not_store_the_index(tmp_path, caplog):
+    # a check without repair removes the entries of a missing pack from repository.chunks, but does not
+    # store the index.
+    location = os.fspath(tmp_path / "repo")
+    pack_ids = create_repo_one_pack_per_chunk(location)
+    with Repository(location, exclusive=True) as repository:
+        delete_pack(repository, pack_ids[0])
+    with Repository(location, exclusive=True) as repository:
+        index_before = {info.name for info in repository.store_list("index")}
         with caplog.at_level(logging.ERROR, logger="borg.repository"):
-            assert repository.check(repair=True, repo_only=True, validate=validate_any) is False
-        assert f"Missing pack: {bin_to_hex(pack_id)}" in caplog.text
-        assert "errors found" in caplog.text
-    with reopen(repository) as repository:
-        # a full check defers the missing pack to the archives phase, so the repository phase passes.
-        assert repository.check(repair=True, repo_only=False, validate=validate_any) is True
+            assert repository.check(repair=False) is False
+        assert 'Run "borg check --repair" to remove their entries from the repository index.' in caplog.text
+        assert H(0) not in repository.chunks
+        assert repository.get(H(0), raise_missing=False) is None
+        assert H(1) in repository.chunks
+    with Repository(location, exclusive=True) as repository:
+        assert {info.name for info in repository.store_list("index")} == index_before
+        assert H(0) in repository.chunks  # the stored index is unchanged
+        assert repository.check(repair=False) is False  # still reported
+
+
+def test_check_repair_all_packs_missing_stores_empty_index(tmp_path):
+    # if no entry is left, the repair stores an empty index and deletes the old fragments.
+    location = os.fspath(tmp_path / "repo")
+    pack_ids = create_repo_one_pack_per_chunk(location)
+    with Repository(location, exclusive=True) as repository:
+        for pack_id in pack_ids.values():
+            delete_pack(repository, pack_id)
+        index_before = {info.name for info in repository.store_list("index")}
+    with Repository(location, exclusive=True) as repository:
+        assert repository.check(repair=True, repo_only=True, validate=validate_any) is False
+        index_after = {info.name for info in repository.store_list("index")}
+        assert len(index_after) == 1 and not index_after & index_before
+    with Repository(location, exclusive=True) as repository:
+        assert len(repository.chunks) == 0
+        assert repository.check(repair=False) is True
+
+
+def test_check_repair_removes_missing_pack_entries_with_a_corrupt_pack(tmp_path):
+    # a repair keeps a corrupt pack and its entries, and removes the entries of a missing pack.
+    location = os.fspath(tmp_path / "repo")
+    pack_ids = create_repo_one_pack_per_chunk(location)
+    with Repository(location, exclusive=True) as repository:
+        delete_pack(repository, pack_ids[0])
+        bad_pack_name = "packs/" + bin_to_hex(pack_ids[1])
+        data = bytearray(repository.store_load(bad_pack_name))
+        data[-1] ^= 0xFF  # its content no longer matches its store hash name
+        repository.store_store(bad_pack_name, bytes(data))
+    with Repository(location, exclusive=True) as repository:
+        assert repository.check(repair=True, repo_only=True, validate=validate_any) is False
+    with Repository(location, exclusive=True) as repository:
+        assert H(0) not in repository.chunks
+        assert H(1) in repository.chunks and H(2) in repository.chunks
+        assert bad_pack_name in [f"packs/{info.name}" for info in repository.store_list("packs")]
+
+
+def test_check_confirms_missing_pack_before_removing_entries(tmp_path, caplog, monkeypatch):
+    # a pack that the packs/ listing lacks, but that store.info() finds, is not missing: its entries
+    # are kept.
+    location = os.fspath(tmp_path / "repo")
+    pack_ids = create_repo_one_pack_per_chunk(location)
+    unlisted = bin_to_hex(pack_ids[0])
+    with Repository(location, exclusive=True) as repository:
+        store_list = repository.store.list
+
+        def list_without_pack(name, **kw):
+            return (info for info in store_list(name, **kw) if not (name == "packs" and info.name == unlisted))
+
+        monkeypatch.setattr(repository.store, "list", list_without_pack)
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert repository.check(repair=True, repo_only=True, validate=validate_any) is True
+        assert "Missing pack" not in caplog.text
+    with Repository(location, exclusive=True) as repository:
+        assert H(0) in repository.chunks
 
 
 def test_check_warns_on_invalid_chunk_index(tmp_path, caplog):

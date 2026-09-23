@@ -445,9 +445,8 @@ def test_compact_keeps_undelete_data_when_chunks_missing(archivers, request):
 
 
 def test_compact_keeps_stale_index_entries(tmp_path):
-    # An index entry whose pack file is gone from the store is stale, but it may be an archive's only
-    # pointer to a chunk: compact keeps it and only reports the problem, since dropping it is
-    # "borg check --repair"'s call. A used stale entry means data is missing (#9850).
+    # A stale index entry references a pack file absent from the store. compact keeps and reports it; a
+    # used stale entry means data is missing (#9850).
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")

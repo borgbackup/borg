@@ -308,12 +308,10 @@ class ArchiveGarbageCollector:
                     pack_used[pid] += entry.obj_size
 
         if stale_ids:
-            # keep these entries: they may be an archive's only pointer to a chunk. dropping them
-            # (repairing the index) is not implemented yet, refs #8572.
+            # stale entries reference a pack absent from the store. they are kept, borg check --repair removes them.
             n = len(stale_ids)
             logger.warning(
-                f"index entries referencing a missing pack file: {n}. Repairing the index "
-                "(dropping the stale references) is tracked in https://github.com/borgbackup/borg/issues/8572."
+                f'index entries referencing a missing pack file: {n}. Run "borg check --repair" to remove them.'
             )
             if stale_used:
                 logger.error(f"{stale_used} of them are still in use: repository data is missing!")

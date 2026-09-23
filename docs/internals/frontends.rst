@@ -859,6 +859,8 @@ Errors
         Object with key {} is indexed to pack {}, but that whole pack is missing from repository {}.
     Repository.PermissionDenied rc: 24 traceback: no
         Repository permission denied: {}
+    Repository.KeyRequired rc: 28 traceback: yes
+        Repository {} needs its key to access the store object {}, but no key was set.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
         Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.
@@ -964,6 +966,8 @@ Errors
         Decompression error: {}
     CorruptPack rc: 93 traceback: no
         {}. Run "borg check --repair" to recover the objects that are still readable.
+    CorruptChunkIndexFragment rc: 94 traceback: no
+        Chunk index fragment {} is corrupt. Run "borg check --repair" to rebuild the chunk index.
 
     Reading a legacy borg 1.x repository (e.g. ``borg transfer --from-borg1``) raises the
     ``LegacyRepository.*`` and ``LegacyRemoteRepository.*`` variants of the repository and RPC

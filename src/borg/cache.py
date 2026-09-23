@@ -38,7 +38,7 @@ from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
-from .crypto.key import store_hash, STORE_HASH_SIZE
+from .crypto.key import store_hash
 from .manifest import Manifest
 from .platform import SaveFile
 from .repository import Repository, StoreObjectNotFound, PackReader
@@ -576,10 +576,11 @@ def list_chunkindex_fragments(repository):
     """List the index/ fragments, returning each fragment's (name, approximate entry count).
 
     This is the single primitive that walks the index/ namespace; list_chunkindex_hashes is a thin
-    wrapper over it. In that namespace each object's name is the store hash of its content. The entry
-    count is estimated from the stored object's byte size (chunkindex_fragment_entry_size() bytes per
-    entry), so we can classify fragments (small vs. sealed) without loading them. The estimate ignores
-    the small fixed header, which is negligible for the fragment sizes we care about.
+    wrapper over it. In that namespace each object's name is the store hash of its content (the key's
+    envelope around the serialized index). The entry count is estimated from the stored object's byte
+    size (chunkindex_fragment_entry_size() bytes per entry), so we can classify fragments (small vs.
+    sealed) without loading them. The estimate ignores the small fixed header and the envelope overhead
+    (a few dozen bytes), which are negligible for the fragment sizes we care about.
     Returns a list of (name, approx_entries) tuples, sorted by name.
     """
     entry_size = chunkindex_fragment_entry_size()
@@ -652,25 +653,28 @@ def delete_chunkindex_from_repo(repository):
 def _store_chunkindex_fragment(repository, batch, stored_hashes, *, force_write):
     """Serialize a temporary ChunkIndex `batch` and store it as an index/<store hash> fragment.
 
-    We don't serialize the flags or the size, so callers pass entries with those zeroed. The object
-    is stored under index/<hash>, where <hash> is the store hash of its content, so borgstore can verify
-    it like any other object; an incompatible format from a different borg version is rejected by
-    borghash's own versioned header (MAGIC + VERSION) when read back.
+    We don't serialize the flags or the size, so callers pass entries with those zeroed. The serialized
+    index is stored in the repository key's envelope (see Repository.store_encrypt_store), under
+    index/<hash>, where <hash> is the store hash of the stored envelope, so borgstore and borg check can
+    verify it like any other content-addressed object. An incompatible format from a different borg
+    version is rejected by borghash's own versioned header (MAGIC + VERSION) when read back.
 
-    Returns (new_hash, stored) where `stored` is True iff we actually wrote to the repository (we skip
-    the write if a fragment with the same content hash already exists and force_write is not set).
+    Returns (new_hash, stored) where `stored` is True iff we actually wrote to the repository: unless
+    force_write is set, we skip the write if a fragment with the same content, read in this session (see
+    Repository.chunkindex_fragment_hashes), is still among stored_hashes.
     """
     with io.BytesIO() as f:
         batch.write(f)
         data = f.getvalue()
-    new_hash = store_hash(data).hexdigest()
-    stored = False
-    if force_write or new_hash not in stored_hashes:
-        index_name = f"index/{new_hash}"
-        logger.debug(f"storing chunks index as {index_name} in repository...")
-        repository.store_store(index_name, data)
-        stored = True
-    return new_hash, stored
+    plaintext_hash = store_hash(data).digest()
+    known_hash = repository.chunkindex_fragment_hashes.get(plaintext_hash)
+    if not force_write and known_hash in stored_hashes:
+        return known_hash, False
+    index_name = repository.store_encrypt_store("index", data, hashed_name=True)
+    logger.debug(f"stored chunks index as {index_name} in repository.")
+    new_hash = index_name.removeprefix("index/")
+    repository.chunkindex_fragment_hashes[plaintext_hash] = new_hash
+    return new_hash, True
 
 
 def write_chunkindex_to_repo(
@@ -686,7 +690,7 @@ def write_chunkindex_to_repo(
     max_entries = CHUNKINDEX_FRAGMENT_ENTRIES_MAX
     # the fragment set present in the repo before we start writing:
     stored_hashes = set(list_chunkindex_hashes(repository))
-    new_hashes = set()  # content hashes of the fragments that make up the index we are writing now
+    new_hashes = set()  # hashes of the fragments that make up the index we are writing now
     fragments_written = 0
 
     total = chunks.new_count if incremental else len(chunks)
@@ -707,10 +711,10 @@ def write_chunkindex_to_repo(
 
     def gen_batches():
         # sort the selected keys per partition, so that an identical set of entries always produces
-        # identical fragments (identical content hashes), no matter in which order the entries were
+        # identical fragments (identical plaintext), no matter in which order the entries were
         # inserted into the hash table: partition membership and prefix_bits (chosen by entry count)
         # only depend on the selected entries. this makes writing/repacking idempotent and convergent
-        # across clients: a fragment that already exists in the repo is not stored again (see
+        # across clients: a fragment whose content already exists in the repo is not stored again (see
         # _store_chunkindex_fragment) and no differently-partitioned duplicates of the same entries
         # can pile up. as the prefix compares the keys' leading bits, ascending prefixes yield the
         # same globally sorted key sequence a single all-keys sort would have produced.
@@ -767,9 +771,10 @@ def write_chunkindex_to_repo(
     # (see _store_chunkindex_fragment), and in that case the replacement is verifiably present, so
     # deleting the superseded fragments is still safe. this also makes repack idempotent -- if a
     # previous repack crashed after storing but before deleting, the next one re-derives the same
-    # fragments, dedupe-skips the uploads, and still deletes the small sources. when there is nothing
-    # to write (new_hashes empty, e.g. an empty incremental index), we skip deletion so we never leave
-    # the repo without an index.
+    # fragments, dedupe-skips the uploads, and still deletes the small sources. in the authenticated-*
+    # modes, a fragment we just wrote can also have the same name as one we are asked to delete (same
+    # entries -> same envelope). when there is nothing to write (new_hashes empty, e.g. an empty
+    # incremental index), we skip deletion so we never leave the repo without an index.
     if new_hashes and (delete_other or delete_these):
         if delete_other:
             delete_these = set(stored_hashes) - new_hashes
@@ -795,8 +800,11 @@ def write_chunkindex_to_repo(
     return new_hashes
 
 
-class CorruptChunkIndexFragment(Exception):
-    """A chunk index fragment's name matches its content hash, but the content does not deserialize."""
+class CorruptChunkIndexFragment(Error):
+    """Chunk index fragment {} is corrupt. Run "borg check --repair" to rebuild the chunk index."""
+
+    # the fragment fails the authentication of the key's envelope or does not deserialize.
+    exit_mcode = 94
 
 
 class ChunkIndexRebuildInterrupted(Error):
@@ -804,25 +812,29 @@ class ChunkIndexRebuildInterrupted(Error):
 
 
 def read_chunkindex_from_repo(repository, hash):
+    """Load the chunk index fragment index/<hash>; return it as a ChunkIndex, or None if it is not there.
+
+    Raises CorruptChunkIndexFragment if the fragment fails the authentication of the key's envelope (see
+    Repository.store_load_decrypt) or does not deserialize.
+    """
     index_name = f"index/{hash}"
     logger.debug(f"trying to load {index_name} from the repo...")
     try:
-        chunks_data = repository.store_load(index_name)
+        chunks_data = repository.store_load_decrypt(index_name, hashed_name=True)
     except StoreObjectNotFound:
         logger.debug(f"{index_name} not found in the repository.")
-    else:
-        if store_hash(chunks_data).digest() == hex_to_bin(hash):
-            logger.debug(f"{index_name} is valid.")
-            try:
-                with io.BytesIO(chunks_data) as f:
-                    chunks = ChunkIndex.read(f)
-            except (ValueError, KeyError, struct.error) as err:
-                # the name matches the content hash, so the bytes are intact but do not deserialize
-                # into a ChunkIndex: the fragment is corrupt.
-                raise CorruptChunkIndexFragment(index_name) from err
-            return chunks
-        else:
-            logger.debug(f"{index_name} is invalid.")
+        return None
+    except IntegrityError as err:
+        raise CorruptChunkIndexFragment(index_name) from err
+    logger.debug(f"{index_name} is valid.")
+    try:
+        with io.BytesIO(chunks_data) as f:
+            chunks = ChunkIndex.read(f)
+    except (ValueError, KeyError, struct.error) as err:
+        # the envelope is authentic, but its content does not deserialize into a ChunkIndex.
+        raise CorruptChunkIndexFragment(index_name) from err
+    repository.chunkindex_fragment_hashes[store_hash(chunks_data).digest()] = hash
+    return chunks
 
 
 def repack_chunkindex(repository):
@@ -895,6 +907,10 @@ def build_chunkindex_from_repo(
 ):
     # fragments_only: build the index from the index/ fragments only, returning None if they cannot be
     # read completely, and never write to the repo.
+    # write_immediately: store the index (all of it, deleting all other fragments) before returning it. The
+    # callers hold an exclusive lock (borg compact, borg repo-compress, borg check --repair).
+    # a corrupt fragment raises CorruptChunkIndexFragment: a corrupt index aborts the command. Only with
+    # write_immediately (the index is rewritten anyway), the index is rebuilt from the packs instead.
     # validate: a repo object validator or None, passed to PackReader.iter_headers. With a validator,
     # the rebuild skips the objects that fail it; without one, a corrupt object header raises CorruptPack.
     # on_drop: a callable or None, passed to PackReader.iter_headers, called once per byte range the
@@ -911,7 +927,7 @@ def build_chunkindex_from_repo(
         # fragments or not at all: a partially merged index would miss chunks that exist in the repo
         # (spurious ObjectNotFound, lost deduplication). so on a failed load, re-list and retry -
         # the fresh listing contains the replacement fragment. if we cannot get a complete, consistent
-        # set (e.g. a persistently unreadable fragment), fall through to the slow rebuild instead.
+        # set (e.g. fragments keep vanishing), fall through to the slow rebuild instead.
         for _ in range(CHUNKINDEX_MERGE_ATTEMPTS):
             if chunkindex_is_invalid(repository):
                 if fragments_only:
@@ -947,12 +963,12 @@ def build_chunkindex_from_repo(
                     chunks[k] = v
                 chunks_to_merge.clear()
             if corrupt_fragment is not None:
-                # retrying would re-read the same corrupt fragment; rebuild the whole index from
-                # the packs instead (or return None in fragments_only mode).
+                # retrying would re-read the same corrupt fragment. abort, unless the index gets rewritten
+                # anyway: then rebuild the whole index from the packs.
                 chunks.clear()
-                if fragments_only:
-                    return None
-                logger.warning(f"{corrupt_fragment} is corrupt, rebuilding the chunk index from the packs.")
+                if not write_immediately:
+                    raise corrupt_fragment
+                logger.warning(f"{corrupt_fragment.args[0]} is corrupt, rebuilding the chunk index from the packs.")
                 break
             if complete:
                 if len(hashes) > 1 and write_immediately:
@@ -1047,9 +1063,9 @@ def build_chunkindex_from_repo(
 
 # per-archive cache of the objects an archive references, stored in the repo as
 # cache/referenced-by-archive.<archive id hex>. it lets a following compact or analyze skip re-scanning
-# an unchanged archive's items. the blob is: file_count (uint64 LE), content_size (uint64 LE), a
-# serialized HashTableNT mapping object id (32 bytes) -> plaintext object size (uint32), and a
-# the store hash of all of that appended for integrity.
+# an unchanged archive's items. the blob is: file_count (uint64 LE), content_size (uint64 LE) and a
+# serialized HashTableNT mapping object id (32 bytes) -> plaintext object size (uint32). it is stored in
+# the repository key's envelope, which binds it to its name (see Repository.store_encrypt_store).
 REFERENCED_BY_ARCHIVE = "referenced-by-archive."  # name prefix within the "cache" store namespace
 ArchiveReferenceEntry = namedtuple("ArchiveReferenceEntry", "size")
 ArchiveReferenceEntryFormatT = namedtuple("ArchiveReferenceEntryFormatT", "size")
@@ -1076,19 +1092,21 @@ def list_archive_reference_caches(repository) -> set:
 
 def load_archive_references(repository, archive_id: bytes):
     """Load and verify an archive's references cache; return it, or None if it is missing/corrupted."""
+    hex_id = bin_to_hex(archive_id)
     try:
-        data = repository.store_load(archive_reference_cache_name(archive_id))
+        data = repository.store_load_decrypt(archive_reference_cache_name(archive_id))
     except StoreObjectNotFound:
         return None
-    # the serialized blob has the store hash of its content appended (the store name cannot also carry
-    # it, as borgstore's name length limit is too small for archive id hex + hash hex). a mismatch means
-    # the cache is corrupted; we then return None so the caller falls back to scanning the archive.
-    hex_id = bin_to_hex(archive_id)
-    if len(data) < 16 + STORE_HASH_SIZE or store_hash(data[:-STORE_HASH_SIZE]).digest() != data[-STORE_HASH_SIZE:]:
+    except IntegrityError:
+        # the cache is corrupted, or it is not the one of this archive (the envelope binds it to its name,
+        # so a cache copied to another archive's name fails, too). the caller then scans the archive.
+        logger.warning(f"Ignoring corrupted references cache of archive {hex_id}.")
+        return None
+    if len(data) < 16:
         logger.warning(f"Ignoring corrupted references cache of archive {hex_id}.")
         return None
     try:
-        with io.BytesIO(data[:-STORE_HASH_SIZE]) as f:
+        with io.BytesIO(data) as f:
             file_count = int.from_bytes(f.read(8), "little")
             content_size = int.from_bytes(f.read(8), "little")
             ids = HashTableNT.read(f)
@@ -1099,14 +1117,13 @@ def load_archive_references(repository, archive_id: bytes):
 
 
 def store_archive_references(repository, archive_id: bytes, references) -> None:
-    """Serialize the references (a small header plus the id->size table, with the store hash appended)."""
+    """Serialize the references (a small header plus the id->size table) and store them in the key's envelope."""
     with io.BytesIO() as f:
         f.write(references.file_count.to_bytes(8, "little"))
         f.write(references.content_size.to_bytes(8, "little"))
         references.ids.write(f)
         data = f.getvalue()
-    data += store_hash(data).digest()
-    repository.store_store(archive_reference_cache_name(archive_id), data)
+    repository.store_encrypt_store(archive_reference_cache_name(archive_id), data)
 
 
 def cleanup_archive_reference_caches(repository, stale_hex_ids: set) -> None:

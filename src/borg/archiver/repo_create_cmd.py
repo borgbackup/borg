@@ -1,9 +1,10 @@
 from ._common import with_repository, with_other_repository, Highlander
-from ..cache import Cache
+from ..cache import Cache, write_chunkindex_to_repo
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, encryption_argument_names, id_hash_argument_names
 from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
+from ..hashindex import ChunkIndex
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -37,6 +38,11 @@ class RepoCreateMixIn:
             key = key_creator(repository, args, other_key=other_key)
             # writing the config is what makes the store a repository, see Repository.create().
             repository.save_config(key)
+            # we know repo/packs/ still does not have any chunks stored in it, but for some stores, there
+            # might be a lot of empty directories and listing them all might be rather slow, so we better
+            # store an empty ChunkIndex now, so that the first repo operation does not have to build the
+            # ChunkIndex the slow way by listing all the directories.
+            write_chunkindex_to_repo(repository, ChunkIndex(), clear=True, force_write=True)
         except BaseException as exc:
             # an interrupted or failed repo-create must not leave a (partial) repository behind, nor a keyfile.
             if key is not None and key.storage == KeyBlobStorage.KEYFILE:

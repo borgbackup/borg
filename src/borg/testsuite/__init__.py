@@ -271,6 +271,25 @@ def filter_xattrs(x):
     raise ValueError("Unsupported type: %s" % type(x))
 
 
+def set_test_key_on_open(monkeypatch):
+    """Make every Repository opened in a test use make_test_key() for its index/ and cache/ objects.
+
+    The test key is only set if the repository has no key yet; a real key set later (e.g. by
+    Manifest.load or key_factory) replaces it.
+    """
+    from ..repository import Repository
+
+    original_open = Repository.open
+
+    def open(self, *args, **kwargs):
+        result = original_open(self, *args, **kwargs)
+        if self.key is None:
+            self.set_key(make_test_key(self))
+        return result
+
+    monkeypatch.setattr(Repository, "open", open)
+
+
 def make_test_key(repository=None):
     """Return an "authenticated-sha256" key for tests that just need some working key.
 

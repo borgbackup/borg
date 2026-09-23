@@ -31,10 +31,9 @@ named after the first byte (2 hex digits) of the object name.
 
 .. _store_hash:
 
-Several store objects are content-addressed or carry an integrity checksum: they
-are named by, or have appended, the **store hash** of their content. The store
-hash is the unkeyed 256 bit BLAKE3 hash, see ``store_hash()`` in ``crypto/key.py``.
-It is the same for every repository and independent of the key/encryption mode
+Several store objects are content-addressed: they are named by the **store hash**
+of their content. The store hash is the unkeyed 256 bit BLAKE3 hash, see
+``store_hash()`` in ``crypto/key.py``. It is the same for every repository and independent of the key/encryption mode
 (unlike the chunk id hash, which the key mode selects).
 
 config/
@@ -62,26 +61,26 @@ packs/
 index/
   0000... .. ffff...
     the chunks index (chunk ID -> location within a pack file), stored as a set
-    of immutable, encrypted index fragments. A fragment's name is the
-    hex-encoded store hash of its content.
+    of immutable index fragments, each in the key's store object envelope (see
+    below). A fragment's name is the hex-encoded store hash of the stored envelope.
 
 See :ref:`packs` for the pack file format, the ``index/`` namespace and how
 both are written and compacted.
 
 cache/
   checked-packs
-    repository check results (pack id -> timestamp, result), as a hashtable with an
-    appended integrity hash. Records are kept across checks: ``check --max-age``
-    skips packs whose intact record is younger than the given age, and partial checks
+    repository check results (pack id -> timestamp, result), as a hashtable in the
+    key's store object envelope (see below). Records are kept across checks:
+    ``check --max-age`` skips packs whose intact record is younger than the given age, and partial checks
     (``--max-duration``) verify the least-recently-checked packs first so repeated
     runs cover the whole repository. Records of corrupt packs are kept for repair and
     always re-verified. Records of packs no longer listed in packs/ are pruned when a
     check finishes.
   referenced-by-archive.<hex-encoded archive ID>
     what one archive references (object ID -> plaintext object size), plus the file
-    count and content size of that archive, with the store hash appended for integrity.
-    It lets a following ``borg compact`` or ``borg analyze`` skip re-reading the items
-    of an unchanged archive.
+    count and content size of that archive, in the key's store object envelope (see
+    below). It lets a following ``borg compact`` or ``borg analyze`` skip re-reading
+    the items of an unchanged archive.
   chunkindex-invalid
     a marker object: while it is present, the chunks index in ``index/`` is considered
     invalid, because its fragments may be missing entries or point at deleted packs.
@@ -107,6 +106,28 @@ keys/
 locks/
   used by the locking system to manage shared and exclusive locks, see
   :ref:`storelocking`.
+
+.. _store_object_envelope:
+
+The index fragments, ``checked-packs`` and the ``referenced-by-archive.*`` objects
+are stored in the **store object envelope**: the repository key's ``encrypt()``,
+exactly as for the metadata and data slots of the objects in a pack (see
+:ref:`security_encryption`), with an empty id and an AAD of
+``b"borg-store-object\0"`` followed by the repository id, the tag ``b"n"`` and the
+object name. For the index fragments, whose name is the store hash of the envelope and
+does not exist before it, the AAD holds the tag ``b"h"`` and the namespace (``index``)
+instead: the tags keep a namespace and an object of the same name apart. So these
+objects are protected like the objects in the packs: encrypted and authenticated in
+the encrypting modes, authenticated only in the ``authenticated-*`` modes. The AAD
+binds an object to its repository and name: an object copied to another name, or
+from another repository using the same key material, fails the authentication.
+Reading or writing them needs the key (``Repository.set_key()``); an object that
+fails the authentication is treated like a corrupted one: ``borg check`` reports a
+corrupt index fragment and ``borg check --repair`` rebuilds the chunks index from the
+packs; any other command that needs the chunks index aborts, except ``borg compact``
+and ``borg repo-compress``, which rebuild it from the packs, as they rewrite the whole
+chunks index anyway (under an exclusive lock). A corrupted cache is ignored and
+rebuilt. The ``chunkindex-invalid`` marker has no content and is stored as is.
 
 
 Keys
@@ -264,7 +285,9 @@ entries are present, or none: a repository created via the Python API
 store, but borg refuses to load a key for it.
 
 ``borg repo-create`` writes the config once, after the key was created: writing
-it is what makes the store a repository. A store without it (e.g. the leftover of
+it is what makes the store a repository. It then writes an empty chunks index
+(which needs the key), so the first use of the repository does not have to build
+it by listing the packs. A store without the config (e.g. the leftover of
 an interrupted ``borg repo-create``) is not a repository: borg reports it as not
 a valid repository, and ``borg repo-create`` refuses to create a repository in a
 non-empty location, saying whether it found a repository config there.

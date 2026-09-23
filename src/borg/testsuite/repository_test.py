@@ -14,15 +14,21 @@ from .. import repository as repository_module
 from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_chunkindex_invalid
 from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
-from ..crypto.key import CHPOKey
+from ..crypto.key import AESOCBKey, AuthenticatedKey, Blake3AuthenticatedKey, CHPOKey
 from ..helpers import IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
 from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
-from . import make_test_key
+from . import make_test_key, set_test_key_on_open
 from .hashindex_test import H
 from .repoobj_test import CHUNK_ID_OFFSET, DATA_SIZE_OFFSET, META_SIZE_OFFSET
+
+
+@pytest.fixture(autouse=True)
+def use_test_key_on_open(monkeypatch):
+    # the index/ and cache/ objects need a key, see Repository.set_key.
+    set_test_key_on_open(monkeypatch)
 
 
 def test_rest_serve_command_local():
@@ -1049,6 +1055,147 @@ def test_assert_writable(repository):
             repository.assert_writable()
 
 
+STORE_OBJ_KEY_CLASSES = [AESOCBKey, CHPOKey, AuthenticatedKey, Blake3AuthenticatedKey]
+ENCRYPTING_KEY_CLASSES = (AESOCBKey, CHPOKey)
+
+
+def make_store_obj_key(key_class, repository):
+    key = key_class(repository)
+    key.init_from_random_data()
+    key.init_ciphers()
+    return key
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_encrypt_store_roundtrip(repository, key_class):
+    payload = b"some index or cache content " * 10
+    with repository:
+        repository.set_key(make_store_obj_key(key_class, repository))
+        assert repository.store_encrypt_store("cache/test", payload) == "cache/test"
+        assert bytes(repository.store_load_decrypt("cache/test")) == payload
+        name = repository.store_encrypt_store("index", payload, hashed_name=True)
+        namespace, hex_hash = name.split("/")
+        assert namespace == "index" and len(hex_hash) == 64
+        assert store_hash(repository.store_load(name)).hexdigest() == hex_hash
+        assert bytes(repository.store_load_decrypt(name, hashed_name=True)) == payload
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_encrypt_store_payload_visibility(repository, key_class):
+    # The encrypting modes hide the payload and give each envelope a new name, the authenticated-*
+    # modes store the payload in the clear and give the same payload the same name.
+    payload = b"a well-known payload " * 10
+    with repository:
+        repository.set_key(make_store_obj_key(key_class, repository))
+        name1 = repository.store_encrypt_store("index", payload, hashed_name=True)
+        name2 = repository.store_encrypt_store("index", payload, hashed_name=True)
+        stored = repository.store_load(name1)
+        if issubclass(key_class, ENCRYPTING_KEY_CLASSES):
+            assert payload not in stored
+            assert name1 != name2
+        else:
+            assert payload in stored
+            assert name1 == name2
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_load_decrypt_detects_tampering(repository, key_class):
+    payload = b"some cache content " * 10
+    with repository:
+        repository.set_key(make_store_obj_key(key_class, repository))
+        # a flipped byte fails the authentication.
+        repository.store_encrypt_store("cache/a", payload)
+        stored = bytearray(repository.store_load("cache/a"))
+        stored[-1] ^= 0x01
+        repository.store_store("cache/a", bytes(stored))
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("cache/a")
+        # an object moved to another name fails, the name is bound into the envelope.
+        repository.store_encrypt_store("cache/b", payload)
+        repository.store_move("cache/b", "cache/c")
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("cache/c")
+        # same for a copy stored under another name.
+        repository.store_encrypt_store("cache/d", payload)
+        repository.store_store("cache/e", repository.store_load("cache/d"))
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("cache/e")
+        # a hashed-name object in another namespace fails (the namespace is the AAD).
+        name = repository.store_encrypt_store("index", payload, hashed_name=True)
+        other_name = "cache/" + name.split("/")[1]
+        repository.store_store(other_name, repository.store_load(name))
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt(other_name, hashed_name=True)
+
+
+def test_store_load_decrypt_error_message(repository):
+    with repository:
+        repository.set_key(make_store_obj_key(AESOCBKey, repository))
+        repository.store_store("cache/test", b"not an envelope")
+        with pytest.raises(IntegrityError) as excinfo:
+            repository.store_load_decrypt("cache/test")
+        assert str(excinfo.value) == "Data integrity error: Store object cache/test: authentication failed"
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_load_decrypt_bound_to_the_repository(tmp_path, key_class):
+    # an object copied from another repository with the same key fails: the repository id is in the AAD.
+    with Repository(os.fspath(tmp_path / "repo1"), exclusive=True, create=True) as repository1:
+        key = make_store_obj_key(key_class, repository1)
+        repository1.set_key(key)
+        cache_data = repository1.store_load(repository1.store_encrypt_store("cache/test", b"payload"))
+        index_name = repository1.store_encrypt_store("index", b"payload", hashed_name=True)
+        index_data = repository1.store_load(index_name)
+    with Repository(os.fspath(tmp_path / "repo2"), exclusive=True, create=True) as repository2:
+        repository2.set_key(key)
+        repository2.store_store("cache/test", cache_data)
+        repository2.store_store(index_name, index_data)
+        with pytest.raises(IntegrityError, match="authentication failed"):
+            repository2.store_load_decrypt("cache/test")
+        with pytest.raises(IntegrityError, match="authentication failed"):
+            repository2.store_load_decrypt(index_name, hashed_name=True)
+
+
+@pytest.mark.parametrize("key_class", STORE_OBJ_KEY_CLASSES)
+def test_store_obj_aad_keeps_names_and_namespaces_apart(repository, key_class):
+    # the envelope of a hashed-name object in the namespace "index" does not authenticate as the object
+    # named "index", and vice versa (the AAD tags them differently).
+    with repository:
+        key = make_store_obj_key(key_class, repository)
+        repository.set_key(key)
+        assert repository._store_obj_aad("index", True) != repository._store_obj_aad("index", False)
+        envelope = repository.store_load(repository.store_encrypt_store("index", b"payload", hashed_name=True))
+        with pytest.raises(IntegrityError):
+            key.decrypt(b"", envelope, aad=repository._store_obj_aad("index", False))
+        envelope = key.encrypt(b"", b"payload", aad=repository._store_obj_aad("index", False))
+        repository.store_store("index/" + store_hash(envelope).hexdigest(), envelope)
+        with pytest.raises(IntegrityError):
+            repository.store_load_decrypt("index/" + store_hash(envelope).hexdigest(), hashed_name=True)
+
+
+def test_store_encrypt_store_without_a_key(repository):
+    with repository:
+        repository.set_key(None)  # undo use_test_key_on_open
+        with pytest.raises(Repository.KeyRequired) as excinfo:
+            repository.store_encrypt_store("cache/test", b"payload")
+        assert excinfo.value.exit_mcode == 28
+        with pytest.raises(Repository.KeyRequired):
+            repository.store_encrypt_store("index", b"payload", hashed_name=True)
+        assert repository.store_list("cache") == []
+        repository.store_store("cache/test", b"payload")
+        with pytest.raises(Repository.KeyRequired):
+            repository.store_load_decrypt("cache/test")
+
+
+def test_store_load_decrypt_missing_object(repository):
+    with repository:
+        repository.set_key(make_test_key(repository))
+        with pytest.raises(repository_module.StoreObjectNotFound):
+            repository.store_load_decrypt("cache/missing")
+        with pytest.raises(repository_module.StoreObjectNotFound):
+            repository.store_load_decrypt("index/" + "0" * 64, hashed_name=True)
+
+
 def test_list(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
@@ -1381,8 +1528,9 @@ def test_flush_store_failure_drops_pending_entries(tmp_path):
 
 
 def _serialized_chunkindex():
-    # Serialize an empty ChunkIndex to bytes, as stored under index/<store_hash(content)>. check() parses
-    # index fragments, so a fragment must be a real ChunkIndex serialization.
+    # Serialize an empty ChunkIndex to bytes, the plaintext of an index/ fragment (see
+    # store_encrypt_store). check() parses index fragments, so a fragment must be a real ChunkIndex
+    # serialization.
     with io.BytesIO() as f:
         ChunkIndex().write(f)
         return f.getvalue()
@@ -1408,13 +1556,11 @@ def test_check_detects_corruption_in_later_object(tmp_path):
 
 def test_check_detects_index_corruption(tmp_path):
     # index/ objects are named by store_hash(content) like packs, so check verifies them the same way.
-    content = _serialized_chunkindex()
-    index_name = "index/" + store_hash(content).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        repository.store_store(index_name, content)
+        index_name = repository.store_encrypt_store("index", _serialized_chunkindex(), hashed_name=True)
         assert repository.check(repair=False) is True  # index object intact (name == store_hash(content))
 
-        corrupted = bytearray(content)
+        corrupted = bytearray(repository.store_load(index_name))
         corrupted[0] ^= 0xFF
         repository.store_store(index_name, bytes(corrupted))  # same name, rotted content
         assert repository.check(repair=False) is False  # mismatch between content hash and name detected
@@ -1431,11 +1577,11 @@ def test_check_reports_invalid_pack_name(tmp_path, caplog):
             assert repository.check(repair=False) is False
 
         assert "packs/not-a-hex-name has an invalid name" in caplog.text
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # the valid pack was checked
 
 
-def test_check_repair_rebuilds_corrupt_index(tmp_path):
+def test_check_repair_rebuilds_corrupt_index(tmp_path, caplog):
     # check(repair=True) rebuilds a corrupt index from the packs' object headers.
     location = os.fspath(tmp_path / "repo")
     ids = [H(x) for x in range(10)]
@@ -1452,7 +1598,11 @@ def test_check_repair_rebuilds_corrupt_index(tmp_path):
             repository.store_store(name, bytes(data))
         assert repository.check(repair=False) is False  # read-only check reports the corrupt index
     with reopen(repository) as repository:
-        assert repository.check(repair=True, validate=validate_any) is True  # repair rebuilds the index from the packs
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger="borg.repository"):
+            assert repository.check(repair=True, validate=validate_any) is True  # repair rebuilds the index
+        # each rotted fragment is counted once (the cross-check does not load the known corrupt index).
+        assert f"Checked {len(index_names)} index files ({len(index_names)} errors)" in caplog.text
     with reopen(repository) as repository:
         assert repository.check(repair=False) is True  # the rebuilt index passes a read-only check
         for i, cid in enumerate(ids):
@@ -1696,9 +1846,10 @@ def test_check_reports_orphan_pack_not_referenced_by_index(tmp_path, caplog):
 
 
 def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, caplog):
-    # an index/ fragment whose name matches its content hash but whose content does not deserialize
-    # into a ChunkIndex makes the fragment set unreadable; check skips the cross-check (and still
-    # passes) instead of crashing or rebuilding from the packs (refs #9898).
+    # an index/ fragment whose name matches its content hash and whose envelope is authentic, but whose
+    # content does not deserialize into a ChunkIndex, makes the fragment set unreadable; check reports it
+    # as an index error and skips the cross-check instead of crashing or rebuilding from the packs
+    # (refs #9898).
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         for x in range(3):
@@ -1707,12 +1858,41 @@ def test_check_missing_pack_detection_skipped_when_index_unreadable(tmp_path, ca
     with Repository(location, exclusive=True) as repository:
         pack_id = repository.chunks[H(0)].pack_id
         repository.store_delete("packs/" + bin_to_hex(pack_id))  # pack gone, index entry kept
-        content = b"not a serialized chunk index"
-        repository.store_store("index/" + store_hash(content).hexdigest(), content)
+        index_name = repository.store_encrypt_store("index", b"not a serialized chunk index", hashed_name=True)
         with caplog.at_level(logging.WARNING):
-            assert repository.check(repair=False) is True
+            assert repository.check(repair=False) is False
         assert "Missing pack" not in caplog.text
         assert "Cannot cross-check packs against the chunk index" in caplog.text
+        assert f"Store object {index_name} is corrupted" in caplog.text
+
+
+@pytest.mark.parametrize("tamper", ["plaintext", "other_key"])
+def test_check_repairs_index_fragment_failing_authentication(tmp_path, caplog, tamper):
+    # a fragment that matches its name, but fails the authentication (e.g. written by a hostile store
+    # without the key, or by an older borg 2 beta as plaintext) is an index error, and repair rebuilds
+    # the index from the packs, dropping that fragment.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()
+    with Repository(location, exclusive=True) as repository:
+        with io.BytesIO() as f:
+            ChunkIndex().write(f)
+            content = f.getvalue()
+        if tamper == "plaintext":
+            data = content
+        else:
+            data = make_store_obj_key(AESOCBKey, repository).encrypt(b"", content, aad=b"")
+        name = store_hash(data).hexdigest()
+        repository.store_store(f"index/{name}", data)
+        with caplog.at_level(logging.ERROR):
+            assert repository.check(repair=False) is False
+        assert f"Store object index/{name} is corrupted" in caplog.text
+        assert name in {info.name for info in repository.store_list("index")}  # a check does not write.
+        assert repository.check(repair=True, validate=accept_all) is True
+        assert name not in {info.name for info in repository.store_list("index")}
+        assert repository.check(repair=False) is True
 
 
 def test_check_partial_still_detects_missing_pack(tmp_path, caplog):
@@ -1734,21 +1914,37 @@ def test_check_partial_still_detects_missing_pack(tmp_path, caplog):
 def test_check_checked_packs_roundtrip(tmp_path):
     # the set survives a store/load round-trip; a rotted blob loads as empty.
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.table[H(1)] = PackTracker.Entry(timestamp=123, result=1)
         tracker.table[H(2)] = PackTracker.Entry(timestamp=456, result=0)
         tracker.save()
 
-        loaded = PackTracker.load(repository.store)
+        loaded = PackTracker.load(repository)
         assert len(loaded) == 2
         assert H(1) in loaded.table and H(2) in loaded.table
         assert tuple(loaded.table[H(2)]) == (456, 0)
 
         corrupted = bytearray(repository.store.load(PackTracker.NAME))
-        corrupted[0] ^= 0xFF  # break the appended store hash
+        corrupted[-1] ^= 0xFF  # fails the authentication of the key's envelope
         repository.store.store(PackTracker.NAME, bytes(corrupted))
-        rotted = PackTracker.load(repository.store)
+        rotted = PackTracker.load(repository)
         assert len(rotted) == 0
+
+
+def test_check_checked_packs_bound_to_its_name(tmp_path, caplog):
+    # an object in the key's envelope, copied from another name to cache/checked-packs, is ignored:
+    # the envelope binds the object to its name.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        tracker = PackTracker.new(repository)
+        tracker.table[H(1)] = PackTracker.Entry(timestamp=123, result=1)
+        with io.BytesIO() as f:
+            tracker.table.write(f)
+            data = f.getvalue()
+        repository.store_encrypt_store("cache/other", data)
+        repository.store_store(PackTracker.NAME, repository.store_load("cache/other"))
+        with caplog.at_level(logging.WARNING):
+            assert len(PackTracker.load(repository)) == 0
+        assert "Ignoring corrupted checked-packs set." in caplog.text
 
 
 def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
@@ -1759,7 +1955,7 @@ def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):
         repository.store_store("packs/" + bin_to_hex(intact_id), intact)
 
         # mark the intact pack as recently checked.
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1777,7 +1973,7 @@ def test_check_partial_rechecks_pack_recorded_corrupt(tmp_path):
         corrupt_id = H(1)  # stored content does not hash to this name
         repository.store_store("packs/" + bin_to_hex(corrupt_id), b"CORRUPT-does-not-match-name")
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(corrupt_id, ok=False)
         tracker.save()
 
@@ -1811,7 +2007,7 @@ def test_check_partial_clears_recorded_corruption_when_intact(tmp_path, monkeypa
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=False)  # stale corrupt record
         tracker.save()
 
@@ -1826,7 +2022,7 @@ def test_check_partial_skips_pack_recorded_intact(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1841,7 +2037,7 @@ def test_check_without_max_age_verifies_all_but_keeps_records(tmp_path, monkeypa
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.save()
 
@@ -1850,7 +2046,7 @@ def test_check_without_max_age_verifies_all_but_keeps_records(tmp_path, monkeypa
         assert repository.check(repair=False) is True
         assert pack_key in hashed_keys  # verified despite the fresh intact record
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # record kept
 
 
@@ -1868,7 +2064,7 @@ def test_check_full_keeps_records_after_check(tmp_path):
 
         assert repository.check(repair=False) is False
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.corrupt_ids() == [corrupt_id]
         assert after.table[intact_id].result == 1
 
@@ -1889,7 +2085,7 @@ def test_check_full_reverifies_carried_over_corrupt_record(tmp_path, monkeypatch
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=False)  # recorded corrupt in an earlier check
         tracker.save()
 
@@ -1898,7 +2094,7 @@ def test_check_full_reverifies_carried_over_corrupt_record(tmp_path, monkeypatch
         assert repository.check(repair=False) is True
         assert pack_key in hashed_keys  # re-verified
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # verified intact, corrupt record replaced
 
 
@@ -1907,13 +2103,13 @@ def test_check_full_prunes_corrupt_record_of_vanished_pack(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, _ = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(H(9), ok=False)  # no such pack in packs/
         tracker.save()
 
         assert repository.check(repair=False) is True
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert H(9) not in after.table
         assert intact_id in after.table
 
@@ -1924,11 +2120,11 @@ def test_check_partial_keeps_corrupt_record_across_runs(tmp_path):
         corrupt_id = _store_corrupt_pack(repository, H(1))
 
         assert repository.check(repair=False, max_duration=3600, max_age=3600) is False
-        assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
+        assert PackTracker.load(repository).corrupt_ids() == [corrupt_id]
 
         # a second run re-verifies it and keeps reporting it.
         assert repository.check(repair=False, max_duration=3600, max_age=3600) is False
-        assert PackTracker.load(repository.store).corrupt_ids() == [corrupt_id]
+        assert PackTracker.load(repository).corrupt_ids() == [corrupt_id]
 
 
 def test_check_partial_break_reports_unreached_corrupt_record(tmp_path, monkeypatch, caplog):
@@ -1942,7 +2138,7 @@ def test_check_partial_break_reports_unreached_corrupt_record(tmp_path, monkeypa
         corrupt_key = "packs/" + bin_to_hex(corrupt_id)
         repository.store_store(corrupt_key, b"CORRUPT-does-not-match-name")
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(corrupt_id, ok=False)  # recorded corrupt by an earlier check
         tracker.save()
 
@@ -1973,7 +2169,7 @@ def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)  # fresh timestamp
         tracker.save()
 
@@ -1982,7 +2178,7 @@ def test_check_max_age_skips_fresh_ok(tmp_path, monkeypatch):
         assert repository.check(repair=False, max_age=3600) is True
         assert pack_key not in hashed_keys  # skipped, its record is fresh
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].result == 1  # record kept
 
 
@@ -1992,7 +2188,7 @@ def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
         intact_id, pack_key = _store_intact_pack(repository)
 
         max_age = 50
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         old_ts = int(time.time()) - (max_age + 100)  # clearly beyond max_age
         tracker.table[intact_id] = PackTracker.Entry(timestamp=old_ts, result=1)
         tracker.save()
@@ -2002,7 +2198,7 @@ def test_check_max_age_reverifies_stale_ok(tmp_path, monkeypatch):
         assert repository.check(repair=False, max_age=max_age) is True
         assert pack_key in hashed_keys  # stale, re-verified
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert after.table[intact_id].timestamp > old_ts  # record refreshed
 
 
@@ -2012,7 +2208,7 @@ def test_check_max_age_reverifies_stale_within_skew(tmp_path, monkeypatch):
         intact_id, pack_key = _store_intact_pack(repository)
 
         max_age = MAX_CLOCK_SKEW * 2  # window wider than MAX_CLOCK_SKEW
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         past_ts = int(time.time()) - (max_age + MAX_CLOCK_SKEW // 2)  # just past the window
         tracker.table[intact_id] = PackTracker.Entry(timestamp=past_ts, result=1)
         tracker.save()
@@ -2028,7 +2224,7 @@ def test_check_max_age_skips_near_future_ok(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         future_ts = int(time.time()) + MAX_CLOCK_SKEW // 2
         tracker.table[intact_id] = PackTracker.Entry(timestamp=future_ts, result=1)
         tracker.save()
@@ -2044,7 +2240,7 @@ def test_check_max_age_reverifies_far_future_ok(tmp_path, monkeypatch):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         far_future_ts = int(time.time()) + MAX_CLOCK_SKEW + 3600
         tracker.table[intact_id] = PackTracker.Entry(timestamp=far_future_ts, result=1)
         tracker.save()
@@ -2062,7 +2258,7 @@ def test_check_max_age_reverifies_future_beyond_small_window(tmp_path, monkeypat
         intact_id, pack_key = _store_intact_pack(repository)
 
         small_window = MAX_CLOCK_SKEW // 4
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         future_ts = int(time.time()) + MAX_CLOCK_SKEW // 2  # ahead of us, but < MAX_CLOCK_SKEW
         tracker.table[intact_id] = PackTracker.Entry(timestamp=future_ts, result=1)
         tracker.save()
@@ -2078,7 +2274,7 @@ def test_check_max_age_reverifies_corrupt_even_when_fresh(tmp_path, monkeypatch)
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, pack_key = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=False)  # fresh, but corrupt
         tracker.save()
 
@@ -2093,14 +2289,14 @@ def test_check_max_age_prunes_vanished_ok_record(tmp_path):
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         intact_id, _ = _store_intact_pack(repository)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(intact_id, ok=True)
         tracker.record(H(9), ok=True)  # no such pack in packs/
         tracker.save()
 
         assert repository.check(repair=False, max_age=3600) is True
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert intact_id in after.table
         assert H(9) not in after.table
 
@@ -2115,7 +2311,7 @@ def test_check_max_age_partial_progress(tmp_path, monkeypatch):
         repository.store_store("packs/" + bin_to_hex(pack_a_id), pack_a)
         repository.store_store("packs/" + bin_to_hex(pack_b_id), pack_b)
 
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.record(pack_a_id, ok=True)  # fresh
         tracker.save()
 
@@ -2125,7 +2321,7 @@ def test_check_max_age_partial_progress(tmp_path, monkeypatch):
         assert "packs/" + bin_to_hex(pack_a_id) not in hashed_keys
         assert "packs/" + bin_to_hex(pack_b_id) in hashed_keys
 
-        after = PackTracker.load(repository.store)
+        after = PackTracker.load(repository)
         assert pack_a_id in after.table and pack_b_id in after.table
 
 
@@ -2144,7 +2340,7 @@ def test_check_partial_orders_stale_oldest_first_and_skips_fresh(tmp_path, monke
         newer_key = "packs/" + bin_to_hex(newer_id)
 
         now = int(time.time())
-        tracker = PackTracker.new(repository.store)
+        tracker = PackTracker.new(repository)
         tracker.table[fresh_id] = PackTracker.Entry(timestamp=now - 10, result=1)  # within max_age
         tracker.table[older_id] = PackTracker.Entry(timestamp=now - (max_age + 1000), result=1)
         tracker.table[newer_id] = PackTracker.Entry(timestamp=now - (max_age + 100), result=1)
@@ -2173,7 +2369,7 @@ def test_check_max_age_reuses_records_of_plain_check(tmp_path, monkeypatch):
 
 
 def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
-    # load() drops a set whose entries have a different layout than Entry, even though its store hash matches.
+    # load() drops a set whose entries have a different layout than Entry, even though its envelope is authentic.
     OtherEntry = namedtuple("OtherEntry", "timestamp result extra")
     OtherFormat = namedtuple("OtherFormat", "timestamp result extra")
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
@@ -2184,9 +2380,9 @@ def test_check_checked_packs_ignores_foreign_entry_layout(tmp_path):
         with io.BytesIO() as f:
             table.write(f)
             data = f.getvalue()
-        repository.store_store(PackTracker.NAME, data + store_hash(data).digest())
+        repository.store_encrypt_store(PackTracker.NAME, data)
 
-        tracker = PackTracker.load(repository.store)
+        tracker = PackTracker.load(repository)
         assert len(tracker) == 0
 
 
@@ -2211,12 +2407,10 @@ def test_check_progress_covers_packs_and_index(tmp_path, monkeypatch):
     monkeypatch.setattr("borg.repository.ProgressIndicatorPercent", FakePI)
     pack = fchunk(b"A", chunk_id=H(1))
     pack_name = "packs/" + store_hash(pack).hexdigest()
-    index_content = _serialized_chunkindex()
-    index_name = "index/" + store_hash(index_content).hexdigest()
     with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
         repository.store_store(pack_name, pack)
-        repository.store_store(index_name, index_content)
-        # create() already wrote a chunk index, so don't assume a count: derive it from the store.
+        repository.store_encrypt_store("index", _serialized_chunkindex(), hashed_name=True)
+        # don't assume a count: derive it from the store.
         n_packs = len(repository.store_list("packs"))
         n_index = len(repository.store_list("index"))
         assert repository.check(repair=False) is True
@@ -2911,14 +3105,13 @@ def test_open_refuses_bad_config(tmp_path):
 
 
 def test_create_failure_leaves_no_store_behind(tmp_path, monkeypatch):
-    # a failure inside create() after the store was created (e.g. disk full while writing the empty chunk
-    # index) must not leave a store without config behind.
-    from .. import cache as cache_module
+    # a failure inside create() after the store was created (e.g. disk full while writing the config)
+    # must not leave a store without config behind.
 
-    def failing_write(*args, **kwargs):
+    def failing_save_config(self, key=None):
         raise OSError("simulated disk full")
 
-    monkeypatch.setattr(cache_module, "write_chunkindex_to_repo", failing_write)
+    monkeypatch.setattr(Repository, "save_config", failing_save_config)
     location = os.fspath(tmp_path / "repo")
     with pytest.raises(OSError, match="simulated disk full"):
         with Repository(location, exclusive=True, create=True):

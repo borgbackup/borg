@@ -502,6 +502,7 @@ class Manifest:
             self.archives: ArchivesInterface = LegacyArchives(repository, self)
         else:
             self.archives: ArchivesInterface = Archives(repository, self)
+            repository.set_key(key)  # the key protects the repository's index/ and cache/ store objects
         self.key = key
         self.repo_objs = ro_cls(key)
         self.repository = repository

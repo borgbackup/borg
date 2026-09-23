@@ -6,6 +6,7 @@ import pytest
 
 from ...cache import write_chunkindex_to_repo
 from ...constants import *  # NOQA
+from ...crypto.key import RepoKeyNotFoundError
 from ...helpers import bin_to_hex
 from ...helpers.passphrase import PassphraseWrong
 from ...manifest import Manifest
@@ -82,8 +83,6 @@ def test_debug_put_get_delete_obj(archivers, request):
 
     output = cmd(archiver, "debug", "delete-obj", id_hash)
     assert "deleted" in output
-    # put-obj stored the file's bytes, not a repo object, so the key type is read from the manifest.
-    assert "Could not set up the key" not in output
 
     # the object is gone now: deleting it again reports it is not there
     output = cmd(archiver, "debug", "delete-obj", id_hash)
@@ -131,31 +130,41 @@ def test_debug_delete_obj_drops_superseded_gap(archivers, request):
     output = cmd(archiver, "debug", "delete-obj", bin_to_hex(w_id))
 
     assert "deleted" in output
-    assert "Could not set up the key" not in output
     assert pack_size_of(archiver, y_id) == y_size  # W and the superseded copy of X are gone
     with open_repository(archiver) as repository:
         assert repository.get(w_id, raise_missing=False) is None
         assert repository.get(x_id) is not None  # served from its second copy
 
 
-def test_debug_delete_obj_without_a_key_keeps_superseded_gap(archivers, request):
+def test_debug_delete_obj_without_a_key_aborts(archivers, request):
+    # the chunk index in index/ needs the key, so without a key nothing can be deleted.
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
-    (w_id, x_id, y_id), (_, x_size, y_size) = put_pack_with_superseded_gap(archiver)
+    (w_id, x_id, y_id), (w_size, x_size, y_size) = put_pack_with_superseded_gap(archiver)
+    keys = {}
     for name in os.listdir(archiver.keys_path):
+        with open(os.path.join(archiver.keys_path, name), "rb") as f:
+            keys[name] = f.read()
         os.unlink(os.path.join(archiver.keys_path, name))
 
-    output = cmd(archiver, "debug", "delete-obj", bin_to_hex(w_id))
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "debug", "delete-obj", bin_to_hex(w_id), exit_code=RepoKeyNotFoundError.exit_mcode)
+        assert "deleted" not in output
+    else:
+        with pytest.raises(RepoKeyNotFoundError):
+            cmd(archiver, "debug", "delete-obj", bin_to_hex(w_id))
 
-    assert "Could not set up the key" in output
-    assert "deleted" in output
-    assert pack_size_of(archiver, y_id) == x_size + y_size  # only W is gone, the gap is kept
+    for name, data in keys.items():  # open_repository needs the key, too
+        with open(os.path.join(archiver.keys_path, name), "wb") as f:
+            f.write(data)
+    assert pack_size_of(archiver, y_id) == w_size + x_size + y_size  # nothing is gone
 
 
 def test_debug_delete_obj_with_a_wrong_passphrase_deletes_nothing(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     (w_id, x_id, y_id), (w_size, x_size, y_size) = put_pack_with_superseded_gap(archiver)
+    passphrase = os.environ["BORG_PASSPHRASE"]
     monkeypatch.setenv("BORG_PASSPHRASE", "wrong")
 
     if archiver.FORK_DEFAULT:
@@ -164,20 +173,33 @@ def test_debug_delete_obj_with_a_wrong_passphrase_deletes_nothing(archivers, req
         with pytest.raises(PassphraseWrong):
             cmd(archiver, "debug", "delete-obj", bin_to_hex(w_id))
 
+    monkeypatch.setenv("BORG_PASSPHRASE", passphrase)  # open_repository needs the key
     assert pack_size_of(archiver, y_id) == w_size + x_size + y_size
     with open_repository(archiver) as repository:
         assert repository.get(w_id, raise_missing=False) is not None
 
 
-def test_debug_delete_obj_with_invalid_ids_only_sets_up_no_key(archivers, request, monkeypatch):
+@pytest.mark.parametrize("command", ["get-obj", "put-obj"])
+def test_debug_get_put_obj_with_a_wrong_passphrase_aborts(archivers, request, monkeypatch, command):
+    # the chunk index in index/ needs the key, so get-obj and put-obj load it.
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", contents=b"some data")
+    id_hash = cmd(archiver, "debug", "id-hash", "input/file").strip()
+    if command == "get-obj":
+        cmd(archiver, "debug", "put-obj", id_hash, "input/file")
+        args = ("debug", "get-obj", id_hash, "output/file")
+    else:
+        args = ("debug", "put-obj", id_hash, "input/file")
     monkeypatch.setenv("BORG_PASSPHRASE", "wrong")
 
-    output = cmd(archiver, "debug", "delete-obj", "invalid")
-
-    assert "is invalid" in output
-    assert "Could not set up the key" not in output
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, *args, exit_code=PassphraseWrong.exit_mcode)
+        assert id_hash not in output
+    else:
+        with pytest.raises(PassphraseWrong):
+            cmd(archiver, *args)
+    assert not os.path.exists("output/file")
 
 
 def test_debug_id_hash_format_put_get_parse_obj(archivers, request):

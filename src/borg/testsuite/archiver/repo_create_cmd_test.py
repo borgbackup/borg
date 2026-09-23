@@ -3,10 +3,13 @@ from unittest.mock import patch
 
 import pytest
 
+from ...archiver import repo_create_cmd
+from ...cache import list_chunkindex_hashes, read_chunkindex_from_repo
 from ...helpers.errors import Error, CancelledByUser
 from ...constants import *  # NOQA
 from ...crypto.key import FlexiKey
-from . import cmd, create_src_archive, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION, KF_LOCATION
+from . import cmd, create_src_archive, generate_archiver_tests, open_repository
+from . import RK_ENCRYPTION, KF_ENCRYPTION, KF_LOCATION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -159,3 +162,35 @@ def test_repo_create_failure_leaves_nothing_behind(archivers, request, monkeypat
     # and nothing stands in the way of creating the repository there now.
     cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
     assert os.listdir(keys_dir)
+
+
+def test_repo_create_writes_an_empty_chunk_index(archivers, request):
+    # repo-create stores an empty chunk index (in the key's envelope), so the first use of the repository
+    # does not have to build it by listing the packs.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with open_repository(archiver) as repository:
+        hashes = list_chunkindex_hashes(repository)
+        assert len(hashes) == 1
+        chunks = read_chunkindex_from_repo(repository, hashes[0])
+        assert chunks is not None and len(chunks) == 0
+
+
+def test_repo_create_chunk_index_failure_leaves_nothing_behind(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("patches object")
+    keys_dir = os.path.join(archiver.tmpdir, "keys")
+    monkeypatch.setenv("BORG_KEYS_DIR", keys_dir)
+
+    def failing_write_chunkindex_to_repo(*args, **kwargs):
+        raise OSError("simulated store failure while writing the chunk index")
+
+    with patch.object(repo_create_cmd, "write_chunkindex_to_repo", failing_write_chunkindex_to_repo):
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION, exit_code=2)
+        else:
+            with pytest.raises(OSError, match="simulated store failure"):
+                cmd(archiver, "repo-create", KF_ENCRYPTION, KF_LOCATION)
+    assert not os.path.exists(archiver.repository_location)
+    assert not os.path.exists(keys_dir) or not os.listdir(keys_dir)

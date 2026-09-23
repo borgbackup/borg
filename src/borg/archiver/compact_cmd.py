@@ -508,6 +508,8 @@ class CompactMixIn:
 
             ``borg compact`` does not rewrite or merge packs that ``borg check`` recorded as corrupt
             and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks.
+            That repair does not remove damage outside any chunk (e.g. bytes appended to a pack), so such a
+            pack stays recorded corrupt and ``borg compact`` warns about it on every run (refs #10026).
 
             You usually do not want to run ``borg compact`` after every write operation, but
             either regularly (e.g., once a month, possibly together with ``borg check``) or

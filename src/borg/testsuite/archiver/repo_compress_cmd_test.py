@@ -13,7 +13,7 @@ from ...archiver.repo_compress_cmd import PackRecompressor
 
 from .. import make_test_key
 from . import create_regular_file, cmd, open_repository, RK_ENCRYPTION
-from ..repository_test import H, accept_all, fchunk, pdchunk
+from ..repository_test import H, accept_all, fchunk, pdchunk, corrupt_chunk_on_disk
 
 
 def test_repo_compress(archiver):
@@ -238,6 +238,39 @@ def test_repo_compress_soft_interrupt_persists_valid_index(archiver, monkeypatch
     # a later run finishes the recompression of the remaining packs
     cmd(archiver, "repo-compress", "-C", "zstd,3")
     cmd(archiver, "check")
+
+
+@pytest.mark.parametrize("corrupt_ctype", (CNONE.ID, ZLIB.ID))
+def test_repo_compress_keeps_corrupt_pack(archiver, corrupt_ctype):
+    # repo-compress keeps a pack "borg check" recorded corrupt unchanged and warns (#10410).
+    # with "-C none", the corrupt object is either already stored as wanted (CNONE) or needs recompressing (ZLIB).
+    create_regular_file(archiver.input_path, "rand", contents=os.urandom(100_000))  # stored uncompressed
+    create_regular_file(archiver.input_path, "text", contents=b"z" * 100_000)  # stored zlib compressed
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input", "-C", "zlib,3")
+    with open_repository(archiver) as repository:
+        manifest = Manifest.load(repository)
+        ctypes = {}  # pack_id -> {ctype, ...}
+        for id, entry in repository.chunks.iteritems():
+            meta = manifest.repo_objs.parse_meta(id, repository.get(id, read_data=False), ro_type=ROBJ_DONTCARE)
+            ctypes.setdefault(entry.pack_id, set()).add(meta["ctype"])
+            if meta["ctype"] == corrupt_ctype and meta["size"] == 100_000:
+                corrupt_id = id
+        corrupt_pack = repository.chunks[corrupt_id].pack_id
+        # the corrupt pack holds both objects, and another pack holds an object "-C none" recompresses.
+        assert ctypes.pop(corrupt_pack) >= {CNONE.ID, ZLIB.ID}
+        assert any(ZLIB.ID in pack_ctypes for pack_ctypes in ctypes.values())
+        packs_before = {info.name for info in repository.store_list("packs")}
+        corrupt_chunk_on_disk(repository, corrupt_id)  # corrupts the data, the metadata stays readable
+    cmd(archiver, "check", exit_code=1)
+
+    output = cmd(archiver, "repo-compress", "-v", "-C", "none", exit_code=EXIT_WARNING)
+    assert '1 pack(s) recorded corrupt by "borg check" are not rewritten.' in output
+    with open_repository(archiver) as repository:
+        packs_after = {info.name for info in repository.store_list("packs")}
+    assert bin_to_hex(corrupt_pack) in packs_after
+    assert len(packs_before - packs_after) >= 1  # other packs were recompressed
+    cmd(archiver, "check", exit_code=1)
 
 
 def transform_via(replacements):

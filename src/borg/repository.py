@@ -29,7 +29,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
-from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
+from .repoobj import RepoObj, OBJ_MAGIC
 from .crypto.key import is_keyfile, store_hash, STORE_HASH_NAME
 
 logger = create_logger(__name__)
@@ -440,15 +440,13 @@ class PackReader:
     def _parse_header(hdr_data, offset, pack_size):
         """Return (ObjHeader, None) for a valid header at offset, (None, problem) otherwise.
 
-        Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack and is
-        at most MAX_DATA_SIZE bytes, the limit put() enforces on a whole object. problem names
-        which of these failed.
+        hdr_data: the obj_header.size bytes at offset, a position in the pack. pack_size: the pack size in bytes.
+        Valid means: RepoObj.parse_header accepts hdr_data, and the object fits into the pack and is
+        at most MAX_DATA_SIZE bytes. problem is a message naming the check that failed.
         """
-        hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
-        if hdr.magic != OBJ_MAGIC:
-            return None, "no object header"
-        if hdr.version not in SUPPORTED_OBJ_VERSIONS:
-            return None, f"unsupported object version {hdr.version}"
+        hdr, problem = RepoObj.parse_header(hdr_data)
+        if hdr is None:
+            return None, problem
         obj_size = RepoObj.obj_header.size + hdr.meta_size + hdr.data_size
         if offset + obj_size > pack_size:
             return None, "object extends past end of file"
@@ -1854,10 +1852,11 @@ class Repository:
                 # comes from the same index we already route with.
                 load_size = min(load_size, obj_size)
                 obj = reader.read(obj_offset, load_size)
+                parsed_hdr, problem = RepoObj.parse_header(obj)
+                if parsed_hdr is None:
+                    raise IntegrityError(f"{problem} [id {id_hex}]")
                 hdr = obj[0:hdr_size]
-                if len(hdr) != hdr_size:
-                    raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
-                meta_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr)).meta_size
+                meta_size = parsed_hdr.meta_size
                 if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.

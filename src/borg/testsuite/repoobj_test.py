@@ -163,6 +163,47 @@ def test_malformed_object_inconsistent_sizes(key):
         repo_objs.parse(id, hdr, ro_type=ROBJ_FILE_STREAM)
 
 
+def test_parse_header(key):
+    repo_objs = RepoObj(key)
+    data = b"foobar"
+    id = repo_objs.id_hash(data)
+    obj = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
+    for buf in obj, obj + b"trailing bytes", memoryview(obj)[: RepoObj.obj_header.size]:
+        hdr, problem = RepoObj.parse_header(buf)
+        assert problem is None
+        assert (hdr.magic, hdr.version, hdr.chunk_id) == (OBJ_MAGIC, OBJ_VERSION, id)
+        assert RepoObj.obj_header.size + hdr.meta_size + hdr.data_size == len(obj)
+
+
+@pytest.mark.parametrize(
+    "damage, problem",
+    [
+        ("truncated", "object too small: expected at least 49 header bytes, got 48"),
+        ("magic", "no object header"),
+        ("version", "unsupported object version 238"),
+    ],
+    ids=["truncated", "magic", "version"],
+)
+def test_parse_header_rejects(key, damage, problem):
+    # parse_meta() and parse() raise the problem parse_header() names.
+    repo_objs = RepoObj(key)
+    data = b"foobar"
+    id = repo_objs.id_hash(data)
+    obj = bytearray(repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM))
+    if damage == "truncated":
+        obj = obj[: RepoObj.obj_header.size - 1]
+    elif damage == "magic":
+        obj[0] ^= 0xFF
+    else:
+        obj[len(OBJ_MAGIC)] = 0xEE  # version byte
+    obj = bytes(obj)
+    assert RepoObj.parse_header(obj) == (None, problem)
+    with pytest.raises(IntegrityError, match=f": {problem}$"):
+        repo_objs.parse_meta(id, obj, ro_type=ROBJ_FILE_STREAM)
+    with pytest.raises(IntegrityError, match=f": {problem}$"):
+        repo_objs.parse(id, obj, ro_type=ROBJ_FILE_STREAM)
+
+
 def test_spoof_archive(key):
     repo_objs = RepoObj(key)
     data = b"fake or malicious archive data"  # File content could be provided by an attacker.

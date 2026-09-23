@@ -1525,6 +1525,35 @@ def test_get_read_data_false_large_meta(tmp_path):
         assert result == chunk[: hdr_size + len(big_meta)]
 
 
+@pytest.mark.parametrize(
+    "damage, problem",
+    [
+        ("truncated", "object too small: expected at least 49 header bytes, got 48"),
+        ("magic", "no object header"),
+        ("version", "unsupported object version 238"),
+    ],
+    ids=["truncated", "magic", "version"],
+)
+def test_get_read_data_false_rejects_header(tmp_path, damage, problem):
+    # get(read_data=False) sizes its metadata read by meta_size, so it checks the header first.
+    chunk = bytearray(fchunk(b"DATA", meta=b"META"))
+    if damage == "truncated":
+        chunk = chunk[: RepoObj.obj_header.size - 1]
+    elif damage == "magic":
+        chunk[0] ^= 0xFF
+    else:
+        chunk[len(OBJ_MAGIC)] = 0xEE  # version byte
+    pack_id, chunk_id = H(45), H(50)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), bytes(chunk))
+        chunks = ChunkIndex()
+        chunks.add(chunk_id, len(chunk))
+        chunks.update_pack_info([(chunk_id, pack_id, 0, len(chunk))])
+        repository.chunks = chunks
+        with pytest.raises(IntegrityError, match=f": {problem} \\[id {bin_to_hex(chunk_id)}\\]$"):
+            repository.get(chunk_id, read_data=False)
+
+
 def test_get_uses_chunk_index_location(tmp_path):
     # get() routes to the correct pack and offset when a ChunkIndex is assigned via the chunks property.
     chunk1 = fchunk(b"FIRST")

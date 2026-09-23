@@ -16,3 +16,4 @@ This chapter details deployment strategies for the following scenarios.
    deployment/image-backup
    deployment/pull-backup
    deployment/non-root-user
+   deployment/yubikey

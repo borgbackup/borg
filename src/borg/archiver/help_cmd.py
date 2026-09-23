@@ -605,21 +605,22 @@ class HelpMixIn:
                 Use this so you do not need to type ``--repo /path/to/my/repo`` all the time.
             BORG_OTHER_REPO
                 Similar to BORG_REPO, but gives the default for ``--other-repo``.
-            BORG_PASSPHRASE (and BORG_OTHER_PASSPHRASE)
+            BORG_PASSPHRASE (and BORG_NEW_PASSPHRASE, BORG_OTHER_PASSPHRASE)
                 When set, use the value to answer the passphrase question for encrypted repositories.
                 It is used when a passphrase is needed to access an encrypted repo as well as when a new
                 passphrase should be initially set when initializing an encrypted repo.
                 BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are mutually exclusive:
                 if more than one of them is set, borg refuses to guess and aborts with
                 "More than one passphrase environment variable is set". The same applies to the
-                ``BORG_OTHER_*`` variants (which are a separate, independent group).
+                ``BORG_NEW_*`` and ``BORG_OTHER_*`` variants (each of which is a separate,
+                independent group).
                 See also BORG_NEW_PASSPHRASE.
-                borg removes the passphrase-related variables (BORG_PASSPHRASE, BORG_NEW_PASSPHRASE,
-                BORG_PASSCOMMAND, BORG_PASSPHRASE_FD and their ``BORG_OTHER_*`` variants) as well as
+                borg removes the passphrase-related variables (BORG_PASSPHRASE, BORG_PASSCOMMAND,
+                BORG_PASSPHRASE_FD and their ``BORG_NEW_*`` and ``BORG_OTHER_*`` variants) as well as
                 BORGSTORE_REST_PASSWORD from the environment of the subprocesses it starts (like the
                 command given in BORG_PASSCOMMAND, ``--paths-from-command`` / ``--content-from-command``
                 commands, tar filter commands and ``borg with-lock`` commands).
-            BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
+            BORG_PASSCOMMAND (and BORG_NEW_PASSCOMMAND, BORG_OTHER_PASSCOMMAND)
                 When set, use the standard output of the command (trailing newlines are stripped) to answer the
                 passphrase question for encrypted repositories.
                 It is used when a passphrase is needed to access an encrypted repo as well as when a new
@@ -627,17 +628,19 @@ class HelpMixIn:
                 is executed without a shell. So variables, like ``$HOME`` will work, but ``~`` won't.
                 Mutually exclusive with BORG_PASSPHRASE and BORG_PASSPHRASE_FD, see there.
                 See also BORG_NEW_PASSPHRASE.
-            BORG_PASSPHRASE_FD (and BORG_OTHER_PASSPHRASE_FD)
+            BORG_PASSPHRASE_FD (and BORG_NEW_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD)
                 When set, specifies a file descriptor to read a passphrase
                 from. Programs starting borg may choose to open an anonymous pipe
                 and use it to pass a passphrase. This is safer than passing via
                 BORG_PASSPHRASE, because on some systems (e.g. Linux) environment
                 can be examined by other processes.
                 Mutually exclusive with BORG_PASSPHRASE and BORG_PASSCOMMAND, see there.
-            BORG_NEW_PASSPHRASE
-                When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
-                This variable is checked first. If it is not set, BORG_PASSPHRASE, BORG_PASSCOMMAND and
-                BORG_PASSPHRASE_FD are checked (in that order).
+            BORG_NEW_PASSPHRASE (and BORG_NEW_PASSCOMMAND, BORG_NEW_PASSPHRASE_FD)
+                When set, use these to answer the passphrase question when a **new** passphrase is
+                asked for: like BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD, but for
+                the new passphrase.
+                The ``BORG_NEW_*`` group is checked first. If none of its variables is set,
+                BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are checked (in that order).
                 Main use case for this is to fully automate ``borg key change-passphrase``.
             BORG_DISPLAY_PASSPHRASE
                 When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.

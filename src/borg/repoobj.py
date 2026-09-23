@@ -79,22 +79,6 @@ class RepoObj:
     obj_header = Struct("<8sB32sII")
     ObjHeader = namedtuple("ObjHeader", "magic version chunk_id meta_size data_size")
 
-    @classmethod
-    def extract_crypted_data(cls, data: bytes) -> bytes:
-        # used for crypto type detection
-        hdr_size = cls.obj_header.size
-        if len(data) < hdr_size:
-            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(data)}")
-        hdr = cls.ObjHeader(*cls.obj_header.unpack(data[:hdr_size]))
-        if hdr.magic != OBJ_MAGIC:
-            raise IntegrityError("invalid object magic")
-        if hdr.version not in SUPPORTED_OBJ_VERSIONS:
-            raise IntegrityError(f"unsupported object version: {hdr.version}")
-        overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
-        if overall_expected_size != len(data):
-            raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(data)}")
-        return data[hdr_size + hdr.meta_size :]  # crypted data
-
     def __init__(self, key):
         self.key = key
         # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates

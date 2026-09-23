@@ -67,10 +67,6 @@ def test_format_parse_roundtrip(key):
     assert got_meta["custom"] == "something"
     assert data == got_data
 
-    edata = repo_objs.extract_crypted_data(cdata)
-    key = repo_objs.key
-    assert edata.startswith(bytes((key.TYPE,)))
-
 
 def test_format_parse_roundtrip_borg1(legacy_key):  # legacy
     repo_objs = RepoObj1(legacy_key)
@@ -149,8 +145,6 @@ def test_malformed_object_too_short(key):
     hdr_size = RepoObj.obj_header.size
     for blob in [b"", b"BORG_OBJ", b"\x00" * (hdr_size - 1)]:
         with pytest.raises(IntegrityError):
-            RepoObj.extract_crypted_data(blob)
-        with pytest.raises(IntegrityError):
             repo_objs.parse_meta(id, blob, ro_type=ROBJ_FILE_STREAM)
         with pytest.raises(IntegrityError):
             repo_objs.parse(id, blob, ro_type=ROBJ_FILE_STREAM)
@@ -163,8 +157,6 @@ def test_malformed_object_inconsistent_sizes(key):
     id = repo_objs.id_hash(b"x")
     # huge meta_size, but no actual meta/data bytes follow the header
     hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, id, 0xFFFFFFFF, 0)
-    with pytest.raises(IntegrityError):
-        RepoObj.extract_crypted_data(hdr)
     with pytest.raises(IntegrityError):
         repo_objs.parse_meta(id, hdr, ro_type=ROBJ_FILE_STREAM)
     with pytest.raises(IntegrityError):

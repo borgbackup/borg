@@ -462,6 +462,46 @@ cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
 ctypedef const EVP_CIPHER * (* CIPHER)()
 
 
+# EVP_EncryptUpdate() / EVP_DecryptUpdate() take the input length as a C int, so a message longer
+# than INT_MAX bytes has to be fed to the cipher in several calls. Our AEAD modes (OCB,
+# chacha20-poly1305) stream: several calls with the pieces of the input are equivalent to one call
+# with all of it. The chunk size is a module variable only so that a test can shrink it, see
+# _set_cipher_update_chunk_size().
+cdef Py_ssize_t cipher_update_chunk_size = 1 << 30
+
+
+def _set_cipher_update_chunk_size(size):
+    """Set the chunk size _cipher_update() feeds to OpenSSL per call (for tests). Returns the previous size."""
+    global cipher_update_chunk_size
+    assert 0 < size <= (1 << 30)
+    previous = cipher_update_chunk_size
+    cipher_update_chunk_size = size
+    return previous
+
+
+cdef Py_ssize_t _cipher_update(EVP_CIPHER_CTX *ctx, bint encrypt, unsigned char *out,
+                               const unsigned char *inp, Py_ssize_t inlen) noexcept nogil:
+    """Feed inlen input bytes to EVP_EncryptUpdate() (encrypt) / EVP_DecryptUpdate() in chunks that
+    fit their int input length. out receives the output (NULL: the input is AAD, there is no output).
+    Returns the number of output bytes written, or -1 if OpenSSL failed."""
+    cdef Py_ssize_t done = 0, written = 0
+    cdef int chunk, olen, rc
+    cdef unsigned char *outp
+    while True:
+        chunk = <int> (cipher_update_chunk_size if inlen - done > cipher_update_chunk_size else inlen - done)
+        outp = NULL if out == NULL else out + written
+        if encrypt:
+            rc = EVP_EncryptUpdate(ctx, outp, &olen, inp + done, chunk)
+        else:
+            rc = EVP_DecryptUpdate(ctx, outp, &olen, inp + done, chunk)
+        if not rc:
+            return -1
+        done += chunk
+        written += olen
+        if done >= inlen:
+            return written
+
+
 cdef class _AEAD_BASE:
     # new crypto used in borg >= 2.0
     # Layout: HEADER + MAC 16 + CT
@@ -523,17 +563,17 @@ cdef class _AEAD_BASE:
         # CHACHA20 has an internal 32bit block counter (besides the 96bit (12Byte) IV we give it),
         # thus we must not encrypt more than 2^32 cipher blocks with the same (key, IV) pair.
         # AES-OCB has no such counter (it derives the per-block offsets from the IV), but we apply
-        # the same limit to both ciphers: the check is cheap and can not trigger for borg messages
-        # anyway, as these are limited to MAX_DATA_SIZE.
+        # the same limit to both ciphers: the check is cheap and 2^32 blocks (64 GiB) is far beyond
+        # any borg message (pack objects are limited to MAX_DATA_SIZE).
         block_count = self.block_count(len(data))
         if block_count > 2**32:
             raise ValueError('too much data for one message (max 2^32 cipher blocks)')
-        cdef int ilen = len(data)
-        cdef int hlen = len(header)
+        cdef Py_ssize_t ilen = len(data)
+        cdef Py_ssize_t hlen = len(header)
         assert hlen == self.header_len_expected
         cdef int aoffset = self.aad_offset
-        cdef int alen = hlen - aoffset
-        cdef int aadlen = len(aad)
+        cdef Py_ssize_t alen = hlen - aoffset
+        cdef Py_ssize_t aadlen = len(aad)
         cdef Py_buffer idata
         cdef bint idata_acquired = False
         cdef Py_buffer hdata
@@ -542,8 +582,8 @@ cdef class _AEAD_BASE:
         cdef bint aadata_acquired = False
         cdef unsigned char *odata = NULL
         cdef int olen
-        cdef int offset
-        cdef int rc
+        cdef Py_ssize_t offset
+        cdef Py_ssize_t written
 
         try:
             # Our AEAD ciphers (OCB, chacha20-poly1305) are padding-free: the ciphertext is
@@ -569,15 +609,15 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_EncryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_EncryptInit_ex failed')
-            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen):
+            if _cipher_update(self.ctx, True, NULL, <const unsigned char*> aadata.buf, aadlen) < 0:
                 raise CryptoError('EVP_EncryptUpdate failed')
-            if not EVP_EncryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> hdata.buf+aoffset, alen):
+            if _cipher_update(self.ctx, True, NULL, <const unsigned char*> hdata.buf+aoffset, alen) < 0:
                 raise CryptoError('EVP_EncryptUpdate failed')
             with nogil:
-                rc = EVP_EncryptUpdate(self.ctx, odata+offset, &olen, <const unsigned char*> idata.buf, ilen)
-            if not rc:
+                written = _cipher_update(self.ctx, True, odata+offset, <const unsigned char*> idata.buf, ilen)
+            if written < 0:
                 raise CryptoError('EVP_EncryptUpdate failed')
-            offset += olen
+            offset += written
             # Final can emit a buffered partial block (OCB does). Our AEAD modes are
             # padding-free, so it never writes more than the space left in the
             # exact-size result buffer.
@@ -612,19 +652,19 @@ cdef class _AEAD_BASE:
             # truncated data - handle it like any other corruption or tampering, instead of
             # confusing OpenSSL with negative lengths below.
             raise IntegrityError('Authentication failed: envelope too short')
-        cdef int ilen = len(envelope)
-        cdef int hlen = self.header_len_expected
+        cdef Py_ssize_t ilen = len(envelope)
+        cdef Py_ssize_t hlen = self.header_len_expected
         cdef int aoffset = self.aad_offset
-        cdef int alen = hlen - aoffset
-        cdef int aadlen = len(aad)
+        cdef Py_ssize_t alen = hlen - aoffset
+        cdef Py_ssize_t aadlen = len(aad)
         cdef Py_buffer idata
         cdef bint idata_acquired = False
         cdef Py_buffer aadata
         cdef bint aadata_acquired = False
         cdef unsigned char *odata = NULL
         cdef int olen
-        cdef int offset
-        cdef int rc
+        cdef Py_ssize_t offset
+        cdef Py_ssize_t written
 
         try:
             # Our AEAD ciphers (OCB, chacha20-poly1305) are padding-free: the plaintext is
@@ -643,18 +683,18 @@ cdef class _AEAD_BASE:
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET IVLEN failed')
             if not EVP_DecryptInit_ex(self.ctx, NULL, NULL, self.key, self.iv):
                 raise CryptoError('EVP_DecryptInit_ex failed')
-            if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> aadata.buf, aadlen):
+            if _cipher_update(self.ctx, False, NULL, <const unsigned char*> aadata.buf, aadlen) < 0:
                 raise CryptoError('EVP_DecryptUpdate failed')
-            if not EVP_DecryptUpdate(self.ctx, NULL, &olen, <const unsigned char*> idata.buf+aoffset, alen):
+            if _cipher_update(self.ctx, False, NULL, <const unsigned char*> idata.buf+aoffset, alen) < 0:
                 raise CryptoError('EVP_DecryptUpdate failed')
             offset = 0
             with nogil:
-                rc = EVP_DecryptUpdate(self.ctx, odata+offset, &olen,
-                                       <const unsigned char*> idata.buf+hlen+self.mac_len,
-                                       ilen-hlen-self.mac_len)
-            if not rc:
+                written = _cipher_update(self.ctx, False, odata+offset,
+                                         <const unsigned char*> idata.buf+hlen+self.mac_len,
+                                         ilen-hlen-self.mac_len)
+            if written < 0:
                 raise CryptoError('EVP_DecryptUpdate failed')
-            offset += olen
+            offset += written
             if not EVP_CIPHER_CTX_ctrl(self.ctx, EVP_CTRL_AEAD_SET_TAG, self.mac_len, <unsigned char *> idata.buf + hlen):
                 raise CryptoError('EVP_CIPHER_CTX_ctrl SET TAG failed')
             # Final can emit a buffered partial block (OCB does). Our AEAD modes are

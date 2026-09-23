@@ -1,4 +1,4 @@
-"""Tests for borg.crypto.low_level.XXH64.
+"""Tests for borg.crypto.low_level: the AEAD ciphers' chunked OpenSSL calls and XXH64.
 
 XXH64 only exists to support ``borg transfer`` from borg 1.x repos (see #9935), where it is
 needed to verify the XXH64 integrity data that borg 1.x wrote for its repo index/hints files.
@@ -10,9 +10,12 @@ canonical (big-endian) XXH64 results for that buffer, cross-checked against the 
 xxHash implementation.
 """
 
+import os
+
 import pytest
 
-from ...crypto.low_level import XXH64, xxh64
+from ...crypto.low_level import AES256_OCB, CHACHA20_POLY1305, IntegrityError, XXH64, xxh64
+from ...crypto.low_level import _set_cipher_update_chunk_size
 
 # xxHash test-buffer generator, transcribed verbatim from tests/sanity_test.c:
 #   XXH_U64 byteGen = PRIME32;
@@ -103,3 +106,52 @@ def test_accepts_buffer_protocol():
     h.update(bytearray(data[:50]))
     h.update(memoryview(data[50:]))
     assert h.hexdigest() == expected
+
+
+@pytest.fixture
+def small_cipher_update_chunks():
+    """Make the AEAD ciphers feed their input to OpenSSL in 7 byte chunks (see _cipher_update).
+
+    7 is not a multiple of the 16 byte cipher block, so chunk boundaries fall inside blocks, which OCB
+    buffers across calls.
+    """
+    previous = _set_cipher_update_chunk_size(7)
+    yield
+    _set_cipher_update_chunk_size(previous)
+
+
+@pytest.mark.parametrize("cipher_cls", [AES256_OCB, CHACHA20_POLY1305])
+def test_aead_cipher_update_in_chunks(cipher_cls, small_cipher_update_chunks):
+    """Chunked processing gives the same envelope and plaintext as one call with all of the input."""
+    key = b"k" * 32
+    header = b"\x01\x02"
+    aad = b"additional authenticated data " * 3  # longer than a chunk, so the AAD is chunked, too
+    data = os.urandom(1000)
+    previous = _set_cipher_update_chunk_size(1 << 30)  # reference: everything in one call
+    envelope = cipher_cls(key, iv=42, header_len=len(header), aad_offset=1).encrypt(data, header=header, aad=aad)
+    _set_cipher_update_chunk_size(previous)
+    cipher = cipher_cls(key, iv=42, header_len=len(header), aad_offset=1)
+    assert cipher.encrypt(data, header=header, aad=aad) == envelope
+    assert cipher.decrypt(envelope, aad=aad) == data
+    for size in (0, 1, 7, 16, 17):  # empty, less than a chunk, one chunk, one block, a block plus a byte
+        cipher = cipher_cls(key, iv=size, header_len=len(header), aad_offset=1)
+        assert cipher.decrypt(cipher.encrypt(data[:size], header=header, aad=aad), aad=aad) == data[:size]
+    tampered = envelope[:-1] + bytes([envelope[-1] ^ 1])
+    with pytest.raises(IntegrityError):
+        cipher.decrypt(tampered, aad=aad)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("BORG_TESTS_BIG_MEMORY"), reason="needs ~4 GiB of RAM, set BORG_TESTS_BIG_MEMORY=1 to run"
+)
+@pytest.mark.parametrize("cipher_cls", [AES256_OCB, CHACHA20_POLY1305])
+def test_aead_message_longer_than_int_max(cipher_cls):
+    """A message of more than 2^31 bytes exceeds the C int input length of one OpenSSL update call."""
+    size = 2**31 + 1000
+    data = bytes(size)  # all zero: cheap to allocate
+    cipher = cipher_cls(b"k" * 32, iv=0)
+    envelope = cipher.encrypt(data)
+    assert len(envelope) == 16 + size
+    del data
+    plaintext = cipher.decrypt(envelope)
+    assert len(plaintext) == size and plaintext.count(b"\0") == size

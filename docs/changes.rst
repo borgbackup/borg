@@ -191,6 +191,9 @@ New features:
 
 Fixes:
 
+- crypto: the AEAD ciphers (AES-OCB, ChaCha20-Poly1305) feed their input to OpenSSL in
+  chunks, so a message of 2 GiB or more does not fail with SystemError (or get
+  truncated above 4 GiB) any more: the OpenSSL update calls take an int length.
 - repository: raise DoesNotExist for a missing rest:// repo, #10365
 - extract: do not abort on corrupted chunks, replace them by all-zero data with a warning, #840
 - compact:

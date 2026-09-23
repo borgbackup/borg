@@ -1255,7 +1255,7 @@ def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
     # a defect chunk that no archive references, so the check after the repair finds nothing missing.
     # delete() rewrites its pack, keeping the other object in it (the bystander).
     (bystander_id, defect_id), pack_id = put_objects_in_one_pack(archiver, [b"bystander", b"defect"])
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         corrupt_chunk_on_disk(repository, defect_id)
     packs_before = list_packs(archiver)
     assert len(packs_before) > 10
@@ -1272,7 +1272,7 @@ def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
     assert packs_before - list_packs(archiver) == {bin_to_hex(pack_id)}
     assert len(new_packs) == 1
     assert [bin_to_hex(pack_id) for pack_id in walked] == list(new_packs)
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         assert defect_id not in repository.chunks
         assert bin_to_hex(repository.chunks[bystander_id].pack_id) in new_packs
     cmd(archiver, "check", exit_code=0)
@@ -1286,7 +1286,7 @@ def test_repair_finish_reads_no_pack_after_deleting_a_whole_pack(archiver, monke
     # local-only: this patches in-process archive and repository internals.
     check_cmd_setup(archiver)
     (defect_id,), pack_id = put_objects_in_one_pack(archiver, [b"defect"])
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         corrupt_chunk_on_disk(repository, defect_id)
     packs_before = list_packs(archiver)
 
@@ -1299,7 +1299,7 @@ def test_repair_finish_reads_no_pack_after_deleting_a_whole_pack(archiver, monke
     assert "pack(s) written by the repair." not in output
     assert walked == []
     assert list_packs(archiver) == packs_before - {bin_to_hex(pack_id)}
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         assert defect_id not in repository.chunks
     cmd(archiver, "check", exit_code=0)
 
@@ -1346,7 +1346,7 @@ def test_repair_finish_reads_the_pack_its_flush_stores(archiver, monkeypatch):
         assert repository.put(chunk_id, checker.repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)) is None
         checker.finish()
         assert not checker.error_found
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         assert walked == [repository.chunks[chunk_id].pack_id]
 
 
@@ -1360,7 +1360,7 @@ def test_repair_finish_reads_a_rewritten_pack_no_index_entry_names(archiver, mon
     # local-only: this patches in-process archive and repository internals.
     check_cmd_setup(archiver)
     (dropped_id, defect_id), pack_id = put_objects_in_one_pack(archiver, [b"dropped", b"defect"])
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         corrupt_chunk_on_disk(repository, defect_id)  # corrupts the payload, the header still validates
         key = "packs/" + bin_to_hex(pack_id)
         dropped = repository.chunks[dropped_id]
@@ -1377,7 +1377,7 @@ def test_repair_finish_reads_a_rewritten_pack_no_index_entry_names(archiver, mon
     new_packs = list_packs(archiver) - packs_before
     assert len(new_packs) == 1
     assert [bin_to_hex(pack_id) for pack_id in walked] == list(new_packs)
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         assert not any(bin_to_hex(entry.pack_id) in new_packs for _, entry in repository.chunks.iteritems())
 
 
@@ -1396,7 +1396,7 @@ def test_repair_finish_accepts_a_superseded_duplicate_in_a_rewritten_pack(archiv
     (dropped_id, dup_id, _, defect_id), pack_id = put_objects_in_one_pack(
         archiver, [b"dropped", b"duplicate", b"duplicate", b"defect"]
     )
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         corrupt_chunk_on_disk(repository, defect_id)  # corrupts the payload, the header still validates
         key = "packs/" + bin_to_hex(pack_id)
         dropped = repository.chunks[dropped_id]
@@ -1409,7 +1409,7 @@ def test_repair_finish_accepts_a_superseded_duplicate_in_a_rewritten_pack(archiv
     assert "in a gap, keeping the remaining" in output
     assert len(walked) == 1
     assert "the chunks index does not match the pack" not in output
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         entry = repository.chunks[dup_id]
         assert entry.pack_id == walked[0]
         # the second copy: the first one starts where the dropped object ends.
@@ -1465,7 +1465,7 @@ def test_repair_finish_fixes_a_wrong_index_entry_for_a_written_pack(archiver, mo
     assert "Indexed objects not in the pack: 1, objects in the pack with an unindexed chunk id: 1." in output
     assert "Archive consistency check complete, problems found." in output
 
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         stored = repository.chunks[chunk_id]
         assert (stored.pack_id, stored.obj_offset, stored.obj_size) == (entry.pack_id, entry.obj_offset, entry.obj_size)
     cmd(archiver, "check", exit_code=0)
@@ -1494,7 +1494,7 @@ def test_repair_finish_reports_a_missing_written_pack(archiver, monkeypatch):
     assert f"pack {bin_to_hex(pack_id)}: written by the repair, but it is missing." in output
     assert "the chunks index does not match the pack" not in output
     assert "Archive consistency check complete, problems found." in output
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         assert not any(entry.pack_id == pack_id for _, entry in repository.chunks.iteritems())
 
 

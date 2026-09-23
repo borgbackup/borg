@@ -1022,6 +1022,17 @@ jobs:
               sudo python3 -m ensurepip
               sudo python3 -m pip install virtualenv
 
+              # illumos does not overcommit memory: fork() must reserve swap for the
+              # child's entire address space, so the big pytest workers sporadically
+              # fail to spawn subprocesses (borg serve, for the remote_archiver tests)
+              # with ENOMEM "[Errno 12] Not enough space" when the image's small swap
+              # is exhausted (the swap-backed tmpfs /tmp and a ZFS-ARC-squeezed
+              # availrmem eat into it, too). Add a sparse swap zvol so those
+              # reservations have room; it costs nothing unless actually paged to.
+              sudo zfs create -s -V 4G -b $(pagesize) -o primarycache=metadata rpool/swap2
+              sudo swap -a /dev/zvol/dsk/rpool/swap2
+              swap -lh && swap -sh
+
               # On omniOS /tmp is swap-backed tmpfs (small, RAM-bound), so the pip/cargo
               # build temps and the pytest temp tree quickly exhaust it ("no space left on
               # device"). /var/tmp is disk-backed (ZFS), so redirect TMPDIR there.

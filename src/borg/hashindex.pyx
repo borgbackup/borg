@@ -1,11 +1,12 @@
 from collections.abc import MutableMapping
 from collections import namedtuple
+from array import array
 import os
 import struct
 
 from borghash import HashTableNT
 
-from .constants import UNKNOWN_INT32, UNKNOWN_BYTES32
+from .constants import UNKNOWN_INT32, UNKNOWN_BYTES32, CHUNKINDEX_ITER_PACKS_ENTRIES_MAX
 
 
 
@@ -89,6 +90,50 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         for key, value in self.ht.items(prefix_bits=prefix_bits, prefix=prefix):
             if not only_new or (value.flags & self.F_NEW):
                 yield key, self.hide_system_flags(value)
+
+    def iter_packs(self, *, max_entries=CHUNKINDEX_ITER_PACKS_ENTRIES_MAX):
+        """
+        Iterate the index grouped by pack: yield (pack_id, chunk_ids) once per pack, in ascending
+        pack_id order, chunk_ids sorted by the chunks' offsets within that pack.
+
+        Entries with F_PENDING are skipped: their pack location is not resolved yet, they have no pack.
+
+        max_entries: how many entries to hold at a time. The packs are partitioned by the leading bits
+        of their pack id and the index is scanned once per partition, so a lower value means less memory
+        and more scans. Partitioning by pack id puts all entries of a pack into the same partition, so
+        each pack is yielded once and complete. Pack ids are hashes, thus the partitions come out about
+        equally sized; the partition count aims 5% below max_entries, so that a partition only rarely
+        overshoots it (same reasoning as in write_chunkindex_to_repo, #9886). At most the first two pack
+        id bytes are used, so an index of more than 65536 * max_entries entries holds more than
+        max_entries per partition.
+
+        An entry is held as obj_offset << 32 | k_to_idx(chunk_id): 8 bytes rather than the 32 byte chunk
+        id (k_to_idx returns the entry's uint32 slot index), idx_to_k() resolves it back. The index must
+        not be modified while iterating: a delete zeroes the key of its slot, so idx_to_k() would return
+        zeros instead of raising, and an insert can rehash the table the scan below walks.
+        """
+        if max_entries < 1:
+            raise ValueError("max_entries must be >= 1.")
+        ht = self.ht
+        k_to_idx, idx_to_k = ht.k_to_idx, ht.idx_to_k
+        pending = self.F_PENDING
+        target_entries = max_entries - max_entries // 20  # 5% headroom, see above
+        partitions = -(-len(ht) // target_entries)  # == ceil(len(ht) / target_entries)
+        prefix_bits = min((partitions - 1).bit_length(), 16) if partitions > 1 else 0
+        shift = 16 - prefix_bits  # prefix_bits == 0 -> selector >> 16 == 0 == prefix: one partition
+        for prefix in range(2 ** prefix_bits):
+            by_pack = {}
+            for key, entry in ht.items():
+                pack_id = entry.pack_id
+                if (pack_id[0] << 8 | pack_id[1]) >> shift != prefix or entry.flags & pending:
+                    continue
+                records = by_pack.get(pack_id)
+                if records is None:
+                    records = by_pack[pack_id] = array("Q")
+                records.append(entry.obj_offset << 32 | k_to_idx(key))
+            for pack_id in sorted(by_pack):
+                # pop: free the records of each pack as it is yielded.
+                yield pack_id, [idx_to_k(record & 0xFFFFFFFF) for record in sorted(by_pack.pop(pack_id))]
 
     def add(self, key, size):
         v = self.get(key)

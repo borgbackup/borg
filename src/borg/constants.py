@@ -136,6 +136,10 @@ CHUNKINDEX_SMALL_FRAGMENT_CAP = 15
 # How often to restart merging the fragments into a chunk index when a listed fragment vanishes
 # mid-merge (a concurrent repack replaced it). After that, fall back to the slow rebuild from packs.
 CHUNKINDEX_MERGE_ATTEMPTS = 3
+# ChunkIndex.iter_packs() holds at most this many entries at a time, 8 bytes each (~16 bytes including
+# the array growth slack) plus ~150 bytes per pack for the grouping, and does one full scan of the chunk
+# index per max_entries entries it contains.
+CHUNKINDEX_ITER_PACKS_ENTRIES_MAX = 1000000  # ~16MB
 # Marker object in the cache/ namespace: the chunk index is invalid. While it is present, the index/ fragments
 # may be missing entries or point at deleted packs, so the chunk index is rebuilt from the packs on next load
 # and the leftover fragments are deleted.

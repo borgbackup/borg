@@ -91,6 +91,9 @@ class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
         self, mac_key: bytes, enc_key: bytes, iv: int | bytes | None = None, header_len: int = 1, aad_offset: int = 1
     ) -> None: ...
 
+# for tests: the chunk size the AEAD ciphers feed to OpenSSL per update call, see _cipher_update()
+def _set_cipher_update_chunk_size(size: int) -> int: ...
+
 class _AEAD_BASE:
     """Base class for AEAD cipher suites."""
 

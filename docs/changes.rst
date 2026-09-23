@@ -175,15 +175,11 @@ Breaking changes (you must create new repos for b25):
   are also given there as plain text.
 - store hash: use the much faster pure software blake3 hash instead of sha256
   to name content-addressed objects in the store.
+- index and cache store objects are protected by the repository key now:
+  encrypted and authenticated in the encrypting modes, authenticated only in
+  the authenticated modes, #9819, #10235.
 - drop OBJ_VERSION_NO_HEADER_AAD (pack object format v1) support, #9973
-- KeyType: renumber the authenticated-* key types to 0x50 / 0x60
-- the index/ fragments and the cache/checked-packs and cache/referenced-by-archive.*
-  store objects are protected by the repository key now, like the objects in the
-  packs: encrypted and authenticated in the encrypting modes, authenticated only in
-  the authenticated-* modes, #9819, #10235. A corrupt chunk index (a fragment that
-  fails the authentication) aborts the commands that need it, run
-  "borg check --repair" to rebuild it (borg compact and borg repo-compress rebuild
-  it, too).
+- KeyType: renumber the authenticated key types to 0x50 / 0x60
 
 New features:
 
@@ -191,16 +187,17 @@ New features:
 - diff --stats: show a summary of the differences, #796
 - repo-info: show whether the key uses an empty passphrase, #9072
 - the "previously unknown unencrypted repository" warning now says why the repository
-  is considered unencrypted: a none-* / authenticated-* mode (no data encryption) or a
+  is considered unencrypted: an authenticated mode (no data encryption) or a
   repokey with an empty passphrase, #9072
+- mount: support Windows using WinFsp (via mfusepy), #2316
+- import-tar --strip-components: strip leading path components, #6461
+- add the BORG_NEW_PASSCOMMAND and BORG_NEW_PASSPHRASE_FD env vars
 
 Fixes:
 
 - crypto: the AEAD ciphers (AES-OCB, ChaCha20-Poly1305) feed their input to OpenSSL in
-  chunks, so a message of 2 GiB or more does not fail with SystemError (or get
-  truncated above 4 GiB) any more: the OpenSSL update calls take an int length.
+  <= 1GB chunks, to overcome the 32bit size limit of the OpenSSL API.
 - repository: raise DoesNotExist for a missing rest:// repo, #10365
-- extract: do not abort on corrupted chunks, replace them by all-zero data with a warning, #840
 - compact:
 
   - build the chunk index once, not three times
@@ -210,10 +207,15 @@ Fixes:
   - use one chunk index for the checker and the repository, #10364
   - --repair: validate the repository index rebuild with the key, #9901
   - --repair: misc. other improvements and fixes, #8476
-- Repository: don't mask the original exception when unwinding with buffered
+- repository: don't mask the original exception when unwinding with buffered
   chunks
 - treat an empty BORG_ZSTD_MT_WORKERS as unset (an empty value made borg fail)
-- extract: report a failing close() of an extracted file as a warning
+- extract:
+
+  - do not abort on corrupted chunks, replace them with all-zero data and warn, #840
+  - report a failing close() of an extracted file as a warning
+  - refuse to extract into a non-empty directory, #10057
+  - --continue: keep groups of hard links together
 - prepare_subprocess_env: remove all passphrase-related env vars, #6480
 - mount: mfusepy: pass the libfuse options as keyword arguments, fix getattr with a file handle
 - index rebuild: abort cleanly on a corrupt object header, #10122
@@ -223,6 +225,7 @@ Fixes:
   - do not report a merely touched file as modified when the chunker params
     differ, #10351
   - report a file as modified when chunks were reordered or duplicated
+- import-tar: show the stored paths in the file status output
 
 Other changes:
 
@@ -237,13 +240,16 @@ Other changes:
     - bundle only needed botocore models
 
 - compress: reuse the zstd compressor per thread, improving throughput especially
-  for big chunks at high-speed, low-compression zstd levels
-- add_warning: store exceptions given as args as text, not the exception object -
-  reduces memory usage when there are many warnings
+  for big chunks at fast, low-compression zstd levels
+- add_warning: store exceptions given as args as text, not as exception objects,
+  reducing memory usage when there are many warnings
 - check:
 
   - do not reject items with unknown keys, drop item_keys from the manifest
   - resync on any item-key-like first key, not only on known keys
+  - always require the borg key (now needed to access cache and index)
+  - --repair: re-read only the packs the repair wrote, #8466
+  - make the chunk index rebuild interruptible, #10042
 - remove the repository feature flags mechanism (used to be in the manifest,
   but was never really used)
 - security: drop the manifest timestamp replay check (not needed any more)
@@ -254,11 +260,15 @@ Other changes:
   - fix two inaccuracies in the borg diff JSON docs, #7486
   - an empty passphrase can be replaced later with ``borg key change-passphrase``, #9072
   - FAQ about deduplicating related repositories on the filesystem, see #9104
+  - derive the borg passphrase from a YubiKey (challenge-response), #4549
+  - protect the borg passphrase with age (which also supports crypto tokens,
+    TPM, Apple Secure Enclave, ... via age plugins), #4549
 - tests:
 
-  - add an archiver level test for BORG_WORKAROUNDS=authenticated_no_key
+  - add an archiver-level test for BORG_WORKAROUNDS=authenticated_no_key
     (make sure an authenticated mode repository can be read using this
     workaround, even if the key or passphrase is lost)
+  - CI: run the S3 tests against moto instead of MinIO, #10361
 
 
 Version 2.0.0b24 (2026-09-02)
@@ -388,7 +398,7 @@ Other changes:
   - fix OpenSSL, rclone and IV details in internals/security.rst
   - update the mount -o versions example to the current naming
   - fix the man page install command in installation.rst
-  - fix BORG_ASSERT_ID claims about authenticated-* and none-* modes
+  - fix BORG_ASSERT_ID claims about authenticated and none modes
   - point borg delete -a pattern help at the match-archives topic
 
 
@@ -439,7 +449,7 @@ New features:
 - analyze: report deduplicated size of a set of archives, #5741, #9992
 - compression: support zstd's negative ("fast") levels, ``zstd,-1`` .. ``zstd,-128``, #9950.
   They trade compression ratio for speed. Compatible with existing repositories.
-- create --encryption: new none-* and authenticated-* modes, #9104.
+- create --encryption: new none and authenticated modes, #9104.
   Uses either sha256 or blake3, improves authentication and checksumming capabilities.
 - create: --map and --reuse-from for efficient block device snapshot backups.
   Adds the lvm-thin-map.py script to generate input maps from thin_dump XML, see #4363.
@@ -1490,7 +1500,7 @@ Other changes:
   when borg does not need to read borg 1.x repos/archives anymore, after
   users have transferred their archives, even much more can be removed.
 - docs: updated / removed outdated stuff
-- renamed r* commands to repo-*
+- renamed r... commands to repo-...
 
 
 Version 2.0.0b9 (2024-07-20)

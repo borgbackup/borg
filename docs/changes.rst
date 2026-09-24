@@ -201,6 +201,9 @@ Fixes:
 - crypto: the AEAD ciphers (AES-OCB, ChaCha20-Poly1305) feed their input to OpenSSL in
   <= 1GB chunks, to overcome the 32bit size limit of the OpenSSL API.
 - repository: raise DoesNotExist for a missing ssh:// repo, #10365
+- --from-borg1 via ssh:// failed with a borg 1.x "borg serve" (e.g. borg
+  transfer): the legacy client used RPC methods borg 1.x does not have and did
+  not convert the bytes a borg 1.x server sends back.
 - compact:
 
   - build the chunk index once, not three times

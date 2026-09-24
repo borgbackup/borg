@@ -12,7 +12,8 @@ from ..helpers import PathNotAllowed
 from ..helpers import msgpack
 from ..fslocking import Lock, LockFailed
 from ..platformflags import is_win32
-from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod
+from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod, bytes_from_borg1
+from ..manifest import Manifest
 from ..legacy.repository import LegacyRepository, LoggedIO
 from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
 from ..compress import CNONE
@@ -987,3 +988,66 @@ def test_remote_borg_cmd(remote_repository, monkeypatch):
         assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
         monkeypatch.setenv("BORG_RSH", "ssh -i foo")
         assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
+
+
+# A borg 1.x "borg serve", emulated with the legacy server: it has no info, close and get_manifest methods,
+# it packs bytes into the msgpack "raw" type and it closes the repository when the client closes stdin.
+BORG1_SERVE = """
+import msgpack
+from borg.logger import setup_logging
+from borg.legacy import remote
+
+
+class Borg1Msgpack:
+    @staticmethod
+    def packb(o):
+        return msgpack.packb(o, use_bin_type=False)
+
+
+remote.msgpack = Borg1Msgpack
+remote.BORG_VERSION = (1, 4, 5)
+remote.RepositoryServer._legacy_rpc_methods = tuple(
+    m for m in remote.RepositoryServer._legacy_rpc_methods if m not in ("info", "close", "get_manifest")
+)
+setup_logging(is_serve=True)
+server = remote.RepositoryServer(restrict_to_paths=None, restrict_to_repositories=None)
+try:
+    server.serve()
+except AssertionError:
+    # the legacy server expects a close call before stdin gets closed, borg 1.x did not.
+    if server.repository is None:
+        raise
+    server.repository.close()
+"""
+
+
+@pytest.mark.skipif(is_win32, reason="Remote repository does not yet work on Windows.")
+def test_remote_borg1_server(tmp_path, monkeypatch):
+    path = os.fspath(tmp_path / "repository")
+    data = fchunk(b"\xff\xfe not utf-8")
+    with LegacyRepository(path, exclusive=True, create=True) as repository:
+        repository.put(Manifest.MANIFEST_ID, fchunk(b"manifest"))
+        repository.put(H(1), data)
+        repository.commit(compact=False)
+        repository_id = repository.id
+    server = tmp_path / "borg1_serve.py"
+    server.write_text(BORG1_SERVE)
+    monkeypatch.setattr(LegacyRemoteRepository, "borg_cmd", lambda self, args, testing: [sys.executable, str(server)])
+    with LegacyRemoteRepository(Location("ssh://__testsuite__/" + path), exclusive=True) as remote_repository:
+        assert remote_repository.borg1_server
+        assert remote_repository.version == 1
+        assert remote_repository.id == repository_id
+        assert remote_repository.get_manifest() == fchunk(b"manifest")
+        assert remote_repository.get(H(1)) == data
+        assert set(remote_repository.list()) == {Manifest.MANIFEST_ID, H(1)}
+    # the server closed the repository (and released its lock) when the client closed the connection.
+    with LegacyRepository(path, exclusive=True) as repository:
+        assert repository.get(H(1)) == data
+
+
+def test_bytes_from_borg1():
+    # borg 1.x packed bytes into the msgpack "raw" type, which the client unpacks to str.
+    value = (b"\x00\xff\xfe not utf-8", H(1))
+    unpacked = msgpack.unpackb(msgpack.packb(value, use_bin_type=False))
+    assert all(isinstance(v, str) for v in unpacked)
+    assert bytes_from_borg1(unpacked) == value

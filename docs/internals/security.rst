@@ -398,7 +398,9 @@ used:
   index or cache objects of another repository using the same key material. Their names still show
   the archive ids that have a reference cache and that a check ran.
   ``cache/chunkindex-invalid`` is an empty marker object.
-- ``locks/*`` -- the repository locks, not encrypted.
+- ``locks/*`` -- the repository locks are in the key's store object envelope, like the
+  index, and are named by the store hash of the envelope. The store only sees how many
+  lock objects there are and when they were written, not who holds them.
 
 Authorization and transport security come from the transport, not from borg.
 

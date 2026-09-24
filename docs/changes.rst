@@ -178,6 +178,10 @@ Breaking changes (you must create new repos for b25):
 - index and cache store objects are protected by the repository key now:
   encrypted and authenticated in the encrypting modes, authenticated only in
   the authenticated modes, #9819, #10235.
+- repository lock objects are protected by the repository key now, like the index
+  and cache store objects, #8386. As locking needs the key, borg asks for the
+  passphrase before waiting for the lock, and break-lock and repo-delete (also
+  with --force) need the key, too.
 - drop OBJ_VERSION_NO_HEADER_AAD (pack object format v1) support, #9973
 - KeyType: renumber the authenticated key types to 0x50 / 0x60
 - ssh:// repository URLs access current repositories via REST over ssh

@@ -65,7 +65,7 @@ If you only back up your own files, run it as your normal user (i.e. not root).
 
 For a local repository always use the same user to invoke borg.
 
-For a remote repository: always use e.g., rest://borg@remote_host/path/to/repo
+For a remote repository: always use e.g., ssh://borg@remote_host/path/to/repo
 (Borg connects via ssh and runs ``borg serve --rest`` on the remote). You can use
 this from different local users; the remote user running borg and accessing the
 repo will always be `borg`.
@@ -147,7 +147,7 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
     # Setting this, so the repo does not need to be given on the commandline.
     # One slash after the host means: relative to the remote login directory,
     # so this is ~/backup/main of the remote "username" user:
-    export BORG_REPO=rest://username@example.com:2022/backup/main
+    export BORG_REPO=ssh://username@example.com:2022/backup/main
 
     # See the section "Passphrase notes" for more infos.
     export BORG_PASSPHRASE='XYZl0ngandsecurepa_55_phrasea&&123'
@@ -394,21 +394,22 @@ Remote repositories
 
 Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
-is installed on the remote host, in which case a ``rest://`` repository URL is
+is installed on the remote host, in which case an ``ssh://`` repository URL is
 used. Borg connects via SSH and runs ``borg serve --rest`` on the remote host,
 which serves the repository talking HTTP over stdio::
 
-  $ borg -r rest://user@hostname:port/path/to/repo repo-create ...
+  $ borg -r ssh://user@hostname:port/path/to/repo repo-create ...
 
 Note: Please see the usage chapter for a full documentation of repo URLs. Also
 see :ref:`ssh_configuration` for recommended settings to avoid disconnects and hangs.
 
 .. note::
 
-   The legacy ``ssh://`` transport, served by ``borg serve`` on the remote host,
-   is now only used to access legacy borg 1.x (v1) repositories (e.g. via
-   ``borg transfer --from-borg1 --other-repo ssh://...``). For current
-   repositories, use a ``rest://`` repository as shown above.
+   An ``ssh://`` repository URL is also used to access legacy borg 1.x (v1)
+   repositories on a remote host, e.g. via
+   ``borg transfer --from-borg1 --other-repo ssh://...``. Due to ``--from-borg1``,
+   Borg then talks the legacy borg 1.x protocol to ``borg serve`` on the remote
+   host, which may also be a borg 1.x ``borg serve``.
 
 If it is not possible to install Borg on the remote host,
 it is still possible to use the remote host to store a repository by
@@ -426,7 +427,7 @@ Other kinds of repositories
 ---------------------------
 
 Due to using the `borgstore` project, borg also supports other kinds of
-(remote) repositories besides `file:` and `rest:`:
+(remote) repositories besides `file:` and `ssh:`:
 
 - sftp: the borg client will directly talk to an sftp server.
   This does not require borg being installed on the sftp server.
@@ -572,7 +573,7 @@ Example with **borg extract**:
 Difference when using a **remote borg backup server**:
 
 It is basically all the same as with the local repository, but you need to
-refer to the repo using a ``rest://`` URL (Borg connects via ssh and runs
+refer to the repo using an ``ssh://`` URL (Borg connects via ssh and runs
 ``borg serve --rest`` on the remote host).
 
 In the given example, ``borg`` is the user name used to log into the machine
@@ -587,6 +588,6 @@ case if unattended, automated backups were done).
 
 ::
 
-    borg -r rest://borg@backup.example.org:2222/path/to/repo mount /mnt/borg
+    borg -r ssh://borg@backup.example.org:2222/path/to/repo mount /mnt/borg
     # or
-    borg -r rest://borg@backup.example.org:2222/path/to/repo extract archive
+    borg -r ssh://borg@backup.example.org:2222/path/to/repo extract archive

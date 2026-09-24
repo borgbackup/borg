@@ -180,6 +180,9 @@ Breaking changes (you must create new repos for b25):
   the authenticated modes, #9819, #10235.
 - drop OBJ_VERSION_NO_HEADER_AAD (pack object format v1) support, #9973
 - KeyType: renumber the authenticated key types to 0x50 / 0x60
+- ssh:// repository URLs access current repositories via REST over ssh
+  (served by a remote "borg serve"), #9765. With --from-borg1, they access
+  legacy borg 1.x repositories via the legacy protocol (as before).
 
 New features:
 
@@ -197,7 +200,7 @@ Fixes:
 
 - crypto: the AEAD ciphers (AES-OCB, ChaCha20-Poly1305) feed their input to OpenSSL in
   <= 1GB chunks, to overcome the 32bit size limit of the OpenSSL API.
-- repository: raise DoesNotExist for a missing rest:// repo, #10365
+- repository: raise DoesNotExist for a missing ssh:// repo, #10365
 - compact:
 
   - build the chunk index once, not three times

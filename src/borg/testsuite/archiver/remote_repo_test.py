@@ -63,7 +63,7 @@ def test_rclone_repo_basics(archiver, tmp_path):
 def test_rest_repo_basics(archiver, monkeypatch):
     create_regular_file(archiver.input_path, "file1", size=100 * 1024)
     create_regular_file(archiver.input_path, "file2", size=10 * 1024)
-    # A rest:// repo over ssh starts "borg serve --rest" on the remote. For this test the remote is
+    # An ssh:// repo starts "borg serve --rest" on the remote. For this test the remote is
     # localhost (see CI BORG_TEST_REST_REPO), so point BORG_REMOTE_PATH at the borg under test
     # (an absolute path that is valid locally) unless the caller already set it.
     if not os.environ.get("BORG_REMOTE_PATH"):

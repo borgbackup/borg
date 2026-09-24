@@ -8,9 +8,9 @@ locations and passphrases first:
 
 ::
 
-    # The destination is a Borg 2 repository: use a rest:// (or local) location,
-    # ssh:// is only supported for the legacy Borg 1.x source repository.
-    export BORG_REPO=rest://borg2@borgbackup/tests/b20
+    # The destination is a Borg 2 repository, the source is a legacy Borg 1.x repository
+    # (accessed via the legacy protocol due to --from-borg1).
+    export BORG_REPO=ssh://borg2@borgbackup/tests/b20
     export BORG_PASSPHRASE='your-borg2-repo-passphrase'
     export BORG_OTHER_REPO=ssh://borg2@borgbackup/./tests/b1x
     export BORG_OTHER_PASSPHRASE='your-borg1-repo-passphrase'

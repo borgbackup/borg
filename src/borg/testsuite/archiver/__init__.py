@@ -140,7 +140,7 @@ def generate_archiver_tests(metafunc, kinds: str):
     #
     # Picking "kinds" (see #9324, testsuite speedup):
     # - "local" should always be included.
-    # - "remote" exercises the rest:// transport (it spawns a borgstore-server-rest subprocess and does
+    # - "remote" exercises the ssh:// transport (it spawns a "borg serve --rest" subprocess and does
     #   synchronous HTTP-over-stdio round trips per object), so a remote run costs several times its local
     #   twin. Only add "remote" where a backend genuinely branches its implementation per transport, and
     #   that branch is not already exercised by another remote-tested file:

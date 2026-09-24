@@ -49,11 +49,11 @@ files they will be included in this set.
 
 The ``command`` keyword forces execution of the specified command
 upon login. This must be ``borg serve --rest``: ``--rest`` serves a current
-repository (the server side of a ``rest://`` repository URL), while ``borg serve``
-without it serves a legacy borg 1.x repository using the legacy RPC protocol.
-The client cannot supply ``--rest`` itself - the mode is deliberately pinned by
-the forced command - so a forced command without ``--rest`` locks out all clients
-using current (``rest://``) repositories.
+repository (the server side of an ``ssh://`` repository URL), while ``borg serve``
+without it serves a legacy borg 1.x repository using the legacy RPC protocol
+(used by ``--from-borg1``). The client cannot supply ``--rest`` itself - the mode
+is deliberately pinned by the forced command - so a forced command without
+``--rest`` locks out all clients using current repositories.
 
 The ``--restrict-to-repository`` option permits access to exactly **one**
 repository. It can be given multiple times to permit access to more than
@@ -77,12 +77,12 @@ come from the forced command.
 The user therefore selects the repository through the path in the repository
 URL::
 
-  borg -r rest://<user>@<host>/repository repo-list
+  borg -r ssh://<user>@<host>/repository repo-list
 
 A path with a single leading slash is relative to the directory ssh logs into
 (the user's home directory), so with the forced command shown above,
-``rest://<user>@<host>/repository`` and
-``rest://<user>@<host>//home/<user>/repository`` address the same repository.
+``ssh://<user>@<host>/repository`` and
+``ssh://<user>@<host>//home/<user>/repository`` address the same repository.
 
 Refer to the `sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>`_
 man page for more details on SSH options.

@@ -149,73 +149,8 @@ class TestLocationWithoutEnv:
             "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='relative/path')"
         )
 
-    def test_rest(self, monkeypatch):
-        monkeypatch.delenv("BORG_REPO", raising=False)
-        assert (
-            repr(Location("rest://user@host:1234//absolute/path"))
-            == "Location(proto='rest', user='user', pass=None, host='host', port=1234, path='/absolute/path')"
-        )
-        assert (
-            repr(Location("rest://user@host:1234/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='host', port=1234, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest://user@host/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='host', port=None, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest://user@[::]:1234/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='::', port=1234, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest://user@[::]/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='::', port=None, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest://user@[2001:db8::]:1234/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='2001:db8::', port=1234, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest://user@[2001:db8::]/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='2001:db8::', port=None, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest://user@[2001:db8::c0:ffee]:1234/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='2001:db8::c0:ffee', port=1234, path='relative/path')"  # noqa: E501
-        )
-        assert (
-            repr(Location("rest://user@[2001:db8::c0:ffee]/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='2001:db8::c0:ffee', port=None, path='relative/path')"  # noqa: E501
-        )
-        assert (
-            repr(Location("rest://user@[2001:db8::192.0.2.1]:1234/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='2001:db8::192.0.2.1', port=1234, path='relative/path')"  # noqa: E501
-        )
-        assert (
-            repr(Location("rest://user@[2001:db8::192.0.2.1]/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, host='2001:db8::192.0.2.1', port=None, path='relative/path')"  # noqa: E501
-        )
-        assert (
-            repr(Location("rest://user@[2a02:0001:0002:0003:0004:0005:0006:0007]/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, "
-            "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest://user@[2a02:0001:0002:0003:0004:0005:0006:0007]:1234/relative/path"))
-            == "Location(proto='rest', user='user', pass=None, "
-            "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest:///relative/path"))
-            == "Location(proto='rest', user=None, pass=None, host=None, port=None, path='relative/path')"
-        )
-        assert (
-            repr(Location("rest:////absolute/path"))
-            == "Location(proto='rest', user=None, pass=None, host=None, port=None, path='/absolute/path')"
-        )
-
     def test_server_side_path_is_posix(self, monkeypatch):
-        # ssh:// and rest:// paths live on the *server*, so they must be normalized as POSIX
+        # ssh:// paths live on the *server*, so they must be normalized as POSIX
         # paths, no matter what the client runs on. A Windows client used to normalize them
         # with ntpath, turning "/path/to/repo" into "\path\to\repo"; ssh passes the command
         # through the remote shell, which ate the backslashes and left "pathtorepo", see #10199.
@@ -226,31 +161,29 @@ class TestLocationWithoutEnv:
         # Faking a Windows client by swapping in ntpath tests this on any platform instead.
         monkeypatch.delenv("BORG_REPO", raising=False)
         monkeypatch.setattr(parseformat.os, "path", ntpath)
-        for proto in ("ssh", "rest"):
-            assert Location(f"{proto}://user@host/relative/path").path == "relative/path"
-            assert Location(f"{proto}://user@host//absolute/path").path == "/absolute/path"
-            assert Location(f"{proto}://user@host:1234//absolute/path").path == "/absolute/path"
-            assert Location(f"{proto}://user@host//absolute/./x/../path").path == "/absolute/path"
-            assert (
-                Location(f"{proto}://user@host//absolute/path").canonical_path()
-                == f"{proto}://user@host//absolute/path"
-            )
+        assert Location("ssh://user@host/relative/path").path == "relative/path"
+        assert Location("ssh://user@host//absolute/path").path == "/absolute/path"
+        assert Location("ssh://user@host:1234//absolute/path").path == "/absolute/path"
+        assert Location("ssh://user@host//absolute/./x/../path").path == "/absolute/path"
+        assert Location("ssh://user@host//absolute/path").canonical_path() == "ssh://user@host//absolute/path"
 
     @pytest.mark.parametrize(
         "location",
         [
-            "rest://host",  # no path
-            "rest://host/",  # empty path
-            "rest://user@host/",  # empty path
-            "rest://user@host:1234/",  # empty path
-            "rest://",  # nothing at all
-            "rest:/host/path",  # only one slash after the scheme
-            "rest:host/path",  # no slash after the scheme
+            "ssh://host",  # no path
+            "ssh://host/",  # empty path
+            "ssh://user@host/",  # empty path
+            "ssh://user@host:1234/",  # empty path
+            "ssh:///path",  # no host
+            "ssh:////absolute/path",  # no host
+            "ssh://",  # nothing at all
+            "ssh:/host/path",  # only one slash after the scheme
+            "ssh:host/path",  # no slash after the scheme
         ],
     )
-    def test_rest_invalid(self, monkeypatch, location):
-        # a malformed rest:// URL must be rejected - it used to be taken for a local path
-        # (relative to the cwd) and then failed with a confusing error, see #10215.
+    def test_ssh_invalid(self, monkeypatch, location):
+        # a malformed ssh:// URL must be rejected - it must not be taken for a local path
+        # (relative to the cwd) and then fail with a confusing error, see #10215.
         monkeypatch.delenv("BORG_REPO", raising=False)
         with pytest.raises(ValueError, match="Invalid location format"):
             Location(location)
@@ -258,7 +191,7 @@ class TestLocationWithoutEnv:
     def test_invalid_location_hint(self, monkeypatch):
         # an unparsable URL of a scheme we parse ourselves tells the user the accepted forms.
         monkeypatch.delenv("BORG_REPO", raising=False)
-        for location, scheme in [("rest://host/", "rest"), ("ssh://host/", "ssh"), ("file://rel", "file")]:
+        for location, scheme in [("ssh://host/", "ssh"), ("file://rel", "file")]:
             with pytest.raises(ValueError, match=f"Expected: {scheme}:"):
                 Location(location)
 
@@ -267,9 +200,9 @@ class TestLocationWithoutEnv:
         # a local path starting with a scheme name is not mistaken for a URL if it is made
         # unambiguous with "./" or by giving it as an absolute path.
         monkeypatch.delenv("BORG_REPO", raising=False)
-        assert Location("./rest:/host").proto == "file"
-        assert Location("./rest:/host").path == os.path.abspath("rest:/host")
-        assert Location("/abs/rest:/host").path == "/abs/rest:/host"
+        assert Location("./ssh:/host").proto == "file"
+        assert Location("./ssh:/host").path == os.path.abspath("ssh:/host")
+        assert Location("/abs/ssh:/host").path == "/abs/ssh:/host"
 
     # For the protocols handled (parsed + validated) by borgstore itself, borg only detects
     # the scheme and passes the raw URL through; it no longer extracts user/host/port/path.
@@ -395,10 +328,6 @@ class TestLocationWithoutEnv:
             "ssh://host/relative/path",
             "ssh://host//absolute/path",
             "ssh://user@host:1234/relative/path",
-            "rest://host/relative/path",
-            "rest://host//absolute/path",
-            "rest://user@host:1234/relative/path",
-            "rest:///relative/path",
             "sftp://host/relative/path",
             "sftp://host//absolute/path",
             "sftp://user@host:1234/relative/path",

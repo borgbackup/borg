@@ -633,9 +633,10 @@ class LegacyRemoteRepository:
         """actual remoting is done via self.call in the @api decorator"""
 
 
-# borg serve: borg only serves legacy (borg 1.x / v1) repositories over ssh:// now (current
-# repositories use rest://). The legacy client above (LegacyRemoteRepository) spawns "borg serve"
-# on the remote host; this server keeps the legacy RPC method allowlist and opens LegacyRepository.
+# borg serve (without --rest): serves legacy (borg 1.x / v1) repositories via the legacy RPC protocol
+# (current repositories are served via REST by "borg serve --rest"). The legacy client above
+# (LegacyRemoteRepository) spawns "borg serve" on the remote host; this server keeps the legacy RPC
+# method allowlist and opens LegacyRepository.
 
 
 class RepositoryServer:  # pragma: no cover
@@ -817,7 +818,7 @@ class RepositoryServer:  # pragma: no cover
         return path
 
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, v1_legacy=False):
-        # borg only serves legacy (v1) repositories now; current repositories are accessed via rest://.
+        # this server only serves legacy (v1) repositories; current repositories are served via REST.
         self.RepoCls = LegacyRepository
         self.rpc_methods = self._legacy_rpc_methods
         logging.debug("Resolving repository path %r", path)

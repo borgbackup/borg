@@ -282,7 +282,7 @@ jobs:
         sudo chmod o+x "$HOME"
         # Export SFTP test URL for tox via GITHUB_ENV
         echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
-        echo "BORG_TEST_REST_REPO=rest://sftpuser@localhost:22/borg/rest-repo" >> $GITHUB_ENV
+        echo "BORG_TEST_REST_REPO=ssh://sftpuser@localhost:22/borg/rest-repo" >> $GITHUB_ENV
 
     - name: Install and start moto S3 server (test only)
       # The S3 tests run against moto in server mode: it comes from PyPI (pinned in

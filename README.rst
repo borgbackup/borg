@@ -102,7 +102,7 @@ Main features
 **Off-site backups**
     Borg can store data on any remote host accessible via misc. protocols:
 
-    * ``rest://`` (REST-http-over-stdio-over-ssh) and ``http(s)://``
+    * ``ssh://`` (REST-http-over-stdio-over-ssh) and ``http(s)://``
       (REST-http-over-tcp). Significant performance gains can be achieved with
       these by having a remote agent (borg must be installed on the repo server).
     * ``sftp://``

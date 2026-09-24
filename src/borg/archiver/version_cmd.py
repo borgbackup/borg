@@ -38,9 +38,9 @@ class VersionMixIn:
         This command displays the Borg client and server versions.
 
         For current repositories the client code directly accesses the repository (also for
-        rest:// repositories), so the client version is shown as the server version, too.
+        ssh:// repositories), so the client version is shown as the server version, too.
 
-        If a legacy (borg 1.x / v1) repository is given via ssh: together with --from-borg1,
+        If a legacy (borg 1.x / v1) repository is given via ssh:// together with --from-borg1,
         the remote Borg is queried, and its version is displayed as the server version.
 
         Examples::

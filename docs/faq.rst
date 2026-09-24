@@ -860,7 +860,7 @@ Please see the next question.
 Why does Borg disconnect or hang when backing up to a remote server?
 --------------------------------------------------------------------
 
-Communication with the remote server (e.g. using a ``rest://user@host/path`` repo URL)
+Communication with the remote server (e.g. using an ``ssh://user@host/path`` repo URL)
 is tunneled through an SSH connection. This can lead to some issues that would not
 occur during a local backup:
 
@@ -1142,7 +1142,7 @@ borgstore, which Borg uses for repository access, can limit the transfer rate::
 
 Pros:
 
-- works for all backends (``sftp://``, ``rest://``, ``rclone:``, ``s3://``, ...).
+- works for all backends (``sftp://``, ``ssh://``, ``rclone:``, ``s3://``, ...).
 - limits both directions.
 - needs no additional software.
 
@@ -1163,7 +1163,7 @@ backend call.
 Using pv on the ssh connection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For ``rest://`` repositories, Borg connects via ssh, so the transfer can be
+For ``ssh://`` repositories, Borg connects via ssh, so the transfer can be
 limited with pipeviewer_. Put a ``pv`` on each side of the connection using an
 ssh ``ProxyCommand`` (this needs ``nc``), e.g. in ``~/.ssh/config``::
 
@@ -1189,7 +1189,7 @@ Pros:
 
 Cons:
 
-- only works for ``rest://`` repositories. ``sftp://`` does not run an external
+- only works for ``ssh://`` repositories. ``sftp://`` does not run an external
   ssh command (borgstore uses paramiko and creates the connection itself) and
   a ``ProxyCommand`` in ``~/.ssh/config`` is not used there.
 - needs ``pv`` and ``nc``.

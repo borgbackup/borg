@@ -8,8 +8,8 @@ Borg now uses the ``borgstore`` package to implement the key/value store it
 uses for the repository.
 
 For a local repository (or a locally mounted network filesystem) it uses the
-``file:`` store (posixfs backend). For a remote repository it uses the ``rest:``
-store, talking to a ``borg serve --rest`` process on the remote side (which in
+``file:`` store (posixfs backend). For a remote ``ssh://`` repository it uses the
+REST store, talking to a ``borg serve --rest`` process on the remote side (which in
 turn uses borgstore there). Other backends (``sftp:``, ``rclone:``, ``s3:``/
 ``b2:``) do not need a filesystem on the repository side at all.
 

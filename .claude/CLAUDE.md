@@ -131,13 +131,13 @@ so the repository storage layer never sees plaintext or has any notion of files/
 - **`repository.py`** — `Repository`, a key→value object store built on top of **borgstore**
   (`borgstore.store.Store`). Keys are 32-byte object IDs; the repo doesn't know what an "archive" or
   "file" is. borgstore provides the actual storage backends and transport: local filesystem,
-  `ssh://` (borgstore ssh backend, optionally reusing `BORGSTORE_RSH`), and `rest://` (borgstore REST
-  server, served by `borg serve --rest`). This replaces the borg 1.x segment/journal format — read
+  `ssh://` (borgstore REST backend talking HTTP over stdio over ssh to a remote `borg serve`,
+  optionally reusing `BORGSTORE_RSH`), `sftp://`, `http(s)://`, `rclone:`, `s3:`/`b2:`. This replaces the borg 1.x segment/journal format — read
   `docs/internals/data-structures.rst` before touching repository/object/format code.
-- **`archiver/serve_cmd.py`** — `borg serve` provides the server side for remote repositories: the
-  default mode serves a repository over stdio to a connecting borgstore ssh backend, and
-  `borg serve --rest` runs the borgstore REST server. (There is no separate `remote.py` / custom RPC
-  layer anymore — borgstore owns the client/server transport.)
+- **`archiver/serve_cmd.py`** — `borg serve` provides the server side for `ssh://` repositories:
+  `borg serve --rest` runs the borgstore REST server on stdio for a current repository, plain
+  `borg serve` serves a legacy borg 1.x repository via the legacy RPC protocol (`--from-borg1`,
+  `legacy/remote.py`).
 - **`crypto/key.py`, `crypto/low_level.pyx`** — encryption/authentication (AEAD: AES-256-OCB or
   ChaCha20-Poly1305; ids via HMAC-SHA256 or BLAKE3) and key file handling (keyfile vs repokey
   storage). The `id_hash` used for deduplication depends on the key/encryption mode.
@@ -168,7 +168,7 @@ so the repository storage layer never sees plaintext or has any notion of files/
   progress reporting, filesystem helpers); check here before writing a new utility, it may exist.
 
 **Client/server split:** most `do_*` archiver commands operate against a local or remote `Repository`
-transparently — the choice of local vs. `ssh://`/`rest://` is resolved by `Location` parsing in
+transparently — the choice of local vs. `ssh://` etc. is resolved by `Location` parsing in
 `helpers/` and borgstore backend selection, and doesn't otherwise change command logic. `borg serve`
 on the remote end provides the server side.
 

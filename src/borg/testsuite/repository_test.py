@@ -8,6 +8,7 @@ from collections import namedtuple
 
 import pytest
 from borghash import HashTableNT
+from borgstore.backends.rest import REST
 
 from ..crypto.key import store_hash
 from .. import repository as repository_module
@@ -15,7 +16,7 @@ from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_ch
 from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
 from ..crypto.key import AESOCBKey, AuthenticatedKey, Blake3AuthenticatedKey, CHPOKey
-from ..helpers import IntegrityError, Location, bin_to_hex
+from ..helpers import Error, IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
 from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
@@ -32,20 +33,20 @@ def use_test_key_on_open(monkeypatch):
 
 
 def test_rest_serve_command_local():
-    # rest:// without a host runs "borg serve --rest" locally, talking over stdio.
-    cmd = rest_serve_command(Location("rest:////tmp/repo"))
+    # ssh:// with the special host "__testsuite__" runs "borg serve --rest" locally, talking over stdio.
+    cmd = rest_serve_command(Location("ssh://__testsuite__//tmp/repo"))
     assert "ssh" not in cmd
     assert cmd[0] == sys.executable
     assert cmd[-4:] == ["serve", "--rest", "--backend", "FILE:/tmp/repo"]
 
 
 def test_rest_serve_command_ssh(monkeypatch):
-    # rest:// with a host is reached via ssh, running "borg serve --rest" remotely.
+    # ssh:// with a host is reached via ssh, running "borg serve --rest" remotely.
     # we override BORGSTORE_RSH to a simple "ssh" here to simplify testing.
     # without that, borgstore 0.5.5+ would also set some ssh options via cmdline.
     monkeypatch.setenv("BORGSTORE_RSH", "ssh")
     monkeypatch.delenv("BORG_REMOTE_PATH", raising=False)
-    cmd = rest_serve_command(Location("rest://user@host/repo/path"))
+    cmd = rest_serve_command(Location("ssh://user@host/repo/path"))
     assert cmd[:2] == ["ssh", "user@host"]
     assert cmd[-5:] == ["borg", "serve", "--rest", "--backend", "FILE:repo/path"]
 
@@ -67,15 +68,52 @@ def test_propagate_rsh(monkeypatch):
     assert "BORGSTORE_RSH" not in os.environ
 
 
-@pytest.mark.parametrize("proto", ["file", "rest"])
+@pytest.mark.parametrize("v1_legacy", [False, True])
+def test_get_repository_ssh(monkeypatch, v1_legacy):
+    # ssh:// is a current repository served via REST, or a legacy repository with --from-borg1 (#9765).
+    from ..archiver._common import get_repository
+    from ..legacy import remote as legacy_remote
+
+    class FakeLegacyRemoteRepository:
+        def __init__(self, location, **kw):
+            self._location = location
+
+    monkeypatch.setattr(legacy_remote, "LegacyRemoteRepository", FakeLegacyRemoteRepository)
+    location = Location("ssh://user@host/repo/path")
+    repository = get_repository(
+        location, create=False, exclusive=False, lock_wait=1, lock=True, args=None, v1_legacy=v1_legacy
+    )
+    assert type(repository) is (FakeLegacyRemoteRepository if v1_legacy else Repository)
+    assert repository._location is location
+
+
+@pytest.mark.parametrize("proto", ["file", "ssh"])
 def test_open_nonexistent_repository(tmp_path, proto):
-    # A missing repository raises Repository.DoesNotExist, also via the rest:// transport (#10365).
+    # A missing repository raises Repository.DoesNotExist, also via the ssh:// transport (#10365).
     path = os.fspath(tmp_path / "nonexistent")
-    location = Location(path if proto == "file" else f"rest:///{path}")
+    location = Location(path if proto == "file" else f"ssh://__testsuite__/{path}")
     with pytest.raises(Repository.DoesNotExist):
         with Repository(location, exclusive=True):
             pass
     assert not os.path.exists(path)
+
+
+@pytest.mark.parametrize("create", [False, True])
+def test_remote_serve_fails_to_start(tmp_path, monkeypatch, create):
+    # e.g. a borg 1.x "borg serve" on the remote host does not know --rest: the user gets an error
+    # showing the server's stderr and a hint, not a traceback of the dead store's close().
+    def failing_rest_backend(location):
+        error = "borg serve: error: unrecognized arguments: --rest"
+        command = [sys.executable, "-c", f"import sys; sys.stderr.write({error!r} + '\\n'); sys.exit(2)"]
+        # no waiting between the reconnect attempts, to keep the test fast.
+        return REST(base_url="http://stdio-backend", command=command, reconnect_wait=0)
+
+    monkeypatch.setattr(repository_module, "build_rest_backend", failing_rest_backend)
+    location = Location("ssh://__testsuite__/" + os.fspath(tmp_path / "repository"))
+    with pytest.raises(Error, match="use --from-borg1") as exc_info:
+        with Repository(location, exclusive=True, create=create):
+            pass
+    assert "unrecognized arguments: --rest" in str(exc_info.value)
 
 
 @pytest.fixture()

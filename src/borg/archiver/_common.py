@@ -32,23 +32,17 @@ logger = create_logger(__name__)
 def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_legacy, allow_incomplete=False):
     # create_config=False: when creating, the command (repo-create) writes the repository config itself,
     # once the key exists, see Repository.create(). For an existing repository, the flag is irrelevant.
-    if location.proto == "ssh":
-        if v1_legacy:
-            from ..legacy.remote import LegacyRemoteRepository
+    if location.proto == "ssh" and v1_legacy:
+        # legacy borg 1.x repository, served by a remote "borg serve" via the legacy RPC protocol
+        from ..legacy.remote import LegacyRemoteRepository
 
-            repository = LegacyRemoteRepository(
-                location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
-            )
-        else:
-            raise Error(
-                "ssh:// is no longer supported for current repositories; use rest:// instead "
-                "(it can tunnel over ssh). ssh:// remains available only for legacy v1 repositories "
-                "via --from-borg1."
-            )
+        repository = LegacyRemoteRepository(
+            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
+        )
 
     elif (
-        location.proto in ("rest", "sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_legacy
-    ):  # stuff directly supported by borgstore
+        location.proto in ("ssh", "sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_legacy
+    ):  # stuff directly supported by borgstore (ssh: REST via a remote "borg serve --rest")
         repository = Repository(
             location,
             create=create,

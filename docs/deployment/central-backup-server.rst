@@ -10,11 +10,10 @@ clients.
 
 .. note::
 
-   This example predates Borg 2 and uses the legacy ``ssh://`` transport (served
-   by ``borg serve``) and ``borg init``. With Borg 2, the ``ssh://`` transport is
-   only used for legacy borg 1.x (v1) repositories; for current repositories use a
-   ``rest://`` repository instead (Borg connects via ssh and runs a borgstore REST
-   server on the remote host), and use ``borg repo-create`` instead of ``borg init``.
+   This example predates Borg 2 and uses ``borg init`` and ``borg serve``. With
+   Borg 2, use ``borg repo-create`` instead of ``borg init``, and ``borg serve --rest``
+   instead of ``borg serve`` in the forced command (for ``ssh://`` repositories,
+   Borg connects via ssh and runs ``borg serve --rest`` on the remote host).
 
 Machines
 --------

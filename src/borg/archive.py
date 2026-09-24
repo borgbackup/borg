@@ -2689,8 +2689,32 @@ class ArchiveChecker:
                     return False, "missing required keys: " + list_keys_safe(required_item_keys - keys)
                 return True, ""
 
+            def robust_item_ids():
+                """Returns the item metadata chunk ids, skipping missing or corrupted item_ptrs chunks."""
+                item_ids = []
+                for ptr_no, ptr_id in enumerate(archive.item_ptrs):
+                    cid = bin_to_hex(ptr_id)
+                    if ptr_id not in self.chunks:
+                        self.error_found = True
+                        logger.error(f"Archive {archive.name}: item pointers chunk {ptr_no} {cid} is missing!")
+                        continue
+                    try:
+                        cdata = self.repository.get(ptr_id)
+                        _, data = self.repo_objs.parse(ptr_id, cdata, ro_type=ROBJ_ARCHIVE_CHUNKIDS)
+                        item_ids.extend(msgpack.unpackb(data))
+                    except IntegrityErrorBase as integrity_error:
+                        self.error_found = True
+                        logger.error(
+                            f"Archive {archive.name}: item pointers chunk {ptr_no} {cid} is corrupted: "
+                            f"{integrity_error}"
+                        )
+                    except msgpack.UnpackException:
+                        self.error_found = True
+                        logger.error(f"Archive {archive.name}: item pointers chunk {ptr_no} {cid} is not unpackable.")
+                return item_ids
+
             i = 0
-            archive_items = archive_get_items(archive, repo_objs=self.repo_objs, repository=self.repository)
+            archive_items = robust_item_ids()
             for state, items in groupby(archive_items, missing_chunk_detector):
                 items = list(items)
                 if state % 2:

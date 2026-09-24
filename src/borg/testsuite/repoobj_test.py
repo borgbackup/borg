@@ -178,7 +178,7 @@ def test_parse_header(key):
 @pytest.mark.parametrize(
     "damage, problem",
     [
-        ("truncated", "object too small: expected at least 49 header bytes, got 48"),
+        ("truncated", "object too small: expected at least 49 header bytes, got 48 bytes"),
         ("magic", "no object header"),
         ("version", "unsupported object version 238"),
     ],

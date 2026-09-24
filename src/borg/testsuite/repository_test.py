@@ -1528,17 +1528,20 @@ def test_get_read_data_false_large_meta(tmp_path):
 @pytest.mark.parametrize(
     "damage, problem",
     [
-        ("truncated", "object too small: expected at least 49 header bytes, got 48"),
+        ("truncated", "object too small: expected at least 49 header bytes, got 48 bytes"),
         ("magic", "no object header"),
         ("version", "unsupported object version 238"),
+        ("truncated_meta", "object too small: expected 4 metadata bytes, got 2 bytes"),
     ],
-    ids=["truncated", "magic", "version"],
+    ids=["truncated", "magic", "version", "truncated_meta"],
 )
-def test_get_read_data_false_rejects_header(tmp_path, damage, problem):
-    # get(read_data=False) sizes its metadata read by meta_size, so it checks the header first.
+def test_get_read_data_false_rejects_damaged_object(tmp_path, damage, problem):
+    # get(read_data=False) raises IntegrityError for an invalid header or truncated metadata.
     chunk = bytearray(fchunk(b"DATA", meta=b"META"))
     if damage == "truncated":
         chunk = chunk[: RepoObj.obj_header.size - 1]
+    elif damage == "truncated_meta":
+        chunk = chunk[: RepoObj.obj_header.size + 2]
     elif damage == "magic":
         chunk[0] ^= 0xFF
     else:
@@ -3149,7 +3152,10 @@ def test_superseded_gap_ranges_warns_where_it_keeps_bytes(tmp_path, caplog):
         f"pack {pack_hex}: no object header at offset {len(rejected)} in a gap, "
         f"keeping the remaining {len(garbage)} bytes of the gap." in caplog.text
     )
-    assert f"pack {pack_hex}: 3 bytes, too few for an object header, at offset 0 in a gap" in caplog.text
+    assert (
+        f"pack {pack_hex}: object too small: expected at least {RepoObj.obj_header.size} header bytes, got 3 bytes "
+        f"at offset 0 in a gap" in caplog.text
+    )
 
 
 def test_superseded_gap_ranges_ends_at_an_object_reaching_past_the_gap(tmp_path, caplog):

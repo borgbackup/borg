@@ -1093,6 +1093,22 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
     assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
 
 
+def test_find_lost_archives_skips_chunk_with_corrupt_object_header(archivers, request):
+    """--find-lost-archives logs and skips an indexed chunk whose object header has a bad magic."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        chunk_id, entry = next(iter(repository.chunks.items()))
+        key = "packs/" + bin_to_hex(entry.pack_id)
+        repository.store_store(key, corrupt(repository.store_load(key), entry.obj_offset))
+    # without --repair, the archives check uses the stored chunks index, which still lists the damaged chunk.
+    output = cmd(archiver, "check", "--archives-only", "--find-lost-archives", exit_code=1)
+    assert f"Skipping corrupted chunk: Data integrity error: no object header [id {bin_to_hex(chunk_id)}]" in output
+    assert "Archive consistency check complete, problems found." in output
+
+
 def test_check_repair_validates_index_rebuild(archivers, request):
     """--repair leaves an object that fails validation out of the index and keeps the object after it (#9901)."""
     archiver = request.getfixturevalue(archivers)

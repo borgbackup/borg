@@ -80,7 +80,7 @@ class RepoObj:
     ObjHeader = namedtuple("ObjHeader", "magic version chunk_id meta_size data_size")
 
     @classmethod
-    def parse_header(cls, buf: bytes | memoryview) -> tuple:
+    def parse_header(cls, buf: bytes | memoryview) -> tuple["RepoObj.ObjHeader | None", str | None]:
         """Return (ObjHeader, None) if buf starts with a valid object header, (None, problem) otherwise.
 
         buf: object bytes starting at the header, bytes after the header are ignored.
@@ -89,7 +89,7 @@ class RepoObj:
         """
         hdr_size = cls.obj_header.size
         if len(buf) < hdr_size:
-            return None, f"object too small: expected at least {hdr_size} header bytes, got {len(buf)}"
+            return None, f"object too small: expected at least {hdr_size} header bytes, got {len(buf)} bytes"
         hdr = cls.ObjHeader(*cls.obj_header.unpack(buf[:hdr_size]))
         if hdr.magic != OBJ_MAGIC:
             return None, "no object header"
@@ -269,6 +269,7 @@ def object_validator(repo_objs):
     In the "authenticated-*" modes the tag is deterministic and binds an object to its chunk id
     alone. They therefore accept an object that a backed up file contains, at any offset in any pack.
     """
+    hdr_size = RepoObj.obj_header.size
     overhead = repo_objs.key.PAYLOAD_OVERHEAD  # the envelope adds a fixed number of bytes to the payload
 
     def validate(chunk_id, obj):
@@ -285,8 +286,8 @@ def object_validator(repo_objs):
         csize = meta.get("csize")
         if not isinstance(csize, int) or isinstance(csize, bool):  # msgpack unpacks true/false to bool
             return False
-        hdr, _ = RepoObj.parse_header(obj)
-        return hdr.data_size == csize + overhead
+        data_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size])).data_size
+        return data_size == csize + overhead
 
     return validate
 

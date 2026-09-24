@@ -2515,8 +2515,8 @@ class ArchiveChecker:
             if sig_int:
                 break
             pi.show()
-            cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
             try:
+                cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
                 meta = self.repo_objs.parse_meta(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
             except IntegrityErrorBase as exc:
                 logger.error("Skipping corrupted chunk: %s", exc)

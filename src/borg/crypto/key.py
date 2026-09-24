@@ -422,6 +422,10 @@ class KeyBase:
     def encrypt(self, id, data, aad=b""):
         pass
 
+    def encrypt_oneshot(self, id, data, aad=b""):
+        """Like encrypt(), but safe to call from any thread, concurrently with encrypt(), see AEADKeyBase."""
+        raise NotImplementedError
+
     def decrypt(self, id, data, aad=b""):
         pass
 
@@ -1131,6 +1135,10 @@ class MACKeyBase(KeyBase):
         tag = self.mac(self._tag_prefix(header, aad, id), data)
         return b"".join([header, tag, data])
 
+    def encrypt_oneshot(self, id, data, aad=b""):
+        # encrypt() has no state (it just computes a MAC), so it is safe to call from any thread already.
+        return self.encrypt(id, data, aad=aad)
+
     def decrypt(self, id, data, aad=b""):
         if len(data) < self.PAYLOAD_OVERHEAD:
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: truncated envelope")
@@ -1386,6 +1394,21 @@ class AEADKeyBase(KeyBase):
         iv_48bit = iv.to_bytes(6, "big")
         header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
         return self.cipher.encrypt(data, header=header, iv=iv, aad=aad + id)
+
+    def encrypt_oneshot(self, id, data, aad=b""):
+        """Like encrypt(), but in a fresh one-off session: a new random session id, IV 0.
+
+        This does not use or change the key's current session (self.sessionid, self.cipher, the IV counter),
+        so it is safe to call from any thread, also concurrently with encrypt(): two threads sharing the
+        session's IV counter could otherwise encrypt two messages with the same IV. decrypt() reads the
+        result like any other envelope. Each call derives a new session key, so this is meant for rare,
+        small objects (e.g. the repository lock objects), not for chunks.
+        """
+        sessionid = os.urandom(24)
+        iv = 0
+        cipher = self._get_cipher(sessionid, iv)
+        header = self.TYPE_STR + b"\0" + iv.to_bytes(6, "big") + sessionid  # see Layout
+        return cipher.encrypt(data, header=header, iv=iv, aad=aad + id)
 
     def decrypt(self, id, data, aad=b""):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header

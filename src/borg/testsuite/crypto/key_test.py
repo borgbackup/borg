@@ -609,7 +609,7 @@ def test_key_class_for_unknown_suite():
 
 
 def test_key_class_of_needs_key_info():
-    repository = MagicMock(encryption=None, id_hash=None)
+    repository = MagicMock(encryption=None, id_hash=None, key=None)
     with pytest.raises(RepositoryKeyInfoMissing):
         key_class_of(repository)
     with pytest.raises(RepositoryKeyInfoMissing):

@@ -289,8 +289,7 @@ def test_transform_pack_keeps_unindexed_gap(tmp_path):
     # must be carried into the transformed pack unchanged - recovering them is "borg check --repair"'s
     # job. also, the objects around them must be repointed correctly although their sizes changed.
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
-        repository.set_key(make_test_key(repository))  # the index/ objects need a key
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 3  # one flush() -> one pack
         for cid, data in [(H(0), b"WWWW"), (H(1), b"XXXX"), (H(2), b"YYYY")]:
             repository.put(cid, fchunk(data, chunk_id=cid))
@@ -326,8 +325,7 @@ def test_transform_pack_drops_superseded_gap(tmp_path):
     # a gap object whose chunk id the index maps to another location is a redundant, superseded
     # duplicate (equal ids mean equal content) - a transformed pack must not carry it forward.
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
-        repository.set_key(make_test_key(repository))  # the index/ objects need a key
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 2  # one flush() -> one pack
         # pack A: W and X; pack B: a second copy of X, which repoints the index to pack B,
         # leaving X's bytes in pack A as a superseded gap.
@@ -355,8 +353,7 @@ def test_transform_pack_unchanged_pack_untouched(tmp_path):
     # if every transform keeps its object, the store must not be touched at all:
     # no pack write, no pack delete, no before_change call.
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
-        repository.set_key(make_test_key(repository))  # the index/ objects need a key
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 2  # one flush() -> one pack
         for cid, data in [(H(0), b"WWWW"), (H(1), b"XXXX")]:
             repository.put(cid, fchunk(data, chunk_id=cid))

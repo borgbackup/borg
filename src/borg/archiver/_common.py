@@ -6,6 +6,7 @@ import borg
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
+from ..crypto.key import key_factory
 from ..helpers import CommandError, Error
 from ..helpers import SortBySpec, location_validator, Location, relative_time_marker_validator
 from ..helpers import FilesystemPathSpec
@@ -29,9 +30,13 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_legacy, allow_incomplete=False):
+def get_repository(
+    location, *, create, exclusive, lock_wait, lock, args, v1_legacy, allow_incomplete=False, other=False
+):
     # create_config=False: when creating, the command (repo-create) writes the repository config itself,
     # once the key exists, see Repository.create(). For an existing repository, the flag is irrelevant.
+    # other=True: the "other" repository, its key is loaded with the BORG_OTHER_* settings (see key_factory).
+    key_loader = functools.partial(key_factory, other=True) if other else None
     if location.proto == "ssh" and v1_legacy:
         # legacy borg 1.x repository, served by a remote "borg serve" via the legacy RPC protocol
         from ..legacy.remote import LegacyRemoteRepository
@@ -51,6 +56,7 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_leg
             exclusive=exclusive,
             lock_wait=lock_wait,
             lock=lock,
+            key_loader=key_loader,
         )
 
     else:
@@ -69,6 +75,7 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_leg
                 exclusive=exclusive,
                 lock_wait=lock_wait,
                 lock=lock,
+                key_loader=key_loader,
             )
     return repository
 
@@ -193,6 +200,7 @@ def with_other_repository(manifest=False, cache=False, required=False):
                 lock=True,
                 args=args,
                 v1_legacy=v1_legacy,
+                other=True,
             )
 
             with repository:

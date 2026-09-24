@@ -226,7 +226,7 @@ def test_compact_packs_respects_threshold(tmp_path):
     # not worth it. This covers the rewrite, leave-alone and keep/drop split unique to multi-object packs.
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 4  # buffer several objects, so each flush() writes one pack
         for i in range(3):  # H0..H2 -> wasteful pack
             repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
@@ -268,7 +268,7 @@ def test_compact_superseded_duplicate(tmp_path):
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         manifest = gc_manifest(repository)
         repo_objs = manifest.repo_objs
         # objects formatted by repo_objs, so the superseded copy of X validates.
@@ -321,7 +321,7 @@ def test_compact_keeps_orphan_pack(tmp_path):
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 4
         repository.put(H(0), fchunk(b"KEEP", chunk_id=H(0)))
         repository.flush()
@@ -351,7 +351,7 @@ def test_compact_keeps_unindexed_waste(tmp_path):
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 4
         for cid, data in [(H(0), b"AAAA"), (H(1), b"BBBBBBBBBB"), (H(2), b"CCCC")]:
             repository.put(cid, fchunk(data, chunk_id=cid))
@@ -380,7 +380,7 @@ def test_compact_reclaims_indexed_waste_only(tmp_path):
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 4
         # indexed-waste pack: one used, one unused object -> reclaimable waste, every byte still indexed.
         for cid, data in [(H(0), b"KEEP"), (H(1), b"DROPME")]:
@@ -488,7 +488,7 @@ def test_compact_keeps_stale_index_entries(tmp_path):
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 4
         repository.put(H(0), fchunk(b"GONE", chunk_id=H(0)))
         repository.flush()
@@ -509,7 +509,7 @@ def test_compact_skips_oversized_index_entry(tmp_path):
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         repository._pack_writer.max_count = 4
         repository.put(H(0), fchunk(b"DATA", chunk_id=H(0)))
         repository.flush()
@@ -533,7 +533,7 @@ def test_compact_packs_merges_tiny_packs(tmp_path, monkeypatch):
     monkeypatch.setenv("BORG_PACK_MAX_SIZE", "300")
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         num = 10
         for i in range(num):
             repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
@@ -583,7 +583,7 @@ def test_compact_packs_below_merge_size_gate_leaves_tiny_packs(tmp_path, monkeyp
     monkeypatch.setenv("BORG_PACK_MAX_SIZE", "100000")  # far above what these tiny packs total
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         for i in range(3):
             repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
             repository.flush()
@@ -609,7 +609,7 @@ def test_compact_packs_below_all_packs_gate_changes_nothing(tmp_path):
     # compact must leave the repo untouched rather than pay that cost for so little.
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         # one big, fully-used pack (well above MIN_PACK_SIZE, so it is not a merge candidate) ...
         repository.put(H(0), fchunk(b"U" * 2_000_000, chunk_id=H(0)))
         repository.flush()
@@ -644,7 +644,7 @@ def record_corrupt(repository, pack_id):
 @pytest.mark.parametrize("dry_run", (False, True))
 def test_compact_packs_does_not_rewrite_corrupt_pack(tmp_path, caplog, dry_run):
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         manifest = gc_manifest(repository)
         repository._pack_writer.max_count = 4
         for i in range(3):
@@ -672,7 +672,7 @@ def test_compact_packs_does_not_merge_corrupt_pack(tmp_path, caplog, monkeypatch
     monkeypatch.setenv("BORG_PACK_MAX_SIZE", "300")
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         manifest = gc_manifest(repository)
         num = 10
         for i in range(num):
@@ -701,7 +701,7 @@ def test_compact_packs_corrupt_pack_does_not_count_toward_merge_gate(tmp_path, m
     monkeypatch.setenv("BORG_PACK_MAX_SIZE", "300")
 
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         manifest = gc_manifest(repository)
         num = 0
         total = 0
@@ -725,7 +725,7 @@ def test_compact_packs_corrupt_pack_does_not_count_toward_merge_gate(tmp_path, m
 def test_compact_packs_drops_unused_corrupt_pack(tmp_path, caplog):
     # a corrupt pack whose bytes are all indexed and unused is dropped.
     location = os.fspath(tmp_path / "repo")
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         manifest = gc_manifest(repository)
         repository.put(H(0), fchunk(b"DATA0", chunk_id=H(0)))
         repository.flush()

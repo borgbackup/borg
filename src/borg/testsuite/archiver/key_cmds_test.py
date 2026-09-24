@@ -392,7 +392,8 @@ def test_change_passphrase_does_not_change_algorithm_argon2(archivers, request):
     os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
     cmd(archiver, "key", "change-passphrase")
 
-    with Repository(archiver.repository_path) as repository:
+    # lock=False: locking needs the key, but BORG_PASSPHRASE is the old passphrase now.
+    with Repository(archiver.repository_path, lock=False) as repository:
         key_data = repository.load_key()
         _, key_data = keyfile_parse(key_data, bin_to_hex(repository.id))
         key = msgpack.unpackb(binascii.a2b_base64(key_data))

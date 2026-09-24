@@ -1148,7 +1148,8 @@ def test_check_aborts_without_key_info(archivers, request, mode):
     """check always needs the key: it refuses a repository whose config has no key info."""
     archiver = request.getfixturevalue(archivers)
     # a repository created via the Python API has no key, so its config has no key info.
-    with Repository(archiver.repository_location, exclusive=True, create=True):
+    # lock=False: locking needs the key.
+    with Repository(archiver.repository_location, exclusive=True, create=True, lock=False):
         pass
     if archiver.FORK_DEFAULT:
         expected_ec = RepositoryKeyInfoMissing("repo").exit_code

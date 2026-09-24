@@ -3305,13 +3305,13 @@ def test_create_failure_leaves_no_store_behind(tmp_path, monkeypatch):
     def failing_save_config(self, key=None):
         raise OSError("simulated disk full")
 
-    monkeypatch.setattr(Repository, "save_config", failing_save_config)
     location = os.fspath(tmp_path / "repo")
-    with pytest.raises(OSError, match="simulated disk full"):
-        with Repository(location, exclusive=True, create=True):
-            pass
+    with monkeypatch.context() as m:
+        m.setattr(Repository, "save_config", failing_save_config)
+        with pytest.raises(OSError, match="simulated disk full"):
+            with Repository(location, exclusive=True, create=True):
+                pass
     assert not os.path.exists(location)
-    monkeypatch.undo()
     with Repository(location, exclusive=True, create=True):  # and creating it afterwards works
         pass
     assert os.path.exists(os.path.join(location, "config", "config"))

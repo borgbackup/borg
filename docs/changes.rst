@@ -204,6 +204,9 @@ Fixes:
 - --from-borg1 via ssh:// failed with a borg 1.x "borg serve" (e.g. borg
   transfer): the legacy client used RPC methods borg 1.x does not have and did
   not convert the bytes a borg 1.x server sends back.
+- --from-borg1: borg 1.x repositories in authenticated or authenticated-blake2
+  mode could not be accessed ("passphrase is incorrect"), as their key was not
+  decrypted with the pbkdf2 key derivation borg 1.x used for it.
 - compact:
 
   - build the chunk index once, not three times

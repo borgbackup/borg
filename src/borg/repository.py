@@ -105,13 +105,13 @@ def borg_permissions(permissions):
 
 
 def rest_serve_command(location):
-    """Build the command line that serves a rest:// *location* via "borg serve --rest".
+    """Build the command line that serves an ssh:// *location* via "borg serve --rest".
 
-    For a local rest:// (no host) we run this borg directly (over stdio); if a host is
-    given, we prefix an ssh command (reusing borgstore's ssh_cmd / BORGSTORE_RSH).
+    We prefix an ssh command (reusing borgstore's ssh_cmd / BORGSTORE_RSH) to reach the remote borg.
+    For the special host "__testsuite__", we run this borg locally instead (over stdio, no ssh).
     """
     backend_arg = f"FILE:{location.path}"
-    if not location.host:
+    if location.host == "__testsuite__":
         # run this borg locally, talking over stdio
         borg_cmd = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "borg"]
         return borg_cmd + ["serve", "--rest", "--backend", backend_arg]
@@ -138,7 +138,7 @@ def propagate_rsh():
 
 
 def build_rest_backend(location):
-    """Return a borgstore REST backend for a rest:// *location*, served by "borg serve --rest"."""
+    """Return a borgstore REST backend for an ssh:// *location*, served by "borg serve --rest"."""
     return REST(base_url="http://stdio-backend", command=rest_serve_command(location))
 
 
@@ -950,9 +950,9 @@ class Repository:
         propagate_rsh()  # borgstore shall use the same remote shell command as borg
 
         try:
-            if location.proto == "rest":
-                # rest:// is served by "borg serve --rest" (reachable via ssh if a host is given),
-                # talking HTTP over stdio - rather than borgstore's own "borgstore-server-rest" command.
+            if location.proto == "ssh":
+                # ssh:// is served by a remote "borg serve --rest" (reached via ssh), talking HTTP over stdio -
+                # rather than borgstore's own "borgstore-server-rest" command.
                 # permissions are not given to the (remote) backend here; they are enforced on the
                 # server side by "borg serve --rest --permissions ...".
                 backend = build_rest_backend(location)
@@ -963,9 +963,9 @@ class Repository:
                 self.store = Store(url, config=ns_config, permissions=permissions, cache_url=cache_url)
         except StoreBackendError as e:
             raise Error(str(e))
-        # None means "all" (no restrictions); for rest:// the backend enforces permissions
+        # None means "all" (no restrictions); for ssh:// the backend enforces permissions
         # server-side, so the client does not check them (see above).
-        self.permissions = None if location.proto == "rest" else permissions
+        self.permissions = None if location.proto == "ssh" else permissions
         self.store_opened = False
         self.version = None
         self.id = None
@@ -1127,7 +1127,7 @@ class Repository:
         try:
             text = self.store.load("config/config").decode()
         except StoreBackendDoesNotExist:
-            # A rest:// store's open() does not contact the server, so for rest:// a missing repository
+            # An ssh:// store's open() does not contact the server, so for ssh:// a missing repository
             # only shows up here, when the first request fails with BackendDoesNotExist (#10365).
             raise self.DoesNotExist(str(self._location)) from None
         except StoreObjectNotFound:

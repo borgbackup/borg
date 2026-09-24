@@ -767,15 +767,15 @@ class Location:
     # passes the raw URL through. covers both "scheme://..." and opaque "scheme:..." forms.
     BORGSTORE_SCHEMES = ("sftp", "http", "https", "s3", "b2", "rclone")
 
-    # locations that borg parses itself, see ssh_re / rest_re / file_re below.
-    BORG_SCHEMES = ("ssh", "rest", "file")
+    # locations that borg parses itself, see ssh_re / file_re below.
+    BORG_SCHEMES = ("ssh", "file")
 
     # path may contain any chars, but to avoid ambiguities with the other regexes it must not start
     # with any of the scheme specifiers above (all of which are matched before local_re in _parse).
     # Rejecting them here makes a malformed URL fail with a helpful error instead of being silently
-    # taken for a local path - e.g. "rest://host/" used to end up as the local directory
-    # "./rest:/host", see #10215. A local path that really starts with such a prefix can still be
-    # used by prefixing it with "./" (or by giving it as an absolute path).
+    # taken for a local path - e.g. "ssh://host/" would end up as the local directory "./ssh:/host",
+    # see #10215. A local path that really starts with such a prefix can still be used by prefixing
+    # it with "./" (or by giving it as an absolute path).
     local_path_re = r"(?!(?:" + "|".join(BORG_SCHEMES + BORGSTORE_SCHEMES) + r"):)" r"(?P<path>.+)"
 
     # abs_path must start with a slash (or drive letter on Windows).
@@ -785,29 +785,18 @@ class Location:
     abs_or_rel_path_re = r"(?P<path>.+)"
 
     # We only parse out individual fields (user/host/port/path) for the protocols where borg
-    # itself needs them: legacy "ssh" (v1 repositories) and "rest" (for the ssh tunnel + FILE
-    # backend), plus local "file" paths. Everything else (see BORGSTORE_SCHEMES) is handed to
-    # borgstore as the raw URL and parsed/validated there - we only detect the scheme.
+    # itself needs them: "ssh" (for the ssh command line and the FILE backend path) plus local
+    # "file" paths. Everything else (see BORGSTORE_SCHEMES) is handed to borgstore as the raw URL
+    # and parsed/validated there - we only detect the scheme.
 
-    # ssh:// is only used for legacy borg 1.x repositories nowadays.
+    # ssh:// reaches a remote "borg serve" via ssh: for current repositories, borg talks HTTP (REST)
+    # over the ssh connection's stdio; for legacy borg 1.x repositories (--from-borg1), it uses the
+    # legacy RPC protocol.
     ssh_re = re.compile(
         r"(?P<proto>ssh)://"
         + optional_user_re
         + host_re
         + optional_port_re
-        + r"/"  # this is the separator, not part of the path!
-        + abs_or_rel_path_re,
-        re.VERBOSE,
-    )
-
-    # REST http via stdio (via ssh, if host given):
-    rest_re = re.compile(
-        r"(?P<proto>(rest))://"
-        + r"("
-        + optional_user_re
-        + host_re
-        + optional_port_re
-        + r")?"
         + r"/"  # this is the separator, not part of the path!
         + abs_or_rel_path_re,
         re.VERBOSE,
@@ -823,8 +812,6 @@ class Location:
 
     # accepted forms per scheme borg parses itself, used to explain a URL we could not parse.
     scheme_hints = {
-        "rest": "rest://[user@]host[:port]/path/to/repo (path relative to the remote directory ssh "
-        "logs into) or rest://[user@]host[:port]//path/to/repo (absolute path)",
         "ssh": "ssh://[user@]host[:port]/path/to/repo (path relative to the remote directory ssh "
         "logs into) or ssh://[user@]host[:port]//path/to/repo (absolute path)",
         "file": "file:///C:/path/to/repo" if is_win32 else "file:///path/to/repo",
@@ -881,15 +868,6 @@ class Location:
             # remote path: normalize with posixpath, not with the client's os.path, see #10199.
             self.path = posixpath.normpath(m.group("path"))
             return True
-        m = self.rest_re.match(text)
-        if m:
-            self.proto = m.group("proto")
-            self.user = m.group("user")
-            self._host = m.group("host")
-            self.port = m.group("port") and int(m.group("port")) or None
-            # remote path: normalize with posixpath, not with the client's os.path, see #10199.
-            self.path = posixpath.normpath(m.group("path"))
-            return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group("proto")
@@ -932,7 +910,7 @@ class Location:
     def canonical_path(self):
         if self.proto == "file":
             return normalize_local_path(self.path)
-        if self.proto in ("rest", "ssh"):
+        if self.proto == "ssh":
             return (
                 f"{self.proto}://"
                 f"{(self.user + '@') if self.user else ''}"

@@ -23,7 +23,7 @@ class ServeMixIn:
             ).serve()
 
     def do_serve_rest(self, args):
-        """Serve a current (non-legacy) rest:// repository on stdio (borgstore REST server)."""
+        """Serve a current (non-legacy) repository on stdio (borgstore REST server)."""
         from borgstore.server.rest import serve as rest_serve
         from ..repository import borg_permissions
 
@@ -68,13 +68,14 @@ class ServeMixIn:
         It operates in one of two modes:
 
         - default (no option): serve a **legacy** (borg 1.x / v1) repository using the legacy
-          RPC protocol. This is used e.g. for ``borg transfer --from-borg1`` and is command-line
-          compatible with borg 1.x ``borg serve``.
+          RPC protocol. A borg client using an ``ssh://`` repository together with ``--from-borg1``
+          (e.g. ``borg transfer --from-borg1``) starts this automatically via SSH. It is
+          command-line compatible with borg 1.x ``borg serve``.
 
         - ``--rest``: serve a **current** (non-legacy) repository as the server-side component of
-          a ``rest://`` repository, talking HTTP over stdio. The repository to serve is given via
-          ``--backend FILE:<path>``. A borg client using a ``rest://`` repository starts this
-          automatically (over SSH if a host is given).
+          an ``ssh://`` repository, talking HTTP over stdio. The repository to serve is given via
+          ``--backend FILE:<path>``. A borg client using an ``ssh://`` repository starts this
+          automatically via SSH.
 
         Please note that, in legacy mode, `borg serve` does not support providing a specific
         repository via the `--repo` option or the `BORG_REPO` environment variable - it is the
@@ -101,7 +102,7 @@ class ServeMixIn:
             "--rest",
             dest="rest",
             action="store_true",
-            help="serve a current (non-legacy) repository as a rest:// server (HTTP over stdio). "
+            help="serve a current (non-legacy) repository as an ssh:// server (HTTP over stdio). "
             "Requires --backend. Without this option, a legacy (borg 1.x) repository is served.",
         )
         subparser.add_argument(

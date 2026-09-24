@@ -130,7 +130,7 @@ class CheckMixIn:
            A corrupt index ends the check after this step, as the archives check needs it,
            unless ``--repair`` is given (see below). Running the repository check can
            be split into multiple partial checks using ``--max-duration``.
-           For rest:// repositories, the server computes the hashes, so the pack contents do
+           For ssh:// repositories, the server computes the hashes, so the pack contents do
            not have to travel over the network. For other remote backends, borg usually has
            to read (download) the objects to hash them.
 

@@ -12,6 +12,7 @@ from ..repoobj import (
     OBJ_MAGIC,
     OBJ_VERSION,
     RepoObj,
+    object_authenticator,
     object_validator,
 )
 from ..legacy.repoobj import RepoObj1
@@ -487,3 +488,48 @@ def test_object_validator_accepts_every_compression(compression):
     repo_objs.compressor = CompressionSpec(compression).compressor
     chunk_id, head = validator_input(repo_objs, b"payload" * 100)
     assert object_validator(repo_objs)(chunk_id, head)
+
+
+@pytest.mark.parametrize("key_class", [AuthenticatedKey, CHPOKey, AESOCBKey])
+def test_object_authenticator_checks_both_slots(key_class):
+    # a flipped byte in the metadata slot or in the data slot, a wrong chunk id or a truncated object
+    # fails authentication, for each key family.
+    key = key_class(None)
+    key.init_from_random_data()
+    key.init_ciphers()
+    repo_objs = RepoObj(key)
+    data = b"payload" * 100
+    chunk_id = repo_objs.id_hash(data)
+    obj = repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
+    authenticate = object_authenticator(repo_objs)
+    assert authenticate(chunk_id, obj)
+    assert authenticate(chunk_id, memoryview(obj))
+    for pos in (RepoObj.obj_header.size, len(obj) - 1):  # first byte of the metadata slot, last of the data slot
+        bad = bytearray(obj)
+        bad[pos] ^= 0x01
+        assert not authenticate(chunk_id, bytes(bad))
+    assert not authenticate(repo_objs.id_hash(b"other"), obj)
+    assert not authenticate(chunk_id, obj[:-1])
+
+
+def test_object_authenticator_does_not_check_the_id(aead_key):
+    # the data is not decompressed and not hashed: an object whose plaintext does not match its id,
+    # but whose slots authenticate, is accepted.
+    repo_objs = RepoObj(aead_key)
+    chunk_id = repo_objs.id_hash(b"foobar" * 10)
+    assert object_authenticator(repo_objs)(chunk_id, wrong_content_object(repo_objs, chunk_id))
+
+
+def test_object_authenticator_propagates_an_unexpected_exception(monkeypatch):
+    # only a failed authentication or unpacking gives False, any other exception propagates.
+    repo_objs = RepoObj(make_test_key())
+    data = b"payload" * 100
+    chunk_id = repo_objs.id_hash(data)
+    obj = repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
+
+    def parse_raising_valueerror(*args, **kwargs):
+        raise ValueError("not a failure to authenticate")
+
+    monkeypatch.setattr(repo_objs, "parse", parse_raising_valueerror)
+    with pytest.raises(ValueError):
+        object_authenticator(repo_objs)(chunk_id, obj)

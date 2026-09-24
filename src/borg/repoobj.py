@@ -298,5 +298,28 @@ def object_validator(repo_objs):
     return validate
 
 
+def object_authenticator(repo_objs):
+    """Return authenticate(chunk_id, obj): True if obj is the whole repo object with id chunk_id.
+
+    obj is an object's header, metadata slot and data slot. Parsing it checks that the header's sizes
+    add up to len(obj) and verifies the tags of both slots, each computed over the slot and over the
+    header prefix (magic, version, chunk id) and chunk_id as AAD (additional authenticated data: bytes
+    the tag covers without being part of the ciphertext). The data is neither decompressed nor hashed,
+    so a plaintext that does not hash to chunk_id is accepted.
+
+    With the authenticated_no_key workaround, the "authenticated-*" modes do not verify the tags, so
+    this accepts any object whose metadata slot unpacks.
+    """
+
+    def authenticate(chunk_id, obj):
+        try:
+            repo_objs.parse(chunk_id, obj, decompress=False, want_compressed=True, ro_type=ROBJ_DONTCARE)
+        except (IntegrityErrorBase, msgpack.UnpackException):
+            return False
+        return True
+
+    return authenticate
+
+
 # Backward compatibility: RepoObj1 has moved to borg.legacy.repoobj
 from .legacy.repoobj import RepoObj1  # noqa: F401

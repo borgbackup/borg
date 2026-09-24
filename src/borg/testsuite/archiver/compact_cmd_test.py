@@ -469,6 +469,7 @@ def test_compact_keeps_corrupt_pack(archivers, request):
 
     output = cmd(archiver, "compact", "-v", "--threshold", "0", exit_code=EXIT_WARNING)
     assert '1 pack(s) recorded corrupt by "borg check" are not rewritten or merged.' in output
+    assert "Damage outside of chunks is not repaired yet, see #10026." in output
     repository = open_repository(archiver)
     with repository:
         assert repository.store_load(pack_key) == pack_before

@@ -13,8 +13,7 @@ from ..helpers.argparsing import ArgumentParser
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex
 from ..helpers import set_ec, EXIT_ERROR, EXIT_WARNING, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin
-from ..helpers import IntegrityError
-from ..helpers import ProgressIndicatorPercent
+from ..helpers import IntegrityError, ProgressIndicatorPercent
 from ..repoobj import object_validator
 from ..repository import Repository, PackTracker
 
@@ -383,7 +382,7 @@ class ArchiveGarbageCollector:
         if kept_corrupt:
             logger.warning(
                 f'{len(kept_corrupt)} pack(s) recorded corrupt by "borg check" are not rewritten or merged. '
-                'Run "borg check --repair --verify-data".'
+                'Run "borg check --repair --verify-data". Damage outside of chunks is not repaired yet, see #10026.'
             )
             for pid in sorted(kept_corrupt):
                 logger.debug(f"Corrupt pack: {bin_to_hex(pid)}")
@@ -507,9 +506,11 @@ class CompactMixIn:
             the next ``borg compact``.
 
             ``borg compact`` does not rewrite or merge packs that ``borg check`` recorded as corrupt
-            and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks.
-            That repair does not remove damage outside any chunk (e.g. bytes appended to a pack), so such a
-            pack stays recorded corrupt and ``borg compact`` warns about it on every run (refs #10026).
+            and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by
+            rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
+            pack): a pack with such damage and no corrupt chunk stays recorded corrupt and ``borg compact``
+            warns about it on every run, a pack that also has a corrupt chunk is rewritten with that damage
+            copied into the new pack (refs #10026).
 
             You usually do not want to run ``borg compact`` after every write operation, but
             either regularly (e.g., once a month, possibly together with ``borg check``) or

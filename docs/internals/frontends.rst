@@ -861,6 +861,8 @@ Errors
         Repository permission denied: {}
     Repository.KeyRequired rc: 28 traceback: yes
         Repository {} needs its key to access the store object {}, but no key was set.
+    Repository.LegacyRepository rc: 29 traceback: no
+        {} looks like a borg 1.x repository, use --from-borg1 to access it (e.g. with borg transfer).
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
         Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.

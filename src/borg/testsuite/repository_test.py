@@ -116,6 +116,19 @@ def test_remote_serve_fails_to_start(tmp_path, monkeypatch, create):
     assert "unrecognized arguments: --rest" in str(exc_info.value)
 
 
+@pytest.mark.parametrize("proto", ["file", "ssh"])
+def test_open_legacy_repository(tmp_path, proto):
+    # A borg 1.x repository (config is a file, not the config/ namespace) raises Repository.LegacyRepository.
+    path = tmp_path / "v1repo"
+    (path / "data").mkdir(parents=True)
+    (path / "config").write_text("[repository]\nversion = 1\nsegments_per_dir = 1000\nid = 00\n")
+    (path / "README").write_text("This is a Borg Backup repository.\n")
+    location = Location(os.fspath(path) if proto == "file" else f"ssh://__testsuite__/{os.fspath(path)}")
+    with pytest.raises(Repository.LegacyRepository):
+        with Repository(location, exclusive=True):
+            pass
+
+
 @pytest.fixture()
 def repository(tmp_path):
     repository_location = os.fspath(tmp_path / "repository")

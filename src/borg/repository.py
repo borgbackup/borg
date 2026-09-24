@@ -886,6 +886,11 @@ class Repository:
 
         exit_mcode = 28
 
+    class LegacyRepository(Error):
+        """{} looks like a borg 1.x repository, use --from-borg1 to access it (e.g. with borg transfer)."""
+
+        exit_mcode = 29
+
     # Whole packs kept in memory for reads; the least recently used is evicted first.
     # Memory use is this count times the pack size.
     PACK_READER_CACHE_SIZE = 3
@@ -1141,6 +1146,8 @@ class Repository:
             # only shows up here, when the first request fails with BackendDoesNotExist (#10365).
             raise self.DoesNotExist(str(self._location)) from None
         except StoreObjectNotFound:
+            if self._is_legacy_repository():
+                raise self.LegacyRepository(str(self._location)) from None
             # the store exists, but has no repository config: a repository that lost its config, something
             # that never was a borg 2 repository, or the leftover of an interrupted repo-create (see create()).
             raise _ConfigMissing() from None
@@ -1158,6 +1165,19 @@ class Repository:
         if (self.encryption is None) != (self.id_hash is None):
             # the crypto suite is recorded by both entries or by none, see save_config().
             raise self.InvalidRepository(str(self._location))
+
+    def _is_legacy_repository(self):
+        """Does the (opened) store look like a borg 1.x repository?
+
+        A borg 1.x repository has a config *file* where borg 2 has the config/ namespace, so the store
+        object config/config is not found. The backend (not the Store, which only knows names within
+        namespaces) can look at that file-or-namespace directly.
+        """
+        try:
+            info = self.store.backend.info("config")
+        except (StoreBackendError, OSError):  # e.g. PermissionDenied, connection errors
+            return False
+        return info.exists and not info.directory
 
     def looks_like_borg_store(self):
         """Does the (opened, config-less) store have the packs, archives, index and config namespaces?

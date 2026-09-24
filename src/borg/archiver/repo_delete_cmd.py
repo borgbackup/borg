@@ -123,6 +123,9 @@ class RepoDeleteMixIn:
         ``--force`` also destroys a store that has no repository config, provided it looks
         like a borg store (it has the packs, archives, index and config namespaces).
 
+        Deleting a repository needs its key, as locking it needs the key. If the key is lost,
+        the repository is useless and has to be deleted with the storage's own tools.
+
         Always first use ``--dry-run --list`` to see what would be deleted.
         """
         )

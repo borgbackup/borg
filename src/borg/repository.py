@@ -975,7 +975,7 @@ class Repository:
         # the crypto suite of the repository's key, as recorded in the repository config (see save_config):
         self.encryption = None  # the "--encryption" name, e.g. "aes256-ocb"
         self.id_hash = None  # the "--id-hash" name, e.g. "sha256"
-        # the repository's key, see set_key(): the index/ and cache/ objects are stored in its envelope.
+        # the repository's key, see set_key(): the lock, index/ and cache/ objects are stored in its envelope.
         self.key = None
         # key_loader(repository) returns the repository's key; acquire_lock() calls it if no key was set yet.
         # None: key_factory(repository).
@@ -2296,20 +2296,35 @@ class Repository:
     def acquire_lock(self):
         """Lock the repository (as requested by open()), loading its key first if no key was set yet.
 
-        So a passphrase prompt comes before waiting for the lock, and no lock is held while prompting.
+        The key is needed first, because the lock objects are stored in its envelope (see storelocking).
+        This is also why a passphrase prompt comes before waiting for the lock.
         """
         assert self.lock is None
         exclusive, lock_wait = self._lock_args
         self.lock = self._make_lock(exclusive=exclusive, timeout=lock_wait).acquire()
 
     def break_lock(self):
-        Lock(self.store, repository=self._location.canonical_path()).break_lock()
+        """Delete all lock objects (not just ours). Loads the key first if no key was set yet, see acquire_lock()."""
+        self._make_lock().break_lock()
 
     def _make_lock(self, **kwargs):
-        """Return a Lock for this repository, loading the repository's key first if no key was set yet."""
+        """Return a Lock whose lock objects are sealed with the repository's key (loaded first, if needed).
+
+        The Lock keeps using the key it was made with, also if set_key() sets another key later, so that
+        our own lock objects always stay readable for us.
+        """
         if self.key is None:
             self.set_key(self._key_loader(self) if self._key_loader is not None else key_factory(self))
-        return Lock(self.store, repository=self._location.canonical_path(), **kwargs)
+        key, aad = self.key, self._store_obj_aad("locks", True)
+
+        def seal(value):
+            # encrypt_oneshot: a LockRefresher thread may refresh the lock while the main thread encrypts.
+            return key.encrypt_oneshot(b"", value, aad=aad)
+
+        def unseal(envelope):
+            return key.decrypt(b"", envelope, aad=aad)
+
+        return Lock(self.store, repository=self._location.canonical_path(), seal=seal, unseal=unseal, **kwargs)
 
     def migrate_lock(self, old_id, new_id):
         # note: only needed for local repos
@@ -2332,7 +2347,7 @@ class Repository:
         return self.store.store(name, value)
 
     def set_key(self, key):
-        """Set the key that protects the index/ and cache/ store objects, see store_encrypt_store()."""
+        """Set the key that protects the lock, index/ and cache/ store objects, see store_encrypt_store()."""
         self.key = key
 
     def _store_obj_aad(self, name, hashed_name):

@@ -272,7 +272,7 @@ def filter_xattrs(x):
 
 
 def set_test_key_on_open(monkeypatch):
-    """Make every Repository opened in a test use make_test_key() for its index/ and cache/ objects.
+    """Make every Repository opened in a test use make_test_key() for its lock, index/ and cache/ objects.
 
     The test key is only set if the repository has no key yet. It is set before the repository gets
     opened, as locking it needs the key already (see Repository.acquire_lock). A real key set later

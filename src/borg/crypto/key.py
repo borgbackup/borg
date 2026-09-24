@@ -279,7 +279,7 @@ def key_factory(repository, *, other=False):
     """Return the (loaded) key of repository, its class selected by the repository config.
 
     The key is also set as the repository's key (see Repository.set_key): it protects the repository's
-    index/ and cache/ store objects. If the repository already has its key (e.g. it was loaded before
+    lock, index/ and cache/ store objects. If the repository already has its key (e.g. it was loaded before
     locking the repository, see Repository.acquire_lock), that key is returned.
     """
     if repository.key is not None:

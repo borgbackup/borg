@@ -21,9 +21,20 @@ def test_break_lock(archivers, request):
     cmd(archiver, "break-lock")
 
 
+def test_break_lock_needs_the_key(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    monkeypatch.setenv("BORG_PASSPHRASE", "wrong")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "break-lock", exit_code=PassphraseWrong.exit_mcode)
+    else:
+        with pytest.raises(PassphraseWrong):
+            cmd(archiver, "break-lock")
+
+
 def test_passphrase_is_checked_before_waiting_for_the_lock(archivers, request, monkeypatch):
-    # the key is loaded (and the passphrase checked) before waiting for the lock: a wrong passphrase
-    # fails right away, not with a lock timeout.
+    # the lock objects are sealed with the key, so the key is loaded (and the passphrase checked) before
+    # waiting for the lock: a wrong passphrase fails right away, not with a lock timeout.
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     with Repository(archiver.repository_path, exclusive=True):  # like another borg, holding the lock

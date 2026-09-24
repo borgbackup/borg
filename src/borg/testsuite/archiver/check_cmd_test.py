@@ -607,6 +607,25 @@ def test_missing_archive_metadata(archivers, request):
     cmd(archiver, "check", exit_code=0)
 
 
+@pytest.mark.parametrize("damage", ["missing", "corrupted"])
+def test_damaged_archive_item_ptrs_chunk(archivers, request, damage):
+    # an item_ptrs chunk (the list of item metadata chunk ids) is damaged: check reports it and continues.
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        ptr_id = archive.metadata.item_ptrs[0]
+        if damage == "missing":
+            repository.delete(ptr_id, validate=None)
+        else:
+            corrupt_chunk_on_disk(repository, ptr_id)
+    output = cmd(archiver, "check", "-v", "--archives-only", exit_code=1)
+    assert f"Archive archive1: item pointers chunk 0 {bin_to_hex(ptr_id)} is {damage}" in output
+    assert "archive2" in output  # the check continued with the next archive
+    cmd(archiver, "check", "--archives-only", "--repair", exit_code=0)
+    cmd(archiver, "check", "--archives-only", exit_code=0)
+
+
 # checker_builds: per index build in ArchiveChecker, whether repository.chunks was loaded at that time.
 # A full check without --repair uses the index the repository check loaded. --repair builds once: finish()
 # re-reads only the packs the repair wrote, see test_repair_finish_reads_only_the_packs_put_wrote.

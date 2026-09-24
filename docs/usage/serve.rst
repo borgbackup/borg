@@ -19,9 +19,8 @@ options. This list currently contains:
   ``--restrict-to-path`` / ``--restrict-to-repository``.
 
 Notably, ``--rest`` is *not* in the allowlist, so the forced command pins the
-mode (current ``rest://`` repositories vs. legacy Borg 1.x repositories), and
-neither are ``--restrict-to-path``, ``--restrict-to-repository``, ``--umask``
-and ``--permissions``.
+mode (current repositories vs. legacy Borg 1.x repositories), and neither are
+``--restrict-to-path``, ``--restrict-to-repository``, ``--umask`` and ``--permissions``.
 
 Environment variables (such as BORG_XXX) contained in the original
 command sent by the client are *not* interpreted, but ignored. If BORG_XXX environment
@@ -33,7 +32,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     # Allow an SSH keypair to run only borg, and only have access to /path/to/repo.
     # Use key options to disable unneeded and potentially dangerous SSH functionality.
     # This will help to secure an automated remote backup system.
-    # --rest serves a current (rest://) repository; without it, a legacy Borg 1.x
+    # --rest serves a current (ssh://) repository; without it, a legacy Borg 1.x
     # repository would be served. The client supplies --backend FILE:<path>,
     # which is validated against --restrict-to-path.
     $ cat ~/.ssh/authorized_keys

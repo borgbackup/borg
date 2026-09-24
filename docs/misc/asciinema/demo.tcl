@@ -78,7 +78,7 @@ ls ~/Documents
 # Backups are stored in a "repository". Let's tell borg where ours is,
 # so we do not have to repeat it in every command:
 export BORG_REPO=/media/backup/borgdemo
-# It could also live on another machine, e.g. rest://user@server/backup.
+# It could also live on another machine, e.g. ssh://user@server/backup.
 
 # Creating the repository - encrypted and authenticated, with the key stored in the repo itself:
 borg repo-create --encryption=aes256-ocb --key-location=repokey

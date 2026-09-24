@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# rest_perf_test.sh - borg2 performance harness for rest:// repositories.
+# rest_perf_test.sh - borg2 performance harness for ssh:// repositories.
 #
 # Runs a fixed workload (repo-create -> backup -> backup again -> dry-run extract
-# -> check) against a rest:// repo served over a localhost sshd, under several
+# -> check) against an ssh:// repo served over a localhost sshd, under several
 # network conditions emulated by borgstore (BORGSTORE_LATENCY / BORGSTORE_BANDWIDTH).
 # LAN and WAN use the SAME bandwidth (1 Gbit/s) and differ only in latency (0.3ms vs
 # 30ms), to isolate latency's effect; raw is a no-emulation baseline. Prints a table.
@@ -35,8 +35,8 @@ set -euo pipefail
 # Default ~7.4GB: 20000x20KiB + 1000x5MiB + 2x1GiB. Override GROUPS_SPEC for smoke tests.
 : "${GROUPS_SPEC:=tiny:20000:20480 med:1000:5242880 big:2:1073741824}"
 
-# rest://user@host//abs/path  (the double slash is intentional: //tmp/REPO is absolute)
-REPO_URL="rest://${REPO_TARGET}/${REPO_PATH}"
+# ssh://user@host//abs/path  (the double slash is intentional: //tmp/REPO is absolute)
+REPO_URL="ssh://${REPO_TARGET}/${REPO_PATH}"
 
 # Per-profile emulation values: LATENCY in microseconds, BANDWIDTH in bits/s (0 = off).
 # lan and wan share the SAME bandwidth (1 Gbit/s); only latency differs, to isolate how
@@ -52,7 +52,7 @@ profile_params() {
 
 # Suppress borg's interactive prompts (unencrypted repo access, repo deletion) and
 # point borg at the venv borg on the *remote* side (a bare 'borg' would not resolve
-# in a non-interactive ssh session's minimal PATH). rest:// is served by 'borg serve
+# in a non-interactive ssh session's minimal PATH). ssh:// is served by 'borg serve
 # --rest', so BORG_REMOTE_PATH is the command the server runs.
 export BORG_REMOTE_PATH="$VENV/bin/borg"
 export BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=yes

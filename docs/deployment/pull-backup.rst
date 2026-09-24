@@ -262,7 +262,7 @@ standard input and output available to a unix socket::
 Socat will wait until a connection is opened. Then socat will execute the
 command given, redirecting Standard Input and Output to the unix socket.
 ``--rest`` and ``--backend`` are required here: ``--rest`` serves a current
-repository (talking HTTP over stdio, the server side of a ``rest://`` repository
+repository (talking HTTP over stdio, the server side of an ``ssh://`` repository
 URL), and ``--backend`` selects the repository to serve. ``--restrict-to-path``
 is not necessary but a sane default.
 
@@ -271,7 +271,7 @@ is not necessary but a sane default.
    (see ``BORG_RSH`` below) is discarded - including the ``--backend`` option the
    client would normally use to tell the server which repository it wants. The
    repository therefore is the one given by ``--backend`` in the socat command
-   above, no matter which path the client uses in its ``rest://`` URL. Use the
+   above, no matter which path the client uses in its ``ssh://`` URL. Use the
    same path in both places to avoid confusion.
 
 .. note::
@@ -322,7 +322,7 @@ SSH command. Those arguments can not be handled by socat. We wrap the command wi
 All Borg commands can now be executed on *borg-client*. For example to create a
 backup execute the ``borg create`` command::
 
-   borg-client:~$ borg create --repo rest://borg-server//path/to/repo archive /path_to_backup
+   borg-client:~$ borg create --repo ssh://borg-server//path/to/repo archive /path_to_backup
 
 When automating backup creation, the
 interactive ssh session may seem inappropriate. An alternative way of creating
@@ -333,7 +333,7 @@ a backup may be the following command::
       borgc@borg-client \
       BORG_RSH="sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
       borg create \
-      --repo rest://borg-server//path/to/repo archive /path_to_backup \
+      --repo ssh://borg-server//path/to/repo archive /path_to_backup \
       ';' rm /run/borg/reponame.sock
 
 This command also automatically removes the socket file after the ``borg
@@ -406,7 +406,7 @@ Initiating borg command execution from *borg-server* (e.g. repo-create)::
     eval $(ssh-agent) > /dev/null
     ssh-add -q ~/.ssh/borg-client_key
     echo 'your secure borg key passphrase' | \
-      ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg repo-create --encryption aes256-ocb --key-location repokey -r rest://borgs@borg-server/repo"
+      ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg repo-create --encryption aes256-ocb --key-location repokey -r ssh://borgs@borg-server/repo"
     kill "${SSH_AGENT_PID}"
   )
 
@@ -432,13 +432,13 @@ Parentheses are not needed when using a dedicated bash process.
   * The keys meant to be loaded into the agent must be specified explicitly, not from default locations.
   * The *borg-client*'s entry in *borgs@borg-server:~/.ssh/authorized_keys* must be as restrictive as possible.
 
-``echo 'your secure borg key passphrase' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg repo-create --encryption aes256-ocb --key-location repokey -r rest://borgs@borg-server/repo"``
+``echo 'your secure borg key passphrase' | ssh -A -o StrictHostKeyChecking=no borgc@borg-client "BORG_PASSPHRASE=\$(cat) BORG_RSH='ssh -o StrictHostKeyChecking=no' borg repo-create --encryption aes256-ocb --key-location repokey -r ssh://borgs@borg-server/repo"``
 
   Run the *borg repo-create* command on *borg-client*.
 
-  *rest://borgs@borg-server/repo* refers to the repository *repo* within borgs's home directory on *borg-server*
+  *ssh://borgs@borg-server/repo* refers to the repository *repo* within borgs's home directory on *borg-server*
   (a path given with a single leading slash is relative to the directory ssh logs into; use
-  *rest://borgs@borg-server//path/to/repo* for an absolute path).
+  *ssh://borgs@borg-server//path/to/repo* for an absolute path).
 
   Borg on *borg-client* connects via ssh (using *BORG_RSH*) and runs ``borg serve --rest`` on
   *borg-server*, which the forced command in *borgs@borg-server:~/.ssh/authorized_keys* pins down.
@@ -490,7 +490,7 @@ using ``localhost`` instead of ``mybackup``
 
 2. On machine ``myclient``
 
-``borg create -v --progress --stats -r rest://backup@localhost:8022//home/backup/repos/myclient system /``
+``borg create -v --progress --stats -r ssh://backup@localhost:8022//home/backup/repos/myclient system /``
 
 Make sure to use port ``8022`` and ``localhost`` for the repository as this instructs borg on ``myclient`` to use the
 remote forwarded ssh connection.

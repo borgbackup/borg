@@ -402,10 +402,10 @@ used:
 
 Authorization and transport security come from the transport, not from borg.
 
-Remote repositories over SSH: ``rest://``
+Remote repositories over SSH: ``ssh://``
 -----------------------------------------
 
-For a ``rest://`` repository, borg runs ``borg serve --rest --backend FILE:<path>``
+For an ``ssh://`` repository, borg runs ``borg serve --rest --backend FILE:<path>``
 on the remote machine and speaks HTTP to it over that process' *stdin/stdout* -- not
 over a socket. If the URL contains a host, the process is started through the
 system's SSH client (honouring ``BORG_RSH`` / ``BORGSTORE_RSH`` for the ssh command
@@ -452,7 +452,7 @@ its dependencies, so their security properties are those of the respective libra
 - ``http(s)://`` talks to a borgstore REST server over plain HTTP, authenticating
   with HTTP Basic auth taken from the URL or from ``BORGSTORE_REST_USERNAME`` /
   ``BORGSTORE_REST_PASSWORD``. Basic auth sends the credentials to the server on
-  every request, so use ``https`` if you use this at all. ``rest://`` over SSH needs
+  every request, so use ``https`` if you use this at all. ``ssh://`` needs
   no such credentials.
 
 In every case the repository never receives the borg key or the passphrase, so a
@@ -465,11 +465,10 @@ Legacy borg 1.x RPC protocol
 
 ``borg serve`` *without* ``--rest`` still speaks the borg 1.x RPC protocol:
 msgpack'd messages exchanged over stdio (``borg.legacy.remote``). It exists only so
-that borg 2 can *read* a borg 1.x repository through an ``ssh://`` URL, e.g. for
-``borg transfer --from-borg1``; ``ssh://`` is rejected for current repositories, and
-this protocol cannot serve one. Its transport is the system's SSH client, so the same
-"authorization and transport security are SSH's" reasoning as for ``rest://``
-applies.
+that borg 2 can *read* a borg 1.x repository through an ``ssh://`` URL with
+``--from-borg1``, e.g. for ``borg transfer --from-borg1``; it cannot serve a current
+repository. Its transport is the system's SSH client, so the same
+"authorization and transport security are SSH's" reasoning as for REST applies.
 
 Within that protocol, critical vulnerabilities such as remote code execution are
 inhibited by its design:
@@ -526,8 +525,8 @@ while libssl implements TLS and related protocols.
 The latter historically contained most vulnerabilities, especially critical ones, and Borg's own
 extension modules do not use it: they link ``libcrypto`` only. Note that libssl can still be
 reached through Python's ``ssl`` module by the transports that do networking inside the borg
-process, i.e. ``s3:``/``b2:`` and ``http(s)://`` (see :ref:`remote_access_security`); ``rest://``
-and the legacy ``ssh://`` protocol do not need it, as they only talk to a subprocess over pipes.
+process, i.e. ``s3:``/``b2:`` and ``http(s)://`` (see :ref:`remote_access_security`); ``ssh://``
+(REST and the legacy protocol) does not need it, as it only talks to a subprocess over pipes.
 Accordingly, the binaries released by the project do include Python's ``ssl``/``_ssl`` modules
 (they are needed by pyfuse3/trio as well).
 

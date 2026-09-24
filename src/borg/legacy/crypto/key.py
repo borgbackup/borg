@@ -128,7 +128,7 @@ class PlaintextKey(KeyBase):
         return memoryview(data)[1:]
 
 
-class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
+class AuthenticatedKeyBase(Pbkdf2FileMixin, AESKeyBase, FlexiKey):  # type: ignore[misc]
     # default storage; an individual key's actual storage is tracked per-instance in self.storage.
     STORAGE = KeyBlobStorage.REPO
     # an authenticated-mode key has real key material (id/auth key) and a key blob, just no data

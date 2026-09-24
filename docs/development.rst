@@ -480,9 +480,9 @@ Checklist:
 - Check if there are any pending fixes for security issues.
 - Find and fix any low hanging fruit left on the issue tracker.
 - Check that GitHub Actions CI is happy.
-- Update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``.
-- Check version number of upcoming release in ``CHANGES.rst``.
-- Render ``CHANGES.rst`` via ``make html`` and check for markup errors.
+- Update ``docs/changes.rst``, based on ``git log $PREVIOUS_RELEASE..``.
+- Check version number of upcoming release in ``docs/changes.rst``.
+- Render ``docs/changes.rst`` via ``make html`` and check for markup errors.
 - Verify that ``MANIFEST.in``, ``pyproject.toml`` and ``setup.py`` are complete.
 - Run these commands, check git status for files that might need to be added, and commit::
 

@@ -177,7 +177,7 @@ jobs:
         prerelease=""
         case "$TAG" in *a*|*b*|*rc*) prerelease="--prerelease" ;; esac
         cat > release-notes.md <<EOF
-        See the [changelog](https://github.com/borgbackup/borg/blob/$TAG/CHANGES.rst) for what changed in this release.
+        See the [changelog](https://github.com/borgbackup/borg/blob/$TAG/docs/changes.rst) for what changed in this release.
 
         ### Installation
 

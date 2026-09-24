@@ -1007,18 +1007,28 @@ class Repository:
         return f"<{self.__class__.__name__} {self._location}>"
 
     def __enter__(self):
-        if self.do_create:
-            self.do_create = False
-            self.create()
-            self.created = True
         try:
-            self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
-        except Exception:
-            self.close(aborting=True)
-            if self.created:
-                # we just created the store, but could not open it: do not leave it behind (see create()).
-                self.store.destroy()
-            raise
+            if self.do_create:
+                self.do_create = False
+                self.create()
+                self.created = True
+            try:
+                self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
+            except Exception:
+                self.close(aborting=True)
+                if self.created:
+                    # we just created the store, but could not open it: do not leave it behind (see create()).
+                    self.store.destroy()
+                raise
+        except StoreBackendError as e:
+            if self._location.proto != "ssh":
+                raise
+            # the first request to the remote "borg serve" failed, usually because it did not start.
+            raise Error(
+                f"Could not access the repository via borg serve on the remote host: {e}\n"
+                "Is borg 2 installed there (see BORG_REMOTE_PATH)? "
+                "For a borg 1.x repository, use --from-borg1."
+            ) from None
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -1387,7 +1397,13 @@ class Repository:
                     logger.warning("failed to release the lock during close: %s", exc)
                     self.lock = None
             if self.store_opened:
-                self.store.close()
+                try:
+                    self.store.close()
+                except Exception as exc:
+                    if not unwinding:
+                        raise
+                    # when the store is dead (e.g. the remote borg serve exited), closing it fails, too.
+                    logger.debug("failed to close the store during close: %s", exc)
                 self.store_opened = False
             self.opened = False
             self._pack_cache.clear()

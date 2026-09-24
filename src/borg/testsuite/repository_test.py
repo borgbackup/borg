@@ -8,6 +8,7 @@ from collections import namedtuple
 
 import pytest
 from borghash import HashTableNT
+from borgstore.backends.rest import REST
 
 from ..crypto.key import store_hash
 from .. import repository as repository_module
@@ -15,7 +16,7 @@ from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_ch
 from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
 from ..crypto.key import AESOCBKey, AuthenticatedKey, Blake3AuthenticatedKey, CHPOKey
-from ..helpers import IntegrityError, Location, bin_to_hex
+from ..helpers import Error, IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
 from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
@@ -95,6 +96,24 @@ def test_open_nonexistent_repository(tmp_path, proto):
         with Repository(location, exclusive=True):
             pass
     assert not os.path.exists(path)
+
+
+@pytest.mark.parametrize("create", [False, True])
+def test_remote_serve_fails_to_start(tmp_path, monkeypatch, create):
+    # e.g. a borg 1.x "borg serve" on the remote host does not know --rest: the user gets an error
+    # showing the server's stderr and a hint, not a traceback of the dead store's close().
+    def failing_rest_backend(location):
+        error = "borg serve: error: unrecognized arguments: --rest"
+        command = [sys.executable, "-c", f"import sys; sys.stderr.write({error!r} + '\\n'); sys.exit(2)"]
+        # no waiting between the reconnect attempts, to keep the test fast.
+        return REST(base_url="http://stdio-backend", command=command, reconnect_wait=0)
+
+    monkeypatch.setattr(repository_module, "build_rest_backend", failing_rest_backend)
+    location = Location("ssh://__testsuite__/" + os.fspath(tmp_path / "repository"))
+    with pytest.raises(Error, match="use --from-borg1") as exc_info:
+        with Repository(location, exclusive=True, create=create):
+            pass
+    assert "unrecognized arguments: --rest" in str(exc_info.value)
 
 
 @pytest.fixture()

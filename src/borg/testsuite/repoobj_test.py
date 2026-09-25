@@ -12,8 +12,8 @@ from ..repoobj import (
     OBJ_MAGIC,
     OBJ_VERSION,
     RepoObj,
-    object_authenticator,
     object_validator,
+    whole_object_authenticator,
 )
 from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
@@ -491,7 +491,7 @@ def test_object_validator_accepts_every_compression(compression):
 
 
 @pytest.mark.parametrize("key_class", [AuthenticatedKey, CHPOKey, AESOCBKey])
-def test_object_authenticator_checks_both_slots(key_class):
+def test_whole_object_authenticator_checks_both_slots(key_class):
     # a flipped byte in the metadata slot or in the data slot, a wrong chunk id or a truncated object
     # fails authentication, for each key family.
     key = key_class(None)
@@ -501,7 +501,7 @@ def test_object_authenticator_checks_both_slots(key_class):
     data = b"payload" * 100
     chunk_id = repo_objs.id_hash(data)
     obj = repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
-    authenticate = object_authenticator(repo_objs)
+    authenticate = whole_object_authenticator(repo_objs)
     assert authenticate(chunk_id, obj)
     assert authenticate(chunk_id, memoryview(obj))
     for pos in (RepoObj.obj_header.size, len(obj) - 1):  # first byte of the metadata slot, last of the data slot
@@ -512,15 +512,29 @@ def test_object_authenticator_checks_both_slots(key_class):
     assert not authenticate(chunk_id, obj[:-1])
 
 
-def test_object_authenticator_does_not_check_the_id(aead_key):
-    # the data is not decompressed and not hashed: an object whose plaintext does not match its id,
-    # but whose slots authenticate, is accepted.
+@pytest.mark.parametrize("key_class", [AuthenticatedKey, CHPOKey, AESOCBKey])
+def test_whole_object_authenticator_refuses_authenticated_no_key(key_class, monkeypatch):
+    # the workaround skips the tag verification of the "authenticated-*" keys only.
+    key = key_class(None)
+    key.init_from_random_data()
+    key.init_ciphers()
+    monkeypatch.setattr("borg.repoobj.AUTHENTICATED_NO_KEY", True)
+    if key_class is AuthenticatedKey:
+        with pytest.raises(Error, match="authenticated_no_key"):
+            whole_object_authenticator(RepoObj(key))
+    else:
+        assert callable(whole_object_authenticator(RepoObj(key)))
+
+
+def test_whole_object_authenticator_does_not_check_the_id(aead_key):
+    # only the tags are checked: an object whose slots authenticate but whose plaintext does not match
+    # its id is accepted.
     repo_objs = RepoObj(aead_key)
     chunk_id = repo_objs.id_hash(b"foobar" * 10)
-    assert object_authenticator(repo_objs)(chunk_id, wrong_content_object(repo_objs, chunk_id))
+    assert whole_object_authenticator(repo_objs)(chunk_id, wrong_content_object(repo_objs, chunk_id))
 
 
-def test_object_authenticator_propagates_an_unexpected_exception(monkeypatch):
+def test_whole_object_authenticator_propagates_an_unexpected_exception(monkeypatch):
     # only a failed authentication or unpacking gives False, any other exception propagates.
     repo_objs = RepoObj(make_test_key())
     data = b"payload" * 100
@@ -532,4 +546,4 @@ def test_object_authenticator_propagates_an_unexpected_exception(monkeypatch):
 
     monkeypatch.setattr(repo_objs, "parse", parse_raising_valueerror)
     with pytest.raises(ValueError):
-        object_authenticator(repo_objs)(chunk_id, obj)
+        whole_object_authenticator(repo_objs)(chunk_id, obj)

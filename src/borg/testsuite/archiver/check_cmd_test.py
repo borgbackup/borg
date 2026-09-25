@@ -1075,7 +1075,8 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
         repository.store_store(key, pack)
 
     output = cmd(archiver, "check", "--repair", "--debug", exit_code=0)
-    problem = {"magic": "no object header", "data_size": "object does not authenticate"}[damaged_field]
+    problems = {"magic": "no object header", "data_size": "object header or metadata does not authenticate"}
+    problem = problems[damaged_field]
     assert f"{problem} at offset {damaged_offset}" in output
     assert f"continuing at the object at offset {next_offset}" in output  # the rebuild resumed at the next object
     # the resync dropped an object, so the summary reports a problem.

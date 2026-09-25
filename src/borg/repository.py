@@ -30,7 +30,6 @@ from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
 from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
-from .crypto import key as crypto_key
 from .crypto.key import is_keyfile, store_hash, STORE_HASH_NAME
 
 logger = create_logger(__name__)
@@ -470,7 +469,7 @@ class PackReader:
         end = start + size
         obj = buf[start:end] if end <= len(buf) else self.read(offset, size)
         if not validate(hdr.chunk_id, obj):
-            return "object does not authenticate"
+            return "object header or metadata does not authenticate"
         return None
 
     def _find_header(self, offset, pack_size, validate):
@@ -690,8 +689,8 @@ def remove_missing_pack_entries(chunks, missing_pack_ids):
 SALVAGE_INTACT = "intact"  # the pack's store hash matches its name
 SALVAGE_DONE = "salvaged"  # the pack was replaced by one holding only its authenticated objects
 SALVAGE_NOTHING_AUTHENTICATES = "nothing authenticates"  # no object in the pack authenticates
-SALVAGE_UNSTABLE = "unstable"  # two reads of the pack gave different results
-SALVAGE_READ_ERROR = "read error"  # reading the pack raised OSError
+SALVAGE_READS_DIFFER = "reads differ"  # two reads of the pack disagree
+SALVAGE_READ_ERROR = "read error"  # reading the pack failed
 
 # status: one of the SALVAGE_* outcomes.
 # new_pack_id: id of the replacement pack (SALVAGE_DONE), else None.
@@ -967,9 +966,8 @@ class Repository:
             if cache_size:
                 ns_config["packs/"]["size"] = int(cache_size)
             cache_url = cache_dir.as_uri()
-        # True if BORG_STORE_CACHE set up a local cache of packs: store.load() of a pack may then return the
-        # cached copy instead of reading the backend.
-        self.pack_store_cache = cache_url is not None
+        # True if packs are cached locally (BORG_STORE_CACHE): store.load() of a pack may return the cached copy.
+        self.uses_pack_store_cache = cache_url is not None
 
         propagate_rsh()  # borgstore shall use the same remote shell command as borg
 
@@ -2307,7 +2305,7 @@ class Repository:
         self.store_delete(pack_key)
         return new_pack_id, len(pack_data)
 
-    def salvage_pack(self, pack_id, *, validate, authenticate, chunks, before_old_pack_delete=None):
+    def salvage_pack(self, pack_id, *, validate, authenticate, chunks=None, before_old_pack_delete=None):
         """Replace pack <pack_id> by a pack holding only the objects in it that authenticate.
 
         A pack is named by the store hash (STORE_HASH_NAME) of its content.
@@ -2316,8 +2314,9 @@ class Repository:
             is the repo object with id chunk_id, see repoobj.object_validator. The pack is walked with
             PackReader.iter_headers(validate).
         authenticate: authenticate(chunk_id, obj) -> bool, True if obj (a whole object: header, metadata
-            slot and data slot) is the repo object with id chunk_id, see repoobj.object_authenticator.
-        chunks: the ChunkIndex to update, or None to leave the chunk index unchanged.
+            slot and data slot) is the repo object with id chunk_id, see repoobj.whole_object_authenticator.
+            It must verify the tags of both slots.
+        chunks: the ChunkIndex to update. Default: self.chunks.
         before_old_pack_delete: callable without arguments, called once just before the old pack is deleted,
             see SALVAGE_DONE.
 
@@ -2327,10 +2326,11 @@ class Repository:
         objects' bytes in their old order.
 
         Returns a SalvageResult. The store and the chunk index change only for SALVAGE_DONE:
-        - SALVAGE_UNSTABLE: the loaded bytes hash to the pack's name, or a second load of the pack
-          differs from the first. An object is dropped only if two identical loads both fail it.
-        - SALVAGE_READ_ERROR: reading the pack raised OSError. All reads happen before the first
-          store change.
+        - SALVAGE_READS_DIFFER: the loaded bytes hash to the pack's name although the store hash did
+          not, or a second load of the pack differs from the first, e.g. due to corruption in memory
+          or in transfer. Objects are dropped only if both loads return the same bytes.
+        - SALVAGE_READ_ERROR: reading the pack raised OSError or a store backend error other than
+          StoreObjectNotFound. All reads happen before the first store change.
         - SALVAGE_DONE: the replacement pack is stored, before_old_pack_delete is called, chunks is
           updated, then the old pack is deleted. If the replacement pack has the old pack's name
           (the kept bytes are the undamaged pack), storing it overwrites the old pack, and
@@ -2341,44 +2341,43 @@ class Repository:
         has no entry gets one with flags F_USED and size 0 (the plaintext size is unknown). Entries
         of other packs and F_PENDING entries stay as they are.
 
-        Raises Error before any store access if BORG_WORKAROUNDS=authenticated_no_key is set (then
-        decrypting skips the tag verification, so authenticate accepts damaged objects) or if
-        pack_store_cache is set (then two loads can return the same cached copy). Raises
-        PermissionDenied unless the repo permissions allow compaction (see assert_writable), and
-        StoreObjectNotFound if the pack is missing. Requires the exclusive lock.
+        Raises Error before any store access if uses_pack_store_cache is set (then two loads can
+        return the same cached copy). Raises PermissionDenied unless the repo permissions allow
+        compaction (see assert_writable), and StoreObjectNotFound if the pack is missing. Requires the
+        exclusive lock.
         """
-        if crypto_key.AUTHENTICATED_NO_KEY:
-            raise Error(
-                "Pack salvage refused: with BORG_WORKAROUNDS=authenticated_no_key objects are not authenticated."
-            )
-        if self.pack_store_cache:
+        if self.uses_pack_store_cache:
             raise Error("Pack salvage refused: with BORG_STORE_CACHE, pack reads may return the cached copy.")
         self._lock_refresh()
+        if chunks is None:
+            chunks = self.chunks
         self.assert_writable()
         pack_hex = bin_to_hex(pack_id)
         pack_key = "packs/" + pack_hex
 
-        def untouched(status):
+        def unchanged(status):
             return SalvageResult(status, None, [], 0, [])
 
         try:
             if self.store.hash(pack_key, algorithm=STORE_HASH_NAME) == pack_hex:
-                return untouched(SALVAGE_INTACT)
+                return unchanged(SALVAGE_INTACT)
             pack_contents = self.store.load(pack_key)
+            if store_hash(pack_contents).digest() == pack_id:
+                return unchanged(SALVAGE_READS_DIFFER)
             reader = PackReader(pack_id=pack_id, pack_contents=pack_contents)
             kept_old = []  # (chunk_id, old offset, size) of each kept object, offset-ordered
             for chunk_id, offset, size in reader.iter_headers(validate=validate):
                 if authenticate(chunk_id, reader.read(offset, size)):
                     kept_old.append((chunk_id, offset, size))
             if not kept_old:
-                return untouched(SALVAGE_NOTHING_AUTHENTICATES)
-            if store_hash(pack_contents).digest() == pack_id:
-                return untouched(SALVAGE_UNSTABLE)
+                return unchanged(SALVAGE_NOTHING_AUTHENTICATES)
             if self.store.load(pack_key) != pack_contents:
-                return untouched(SALVAGE_UNSTABLE)
-        except OSError as exc:
+                return unchanged(SALVAGE_READS_DIFFER)
+        except StoreObjectNotFound:
+            raise
+        except (OSError, StoreBackendError) as exc:
             logger.warning(f"pack {pack_hex}: {exc}, not salvaging it.")
-            return untouched(SALVAGE_READ_ERROR)
+            return unchanged(SALVAGE_READ_ERROR)
 
         new_pack_data = b"".join(pack_contents[offset : offset + size] for _, offset, size in kept_old)
         # equal to pack_id if the kept bytes are the undamaged pack, e.g. when the damage is appended bytes.
@@ -2394,34 +2393,33 @@ class Repository:
         if before_old_pack_delete is not None and new_pack_id != pack_id:
             before_old_pack_delete()
 
+        new_by_old_offset = {old[1]: new for old, new in zip(kept_old, kept)}
+        new_by_id = {}  # chunk_id -> its first kept copy
+        for new in kept:
+            new_by_id.setdefault(new[0], new)
+        # collect first: the index must not be mutated while iterating it.
+        listed = [
+            (chunk_id, entry.obj_offset)
+            for chunk_id, entry in chunks.iteritems()
+            if entry.pack_id == pack_id and not (entry.flags & ChunkIndex.F_PENDING)
+        ]
+        new_locations = []
         removed_ids = []
-        if chunks is not None:
-            new_by_old_offset = {old[1]: new for old, new in zip(kept_old, kept)}
-            new_by_id = {}  # chunk_id -> its first kept copy
-            for new in kept:
-                new_by_id.setdefault(new[0], new)
-            # collect first: the index must not be mutated while iterating it.
-            listed = [
-                (chunk_id, entry.obj_offset)
-                for chunk_id, entry in chunks.iteritems()
-                if entry.pack_id == pack_id and not (entry.flags & ChunkIndex.F_PENDING)
-            ]
-            new_locations = []
-            for chunk_id, old_offset in listed:
-                new = new_by_old_offset.get(old_offset)
-                if new is None or new[0] != chunk_id:
-                    new = new_by_id.get(chunk_id)
-                if new is None:
-                    del chunks[chunk_id]
-                    removed_ids.append(chunk_id)
-                else:
-                    new_locations.append((chunk_id, new_pack_id, new[1], new[2]))
-            chunks.update_pack_info(new_locations)
-            for chunk_id, (_, offset, size) in new_by_id.items():
-                if chunk_id not in chunks:
-                    chunks[chunk_id] = ChunkIndexEntry(
-                        flags=ChunkIndex.F_USED, size=0, pack_id=new_pack_id, obj_offset=offset, obj_size=size
-                    )
+        for chunk_id, old_offset in listed:
+            new = new_by_old_offset.get(old_offset)
+            if new is None or new[0] != chunk_id:
+                new = new_by_id.get(chunk_id)
+            if new is None:
+                del chunks[chunk_id]
+                removed_ids.append(chunk_id)
+            else:
+                new_locations.append((chunk_id, new_pack_id, new[1], new[2]))
+        chunks.update_pack_info(new_locations)
+        for chunk_id, (_, offset, size) in new_by_id.items():
+            if chunk_id not in chunks:
+                chunks[chunk_id] = ChunkIndexEntry(
+                    flags=ChunkIndex.F_USED, size=0, pack_id=new_pack_id, obj_offset=offset, obj_size=size
+                )
 
         if new_pack_id != pack_id:  # else storing the replacement pack overwrote the old one
             self.store_delete(pack_key)

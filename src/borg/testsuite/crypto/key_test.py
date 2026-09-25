@@ -609,10 +609,41 @@ def test_key_class_for_unknown_suite():
 
 
 def test_key_class_of_needs_key_info():
-    repository = MagicMock(encryption=None, id_hash=None)
+    repository = MagicMock(encryption=None, id_hash=None, key=None)
     with pytest.raises(RepositoryKeyInfoMissing):
         key_class_of(repository)
     with pytest.raises(RepositoryKeyInfoMissing):
         key_factory(repository)
     repository = MagicMock(encryption="authenticated-sha256", id_hash="sha256")
     assert key_class_of(repository) is AuthenticatedKey
+
+
+@pytest.mark.parametrize("cls", [AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey])
+def test_encrypt_oneshot_aead(cls):
+    key = cls(None)
+    key.init_from_random_data()
+    key.init_ciphers()
+    sessionid, cipher, iv = key.sessionid, key.cipher, key.cipher.next_iv()
+    plaintext, aad = b"lock object", b"some aad"
+    envelopes = [key.encrypt_oneshot(b"", plaintext, aad=aad) for _ in range(3)]
+    # the key's current session is not used or changed.
+    assert (key.sessionid, key.cipher, key.cipher.next_iv()) == (sessionid, cipher, iv)
+    # every envelope has its own fresh session and starts at IV 0 (see AEADKeyBase Layout).
+    sessionids = {envelope[8:32] for envelope in envelopes}
+    assert len(sessionids) == len(envelopes) and sessionid not in sessionids
+    assert all(envelope[2:8] == bytes(6) for envelope in envelopes)
+    for envelope in envelopes:
+        assert key.decrypt(b"", envelope, aad=aad) == plaintext
+        with pytest.raises(IntegrityError):
+            key.decrypt(b"", envelope, aad=b"other aad")
+
+
+@pytest.mark.parametrize("cls", [AuthenticatedKey, Blake3AuthenticatedKey])
+def test_encrypt_oneshot_authenticated(cls):
+    key = cls(None)
+    key.init_from_random_data()
+    key.init_ciphers()
+    plaintext, aad = b"lock object", b"some aad"
+    envelope = key.encrypt_oneshot(b"", plaintext, aad=aad)
+    assert envelope == key.encrypt(b"", plaintext, aad=aad)
+    assert key.decrypt(b"", envelope, aad=aad) == plaintext

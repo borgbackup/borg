@@ -36,6 +36,9 @@ class RepoCreateMixIn:
         key = None
         try:
             key = key_creator(repository, args, other_key=other_key)
+            # the lock needs the key, see Repository.acquire_lock(). until save_config() below, the store is
+            # not a repository (see Repository.create()), so no other client can use it before we lock it.
+            repository.acquire_lock()
             # writing the config is what makes the store a repository, see Repository.create().
             repository.save_config(key)
             # we know repo/packs/ still does not have any chunks stored in it, but for some stores, there

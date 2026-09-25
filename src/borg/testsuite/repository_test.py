@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import os
 import struct
@@ -18,6 +19,7 @@ from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
 from ..crypto.key import AESOCBKey, AuthenticatedKey, Blake3AuthenticatedKey, CHPOKey
 from ..helpers import Error, IntegrityError, Location, bin_to_hex
 from ..hashindex import ChunkIndex, ChunkIndexEntry
+from ..platform import get_process_id
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
 from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator
@@ -1255,6 +1257,23 @@ def test_store_encrypt_store_without_a_key(repository):
         repository.store_store("cache/test", b"payload")
         with pytest.raises(Repository.KeyRequired):
             repository.store_load_decrypt("cache/test")
+
+
+@pytest.mark.parametrize("key_class", [AESOCBKey, CHPOKey])
+def test_lock_objects_are_sealed(repository, key_class):
+    # the lock objects are in the envelope of the repository's key, bound to the repository and to locks/.
+    key = make_store_obj_key(key_class, repository)
+    repository.set_key(key)  # before opening it: locking the repository needs the key
+    with repository:
+        (info,) = repository.store_list("locks")
+        content = bytes(repository.store_load(f"locks/{info.name}"))
+        hostid, pid, _ = get_process_id()
+        assert hostid.encode() not in content and str(pid).encode() not in content
+        assert info.name == store_hash(content).hexdigest()
+        lock = json.loads(key.decrypt(b"", content, aad=repository._store_obj_aad("locks", True)))
+        assert (lock["hostid"], lock["processid"]) == (hostid, pid)
+        with pytest.raises(IntegrityError):  # not valid as an object of another namespace
+            key.decrypt(b"", content, aad=repository._store_obj_aad("index", True))
 
 
 def test_store_load_decrypt_missing_object(repository):
@@ -3305,13 +3324,13 @@ def test_create_failure_leaves_no_store_behind(tmp_path, monkeypatch):
     def failing_save_config(self, key=None):
         raise OSError("simulated disk full")
 
-    monkeypatch.setattr(Repository, "save_config", failing_save_config)
     location = os.fspath(tmp_path / "repo")
-    with pytest.raises(OSError, match="simulated disk full"):
-        with Repository(location, exclusive=True, create=True):
-            pass
+    with monkeypatch.context() as m:
+        m.setattr(Repository, "save_config", failing_save_config)
+        with pytest.raises(OSError, match="simulated disk full"):
+            with Repository(location, exclusive=True, create=True):
+                pass
     assert not os.path.exists(location)
-    monkeypatch.undo()
     with Repository(location, exclusive=True, create=True):  # and creating it afterwards works
         pass
     assert os.path.exists(os.path.join(location, "config", "config"))

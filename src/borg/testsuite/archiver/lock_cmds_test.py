@@ -8,6 +8,8 @@ import pytest
 from ...constants import *  # NOQA
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 from ...helpers import CommandError
+from ...helpers.passphrase import PassphraseWrong
+from ...repository import Repository
 from ...platformflags import is_haiku, is_win32
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -17,6 +19,31 @@ def test_break_lock(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "break-lock")
+
+
+def test_break_lock_needs_the_key(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    monkeypatch.setenv("BORG_PASSPHRASE", "wrong")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "break-lock", exit_code=PassphraseWrong.exit_mcode)
+    else:
+        with pytest.raises(PassphraseWrong):
+            cmd(archiver, "break-lock")
+
+
+def test_passphrase_is_checked_before_waiting_for_the_lock(archivers, request, monkeypatch):
+    # the lock objects are sealed with the key, so the key is loaded (and the passphrase checked) before
+    # waiting for the lock: a wrong passphrase fails right away, not with a lock timeout.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with Repository(archiver.repository_path, exclusive=True):  # like another borg, holding the lock
+        monkeypatch.setenv("BORG_PASSPHRASE", "wrong")
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, "repo-info", exit_code=PassphraseWrong.exit_mcode)
+        else:
+            with pytest.raises(PassphraseWrong):
+                cmd(archiver, "repo-info")
 
 
 @pytest.mark.skipif(is_haiku or is_win32, reason="does not find borg python module on Haiku OS and Windows")

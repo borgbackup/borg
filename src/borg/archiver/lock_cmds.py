@@ -44,6 +44,9 @@ class LocksMixIn:
         This command breaks the repository and cache locks.
         Use with care and only when no Borg process (on any machine) is
         trying to access the cache or the repository.
+
+        The repository lock objects are protected by the repository key, so this
+        command needs the key.
         """
         )
         subparser = ArgumentParser(

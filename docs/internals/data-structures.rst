@@ -105,18 +105,19 @@ keys/
 
 locks/
   used by the locking system to manage shared and exclusive locks, see
-  :ref:`storelocking`.
+  :ref:`storelocking`. The lock objects are stored in the store object envelope
+  (see below).
 
 .. _store_object_envelope:
 
-The index fragments, ``checked-packs`` and the ``referenced-by-archive.*`` objects
-are stored in the **store object envelope**: the repository key's ``encrypt()``,
+The index fragments, the lock objects, ``checked-packs`` and the
+``referenced-by-archive.*`` objects are stored in the **store object envelope**: the repository key's ``encrypt()``,
 exactly as for the metadata and data slots of the objects in a pack (see
 :ref:`security_encryption`), with an empty id and an AAD of
 ``b"borg-store-object\0"`` followed by the repository id, the tag ``b"n"`` and the
-object name. For the index fragments, whose name is the store hash of the envelope and
-does not exist before it, the AAD holds the tag ``b"h"`` and the namespace (``index``)
-instead: the tags keep a namespace and an object of the same name apart. So these
+object name. For the index fragments and the lock objects, whose name is the store hash
+of the envelope and does not exist before it, the AAD holds the tag ``b"h"`` and the
+namespace (``index`` or ``locks``) instead: the tags keep a namespace and an object of the same name apart. So these
 objects are protected like the objects in the packs: encrypted and authenticated in
 the encrypting modes, authenticated only in the ``authenticated-*`` modes. The AAD
 binds an object to its repository and name: an object copied to another name, or
@@ -127,7 +128,9 @@ corrupt index fragment and ``borg check --repair`` rebuilds the chunks index fro
 packs; any other command that needs the chunks index aborts, except ``borg compact``
 and ``borg repo-compress``, which rebuild it from the packs, as they rewrite the whole
 chunks index anyway (under an exclusive lock). A corrupted cache is ignored and
-rebuilt. The ``chunkindex-invalid`` marker has no content and is stored as is.
+rebuilt. A lock object that fails the authentication is treated as a foreign exclusive
+lock, see :ref:`storelocking`. The ``chunkindex-invalid`` marker has no content and is
+stored as is.
 
 
 Keys
@@ -1152,6 +1155,14 @@ locked.
 
 To implement locking based on ``borgstore``, borg stores objects below locks/.
 
+The objects are stored in the :ref:`store object envelope <store_object_envelope>`,
+so locking the repository needs the key: borg loads it (and asks for the passphrase,
+if needed) before it waits for the lock. A lock object is named by the store hash of
+its envelope, so neither its content nor its name tells who uses the repository. Every
+lock object is encrypted in a fresh one-off session (a new random session id), because
+a lock may be refreshed by a background thread while the main thread encrypts other
+objects.
+
 The objects contain:
 
 - a timestamp when lock was created (or refreshed), stamped by the clock of
@@ -1179,6 +1190,12 @@ Using that information, borg implements:
   a few minutes.
 - telling the user which lock blocks them (type, host, pid, age) while waiting
   for it and in the error message if acquiring it times out.
+- a lock object that can not be read (it fails the authentication, e.g. because it
+  is corrupt or was not written by a borg with the repository's key) is treated as
+  a foreign exclusive lock: nothing is known about it but its store-side mtime, so it
+  only expires if the storage's clock confirms that it was not written for longer
+  than the stale timeout. Without store-side mtimes, it never expires; then
+  ``borg break-lock`` removes it.
 
 See the module docstring of ``src/borg/storelocking.py`` for the details
 (clock domains, how store "now" is derived, what happens without store-side
@@ -1188,8 +1205,8 @@ Breaking the lock
 -----------------
 
 In case you run into troubles with the repository lock, you can use the
-``borg break-lock`` command after you first have made sure that no Borg process
-is running on any machine that accesses this repository. Be very careful, the
+``borg break-lock`` command (it needs the key) after you first have made sure that
+no Borg process is running on any machine that accesses this repository. Be very careful, the
 repository might get damaged if multiple processes write to it at the same time.
 
 Usually you do not need this: a stale lock resolves automatically (see above),

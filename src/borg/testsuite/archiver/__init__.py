@@ -245,7 +245,8 @@ class KeyedRepository(Repository):
     """A Repository that loads its key when it is opened, as the index/ and cache/ objects need it.
 
     Tests use it to access a repository created by "borg repo-create" directly. The key is loaded with
-    key_factory, using the BORG_PASSPHRASE and BORG_KEYS_DIR the archiver fixture sets.
+    key_factory, using the BORG_PASSPHRASE and BORG_KEYS_DIR the archiver fixture sets. Repository.open
+    loads it already when it locks the repository; this also loads it when opening without a lock.
     """
 
     def open(self, *args, **kwargs):
@@ -253,7 +254,7 @@ class KeyedRepository(Repository):
 
         result = super().open(*args, **kwargs)
         try:
-            key_factory(self)  # sets the key, replacing a key set by Repository.open (e.g. a test key)
+            key_factory(self)  # sets the key, if open() did not already
         except RepositoryKeyInfoMissing:
             pass  # no key yet, e.g. a repository created without "borg repo-create"
         return result

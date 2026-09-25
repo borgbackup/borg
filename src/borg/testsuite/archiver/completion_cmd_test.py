@@ -164,7 +164,7 @@ def test_tcsh_completion_dynamic_helpers(archivers, request):
     assert "aid:{id}{NL}" in helper and "{archive}{NL}" in helper and "{tags}{NL}" in helper
     assert "`" not in helper, "backquotes in the helper would nest inside the completion rules"
     assert "eval _borg_complete_archive" in output, "archive completion not used for ARCHIVE"
-    assert "'n/--tags/`_borg_complete_tags`/'" in output, "tag completion not used for --tags"
+    assert "'n/--tag/`_borg_complete_tags`/'" in output, "tag completion not used for --tag"
 
 
 def test_tcsh_completion_positional_patterns(archivers, request):

@@ -783,7 +783,8 @@ class CreateMixIn:
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
 
-        The ``--tags`` option can be used to add a list of tags to the new archive.
+        The ``--tag`` option can be used to add a tag to the new archive. To add
+        multiple tags, give it multiple times, e.g. ``--tag foo --tag bar``.
 
         The archive name does not need to be unique; you can and should use the same
         name for a series of archives. The unique archive identifier is its ID (hash),
@@ -1348,12 +1349,14 @@ class CreateMixIn:
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
         archive_group.add_argument(
-            "--tags",
+            "--tag",
             metavar="TAG",
             dest="tags",
             type=helpers.tag_validator,
-            nargs="+",
-            help="add tags to archive (comma-separated or multiple arguments)",
+            # "extend" with nargs=1: one tag per option (so it can not swallow NAME), giving a flat list of tags.
+            action="extend",
+            nargs=1,
+            help="add tag to archive (can be given multiple times)",
         )
 
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")

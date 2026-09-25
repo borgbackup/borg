@@ -770,7 +770,7 @@ def test_create_tags(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "--tags", "foo", "bar", "baz", "--", "test", "input")
+    cmd(archiver, "create", "--tag", "foo", "--tag", "bar", "--tag", "baz", "test", "input")
     info = cmd(archiver, "info", "--json", "test")
     info = json.loads(info)
     assert sorted(info["archives"][0]["tags"]) == ["bar", "baz", "foo"]
@@ -780,7 +780,7 @@ def test_create_invalid_tags(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    output = cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input", exit_code=EXIT_ERROR)
+    output = cmd(archiver, "create", "--tag", "@INVALID", "test", "input", exit_code=EXIT_ERROR)
     assert "Unknown special tags given" in output
 
 

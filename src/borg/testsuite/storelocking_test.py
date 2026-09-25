@@ -105,6 +105,18 @@ class TestLock:
         with Lock(lockstore, exclusive=True, id=ID1, timeout=0.1) as lock:
             assert lock.got_exclusive_lock()
 
+    @pytest.mark.parametrize("exclusive", [True, False])
+    def test_lock_timeout_zero(self, lockstore, exclusive):
+        # With timeout 0, a lock is acquired if nothing blocks it, and a blocked acquire does not wait.
+        with Lock(lockstore, exclusive=exclusive, id=ID1, timeout=0) as lock:
+            assert lock.got_exclusive_lock() == exclusive
+            blocked = Lock(lockstore, exclusive=True, id=ID2, timeout=0)
+            blocked.retry_delay_min = blocked.retry_delay_max = 60
+            start = time.monotonic()
+            with pytest.raises(LockTimeout):
+                blocked.acquire()
+            assert time.monotonic() - start < 30  # it did not sleep before retrying
+
     def test_double_nonexclusive_lock_succeeds(self, lockstore):
         with Lock(lockstore, exclusive=False, id=ID1):
             with Lock(lockstore, exclusive=False, id=ID2):

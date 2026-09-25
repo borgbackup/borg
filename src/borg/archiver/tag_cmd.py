@@ -35,8 +35,14 @@ class TagMixIn:
                 # but allow --set if the existing special tags are also given.
                 new_tags = set(args.set_tags)
                 existing_special = {tag for tag in archive.tags if tag.startswith("@")}
-                clobber = not existing_special.issubset(new_tags)
-                if not clobber:
+                missing_special = existing_special - new_tags
+                if missing_special:
+                    self.print_warning(
+                        f"Archive {archive_info.name} {bin_to_hex(archive_info.id):.8}: not setting tags, "
+                        f"this would remove special tags {','.join(sorted(missing_special))}. "
+                        f"Also give them to --set or use --add / --remove."
+                    )
+                else:
                     archive.tags = new_tags
             if args.clear_tags:
                 # only remove normal tags, keep special tags.
@@ -71,7 +77,8 @@ class TagMixIn:
 
             Pre-existing special tags cannot be removed via ``--set``. You can still use
             ``--set``, but you must also give pre-existing special tags (so they won't be
-            removed).
+            removed). If they are not given, borg emits a warning and does not set the tags
+            of that archive.
 
             ``--clear`` removes all normal tags, but keeps special tags. Combined with
             ``--add``, it replaces the normal tags.

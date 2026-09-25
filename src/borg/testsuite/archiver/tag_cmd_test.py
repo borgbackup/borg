@@ -41,7 +41,8 @@ def test_tag_set_noclobber_special(archivers, request):
     assert "tags: @PROT." in output
     # archive now has a special tag.
     # it must not be possible to accidentally erase such special tags by using --set:
-    output = cmd(archiver, "tag", "-a", "archive", "--set", "clobber")
+    output = cmd(archiver, "tag", "-a", "archive", "--set", "clobber", exit_code=EXIT_WARNING)
+    assert "not setting tags, this would remove special tags @PROT." in output
     assert "tags: @PROT." in output
     # it is possible though to use --set if the existing special tags are also given:
     output = cmd(archiver, "tag", "-a", "archive", "--set", "noclobber", "--set", "@PROT")

@@ -2318,8 +2318,8 @@ class Repository:
         authenticate: authenticate(chunk_id, obj) -> bool, True if obj (a whole object: header, metadata
             slot and data slot) is the repo object with id chunk_id, see repoobj.object_authenticator.
         chunks: the ChunkIndex to update, or None to leave the chunk index unchanged.
-        before_old_pack_delete: callable without arguments, called once after the replacement pack is
-            stored and before the chunk index is updated and the old pack is deleted.
+        before_old_pack_delete: callable without arguments, called once just before the old pack is deleted,
+            see SALVAGE_DONE.
 
         Every object the walk yields and authenticate accepts is kept, whether the chunk index lists
         it or not. Everything else is dropped: objects authenticate rejects, byte ranges the walk
@@ -2333,8 +2333,8 @@ class Repository:
           store change.
         - SALVAGE_DONE: the replacement pack is stored, before_old_pack_delete is called, chunks is
           updated, then the old pack is deleted. If the replacement pack has the old pack's name
-          (the kept bytes are the undamaged pack), storing it overwrites the old pack and the delete
-          is skipped.
+          (the kept bytes are the undamaged pack), storing it overwrites the old pack, and
+          before_old_pack_delete and the delete are skipped.
 
         The chunk index update: an entry of this pack is pointed at the kept object at its offset,
         or else at a kept copy of the same chunk id, or else removed. A kept object whose chunk id
@@ -2391,7 +2391,7 @@ class Repository:
         dropped_bytes = len(pack_contents) - len(new_pack_data)
 
         self.store_store("packs/" + bin_to_hex(new_pack_id), new_pack_data)
-        if before_old_pack_delete is not None:
+        if before_old_pack_delete is not None and new_pack_id != pack_id:
             before_old_pack_delete()
 
         removed_ids = []

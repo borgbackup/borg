@@ -3418,18 +3418,22 @@ def test_salvage_pack_leaves_a_pack_alone_if_nothing_authenticates(salvage_repos
 def test_salvage_pack_drops_uncovered_trailing_bytes(salvage_repository, tail):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, offsets = store_salvage_pack(salvage_repository, objs, listed=range(3), tail=tail)
+    pack_id, _ = store_salvage_pack(salvage_repository, objs, listed=range(3), tail=tail)
+    index_before = index_contents(salvage_repository.chunks)
+    called = []
 
-    result = salvage(salvage_repository, repo_objs, pack_id)
+    result = salvage(salvage_repository, repo_objs, pack_id, before_old_pack_delete=lambda: called.append(1))
 
     assert result.status == SALVAGE_DONE
     assert result.dropped_bytes == len(tail)
     assert result.removed_ids == []
-    # the kept bytes are the original pack, so the replacement has the store hash name of the undamaged pack.
+    # the kept bytes are the original pack, so the replacement has the store hash name of the undamaged pack
+    # and the old pack is not deleted.
     assert result.new_pack_id == pack_id
+    assert called == []
     assert store_contents(salvage_repository) == {bin_to_hex(pack_id): b"".join(obj for _, obj in objs)}
-    for (chunk_id, obj), offset in zip(objs, offsets):
-        assert salvage_repository.chunks[chunk_id].obj_offset == offset
+    assert index_contents(salvage_repository.chunks) == index_before
+    for chunk_id, obj in objs:
         assert bytes(salvage_repository.get(chunk_id)) == obj
 
 

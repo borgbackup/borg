@@ -1525,6 +1525,38 @@ def test_get_read_data_false_large_meta(tmp_path):
         assert result == chunk[: hdr_size + len(big_meta)]
 
 
+@pytest.mark.parametrize(
+    "damage, problem",
+    [
+        ("truncated", "object too small: expected at least 49 header bytes, got 48 bytes"),
+        ("magic", "no object header"),
+        ("version", "unsupported object version 238"),
+        ("truncated_meta", "object too small: expected 4 metadata bytes, got 2 bytes"),
+    ],
+    ids=["truncated", "magic", "version", "truncated_meta"],
+)
+def test_get_read_data_false_rejects_damaged_object(tmp_path, damage, problem):
+    # get(read_data=False) raises IntegrityError for an invalid header or truncated metadata.
+    chunk = bytearray(fchunk(b"DATA", meta=b"META"))
+    if damage == "truncated":
+        chunk = chunk[: RepoObj.obj_header.size - 1]
+    elif damage == "truncated_meta":
+        chunk = chunk[: RepoObj.obj_header.size + 2]
+    elif damage == "magic":
+        chunk[0] ^= 0xFF
+    else:
+        chunk[len(OBJ_MAGIC)] = 0xEE  # version byte
+    pack_id, chunk_id = H(45), H(50)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), bytes(chunk))
+        chunks = ChunkIndex()
+        chunks.add(chunk_id, len(chunk))
+        chunks.update_pack_info([(chunk_id, pack_id, 0, len(chunk))])
+        repository.chunks = chunks
+        with pytest.raises(IntegrityError, match=f": {problem} \\[id {bin_to_hex(chunk_id)}\\]$"):
+            repository.get(chunk_id, read_data=False)
+
+
 def test_get_uses_chunk_index_location(tmp_path):
     # get() routes to the correct pack and offset when a ChunkIndex is assigned via the chunks property.
     chunk1 = fchunk(b"FIRST")
@@ -3120,7 +3152,10 @@ def test_superseded_gap_ranges_warns_where_it_keeps_bytes(tmp_path, caplog):
         f"pack {pack_hex}: no object header at offset {len(rejected)} in a gap, "
         f"keeping the remaining {len(garbage)} bytes of the gap." in caplog.text
     )
-    assert f"pack {pack_hex}: 3 bytes, too few for an object header, at offset 0 in a gap" in caplog.text
+    assert (
+        f"pack {pack_hex}: object too small: expected at least {RepoObj.obj_header.size} header bytes, got 3 bytes "
+        f"at offset 0 in a gap" in caplog.text
+    )
 
 
 def test_superseded_gap_ranges_ends_at_an_object_reaching_past_the_gap(tmp_path, caplog):

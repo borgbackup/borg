@@ -57,7 +57,7 @@ OBJ_MAGIC = b"BORG_OBJ"
 # meta_encrypted, b"D" for data_encrypted, binding each ciphertext to its slot. format() writes this version.
 OBJ_VERSION_HEADER_AAD = 0x02
 OBJ_VERSION = OBJ_VERSION_HEADER_AAD
-# Versions accepted by parse() and parse_meta().
+# Versions accepted by parse_header().
 SUPPORTED_OBJ_VERSIONS = (OBJ_VERSION_HEADER_AAD,)
 
 # Fixed header size per blob: OBJ_MAGIC(8) + version(1) + chunk_id(32) + meta_size(4) + data_size(4)
@@ -80,20 +80,22 @@ class RepoObj:
     ObjHeader = namedtuple("ObjHeader", "magic version chunk_id meta_size data_size")
 
     @classmethod
-    def extract_crypted_data(cls, data: bytes) -> bytes:
-        # used for crypto type detection
+    def parse_header(cls, buf: bytes | memoryview) -> tuple["RepoObj.ObjHeader | None", str | None]:
+        """Return (ObjHeader, None) if buf starts with a valid object header, (None, problem) otherwise.
+
+        buf: object bytes starting at the header, bytes after the header are ignored.
+        Valid means: buf holds at least obj_header.size bytes, the header has OBJ_MAGIC and a version in
+        SUPPORTED_OBJ_VERSIONS. problem is a message naming the check that failed.
+        """
         hdr_size = cls.obj_header.size
-        if len(data) < hdr_size:
-            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(data)}")
-        hdr = cls.ObjHeader(*cls.obj_header.unpack(data[:hdr_size]))
+        if len(buf) < hdr_size:
+            return None, f"object too small: expected at least {hdr_size} header bytes, got {len(buf)} bytes"
+        hdr = cls.ObjHeader(*cls.obj_header.unpack(buf[:hdr_size]))
         if hdr.magic != OBJ_MAGIC:
-            raise IntegrityError("invalid object magic")
+            return None, "no object header"
         if hdr.version not in SUPPORTED_OBJ_VERSIONS:
-            raise IntegrityError(f"unsupported object version: {hdr.version}")
-        overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
-        if overall_expected_size != len(data):
-            raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(data)}")
-        return data[hdr_size + hdr.meta_size :]  # crypted data
+            return None, f"unsupported object version {hdr.version}"
+        return hdr, None
 
     def __init__(self, key):
         self.key = key
@@ -161,14 +163,10 @@ class RepoObj:
         assert isinstance(cdata, (bytes, memoryview))
         assert isinstance(ro_type, str)
         obj = memoryview(cdata)
+        hdr, problem = self.parse_header(obj)
+        if hdr is None:
+            raise IntegrityError(problem)
         hdr_size = self.obj_header.size
-        if len(obj) < hdr_size:
-            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(obj)}")
-        hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
-        if hdr.magic != OBJ_MAGIC:
-            raise IntegrityError("invalid object magic")
-        if hdr.version not in SUPPORTED_OBJ_VERSIONS:
-            raise IntegrityError(f"unsupported object version: {hdr.version}")
         if hdr_size + hdr.meta_size > len(obj):
             raise IntegrityError(
                 f"object too small: expected at least {hdr_size + hdr.meta_size} bytes, got {len(obj)}"
@@ -211,14 +209,10 @@ class RepoObj:
         assert isinstance(id, bytes)
         assert isinstance(cdata, (bytes, memoryview))
         obj = memoryview(cdata)
+        hdr, problem = self.parse_header(obj)
+        if hdr is None:
+            raise IntegrityError(problem)
         hdr_size = self.obj_header.size
-        if len(obj) < hdr_size:
-            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(obj)}")
-        hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
-        if hdr.magic != OBJ_MAGIC:
-            raise IntegrityError("invalid object magic")
-        if hdr.version not in SUPPORTED_OBJ_VERSIONS:
-            raise IntegrityError(f"unsupported object version: {hdr.version}")
         overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
         if overall_expected_size != len(obj):
             raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(obj)}")

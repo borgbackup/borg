@@ -29,7 +29,7 @@ from .helpers import ProgressIndicatorPercent
 from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
-from .repoobj import RepoObj, OBJ_MAGIC, SUPPORTED_OBJ_VERSIONS
+from .repoobj import RepoObj, OBJ_MAGIC
 from .crypto.key import is_keyfile, store_hash, STORE_HASH_NAME
 
 logger = create_logger(__name__)
@@ -440,15 +440,15 @@ class PackReader:
     def _parse_header(hdr_data, offset, pack_size):
         """Return (ObjHeader, None) for a valid header at offset, (None, problem) otherwise.
 
-        Valid means: OBJ_MAGIC, a supported version, and an object that fits into the pack and is
-        at most MAX_DATA_SIZE bytes, the limit put() enforces on a whole object. problem names
-        which of these failed.
+        hdr_data: at most obj_header.size bytes read at offset, a position in the pack.
+        pack_size: the pack size in bytes.
+        Valid means: RepoObj.parse_header accepts hdr_data, and the object fits into the pack and is
+        at most MAX_DATA_SIZE bytes, the maximum size of a whole object. problem is a message naming the
+        check that failed.
         """
-        hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr_data))
-        if hdr.magic != OBJ_MAGIC:
-            return None, "no object header"
-        if hdr.version not in SUPPORTED_OBJ_VERSIONS:
-            return None, f"unsupported object version {hdr.version}"
+        hdr, problem = RepoObj.parse_header(hdr_data)
+        if hdr is None:
+            return None, problem
         obj_size = RepoObj.obj_header.size + hdr.meta_size + hdr.data_size
         if offset + obj_size > pack_size:
             return None, "object extends past end of file"
@@ -636,10 +636,7 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
         while offset < gend:
             # one read for the header and the metadata slot after it.
             buf = reader.read(offset, min(gend - offset, META_READ_SIZE))
-            if len(buf) < hdr_size:
-                hdr, problem = None, f"{len(buf)} bytes, too few for an object header,"
-            else:
-                hdr, problem = PackReader._parse_header(buf[:hdr_size], offset, pack_size)
+            hdr, problem = PackReader._parse_header(buf[:hdr_size], offset, pack_size)
             if hdr is not None and offset + hdr_size + hdr.meta_size + hdr.data_size > gend:
                 hdr, problem = None, "object reaching past its gap"
             if hdr is None:
@@ -1854,10 +1851,10 @@ class Repository:
                 # comes from the same index we already route with.
                 load_size = min(load_size, obj_size)
                 obj = reader.read(obj_offset, load_size)
-                hdr = obj[0:hdr_size]
-                if len(hdr) != hdr_size:
-                    raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
-                meta_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr)).meta_size
+                hdr, problem = RepoObj.parse_header(obj)
+                if hdr is None:
+                    raise IntegrityError(f"{problem} [id {id_hex}]")
+                meta_size = hdr.meta_size
                 if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
@@ -1867,9 +1864,11 @@ class Repository:
                     obj = reader.read(obj_offset, retry_size)
                 meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:
-                    raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
-                # hdr, meta are memoryviews for an in-memory pack; return them concatenated as bytes.
-                return bytes(hdr) + bytes(meta)
+                    raise IntegrityError(
+                        f"object too small: expected {meta_size} metadata bytes, got {len(meta)} bytes [id {id_hex}]"
+                    )
+                # obj, meta are memoryviews for an in-memory pack; return the header and meta as bytes.
+                return bytes(obj[:hdr_size]) + bytes(meta)
         except StoreObjectNotFound:
             if raise_missing:
                 raise self.ObjectNotFound(id, str(self._location)) from None

@@ -92,6 +92,19 @@ class TestLock:
             assert len(locks) == 1  # only the non-exclusive lock of ID1 is left
             assert not any(lock["exclusive"] for lock in locks.values())
 
+    def test_exclusive_lock_on_slow_store(self, lockstore, monkeypatch):
+        # An exclusive lock is acquired if no other lock exists, even if writing our lock object
+        # takes longer than the timeout.
+        orig_store = lockstore.store
+
+        def slow_store(name, value):
+            time.sleep(0.2)
+            return orig_store(name, value)
+
+        monkeypatch.setattr(lockstore, "store", slow_store)
+        with Lock(lockstore, exclusive=True, id=ID1, timeout=0.1) as lock:
+            assert lock.got_exclusive_lock()
+
     def test_double_nonexclusive_lock_succeeds(self, lockstore):
         with Lock(lockstore, exclusive=False, id=ID1):
             with Lock(lockstore, exclusive=False, id=ID2):

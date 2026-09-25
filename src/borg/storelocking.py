@@ -463,12 +463,15 @@ class Lock:
                 if self.is_exclusive:
                     if len(exclusive_locks) == 1 and exclusive_locks[0]["key"] == key:
                         logger.debug("LOCK-ACQUIRE: we are the only exclusive lock!")
-                        while time.monotonic() - started < self.timeout:
+                        # check at least once, even if creating our lock already used up the timeout.
+                        while True:
                             locks = self._find_locks(only_exclusive=False)
                             if len(locks) == 1 and locks[0]["key"] == key:
                                 logger.debug("LOCK-ACQUIRE: success! no non-exclusive locks are left!")
                                 return self
                             blocking_locks = [lock for lock in locks if lock["key"] != key]
+                            if time.monotonic() - started >= self.timeout:
+                                break
                             self._log_blocking_locks(blocking_locks)
                             time.sleep(self.other_locks_go_away_delay)
                         logger.debug("LOCK-ACQUIRE: timeout while waiting for non-exclusive locks to go away.")

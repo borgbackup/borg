@@ -209,12 +209,11 @@ Files changed while reading: {files_changed_while_reading}
             stream = stream or sys.stderr
             self.last_progress = now
             if self.output_json:
-                if not final:
-                    data = self.as_dict()
-                    if item:
-                        data |= text_to_json("path", item.path)
-                else:
-                    data = {}
+                # the progress is rate limited, so the final object must have the final statistics: nothing
+                # else reports what was processed since the previous object (or all of a short operation).
+                data = self.as_dict()
+                if item and not final:
+                    data |= text_to_json("path", item.path)
                 data |= {"time": time.time(), "type": "archive_progress", "finished": final}
                 msg = json.dumps(data)
                 end = "\n"
@@ -223,7 +222,7 @@ Files changed while reading: {files_changed_while_reading}
                 if not final:
                     # no width limit here, so always show the sizes precisely, see #3559.
                     osize_fmt = format_file_size(self.osize, fine=True)
-                    usize_fmt = format_file_size(self.usize, fine=True)
+                    usize_fmt = format_file_size(self.usize or 0, fine=True)  # None: unknown (dry-run)
                     msg = f"{osize_fmt} O {usize_fmt} U {self.nfiles} N "
                     msg += remove_surrogates(item.path) if item else ""
                 else:
@@ -236,7 +235,7 @@ Files changed while reading: {files_changed_while_reading}
                     # if the terminal is clearly wider than the classic 80 columns, see #3559.
                     fine = columns >= 110
                     osize_fmt = format_file_size(self.osize, fine=fine)
-                    usize_fmt = format_file_size(self.usize, fine=fine)
+                    usize_fmt = format_file_size(self.usize or 0, fine=fine)  # None: unknown (dry-run)
                     msg = f"{osize_fmt} O {usize_fmt} U {self.nfiles} N "
                     path = remove_surrogates(item.path) if item else ""
                     space = columns - swidth(msg)
@@ -2114,7 +2113,8 @@ class TarfileObjectProcessors:
     def process_file(self, *, tarinfo, status, type, tar):
         with self.create_helper(tarinfo, status, type) as (item, status):
             self.print_file_status(status, item.path)
-            status = None  # we already printed the status
+            self.stats.files_stats[status] += 1
+            status = None  # we already printed and counted the status
             fd = tar.extractfile(tarinfo)
             self.digester.start()
             self.process_file_chunks(
@@ -2989,6 +2989,7 @@ class ArchiveRecreater:
         dry_run=False,
         stats=False,
         progress=False,
+        log_json=False,
         file_status_printer=None,
         timestamp=None,
     ):
@@ -3018,6 +3019,7 @@ class ArchiveRecreater:
         self.dry_run = dry_run
         self.stats = stats
         self.progress = progress
+        self.log_json = log_json  # output the progress as archive_progress JSON objects
         self.print_file_status = file_status_printer or (lambda *args: None)
 
     def recreate(self, archive_id, target_name, delete_original, comment=None):
@@ -3034,6 +3036,10 @@ class ArchiveRecreater:
 
     def process_items(self, archive, target):
         matcher = self.matcher
+        if self.dry_run:
+            # the statistics of a dry-run are what would be in the new archive. what would be new to the
+            # repository (the deduplicated size) is unknown, see Statistics.as_dict().
+            target.stats.usize = None
 
         for item in archive.iter_items():
             if not matcher.match(item.path):
@@ -3041,6 +3047,11 @@ class ArchiveRecreater:
                 continue
             if self.dry_run:
                 self.print_file_status("+", item.path)  # included
+                if "chunks" in item:
+                    target.stats.nfiles += 1
+                    target.stats.osize += item.get_size()
+                if self.progress:
+                    target.stats.show_progress(item=item)
             else:
                 self.process_item(archive, target, item)
         if self.progress:
@@ -3048,6 +3059,7 @@ class ArchiveRecreater:
 
     def process_item(self, archive, target, item):
         status = file_status(item.mode)
+        target.stats.files_stats[status] += 1
         if "chunks" in item:
             self.print_file_status(status, item.path)
             status = None
@@ -3162,6 +3174,7 @@ class ArchiveRecreater:
             name,
             create=True,
             progress=self.progress,
+            log_json=self.log_json,
             chunker_params=chunker_params or self.chunker_params,
             cache=self.cache,
         )

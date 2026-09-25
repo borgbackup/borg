@@ -14,6 +14,8 @@
 
 .. include:: usage/general/logging.rst.inc
 
+.. _return_codes:
+
 .. include:: usage/general/return-codes.rst.inc
 
 .. include:: usage/general/config.rst.inc

@@ -90,13 +90,15 @@ it is not produced unless ``--progress`` is specified.
 archive_progress
     Output during operations creating archives (:ref:`borg_create`, :ref:`borg_import-tar`,
     :ref:`borg_recreate` and :ref:`borg_transfer`).
-    The following keys exist, each represents the current progress.
+    The following keys exist, each represents the current progress. The output is rate limited, so
+    only the last object (*finished* is *true*) tells about everything that was processed.
 
     original_size
         Original size of the data processed so far (before compression and deduplication)
     deduplicated_size
         Deduplicated size of the data processed so far (before compression): the size of the
-        chunks that were new to the repository
+        chunks that were new to the repository. Absent for a ``--dry-run`` of :ref:`borg_create`
+        or :ref:`borg_recreate`: it only knows the number of files and the original size.
     nfiles
         Number of (regular) files processed so far
     hashing_time
@@ -105,7 +107,8 @@ archive_progress
         Seconds spent chunking file contents so far (float)
     files_stats
         Object mapping the single-character file status (as used by ``--list``) to the number of
-        files that got that status so far, e.g. ``{"A": 3, "d": 3}``
+        items that got that status so far, e.g. ``{"A": 3, "d": 3}``. It is empty for
+        :ref:`borg_transfer`, which has no file status.
     store_stats
         Object with the storage backend statistics. It is empty here, it is only filled in for the
         final :ref:`borg_create` ``--json`` output on *stdout*, see `Archive formats`_.
@@ -115,8 +118,8 @@ archive_progress
         Unix timestamp (float)
     finished
         boolean indicating whether the operation has finished, only the last object for an *operation*
-        can have this property set to *true*. That last object has no keys besides *time*, *type*
-        and *finished*.
+        can have this property set to *true*. That last object has the final statistics of the
+        archive and no *path*.
 
 progress_message
     A message-based progress information with no concrete progress information, just a message
@@ -158,14 +161,48 @@ progress_percent
         Unix timestamp (float)
 
 file_status
-    This is only output by :ref:`borg_create`, :ref:`borg_import-tar` and :ref:`borg_recreate` if
-    ``--list`` is specified. The usual rules for the file listing applies, including the
-    ``--filter`` option.
+    One object per listed item, output by :ref:`borg_create`, :ref:`borg_import-tar`,
+    :ref:`borg_recreate`, :ref:`borg_extract` and :ref:`borg_export-tar` if ``--list`` is
+    specified. The usual rules for the file listing apply, including the ``--filter`` option.
 
     status
-        Single-character status as for regular list output
+        Single-character status as for regular list output: the item flags of :ref:`borg_create`,
+        or ``+`` (item extracted / exported) and ``-`` (item excluded) for :ref:`borg_extract`
+        and :ref:`borg_export-tar`.
     path
         Path of the file system object
+
+archive_status
+    One object per listed archive, output by :ref:`borg_prune` (``--list``, ``--list-kept`` and
+    ``--list-pruned``), :ref:`borg_delete` and :ref:`borg_undelete` (``--list``). With ``--json``,
+    :ref:`borg_prune` outputs the archives on *stdout* instead.
+
+    status
+        *kept* or *pruned* (:ref:`borg_prune`), *deleted* (:ref:`borg_delete`) or *undeleted*
+        (:ref:`borg_undelete`). With ``--dry-run``, this is what would be done.
+    dry_run
+        *true* for a ``--dry-run``: *status* tells what would be done, nothing was changed
+    name, archive
+        Name of the archive
+    id
+        Archive ID (hex)
+    time
+        Archive timestamp
+    message
+        The text line of the ``--list`` output, e.g. *Keeping archive (rule: daily #1): ...*
+
+    :ref:`borg_prune` additionally gives the keys of the archive objects of ``borg prune --json``:
+    the keys requested via ``--format`` and
+
+    group
+        Object mapping the ``--group-by`` keys to the values of this archive
+    kept
+        *true* if the archive is kept, *false* if it is pruned
+    keep_rule, kept_oldest, kept_archive_number
+        For a kept archive: the rule keeping it (e.g. *daily*), whether it is the oldest archive kept
+        by the rule, and its number within the rule (1 = the most recent one)
+    deleted_archive_number
+        For a pruned archive: its number among the pruned archives (1 = the first one pruned)
 
 log_message
     Any regular log output invokes this type. Regular log options and filtering applies to these as well.
@@ -208,7 +245,35 @@ See Prompts_ for the types used by prompts.
     {"type": "file_status", "status": "A", "path": "src/linux/file1"}
     {"type": "file_status", "status": "d", "path": "src/linux"}
     {"type": "file_status", "status": "d", "path": "src"}
-    {"time": 1787900398.686938, "type": "archive_progress", "finished": true}
+    {"original_size": 250012, "deduplicated_size": 250012, "nfiles": 3, "hashing_time": 0.002,
+     "chunking_time": 0.001, "files_stats": {"A": 3, "d": 3}, "store_stats": {}, "time": 1787900398.686938,
+     "type": "archive_progress", "finished": true}
+
+:ref:`borg_extract` file listing, with ``--exclude src/linux/baz/file3``::
+
+    {"type": "file_status", "status": "+", "path": "src"}
+    {"type": "file_status", "status": "+", "path": "src/linux"}
+    {"type": "file_status", "status": "+", "path": "src/linux/baz"}
+    {"type": "file_status", "status": "+", "path": "src/linux/baz/file2"}
+    {"type": "file_status", "status": "-", "path": "src/linux/baz/file3"}
+    {"type": "file_status", "status": "+", "path": "src/linux/file1"}
+
+:ref:`borg_prune` archive listing, with ``--list --dry-run --keep-daily=1``::
+
+    {"name": "daily", "archive": "daily", "id": "2c77c68a...", "time": "2026-09-09T02:00:00.000000+02:00",
+     "group": {"name": "daily", "host": "host"}, "kept": true, "keep_rule": "daily", "kept_oldest": false,
+     "kept_archive_number": 1, "status": "kept", "dry_run": true, "type": "archive_status",
+     "message": "Keeping archive (rule: daily #1):            daily   Wed, 2026-09-09 02:00:00 +0200 [2c77c68a...]"}
+    {"name": "daily", "archive": "daily", "id": "99a5671a...", "time": "2026-09-08T02:00:00.000000+02:00",
+     "group": {"name": "daily", "host": "host"}, "kept": false, "deleted_archive_number": 1, "status": "pruned",
+     "dry_run": true, "type": "archive_status",
+     "message": "Would prune:                                 daily   Tue, 2026-09-08 02:00:00 +0200 [99a5671a...]"}
+
+:ref:`borg_delete` archive listing, with ``--list``::
+
+    {"name": "daily", "archive": "daily", "id": "99a5671a...", "time": "2026-09-08T02:00:00.000000+02:00",
+     "status": "deleted", "dry_run": false, "type": "archive_status",
+     "message": "Deleted archive: daily   Tue, 2026-09-08 02:00:00 +0200 [99a5671a...] (1/1)"}
 
 Saving the local cache at the end of :ref:`borg_create`::
 

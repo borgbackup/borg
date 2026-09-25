@@ -189,6 +189,39 @@ def test_import_tar_nfiles(archivers, request):
     assert info["archives"][0]["stats"]["nfiles"] == 3
 
 
+def test_import_tar_files_stats(archivers, request):
+    """import-tar counts the items by their status, like create does."""
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w") as tar:
+        for name in ("dir/file1", "dir/file2"):
+            data = name.encode()
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.size = len(data)
+            tar.addfile(tarinfo, io.BytesIO(data))
+        tarinfo = tarfile.TarInfo("dir/hardlink1")
+        tarinfo.type = tarfile.LNKTYPE
+        tarinfo.linkname = "dir/file1"
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/subdir")
+        tarinfo.type = tarfile.DIRTYPE
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/symlink1")
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = "file1"
+        tar.addfile(tarinfo)
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    stats = json.loads(cmd(archiver, "import-tar", "--json", "dst", "input.tar"))["archive"]["stats"]
+    assert stats["files_stats"] == {"A": 2, "h": 1, "d": 1, "s": 1}
+    output = cmd(archiver, "import-tar", "--stats", "dst2", "input.tar")
+    assert "Added files: 2" in output
+    # the final archive_progress object has the final statistics
+    output = cmd(archiver, "import-tar", "--log-json", "--progress", "dst3", "input.tar")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    final = [msg for msg in messages if msg["type"] == "archive_progress"][-1]
+    assert final["finished"] and final["nfiles"] == 3
+    assert final["files_stats"] == {"A": 2, "h": 1, "d": 1, "s": 1}
+
+
 def test_import_tar_json(archivers, request):
     """import-tar --json reports the stats of the new archive like create --json does, see #10335."""
     archiver = request.getfixturevalue(archivers)
@@ -937,3 +970,23 @@ def test_acl_roundtrip(archivers, request):
         assert "acl_default" in extracted_dir_acl
         assert extracted_dir_acl["acl_default"] == dir_acl["acl_default"]
         assert b"user:root:r--" in dir_acl["acl_default"]
+
+
+def test_export_tar_list_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    os.unlink("input/flagfile")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    # the text listing has the "+" prefix, like the listing of borg extract
+    output = cmd(archiver, "export-tar", "test", "simple.tar", "--list", "--tar-format=GNU")
+    lines = output.splitlines()  # the line ending depends on the platform
+    assert "+ input/file1" in lines
+    assert "+ input/dir2" in lines
+    # with --log-json, the listing consists of file_status objects (one per item), no text lines
+    output = cmd(archiver, "export-tar", "test", "simple2.tar", "--list", "--log-json", "--tar-format=GNU")
+    messages = [json.loads(line) for line in output.splitlines()]
+    file_status = [msg for msg in messages if msg["type"] == "file_status"]
+    assert {"type": "file_status", "status": "+", "path": "input/file1"} in file_status
+    assert {"type": "file_status", "status": "+", "path": "input/dir2"} in file_status
+    assert all(msg["status"] == "+" for msg in file_status)

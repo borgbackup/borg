@@ -1,4 +1,7 @@
+import pytest
+
 from ...constants import *  # NOQA
+from ...helpers import CommandError
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
@@ -87,3 +90,26 @@ def test_tag_options_before_archive_name(archivers, request):
     assert "tags: bb." in output
     output = cmd(archiver, "tag", "--set", "cc", "--set", "dd", "archive")
     assert "tags: cc,dd." in output
+
+
+def test_tag_all_archives_needs_selection(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive1", archiver.input_path)
+    cmd(archiver, "create", "archive2", archiver.input_path)
+    cmd(archiver, "tag", "-a", "sh:*", "--add", "aa")
+    # Without NAME or archive filters, borg must refuse to change the tags of all archives.
+    msg = "if you really want to change the tags of all archives"
+    for tag_args in (["--set", "bb"], ["--clear"], ["--add", "bb"], ["--remove", "aa"]):
+        if archiver.FORK_DEFAULT:
+            output = cmd(archiver, "tag", *tag_args, exit_code=CommandError().exit_code)
+            assert msg in output
+        else:
+            with pytest.raises(CommandError, match=msg):
+                cmd(archiver, "tag", *tag_args)
+    # just showing the tags of all archives is fine:
+    output = cmd(archiver, "tag")
+    assert output.count("tags: aa.") == 2
+    # an explicit selection of all archives is fine:
+    output = cmd(archiver, "tag", "-a", "sh:*", "--clear")
+    assert output.count("tags: .") == 2

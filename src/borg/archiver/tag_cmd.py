@@ -1,7 +1,7 @@
 from ._common import with_repository, define_archive_filters_group, archive_match_patterns
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, archivename_validator, tag_validator
+from ..helpers import CommandError, bin_to_hex, archivename_validator, tag_validator
 from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
@@ -13,6 +13,15 @@ class TagMixIn:
     @with_repository(cache=True)
     def do_tag(self, args, repository, manifest, cache):
         """Manage tags."""
+
+        modifying = args.set_tags is not None or args.clear_tags or args.add_tags or args.remove_tags
+        # any explicitly given archive filter counts as a deliberate selection;
+        # all these args are falsy when not given (--first / --last are PositiveInt, defaulting to None).
+        any_filters_given = any(
+            (args.name, args.match_archives, args.first, args.last, args.oldest, args.newest, args.older, args.newer)
+        )
+        if modifying and not any_filters_given:
+            raise CommandError("Aborting: if you really want to change the tags of all archives, please use -a 'sh:*'.")
 
         if args.name:
             archive_infos = [manifest.archives.get_one(archive_match_patterns(args))]
@@ -66,6 +75,10 @@ class TagMixIn:
 
             ``--clear`` removes all normal tags, but keeps special tags. Combined with
             ``--add``, it replaces the normal tags.
+
+            To change tags, you must select the archives: give an archive NAME or use archive
+            filter options like ``--match-archives``. To change the tags of all archives, use
+            ``--match-archives 'sh:*'``.
 
             Each of ``--set``, ``--add`` and ``--remove`` takes exactly one tag. To give
             multiple tags, use the option multiple times.

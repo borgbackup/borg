@@ -17,7 +17,7 @@ Shared locks may coexist, an exclusive lock must be alone. acquire() lists the l
 its own lock object if nothing forbids it, and lists again to detect a race with other clients
 creating theirs at the same time: an exclusive acquirer backs off if another exclusive lock showed
 up (and otherwise waits for remaining shared locks to go away), a shared acquirer backs off if an
-exclusive lock showed up. This is retried until the timeout.
+exclusive lock showed up. This is tried at least once, then retried until the timeout.
 
 Staleness
 ---------
@@ -446,7 +446,8 @@ class Lock:
         logger.debug(f"LOCK-ACQUIRE: trying to acquire a lock. exclusive: {self.is_exclusive}.")
         started = time.monotonic()
         blocking_locks = []  # the foreign lock(s) that most recently kept us from acquiring
-        while time.monotonic() - started < self.timeout:
+        # try at least once, even with timeout 0 or if a try already used up the timeout.
+        while True:
             exclusive_locks = self._find_locks(only_exclusive=True)
             if all(lock.get("maybe_stale") for lock in exclusive_locks):
                 # there are no exclusive locks (or only ones that look stale, but whose staleness
@@ -463,12 +464,15 @@ class Lock:
                 if self.is_exclusive:
                     if len(exclusive_locks) == 1 and exclusive_locks[0]["key"] == key:
                         logger.debug("LOCK-ACQUIRE: we are the only exclusive lock!")
-                        while time.monotonic() - started < self.timeout:
+                        # check the other locks at least once before looking at the timeout.
+                        while True:
                             locks = self._find_locks(only_exclusive=False)
                             if len(locks) == 1 and locks[0]["key"] == key:
                                 logger.debug("LOCK-ACQUIRE: success! no non-exclusive locks are left!")
                                 return self
                             blocking_locks = [lock for lock in locks if lock["key"] != key]
+                            if time.monotonic() - started >= self.timeout:
+                                break
                             self._log_blocking_locks(blocking_locks)
                             time.sleep(self.other_locks_go_away_delay)
                         logger.debug("LOCK-ACQUIRE: timeout while waiting for non-exclusive locks to go away.")
@@ -492,6 +496,8 @@ class Lock:
             else:
                 # there is at least one exclusive lock we can not consider stale - it blocks us.
                 blocking_locks = exclusive_locks
+            if time.monotonic() - started >= self.timeout:
+                break
             self._log_blocking_locks(blocking_locks)
             # wait a random bit before retrying
             time.sleep(

@@ -319,7 +319,7 @@ def test_key_export_paperkey(archivers, request):
 
     assert (
         export_contents
-        == """To restore key use borg key import --paper /path/to/repo
+        == """To restore key use borg key import --paper
 
 BORG PAPER KEY v1
 id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02

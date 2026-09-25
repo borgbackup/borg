@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,7 +9,7 @@ from ...constants import *  # NOQA
 from ...helpers import get_cache_dir, bin_to_hex, sig_int, Error
 from ...hashindex import ChunkIndex
 from ...repoobj import RepoObj
-from ...repository import Repository
+from ...repository import Repository, PackTracker
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
 from ...cache import delete_chunkindex_from_repo, write_chunkindex_to_repo
 from ...manifest import Manifest
@@ -19,7 +20,7 @@ from ... import cache
 from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from . import changedir
 from .. import make_test_key
-from ..repository_test import H, fchunk, pdchunk
+from ..repository_test import H, fchunk, pdchunk, corrupt_chunk_on_disk
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -444,6 +445,43 @@ def test_compact_keeps_undelete_data_when_chunks_missing(archivers, request):
         assert fd.read() == b"G" * (1024 * 80)  # its data survived compaction
 
 
+def test_compact_keeps_corrupt_pack(archivers, request):
+    # compact keeps a pack "borg check" recorded corrupt unchanged and warns (#10410).
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    keep = os.urandom(200_000)
+    create_regular_file(archiver.input_path, "s3/keep", contents=keep)
+    create_regular_file(archiver.input_path, "s3/drop", contents=os.urandom(30_000))
+    create_regular_file(archiver.input_path, "s3k/keep", contents=keep)
+    cmd(archiver, "create", "a", "input/s3")
+    cmd(archiver, "create", "b", "input/s3k")  # dedups against a
+    cmd(archiver, "delete", "-a", "a")  # the s3/drop chunk is unused now
+    repository = open_repository(archiver)
+    with repository:
+        manifest = Manifest.load(repository)
+        b = Archive(manifest, manifest.archives.get_one(["b"]).id)
+        keep_id = next(id for item in b.iter_items() if "chunks" in item for id, _ in item.chunks)
+        pack_key = "packs/" + bin_to_hex(repository.chunks[keep_id].pack_id)
+        corrupt_chunk_on_disk(repository, keep_id)
+        pack_before = repository.store_load(pack_key)
+    cmd(archiver, "check", exit_code=1)
+
+    output = cmd(archiver, "compact", "-v", "--threshold", "0", exit_code=EXIT_WARNING)
+    assert '1 pack(s) recorded corrupt by "borg check" are not rewritten or merged.' in output
+    assert "Damage outside of chunks is not repaired yet, see #10026." in output
+    repository = open_repository(archiver)
+    with repository:
+        assert repository.store_load(pack_key) == pack_before
+    cmd(archiver, "check", exit_code=1)
+
+    # the repair deletes the corrupt chunk: compact reports it missing and no corrupt pack.
+    cmd(archiver, "check", "--repair", "--verify-data", exit_code=EXIT_SUCCESS)
+    output = cmd(archiver, "compact", "-v", "--threshold", "0", exit_code=EXIT_ERROR)
+    assert "missing objects" in output
+    assert "recorded corrupt" not in output
+
+
 def test_compact_keeps_stale_index_entries(tmp_path):
     # A stale index entry references a pack file absent from the store. compact keeps and reports it; a
     # used stale entry means data is missing (#9850).
@@ -594,6 +632,116 @@ def test_compact_packs_below_all_packs_gate_changes_nothing(tmp_path):
         assert {info.name for info in repository.store_list("packs")} == packs_before
         assert pdchunk(repository.get(H(0))) == b"U" * 2_000_000
         assert pdchunk(repository.get(H(1))) == b"x"
+
+
+def record_corrupt(repository, pack_id):
+    """Record pack_id as corrupt in PackTracker."""
+    tracker = PackTracker.load(repository)
+    tracker.record(pack_id, False)
+    tracker.save()
+
+
+@pytest.mark.parametrize("dry_run", (False, True))
+def test_compact_packs_does_not_rewrite_corrupt_pack(tmp_path, caplog, dry_run):
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        manifest = gc_manifest(repository)
+        repository._pack_writer.max_count = 4
+        for i in range(3):
+            repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
+        repository.flush()
+        pack_id = repository.chunks[H(0)].pack_id
+        for i in range(3):  # H0 used, H1 and H2 unused
+            flags = ChunkIndex.F_USED if i == 0 else ChunkIndex.F_NONE
+            repository.chunks[H(i)] = repository.chunks[H(i)]._replace(flags=flags)
+        record_corrupt(repository, pack_id)
+
+        gc = ArchiveGarbageCollector(repository, manifest, stats=False, threshold=0, dry_run=dry_run)
+        gc.chunks = repository.chunks
+        with caplog.at_level(logging.WARNING):
+            gc.compact_packs()
+
+        assert '1 pack(s) recorded corrupt by "borg check" are not rewritten or merged.' in caplog.text
+        assert gc.store_changed is False
+        assert [info.name for info in repository.store_list("packs")] == [bin_to_hex(pack_id)]
+        for i in range(3):
+            assert repository.chunks[H(i)].pack_id == pack_id
+
+
+def test_compact_packs_does_not_merge_corrupt_pack(tmp_path, caplog, monkeypatch):
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", "300")
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        manifest = gc_manifest(repository)
+        num = 10
+        for i in range(num):
+            repository.put(H(i), fchunk(f"DATA{i}".encode(), chunk_id=H(i)))
+            repository.flush()  # one tiny pack per object
+        for i in range(num):
+            repository.chunks[H(i)] = repository.chunks[H(i)]._replace(flags=ChunkIndex.F_USED)
+        corrupt_pack = repository.chunks[H(0)].pack_id
+        record_corrupt(repository, corrupt_pack)
+
+        gc = ArchiveGarbageCollector(repository, manifest, stats=False, threshold=10)
+        gc.chunks = repository.chunks
+        with caplog.at_level(logging.WARNING):
+            gc.compact_packs()
+
+        assert gc.store_changed is True  # the other tiny packs were merged
+        assert "recorded corrupt" in caplog.text
+        assert bin_to_hex(corrupt_pack) in {info.name for info in repository.store_list("packs")}
+        assert repository.chunks[H(0)].pack_id == corrupt_pack
+        for i in range(1, num):
+            assert repository.chunks[H(i)].pack_id != corrupt_pack
+
+
+def test_compact_packs_corrupt_pack_does_not_count_toward_merge_gate(tmp_path, monkeypatch):
+    # the tiny packs reach a full pack only together with the corrupt one, so nothing is merged.
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", "300")
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        manifest = gc_manifest(repository)
+        num = 0
+        total = 0
+        while total < repository.pack_max_size:
+            repository.put(H(num), fchunk(f"DATA{num}".encode(), chunk_id=H(num)))
+            repository.flush()  # one tiny pack per object
+            repository.chunks[H(num)] = repository.chunks[H(num)]._replace(flags=ChunkIndex.F_USED)
+            total += repository.store.info("packs/" + bin_to_hex(repository.chunks[H(num)].pack_id)).size
+            num += 1
+        record_corrupt(repository, repository.chunks[H(num - 1)].pack_id)
+        packs_before = {info.name for info in repository.store_list("packs")}
+
+        gc = ArchiveGarbageCollector(repository, manifest, stats=False, threshold=10)
+        gc.chunks = repository.chunks
+        gc.compact_packs()
+
+        assert gc.store_changed is False
+        assert {info.name for info in repository.store_list("packs")} == packs_before
+
+
+def test_compact_packs_drops_unused_corrupt_pack(tmp_path, caplog):
+    # a corrupt pack whose bytes are all indexed and unused is dropped.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        manifest = gc_manifest(repository)
+        repository.put(H(0), fchunk(b"DATA0", chunk_id=H(0)))
+        repository.flush()
+        pack_id = repository.chunks[H(0)].pack_id
+        repository.chunks[H(0)] = repository.chunks[H(0)]._replace(flags=ChunkIndex.F_NONE)
+        record_corrupt(repository, pack_id)
+
+        gc = ArchiveGarbageCollector(repository, manifest, stats=False, threshold=10)
+        gc.chunks = repository.chunks
+        with caplog.at_level(logging.WARNING):
+            gc.compact_packs()
+
+        assert "recorded corrupt" not in caplog.text
+        assert gc.store_changed is True
+        assert list(repository.store_list("packs")) == []
+        assert H(0) not in gc.chunks
 
 
 def test_compact_gc_after_index_loss(archivers, request):

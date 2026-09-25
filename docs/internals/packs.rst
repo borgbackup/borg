@@ -243,6 +243,9 @@ content-addressed name and deletes the old one) and ``borg debug delete-obj``. A
 single blob cannot be removed from a pack in place: all of these paths write a new
 pack file without it and then delete the old one, so store-level deletion always
 operates at pack granularity.
+``borg compact`` (rewriting, merging) and ``borg repo-compress`` skip packs recorded
+corrupt in ``cache/checked-packs``: the rewritten pack would get a new content-addressed
+name that passes ``borg check``, hiding the corruption.
 
 Gap bytes
 ~~~~~~~~~

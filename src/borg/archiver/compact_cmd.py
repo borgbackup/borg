@@ -12,10 +12,10 @@ from ..helpers import get_cache_dir
 from ..helpers.argparsing import ArgumentParser
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex
-from ..helpers import set_ec, EXIT_ERROR, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin, IntegrityError
-from ..helpers import ProgressIndicatorPercent
+from ..helpers import set_ec, EXIT_ERROR, EXIT_WARNING, Error, sig_int, format_file_size, bin_to_hex, hex_to_bin
+from ..helpers import IntegrityError, ProgressIndicatorPercent
 from ..repoobj import object_validator
-from ..repository import Repository
+from ..repository import Repository, PackTracker
 
 from ..logger import create_logger
 
@@ -267,6 +267,10 @@ class ArchiveGarbageCollector:
         - no indexed objects unused                      -> keep it, unless it is a tiny pack we
                                 merge (see below).
 
+        A pack recorded corrupt in PackTracker is dropped if all its bytes are indexed and unused,
+        otherwise kept unchanged: a pack's id is the hash of its content, so a rewritten or merged copy
+        of the corrupt bytes would get a new id that passes "borg check".
+
         A pack can hold bytes no index entry covers (a chunk copy stored again elsewhere, or objects
         from a backup that crashed before writing its index). compact_pack keeps those; recovering or
         dropping them is "borg check --repair"'s job. See issue #9868.
@@ -327,6 +331,9 @@ class ArchiveGarbageCollector:
                 "https://github.com/borgbackup/borg/issues/8572."
             )
 
+        # packs recorded corrupt in PackTracker that are still in the store
+        corrupt_packs = set(PackTracker.load(self.repository).corrupt_ids()) & pack_total.keys()
+
         # decide each pack's fate. a pack's reclaimable bytes are its indexed-but-unused bytes; the
         # redundant duplicates compact_pack finds in the gaps are reclaimed on top when it rewrites.
         # a merge fills packs up to pack_max_size, so cap "tiny" at half of that: a merged full pack
@@ -344,13 +351,13 @@ class ArchiveGarbageCollector:
                 continue  # leave this pack untouched
             reclaimable = indexed - used  # unused indexed bytes; the only bytes compact removes
             if reclaimable == 0:
-                if used == indexed and total < tiny_limit:
+                if used == indexed and total < tiny_limit and pid not in corrupt_packs:
                     merge_packs.add(pid)  # fully-used but tiny -> merge candidate
                 continue  # nothing to reclaim -> leave alone
             if used == 0 and indexed == total:
                 drop_packs.add(pid)  # whole file is unused indexed bytes -> drop it
                 pack_reclaim[pid] = reclaimable
-            elif 100 * reclaimable / total >= self.threshold:
+            elif 100 * reclaimable / total >= self.threshold and pid not in corrupt_packs:
                 rewrite_packs.add(pid)  # wasteful enough -> copy used objects (and unindexed bytes) forward
                 pack_reclaim[pid] = reclaimable
             # else: below threshold -> leave alone
@@ -370,6 +377,16 @@ class ArchiveGarbageCollector:
             drop_packs, rewrite_packs, pack_reclaim = set(), set(), {}
         if not worth_merging:
             merge_packs = set()
+
+        kept_corrupt = corrupt_packs - drop_packs
+        if kept_corrupt:
+            logger.warning(
+                f'{len(kept_corrupt)} pack(s) recorded corrupt by "borg check" are not rewritten or merged. '
+                'Run "borg check --repair --verify-data". Damage outside of chunks is not repaired yet, see #10026.'
+            )
+            for pid in sorted(kept_corrupt):
+                logger.debug(f"Corrupt pack: {bin_to_hex(pid)}")
+            set_ec(EXIT_WARNING)
 
         if self.dry_run:
             freed = sum(pack_reclaim.values())
@@ -487,6 +504,13 @@ class CompactMixIn:
             Other bytes no index entry covers, such as packs left behind by a backup that crashed
             before recording its objects, are re-indexed by ``borg check --repair`` and reclaimed by
             the next ``borg compact``.
+
+            ``borg compact`` does not rewrite or merge packs that ``borg check`` recorded as corrupt
+            and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by
+            rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
+            pack): a pack with such damage and no corrupt chunk stays recorded corrupt and ``borg compact``
+            warns about it on every run, a pack that also has a corrupt chunk is rewritten with that damage
+            copied into the new pack (refs #10026).
 
             You usually do not want to run ``borg compact`` after every write operation, but
             either regularly (e.g., once a month, possibly together with ``borg check``) or

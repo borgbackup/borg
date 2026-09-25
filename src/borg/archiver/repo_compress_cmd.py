@@ -7,11 +7,11 @@ from ._common import with_repository, Highlander
 from ..cache import build_chunkindex_from_repo, delete_chunkindex_from_repo, write_chunkindex_to_repo
 from ..compress import ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..constants import *  # NOQA
-from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec
-from ..helpers import format_file_size, hex_to_bin
+from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec, set_ec, EXIT_WARNING
+from ..helpers import format_file_size, bin_to_hex, hex_to_bin
 from ..helpers.argparsing import ArgumentParser
 from ..repoobj import object_validator
-from ..repository import Repository
+from ..repository import Repository, PackTracker
 
 from ..logger import create_logger
 
@@ -56,6 +56,9 @@ class PackRecompressor:
     Each pack is loaded once (via Repository.transform_pack); objects not stored with the desired
     compression get recompressed, the others are carried into the rewritten pack unchanged. A pack
     whose objects all already match is not rewritten at all.
+
+    A pack recorded corrupt in PackTracker is not rewritten: a pack's id is the hash of its content,
+    so a rewritten copy of the corrupt bytes would get a new id that passes "borg check".
     """
 
     def __init__(self, repository, manifest, *, print_stats):
@@ -72,6 +75,7 @@ class PackRecompressor:
         self.objects_recompressed = 0  # recompressed and rewritten
         self.packs_count = 0
         self.packs_rewritten = 0
+        self.packs_corrupt = 0  # packs recorded corrupt, not rewritten
 
     def recompress(self):
         """Recompress the repository pack after pack; Ctrl-C stops cleanly at a pack boundary."""
@@ -91,13 +95,26 @@ class PackRecompressor:
         size_before = sum(size for _, size in packs)
         size_after = size_before
 
-        stale_packs = set(per_pack) - {pack_id for pack_id, _ in packs}
+        present_packs = {pack_id for pack_id, _ in packs}
+        stale_packs = set(per_pack) - present_packs
         if stale_packs:
             # stale entries reference a pack absent from the store. they are kept, borg check --repair removes them.
             stale = sum(len(per_pack[pack_id]) for pack_id in stale_packs)
             logger.warning(
                 f'index entries referencing a missing pack file: {stale}. Run "borg check --repair" to remove them.'
             )
+
+        # packs recorded corrupt in PackTracker that are still in the store
+        corrupt_packs = set(PackTracker.load(self.repository).corrupt_ids()) & present_packs
+        self.packs_corrupt = len(corrupt_packs)
+        if corrupt_packs:
+            logger.warning(
+                f'{len(corrupt_packs)} pack(s) recorded corrupt by "borg check" are not rewritten. '
+                'Run "borg check --repair --verify-data". Damage outside of chunks is not repaired yet, see #10026.'
+            )
+            for pack_id in sorted(corrupt_packs):
+                logger.debug(f"Corrupt pack: {bin_to_hex(pack_id)}")
+            set_ec(EXIT_WARNING)
 
         pi = ProgressIndicatorPercent(
             total=len(packs), msg="Recompressing %3.1f%%", step=0.1, msgid="repo_compress.recompress"
@@ -108,7 +125,7 @@ class PackRecompressor:
                 break  # stop cleanly at a pack boundary: save the index below, then raise
             ids = per_pack.get(pack_id)
             # a pack without indexed objects (all-gap) is left for "borg check --repair", see #9868.
-            if ids:
+            if ids and pack_id not in corrupt_packs:
                 new_pack_id, new_size = self.repository.transform_pack(
                     pack_id,
                     ids,
@@ -171,7 +188,9 @@ class PackRecompressor:
         stats_logger = logging.getLogger("borg.output.stats")
         objects = self.objects_ok + self.objects_kept + self.objects_recompressed
         stats_logger.info("Recompression stats:")
-        stats_logger.info(f"Packs: {self.packs_count} total, {self.packs_rewritten} rewritten.")
+        # the objects of skipped corrupt packs are not read, so they are not in the objects total.
+        corrupt = f", {self.packs_corrupt} skipped (recorded corrupt)" if self.packs_corrupt else ""
+        stats_logger.info(f"Packs: {self.packs_count} total, {self.packs_rewritten} rewritten{corrupt}.")
         stats_logger.info(
             f"Objects: {objects} total, {self.objects_recompressed} recompressed, "
             f"{self.objects_ok} already had the desired compression, "
@@ -213,6 +232,13 @@ class RepoCompressMixIn:
         Please note that the outcome of recompressing a chunk might not always be the
         desired compression type/level - if no compression gives a shorter output, that
         might be chosen; such chunks are kept as they are.
+
+        ``borg repo-compress`` does not rewrite packs that ``borg check`` recorded as corrupt
+        and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by
+        rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
+        pack): a pack with such damage and no corrupt chunk stays recorded corrupt and is not rewritten,
+        a pack that also has a corrupt chunk is rewritten with that damage copied into the new pack
+        (refs #10026).
 
         Rewriting a pack invalidates every client's cached chunk index, so the next borg
         operation of each client will re-fetch the chunk index from the repository.

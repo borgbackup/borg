@@ -227,6 +227,8 @@ Compaction
   - a pack file with some unused objects is rewritten without them, but only if
     the wasted bytes reach the ``--threshold`` percentage
   - very small pack files are merged into bigger ones
+  - a pack file recorded corrupt by ``borg check`` is not rewritten or merged,
+    it is only deleted if its indexed objects are all unused
 - update the chunks index in ``index/`` accordingly
 - with ``--stats``, compute statistics about:
 

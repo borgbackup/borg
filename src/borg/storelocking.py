@@ -17,7 +17,7 @@ Shared locks may coexist, an exclusive lock must be alone. acquire() lists the l
 its own lock object if nothing forbids it, and lists again to detect a race with other clients
 creating theirs at the same time: an exclusive acquirer backs off if another exclusive lock showed
 up (and otherwise waits for remaining shared locks to go away), a shared acquirer backs off if an
-exclusive lock showed up. This is retried until the timeout.
+exclusive lock showed up. This is tried at least once, then retried until the timeout.
 
 Staleness
 ---------
@@ -464,6 +464,7 @@ class Lock:
                 if self.is_exclusive:
                     if len(exclusive_locks) == 1 and exclusive_locks[0]["key"] == key:
                         logger.debug("LOCK-ACQUIRE: we are the only exclusive lock!")
+                        # check the other locks at least once before looking at the timeout.
                         while True:
                             locks = self._find_locks(only_exclusive=False)
                             if len(locks) == 1 and locks[0]["key"] == key:

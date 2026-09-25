@@ -235,6 +235,13 @@ Fixes:
     differ, #10351
   - report a file as modified when chunks were reordered or duplicated
 - import-tar: show the stored paths in the file status output
+- check: do not crash with a traceback when a repository object can not be read
+  (I/O error, e.g. failing disk or flaky network filesystem). The affected object
+  is reported, the check continues and fails at the end. Such an object is not
+  recorded as corrupt (a later check verifies it again), ``--repair`` refuses to
+  repair around it and ``--verify-data`` no longer deletes chunks it could not
+  read. Other commands stop with the read error instead of working with a
+  partially readable repository, #3509
 
 Other changes:
 

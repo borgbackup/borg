@@ -98,12 +98,12 @@ The check command verifies the consistency of a repository and its archives.
 It consists of two major steps:
 
 1. Checking the consistency of the repository itself. The objects in the ``index/``
-   and ``packs/`` namespaces are named by the sha256 hash of their content, so such
+   and ``packs/`` namespaces are named by the store hash of their content, so such
    an object is intact if and only if the hash of its content still equals its name.
    The check verifies the (small) index objects first and, only if they are intact,
    all packs. It also cross-checks the chunk index against the packs present in the
    repository to detect referenced but missing packs. Bit rot and other types of
-   accidental damage can be detected this way, but as sha256 content-addressing is
+   accidental damage can be detected this way, but as content-addressing is
    not a MAC, this step does not detect tampering. Running the repository check can
    be split into multiple partial checks using ``--max-duration``.
    For rest:// repositories, the server computes the hashes, so the pack contents do
@@ -199,6 +199,24 @@ packs, and, if the key must be recovered, scans chunks for it. These phases do n
 respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
 effect until they finish.
 
+Unreadable repository objects
++++++++++++++++++++++++++++++
+
+A repository object that cannot be read at all (an I/O error from a failing disk, a
+flaky network filesystem, ...) is different from a corrupt one: Borg never saw its
+content, so it cannot tell whether the object is fine. Such an object is reported and
+the check continues, so one run lists everything that is affected; the check then
+fails. The object is not remembered as corrupt, so a later check verifies it again.
+
+Because the data may well be readable again once the underlying problem is fixed,
+``--repair`` refuses to repair while there are unreadable objects, and
+``--verify-data`` leaves chunks it could not read in place instead of deleting them.
+Fix the storage hardware, filesystem or network first, then run the check again.
+
+Only ``borg check`` goes on like this. Other commands stop with the read error rather
+than work with a partially readable repository - e.g. ``borg prune`` would otherwise
+see an archive whose metadata it could not read as undated and thus as the oldest one.
+
 About repair mode
 +++++++++++++++++
 
@@ -230,10 +248,14 @@ by definition, a potentially lossy task.
 In practice, repair mode hooks into both the repository and archive checks:
 
 1. When checking the repository's consistency, repair mode rebuilds the repository
-   index from the packs if the index is corrupt, provided every pack is intact. If
-   any pack is corrupt, the repository check leaves the index and the packs untouched
-   and reports the corruption; salvaging a corrupt pack's still-intact objects is not
-   implemented yet (refs #8572).
+   index from the packs if the index is corrupt, provided every pack matches its
+   store hash. If any pack fails its store hash, the repository check leaves the
+   index and the packs untouched and reports it; salvaging the intact objects of
+   such a pack is not implemented yet (refs #8572). The rebuild authenticates
+   each object's header and metadata with the key, leaves an object that fails
+   this out of the index and reports it as an error. Repair therefore always
+   needs the key, ``--repository-only`` included, and aborts if the key can not
+   be read.
 
 2. When checking the consistency and correctness of archives, repair mode might
    remove whole archives from the manifest if their archive metadata chunk is

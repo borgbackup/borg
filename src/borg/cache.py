@@ -909,8 +909,9 @@ def build_chunkindex_from_repo(
     # read completely, and never write to the repo.
     # write_immediately: store the index (all of it, deleting all other fragments) before returning it. The
     # callers hold an exclusive lock (borg compact, borg repo-compress, borg check --repair).
-    # a corrupt fragment raises CorruptChunkIndexFragment: a corrupt index aborts the command. Only with
-    # write_immediately (the index is rewritten anyway), the index is rebuilt from the packs instead.
+    # a corrupt fragment raises CorruptChunkIndexFragment, an unreadable one Repository.StoreReadError: an
+    # unusable index aborts the command. Only with write_immediately (the index is rewritten anyway), the
+    # index is rebuilt from the packs instead.
     # validate: a repo object validator or None, passed to PackReader.iter_headers. With a validator,
     # the rebuild skips the objects that fail it; without one, a corrupt object header raises CorruptPack.
     # on_drop: a callable or None, passed to PackReader.iter_headers, called once per byte range the
@@ -947,12 +948,13 @@ def build_chunkindex_from_repo(
                 break
             chunks = ChunkIndex()  # we'll merge all fragments into this
             complete = True
-            corrupt_fragment = None
+            unusable_fragment = None  # the error of a fragment that is corrupt or could not be read
             for hash in hashes:
                 try:
                     chunks_to_merge = read_chunkindex_from_repo(repository, hash)
-                except CorruptChunkIndexFragment as err:
-                    corrupt_fragment = err
+                except (CorruptChunkIndexFragment, Repository.StoreReadError) as err:
+                    # a corrupt fragment, or one that could not be read (I/O error, refs #3509).
+                    unusable_fragment = err
                     break
                 if chunks_to_merge is None:
                     logger.debug(f"chunk index fragment {hash} vanished, restarting the merge...")
@@ -962,13 +964,17 @@ def build_chunkindex_from_repo(
                 for k, v in chunks_to_merge.items():
                     chunks[k] = v
                 chunks_to_merge.clear()
-            if corrupt_fragment is not None:
-                # retrying would re-read the same corrupt fragment. abort, unless the index gets rewritten
+            if unusable_fragment is not None:
+                # retrying would re-read the same unusable fragment. abort, unless the index gets rewritten
                 # anyway: then rebuild the whole index from the packs.
                 chunks.clear()
                 if not write_immediately:
-                    raise corrupt_fragment
-                logger.warning(f"{corrupt_fragment.args[0]} is corrupt, rebuilding the chunk index from the packs.")
+                    raise unusable_fragment
+                if isinstance(unusable_fragment, CorruptChunkIndexFragment):
+                    problem = f"{unusable_fragment.args[0]} is corrupt"
+                else:
+                    problem = f"chunk index fragment {hash} could not be read: {unusable_fragment}"
+                logger.warning(f"{problem}, rebuilding the chunk index from the packs.")
                 break
             if complete:
                 if len(hashes) > 1 and write_immediately:

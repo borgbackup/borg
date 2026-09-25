@@ -863,6 +863,10 @@ Errors
         Repository {} needs its key to access the store object {}, but no key was set.
     Repository.LegacyRepository rc: 29 traceback: no
         {} looks like a borg 1.x repository, use --from-borg1 to access it (e.g. with borg transfer).
+    Repository.RepairUnsafe rc: 34 traceback: no
+        Not repairing: {} repository object(s) could not be read. Fix the underlying problem, then check again.
+    Repository.StoreReadError rc: 35 traceback: no
+        Error reading {} from the repository: {}. Check the storage hardware / filesystem.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
         Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.

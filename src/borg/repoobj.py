@@ -298,5 +298,33 @@ def object_validator(repo_objs):
     return validate
 
 
+def whole_object_authenticator(repo_objs):
+    """Return authenticate(chunk_id, obj): True if obj is the whole repo object with id chunk_id.
+
+    obj is an object's header, metadata slot and data slot (object_validator gets the header and the
+    metadata slot only). Parsing it checks that the header's sizes add up to len(obj) and verifies
+    the tags of both slots, each computed over the slot and over the header prefix (magic, version,
+    chunk id) and chunk_id as AAD (additional authenticated data: bytes the tag covers without being
+    part of the ciphertext). Only the tags are checked: an object whose plaintext does not hash to
+    chunk_id is accepted.
+
+    Raises Error for an "authenticated-*" key with the authenticated_no_key workaround, which skips
+    the tag verification.
+    """
+    from .crypto.key import MACKeyBase  # crypto.key imports this module
+
+    if AUTHENTICATED_NO_KEY and isinstance(repo_objs.key, MACKeyBase):
+        raise Error("Objects can not be authenticated with BORG_WORKAROUNDS=authenticated_no_key.")
+
+    def authenticate(chunk_id, obj):
+        try:
+            repo_objs.parse(chunk_id, obj, decompress=False, want_compressed=True, ro_type=ROBJ_DONTCARE)
+        except (IntegrityErrorBase, msgpack.UnpackException):
+            return False
+        return True
+
+    return authenticate
+
+
 # Backward compatibility: RepoObj1 has moved to borg.legacy.repoobj
 from .legacy.repoobj import RepoObj1  # noqa: F401

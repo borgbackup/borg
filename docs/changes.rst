@@ -168,25 +168,23 @@ Version 2.0.0b25 (not released yet)
 
 Breaking changes (you must create new repos for b25):
 
-- cli: remove the none-sha256 and none-blake3 encryption modes, just use the
-  authenticated modes from now on.
-- repository: ini-style config/config text object (repo version 5) instead of
-  manifest, id, version, readme objects. The encryption and id-hash algorithms
-  are also given there as plain text.
+- cli: use ssh:// URLs (not rest://), #9765. ssh:// repository URLs access
+  current repositories via REST over ssh. With --from-borg1, they access
+  legacy borg 1.x repositories via the legacy RPC protocol over ssh.
+- cli: remove the none-sha256 and none-blake3 encryption modes, use the
+  authenticated-sha256 and authenticated-blake3 modes instead.
+- repository: use an ini-style config/config text object (repo version 5)
+  instead of the manifest, id, version and readme objects. The encryption and
+  id-hash algorithms are also given there as plain text.
 - store hash: use the much faster pure software blake3 hash instead of sha256
   to name content-addressed objects in the store.
-- index and cache store objects are protected by the repository key now:
-  encrypted and authenticated in the encrypting modes, authenticated only in
-  the authenticated modes, #9819, #10235.
-- repository lock objects are protected by the repository key now, like the index
-  and cache store objects, #8386. As locking needs the key, borg asks for the
-  passphrase before waiting for the lock, and break-lock and repo-delete (also
-  with --force) need the key, too.
+- the lock, index and cache store objects are now protected by the repository
+  key: encrypted and authenticated in the encrypting modes, authenticated only
+  in the authenticated modes, #9819, #10235, #8386. As locking needs the key,
+  borg asks for the passphrase before waiting for the lock, and break-lock and
+  repo-delete (also with --force) need the key, too.
 - drop OBJ_VERSION_NO_HEADER_AAD (pack object format v1) support, #9973
 - KeyType: renumber the authenticated key types to 0x50 / 0x60
-- ssh:// repository URLs access current repositories via REST over ssh
-  (served by a remote "borg serve"), #9765. With --from-borg1, they access
-  legacy borg 1.x repositories via the legacy protocol (as before).
 
 New features:
 
@@ -203,23 +201,30 @@ New features:
 Fixes:
 
 - crypto: the AEAD ciphers (AES-OCB, ChaCha20-Poly1305) feed their input to OpenSSL in
-  <= 1GB chunks, to overcome the 32bit size limit of the OpenSSL API.
-- repository: raise DoesNotExist for a missing ssh:// repo, #10365
+  <= 1 GiB chunks, to overcome the 32-bit size limit of the OpenSSL API.
+- repository: raise DoesNotExist for a missing ssh:// repository, #10365
 - --from-borg1 via ssh:// failed with a borg 1.x "borg serve" (e.g. borg
   transfer): the legacy client used RPC methods borg 1.x does not have and did
   not convert the bytes a borg 1.x server sends back.
 - --from-borg1: borg 1.x repositories in authenticated or authenticated-blake2
   mode could not be accessed ("passphrase is incorrect"), as their key was not
   decrypted with the pbkdf2 key derivation borg 1.x used for it.
+- repository: show a clear error message for borg 1.x repositories, fixing a
+  crash when --from-borg1 was not given.
 - compact:
 
   - build the chunk index once, not three times
   - validate a gap object before dropping its bytes, #10093
+  - do not rewrite or merge packs recorded corrupt, #10410
+- repo-compress: do not rewrite packs recorded corrupt, #10410
 - check:
 
   - use one chunk index for the checker and the repository, #10364
+  - report missing/corrupted item_ptrs chunks, #10421
+  - --verify-data: read the repo pack by pack, #9998
   - --repair: validate the repository index rebuild with the key, #9901
   - --repair: misc. other improvements and fixes, #8476
+  - --repair: remove the index entries of missing packs, #8572, #9898
 - repository: don't mask the original exception when unwinding with buffered
   chunks
 - treat an empty BORG_ZSTD_MT_WORKERS as unset (an empty value made borg fail)
@@ -239,6 +244,8 @@ Fixes:
     differ, #10351
   - report a file as modified when chunks were reordered or duplicated
 - import-tar: show the stored paths in the file status output
+- locking: try at least once before a lock acquire times out, also with --lock-wait 0
+- repoobj: catch get() errors in --find-lost-archives, #10318
 
 Other changes:
 
@@ -260,12 +267,12 @@ Other changes:
 
   - do not reject items with unknown keys, drop item_keys from the manifest
   - resync on any item-key-like first key, not only on known keys
-  - always require the borg key (now needed to access cache and index)
+  - always require the borg key (now needed to access the cache and the index)
   - --repair: re-read only the packs the repair wrote, #8466
   - make the chunk index rebuild interruptible, #10042
 - remove the repository feature flags mechanism (used to be in the manifest,
   but was never really used)
-- security: drop the manifest timestamp replay check (not needed any more)
+- security: drop the manifest timestamp replay check (not needed anymore)
 - debug get-obj, put-obj, delete-obj: need the key now (to access the chunk index)
 - docs:
 
@@ -282,6 +289,7 @@ Other changes:
     (make sure an authenticated mode repository can be read using this
     workaround, even if the key or passphrase is lost)
   - CI: run the S3 tests against moto instead of MinIO, #10361
+  - CI: add a swap zvol on omniOS to fix sporadic fork ENOMEM
 
 
 Version 2.0.0b24 (2026-09-02)

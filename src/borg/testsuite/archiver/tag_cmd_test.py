@@ -45,6 +45,27 @@ def test_tag_set_noclobber_special(archivers, request):
     assert "tags: @PROT,noclobber." in output
 
 
+def test_tag_clear(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive", archiver.input_path)
+    output = cmd(archiver, "tag", "-a", "archive", "--add", "aa", "--add", "bb")
+    assert "tags: aa,bb." in output
+    output = cmd(archiver, "tag", "-a", "archive", "--clear")
+    assert "tags: ." in output  # no tags!
+    output = cmd(archiver, "tag", "-a", "archive", "--add", "aa", "--add", "@PROT")
+    assert "tags: @PROT,aa." in output
+    # --clear must not remove special tags:
+    output = cmd(archiver, "tag", "-a", "archive", "--clear")
+    assert "tags: @PROT." in output
+    # --clear with --add replaces the normal tags:
+    cmd(archiver, "tag", "-a", "archive", "--add", "aa")
+    output = cmd(archiver, "tag", "-a", "archive", "--clear", "--add", "bb")
+    assert "tags: @PROT,bb." in output
+    # --clear and --set are mutually exclusive:
+    cmd(archiver, "tag", "-a", "archive", "--clear", "--set", "cc", exit_code=EXIT_ERROR)
+
+
 def test_tag_only_known_special(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

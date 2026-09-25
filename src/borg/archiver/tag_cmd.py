@@ -29,6 +29,9 @@ class TagMixIn:
                 clobber = not existing_special.issubset(new_tags)
                 if not clobber:
                     archive.tags = new_tags
+            if args.clear_tags:
+                # only remove normal tags, keep special tags.
+                archive.tags = {tag for tag in archive.tags if tag.startswith("@")}
             archive.tags |= set(args.add_tags or [])
             archive.tags -= set(args.remove_tags or [])
             old_id = archive.id
@@ -61,6 +64,9 @@ class TagMixIn:
             ``--set``, but you must also give pre-existing special tags (so they won't be
             removed).
 
+            ``--clear`` removes all normal tags, but keeps special tags. Combined with
+            ``--add``, it replaces the normal tags.
+
             Each of ``--set``, ``--add`` and ``--remove`` takes exactly one tag. To give
             multiple tags, use the option multiple times.
 
@@ -75,6 +81,9 @@ class TagMixIn:
                 # set the tags of the archive with the given ID to exactly "foo" and "bar"
                 $ borg tag --set foo --set bar aid:1ddaae55
 
+                # remove all normal tags (but not special tags like @PROT) from the archive with the given ID
+                $ borg tag --clear aid:1ddaae55
+
                 # protect the archive with the given ID against deletion and pruning
                 $ borg tag --add @PROT aid:1ddaae55
             """
@@ -83,7 +92,8 @@ class TagMixIn:
         subparsers.add_subcommand("tag", subparser, help="tag archives")
         # each option takes exactly one tag, so it can not swallow the NAME positional argument.
         # note: "extend" with nargs=1 (not "append") gives a flat list of tags that jsonargparse can validate.
-        subparser.add_argument(
+        set_clear_group = subparser.add_mutually_exclusive_group()
+        set_clear_group.add_argument(
             "--set",
             dest="set_tags",
             metavar="TAG",
@@ -91,6 +101,9 @@ class TagMixIn:
             action="extend",
             nargs=1,
             help="set tags (can be given multiple times)",
+        )
+        set_clear_group.add_argument(
+            "--clear", dest="clear_tags", action="store_true", help="remove all normal tags (keep special tags)"
         )
         subparser.add_argument(
             "--add",

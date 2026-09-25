@@ -60,14 +60,55 @@ class TagMixIn:
             Pre-existing special tags cannot be removed via ``--set``. You can still use
             ``--set``, but you must also give pre-existing special tags (so they won't be
             removed).
+
+            Each of ``--set``, ``--add`` and ``--remove`` takes exactly one tag. To give
+            multiple tags, use the option multiple times.
+
+            Examples::
+
+                # add the tags "important" and "keep" to the archive with the given ID
+                $ borg tag --add important --add keep aid:1ddaae55
+
+                # remove the tag "keep" from all archives named "home"
+                $ borg tag --remove keep --match-archives home
+
+                # set the tags of the archive with the given ID to exactly "foo" and "bar"
+                $ borg tag --set foo --set bar aid:1ddaae55
+
+                # protect the archive with the given ID against deletion and pruning
+                $ borg tag --add @PROT aid:1ddaae55
             """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_tag.__doc__, epilog=tag_epilog)
         subparsers.add_subcommand("tag", subparser, help="tag archives")
-        subparser.add_argument("--set", dest="set_tags", metavar="TAG", type=tag_validator, nargs="*", help="set tags")
-        subparser.add_argument("--add", dest="add_tags", metavar="TAG", type=tag_validator, nargs="*", help="add tags")
+        # each option takes exactly one tag, so it can not swallow the NAME positional argument.
+        # note: "extend" with nargs=1 (not "append") gives a flat list of tags that jsonargparse can validate.
         subparser.add_argument(
-            "--remove", dest="remove_tags", metavar="TAG", type=tag_validator, nargs="*", help="remove tags"
+            "--set",
+            dest="set_tags",
+            metavar="TAG",
+            type=tag_validator,
+            action="extend",
+            nargs=1,
+            help="set tags (can be given multiple times)",
+        )
+        subparser.add_argument(
+            "--add",
+            dest="add_tags",
+            metavar="TAG",
+            type=tag_validator,
+            action="extend",
+            nargs=1,
+            help="add tag (can be given multiple times)",
+        )
+        subparser.add_argument(
+            "--remove",
+            dest="remove_tags",
+            metavar="TAG",
+            type=tag_validator,
+            action="extend",
+            nargs=1,
+            help="remove tag (can be given multiple times)",
         )
         define_archive_filters_group(subparser)
         subparser.add_argument(

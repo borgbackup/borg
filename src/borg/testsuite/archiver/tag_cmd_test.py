@@ -12,10 +12,8 @@ def test_tag_set(archivers, request):
     assert "tags: aa." in output
     output = cmd(archiver, "tag", "-a", "archive", "--set", "bb")
     assert "tags: bb." in output
-    output = cmd(archiver, "tag", "-a", "archive", "--set", "bb", "aa")
+    output = cmd(archiver, "tag", "-a", "archive", "--set", "bb", "--set", "aa")
     assert "tags: aa,bb." in output  # sorted!
-    output = cmd(archiver, "tag", "-a", "archive", "--set")
-    assert "tags: ." in output  # no tags!
 
 
 def test_tag_add_remove(archivers, request):
@@ -43,7 +41,7 @@ def test_tag_set_noclobber_special(archivers, request):
     output = cmd(archiver, "tag", "-a", "archive", "--set", "clobber")
     assert "tags: @PROT." in output
     # it is possible though to use --set if the existing special tags are also given:
-    output = cmd(archiver, "tag", "-a", "archive", "--set", "noclobber", "@PROT")
+    output = cmd(archiver, "tag", "-a", "archive", "--set", "noclobber", "--set", "@PROT")
     assert "tags: @PROT,noclobber." in output
 
 
@@ -55,3 +53,16 @@ def test_tag_only_known_special(archivers, request):
     cmd(archiver, "tag", "-a", "archive", "--set", "@UNKNOWN", exit_code=EXIT_ERROR)
     cmd(archiver, "tag", "-a", "archive", "--add", "@UNKNOWN", exit_code=EXIT_ERROR)
     cmd(archiver, "tag", "-a", "archive", "--remove", "@UNKNOWN", exit_code=EXIT_ERROR)
+
+
+def test_tag_options_before_archive_name(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive", archiver.input_path)
+    # tag options take one tag each, so they must not swallow the archive name given after them.
+    output = cmd(archiver, "tag", "--add", "aa", "--add", "bb", "archive")
+    assert "tags: aa,bb." in output
+    output = cmd(archiver, "tag", "--remove", "aa", "archive")
+    assert "tags: bb." in output
+    output = cmd(archiver, "tag", "--set", "cc", "--set", "dd", "archive")
+    assert "tags: cc,dd." in output

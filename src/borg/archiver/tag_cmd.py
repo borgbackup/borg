@@ -30,6 +30,7 @@ class TagMixIn:
 
         for archive_info in archive_infos:
             archive = Archive(manifest, archive_info, cache=cache)
+            old_tags = set(archive.tags)
             if args.set_tags is not None:
                 # avoid that --set (accidentally) erases existing special tags,
                 # but allow --set if the existing special tags are also given.
@@ -50,9 +51,12 @@ class TagMixIn:
             archive.tags |= set(args.add_tags or [])
             archive.tags -= set(args.remove_tags or [])
             old_id = archive.id
-            archive.set_meta("tags", list(sorted(archive.tags)))
-            if old_id != archive.id:
-                manifest.archives.delete_by_id(old_id)
+            if archive.tags != old_tags:
+                # only rewrite the archive metadata if the tags changed, so that just
+                # listing the tags (or a no-op change) does not write to the repository.
+                archive.set_meta("tags", list(sorted(archive.tags)))
+                if old_id != archive.id:
+                    manifest.archives.delete_by_id(old_id)
             print(
                 f"id: {bin_to_hex(old_id):.8} -> {bin_to_hex(archive.id):.8}, "
                 f"tags: {','.join(sorted(archive.tags))}."

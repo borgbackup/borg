@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import pytest
 
 from ...constants import *  # NOQA
@@ -114,3 +117,31 @@ def test_tag_all_archives_needs_selection(archivers, request):
     # an explicit selection of all archives is fine:
     output = cmd(archiver, "tag", "-a", "sh:*", "--clear")
     assert output.count("tags: .") == 2
+
+
+def test_tag_unchanged_tags_do_not_rewrite_archive(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive", archiver.input_path)
+    cmd(archiver, "tag", "-a", "archive", "--add", "aa", "--add", "@PROT")
+    archives_dir = Path(archiver.repository_path) / "archives"
+
+    def live_entries():
+        # the archive entry objects, without soft-deleted ones (having a .del suffix).
+        return [p for p in archives_dir.iterdir() if not p.name.endswith(".del")]
+
+    (archive_entry,) = live_entries()
+    st_before = os.stat(archive_entry)
+    # neither just listing the tags nor a no-op change must rewrite the archive metadata:
+    output = cmd(archiver, "tag")
+    assert "tags: @PROT,aa." in output
+    output = cmd(archiver, "tag", "-a", "archive", "--add", "aa")
+    assert "tags: @PROT,aa." in output
+    output = cmd(archiver, "tag", "-a", "archive", "--remove", "zz")
+    assert "tags: @PROT,aa." in output
+    # a refused --set does not change the tags either:
+    output = cmd(archiver, "tag", "-a", "archive", "--set", "bb", exit_code=EXIT_WARNING)
+    assert "tags: @PROT,aa." in output
+    st_after = os.stat(archive_entry)
+    assert (st_after.st_mtime_ns, st_after.st_ino) == (st_before.st_mtime_ns, st_before.st_ino)
+    assert live_entries() == [archive_entry]

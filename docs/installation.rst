@@ -188,11 +188,11 @@ development header files (sometimes in a separate `-dev` or `-devel` package).
   - Additionally, your OS will need to have FUSE support installed
     (e.g. a package `fuse` for fuse 2 or a package `fuse3` for fuse 3 support).
 * Optionally, if you wish to use S3/B2 Backend:
-  - borgstore[rest,blake3,s3] ~= 0.6.4 (use `pip install borgbackup[s3]`)
+  - borgstore[rest,blake3,s3] ~= 0.7.0 (use `pip install borgbackup[s3]`)
 * Optionally, if you wish to use SFTP Backend:
-  - borgstore[rest,blake3,sftp] ~= 0.6.4 (use `pip install borgbackup[sftp]`)
+  - borgstore[rest,blake3,sftp] ~= 0.7.0 (use `pip install borgbackup[sftp]`)
 * Optionally, if you wish to use rclone Backend:
-  - borgstore[rest,blake3,rclone] ~= 0.6.4 (use `pip install borgbackup[rclone]`)
+  - borgstore[rest,blake3,rclone] ~= 0.7.0 (use `pip install borgbackup[rclone]`)
 * Optionally, if you wish to use the TUI (``borg --cockpit``):
   - textual >= 6.8.0 (use `pip install borgbackup[cockpit]`)
 

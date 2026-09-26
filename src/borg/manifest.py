@@ -43,7 +43,16 @@ class NoManifestError(Error):
     exit_mcode = 26
 
 
-ArchiveInfo = namedtuple("ArchiveInfo", "name id ts tags host user", defaults=[(), None, None])
+class ArchiveInfo(namedtuple("ArchiveInfo", "name id ts tags host user", defaults=[(), None, None])):
+    # metadata: the archive's parsed ArchiveItem if the archives lister had it at hand, None otherwise.
+    # it is an attribute, not a field: it takes no part in equality and hashing (prune uses sets of infos).
+    metadata = None  # for instances made without __new__, e.g. by _make() / _replace()
+
+    def __new__(cls, *args, metadata=None, **kwargs):
+        self = super().__new__(cls, *args, **kwargs)
+        self.metadata = metadata
+        return self
+
 
 # timestamp is a replacement for ts, archive is an alias for name (see SortBySpec)
 AI_HUMAN_SORT_KEYS = ["timestamp", "archive"] + list(ArchiveInfo._fields)
@@ -186,13 +195,21 @@ class Archives:
             info = ItemInfo(*info)  # RPC does not give us a NamedTuple
             yield hex_to_bin(info.name)
 
-    def _get_archive_meta(self, id: bytes) -> dict:
-        # get all metadata directly from the ArchiveItem in the repo.
+    def _get_archive_meta(self, id: bytes) -> tuple[dict, ArchiveItem | None]:
+        # get all metadata directly from the ArchiveItem in the repo, see _parse_archive_meta.
         from .repository import Repository
 
         try:
             cdata = self.repository.get(id)
         except Repository.ObjectNotFound:
+            cdata = None
+        return self._parse_archive_meta(id, cdata)
+
+    def _parse_archive_meta(self, id: bytes, cdata) -> tuple[dict, ArchiveItem | None]:
+        # parse the ArchiveItem repo object cdata (None: the object is missing) into the metadata dict,
+        # return it together with the ArchiveItem (None if the object is missing or not valid).
+        archive_item = None
+        if cdata is None:
             metadata = dict(
                 id=id,
                 name="archive-does-not-exist",
@@ -234,15 +251,17 @@ class Archives:
                     comment=archive_item.get("comment", ""),
                     tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
                 )
-        return metadata
+        return metadata, archive_item
 
     def _infos(self, *, deleted=False):
-        # yield the infos of all archives
-        for id in self.ids(deleted=deleted):
-            yield self._get_archive_meta(id)
+        # yield (info dict, ArchiveItem) of all archives, reading their metadata objects in batches
+        # (see Repository.gather_many).
+        ids = list(self.ids(deleted=deleted))
+        for id, cdata in zip(ids, self.repository.gather_many(ids, raise_missing=False)):
+            yield self._parse_archive_meta(id, cdata)
 
     def _info_tuples(self, *, deleted=False):
-        for info in self._infos(deleted=deleted):
+        for info, archive_item in self._infos(deleted=deleted):
             yield ArchiveInfo(
                 name=info["name"],
                 id=info["id"],
@@ -250,6 +269,7 @@ class Archives:
                 tags=info["tags"],
                 user=info["username"],
                 host=info["hostname"],
+                metadata=archive_item,
             )
 
     def _matching_info_tuples(self, match_patterns, match_end, *, deleted=False):
@@ -292,7 +312,7 @@ class Archives:
 
     def names(self):
         # yield the names of all archives
-        for archive_info in self._infos():
+        for archive_info, _ in self._infos():
             yield archive_info["name"]
 
     def exists(self, name):
@@ -309,7 +329,7 @@ class Archives:
         # check if an archive with this name AND id exists
         assert isinstance(name, str)
         assert isinstance(id, bytes)
-        for archive_info in self._infos():
+        for archive_info, _ in self._infos():
             if archive_info["name"] == name and archive_info["id"] == id:
                 return True
         else:
@@ -327,7 +347,7 @@ class Archives:
 
     def _lookup_name(self, name, raw=False):
         assert isinstance(name, str)
-        for archive_info in self._infos():
+        for archive_info, archive_item in self._infos():
             if archive_info["exists"] and archive_info["name"] == name:
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
@@ -338,6 +358,7 @@ class Archives:
                         tags=archive_info["tags"],
                         user=archive_info["username"],
                         host=archive_info["hostname"],
+                        metadata=archive_item,
                     )
                 else:
                     return archive_info
@@ -356,7 +377,7 @@ class Archives:
         if id in self.ids(deleted=deleted):  # check directory
             # looks like this archive id is in the archives directory, thus it is NOT deleted.
             # OR we have explicitly requested a soft-deleted archive via deleted=True.
-            archive_info = self._get_archive_meta(id)
+            archive_info, archive_item = self._get_archive_meta(id)
             if archive_info["exists"]:  # True means we have found Archive metadata in the repo.
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
@@ -367,6 +388,7 @@ class Archives:
                         tags=archive_info["tags"],
                         user=archive_info["username"],
                         host=archive_info["hostname"],
+                        metadata=archive_item,
                     )
                 return archive_info
         return None  # id not in store, or archive metadata blob missing from repo

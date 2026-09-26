@@ -386,20 +386,20 @@ class ArchiveAnalyzer:
         logger.info(
             f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
         )
-        base = self.analyze_archive(info.id)
+        base = self.analyze_archive(info)
         for i, info in enumerate(archive_infos[1:]):
             pi.show(i + 1)
             logger.info(
                 f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 2}/{num_archives})"
             )
-            new = self.analyze_archive(info.id)
+            new = self.analyze_archive(info)
             self.analyze_change(base, new)
             base = new
         pi.finish()
 
-    def analyze_archive(self, id):
+    def analyze_archive(self, archive_info):
         """compute the set of chunks for each directory in this archive"""
-        archive = Archive(self.manifest, id)
+        archive = Archive(self.manifest, archive_info)
         chunks_by_path = defaultdict(dict)  # collect all chunk IDs generated from files in this directory path
         for item in archive.iter_items():
             if "chunks" in item:

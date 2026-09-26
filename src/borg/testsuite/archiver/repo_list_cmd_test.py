@@ -3,9 +3,13 @@ import os
 
 import pytest
 
+from ...archive import Archive
+from ...archiver.repo_list_cmd import FORMAT_DEFAULT
 from ...constants import *  # NOQA
+from ...helpers.parseformat import ArchiveFormatter
+from ...manifest import Manifest
 from ...repository import Repository
-from . import cmd, checkts, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
+from . import cmd, checkts, create_regular_file, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from .prune_cmd_test import _create_archive_ts
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -290,3 +294,47 @@ def test_repo_list_group_by_invalid_key(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "repo-list", "--group-by", "bogus", exit_code=2)
     assert "Invalid group-by key: bogus" in output
+
+
+def test_archives_metadata_one_gather(archivers, request, backup_files):
+    # listing the archives reads all their metadata objects with one store.gather call, not one load each.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name in ("test-1", "test-2", "test-3"):
+        cmd(archiver, "create", name, backup_files)
+    with open_repository(archiver) as repository:
+        manifest = Manifest.load(repository)
+        repository.chunks  # build the chunk index now, it would load the index/ objects
+        gathers_before = repository.store.stats["gather_calls"]
+        loads_before = repository.store.stats["load_calls"]
+        assert sorted(info.name for info in manifest.archives.list()) == ["test-1", "test-2", "test-3"]
+        assert repository.store.stats["gather_calls"] - gathers_before == 1
+        assert repository.store.stats["load_calls"] == loads_before
+
+
+def test_archives_metadata_reused_by_formatter(archivers, request, backup_files):
+    # the default repo-list format needs the archives' tags, username, hostname and comment: the formatter
+    # builds each Archive from its listed ArchiveInfo and its metadata, without any further store access.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name in ("test-1", "test-2", "test-3"):
+        cmd(archiver, "create", "--comment", f"comment of {name}", name, backup_files)
+    with open_repository(archiver) as repository:
+        manifest = Manifest.load(repository)
+        repository.chunks  # build the chunk index now, it would load the index/ objects
+        stats_before = repository.store.stats
+        formatter = ArchiveFormatter(FORMAT_DEFAULT, repository, manifest, manifest.key)
+        output = [formatter.format_item(info) for info in manifest.archives.list(sort_by=["name"])]
+        stats = repository.store.stats
+        for i, line in enumerate(output, 1):
+            assert f"  test-{i}  " in line and f"comment of test-{i}" in line
+        assert stats["gather_calls"] - stats_before["gather_calls"] == 1
+        assert stats["list_calls"] - stats_before["list_calls"] == 1  # listing archives/
+        assert stats["load_calls"] == stats_before["load_calls"]
+
+        # without the metadata, Archive looks the archive up and loads its metadata as before.
+        info = manifest.archives.get("test-2")._replace()
+        assert info.metadata is None
+        archive = Archive(manifest, info)
+        assert archive.metadata.comment == "comment of test-2"
+        assert repository.store.stats["load_calls"] > stats["load_calls"]

@@ -49,7 +49,7 @@ class RecreateMixIn:
             else:
                 target = archive_info.name
                 delete_original = True
-            if not recreater.recreate(archive_info.id, target, delete_original, args.comment):
+            if not recreater.recreate(archive_info, target, delete_original, args.comment):
                 logger.info(f"Skipped archive {name} {hex_id}: Nothing to do.")
 
     def build_parser_recreate(self, subparsers, common_parser, mid_common_parser):

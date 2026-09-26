@@ -1134,6 +1134,7 @@ class ArchiveFormatter(BaseFormatter):
         self.key = key
         self.name = None
         self.id = None
+        self.archive_info = None
         self._archive = None
         self.deleted = deleted  # True if we want to deal with deleted archives.
         self.format_keys = {f[1] for f in Formatter().parse(format)}
@@ -1153,6 +1154,7 @@ class ArchiveFormatter(BaseFormatter):
     def get_item_data(self, archive_info, jsonline=False):
         self.name = archive_info.name
         self.id = archive_info.id
+        self.archive_info = archive_info
         item_data = {}
         item_data |= {} if jsonline else self.static_data
         item_data |= {
@@ -1177,7 +1179,8 @@ class ArchiveFormatter(BaseFormatter):
         if self._archive is None or self._archive.id != self.id:
             from ..archive import Archive
 
-            self._archive = Archive(self.manifest, self.id, deleted=self.deleted)
+            # the ArchiveInfo usually carries the archive's metadata, so this does not need to load it again.
+            self._archive = Archive(self.manifest, self.archive_info, deleted=self.deleted)
         return self._archive
 
     def get_meta(self, key, default=None):

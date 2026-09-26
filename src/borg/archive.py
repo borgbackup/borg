@@ -49,7 +49,7 @@ from .helpers import MAP_DATA, MAP_ZERO, MAP_SAME, input_map_check_size
 from .helpers import os_stat
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
-from .manifest import Manifest
+from .manifest import Manifest, ArchiveInfo
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
@@ -618,6 +618,12 @@ class Archive:
         log_json=False,
         deleted=False,
     ):
+        info = None
+        if isinstance(name, ArchiveInfo):
+            # an archive listed by manifest.archives: if the info carries the archive's metadata, there is
+            # no need to look the archive up again and load its metadata. otherwise, look it up by id.
+            info = name if name.metadata is not None else None
+            name = name.id
         name_is_id = isinstance(name, bytes)
         if not name_is_id:
             assert len(name) <= 255
@@ -654,15 +660,16 @@ class Archive:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
             self.tags = set()
         else:
-            if name_is_id:
-                # we also go over the manifest here to avoid soft-deleted archives,
-                # except if we explicitly request one via deleted=True.
-                info = self.manifest.archives.get_by_id(name, deleted=deleted)
-            else:
-                info = self.manifest.archives.get(name)
             if info is None:
-                raise self.DoesNotExist(name)
-            self.load(info.id)
+                if name_is_id:
+                    # we also go over the manifest here to avoid soft-deleted archives,
+                    # except if we explicitly request one via deleted=True.
+                    info = self.manifest.archives.get_by_id(name, deleted=deleted)
+                else:
+                    info = self.manifest.archives.get(name)
+                if info is None:
+                    raise self.DoesNotExist(name)
+            self.load(info.id, metadata=info.metadata)
 
     def _load_meta(self, id):
         cdata = self.repository.get(id)
@@ -673,9 +680,10 @@ class Archive:
             raise Exception("Unknown archive metadata version")
         return metadata
 
-    def load(self, id):
+    def load(self, id, *, metadata=None):
+        # metadata: the archive's ArchiveItem if the caller already has it (see ArchiveInfo.metadata).
         self.id = id
-        self.metadata = self._load_meta(self.id)
+        self.metadata = metadata if metadata is not None else self._load_meta(self.id)
         self.name = self.metadata.name
         self.comment = self.metadata.get("comment", "")
         self.tags = set(self.metadata.get("tags", []))
@@ -3020,8 +3028,8 @@ class ArchiveRecreater:
         self.progress = progress
         self.print_file_status = file_status_printer or (lambda *args: None)
 
-    def recreate(self, archive_id, target_name, delete_original, comment=None):
-        archive = self.open_archive(archive_id)
+    def recreate(self, archive_info, target_name, delete_original, comment=None):
+        archive = self.open_archive(archive_info)
         target = self.create_target(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
@@ -3167,5 +3175,5 @@ class ArchiveRecreater:
         )
         return target
 
-    def open_archive(self, archive_id, **kwargs):
-        return Archive(self.manifest, archive_id, cache=self.cache, **kwargs)
+    def open_archive(self, archive_info, **kwargs):
+        return Archive(self.manifest, archive_info, cache=self.cache, **kwargs)

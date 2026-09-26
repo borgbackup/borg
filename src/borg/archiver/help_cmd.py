@@ -324,7 +324,7 @@ class HelpMixIn:
         - aid: prefix match on the archive id (only one result allowed)
         - user: exact match on the username who created the archive
         - host: exact match on the hostname where the archive was created
-        - tags: match on the archive tags
+        - tags: match archives having all the given tags (comma-separated, e.g. tags:TAG1,TAG2)
         - date: match on the archive creation timestamp
 
         In case of a name pattern match,
@@ -399,8 +399,9 @@ class HelpMixIn:
             borg delete -a 'user:kenny'
             borg delete -a 'host:kenny-pc'
 
-            # tags match
+            # tags match (both lines match archives having TAG1 and TAG2)
             borg delete -a 'tags:TAG1' -a 'tags:TAG2'
+            borg delete -a 'tags:TAG1,TAG2'
 
             # archive creation date match
             borg delete -a 'date:2025-01'

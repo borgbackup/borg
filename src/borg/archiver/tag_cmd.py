@@ -1,7 +1,7 @@
 from ._common import with_repository, define_archive_filters_group, archive_match_patterns
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, archivename_validator, tag_validator
+from ..helpers import CommandError, bin_to_hex, archivename_validator, tag_validator
 from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
@@ -14,6 +14,15 @@ class TagMixIn:
     def do_tag(self, args, repository, manifest, cache):
         """Manage tags."""
 
+        modifying = args.set_tags is not None or args.clear_tags or args.add_tags or args.remove_tags
+        # any explicitly given archive filter counts as a deliberate selection;
+        # all these args are falsy when not given (--first / --last are PositiveInt, defaulting to None).
+        any_filters_given = any(
+            (args.name, args.match_archives, args.first, args.last, args.oldest, args.newest, args.older, args.newer)
+        )
+        if modifying and not any_filters_given:
+            raise CommandError("Aborting: if you really want to change the tags of all archives, please use -a 'sh:*'.")
+
         if args.name:
             archive_infos = [manifest.archives.get_one(archive_match_patterns(args))]
         else:
@@ -21,20 +30,33 @@ class TagMixIn:
 
         for archive_info in archive_infos:
             archive = Archive(manifest, archive_info, cache=cache)
+            old_tags = set(archive.tags)
             if args.set_tags is not None:
                 # avoid that --set (accidentally) erases existing special tags,
                 # but allow --set if the existing special tags are also given.
                 new_tags = set(args.set_tags)
                 existing_special = {tag for tag in archive.tags if tag.startswith("@")}
-                clobber = not existing_special.issubset(new_tags)
-                if not clobber:
+                missing_special = existing_special - new_tags
+                if missing_special:
+                    self.print_warning(
+                        f"Archive {archive_info.name} {bin_to_hex(archive_info.id):.8}: not setting tags, "
+                        f"this would remove special tags {','.join(sorted(missing_special))}. "
+                        f"Also give them to --set or use --add / --remove."
+                    )
+                else:
                     archive.tags = new_tags
+            if args.clear_tags:
+                # only remove normal tags, keep special tags.
+                archive.tags = {tag for tag in archive.tags if tag.startswith("@")}
             archive.tags |= set(args.add_tags or [])
             archive.tags -= set(args.remove_tags or [])
             old_id = archive.id
-            archive.set_meta("tags", list(sorted(archive.tags)))
-            if old_id != archive.id:
-                manifest.archives.delete_by_id(old_id)
+            if archive.tags != old_tags:
+                # only rewrite the archive metadata if the tags changed, so that just
+                # listing the tags (or a no-op change) does not write to the repository.
+                archive.set_meta("tags", list(sorted(archive.tags)))
+                if old_id != archive.id:
+                    manifest.archives.delete_by_id(old_id)
             print(
                 f"id: {bin_to_hex(old_id):.8} -> {bin_to_hex(archive.id):.8}, "
                 f"tags: {','.join(sorted(archive.tags))}."
@@ -59,15 +81,71 @@ class TagMixIn:
 
             Pre-existing special tags cannot be removed via ``--set``. You can still use
             ``--set``, but you must also give pre-existing special tags (so they won't be
-            removed).
+            removed). If they are not given, borg emits a warning and does not set the tags
+            of that archive.
+
+            ``--clear`` removes all normal tags, but keeps special tags. Combined with
+            ``--add``, it replaces the normal tags.
+
+            To change tags, you must select the archives: give an archive NAME or use archive
+            filter options like ``--match-archives``. To change the tags of all archives, use
+            ``--match-archives 'sh:*'``.
+
+            Each of ``--set``, ``--add`` and ``--remove`` takes exactly one tag. To give
+            multiple tags, use the option multiple times.
+
+            Examples::
+
+                # add the tags "important" and "keep" to the archive with the given ID
+                $ borg tag --add important --add keep aid:1ddaae55
+
+                # remove the tag "keep" from all archives named "home"
+                $ borg tag --remove keep --match-archives home
+
+                # set the tags of the archive with the given ID to exactly "foo" and "bar"
+                $ borg tag --set foo --set bar aid:1ddaae55
+
+                # remove all normal tags (but not special tags like @PROT) from the archive with the given ID
+                $ borg tag --clear aid:1ddaae55
+
+                # protect the archive with the given ID against deletion and pruning
+                $ borg tag --add @PROT aid:1ddaae55
             """
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_tag.__doc__, epilog=tag_epilog)
         subparsers.add_subcommand("tag", subparser, help="tag archives")
-        subparser.add_argument("--set", dest="set_tags", metavar="TAG", type=tag_validator, nargs="*", help="set tags")
-        subparser.add_argument("--add", dest="add_tags", metavar="TAG", type=tag_validator, nargs="*", help="add tags")
+        # each option takes exactly one tag, so it can not swallow the NAME positional argument.
+        # note: "extend" with nargs=1 (not "append") gives a flat list of tags that jsonargparse can validate.
+        set_clear_group = subparser.add_mutually_exclusive_group()
+        set_clear_group.add_argument(
+            "--set",
+            dest="set_tags",
+            metavar="TAG",
+            type=tag_validator,
+            action="extend",
+            nargs=1,
+            help="set tags (can be given multiple times)",
+        )
+        set_clear_group.add_argument(
+            "--clear", dest="clear_tags", action="store_true", help="remove all normal tags (keep special tags)"
+        )
         subparser.add_argument(
-            "--remove", dest="remove_tags", metavar="TAG", type=tag_validator, nargs="*", help="remove tags"
+            "--add",
+            dest="add_tags",
+            metavar="TAG",
+            type=tag_validator,
+            action="extend",
+            nargs=1,
+            help="add tag (can be given multiple times)",
+        )
+        subparser.add_argument(
+            "--remove",
+            dest="remove_tags",
+            metavar="TAG",
+            type=tag_validator,
+            action="extend",
+            nargs=1,
+            help="remove tag (can be given multiple times)",
         )
         define_archive_filters_group(subparser)
         subparser.add_argument(

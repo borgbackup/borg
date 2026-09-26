@@ -249,7 +249,7 @@ class ArchiveGarbageCollector:
                         f"Soft-deleted archive {name} {hex_id}: {missing} objects missing from the index; "
                         f'"borg undelete" may not fully recover it.'
                     )
-            except (Repository.ObjectNotFound, IntegrityError) as e:
+            except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityError) as e:
                 logger.warning(f"Soft-deleted archive {name} {hex_id} cannot be fully preserved: {e}")
 
     def compact_packs(self):

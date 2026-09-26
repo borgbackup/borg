@@ -216,6 +216,104 @@ def test_create_duplicate_root(archivers, request):
     assert sorted(paths) == ["input", "input/a", "input/a/hardlink", "input/b", "input/b/hardlink"]
 
 
+def _create_hardlinked_files(archiver):
+    create_regular_file(archiver.input_path, "file1", contents=b"123456")
+    for name in "file2", "file3":
+        os.link(os.path.join(archiver.input_path, "file1"), os.path.join(archiver.input_path, name))
+
+
+def _list_items(archiver, name):
+    archive_list = cmd(archiver, "list", name, "--json-lines", "--format={path}{hlid}")
+    return [json.loads(line) for line in archive_list.split("\n") if line]
+
+
+@requires_hardlinks
+def test_create_hardlinked_roots(archivers, request):
+    # recursion roots that are hard links of each other are different paths and must all be archived,
+    # they are not the same root given twice (#5603).
+    archiver = request.getfixturevalue(archivers)
+    _create_hardlinked_files(archiver)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/file1", "input/file2", "input/file3")
+    items = _list_items(archiver, "test")
+    assert [item["path"] for item in items] == ["input/file1", "input/file2", "input/file3"]
+    hlids = {item["hlid"] for item in items}
+    assert len(hlids) == 1 and hlids != {""}  # one hard link group
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        sts = [os.stat(f"input/{name}") for name in ("file1", "file2", "file3")]
+        assert {st.st_ino for st in sts} == {sts[0].st_ino}
+        assert all(st.st_nlink == 3 for st in sts)
+        with open("input/file3", "rb") as f:
+            assert f.read() == b"123456"
+
+
+@requires_hardlinks
+def test_create_hardlinked_root_and_parent_dir(archivers, request):
+    # a file root given before its parent directory must not hide its hard links when recursing into
+    # the directory, and the file itself must be archived only once.
+    archiver = request.getfixturevalue(archivers)
+    _create_hardlinked_files(archiver)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/file1", "input")
+    paths = [item["path"] for item in _list_items(archiver, "test")]
+    assert sorted(paths) == ["input", "input/file1", "input/file2", "input/file3"]
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert all(os.stat(f"input/{name}").st_nlink == 3 for name in ("file1", "file2", "file3"))
+
+
+@requires_hardlinks
+def test_create_duplicate_file_root(archivers, request):
+    # the very same file given twice as a recursion root (also with a different spelling of the path)
+    # is archived only once, like a directory given twice (#5603).
+    archiver = request.getfixturevalue(archivers)
+    _create_hardlinked_files(archiver)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/file1", "input/file1", "./input/../input/file1", "input/file2")
+    paths = [item["path"] for item in _list_items(archiver, "test")]
+    assert paths == ["input/file1", "input/file2"]
+
+
+@requires_hardlinks
+def test_create_dir_root_and_roots_inside_it(archivers, request):
+    # roots that were already archived while recursing into a directory root given before them must
+    # not be archived again. a duplicate hard link item made borg extract delete the file (#10393).
+    archiver = request.getfixturevalue(archivers)
+    _create_hardlinked_files(archiver)
+    create_regular_file(archiver.input_path, "dir/file", contents=b"abc")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input", "input/file1", "input/file2", "./input/file3", "input/dir")
+    paths = [item["path"] for item in _list_items(archiver, "test")]
+    assert sorted(paths) == ["input", "input/dir", "input/dir/file", "input/file1", "input/file2", "input/file3"]
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert all(os.stat(f"input/{name}").st_nlink == 3 for name in ("file1", "file2", "file3"))
+
+
+def test_create_dir_root_and_not_archived_roots_inside_it(archivers, request):
+    # roots inside a directory root given before them, which were not archived while recursing into
+    # that directory, because it did not recurse into their parent directory.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file", contents=b"abc")
+    create_regular_file(archiver.input_path, "tagged/.nobackup")
+    create_regular_file(archiver.input_path, "tagged/file", contents=b"abc")
+    create_regular_file(archiver.input_path, "tagged/dir/file", contents=b"abc")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(
+        archiver,
+        "create",
+        "--exclude-if-present=.nobackup",
+        "test",
+        "input",
+        "input/tagged/file",
+        "input/tagged/dir",
+        "input/file",
+    )
+    paths = [item["path"] for item in _list_items(archiver, "test")]
+    assert sorted(paths) == ["input", "input/file", "input/tagged/dir", "input/tagged/dir/file", "input/tagged/file"]
+
+
 def test_create_unreadable_parent(archiver):
     parent_dir = os.path.join(archiver.input_path, "parent")
     root_dir = os.path.join(archiver.input_path, "parent", "root")
@@ -1283,8 +1381,8 @@ def test_create_symlink_below_root_not_followed(archivers, request):
 
 @pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
 def test_create_symlink_root_and_target(archivers, request):
-    # a followed symlink root and its target are the same fs objects, so they are archived
-    # only once, under the path given first (like any other recursion root given twice).
+    # a followed symlink root and its target directory are the same directory, so its contents are
+    # archived only once, under the path given first (like any other directory given twice).
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "target/file", contents=b"content")
     os.symlink("target", os.path.join(archiver.input_path, "link"))
@@ -1293,6 +1391,19 @@ def test_create_symlink_root_and_target(archivers, request):
     output = cmd(archiver, "list", "test")
     assert "input/link/file" in output
     assert "input/target/file" not in output
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_create_symlink_root_and_target_file(archivers, request):
+    # a followed symlink root and its target file are different paths, so both are archived.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "target", contents=b"content")
+    os.symlink("target", os.path.join(archiver.input_path, "link"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/link", "input/target")
+    archive_list = cmd(archiver, "list", "test", "--json-lines")
+    items = [json.loads(line) for line in archive_list.split("\n") if line]
+    assert [(item["path"], item["type"]) for item in items] == [("input/link", "-"), ("input/target", "-")]
 
 
 @pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")

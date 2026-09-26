@@ -9,6 +9,7 @@ from borgstore.store import ItemInfo, ObjectNotFound as StoreObjectNotFound
 from ..helpers.errors import CommandError, Error
 from ..helpers.parseformat import bin_to_hex
 from ..helpers.time import parse_timestamp
+from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 from ..manifest import Archives, ArchiveInfo, ArchivesInterface
 from ..repository import Repository
 
@@ -257,6 +258,41 @@ def test_get_archive_meta_bad_version():
 
     with pytest.raises(Exception, match="Unknown archive metadata version"):
         ar._get_archive_meta(_id(1))
+
+
+def test_infos_gathers_archive_metadata():
+    # _infos reads all archive metadata objects with one gather_many call, keeping the order of ids():
+    # a missing object (None) and one failing to parse yield placeholder infos with exists=False.
+    ar, repo, manifest = _archives()
+    ids = [_id(1), _id(2), _id(3)]
+    repo.store_list.return_value = [_iteminfo(id_) for id_ in ids]
+    repo.gather_many.return_value = iter([b"cdata1", None, b"cdata3"])
+
+    def parse(id_, cdata, ro_type):
+        if id_ == _id(3):
+            raise IntegrityErrorBase("corrupted")
+        return None, b"data"
+
+    manifest.repo_objs.parse.side_effect = parse
+    manifest.key.unpack_archive.return_value = {
+        "version": 2,
+        "name": "myarchive",
+        "time": TS,
+        "username": "alice",
+        "hostname": "myhost",
+    }
+
+    infos = list(ar._infos())
+
+    repo.gather_many.assert_called_once_with(ids, raise_missing=False)
+    repo.get.assert_not_called()
+    assert [info["id"] for info in infos] == ids
+    assert [info["exists"] for info in infos] == [True, False, False]
+    assert [info["name"] for info in infos] == [
+        "myarchive",
+        "archive-does-not-exist",
+        "archive-metadata-has-integrity-error",
+    ]
 
 
 def test_get_missing_returns_none():

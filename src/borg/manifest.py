@@ -193,6 +193,12 @@ class Archives:
         try:
             cdata = self.repository.get(id)
         except Repository.ObjectNotFound:
+            cdata = None
+        return self._parse_archive_meta(id, cdata)
+
+    def _parse_archive_meta(self, id: bytes, cdata) -> dict:
+        # parse the ArchiveItem repo object cdata (None: the object is missing) into the metadata dict.
+        if cdata is None:
             metadata = dict(
                 id=id,
                 name="archive-does-not-exist",
@@ -237,9 +243,10 @@ class Archives:
         return metadata
 
     def _infos(self, *, deleted=False):
-        # yield the infos of all archives
-        for id in self.ids(deleted=deleted):
-            yield self._get_archive_meta(id)
+        # yield the infos of all archives, reading their metadata objects in batches (see Repository.gather_many)
+        ids = list(self.ids(deleted=deleted))
+        for id, cdata in zip(ids, self.repository.gather_many(ids, raise_missing=False)):
+            yield self._parse_archive_meta(id, cdata)
 
     def _info_tuples(self, *, deleted=False):
         for info in self._infos(deleted=deleted):

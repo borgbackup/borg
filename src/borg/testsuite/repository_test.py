@@ -791,6 +791,110 @@ def test_get_reuses_cached_pack(repo_fixtures, request):
         assert repository.store.stats["load_calls"] - loads_before == 0
 
 
+@pytest.mark.parametrize("variant", ["file", "ssh", "storecache"])
+def test_gather_many_one_gather_for_many_packs(tmp_path, monkeypatch, variant):
+    # gather_many reads objects from several packs with one store.gather call and no store.load, in the
+    # requested order, including repeated ids. Via ssh:// the REST backend gathers on the server side; with a
+    # store cache (writethrough on packs/), store.gather reads the ranges through the cache.
+    path = os.fspath(tmp_path / "repository")
+    if variant == "storecache":
+        monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(tmp_path / "storecache"))
+    location = Location(f"ssh://__testsuite__/{path}" if variant == "ssh" else path)
+    objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(5)}
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository._pack_writer.max_count = 2  # three packs: {H0,H1} {H2,H3} {H4}
+        for chunk_id, chunk in objects.items():
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        assert len({repository.chunks[chunk_id].pack_id for chunk_id in objects}) == 3
+        ids = [H(4), H(0), H(2), H(0), H(1), H(3)]  # out of stored order, across all packs, H0 repeated
+
+        gathers_before = repository.store.stats["gather_calls"]
+        loads_before = repository.store.stats["load_calls"]
+        assert list(repository.gather_many(ids)) == [objects[chunk_id] for chunk_id in ids]
+        assert repository.store.stats["gather_calls"] - gathers_before == 1
+        assert repository.store.stats["load_calls"] == loads_before
+
+
+def test_gather_many_batches(repo_fixtures, request, monkeypatch):
+    # gather_many ends a batch at GATHER_MAX_COUNT objects or once a batch has GATHER_MAX_SIZE bytes.
+    objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(5)}
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 1  # one pack per object
+        for chunk_id, chunk in objects.items():
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        ids = list(objects)
+        expected = list(objects.values())
+
+        monkeypatch.setattr(repository, "GATHER_MAX_COUNT", 2)
+        gathers_before = repository.store.stats["gather_calls"]
+        assert list(repository.gather_many(ids)) == expected
+        assert repository.store.stats["gather_calls"] - gathers_before == 3  # batches of 2, 2 and 1 objects
+
+        monkeypatch.setattr(repository, "GATHER_MAX_COUNT", 1000)
+        monkeypatch.setattr(repository, "GATHER_MAX_SIZE", 2 * len(expected[0]))
+        gathers_before = repository.store.stats["gather_calls"]
+        assert list(repository.gather_many(ids)) == expected
+        assert repository.store.stats["gather_calls"] - gathers_before == 3  # batches of 2, 2 and 1 objects
+
+
+def test_gather_many_missing_id(repo_fixtures, request):
+    # An id that was never stored yields None with raise_missing=False and raises ObjectNotFound otherwise;
+    # the other ids of the batch read back unchanged.
+    objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(2)}
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        for chunk_id, chunk in objects.items():
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        ids = [H(0), H(99), H(1)]  # H(99) was never put
+        assert list(repository.gather_many(ids, raise_missing=False)) == [objects[H(0)], None, objects[H(1)]]
+        with pytest.raises(Repository.ObjectNotFound):
+            list(repository.gather_many(ids))
+
+
+def test_gather_many_missing_pack(repo_fixtures, request):
+    # A pack missing from the store fails the store.gather of its batch; gather_many then reads the batch's
+    # objects one by one with get(): the objects in intact packs are returned, the missing one yields None
+    # with raise_missing=False and raises ObjectNotFound otherwise.
+    objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(2)}
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 1  # two packs: {H0} {H1}
+        for chunk_id, chunk in objects.items():
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        repository.store_delete("packs/" + bin_to_hex(repository.chunks[H(0)].pack_id))  # keep its index entry
+
+        assert list(repository.gather_many([H(0), H(1)], raise_missing=False)) == [None, objects[H(1)]]
+        with pytest.raises(Repository.ObjectNotFound):
+            list(repository.gather_many([H(0), H(1)]))
+
+
+def test_gather_many_uses_cached_pack(repo_fixtures, request):
+    # Objects of a pack that get_many already cached are sliced from it, without a store.gather call.
+    objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(2)}
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # one pack: {H0, H1}
+        for chunk_id, chunk in objects.items():
+            repository.put(chunk_id, chunk)
+        repository.flush()
+        list(repository.get_many([H(0)]))  # loads the whole pack into the cache
+
+        gathers_before = repository.store.stats["gather_calls"]
+        assert list(repository.gather_many([H(0), H(1)])) == list(objects.values())
+        assert repository.store.stats["gather_calls"] == gathers_before
+
+
+def test_gather_many_inflight_pack(repo_fixtures, request):
+    # Objects of a pack whose background store may still be in flight are read via get(), which joins it.
+    objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(2)}
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        repository._pack_writer.max_count = 2  # the second put fills the pack and hands it to the store-thread
+        for chunk_id, chunk in objects.items():
+            repository.put(chunk_id, chunk)
+        assert list(repository.gather_many([H(0), H(1)])) == list(objects.values())
+
+
 def build_one_pack(repository, objects):
     with repository:
         repository._pack_writer.max_count = len(objects) + 1  # prevent per-put flush; one pack on flush()

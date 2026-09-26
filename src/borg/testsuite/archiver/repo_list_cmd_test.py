@@ -4,8 +4,9 @@ import os
 import pytest
 
 from ...constants import *  # NOQA
+from ...manifest import Manifest
 from ...repository import Repository
-from . import cmd, checkts, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
+from . import cmd, checkts, create_regular_file, generate_archiver_tests, open_repository, RK_ENCRYPTION
 from .prune_cmd_test import _create_archive_ts
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -290,3 +291,19 @@ def test_repo_list_group_by_invalid_key(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "repo-list", "--group-by", "bogus", exit_code=2)
     assert "Invalid group-by key: bogus" in output
+
+
+def test_archives_metadata_one_gather(archivers, request, backup_files):
+    # listing the archives reads all their metadata objects with one store.gather call, not one load each.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name in ("test-1", "test-2", "test-3"):
+        cmd(archiver, "create", name, backup_files)
+    with open_repository(archiver) as repository:
+        manifest = Manifest.load(repository)
+        repository.chunks  # build the chunk index now, it would load the index/ objects
+        gathers_before = repository.store.stats["gather_calls"]
+        loads_before = repository.store.stats["load_calls"]
+        assert sorted(info.name for info in manifest.archives.list()) == ["test-1", "test-2", "test-3"]
+        assert repository.store.stats["gather_calls"] - gathers_before == 1
+        assert repository.store.stats["load_calls"] == loads_before

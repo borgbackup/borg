@@ -892,6 +892,10 @@ class Repository:
     # Memory use is this count times the pack size.
     PACK_READER_CACHE_SIZE = 3
 
+    # Limits for one store.gather call in gather_many(): max. object count, and the byte count that ends a batch.
+    GATHER_MAX_COUNT = 1000
+    GATHER_MAX_SIZE = 16 * 1024 * 1024
+
     def __init__(
         self,
         path_or_location,
@@ -1916,6 +1920,63 @@ class Repository:
                 yield None
             else:
                 yield reader.read(entry.obj_offset, entry.obj_size)
+
+    def gather_many(self, ids, raise_missing=True):
+        """Yield the objects for ids in the requested order, reading them in batches with store.gather.
+
+        One store.gather call reads the byte ranges of up to GATHER_MAX_COUNT objects (or about GATHER_MAX_SIZE
+        bytes) from any number of packs, so a backend that supports it (e.g. REST) needs one roundtrip per batch
+        instead of one per object. This suits many small objects spread over many packs, like the archive
+        metadata objects (each usually in a tiny pack of its own). get_many() loads whole packs instead, which
+        suits reading most of the objects of a pack.
+
+        raise_missing: like for get(). Ids whose objects cannot be gathered (unknown or still buffered ids, and
+        the ids of a batch that hit a missing or truncated pack) are read with get(), so they behave as there.
+        """
+        batch = []
+        batch_size = 0
+        for id_ in ids:
+            batch.append(id_)
+            entry = self.chunks.get(id_)
+            batch_size += entry.obj_size if entry is not None else 0
+            if len(batch) >= self.GATHER_MAX_COUNT or batch_size >= self.GATHER_MAX_SIZE:
+                yield from self._gather_batch(batch, raise_missing)
+                batch = []
+                batch_size = 0
+        if batch:
+            yield from self._gather_batch(batch, raise_missing)
+
+    def _gather_batch(self, ids, raise_missing):
+        """Return the objects for ids (one gather_many batch) in order, reading their ranges with one store.gather."""
+        self._lock_refresh()
+        results = [None] * len(ids)
+        sources = []  # (position in ids, (pack name, obj_offset, obj_size))
+        for i, id_ in enumerate(ids):
+            entry = self.chunks.get(id_)
+            if entry is None or self.chunks.is_pending(id_):
+                # id unknown or still buffered: get() raises or returns None accordingly
+                results[i] = self.get(id_, raise_missing=raise_missing)
+                continue
+            reader = self._pack_cache.get(entry.pack_id)
+            if reader is not None:
+                results[i] = reader.read(entry.obj_offset, entry.obj_size)  # slice from the cached whole pack
+            else:
+                sources.append((i, (bin_to_hex(entry.pack_id), entry.obj_offset, entry.obj_size)))
+        if sources:
+            try:
+                data = self.store.gather([source for _, source in sources], namespace="packs")
+            except (StoreObjectNotFound, ReadRangeError):
+                # a missing or truncated pack: read the objects one by one, so the ones in intact packs are
+                # still returned and the others get get()'s error handling.
+                for i, _ in sources:
+                    results[i] = self.get(ids[i], raise_missing=raise_missing)
+            else:
+                view = memoryview(data)
+                offset = 0
+                for i, (_, _, size) in sources:
+                    results[i] = view[offset : offset + size]
+                    offset += size
+        return results
 
     def put(self, id, data):
         """put a repo object

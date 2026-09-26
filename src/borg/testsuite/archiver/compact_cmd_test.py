@@ -445,6 +445,36 @@ def test_compact_keeps_undelete_data_when_chunks_missing(archivers, request):
         assert fd.read() == b"G" * (1024 * 80)  # its data survived compaction
 
 
+def test_compact_soft_deleted_archive_metadata_missing(archivers, request):
+    # On a damaged repo, compact skips a soft-deleted archive whose metadata object is gone and
+    # goes on compacting (#10435).
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "kept_dir/kept_file", contents=b"K" * (1024 * 80))
+    create_regular_file(archiver.input_path, "gone_dir/gone_file", contents=b"G" * (1024 * 80))
+    cmd(archiver, "create", "kept", "input/kept_dir")
+    cmd(archiver, "create", "gone", "input/gone_dir")
+    cmd(archiver, "delete", "gone")  # soft-delete
+
+    repository = open_repository(archiver)
+    with repository:
+        manifest = Manifest.load(repository)
+        kept = Archive(manifest, manifest.archives.get_one(["kept"]).id)
+        victim = next(id for item in kept.iter_items() if "chunks" in item for id, _ in item.chunks)
+        gone_id = manifest.archives.get_one(["gone"], deleted=True).id
+    # damage the repo: a content chunk of the live "kept" archive (so compact sees missing objects and
+    # preserves the soft-deleted archives) and the metadata object of the soft-deleted "gone" archive.
+    cmd(archiver, "debug", "delete-obj", bin_to_hex(victim))
+    cmd(archiver, "debug", "delete-obj", bin_to_hex(gone_id))
+
+    output = cmd(archiver, "compact", "-v", exit_code=EXIT_ERROR)
+    assert "missing objects" in output
+    assert f"Soft-deleted archive archive-does-not-exist {bin_to_hex(gone_id)} cannot be fully preserved" in output
+    assert f"Archive {bin_to_hex(gone_id)} does not exist" in output  # the error shows the id as hex
+    assert "Finished compaction" in output
+
+
 def test_compact_keeps_corrupt_pack(archivers, request):
     # compact keeps a pack "borg check" recorded corrupt unchanged and warns (#10410).
     archiver = request.getfixturevalue(archivers)

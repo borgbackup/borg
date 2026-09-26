@@ -199,6 +199,29 @@ def test_repo_list_deleted(archivers, request, backup_files):
     assert "deleted2" in output
 
 
+def test_repo_list_archive_metadata_missing(archivers, request, backup_files):
+    # an archive whose metadata object is gone is listed with its placeholder values, the listing goes on (#10435).
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name in ("normal1", "lost1", "deleted1", "lost2"):
+        cmd(archiver, "create", name, backup_files)
+    ids = dict(line.split() for line in cmd(archiver, "repo-list", "--format={archive} {id}{NL}").splitlines())
+    cmd(archiver, "delete", "deleted1")
+    cmd(archiver, "delete", "lost2")
+    cmd(archiver, "debug", "delete-obj", ids["lost1"])  # a live archive
+    cmd(archiver, "debug", "delete-obj", ids["lost2"])  # a soft-deleted archive
+    output = cmd(archiver, "repo-list")
+    assert "normal1" in output
+    assert "archive-does-not-exist" in output
+    assert "lost1" not in output
+    output = cmd(archiver, "repo-list", "--deleted")
+    assert "deleted1" in output
+    assert "archive-does-not-exist" in output
+    assert "lost2" not in output
+    archives = json.loads(cmd(archiver, "repo-list", "--json", "--format={archive} {tags} {comment}"))["archives"]
+    assert sorted(archive["name"] for archive in archives) == ["archive-does-not-exist", "normal1"]
+
+
 def test_repo_list_from_borg1(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() in ["remote", "binary"]:

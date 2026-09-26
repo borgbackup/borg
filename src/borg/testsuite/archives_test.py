@@ -117,13 +117,13 @@ def test_count():
 def test_names():
     ar, _, _ = _archives()
     metas = [_archive_meta("a", _id(1)), _archive_meta("b", _id(2))]
-    ar._infos = Mock(side_effect=lambda deleted=False: iter(metas))
+    ar._infos = Mock(side_effect=lambda deleted=False: iter((meta, None) for meta in metas))
     assert list(ar.names()) == ["a", "b"]
 
 
 def test_exists_true():
     ar, _, _ = _archives()
-    ar._infos = Mock(side_effect=lambda deleted=False: iter([_archive_meta("a", _id(1))]))
+    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), None)]))
     assert ar.exists("a") is True
 
 
@@ -154,19 +154,19 @@ def test_exists_id_deleted():
 
 def test_exists_name_and_id_true():
     ar, _, _ = _archives()
-    ar._infos = Mock(side_effect=lambda deleted=False: iter([_archive_meta("a", _id(1))]))
+    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), None)]))
     assert ar.exists_name_and_id("a", _id(1)) is True
 
 
 def test_exists_name_and_id_false_wrong_name():
     ar, _, _ = _archives()
-    ar._infos = Mock(side_effect=lambda deleted=False: iter([_archive_meta("a", _id(1))]))
+    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), None)]))
     assert ar.exists_name_and_id("b", _id(1)) is False
 
 
 def test_exists_name_and_id_false_wrong_id():
     ar, _, _ = _archives()
-    ar._infos = Mock(side_effect=lambda deleted=False: iter([_archive_meta("a", _id(1))]))
+    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), None)]))
     assert ar.exists_name_and_id("a", _id(2)) is False
 
 
@@ -191,7 +191,8 @@ def test_exists_name_and_ts_false_wrong_name():
 def test_get_archive_meta_object_not_found():
     ar, repo, _ = _archives()
     repo.get.side_effect = Repository.ObjectNotFound(_id(1), "/fake/path")
-    result = ar._get_archive_meta(_id(1))
+    result, archive_item = ar._get_archive_meta(_id(1))
+    assert archive_item is None
     assert result == {
         "id": _id(1),
         "name": "archive-does-not-exist",
@@ -217,8 +218,9 @@ def test_get_archive_meta_success():
         "comment": "weekly",
     }
 
-    result = ar._get_archive_meta(_id(1))
+    result, archive_item = ar._get_archive_meta(_id(1))
 
+    assert archive_item.name == "myarchive"  # the parsed ArchiveItem comes along with the info dict
     assert result["exists"] is True
     assert result["id"] == _id(1)
     assert result["name"] == "myarchive"
@@ -243,7 +245,7 @@ def test_get_archive_meta_success_with_tags():
         "tags": ["beta", "alpha"],
     }
 
-    result = ar._get_archive_meta(_id(1))
+    result, _ = ar._get_archive_meta(_id(1))
 
     assert result["tags"] == ("alpha", "beta")
     assert result["size"] == 0
@@ -262,7 +264,8 @@ def test_get_archive_meta_bad_version():
 
 def test_infos_gathers_archive_metadata():
     # _infos reads all archive metadata objects with one gather_many call, keeping the order of ids():
-    # a missing object (None) and one failing to parse yield placeholder infos with exists=False.
+    # a missing object (None) and one failing to parse yield placeholder infos with exists=False and
+    # no ArchiveItem.
     ar, repo, manifest = _archives()
     ids = [_id(1), _id(2), _id(3)]
     repo.store_list.return_value = [_iteminfo(id_) for id_ in ids]
@@ -282,11 +285,12 @@ def test_infos_gathers_archive_metadata():
         "hostname": "myhost",
     }
 
-    infos = list(ar._infos())
+    infos, archive_items = zip(*ar._infos())
 
     repo.gather_many.assert_called_once_with(ids, raise_missing=False)
     repo.get.assert_not_called()
     assert [info["id"] for info in infos] == ids
+    assert [item.name if item is not None else None for item in archive_items] == ["myarchive", None, None]
     assert [info["exists"] for info in infos] == [True, False, False]
     assert [info["name"] for info in infos] == [
         "myarchive",
@@ -303,7 +307,7 @@ def test_get_missing_returns_none():
 
 def test_get_returns_archive_archiveinfo():
     ar, _, _ = _archives()
-    ar._infos = Mock(side_effect=lambda deleted=False: iter([_archive_meta("a", _id(1))]))
+    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), None)]))
     info = ar.get("a")
     assert isinstance(info, ArchiveInfo)
     assert info.name == "a"
@@ -312,7 +316,7 @@ def test_get_returns_archive_archiveinfo():
 
 def test_get_raw():
     ar, _, _ = _archives()
-    ar._infos = Mock(side_effect=lambda deleted=False: iter([_archive_meta("a", _id(1))]))
+    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), None)]))
     result = ar.get("a", raw=True)
     assert result["name"] == "a"
     assert result["id"] == _id(1)
@@ -330,7 +334,7 @@ def test_get_by_id_missing_returns_none():
 def test_get_by_id(raw):
     ar, repo, _ = _archives()
     repo.store_list.return_value = [_iteminfo(_id(1))]
-    ar._get_archive_meta = Mock(side_effect=lambda id_: _archive_meta("a", _id(1)))
+    ar._get_archive_meta = Mock(side_effect=lambda id_: (_archive_meta("a", _id(1)), None))
     result = ar.get_by_id(_id(1), raw=raw)
     if raw:
         assert result["name"] == "a"
@@ -348,17 +352,45 @@ def test_get_by_id_exists_false_returns_none():
     repo.store_list.return_value = [_iteminfo(_id(1))]
     meta = _archive_meta("a", _id(1))
     meta["exists"] = False
-    ar._get_archive_meta = Mock(side_effect=lambda id_: meta)
+    ar._get_archive_meta = Mock(side_effect=lambda id_: (meta, None))
     assert ar.get_by_id(_id(1)) is None
 
 
 def test_get_by_id_deleted():
     ar, repo, _ = _archives()
     repo.store_list.return_value = [_iteminfo(_id(1))]
-    ar._get_archive_meta = Mock(side_effect=lambda id_: _archive_meta("a", _id(1)))
+    ar._get_archive_meta = Mock(side_effect=lambda id_: (_archive_meta("a", _id(1)), None))
     info = ar.get_by_id(_id(1), deleted=True)
     assert isinstance(info, ArchiveInfo)
     repo.store_list.assert_called_with("archives", deleted=True)
+
+
+def test_archive_info_metadata_not_part_of_the_tuple():
+    # ArchiveInfo.metadata is an attribute, not a field: it takes no part in equality and hashing
+    # (prune uses sets of ArchiveInfos) and instances made without it have metadata None.
+    ts = parse_timestamp(TS)
+    plain = ArchiveInfo(name="a", id=_id(1), ts=ts)
+    with_meta = ArchiveInfo(name="a", id=_id(1), ts=ts, metadata={"name": "a"})
+    assert plain.metadata is None
+    assert with_meta.metadata == {"name": "a"}
+    assert with_meta == plain
+    assert hash(with_meta) == hash(plain)
+    assert len({plain, with_meta}) == 1
+    assert with_meta == ("a", _id(1), ts, (), None, None)
+    assert with_meta._replace(name="b").metadata is None  # made by _make(), without __new__
+    assert ArchiveInfo._fields == ("name", "id", "ts", "tags", "host", "user")
+
+
+def test_archive_infos_carry_metadata():
+    # the ArchiveInfos made by list(), get() and get_by_id() carry the parsed ArchiveItem.
+    archive_item = object()  # stands in for the ArchiveItem
+    ar, repo, _ = _archives()
+    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), archive_item)]))
+    ar._get_archive_meta = Mock(side_effect=lambda id_: (_archive_meta("a", _id(1)), archive_item))
+    repo.store_list.return_value = [_iteminfo(_id(1))]
+    assert [info.metadata for info in ar.list()] == [archive_item]
+    assert ar.get("a").metadata is archive_item
+    assert ar.get_by_id(_id(1)).metadata is archive_item
 
 
 def test_create_calls_store_store():

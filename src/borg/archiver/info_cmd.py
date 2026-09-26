@@ -25,7 +25,7 @@ class InfoMixIn:
         output_data = []
 
         for i, archive_info in enumerate(archive_infos, 1):
-            archive = Archive(manifest, archive_info.id, cache=cache)
+            archive = Archive(manifest, archive_info, cache=cache)
             info = archive.info()
             if args.json:
                 output_data.append(info)

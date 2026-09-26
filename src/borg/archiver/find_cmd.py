@@ -35,7 +35,7 @@ class FindMixIn:
         def _find_inner(cache):
             for i, info in enumerate(archive_infos):
                 logger.info(f"Searching archive {info.name} {info.ts.astimezone()} ({i + 1}/{num_archives})")
-                archive = Archive(manifest, info.id, cache=cache)
+                archive = Archive(manifest, info, cache=cache)
                 formatter = ItemFormatter(archive, format)
                 for item in archive.iter_items(lambda item: matcher.match(item.path)):
                     sys.stdout.write(formatter.format_item(item, args.json_lines, sort=True))

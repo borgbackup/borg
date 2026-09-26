@@ -242,7 +242,7 @@ class ArchiveGarbageCollector:
         for archive_info in self.manifest.archives.list(sort_by=["ts"], deleted=True):
             name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
             try:
-                archive = Archive(self.manifest, archive_info.id, deleted=True)
+                archive = Archive(self.manifest, archive_info, deleted=True)
                 missing = sum(not self._mark_object_used(id) for id in self._archive_object_ids(archive))
                 if missing:
                     logger.warning(

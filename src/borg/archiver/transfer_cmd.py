@@ -167,7 +167,7 @@ class TransferMixIn:
 
         ac_errors = []
         for archive_info in archive_infos:
-            archive = Archive(other_manifest, archive_info.id)
+            archive = Archive(other_manifest, archive_info)
             try:
                 comment_validator(archive.metadata.get("comment", ""))
             except ArgumentTypeError as err:
@@ -217,7 +217,7 @@ class TransferMixIn:
             else:
                 if not dry_run:
                     print(f"{name} {ts_str} {id_hex}: copying archive to destination repo...")
-                other_archive = Archive(other_manifest, id)
+                other_archive = Archive(other_manifest, archive_info)
                 archive = (
                     Archive(manifest, name, cache=cache, create=True, progress=args.progress) if not dry_run else None
                 )

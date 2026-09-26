@@ -20,7 +20,7 @@ class TagMixIn:
             archive_infos = manifest.archives.list_considering(args)
 
         for archive_info in archive_infos:
-            archive = Archive(manifest, archive_info.id, cache=cache)
+            archive = Archive(manifest, archive_info, cache=cache)
             if args.set_tags is not None:
                 # avoid that --set (accidentally) erases existing special tags,
                 # but allow --set if the existing special tags are also given.

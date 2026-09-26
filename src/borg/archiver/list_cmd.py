@@ -60,7 +60,7 @@ class ListMixIn:
         archive_info = manifest.archives.get_one([args.name])
 
         def _list_inner(cache):
-            archive = Archive(manifest, archive_info.id, cache=cache)
+            archive = Archive(manifest, archive_info, cache=cache)
             formatter = ItemFormatter(archive, format)
 
             def item_filter(item):

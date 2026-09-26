@@ -1136,6 +1136,7 @@ class ArchiveFormatter(BaseFormatter):
         self.id = None
         self.archive_info = None
         self._archive = None
+        self._archive_id = None  # the id self._archive was loaded for (self._archive can be None)
         self.deleted = deleted  # True if we want to deal with deleted archives.
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
@@ -1175,28 +1176,38 @@ class ArchiveFormatter(BaseFormatter):
 
     @property
     def archive(self):
-        """lazy load / update loaded archive"""
-        if self._archive is None or self._archive.id != self.id:
+        """lazy load / update loaded archive, None if the archive has no valid metadata object"""
+        if self._archive_id != self.id:
             from ..archive import Archive
 
             # the ArchiveInfo usually carries the archive's metadata, so this does not need to load it again.
-            self._archive = Archive(self.manifest, self.archive_info, deleted=self.deleted)
+            try:
+                self._archive = Archive(self.manifest, self.archive_info, deleted=self.deleted)
+            except Archive.DoesNotExist:
+                # the archives directory lists it, but its metadata object is missing or invalid, so we only
+                # have the placeholder values of the ArchiveInfo (see Archives._parse_archive_meta).
+                self._archive = None
+            self._archive_id = self.id
         return self._archive
 
     def get_meta(self, key, default=None):
-        return self.archive.metadata.get(key, default)
+        archive = self.archive
+        return archive.metadata.get(key, default) if archive is not None else default
 
     def get_ts_start(self):
-        return self.format_time(self.archive.ts_start)
+        archive = self.archive
+        return self.format_time(archive.ts_start if archive is not None else self.archive_info.ts)
 
     def get_ts_end(self):
-        return self.format_time(self.archive.ts_end)
+        archive = self.archive
+        return self.format_time(archive.ts_end if archive is not None else self.archive_info.ts)
 
     def format_time(self, ts):
         return OutputTimestamp(ts)
 
     def get_tags(self):
-        return ",".join(sorted(self.archive.tags))
+        archive = self.archive
+        return ",".join(sorted(archive.tags if archive is not None else self.archive_info.tags))
 
 
 class ItemFormatter(BaseFormatter):

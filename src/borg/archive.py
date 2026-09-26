@@ -668,7 +668,7 @@ class Archive:
                 else:
                     info = self.manifest.archives.get(name)
                 if info is None:
-                    raise self.DoesNotExist(name)
+                    raise self.DoesNotExist(bin_to_hex(name) if name_is_id else name)
             self.load(info.id, metadata=info.metadata)
 
     def _load_meta(self, id):
@@ -2805,7 +2805,11 @@ class ArchiveChecker:
                 archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
                 try:
                     formatted = formatter.format_item(info, jsonline=False)
-                except (Archive.DoesNotExist, Repository.ObjectNotFound, IntegrityErrorBase):
+                    # the formatter uses defaults for keys like {comment} if it has no archive metadata.
+                    metadata_missing = bool(formatter.used_call_keys) and formatter.archive is None
+                except (Repository.ObjectNotFound, IntegrityErrorBase):
+                    metadata_missing = True
+                if metadata_missing:
                     # keys like {comment} need the archive metadata, which is damaged or missing here.
                     # use the values from the archive directory entry, they are always available.
                     formatted = f"{info.name} {OutputTimestamp(info.ts)} {archive_id_hex}"

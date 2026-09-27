@@ -323,7 +323,9 @@ jobs:
       run: |
         set -euxo pipefail
         rustc --version
-        pip install --no-binary cryptography cryptography
+        # --force-reinstall: the moto S3 test server install above already pulled in the
+        # cryptography wheel, without it pip would just keep that one.
+        pip install --force-reinstall --no-binary cryptography cryptography
         # check that the extension links the system OpenSSL dynamically and
         # loads the same version as the system's openssl program
         rust_ext=$(python -c 'import cryptography.hazmat.bindings._rust as m; print(m.__file__)')

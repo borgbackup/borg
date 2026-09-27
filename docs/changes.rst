@@ -163,8 +163,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b25 (not released yet)
------------------------------------
+Version 2.0.0b25 (2026-09-27)
+-----------------------------
 
 Breaking changes (you must create new repos for b25):
 

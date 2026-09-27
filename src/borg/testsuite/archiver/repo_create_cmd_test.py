@@ -219,7 +219,7 @@ def test_repo_create_default_compression(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION, "--compression=zstd,5")
-    assert "Default compression: zstd,5\n" in cmd(archiver, "repo-info")
+    assert "Default compression: zstd,5" + os.linesep in cmd(archiver, "repo-info")
     assert json.loads(cmd(archiver, "repo-info", "--json"))["defaults"]["compression"] == "zstd,5"
     # without --compression, create uses the repository default.
     cmd(archiver, "create", "test", "input")
@@ -242,8 +242,8 @@ def test_repo_create_without_default_compression(archivers, request):
     with open_repository(archiver) as repository:
         assert repository.load_defaults() == {}
     output = cmd(archiver, "repo-info")
-    assert "Default compression: lz4 (built-in)\n" in output
-    assert "Default chunker params: %s,%d,%d,%d,%d (built-in)\n" % CHUNKER_PARAMS in output
+    assert "Default compression: lz4 (built-in)" + os.linesep in output
+    assert "Default chunker params: %s,%d,%d,%d,%d (built-in)" % CHUNKER_PARAMS + os.linesep in output
     assert json.loads(cmd(archiver, "repo-info", "--json"))["defaults"] == {
         "compression": "lz4",
         "chunker_params": "%s,%d,%d,%d,%d" % CHUNKER_PARAMS,
@@ -295,7 +295,7 @@ def test_repo_create_default_chunker_params(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION, "--chunker-params=fixed,4096")
-    assert "Default chunker params: fixed,4096,0\n" in cmd(archiver, "repo-info")
+    assert "Default chunker params: fixed,4096,0" + os.linesep in cmd(archiver, "repo-info")
     assert json.loads(cmd(archiver, "repo-info", "--json"))["defaults"]["chunker_params"] == "fixed,4096,0"
     # without --chunker-params (or with "default"), create uses the repository default.
     cmd(archiver, "create", "test1", "input")

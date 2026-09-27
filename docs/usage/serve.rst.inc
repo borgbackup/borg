@@ -15,7 +15,7 @@ borg serve
     +-------------------------------------------------------+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **options**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
     +-------------------------------------------------------+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--rest``                        | serve a current (non-legacy) repository as a rest:// server (HTTP over stdio). Requires --backend. Without this option, a legacy (borg 1.x) repository is served.                                                                                                                                                                                                                                                                                                |
+    |                                                       | ``--rest``                        | serve a current (non-legacy) repository as an ssh:// server (HTTP over stdio). Requires --backend. Without this option, a legacy (borg 1.x) repository is served.                                                                                                                                                                                                                                                                                                |
     +-------------------------------------------------------+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--backend BACKEND_URL``         | (with --rest) backend URL of the repository to serve, e.g. FILE:/path/to/repo.                                                                                                                                                                                                                                                                                                                                                                                   |
     +-------------------------------------------------------+-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -43,7 +43,7 @@ borg serve
 
 
     options
-        --rest                            serve a current (non-legacy) repository as a rest:// server (HTTP over stdio). Requires --backend. Without this option, a legacy (borg 1.x) repository is served.
+        --rest                            serve a current (non-legacy) repository as an ssh:// server (HTTP over stdio). Requires --backend. Without this option, a legacy (borg 1.x) repository is served.
         --backend BACKEND_URL             (with --rest) backend URL of the repository to serve, e.g. FILE:/path/to/repo.
         --restrict-to-path PATH           Restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all subdirectories is granted implicitly; PATH does not need to point directly to a repository.
         --restrict-to-repository PATH     Restrict repository access. Only the repository located at PATH (no subdirectories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike ``--restrict-to-path``, subdirectories are not accessible; PATH must point directly to a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
@@ -62,13 +62,14 @@ SSH by a borg client and runs until that SSH connection is terminated.
 It operates in one of two modes:
 
 - default (no option): serve a **legacy** (borg 1.x / v1) repository using the legacy
-  RPC protocol. This is used e.g. for ``borg transfer --from-borg1`` and is command-line
-  compatible with borg 1.x ``borg serve``.
+  RPC protocol. A borg client using an ``ssh://`` repository together with ``--from-borg1``
+  (e.g. ``borg transfer --from-borg1``) starts this automatically via SSH. It is
+  command-line compatible with borg 1.x ``borg serve``.
 
 - ``--rest``: serve a **current** (non-legacy) repository as the server-side component of
-  a ``rest://`` repository, talking HTTP over stdio. The repository to serve is given via
-  ``--backend FILE:<path>``. A borg client using a ``rest://`` repository starts this
-  automatically (over SSH if a host is given).
+  an ``ssh://`` repository, talking HTTP over stdio. The repository to serve is given via
+  ``--backend FILE:<path>``. A borg client using an ``ssh://`` repository starts this
+  automatically via SSH.
 
 Please note that, in legacy mode, `borg serve` does not support providing a specific
 repository via the `--repo` option or the `BORG_REPO` environment variable - it is the

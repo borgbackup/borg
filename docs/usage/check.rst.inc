@@ -98,15 +98,20 @@ The check command verifies the consistency of a repository and its archives.
 It consists of two major steps:
 
 1. Checking the consistency of the repository itself. The objects in the ``index/``
-   and ``packs/`` namespaces are named by the sha256 hash of their content, so such
+   and ``packs/`` namespaces are named by the store hash of their content, so such
    an object is intact if and only if the hash of its content still equals its name.
    The check verifies the (small) index objects first and, only if they are intact,
    all packs. It also cross-checks the chunk index against the packs present in the
    repository to detect referenced but missing packs. Bit rot and other types of
-   accidental damage can be detected this way, but as sha256 content-addressing is
-   not a MAC, this step does not detect tampering. Running the repository check can
+   accidental damage can be detected this way, but as content-addressing is
+   not a MAC, this step does not detect tampering of the packs. The index objects
+   are also authenticated with the key when they are loaded for that cross-check.
+   A corrupt index ends the check after this step, as the archives check needs it,
+   unless ``--repair`` is given (see below). This step also verifies the repository
+   defaults object (see ``borg repo-create``): it must be present and authenticate
+   with the key. Running the repository check can
    be split into multiple partial checks using ``--max-duration``.
-   For rest:// repositories, the server computes the hashes, so the pack contents do
+   For ssh:// repositories, the server computes the hashes, so the pack contents do
    not have to travel over the network. For other remote backends, borg usually has
    to read (download) the objects to hash them.
 
@@ -128,6 +133,10 @@ It consists of two major steps:
 Both steps can also be run independently. Pass ``--repository-only`` to run the
 repository checks only, or pass ``--archives-only`` to run the archive checks
 only.
+
+``borg check`` always needs the key, ``--repository-only`` included: it loads
+the key (asking for the passphrase, if needed) before it checks anything and
+aborts if the key can not be loaded.
 
 The ``--max-age`` option makes the check reuse the results of previous
 repository checks: packs whose intact result is younger than the given
@@ -188,16 +197,18 @@ description for more details about the format string).
 If the ``borg check`` process receives a SIGINT signal (Ctrl-C), it stops at the
 next safe boundary, leaving the repository and its chunk index in a consistent state.
 The repository check stops after the current pack; ``--verify-data`` and
-``--find-lost-archives`` stop after the current chunk; a ``--repair`` archive check
-stops between whole archives. Results recorded before the interrupt are kept, so a later
-check does not re-verify those packs until they are due again. With ``--repair``, an
-interrupted archive check may leave some archives already repaired and others not yet
-processed, so run ``borg check --repair`` again to finish.
+``--find-lost-archives`` stop after the current chunk; the archive check stops after the
+current archive item, with ``--repair`` between whole archives. Results recorded before
+the interrupt are kept, so a later check does not re-verify those packs until they are
+due again. With ``--repair``, an interrupted archive check may leave some archives already
+repaired and others not yet processed, so run ``borg check --repair`` again to finish.
 
-During a ``--repair`` run, the archive check first rebuilds the chunk index from the
-packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
-respond to SIGINT, so on a large repository a Ctrl-C during them may appear to have no
-effect until they finish.
+``borg check`` rebuilds the chunk index from the packs when ``--repair`` is given or when
+the stored index cannot be used. Ctrl-C stops that rebuild after the current object and
+discards the partial index: it lacks chunks that are still in the repository, so the check
+would report them as lost. After a ``--repair`` that stored or deleted chunks, borg re-reads the
+packs the repair wrote, makes the chunk index match them and stores it; that always runs to
+completion, also after a Ctrl-C.
 
 About repair mode
 +++++++++++++++++
@@ -230,10 +241,17 @@ by definition, a potentially lossy task.
 In practice, repair mode hooks into both the repository and archive checks:
 
 1. When checking the repository's consistency, repair mode rebuilds the repository
-   index from the packs if the index is corrupt, provided every pack is intact. If
-   any pack is corrupt, the repository check leaves the index and the packs untouched
-   and reports the corruption; salvaging a corrupt pack's still-intact objects is not
-   implemented yet (refs #8572).
+   index from the packs if the index is corrupt, provided every pack matches its
+   store hash. If any pack fails its store hash, the repository check leaves the
+   index and the packs untouched and reports it; salvaging the intact objects of
+   such a pack is not implemented yet (refs #8572). The rebuild authenticates
+   each object's header and metadata with the key, leaves an object that fails
+   this out of the index and reports it as an error. Repair mode also removes the
+   index entries of the chunks stored in missing packs (packs the index references,
+   but that are absent from the repository). Only a full ``borg check --repair``
+   repairs the archives that reference these chunks, ``--repository-only`` does not.
+   A missing or corrupt repository defaults object is replaced by empty defaults, so
+   the repository can be used again; the commands then use the built-in defaults.
 
 2. When checking the consistency and correctness of archives, repair mode might
    remove whole archives from the manifest if their archive metadata chunk is

@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-transfer" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-transfer" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -157,13 +157,13 @@ other repository is borg 1.x
 use the upgrader to convert transferred data (default: no conversion)
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details. Default: the repository default (see borg repo\-create), else lz4.
 .TP
 .BI \-\-recompress \ MODE
 recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (faster: re\-uses compressed data chunks w/o change).If no MODE is given, \fIalways\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-rechunk using given chunker parameters: buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or \fIdefault\fP to use the chunker defaults. default: do not rechunk
+rechunk using given chunker parameters: buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or \fIdefault\fP to use the repository default (see borg repo\-create), else the built\-in chunker defaults. default: do not rechunk
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
@@ -200,9 +200,9 @@ locations and passphrases first:
 .INDENT 3.5
 .sp
 .EX
-# The destination is a Borg 2 repository: use a rest:// (or local) location,
-# ssh:// is only supported for the legacy Borg 1.x source repository.
-export BORG_REPO=rest://borg2@borgbackup/tests/b20
+# The destination is a Borg 2 repository, the source is a legacy Borg 1.x repository
+# (accessed via the legacy protocol due to \-\-from\-borg1).
+export BORG_REPO=ssh://borg2@borgbackup/tests/b20
 export BORG_PASSPHRASE=\(aqyour\-borg2\-repo\-passphrase\(aq
 export BORG_OTHER_REPO=ssh://borg2@borgbackup/./tests/b1x
 export BORG_OTHER_PASSPHRASE=\(aqyour\-borg1\-repo\-passphrase\(aq
@@ -272,6 +272,11 @@ $ borg transfer \-\-from\-borg1 \-\-chunker\-params=$CHUNKER_PARAMS \-\-dry\-run
 .EE
 .UNINDENT
 .UNINDENT
+.sp
+A Borg 1.x repository in \fBnone\fP mode (not encrypted, unkeyed sha256 chunk IDs) is transferred
+like in the second example, re\-chunking with \fB\-\-chunker\-params\fP: all Borg 2 modes use keyed
+chunk IDs. Such a repository has no key material to copy, so create the new repository without
+giving the Borg 1.x repository as \fB\-\-other\-repo\fP\&.
 .SS Keyfile considerations when upgrading from Borg 1.x
 .sp
 If you are using a \fBkeyfile\fP encryption mode (not \fBrepokey\fP), Borg 2

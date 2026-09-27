@@ -284,7 +284,7 @@ class RepoCreateMixIn:
             default=None,  # None: not given. Do not default to sha256 here, see key_creator.
             action=Highlander,
             help="select the id hash function of the encrypted modes: 'sha256' or 'blake3'. "
-            "The 'authenticated-*' modes name their hash themselves.",
+            "The 'authenticated-sha256' and 'authenticated-blake3' modes name their hash themselves.",
         )
         subparser.add_argument(
             "--key-location",

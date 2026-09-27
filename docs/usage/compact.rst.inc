@@ -69,6 +69,13 @@ Other bytes no index entry covers, such as packs left behind by a backup that cr
 before recording its objects, are re-indexed by ``borg check --repair`` and reclaimed by
 the next ``borg compact``.
 
+``borg compact`` does not rewrite or merge packs that ``borg check`` recorded as corrupt
+and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by
+rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
+pack): a pack with such damage and no corrupt chunk stays recorded corrupt and ``borg compact``
+warns about it on every run, a pack that also has a corrupt chunk is rewritten with that damage
+copied into the new pack (refs #10026).
+
 You usually do not want to run ``borg compact`` after every write operation, but
 either regularly (e.g., once a month, possibly together with ``borg check``) or
 when disk space needs to be freed.

@@ -115,11 +115,11 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--timestamp TIMESTAMP``                         | manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.                                                            |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: fastcdc,19,23,21,2                                                                                                                                   |
+    |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: the repository default (see borg repo-create), else fastcdc,19,23,21,2                                                                               |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                                                                                                                             |
+    |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details. Default: the repository default (see borg repo-create), else lz4.                                                                                           |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--tags TAG``                                    | add tags to archive (comma-separated or multiple arguments)                                                                                                                                                                                                  |
+    |                                                       | ``--tag TAG``                                     | add tag to archive (can be given multiple times)                                                                                                                                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
@@ -193,9 +193,9 @@ borg create
     Archive options
         --comment COMMENT                             add a comment text to the archive
         --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
-        --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: fastcdc,19,23,21,2
-        -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
-        --tags TAG                                    add tags to archive (comma-separated or multiple arguments)
+        --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: the repository default (see borg repo-create), else fastcdc,19,23,21,2
+        -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details. Default: the repository default (see borg repo-create), else lz4.
+        --tag TAG                                     add tag to archive (can be given multiple times)
 
 
 Description
@@ -236,7 +236,8 @@ appropriate to use --content-from-command. See the section
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 
-The ``--tags`` option can be used to add a list of tags to the new archive.
+The ``--tag`` option can be used to add a tag to the new archive. To add
+multiple tags, give it multiple times, e.g. ``--tag foo --tag bar``.
 
 The archive name does not need to be unique; you can and should use the same
 name for a series of archives. The unique archive identifier is its ID (hash),

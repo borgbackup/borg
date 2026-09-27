@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-compress" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-repo-compress" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-repo-compress \- Repository (re-)compression.
 .SH SYNOPSIS
@@ -39,7 +39,9 @@ borg [common options] repo\-compress [options]
 Repository (re\-)compression (and/or re\-obfuscation).
 .sp
 Reads all repository objects and recompresses the ones that are not already using
-the compression type/level and obfuscation level given via \fB\-\-compression\fP\&.
+the compression type/level and obfuscation level given via \fB\-\-compression\fP\&. Without
+\fB\-\-compression\fP, that is the repository\(aqs default compression (see \fBborg repo\-create\fP),
+else lz4.
 .sp
 The repository is processed one pack file at a time: a pack is read as a whole and,
 if it holds objects that need recompression, rewritten as a whole \- objects already
@@ -48,6 +50,13 @@ whose objects all already use the desired compression is not touched at all.
 Please note that the outcome of recompressing a chunk might not always be the
 desired compression type/level \- if no compression gives a shorter output, that
 might be chosen; such chunks are kept as they are.
+.sp
+\fBborg repo\-compress\fP does not rewrite packs that \fBborg check\fP recorded as corrupt
+and warns about them. \fBborg check \-\-repair \-\-verify\-data\fP deletes the corrupt chunks by
+rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
+pack): a pack with such damage and no corrupt chunk stays recorded corrupt and is not rewritten,
+a pack that also has a corrupt chunk is rewritten with that damage copied into the new pack
+(refs #10026).
 .sp
 Rewriting a pack invalidates every client\(aqs cached chunk index, so the next borg
 operation of each client will re\-fetch the chunk index from the repository.
@@ -70,7 +79,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details. Default: the repository default (see borg repo\-create), else lz4.
 .TP
 .B  \-s\fP,\fB  \-\-stats
 print statistics

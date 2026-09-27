@@ -195,12 +195,21 @@ Additional mount options supported by Borg:
 
 - ``versions``: when used with a repository mount, this gives a merged, versioned
   view of the files in the archives. EXPERIMENTAL; layout may change in the future.
-- ``allow_damaged_files``: by default, damaged files (where chunks are missing)
-  will return EIO (I/O error) when trying to read the related parts of the file.
-  Set this option to replace the missing parts with all-zero bytes.
+- ``allow_damaged_files``: by default, damaged files (where chunks are missing or
+  corrupted) will return EIO (I/O error) when trying to read the related parts of the
+  file. Set this option to replace the damaged parts with all-zero bytes.
 - ``ignore_permissions``: for security reasons the ``default_permissions`` mount
   option is internally enforced by Borg. ``ignore_permissions`` can be given to
   not enforce ``default_permissions``.
+
+On Windows, ``borg mount`` needs `WinFsp <https://winfsp.dev/>`_ and mfusepy.
+MOUNTPOINT must either be an unused drive (like ``X:``) or a not yet existing
+directory (WinFsp creates it when mounting and removes it when unmounting).
+``borg mount`` always stays in the foreground there and ``borg umount`` is not
+supported: to unmount, stop ``borg mount`` using Ctrl-C or Ctrl-Break. All files
+belong to the user who mounts, unless the ``uid`` / ``gid`` mount options (which
+are implemented by WinFsp there, not by Borg) say otherwise. ``ignore_permissions``
+has no effect. WinFsp does not support hard link counts (they are always 1).
 
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is intended for advanced users
 to tweak performance. It sets the number of cached data chunks; additional

@@ -119,7 +119,7 @@ class CheckMixIn:
                 max_duration=args.max_duration,
                 max_age=max_age,
                 repo_only=args.repo_only,
-                # the object validator for the index rebuild, which only a repair does.
+                # validates each object the index rebuild of a --repository-only repair walks.
                 validate=object_validator(RepoObj(key)),
             ):
                 set_ec(EXIT_WARNING)
@@ -297,16 +297,18 @@ class CheckMixIn:
 
         In practice, repair mode hooks into both the repository and archive checks:
 
-        1. When checking the repository's consistency, repair mode rebuilds the repository
-           index from the packs if the index is corrupt, provided every pack matches its
-           store hash. If any pack fails its store hash, the repository check leaves the
-           index and the packs untouched and reports it; salvaging the intact objects of
-           such a pack is not implemented yet (refs #10026). The rebuild authenticates
-           each object's header and metadata with the key, leaves an object that fails
-           this out of the index and reports it as an error. Repair mode also removes the
-           index entries of the chunks stored in missing packs (packs the index references,
-           but that are absent from the repository). Only a full ``borg check --repair``
-           repairs the archives that reference these chunks, ``--repository-only`` does not.
+        1. When checking the repository's consistency, repair mode verifies every pack if
+           the index is corrupt. A full ``borg check --repair`` then rebuilds the index from
+           the packs in the archive check (which does so on every ``--repair`` run). With
+           ``--repository-only``, the repository check rebuilds it, provided every pack
+           matches its store hash. If any pack fails its store hash, it leaves the index and
+           the packs untouched and reports it; salvaging the intact objects of such a pack
+           is not implemented yet (refs #10026). Either rebuild authenticates each object's
+           header and metadata with the key, leaves an object that fails this out of the
+           index and reports it as an error. Repair mode also removes the index entries of
+           the chunks stored in missing packs (packs the index references, but that are
+           absent from the repository). Only a full ``borg check --repair`` repairs the
+           archives that reference these chunks, ``--repository-only`` does not.
            A missing or corrupt repository defaults object is replaced by empty defaults, so
            the repository can be used again; the commands then use the built-in defaults.
 

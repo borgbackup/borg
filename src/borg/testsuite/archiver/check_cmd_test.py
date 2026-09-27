@@ -23,7 +23,7 @@ from ...cache import (
 )
 from ...crypto.key import RepositoryKeyInfoMissing
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, CommandError, CorruptPack, Error, sig_int
+from ...helpers import bin_to_hex, hex_to_bin, CommandError, CorruptPack, Error, sig_int
 from ...helpers import BackupDamagedChunksError
 from ...helpers.passphrase import PassphraseWrong
 from ...hashindex import ChunkIndex
@@ -908,10 +908,18 @@ def test_check_format_missing_archive_metadata(archivers, request):
     assert "Analyzing archive archive2" in output  # the intact archive still uses the given format
 
 
-def test_check_repair_rebuilds_corrupt_index(archivers, request):
-    # A corrupt index with all packs intact: the default (full) --repair rebuilds the index from the
-    # packs and persists it (via the archives check, see ArchiveChecker.finish), leaving the repository
-    # usable again without a slow rebuild on the next access.
+@pytest.mark.parametrize(
+    "mode, message",
+    [
+        ([], "the archives check rebuilds it from the packs"),
+        (["--repository-only"], "Repository index was corrupted and has been rebuilt from the packs."),
+    ],
+    ids=["full", "repository-only"],
+)
+def test_check_repair_rebuilds_corrupt_index(archivers, request, mode, message):
+    # A corrupt index with all packs intact: --repair rebuilds the index from the packs and persists it,
+    # leaving the repository usable again. A full check rebuilds it in the archives check (see
+    # ArchiveChecker.finish), a repository-only check in the repository check.
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     cmd(archiver, "check", exit_code=0)
@@ -929,8 +937,8 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request):
     else:
         with pytest.raises(CorruptChunkIndexFragment):
             cmd(archiver, "check")
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "rebuilt" in output.lower()
+    output = cmd(archiver, "check", "-v", "--repair", *mode, exit_code=0)
+    assert message in output
     # item 6: repair persisted a fresh index instead of leaving it for a slow rebuild on the next
     # access. confirm the on-disk index exists and every fragment is intact.
     archive, repository = open_archive(archiver.repository_path, "archive1")
@@ -941,6 +949,72 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request):
             assert repository.store.hash(f"index/{info.name}", algorithm=STORE_HASH_NAME) == info.name
     cmd(archiver, "check", exit_code=0)  # the repository is consistent again
     assert "archive1" in cmd(archiver, "repo-list")  # and remains usable
+
+
+def test_check_repair_walks_packs_once_for_corrupt_index(archiver, monkeypatch):
+    # A full --repair with a corrupt index walks the objects of each pack once, for the index rebuild in the
+    # archives check, refs #10434.
+    # local-only: this patches PackReader in-process.
+    check_cmd_setup(archiver)
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        pack_ids = {hex_to_bin(info.name) for info in repository.store_list("packs")}
+        for info in repository.store_list("index"):  # rot every index fragment
+            name = f"index/{info.name}"
+            repository.store_store(name, corrupt(repository.store_load(name), 0))
+
+    orig_iter_headers = PackReader.iter_headers
+    walks = []
+
+    def counting_iter_headers(self, **kwargs):
+        walks.append(self.pack_id)
+        return orig_iter_headers(self, **kwargs)
+
+    monkeypatch.setattr(PackReader, "iter_headers", counting_iter_headers)
+    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+    monkeypatch.setattr(PackReader, "iter_headers", orig_iter_headers)
+    # finish() also walks the packs the repair wrote, so count the packs that existed before the check only.
+    assert sorted(pack_id for pack_id in walks if pack_id in pack_ids) == sorted(pack_ids)
+    assert "the archives check rebuilds it from the packs" in output
+    cmd(archiver, "check", exit_code=0)  # the stored index is intact and matches the packs
+
+
+def test_check_repair_interrupt_during_corrupt_index_rebuild(archiver, monkeypatch):
+    # A full --repair rebuilds a corrupt index in the archives check. A Ctrl-C during that rebuild stops the
+    # check and stores nothing: the corrupt fragments stay, a command needing the index aborts, and a second
+    # --repair completes, refs #10434.
+    # local-only: this patches PackReader in-process.
+    check_cmd_setup(archiver)  # produces several packs
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        assert len(repository.store_list("packs")) > 1  # there is a pack boundary to stop at
+        for info in repository.store_list("index"):  # rot every index fragment
+            name = f"index/{info.name}"
+            repository.store_store(name, corrupt(repository.store_load(name), 0))
+        index_before = {info.name for info in repository.store_list("index")}
+
+    orig_iter_headers = PackReader.iter_headers
+    packs_read = []
+
+    def iter_headers_then_interrupt(self, **kwargs):
+        packs_read.append(self.pack_id)
+        yield from orig_iter_headers(self, **kwargs)
+        sig_int._sig_int_triggered = True  # one Ctrl-C after the first pack was walked
+
+    monkeypatch.setattr(PackReader, "iter_headers", iter_headers_then_interrupt)
+    try:
+        with pytest.raises(Error, match="Got Ctrl-C"):
+            cmd(archiver, "check", "--repair")
+    finally:
+        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+    # restore the real method; monkeypatch.undo() would also drop the autouse env (BORG_TESTONLY_WEAKEN_KDF).
+    monkeypatch.setattr(PackReader, "iter_headers", orig_iter_headers)
+    assert len(packs_read) == 1  # the repository check walked no pack, the archives check stopped after one
+    with Repository(archiver.repository_path, exclusive=True) as repository:
+        assert {info.name for info in repository.store_list("index")} == index_before  # nothing stored
+
+    with pytest.raises(CorruptChunkIndexFragment):
+        cmd(archiver, "repo-list")  # the index is still corrupt; commands needing it abort
+    cmd(archiver, "check", "--repair", exit_code=0)
+    cmd(archiver, "check", exit_code=0)
 
 
 def tamper_object_keeping_pack_name(repository):
@@ -1136,19 +1210,28 @@ def test_find_lost_archives_skips_chunk_with_corrupt_object_header(archivers, re
     assert "Archive consistency check complete, problems found." in output
 
 
-def test_check_repair_validates_index_rebuild(archivers, request):
-    """--repair leaves an object that fails validation out of the index and keeps the object after it (#9901)."""
+@pytest.mark.parametrize("repo_only", [False, True], ids=["full", "repository-only"])
+def test_check_repair_validates_index_rebuild(archivers, request, repo_only):
+    """--repair leaves an object that fails validation out of the index and keeps the object after it (#9901).
+
+    A full check rebuilds the index in the archives check, a repository-only check in the repository check.
+    """
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() != "local":
         pytest.skip("inspects the store directly")
     check_cmd_setup(archiver)
     with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         tampered_id, neighbour_id = tamper_object_keeping_pack_name(repository)
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+    if repo_only:
+        output = cmd(archiver, "check", "-v", "--repair", "--repository-only", exit_code=EXIT_WARNING)
+        assert "index rebuilt without pack byte range(s) it could not authenticate" in output
+    else:
+        output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+        assert "the archives check rebuilds it from the packs" in output
+        assert "Archive consistency check complete, problems found." in output
     assert "does not authenticate" in output
-    assert "continuing at the object at offset" in output
-    assert "index rebuilt without pack byte range(s) it could not authenticate" in output
-    assert "Archive consistency check complete, problems found." in output
+    # the index is rebuilt once, so the tampered object is reported once.
+    assert output.count("continuing at the object at offset") == 1
     with KeyedRepository(archiver.repository_location) as repository:
         assert tampered_id not in repository.chunks
         assert neighbour_id in repository.chunks

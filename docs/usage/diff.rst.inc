@@ -31,6 +31,8 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``--json-lines``                      | Format output as JSON Lines.                                                     |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
+    |                                                       | ``-s``, ``--stats``                   | print a summary of the differences at the end                                    |
+    +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``--sort-by``                         | Sort output by comma-separated fields (e.g., '>size_added,path').                |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``--content-only``                    | Only compare differences in content (exclude metadata differences)               |
@@ -73,7 +75,8 @@ borg diff
         --same-chunker-params    override the check of chunker parameters
         --format FORMAT    specify format for differences between archives (default: "{change} {path}{NL}")
         --json-lines    Format output as JSON Lines.
-        --sort-by     Sort output by comma-separated fields (e.g., '>size_added,path').
+        -s, --stats     print a summary of the differences at the end
+        --sort-by       Sort output by comma-separated fields (e.g., '>size_added,path').
         --content-only    Only compare differences in content (exclude metadata differences)
 
 
@@ -155,9 +158,15 @@ What is compared
 For each matching item in both archives, Borg reports:
 
 - Content changes: total added/removed bytes within files. If chunker parameters are comparable,
-  Borg compares chunk IDs quickly; otherwise, it compares the content. In the latter case, borg
-  can only tell that a file was modified, not by how much: no byte counts are given for it, the
-  text output shows "modified:  (can't get size)" instead.
+  Borg compares chunk IDs quickly: it aligns the two chunk lists of a file like a text diff
+  aligns lines, and the byte counts are the total sizes of the chunks that are not part of that
+  alignment. Inserted, removed, moved and duplicated content is therefore accounted for - a
+  chunk that only moved within the file shows up as removed and added again. Files with very
+  long or very repetitive chunk lists are not aligned (this would be too slow); for these, only
+  the number of occurrences of each chunk ID is compared, so moved content does not show up in
+  their byte counts. If chunker parameters are not comparable, Borg compares the content. In
+  that case, borg can only tell that a file was modified, not by how much: no byte counts
+  are given for it, the text output shows "modified:  (can't get size)" instead.
 - Metadata changes: user, group, mode, and other metadata shown inline as "[old -> new]", like
   "[-rw-r--r-- -> -rwxr-xr-x]" for a mode change. Use ``--content-only`` to suppress metadata changes.
 - Added/removed items: printed as "added: SIZE path" or "removed: SIZE path".
@@ -182,6 +191,30 @@ values as "item1" and "item2". Example::
     {"changes": [{"item1": "-rw-r--r--", "item2": "-rwxr-xr-x", "type": "changed mode"}], "path": "some/file"}
     {"changes": [{"added": 4, "removed": 0, "type": "added"}], "path": "path/to/added-file"}
     {"changes": [{"added": 0, "removed": 5, "type": "removed"}], "path": "path/to/removed-file"}
+
+Statistics
+++++++++++
+With ``--stats``, borg prints a summary of the differences after the per-path output::
+
+    Added items: 23
+    Removed items: 2
+    Changed items: 315
+    Added size: 53.70 MB
+    Removed size: 51.10 MB
+
+"Added"/"Removed" items only exist in ARCHIVE2/ARCHIVE1, "changed" items exist in both
+archives but differ. "Added size"/"Removed size" sum up the file content (in bytes) added/removed
+by all of these items, i.e. the per-path byte counts that ``--sort-by size_added`` /
+``size_removed`` sort by. Items whose content borg could only
+compare byte by byte (see "Performance considerations" below) contribute no byte counts;
+if there are any, an additional "Items with unknown size changes" line reports how many.
+
+Together with ``--json-lines``, the summary is emitted as a final JSON line of the shape
+``{"stats": {...}}`` instead, so it is easy to tell apart from the per-path lines
+(wrapped here for readability, borg prints it as a single line)::
+
+    {"stats": {"added_items": 23, "changed_items": 315, "removed_items": 2,
+               "size_added": 53700000, "size_removed": 51100000, "unknown_size_items": 0}}
 
 Sorting
 ++++++++

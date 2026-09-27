@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-key-change-passphrase" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-key-change-passphrase" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-key-change-passphrase \- Changes the repository key file passphrase.
 .SH SYNOPSIS
@@ -78,7 +78,7 @@ Key location: /root/.config/borg/keys/4881c2f73d9f173bd4c4d30a9f397a596bc742bfa1
 \fBNote:\fP
 .INDENT 0.0
 .INDENT 3.5
-Automatically placed key files are named after the SHA\-256 hash of their own
+Automatically placed key files are named after the \fIstore hash <store_hash>\fP of their own
 contents, not after the repository directory name. Because changing the
 passphrase re\-encrypts the key, the key file is rewritten under a new name and
 the previous one is removed — that is why the two paths above differ. Use

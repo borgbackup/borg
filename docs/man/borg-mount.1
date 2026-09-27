@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-mount" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-mount" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-mount \- Mounts an archive or an entire repository as a FUSE filesystem.
 .SH SYNOPSIS
@@ -134,14 +134,23 @@ Additional mount options supported by Borg:
 \fBversions\fP: when used with a repository mount, this gives a merged, versioned
 view of the files in the archives. EXPERIMENTAL; layout may change in the future.
 .IP \(bu 2
-\fBallow_damaged_files\fP: by default, damaged files (where chunks are missing)
-will return EIO (I/O error) when trying to read the related parts of the file.
-Set this option to replace the missing parts with all\-zero bytes.
+\fBallow_damaged_files\fP: by default, damaged files (where chunks are missing or
+corrupted) will return EIO (I/O error) when trying to read the related parts of the
+file. Set this option to replace the damaged parts with all\-zero bytes.
 .IP \(bu 2
 \fBignore_permissions\fP: for security reasons the \fBdefault_permissions\fP mount
 option is internally enforced by Borg. \fBignore_permissions\fP can be given to
 not enforce \fBdefault_permissions\fP\&.
 .UNINDENT
+.sp
+On Windows, \fBborg mount\fP needs WinFsp \%<https://\:winfsp\:.dev/> and mfusepy.
+MOUNTPOINT must either be an unused drive (like \fBX:\fP) or a not yet existing
+directory (WinFsp creates it when mounting and removes it when unmounting).
+\fBborg mount\fP always stays in the foreground there and \fBborg umount\fP is not
+supported: to unmount, stop \fBborg mount\fP using Ctrl\-C or Ctrl\-Break. All files
+belong to the user who mounts, unless the \fBuid\fP / \fBgid\fP mount options (which
+are implemented by WinFsp there, not by Borg) say otherwise. \fBignore_permissions\fP
+has no effect. WinFsp does not support hard link counts (they are always 1).
 .sp
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is intended for advanced users
 to tweak performance. It sets the number of cached data chunks; additional

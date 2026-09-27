@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-create" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-repo-create" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-repo-create \- Creates a new, empty repository.
 .SH SYNOPSIS
@@ -105,6 +105,14 @@ a different keyboard layout.
 .sp
 You can change your passphrase for existing repositories at any time; it will not affect
 the encryption/decryption key or other secrets.
+.sp
+Borg also accepts an empty passphrase. The repository is still encrypted with a random
+key then, but that key is not protected: with \fBrepokey\fP storage, anybody who can read
+the repository can also unlock the key, which is as good as no encryption at all (with
+\fBkeyfile\fP storage, the key is only on your client, so an empty passphrase may be
+acceptable if e.g. the client\(aqs disk is encrypted). You can add a passphrase later with
+\fBborg key change\-passphrase\fP\&. \fBborg repo\-info\fP shows whether the key has an empty
+passphrase.
 .SS Choosing a crypto suite
 .sp
 Depending on your hardware, hashing and crypto performance may vary widely.
@@ -119,9 +127,6 @@ The easiest way to find out what is fastest is to run \fBborg benchmark cpu\fP\&
 .IP \(bu 2
 \fBauthenticated\-sha256\fP / \fBauthenticated\-blake3\fP: no encryption, but authentication
 (tamper detection) using HMAC\-SHA\-256 resp. keyed BLAKE3.
-.IP \(bu 2
-\fBnone\-sha256\fP / \fBnone\-blake3\fP: neither encryption nor authentication, only
-SHA\-256 resp. BLAKE3 checksums (see below).
 .UNINDENT
 .sp
 \fB\-\-id\-hash\fP selects the id hash function of the \fBencrypted\fP modes:
@@ -150,21 +155,36 @@ You can move the key between these locations later with \fBborg key change\-loca
 This also applies to the \fBauthenticated\-*\fP modes: they do not encrypt your data, but they
 still have a key (used for the id hash and the authentication), so \fB\-\-key\-location\fP
 selects where that key is stored, just like for the encrypted modes.
-\fB\-\-key\-location\fP is only ignored for the \fBnone\-*\fP modes, which have no key at all.
-.sp
-The \fBnone\-*\fP modes use neither encryption nor authentication: everything in the
-repository is readable by anybody, and while every repository object carries a checksum
-(which detects accidental corruption, e.g. bad storage hardware), anybody who modifies an
-object can just recompute that checksum. You are advised NOT to use these modes: in case
-of malicious activity in the repository, they expose you to a Denial\-of\-Service risk (due
-to how the \fIinternals_hashindex\fP works) and other issues (confidentiality,
-tampering, ...).
 .sp
 If you do \fBnot\fP want to encrypt the contents of your backups, but still want to detect
 malicious tampering, use \fB\-\-encryption authenticated\-sha256\fP (or \fB\-blake3\fP). These
 modes are like an encrypted mode minus the data encryption.
 To normally work with \fBauthenticated\-*\fP repositories, you will need the passphrase, but
 there is an emergency workaround; see \fBBORG_WORKAROUNDS=authenticated_no_key\fP docs.
+.SS Repository defaults
+.sp
+\fB\-\-compression\fP sets the repository\(aqs default compression: the commands that compress
+data (\fBborg create\fP, \fBborg recreate\fP, \fBborg import\-tar\fP, \fBborg transfer\fP,
+\fBborg repo\-compress\fP) use it if no compression was given via \fB\-\-compression\fP, the
+environment or the default config file (\fBdefault.yaml\fP). Without a repository default,
+they use lz4. See \fBborg help compression\fP for the compression specs.
+.sp
+\fB\-\-chunker\-params\fP sets the repository\(aqs default chunker parameters: \fBborg create\fP and
+\fBborg import\-tar\fP use them if no chunker parameters were given (in the same ways as above).
+\fBborg recreate\fP and \fBborg transfer\fP only rechunk if \fB\-\-chunker\-params\fP is given, with
+\fB\-\-chunker\-params default\fP, they rechunk to the repository\(aqs default chunker parameters.
+Without a repository default, the built\-in default chunker parameters are used.
+.sp
+This is useful if several clients back up into the same repository or if some commands are
+run manually: they all compress and chunk the same way without having to give these options.
+Using the same chunker parameters is important for deduplication.
+\fBborg repo\-info\fP shows the defaults.
+.sp
+The defaults are stored in the repository and protected by the repository key: changing them
+(e.g. removing an \fBobfuscate\fP compression) needs the key. The defaults object is always
+written, also when no default was given, so removing it is noticed, too: the commands refuse
+to run if it is missing or fails the authentication. \fBborg check\fP reports such an object,
+\fBborg check \-\-repair\fP replaces it by empty defaults (the built\-in defaults are used then).
 .SS Creating a related repository
 .sp
 You can use \fBborg repo\-create \-\-other\-repo ORIG_REPO ...\fP to create a related repository
@@ -197,13 +217,19 @@ reuse the key material from the other repository
 other repository is Borg 1.x
 .TP
 .BI \-e \ ENCRYPTION\fR,\fB \ \-\-encryption \ ENCRYPTION
-select the mode: \(aqaes256\-ocb\(aq, \(aqchacha20\-poly1305\(aq, \(aqauthenticated\-sha256\(aq, \(aqauthenticated\-blake3\(aq, \(aqnone\-sha256\(aq or \(aqnone\-blake3\(aq \fB(required)\fP
+select the mode: \(aqaes256\-ocb\(aq, \(aqchacha20\-poly1305\(aq, \(aqauthenticated\-sha256\(aq or \(aqauthenticated\-blake3\(aq \fB(required)\fP
 .TP
 .BI \-i \ HASH\fR,\fB \ \-\-id\-hash \ HASH
-select the id hash function of the encrypted modes: \(aqsha256\(aq or \(aqblake3\(aq. The \(aqnone\-\fI\(aq and \(aqauthenticated\-\fP\(aq modes name their hash themselves.
+select the id hash function of the encrypted modes: \(aqsha256\(aq or \(aqblake3\(aq. The \(aqauthenticated\-sha256\(aq and \(aqauthenticated\-blake3\(aq modes name their hash themselves.
 .TP
 .BI \-\-key\-location \ LOCATION
-where to store the key: \(aqrepokey\(aq (in the repository, default) or \(aqkeyfile\(aq (in the local keys directory). Ignored for the \fBnone\-*\fP modes (which have no key).
+where to store the key: \(aqrepokey\(aq (in the repository, default) or \(aqkeyfile\(aq (in the local keys directory).
+.TP
+.BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
+set the default compression of the repository, see the output of the \(dqborg help compression\(dq command for details. Default: no repository default (lz4 is used).
+.TP
+.BI \-\-chunker\-params \ PARAMS
+set the default chunker parameters of the repository (same format as for borg create). Default: no repository default (fastcdc,19,23,21,2 is used).
 .TP
 .B  \-\-copy\-crypt\-key
 copy the crypt_key (used for authenticated encryption) from the key of the other repository (default: new random key).
@@ -218,9 +244,8 @@ $ export BORG_REPO=/path/to/repo
 # Recommended AEAD cryptographic modes (key stored in the repository by default)
 $ borg repo\-create \-\-encryption=aes256\-ocb
 $ borg repo\-create \-\-encryption=chacha20\-poly1305
-# No encryption (not recommended)
+# No encryption, only authentication (not recommended)
 $ borg repo\-create \-\-encryption=authenticated\-sha256
-$ borg repo\-create \-\-encryption=none\-sha256
 
 # For the encrypted modes, \-\-encryption (the cipher / AE algorithm) and \-\-id\-hash
 # (the id hash function) are chosen independently. \-\-id\-hash defaults to sha256;
@@ -228,10 +253,9 @@ $ borg repo\-create \-\-encryption=none\-sha256
 $ borg repo\-create \-\-encryption=aes256\-ocb \-\-id\-hash=blake3
 $ borg repo\-create \-\-encryption=chacha20\-poly1305 \-\-id\-hash=blake3
 
-# The \(aqauthenticated\-*\(aq and \(aqnone\-*\(aq modes name their id hash themselves, so they
+# The \(aqauthenticated\-*\(aq modes name their id hash themselves, so they
 # do not take a separate \-\-id\-hash.
 $ borg repo\-create \-\-encryption=authenticated\-blake3
-$ borg repo\-create \-\-encryption=none\-blake3
 
 # Where the key is stored (\-\-key\-location) is also chosen independently.
 # \-\-key\-location defaults to repokey.

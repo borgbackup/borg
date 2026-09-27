@@ -19,11 +19,13 @@ borg tag
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **options**                                                                                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--set TAG``                                | set tags                                                                                                                    |
+    |                                                                             | ``--set TAG``                                | set tags (can be given multiple times)                                                                                      |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--add TAG``                                | add tags                                                                                                                    |
+    |                                                                             | ``--clear``                                  | remove all normal tags (keep special tags)                                                                                  |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--remove TAG``                             | remove tags                                                                                                                 |
+    |                                                                             | ``--add TAG``                                | add tag (can be given multiple times)                                                                                       |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--remove TAG``                             | remove tag (can be given multiple times)                                                                                    |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
     |                                                                                                                                                                                                                                                          |
@@ -63,9 +65,10 @@ borg tag
 
 
     options
-        --set TAG     set tags
-        --add TAG     add tags
-        --remove TAG    remove tags
+        --set TAG     set tags (can be given multiple times)
+        --clear       remove all normal tags (keep special tags)
+        --add TAG     add tag (can be given multiple times)
+        --remove TAG    remove tag (can be given multiple times)
 
 
     :ref:`common_options`
@@ -99,4 +102,32 @@ special and users are only allowed to use known special tags:
 
 Pre-existing special tags cannot be removed via ``--set``. You can still use
 ``--set``, but you must also give pre-existing special tags (so they won't be
-removed).
+removed). If they are not given, borg emits a warning and does not set the tags
+of that archive.
+
+``--clear`` removes all normal tags, but keeps special tags. Combined with
+``--add``, it replaces the normal tags.
+
+To change tags, you must select the archives: give an archive NAME or use archive
+filter options like ``--match-archives``. To change the tags of all archives, use
+``--match-archives 'sh:*'``.
+
+Each of ``--set``, ``--add`` and ``--remove`` takes exactly one tag. To give
+multiple tags, use the option multiple times.
+
+Examples::
+
+    # add the tags "important" and "keep" to the archive with the given ID
+    $ borg tag --add important --add keep aid:1ddaae55
+
+    # remove the tag "keep" from all archives named "home"
+    $ borg tag --remove keep --match-archives home
+
+    # set the tags of the archive with the given ID to exactly "foo" and "bar"
+    $ borg tag --set foo --set bar aid:1ddaae55
+
+    # remove all normal tags (but not special tags like @PROT) from the archive with the given ID
+    $ borg tag --clear aid:1ddaae55
+
+    # protect the archive with the given ID against deletion and pruning
+    $ borg tag --add @PROT aid:1ddaae55

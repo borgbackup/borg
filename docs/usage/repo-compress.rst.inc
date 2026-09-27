@@ -12,17 +12,17 @@ borg repo-compress
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    | **options**                                                                                                                                                                                                  |
-    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details. |
-    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    |                                                       | ``-s``, ``--stats``                               | print statistics                                                                                 |
-    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                                                                                                               |
-    |                                                                                                                                                                                                              |
-    | :ref:`common_options`                                                                                                                                                                                        |
-    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
+    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | **options**                                                                                                                                                                                                                                                                    |
+    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details. Default: the repository default (see borg repo-create), else lz4. |
+    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``-s``, ``--stats``                               | print statistics                                                                                                                                                   |
+    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                 |
+    |                                                                                                                                                                                                                                                                                |
+    | :ref:`common_options`                                                                                                                                                                                                                                                          |
+    +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -37,7 +37,7 @@ borg repo-compress
 
 
     options
-        -C COMPRESSION, --compression COMPRESSION    select compression algorithm, see the output of the "borg help compression" command for details.
+        -C COMPRESSION, --compression COMPRESSION    select compression algorithm, see the output of the "borg help compression" command for details. Default: the repository default (see borg repo-create), else lz4.
         -s, --stats     print statistics
 
 
@@ -50,7 +50,9 @@ Description
 Repository (re-)compression (and/or re-obfuscation).
 
 Reads all repository objects and recompresses the ones that are not already using
-the compression type/level and obfuscation level given via ``--compression``.
+the compression type/level and obfuscation level given via ``--compression``. Without
+``--compression``, that is the repository's default compression (see ``borg repo-create``),
+else lz4.
 
 The repository is processed one pack file at a time: a pack is read as a whole and,
 if it holds objects that need recompression, rewritten as a whole - objects already
@@ -59,6 +61,13 @@ whose objects all already use the desired compression is not touched at all.
 Please note that the outcome of recompressing a chunk might not always be the
 desired compression type/level - if no compression gives a shorter output, that
 might be chosen; such chunks are kept as they are.
+
+``borg repo-compress`` does not rewrite packs that ``borg check`` recorded as corrupt
+and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by
+rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
+pack): a pack with such damage and no corrupt chunk stays recorded corrupt and is not rewritten,
+a pack that also has a corrupt chunk is rewritten with that damage copied into the new pack
+(refs #10026).
 
 Rewriting a pack invalidates every client's cached chunk index, so the next borg
 operation of each client will re-fetch the chunk index from the repository.

@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-import-tar" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-import-tar" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -65,6 +65,16 @@ stdout.
 .sp
 Most documentation of borg create applies. Note that this command does not
 support excluding files.
+.sp
+\fB\-\-strip\-components\fP removes the specified number of leading path elements
+from the tar member names when creating the archive items. Members whose path
+has fewer or equally many elements are silently skipped. Hard link targets are
+stripped accordingly, symbolic link targets are left unchanged.
+.sp
+The path elements are counted after normalizing the member name the same way it
+is stored in the archive, so a leading \fB\&./\fP is not a path element. This differs
+from \fBtar\fP, which counts it: to import \fB\&./top/dir/file\fP as \fBdir/file\fP, use
+\fB\-\-strip\-components=1\fP here, while \fBtar\fP needs \fB\-\-strip\-components=2\fP\&.
 .sp
 A \fB\-\-sparse\fP option (as found in borg create) is not needed: sparse members in
 input tarballs (old GNU and PAX sparse formats) are read correctly and their
@@ -123,6 +133,9 @@ output stats as JSON (implies \-\-stats)
 .TP
 .B  \-\-ignore\-zeros
 ignore zero\-filled blocks in the input tarball
+.TP
+.BI \-\-strip\-components \ NUMBER
+Remove the specified number of leading path elements. Paths with fewer elements will be silently skipped.
 .UNINDENT
 .SS Archive options
 .INDENT 0.0
@@ -134,10 +147,10 @@ add a comment text to the archive
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-specify the chunker parameters: buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL. default: fastcdc,19,23,21,2
+specify the chunker parameters: buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL. default: the repository default (see borg repo\-create), else fastcdc,19,23,21,2
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details. Default: the repository default (see borg repo\-create), else lz4.
 .TP
 .BI \-\-digests \ ALGOS
 compute these hash digests over the full content of each file and store them into the archive items. Comma\-separated list of hash algorithm names, e.g. \(dqblake3\(dq, or \(dqnone\(dq. default: none

@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-extract" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-extract" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-extract \- Extracts archive contents.
 .SH SYNOPSIS
@@ -54,6 +54,33 @@ decrypting, and decompressing.
 \fB\-\-progress\fP can be slower than no progress display, since it makes one additional
 pass over the archive metadata.
 .sp
+Extracting into a non\-empty directory replaces existing files that are in the way and
+leaves all other existing files as they are. The result is a mix of the files that were
+there before and the extracted files, which might not be what you want \- especially not
+by accident in a directory that is in use (e.g. your home directory). Thus, borg refuses
+to extract into a non\-empty directory unless \fB\-\-continue\fP is given (\fB\-\-dry\-run\fP and
+\fB\-\-stdout\fP do not write into the directory, so they always work). The usual way to
+restore is to extract into a new, empty directory: after that, the directory has exactly
+the contents of the extracted archive (or of the selected part of it).
+.sp
+\fB\-\-continue\fP extracts into a non\-empty directory. It is made for continuing a previously
+interrupted extraction of the same archive into the same directory: an existing regular
+file that has the same type, permissions (mode), size and modification time as the
+archived file is considered to be fully extracted already and is skipped. Everything else
+is extracted, replacing existing files. Files that are in the directory, but not in the
+archive, are left as they are. \fB\-\-continue\fP is thus also needed to restore files into an
+existing directory tree. Note that a file that was damaged without a change of its size
+and modification time (e.g. by bit rot) is skipped, not replaced: remove it before
+extracting it.
+.sp
+If a file\(aqs content chunks are missing from the repository or are corrupted (they fail
+authentication, decryption or decompression), the extraction does not abort: each such
+chunk is written as all\-zero data of the correct size, an error naming the chunk is logged,
+the file is reported with a warning and the exit code is a warning. The extracted file thus
+has the correct size and metadata, but wrong (all\-zero) content where the damaged chunks
+were. Run \fBborg check\fP to find out which chunks and archives are affected. This also
+applies to \fB\-\-dry\-run\fP (which thus can be used to find unreadable files) and \fB\-\-stdout\fP\&.
+.sp
 When using \fB\-\-stats\fP, borg reports the store statistics (lines prefixed with
 \(dqStore\(dq) for the extraction: per\-operation call counts and timings, the load/store
 data volumes and throughput, and cache hits/misses. This includes \fB\-\-dry\-run\fP
@@ -68,6 +95,24 @@ so make sure you \fBcd\fP to the right place before calling \fBborg extract\fP\&
 When parent directories are not extracted (because of using file/directory selection
 or any other reason), Borg cannot restore parent directories\(aq metadata, e.g., owner,
 group, permissions, etc.
+.UNINDENT
+.UNINDENT
+.sp
+\fBNote:\fP
+.INDENT 0.0
+.INDENT 3.5
+Restoring some file metadata requires root privileges (or equivalent
+capabilities). This includes the owner and group of files, device nodes,
+privileged file flags (like immutable or append\-only) and privileged
+extended attributes (like Linux capabilities or \fBtrusted.*\fP xattrs).
+.sp
+When running as a normal user, borg still extracts the file contents, but
+the extracted files are owned by the invoking user (the failure to restore
+ownership is silently ignored: no warning, exit code unaffected), privileged
+flags are skipped while the other flags are still set, and privileged xattrs
+and device nodes are skipped with a warning. \fB\-\-numeric\-ids\fP does not
+change this, it only selects whether the archived numeric IDs or the archived
+user/group names are used. To restore all metadata, run \fBborg extract\fP as root.
 .UNINDENT
 .UNINDENT
 .SH OPTIONS
@@ -113,7 +158,7 @@ write all extracted data to stdout
 create holes in the output sparse file from all\-zero chunks
 .TP
 .B  \-\-continue
-continue a previously interrupted extraction of the same archive
+extract into a non\-empty directory, e.g. to continue a previously interrupted extraction of the same archive: skip files that are fully extracted already, replace other existing files
 .UNINDENT
 .SS Include/Exclude options
 .INDENT 0.0
@@ -138,8 +183,11 @@ Remove the specified number of leading path elements. Paths with fewer elements 
 .INDENT 3.5
 .sp
 .EX
-# Extract entire archive
+# Extract entire archive (into the current directory, which must be empty)
 $ borg extract my\-files
+
+# Continue an interrupted extraction (or extract into a non\-empty directory)
+$ borg extract \-\-continue my\-files
 
 # Extract entire archive and list files while processing
 $ borg extract \-\-list my\-files

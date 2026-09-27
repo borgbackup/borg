@@ -324,7 +324,7 @@ The patterns can have a prefix of:
 - aid: prefix match on the archive id (only one result allowed)
 - user: exact match on the username who created the archive
 - host: exact match on the hostname where the archive was created
-- tags: match on the archive tags
+- tags: match archives having all the given tags (comma-separated, e.g. tags:TAG1,TAG2)
 - date: match on the archive creation timestamp
 
 In case of a name pattern match,
@@ -399,8 +399,9 @@ Examples::
     borg delete -a 'user:kenny'
     borg delete -a 'host:kenny-pc'
 
-    # tags match
+    # tags match (both lines match archives having TAG1 and TAG2)
     borg delete -a 'tags:TAG1' -a 'tags:TAG2'
+    borg delete -a 'tags:TAG1,TAG2'
 
     # archive creation date match
     borg delete -a 'date:2025-01'
@@ -494,7 +495,9 @@ another backup that also uses this chunk will not change the stored chunk.
 So if you use different compression specs for the backups, whichever stores a
 chunk first determines its compression. See also ``borg recreate``.
 
-Compression is lz4 by default. If you want something else, you have to specify what you want.
+If you do not specify a compression via ``--compression`` (or the environment or the
+default config file), the repository's default compression is used, which can be set
+with ``borg repo-create --compression``. Without a repository default, compression is lz4.
 
 Valid compression specifiers are:
 
@@ -502,7 +505,7 @@ none
     Do not compress.
 
 lz4
-    Use lz4 compression. Very high speed, very low compression. (default)
+    Use lz4 compression. Very high speed, very low compression. (built-in default)
 
 zstd[,L]
     Use zstd ("zstandard") compression, a modern wide-range algorithm.

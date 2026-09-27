@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-compact" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-compact" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-compact \- Collects garbage in the repository.
 .SH SYNOPSIS
@@ -59,6 +59,13 @@ indexed chunks (e.g. written by concurrent backups) that it finds while rewritin
 Other bytes no index entry covers, such as packs left behind by a backup that crashed
 before recording its objects, are re\-indexed by \fBborg check \-\-repair\fP and reclaimed by
 the next \fBborg compact\fP\&.
+.sp
+\fBborg compact\fP does not rewrite or merge packs that \fBborg check\fP recorded as corrupt
+and warns about them. \fBborg check \-\-repair \-\-verify\-data\fP deletes the corrupt chunks by
+rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
+pack): a pack with such damage and no corrupt chunk stays recorded corrupt and \fBborg compact\fP
+warns about it on every run, a pack that also has a corrupt chunk is rewritten with that damage
+copied into the new pack (refs #10026).
 .sp
 You usually do not want to run \fBborg compact\fP after every write operation, but
 either regularly (e.g., once a month, possibly together with \fBborg check\fP) or

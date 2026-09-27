@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-tag" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-tag" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-tag \- Manage tags.
 .SH SYNOPSIS
@@ -50,7 +50,41 @@ special and users are only allowed to use known special tags:
 .sp
 Pre\-existing special tags cannot be removed via \fB\-\-set\fP\&. You can still use
 \fB\-\-set\fP, but you must also give pre\-existing special tags (so they won\(aqt be
-removed).
+removed). If they are not given, borg emits a warning and does not set the tags
+of that archive.
+.sp
+\fB\-\-clear\fP removes all normal tags, but keeps special tags. Combined with
+\fB\-\-add\fP, it replaces the normal tags.
+.sp
+To change tags, you must select the archives: give an archive NAME or use archive
+filter options like \fB\-\-match\-archives\fP\&. To change the tags of all archives, use
+\fB\-\-match\-archives \(aqsh:*\(aq\fP\&.
+.sp
+Each of \fB\-\-set\fP, \fB\-\-add\fP and \fB\-\-remove\fP takes exactly one tag. To give
+multiple tags, use the option multiple times.
+.sp
+Examples:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+# add the tags \(dqimportant\(dq and \(dqkeep\(dq to the archive with the given ID
+$ borg tag \-\-add important \-\-add keep aid:1ddaae55
+
+# remove the tag \(dqkeep\(dq from all archives named \(dqhome\(dq
+$ borg tag \-\-remove keep \-\-match\-archives home
+
+# set the tags of the archive with the given ID to exactly \(dqfoo\(dq and \(dqbar\(dq
+$ borg tag \-\-set foo \-\-set bar aid:1ddaae55
+
+# remove all normal tags (but not special tags like @PROT) from the archive with the given ID
+$ borg tag \-\-clear aid:1ddaae55
+
+# protect the archive with the given ID against deletion and pruning
+$ borg tag \-\-add @PROT aid:1ddaae55
+.EE
+.UNINDENT
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -64,13 +98,16 @@ specify the archive name
 .INDENT 0.0
 .TP
 .BI \-\-set \ TAG
-set tags
+set tags (can be given multiple times)
+.TP
+.B  \-\-clear
+remove all normal tags (keep special tags)
 .TP
 .BI \-\-add \ TAG
-add tags
+add tag (can be given multiple times)
 .TP
 .BI \-\-remove \ TAG
-remove tags
+remove tag (can be given multiple times)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

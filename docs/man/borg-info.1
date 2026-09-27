@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-info" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-info" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-info \- Show archive details such as disk space used
 .SH SYNOPSIS
@@ -42,8 +42,9 @@ The original size shown here is the total size of the archive\(aqs source data
 (uncompressed, counting duplicate content per occurrence).
 .sp
 Deduplicated sizes are not shown here (computing them per archive is expensive).
-For the deduplicated size of a set of archives, use \fBborg analyze\fP; for the
-repository\-wide deduplicated size, use \fBborg compact \-\-stats\fP\&.
+\fBborg create \-\-stats\fP (also with \fB\-\-json\fP) reports the deduplicated size of the
+archive it has just created. For the deduplicated size of a set of archives, use
+\fBborg analyze\fP; for the repository\-wide deduplicated size, use \fBborg compact \-\-stats\fP\&.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

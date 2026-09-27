@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-repo-delete" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-repo-delete" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-repo-delete \- Deletes a repository.
 .SH SYNOPSIS
@@ -42,6 +42,12 @@ When you delete a complete repository, the security info and local cache for it
 (if any) are also deleted. Alternatively, you can delete just the local cache
 with the \fB\-\-cache\-only\fP option, or keep the security info with the
 \fB\-\-keep\-security\-info\fP option.
+.sp
+\fB\-\-force\fP also destroys a store that has no repository config, provided it looks
+like a borg store (it has the packs, archives, index and config namespaces).
+.sp
+Deleting a repository needs its key, as locking it needs the key. If the key is lost,
+the repository is useless and has to be deleted with the storage\(aqs own tools.
 .sp
 Always first use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .SH OPTIONS

@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-check" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-check" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-check \- Checks repository consistency.
 .SH SYNOPSIS
@@ -41,15 +41,20 @@ It consists of two major steps:
 .INDENT 0.0
 .IP 1. 3
 Checking the consistency of the repository itself. The objects in the \fBindex/\fP
-and \fBpacks/\fP namespaces are named by the sha256 hash of their content, so such
+and \fBpacks/\fP namespaces are named by the store hash of their content, so such
 an object is intact if and only if the hash of its content still equals its name.
 The check verifies the (small) index objects first and, only if they are intact,
 all packs. It also cross\-checks the chunk index against the packs present in the
 repository to detect referenced but missing packs. Bit rot and other types of
-accidental damage can be detected this way, but as sha256 content\-addressing is
-not a MAC, this step does not detect tampering. Running the repository check can
+accidental damage can be detected this way, but as content\-addressing is
+not a MAC, this step does not detect tampering of the packs. The index objects
+are also authenticated with the key when they are loaded for that cross\-check.
+A corrupt index ends the check after this step, as the archives check needs it,
+unless \fB\-\-repair\fP is given (see below). This step also verifies the repository
+defaults object (see \fBborg repo\-create\fP): it must be present and authenticate
+with the key. Running the repository check can
 be split into multiple partial checks using \fB\-\-max\-duration\fP\&.
-For rest:// repositories, the server computes the hashes, so the pack contents do
+For \%<ssh://> repositories, the server computes the hashes, so the pack contents do
 not have to travel over the network. For other remote backends, borg usually has
 to read (download) the objects to hash them.
 .IP 2. 3
@@ -72,6 +77,10 @@ machine because they require decrypting data and therefore the encryption key.
 Both steps can also be run independently. Pass \fB\-\-repository\-only\fP to run the
 repository checks only, or pass \fB\-\-archives\-only\fP to run the archive checks
 only.
+.sp
+\fBborg check\fP always needs the key, \fB\-\-repository\-only\fP included: it loads
+the key (asking for the passphrase, if needed) before it checks anything and
+aborts if the key can not be loaded.
 .sp
 The \fB\-\-max\-age\fP option makes the check reuse the results of previous
 repository checks: packs whose intact result is younger than the given
@@ -132,16 +141,18 @@ description for more details about the format string).
 If the \fBborg check\fP process receives a SIGINT signal (Ctrl\-C), it stops at the
 next safe boundary, leaving the repository and its chunk index in a consistent state.
 The repository check stops after the current pack; \fB\-\-verify\-data\fP and
-\fB\-\-find\-lost\-archives\fP stop after the current chunk; a \fB\-\-repair\fP archive check
-stops between whole archives. Results recorded before the interrupt are kept, so a later
-check does not re\-verify those packs until they are due again. With \fB\-\-repair\fP, an
-interrupted archive check may leave some archives already repaired and others not yet
-processed, so run \fBborg check \-\-repair\fP again to finish.
+\fB\-\-find\-lost\-archives\fP stop after the current chunk; the archive check stops after the
+current archive item, with \fB\-\-repair\fP between whole archives. Results recorded before
+the interrupt are kept, so a later check does not re\-verify those packs until they are
+due again. With \fB\-\-repair\fP, an interrupted archive check may leave some archives already
+repaired and others not yet processed, so run \fBborg check \-\-repair\fP again to finish.
 .sp
-During a \fB\-\-repair\fP run, the archive check first rebuilds the chunk index from the
-packs, and, if the key must be recovered, scans chunks for it. These phases do not yet
-respond to SIGINT, so on a large repository a Ctrl\-C during them may appear to have no
-effect until they finish.
+\fBborg check\fP rebuilds the chunk index from the packs when \fB\-\-repair\fP is given or when
+the stored index cannot be used. Ctrl\-C stops that rebuild after the current object and
+discards the partial index: it lacks chunks that are still in the repository, so the check
+would report them as lost. After a \fB\-\-repair\fP that stored or deleted chunks, borg re\-reads the
+packs the repair wrote, makes the chunk index match them and stores it; that always runs to
+completion, also after a Ctrl\-C.
 .SS About repair mode
 .sp
 The check command is a read\-only task by default. If any corruption is found,
@@ -176,10 +187,17 @@ In practice, repair mode hooks into both the repository and archive checks:
 .INDENT 0.0
 .IP 1. 3
 When checking the repository\(aqs consistency, repair mode rebuilds the repository
-index from the packs if the index is corrupt, provided every pack is intact. If
-any pack is corrupt, the repository check leaves the index and the packs untouched
-and reports the corruption; salvaging a corrupt pack\(aqs still\-intact objects is not
-implemented yet (refs #8572).
+index from the packs if the index is corrupt, provided every pack matches its
+store hash. If any pack fails its store hash, the repository check leaves the
+index and the packs untouched and reports it; salvaging the intact objects of
+such a pack is not implemented yet (refs #8572). The rebuild authenticates
+each object\(aqs header and metadata with the key, leaves an object that fails
+this out of the index and reports it as an error. Repair mode also removes the
+index entries of the chunks stored in missing packs (packs the index references,
+but that are absent from the repository). Only a full \fBborg check \-\-repair\fP
+repairs the archives that reference these chunks, \fB\-\-repository\-only\fP does not.
+A missing or corrupt repository defaults object is replaced by empty defaults, so
+the repository can be used again; the commands then use the built\-in defaults.
 .IP 2. 3
 When checking the consistency and correctness of archives, repair mode might
 remove whole archives from the manifest if their archive metadata chunk is

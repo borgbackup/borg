@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-recreate" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-recreate" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-recreate \- Recreate archives.
 .SH SYNOPSIS
@@ -166,10 +166,10 @@ add a comment text to the archive
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the \(dqborg help compression\(dq command for details. Only applies to newly written data, e.g. when re\-chunking with \-\-chunker\-params (and to the new archive metadata); data chunks reused from the existing archive are not recompressed, use borg repo\-compress for that.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details. Only applies to newly written data, e.g. when re\-chunking with \-\-chunker\-params (and to the new archive metadata); data chunks reused from the existing archive are not recompressed, use borg repo\-compress for that. Default: the repository default (see borg repo\-create), else lz4.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-rechunk using given chunker parameters: buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or \fIdefault\fP to use the chunker defaults. default: do not rechunk
+rechunk using given chunker parameters: buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or \fIdefault\fP to use the repository default (see borg repo\-create), else the built\-in chunker defaults. default: do not rechunk
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

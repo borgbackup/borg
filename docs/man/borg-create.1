@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-create" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-create" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-create \- Creates a new archive.
 .SH SYNOPSIS
@@ -71,7 +71,8 @@ appropriate to use \-\-content\-from\-command. See the section
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 .sp
-The \fB\-\-tags\fP option can be used to add a list of tags to the new archive.
+The \fB\-\-tag\fP option can be used to add a tag to the new archive. To add
+multiple tags, give it multiple times, e.g. \fB\-\-tag foo \-\-tag bar\fP\&.
 .sp
 The archive name does not need to be unique; you can and should use the same
 name for a series of archives. The unique archive identifier is its ID (hash),
@@ -179,9 +180,8 @@ terminals, the compact format is used, so that the path stays readable. If the o
 does not go to a terminal (e.g. into a logfile), the precise format is always used.
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
-added \- the \(dqThis Archive\(dq deduplicated size there is most interesting as that is
-how much your repository will grow. Please note that the \(dqAll archives\(dq stats refer to
-the state after creation.
+added \- the deduplicated size there is most interesting as that is how much your
+repository will grow. \fB\-\-json\fP outputs the same statistics as JSON.
 .sp
 When \fB\-\-stats\fP is used together with \fB\-\-dry\-run\fP, only the number of files and the
 original size are reported. They are computed from file system metadata, without reading
@@ -361,13 +361,13 @@ add a comment text to the archive
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: fastcdc,19,23,21,2
+specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL). default: the repository default (see borg repo\-create), else fastcdc,19,23,21,2
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details. Default: the repository default (see borg repo\-create), else lz4.
 .TP
-.BI \-\-tags \ TAG
-add tags to archive (comma\-separated or multiple arguments)
+.BI \-\-tag \ TAG
+add tag to archive (can be given multiple times)
 .UNINDENT
 .SH EXAMPLES
 .sp

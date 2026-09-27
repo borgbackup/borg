@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-environment" "1" "2026-09-02" "" "borg backup tool"
+.TH "borg-environment" "1" "2026-09-27" "" "borg backup tool"
 .SH Name
 borg-environment \- Details regarding environment
 .SH DESCRIPTION
@@ -46,17 +46,23 @@ Use this so you do not need to type \fB\-\-repo /path/to/my/repo\fP all the time
 .B BORG_OTHER_REPO
 Similar to BORG_REPO, but gives the default for \fB\-\-other\-repo\fP\&.
 .TP
-.B BORG_PASSPHRASE (and BORG_OTHER_PASSPHRASE)
+.B BORG_PASSPHRASE (and BORG_NEW_PASSPHRASE, BORG_OTHER_PASSPHRASE)
 When set, use the value to answer the passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo.
 BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are mutually exclusive:
 if more than one of them is set, borg refuses to guess and aborts with
 \(dqMore than one passphrase environment variable is set\(dq. The same applies to the
-\fBBORG_OTHER_*\fP variants (which are a separate, independent group).
+\fBBORG_NEW_*\fP and \fBBORG_OTHER_*\fP variants (each of which is a separate,
+independent group).
 See also BORG_NEW_PASSPHRASE.
+borg removes the passphrase\-related variables (BORG_PASSPHRASE, BORG_PASSCOMMAND,
+BORG_PASSPHRASE_FD and their \fBBORG_NEW_*\fP and \fBBORG_OTHER_*\fP variants) as well as
+BORGSTORE_REST_PASSWORD from the environment of the subprocesses it starts (like the
+command given in BORG_PASSCOMMAND, \fB\-\-paths\-from\-command\fP / \fB\-\-content\-from\-command\fP
+commands, tar filter commands and \fBborg with\-lock\fP commands).
 .TP
-.B BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
+.B BORG_PASSCOMMAND (and BORG_NEW_PASSCOMMAND, BORG_OTHER_PASSCOMMAND)
 When set, use the standard output of the command (trailing newlines are stripped) to answer the
 passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
@@ -65,7 +71,7 @@ is executed without a shell. So variables, like \fB$HOME\fP will work, but \fB~\
 Mutually exclusive with BORG_PASSPHRASE and BORG_PASSPHRASE_FD, see there.
 See also BORG_NEW_PASSPHRASE.
 .TP
-.B BORG_PASSPHRASE_FD (and BORG_OTHER_PASSPHRASE_FD)
+.B BORG_PASSPHRASE_FD (and BORG_NEW_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD)
 When set, specifies a file descriptor to read a passphrase
 from. Programs starting borg may choose to open an anonymous pipe
 and use it to pass a passphrase. This is safer than passing via
@@ -73,10 +79,12 @@ BORG_PASSPHRASE, because on some systems (e.g. Linux) environment
 can be examined by other processes.
 Mutually exclusive with BORG_PASSPHRASE and BORG_PASSCOMMAND, see there.
 .TP
-.B BORG_NEW_PASSPHRASE
-When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
-This variable is checked first. If it is not set, BORG_PASSPHRASE, BORG_PASSCOMMAND and
-BORG_PASSPHRASE_FD are checked (in that order).
+.B BORG_NEW_PASSPHRASE (and BORG_NEW_PASSCOMMAND, BORG_NEW_PASSPHRASE_FD)
+When set, use these to answer the passphrase question when a \fBnew\fP passphrase is
+asked for: like BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD, but for
+the new passphrase.
+The \fBBORG_NEW_*\fP group is checked first. If none of its variables is set,
+BORG_PASSPHRASE, BORG_PASSCOMMAND and BORG_PASSPHRASE_FD are checked (in that order).
 Main use case for this is to fully automate \fBborg key change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
@@ -267,7 +275,7 @@ more afterwards. (Re\-chunking in \fBborg transfer\fP is covered by \fBtransfer\
 An unknown place name is an error. An empty value (\fBBORG_ASSERT_ID=\fP) verifies at none of
 these places, but still where borg always verifies (see below).
 .sp
-Why \fBread\fP is not in the default: in the keyed modes, the envelope already authenticates
+Why \fBread\fP is not in the default: the envelope already authenticates
 every read \- the AEAD tag for the encrypted ciphersuites, the MAC for the (unencrypted)
 \fBauthenticated\-*\fP modes \- and the chunk id is part of what that tag is computed over. So
 a successful decryption resp. tag check already proves that a holder of the borg key
@@ -297,10 +305,8 @@ Independent of this variable, borg always verifies the chunk id:
 in \fBborg check \-\-verify\-data\fP\&. That audit is what makes not verifying elsewhere
 defensible, so it is not configurable (there is no \fBverify_data\fP place name).
 .IP \(bu 2
-for \fBnone\-*\fP mode repositories: they have no key, so nothing authenticates a read
-there and their unkeyed checksums only detect accidental corruption. The id check is
-therefore not optional there: it happens at every place, whatever this variable says.
-Same for reading borg 1.x repositories (\fBborg transfer\fP).
+when reading borg 1.x repositories (\fBborg transfer \-\-from\-borg1\fP): their envelope does
+not cover the chunk id, so the id check is not optional there.
 .UNINDENT
 .TP
 .B BORG_BLAKE3_MT_THRESHOLD
@@ -317,7 +323,8 @@ set it, and can optionally show a chart of the measurements in your browser
 .TP
 .B BORG_ZSTD_MT_WORKERS
 When set to a numeric value, use that many threads to zstd\-compress a single chunk
-(default: the cpu count, but at most 4). 0 or 1 means single\-threaded compression.
+(default: the cpu count, but at most 4). If it is unset or empty, the default is
+used. 0 or 1 means single\-threaded compression.
 Only relevant when compressing with \fBzstd\fP\&.
 Chunks below 768KiB are always compressed single\-threaded: libzstd will not use a
 compression job smaller than 512KiB, so a small chunk gets split very unevenly and
@@ -448,8 +455,7 @@ anyway, without any key material.
 Without the key, borg can not verify anything that needs it: neither the
 authentication tag of the repository objects nor the chunk ids. It therefore
 reads the repository \fBunverified\fP \- a corrupted or tampered repository will
-not be detected. (This only concerns the \fBauthenticated\-*\fP modes; the
-\fBnone\-*\fP modes need no key and keep verifying their checksums.)
+not be detected.
 .sp
 This workaround is \fBonly\fP for emergencies and \fBonly\fP to extract data
 from an affected repository (read\-only access):

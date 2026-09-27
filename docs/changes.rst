@@ -176,7 +176,7 @@ Breaking changes (you must create new repos for b25):
 - repository: use an ini-style config/config text object (repo version 5)
   instead of the manifest, id, version and readme objects. The encryption and
   id-hash algorithms are also given there as plain text.
-- store hash: use the much faster pure software blake3 hash instead of sha256
+- store hash: use the much faster, pure-software blake3 hash instead of sha256
   to name content-addressed objects in the store.
 - the lock, index and cache store objects are now protected by the repository
   key: encrypted and authenticated in the encrypting modes, authenticated only
@@ -188,6 +188,7 @@ Breaking changes (you must create new repos for b25):
 
 New features:
 
+- repo-create: store default compression and chunker params in the repository, #346
 - create/import-tar --json: report the deduplicated size of the new archive, #10335
 - diff --stats: show a summary of the differences, #796
 - repo-info: show whether the key uses an empty passphrase, #9072
@@ -197,15 +198,16 @@ New features:
 - mount: support Windows using WinFsp (via mfusepy), #2316
 - import-tar --strip-components: strip leading path components, #6461
 - add the BORG_NEW_PASSCOMMAND and BORG_NEW_PASSPHRASE_FD env vars
+- tag: add --clear to remove all normal tags
 
 Fixes:
 
 - crypto: the AEAD ciphers (AES-OCB, ChaCha20-Poly1305) feed their input to OpenSSL in
-  <= 1 GiB chunks, to overcome the 32-bit size limit of the OpenSSL API.
+  <= 1 GiB chunks to overcome the 32-bit size limit of the OpenSSL API.
 - repository: raise DoesNotExist for a missing ssh:// repository, #10365
 - --from-borg1 via ssh:// failed with a borg 1.x "borg serve" (e.g. borg
   transfer): the legacy client used RPC methods borg 1.x does not have and did
-  not convert the bytes a borg 1.x server sends back.
+  not convert the bytes a borg 1.x server sent back.
 - --from-borg1: borg 1.x repositories in authenticated or authenticated-blake2
   mode could not be accessed ("passphrase is incorrect"), as their key was not
   decrypted with the pbkdf2 key derivation borg 1.x used for it.
@@ -215,8 +217,8 @@ Fixes:
 
   - build the chunk index once, not three times
   - validate a gap object before dropping its bytes, #10093
-  - do not rewrite or merge packs recorded corrupt, #10410
-- repo-compress: do not rewrite packs recorded corrupt, #10410
+  - do not rewrite or merge packs recorded as corrupt, #10410
+- repo-compress: do not rewrite packs recorded as corrupt, #10410
 - check:
 
   - use one chunk index for the checker and the repository, #10364
@@ -244,12 +246,21 @@ Fixes:
     differ, #10351
   - report a file as modified when chunks were reordered or duplicated
 - import-tar: show the stored paths in the file status output
-- locking: try at least once before a lock acquire times out, also with --lock-wait 0
+- locking: try to acquire a lock at least once before timing out, also with --lock-wait 0
 - repoobj: catch get() errors in --find-lost-archives, #10318
+- repo-list, compact: handle archives with a missing metadata object, #10435
+- create: replace --tags with --tag, taking one tag per option, #10430
+- tag:
+
+  - --set/--add/--remove take one tag per option, #10430
+  - only rewrite the archive metadata if the tags changed
+  - warn if --set is refused because it would remove special tags
+  - refuse to change the tags of all archives without a selection
 
 Other changes:
 
 - update pyinstaller to 6.22.3
+- require borgstore 0.7.0
 - Linux binaries:
 
   - build binaries for older CPUs and older glibc on Ubuntu 24.04, #10342
@@ -263,6 +274,10 @@ Other changes:
   for big chunks at fast, low-compression zstd levels
 - add_warning: store exceptions given as args as text, not as exception objects,
   reducing memory usage when there are many warnings
+- optimize speed, especially for remote repos and repos with many archives:
+
+  - load all archives' metadata with one Store.gather
+  - reuse the listed archive metadata when opening an Archive
 - check:
 
   - do not reject items with unknown keys, drop item_keys from the manifest
@@ -278,11 +293,13 @@ Other changes:
 
   - extract: document the metadata that can only be restored as root, #8088
   - fix two inaccuracies in the borg diff JSON docs, #7486
+  - key export --paper: fix the restore hint for borg 2 syntax, #10428
   - an empty passphrase can be replaced later with ``borg key change-passphrase``, #9072
-  - FAQ about deduplicating related repositories on the filesystem, see #9104
+  - add a FAQ entry about deduplicating related repositories on the filesystem, see #9104
   - derive the borg passphrase from a YubiKey (challenge-response), #4549
   - protect the borg passphrase with age (which also supports crypto tokens,
     TPM, Apple Secure Enclave, ... via age plugins), #4549
+  - explain the tags: archive match pattern
 - tests:
 
   - add an archiver-level test for BORG_WORKAROUNDS=authenticated_no_key

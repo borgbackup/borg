@@ -9,6 +9,7 @@ from collections import namedtuple
 
 import pytest
 from borghash import HashTableNT
+from borgstore.backends.errors import BackendConnectionError, BackendMustBeOpen, PermissionDenied, ReadRangeError
 from borgstore.backends.rest import REST
 
 from ..crypto.key import store_hash
@@ -23,7 +24,7 @@ from ..platform import get_process_id
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
 from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
 from ..repository import SALVAGE_DONE, SALVAGE_INTACT, SALVAGE_NOTHING_AUTHENTICATES
-from ..repository import SALVAGE_READ_ERROR, SALVAGE_READS_DIFFER, StoreBackendError, StoreObjectNotFound
+from ..repository import SALVAGE_READ_ERROR, SALVAGE_READS_DIFFER, StoreObjectNotFound
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator, whole_object_authenticator
 from . import make_test_key, set_test_key_on_open
 from .hashindex_test import H
@@ -3674,7 +3675,9 @@ def test_salvage_pack_leaves_a_pack_that_reads_intact_alone(salvage_repository, 
 
 @pytest.mark.parametrize("method", ["hash", "load"])
 @pytest.mark.parametrize(
-    "error", [OSError(5, "Input/output error"), StoreBackendError("server error")], ids=["OSError", "BackendError"]
+    "error",
+    [OSError(5, "Input/output error"), BackendConnectionError("connection lost"), ReadRangeError("short read")],
+    ids=["OSError", "BackendConnectionError", "ReadRangeError"],
 )
 def test_salvage_pack_leaves_a_pack_alone_on_a_read_error(salvage_repository, monkeypatch, method, error):
     repo_objs = plain_repo_objs()
@@ -3690,6 +3693,28 @@ def test_salvage_pack_leaves_a_pack_alone_on_a_read_error(salvage_repository, mo
     result = salvage(salvage_repository, repo_objs, pack_id)
 
     assert result.status == SALVAGE_READ_ERROR
+    monkeypatch.undo()
+    assert store_contents(salvage_repository) == packs_before
+    assert index_contents(salvage_repository.chunks) == index_before
+
+
+@pytest.mark.parametrize("method", ["hash", "load"])
+@pytest.mark.parametrize(
+    "error", [BackendMustBeOpen("not open"), PermissionDenied("denied")], ids=["BackendMustBeOpen", "PermissionDenied"]
+)
+def test_salvage_pack_raises_other_backend_errors(salvage_repository, monkeypatch, method, error):
+    repo_objs = plain_repo_objs()
+    objs = three_objects(repo_objs)
+    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
+
+    def failing(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(salvage_repository.store, method, failing)
+
+    with pytest.raises(type(error)):
+        salvage(salvage_repository, repo_objs, pack_id)
     monkeypatch.undo()
     assert store_contents(salvage_repository) == packs_before
     assert index_contents(salvage_repository.chunks) == index_before

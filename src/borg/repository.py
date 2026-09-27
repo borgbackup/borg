@@ -14,6 +14,7 @@ from borgstore.store import Store
 from borgstore.backends.rest import REST, ssh_cmd
 from borgstore.store import ObjectNotFound as StoreObjectNotFound, ReadRangeError
 from borgstore.backends.errors import BackendError as StoreBackendError
+from borgstore.backends.errors import BackendConnectionError as StoreBackendConnectionError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
 
@@ -2404,8 +2405,8 @@ class Repository:
         - SALVAGE_READS_DIFFER: the loaded bytes hash to the pack's name although the store hash did
           not, or a second load of the pack differs from the first, e.g. due to corruption in memory
           or in transfer. Objects are dropped only if both loads return the same bytes.
-        - SALVAGE_READ_ERROR: reading the pack raised OSError or a store backend error other than
-          StoreObjectNotFound. All reads happen before the first store change.
+        - SALVAGE_READ_ERROR: reading the pack raised OSError, StoreBackendConnectionError or
+          ReadRangeError. All reads happen before the first store change.
         - SALVAGE_DONE: the replacement pack is stored, before_old_pack_delete is called, chunks is
           updated, then the old pack is deleted. If the replacement pack has the old pack's name
           (the kept bytes are the undamaged pack), storing it overwrites the old pack, and
@@ -2418,8 +2419,8 @@ class Repository:
 
         Raises Error before any store access if uses_pack_store_cache is set (then two loads can
         return the same cached copy). Raises PermissionDenied unless the repo permissions allow
-        compaction (see assert_writable), and StoreObjectNotFound if the pack is missing. Requires the
-        exclusive lock.
+        compaction (see assert_writable), and StoreObjectNotFound if the pack is missing. Other store
+        backend errors propagate. Requires the exclusive lock.
         """
         if self.uses_pack_store_cache:
             raise Error("Pack salvage refused: with BORG_STORE_CACHE, pack reads may return the cached copy.")
@@ -2448,9 +2449,7 @@ class Repository:
                 return unchanged(SALVAGE_NOTHING_AUTHENTICATES)
             if self.store.load(pack_key) != pack_contents:
                 return unchanged(SALVAGE_READS_DIFFER)
-        except StoreObjectNotFound:
-            raise
-        except (OSError, StoreBackendError) as exc:
+        except (OSError, StoreBackendConnectionError, ReadRangeError) as exc:
             logger.warning(f"pack {pack_hex}: {exc}, not salvaging it.")
             return unchanged(SALVAGE_READ_ERROR)
 

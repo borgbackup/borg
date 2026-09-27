@@ -1333,10 +1333,11 @@ class CreateMixIn:
             metavar="PARAMS",
             dest="chunker_params",
             type=ChunkerParams,
-            default=CHUNKER_PARAMS,
+            default=DEFAULT_CHUNKER_PARAMS,  # see default_chunker_params()
             action=Highlander,
             help="specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, NC_LEVEL). default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
+            "HASH_MASK_BITS, NC_LEVEL). default: the repository default (see borg repo-create), "
+            "else %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
         )
         archive_group.add_argument(
             "-C",
@@ -1344,9 +1345,11 @@ class CreateMixIn:
             metavar="COMPRESSION",
             dest="compression",
             type=CompressionSpec,
-            default=CompressionSpec("lz4"),
+            default=None,  # None: not given, see default_compression()
             action=Highlander,
-            help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+            help="select compression algorithm, see the output of the "
+            '"borg help compression" command for details. '
+            "Default: the repository default (see borg repo-create), else lz4.",
         )
         archive_group.add_argument(
             "--tag",

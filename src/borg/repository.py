@@ -26,6 +26,7 @@ from .helpers import get_cache_dir
 from .helpers import replace_placeholders
 from .helpers import sig_int
 from .helpers import ProgressIndicatorPercent
+from .helpers import msgpack
 from .helpers.lrucache import LRUCache
 from .storelocking import Lock
 from .logger import create_logger
@@ -52,6 +53,8 @@ MAX_VALIDATED_META_SIZE = 64 * 1024
 # from the metadata and data slots of pack objects, whose AAD starts with OBJ_MAGIC (b"BORG_OBJ"). The
 # repository id, a tag and the object name (or namespace) follow it, see Repository._store_obj_aad.
 STORE_OBJ_AAD = b"borg-store-object\0"
+# the store object with the repository defaults, e.g. the default compression, see Repository.save_defaults.
+DEFAULTS_NAME = "config/defaults"
 
 
 def repo_lister(repository, *, limit=None):
@@ -984,6 +987,7 @@ class Repository:
         # key_loader(repository) returns the repository's key; acquire_lock() calls it if no key was set yet.
         # None: key_factory(repository).
         self._key_loader = key_loader
+        self._defaults = None  # cache of load_defaults()
         # plaintext store hash -> fragment hash of the index/ fragments read in this session, so a
         # fragment with the same content is not stored again, see cache._store_chunkindex_fragment.
         self.chunkindex_fragment_hashes = {}
@@ -2457,6 +2461,44 @@ class Repository:
             return self.key.decrypt(b"", envelope, aad=self._store_obj_aad(aad_name, hashed_name))
         except IntegrityError as err:
             raise IntegrityError(f"Store object {name}: authentication failed") from err
+
+    def save_defaults(self, defaults):
+        """Store the repository defaults (the config/defaults store object).
+
+        defaults: a dict mapping option names to their default values as strings, e.g.
+        {"compression": "zstd,3"}. The commands use such a default if the option was not given (see
+        with_repository). Unlike config/config, which is read before the key is known, the object is
+        stored in the key's envelope (see store_encrypt_store), so nobody without the key can change the
+        defaults (e.g. remove an "obfuscate" compression) without being noticed.
+        """
+        self.store_encrypt_store(DEFAULTS_NAME, msgpack.packb(defaults))
+        self._defaults = dict(defaults)
+
+    def load_defaults(self):
+        """Return the repository defaults stored by save_defaults(), or {} if there are none.
+
+        The store object is only read once, later calls return the same defaults.
+
+        Raises IntegrityError if the envelope authentication fails, InvalidRepositoryConfig if the
+        content is not a dict of strings.
+        """
+        if self._defaults is not None:
+            return dict(self._defaults)
+        try:
+            data = self.store_load_decrypt(DEFAULTS_NAME)
+        except StoreObjectNotFound:
+            self._defaults = {}
+            return {}
+        try:
+            defaults = msgpack.unpackb(data)
+        except msgpack.UnpackException:
+            defaults = None
+        if not (
+            isinstance(defaults, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in defaults.items())
+        ):
+            raise self.InvalidRepositoryConfig(self._location.canonical_path(), f"{DEFAULTS_NAME} is malformed")
+        self._defaults = defaults
+        return dict(defaults)
 
     def store_delete(self, name, *, deleted=False):
         self._lock_refresh()

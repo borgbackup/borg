@@ -345,7 +345,14 @@ path
     Path to the local repository cache
 
 :ref:`borg_repo-info` additionally emits a *security_dir* key with the path of the local security
-directory of the repository.
+directory of the repository and a *defaults* key with an object containing:
+
+compression
+    The compression spec the commands use if no compression is given: the repository default (see
+    :ref:`borg_repo-create` ``--compression``), else ``lz4``
+chunker_params
+    The chunker params the commands use if no chunker params are given: the repository default (see
+    :ref:`borg_repo-create` ``--chunker-params``), else the built-in default
 
 .. highlight: json
 
@@ -354,6 +361,10 @@ Example ``borg repo-info --json`` output::
     {
         "cache": {
             "path": "/home/user/.cache/borg/65d7898e2142485f44506fb11c0fcd6d7dfd0341716385246068584a62632a94"
+        },
+        "defaults": {
+            "chunker_params": "fastcdc,19,23,21,2",
+            "compression": "lz4"
         },
         "encryption": {
             "encryption": "aes256-ocb",

@@ -223,7 +223,9 @@ class RepoCompressMixIn:
         Repository (re-)compression (and/or re-obfuscation).
 
         Reads all repository objects and recompresses the ones that are not already using
-        the compression type/level and obfuscation level given via ``--compression``.
+        the compression type/level and obfuscation level given via ``--compression``. Without
+        ``--compression``, that is the repository's default compression (see ``borg repo-create``),
+        else lz4.
 
         The repository is processed one pack file at a time: a pack is read as a whole and,
         if it holds objects that need recompression, rewritten as a whole - objects already
@@ -267,9 +269,10 @@ class RepoCompressMixIn:
             metavar="COMPRESSION",
             dest="compression",
             type=CompressionSpec,
-            default=CompressionSpec("lz4"),
+            default=None,  # None: not given, see default_compression()
             action=Highlander,
-            help='select compression algorithm, see the output of the "borg help compression" command for details.',
+            help='select compression algorithm, see the output of the "borg help compression" command for details. '
+            "Default: the repository default (see borg repo-create), else lz4.",
         )
 
         subparser.add_argument("-s", "--stats", dest="stats", action="store_true", help="print statistics")

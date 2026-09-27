@@ -41,7 +41,7 @@ config/
     the repository config (see :ref:`repo_config`), a text object
   defaults
     the repository defaults (see :ref:`repo_defaults`), in the key's store object
-    envelope (see below). Only present if ``borg repo-create`` was given a default.
+    envelope (see below). ``borg repo-create`` always writes it.
   space-reserve.N
     purely random binary data to reserve space, e.g. for disk-full emergencies.
     These objects are created and removed by ``borg repo-space``.
@@ -132,8 +132,9 @@ packs; any other command that needs the chunks index aborts, except ``borg compa
 and ``borg repo-compress``, which rebuild it from the packs, as they rewrite the whole
 chunks index anyway (under an exclusive lock). A corrupted cache is ignored and
 rebuilt. A lock object that fails the authentication is treated as a foreign exclusive
-lock, see :ref:`storelocking`. Commands that use ``config/defaults`` abort if it fails
-the authentication. The ``chunkindex-invalid`` marker has no content and is
+lock, see :ref:`storelocking`. The commands that use ``config/defaults`` abort if it is
+missing or fails the authentication, ``borg check --repair`` replaces it by empty defaults
+(see :ref:`repo_defaults`). The ``chunkindex-invalid`` marker has no content and is
 stored as is.
 
 
@@ -339,8 +340,13 @@ for it.
 Unlike the repository config, which borg must read before it knows the key, the
 defaults are stored in the :ref:`store object envelope <store_object_envelope>`,
 so they are authenticated: an attacker with write access to the storage can not
-change them (e.g. remove an ``obfuscate`` compression) without being noticed. A
-repository without the object has no defaults.
+change them (e.g. remove an ``obfuscate`` compression) without being noticed.
+``borg repo-create`` always writes the object, also when no default was given (an
+empty dict), so removing it is noticed as well: the commands that use the defaults
+refuse to run if the object is missing or fails the authentication. ``borg check``
+reports such an object and ``borg check --repair`` replaces it by empty defaults, so
+the repository can be used again (with the built-in defaults). Like the repository
+config, the defaults themselves can not be restored.
 
 .. _archive:
 

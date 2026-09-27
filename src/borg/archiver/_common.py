@@ -183,14 +183,15 @@ def with_repository(
                         ro_cls = RepoObj1
                     manifest_ = Manifest.load(repository, other=False, ro_cls=ro_cls)
                     kwargs["manifest"] = manifest_
+                    if secure:
+                        assert_secure(repository, manifest_)
+                    # the repository defaults are read only after the security checks passed.
                     if "compression" in args:
                         if args.compression is None:  # not given, see default_compression()
                             args.compression = default_compression(repository)
                         manifest_.repo_objs.compressor = args.compression.compressor
                     if "chunker_params" in args and args.chunker_params == DEFAULT_CHUNKER_PARAMS:
                         args.chunker_params = default_chunker_params(repository)
-                    if secure:
-                        assert_secure(repository, manifest_)
                 if cache:
                     with Cache(
                         repository,

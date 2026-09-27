@@ -891,6 +891,11 @@ class Repository:
 
         exit_mcode = 29
 
+    class DefaultsMissing(Error):
+        """Repository {} has no config/defaults object, run "borg check --repair" to store empty defaults."""
+
+        exit_mcode = 34
+
     # Whole packs kept in memory for reads; the least recently used is evicted first.
     # Memory use is this count times the pack size.
     PACK_READER_CACHE_SIZE = 3
@@ -2466,29 +2471,35 @@ class Repository:
         """Store the repository defaults (the config/defaults store object).
 
         defaults: a dict mapping option names to their default values as strings, e.g.
-        {"compression": "zstd,3"}. The commands use such a default if the option was not given (see
-        with_repository). Unlike config/config, which is read before the key is known, the object is
-        stored in the key's envelope (see store_encrypt_store), so nobody without the key can change the
-        defaults (e.g. remove an "obfuscate" compression) without being noticed.
+        {"compression": "zstd,3"}, or {} for no defaults. The commands use such a default if the option
+        was not given (see with_repository).
+
+        "borg repo-create" always writes the object, so a repository without it lost it (see
+        load_defaults). Unlike config/config, which is read before the key is known, the object is stored
+        in the key's envelope (see store_encrypt_store), so changing the defaults (e.g. removing an
+        "obfuscate" compression) needs the key: a changed object fails the authentication, a removed one
+        is missing, and the commands refuse to run either way.
         """
         self.store_encrypt_store(DEFAULTS_NAME, msgpack.packb(defaults))
         self._defaults = dict(defaults)
 
     def load_defaults(self):
-        """Return the repository defaults stored by save_defaults(), or {} if there are none.
+        """Return the repository defaults stored by save_defaults(), {} if there are none.
 
         The store object is only read once, later calls return the same defaults.
 
-        Raises IntegrityError if the envelope authentication fails, InvalidRepositoryConfig if the
-        content is not a dict of strings.
+        Raises DefaultsMissing if the object is missing (it was removed or lost, "borg check --repair"
+        stores empty defaults), IntegrityError if the envelope authentication fails,
+        InvalidRepositoryConfig if the content is not a dict of strings.
         """
         if self._defaults is not None:
             return dict(self._defaults)
         try:
             data = self.store_load_decrypt(DEFAULTS_NAME)
         except StoreObjectNotFound:
-            self._defaults = {}
-            return {}
+            raise self.DefaultsMissing(self._location.canonical_path()) from None
+        except IntegrityError as err:
+            raise IntegrityError(f'{err.args[0]}. Run "borg check --repair" to store empty defaults.') from err
         try:
             defaults = msgpack.unpackb(data)
         except msgpack.UnpackException:

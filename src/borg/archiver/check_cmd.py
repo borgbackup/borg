@@ -4,15 +4,49 @@ from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..crypto.key import key_factory
-from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error
+from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error, IntegrityError
 from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.time import archive_ts_now, calculate_relative_offset
 from ..repoobj import RepoObj, object_validator
+from ..repository import Repository, DEFAULTS_NAME
 
 from ..logger import create_logger
 
 logger = create_logger()
+
+
+def check_repository_defaults(repository, *, repair):
+    """Verify the repository defaults object (config/defaults, see Repository.load_defaults).
+
+    "borg repo-create" always writes it, so a missing object was removed (or lost), like one that fails
+    the authentication of the key's envelope or does not deserialize. Such an object is an error: the
+    commands using the defaults refuse to run. With repair, empty defaults are stored instead, so the
+    repository can be used again (with the built-in defaults).
+
+    Returns False if a problem was found and not repaired.
+    """
+    try:
+        repository.load_defaults()
+    except Repository.DefaultsMissing:
+        problem = "is missing"
+    except IntegrityError:
+        problem = "fails the authentication"
+    except Repository.InvalidRepositoryConfig:
+        problem = "is malformed"
+    else:
+        return True
+    if not repair:
+        logger.error(
+            f'Repository defaults object {DEFAULTS_NAME} {problem}. Run "borg check --repair" to store empty defaults.'
+        )
+        return False
+    logger.warning(
+        f"Repository defaults object {DEFAULTS_NAME} {problem}, storing empty defaults. "
+        "The defaults set by borg repo-create are lost, the built-in defaults are used now."
+    )
+    repository.save_defaults({})
+    return True
 
 
 class CheckMixIn:
@@ -91,6 +125,8 @@ class CheckMixIn:
                 set_ec(EXIT_WARNING)
             if sig_int:  # repository check interrupted; skip the archive check
                 raise Error("Got Ctrl-C / SIGINT.")
+            if not check_repository_defaults(repository, repair=args.repair):
+                set_ec(EXIT_WARNING)
         if not args.repo_only and not archive_checker.check(
             repository,
             verify_data=args.verify_data,
@@ -128,7 +164,9 @@ class CheckMixIn:
            not a MAC, this step does not detect tampering of the packs. The index objects
            are also authenticated with the key when they are loaded for that cross-check.
            A corrupt index ends the check after this step, as the archives check needs it,
-           unless ``--repair`` is given (see below). Running the repository check can
+           unless ``--repair`` is given (see below). This step also verifies the repository
+           defaults object (see ``borg repo-create``): it must be present and authenticate
+           with the key. Running the repository check can
            be split into multiple partial checks using ``--max-duration``.
            For ssh:// repositories, the server computes the hashes, so the pack contents do
            not have to travel over the network. For other remote backends, borg usually has
@@ -269,6 +307,8 @@ class CheckMixIn:
            index entries of the chunks stored in missing packs (packs the index references,
            but that are absent from the repository). Only a full ``borg check --repair``
            repairs the archives that reference these chunks, ``--repository-only`` does not.
+           A missing or corrupt repository defaults object is replaced by empty defaults, so
+           the repository can be used again; the commands then use the built-in defaults.
 
         2. When checking the consistency and correctness of archives, repair mode might
            remove whole archives from the manifest if their archive metadata chunk is

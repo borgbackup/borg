@@ -1,4 +1,5 @@
 import gc
+import os
 from pathlib import Path
 import re
 import shutil
@@ -68,6 +69,31 @@ def check_cmd_setup(archiver):
         cmd(archiver, "repo-create", RK_ENCRYPTION)
         create_src_archive(archiver, "archive1")
         create_src_archive(archiver, "archive2")
+
+
+@pytest.mark.parametrize("damage", ["missing", "corrupt"])
+def test_check_repository_defaults(archivers, request, damage):
+    # repo-create always writes config/defaults, so a missing object was removed, like one that fails the
+    # authentication. check reports it, check --repair replaces it by empty defaults (the set defaults
+    # are lost), so the repository can be used again.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION, "--compression=zstd,5")
+    create_src_archive(archiver, "archive1")
+    assert "Default compression: zstd,5" + os.linesep in cmd(archiver, "repo-info")
+    with open_repository(archiver) as repository:
+        if damage == "missing":
+            repository.store_delete("config/defaults")
+        else:
+            repository.store_store("config/defaults", corrupt(repository.store_load("config/defaults"), -1))
+    problem = "is missing" if damage == "missing" else "fails the authentication"
+    output = cmd(archiver, "check", exit_code=EXIT_WARNING)
+    assert f"config/defaults {problem}" in output
+    assert "borg check --repair" in output
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert f"config/defaults {problem}, storing empty defaults" in output
+    cmd(archiver, "check", exit_code=0)
+    assert "Default compression: lz4 (built-in)" + os.linesep in cmd(archiver, "repo-info")
+    create_src_archive(archiver, "archive2")  # the repository is usable again
 
 
 def test_check_usage(archivers, request):

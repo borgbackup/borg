@@ -240,7 +240,7 @@ def test_repo_create_without_default_compression(archivers, request):
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     with open_repository(archiver) as repository:
-        assert repository.load_defaults() == {}
+        assert repository.load_defaults() == {}  # the object exists (else DefaultsMissing), but is empty
     output = cmd(archiver, "repo-info")
     assert "Default compression: lz4 (built-in)" + os.linesep in output
     assert "Default chunker params: %s,%d,%d,%d,%d (built-in)" % CHUNKER_PARAMS + os.linesep in output
@@ -333,3 +333,22 @@ def test_default_chunker_params_invalid(archivers, request):
     else:
         with pytest.raises(Repository.InvalidRepositoryConfig):
             cmd(archiver, "create", "test", "input")
+
+
+def test_defaults_missing(archivers, request):
+    # repo-create always writes config/defaults, so a missing object was removed: the commands that use
+    # the defaults refuse to run, unless every default is given explicitly (see check for the repair).
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION, "--compression=zstd,5")
+    with open_repository(archiver) as repository:
+        repository.store_delete("config/defaults")
+    for args in (("create", "test", "input"), ("repo-info",)):
+        if archiver.FORK_DEFAULT:
+            output = cmd(archiver, *args, exit_code=Repository.DefaultsMissing("x").exit_code)
+            assert "borg check --repair" in output
+        else:
+            with pytest.raises(Repository.DefaultsMissing):
+                cmd(archiver, *args)
+    cmd(archiver, "create", "--compression=lz4", "--chunker-params=fixed,4096", "test", "input")
+    assert stored_compression(archiver) == {(LZ4.ID, 255)}

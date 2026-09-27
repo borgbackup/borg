@@ -848,6 +848,8 @@ Errors
         {} has no repository config.
     Repository.CheckNeeded rc: 12 traceback: yes
         Inconsistency detected. Please run "borg check {}".
+    Repository.DefaultsMissing rc: 34 traceback: no
+        Repository {} has no config/defaults object, run "borg check --repair" to store empty defaults.
     Repository.DoesNotExist rc: 13 traceback: no
         Repository {} does not exist.
     Repository.InsufficientFreeSpaceError rc: 14 traceback: no

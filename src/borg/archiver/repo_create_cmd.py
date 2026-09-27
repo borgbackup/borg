@@ -46,8 +46,8 @@ class RepoCreateMixIn:
                 defaults["compression"] = str(args.compression)
             if args.chunker_params not in (None, DEFAULT_CHUNKER_PARAMS):
                 defaults["chunker_params"] = ",".join(str(p) for p in args.chunker_params)
-            if defaults:
-                repository.save_defaults(defaults)
+            # always written, also when empty: a missing object means it was removed, see load_defaults().
+            repository.save_defaults(defaults)
             # we know repo/packs/ still does not have any chunks stored in it, but for some stores, there
             # might be a lot of empty directories and listing them all might be rather slow, so we better
             # store an empty ChunkIndex now, so that the first repo operation does not have to build the
@@ -218,8 +218,11 @@ class RepoCreateMixIn:
         Using the same chunker parameters is important for deduplication.
         ``borg repo-info`` shows the defaults.
 
-        The defaults are stored in the repository and protected by the repository key, so nobody without
-        the key can change them (e.g. remove an ``obfuscate`` compression) without being noticed.
+        The defaults are stored in the repository and protected by the repository key: changing them
+        (e.g. removing an ``obfuscate`` compression) needs the key. The defaults object is always
+        written, also when no default was given, so removing it is noticed, too: the commands refuse
+        to run if it is missing or fails the authentication. ``borg check`` reports such an object,
+        ``borg check --repair`` replaces it by empty defaults (the built-in defaults are used then).
 
         Creating a related repository
         +++++++++++++++++++++++++++++

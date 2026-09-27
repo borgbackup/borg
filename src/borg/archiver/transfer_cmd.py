@@ -405,9 +405,11 @@ class TransferMixIn:
             metavar="COMPRESSION",
             dest="compression",
             type=CompressionSpec,
-            default=CompressionSpec("lz4"),
+            default=None,  # None: not given, see default_compression()
             action=Highlander,
-            help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+            help="select compression algorithm, see the output of the "
+            '"borg help compression" command for details. '
+            "Default: the repository default (see borg repo-create), else lz4.",
         )
         subparser.add_argument(
             "--recompress",
@@ -436,7 +438,8 @@ class TransferMixIn:
             "buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or "
             "buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or "
             "fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or "
-            "`default` to use the chunker defaults. default: do not rechunk",
+            "`default` to use the repository default (see borg repo-create), else the built-in "
+            "chunker defaults. default: do not rechunk",
         )
 
         define_archive_filters_group(subparser)

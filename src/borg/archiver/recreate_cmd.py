@@ -159,13 +159,14 @@ class RecreateMixIn:
             metavar="COMPRESSION",
             dest="compression",
             type=CompressionSpec,
-            default=CompressionSpec("lz4"),
+            default=None,  # None: not given, see default_compression()
             action=Highlander,
             help="select compression algorithm, see the output of the "
             '"borg help compression" command for details. '
             "Only applies to newly written data, e.g. when re-chunking with --chunker-params "
             "(and to the new archive metadata); data chunks reused from the existing archive "
-            "are not recompressed, use borg repo-compress for that.",
+            "are not recompressed, use borg repo-compress for that. "
+            "Default: the repository default (see borg repo-create), else lz4.",
         )
         archive_group.add_argument(
             "--chunker-params",
@@ -178,7 +179,8 @@ class RecreateMixIn:
             "buzhash,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE or "
             "buzhash64,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,WINDOW_SIZE,NC_LEVEL or "
             "fastcdc,CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,NC_LEVEL or "
-            "`default` to use the chunker defaults. default: do not rechunk",
+            "`default` to use the repository default (see borg repo-create), else the built-in "
+            "chunker defaults. default: do not rechunk",
         )
 
         subparser.add_argument(

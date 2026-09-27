@@ -876,7 +876,7 @@ def test_eval_escapes():
 @pytest.mark.parametrize(
     "chunker_params, expected_return",
     [
-        ("default", ("fastcdc", 19, 23, 21, 2)),
+        ("default", DEFAULT_CHUNKER_PARAMS),  # resolved to the repository default by with_repository
         ("19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
         ("buzhash,19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
         ("10,23,16,4095", ("buzhash", 10, 23, 16, 4095)),

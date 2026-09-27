@@ -10,8 +10,9 @@ from ..crypto.key import key_factory
 from ..helpers import CommandError, Error
 from ..helpers import SortBySpec, location_validator, Location, relative_time_marker_validator
 from ..helpers import FilesystemPathSpec
+from ..helpers import ChunkerParams, CompressionSpec
 from ..helpers import Highlander, octal_int
-from ..helpers.argparsing import SUPPRESS, PositiveInt
+from ..helpers.argparsing import SUPPRESS, ArgumentTypeError, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -78,6 +79,37 @@ def get_repository(
                 key_loader=key_loader,
             )
     return repository
+
+
+def _repository_default(repository, name, parse, builtin):
+    """Return the repository default for option name (see Repository.save_defaults), parsed, else builtin."""
+    value = repository.load_defaults().get(name) if isinstance(repository, Repository) else None
+    if value is None:
+        return builtin
+    try:
+        return parse(value)
+    except (ArgumentTypeError, ValueError) as err:
+        raise Repository.InvalidRepositoryConfig(
+            repository._location.canonical_path(), f"invalid default {name} {value!r}: {err}"
+        ) from None
+
+
+def default_compression(repository):
+    """Return the CompressionSpec a command uses if --compression was not given.
+
+    That is the repository default (set by "borg repo-create --compression"), else lz4.
+    An explicitly configured compression (command line, environment, default.yaml) always wins.
+    """
+    return _repository_default(repository, "compression", CompressionSpec, CompressionSpec(BUILTIN_COMPRESSION))
+
+
+def default_chunker_params(repository):
+    """Return the chunker params for "--chunker-params default" (the default of create and import-tar).
+
+    That is the repository default (set by "borg repo-create --chunker-params"), else CHUNKER_PARAMS.
+    Explicitly configured chunker params (command line, environment, default.yaml) always win.
+    """
+    return _repository_default(repository, "chunker_params", ChunkerParams, CHUNKER_PARAMS)
 
 
 def with_repository(
@@ -152,7 +184,11 @@ def with_repository(
                     manifest_ = Manifest.load(repository, other=False, ro_cls=ro_cls)
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
+                        if args.compression is None:  # not given, see default_compression()
+                            args.compression = default_compression(repository)
                         manifest_.repo_objs.compressor = args.compression.compressor
+                    if "chunker_params" in args and args.chunker_params == DEFAULT_CHUNKER_PARAMS:
+                        args.chunker_params = default_chunker_params(repository)
                     if secure:
                         assert_secure(repository, manifest_)
                 if cache:

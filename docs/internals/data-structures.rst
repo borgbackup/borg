@@ -39,6 +39,9 @@ of their content. The store hash is the unkeyed 256 bit BLAKE3 hash, see
 config/
   config
     the repository config (see :ref:`repo_config`), a text object
+  defaults
+    the repository defaults (see :ref:`repo_defaults`), in the key's store object
+    envelope (see below). Only present if ``borg repo-create`` was given a default.
   space-reserve.N
     purely random binary data to reserve space, e.g. for disk-full emergencies.
     These objects are created and removed by ``borg repo-space``.
@@ -110,8 +113,8 @@ locks/
 
 .. _store_object_envelope:
 
-The index fragments, the lock objects, ``checked-packs`` and the
-``referenced-by-archive.*`` objects are stored in the **store object envelope**: the repository key's ``encrypt()``,
+The index fragments, the lock objects, ``checked-packs``, the
+``referenced-by-archive.*`` objects and ``config/defaults`` are stored in the **store object envelope**: the repository key's ``encrypt()``,
 exactly as for the metadata and data slots of the objects in a pack (see
 :ref:`security_encryption`), with an empty id and an AAD of
 ``b"borg-store-object\0"`` followed by the repository id, the tag ``b"n"`` and the
@@ -129,7 +132,8 @@ packs; any other command that needs the chunks index aborts, except ``borg compa
 and ``borg repo-compress``, which rebuild it from the packs, as they rewrite the whole
 chunks index anyway (under an exclusive lock). A corrupted cache is ignored and
 rebuilt. A lock object that fails the authentication is treated as a foreign exclusive
-lock, see :ref:`storelocking`. The ``chunkindex-invalid`` marker has no content and is
+lock, see :ref:`storelocking`. Commands that use ``config/defaults`` abort if it fails
+the authentication. The ``chunkindex-invalid`` marker has no content and is
 stored as is.
 
 
@@ -307,6 +311,36 @@ is 5, the id is in the key (the ``BORG_KEY <id>`` header line of a keyfile or of
 a ``keys/`` object, see :ref:`key_files`), and the encryption mode and id hash
 are what ``borg repo-create`` was given (the key type byte of any repository
 object encodes them as well, see ``KeyType`` in ``constants.py``).
+
+.. _repo_defaults:
+
+Repository defaults
+~~~~~~~~~~~~~~~~~~~
+
+The ``config/defaults`` store object holds default values for command options,
+as a msgpacked dict mapping the option name to its value, both as strings::
+
+    {"compression": "zstd,3", "chunker_params": "fastcdc,19,23,21,2"}
+
+*compression* is the default compression spec (see ``borg help compression``),
+set by ``borg repo-create --compression``. The commands with a ``--compression``
+option use it if no compression was given via the command line, the environment or
+the default config file; without it, they use lz4.
+
+*chunker_params* are the default :ref:`chunker-params <chunker-params>`, set by
+``borg repo-create --chunker-params``. ``borg create`` and ``borg import-tar`` use
+them if no chunker params were given (in the same ways as above), ``borg recreate``
+and ``borg transfer`` for ``--chunker-params default``; without them, the built-in
+default chunker params are used.
+
+Each entry is optional, a missing entry means that the repository has no default
+for it.
+
+Unlike the repository config, which borg must read before it knows the key, the
+defaults are stored in the :ref:`store object envelope <store_object_envelope>`,
+so they are authenticated: an attacker with write access to the storage can not
+change them (e.g. remove an ``obfuscate`` compression) without being noticed. A
+repository without the object has no defaults.
 
 .. _archive:
 

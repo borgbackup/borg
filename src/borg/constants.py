@@ -187,6 +187,13 @@ GOLDILOCKS_AES_PARAMS = (CH_GOLDILOCKS_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_M
 TOEPLITZ_AES_PARAMS = (CH_TOEPLITZ_AES, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, NC_LEVEL)
 CHUNKER_PARAMS = FASTCDC_PARAMS  # the default chunker for file content data
 
+# the compression used if neither --compression nor the repository default (see repo-create) gives one
+BUILTIN_COMPRESSION = "lz4"
+
+# what ChunkerParams returns for "--chunker-params default": the repository default (see repo-create) if it
+# has one, else CHUNKER_PARAMS. with_repository replaces it by the real chunker params.
+DEFAULT_CHUNKER_PARAMS = ("default",)
+
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (CH_FASTCDC, 15, 19, 17, NC_LEVEL)
 

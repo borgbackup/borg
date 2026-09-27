@@ -1,6 +1,6 @@
 import textwrap
 
-from ._common import with_repository
+from ._common import with_repository, default_compression, default_chunker_params
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
@@ -16,6 +16,10 @@ class RepoInfoMixIn:
         """Show repository information."""
         key = manifest.key
         info = basic_json_data(manifest, cache=cache, extra={"security_dir": cache.security_manager.dir})
+        info["defaults"] = {
+            "compression": str(default_compression(repository)),
+            "chunker_params": ",".join(str(p) for p in default_chunker_params(repository)),
+        }
 
         if args.json:
             json_print(info)
@@ -40,6 +44,10 @@ class RepoInfoMixIn:
             if storage == KeyBlobStorage.KEYFILE:
                 encryption += "\nKey file: %s" % key.find_key()
             info["encryption"] = encryption
+            defaults = dict(info["defaults"])
+            for name in defaults:
+                if name not in repository.load_defaults():
+                    defaults[name] += " (built-in)"
 
             output = (
                 textwrap.dedent(
@@ -49,6 +57,8 @@ class RepoInfoMixIn:
             Repository version: {version}
             {encryption}
             Security directory: {security_dir}
+            Default compression: {compression}
+            Default chunker params: {chunker_params}
             """
                 )
                 .strip()
@@ -58,6 +68,8 @@ class RepoInfoMixIn:
                     version=repository.version,
                     encryption=info["encryption"],
                     security_dir=info["security_dir"],
+                    compression=defaults["compression"],
+                    chunker_params=defaults["chunker_params"],
                 )
             )
 

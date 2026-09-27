@@ -487,7 +487,9 @@ class HelpMixIn:
         So if you use different compression specs for the backups, whichever stores a
         chunk first determines its compression. See also ``borg recreate``.
 
-        Compression is lz4 by default. If you want something else, you have to specify what you want.
+        If you do not specify a compression via ``--compression`` (or the environment or the
+        default config file), the repository's default compression is used, which can be set
+        with ``borg repo-create --compression``. Without a repository default, compression is lz4.
 
         Valid compression specifiers are:
 
@@ -495,7 +497,7 @@ class HelpMixIn:
             Do not compress.
 
         lz4
-            Use lz4 compression. Very high speed, very low compression. (default)
+            Use lz4 compression. Very high speed, very low compression. (built-in default)
 
         zstd[,L]
             Use zstd ("zstandard") compression, a modern wide-range algorithm.

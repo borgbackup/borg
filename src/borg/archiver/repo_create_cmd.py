@@ -3,7 +3,7 @@ from ..cache import Cache, write_chunkindex_to_repo
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, encryption_argument_names, id_hash_argument_names
 from ..helpers import CancelledByUser
-from ..helpers import location_validator, Location
+from ..helpers import location_validator, Location, ChunkerParams, CompressionSpec
 from ..hashindex import ChunkIndex
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
@@ -41,6 +41,13 @@ class RepoCreateMixIn:
             repository.acquire_lock()
             # writing the config is what makes the store a repository, see Repository.create().
             repository.save_config(key)
+            defaults = {}
+            if args.compression is not None:
+                defaults["compression"] = str(args.compression)
+            if args.chunker_params not in (None, DEFAULT_CHUNKER_PARAMS):
+                defaults["chunker_params"] = ",".join(str(p) for p in args.chunker_params)
+            if defaults:
+                repository.save_defaults(defaults)
             # we know repo/packs/ still does not have any chunks stored in it, but for some stores, there
             # might be a lot of empty directories and listing them all might be rather slow, so we better
             # store an empty ChunkIndex now, so that the first repo operation does not have to build the
@@ -191,6 +198,29 @@ class RepoCreateMixIn:
         To normally work with ``authenticated-*`` repositories, you will need the passphrase, but
         there is an emergency workaround; see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 
+        Repository defaults
+        +++++++++++++++++++
+
+        ``--compression`` sets the repository's default compression: the commands that compress
+        data (``borg create``, ``borg recreate``, ``borg import-tar``, ``borg transfer``,
+        ``borg repo-compress``) use it if no compression was given via ``--compression``, the
+        environment or the default config file (``default.yaml``). Without a repository default,
+        they use lz4. See ``borg help compression`` for the compression specs.
+
+        ``--chunker-params`` sets the repository's default chunker parameters: ``borg create`` and
+        ``borg import-tar`` use them if no chunker parameters were given (in the same ways as above).
+        ``borg recreate`` and ``borg transfer`` only rechunk if ``--chunker-params`` is given, with
+        ``--chunker-params default``, they rechunk to the repository's default chunker parameters.
+        Without a repository default, the built-in default chunker parameters are used.
+
+        This is useful if several clients back up into the same repository or if some commands are
+        run manually: they all compress and chunk the same way without having to give these options.
+        Using the same chunker parameters is important for deduplication.
+        ``borg repo-info`` shows the defaults.
+
+        The defaults are stored in the repository and protected by the repository key, so nobody without
+        the key can change them (e.g. remove an ``obfuscate`` compression) without being noticed.
+
         Creating a related repository
         +++++++++++++++++++++++++++++
 
@@ -262,6 +292,27 @@ class RepoCreateMixIn:
             action=Highlander,
             help="where to store the key: 'repokey' (in the repository, default) or 'keyfile' "
             "(in the local keys directory).",
+        )
+        subparser.add_argument(
+            "-C",
+            "--compression",
+            metavar="COMPRESSION",
+            dest="compression",
+            type=CompressionSpec,
+            default=None,
+            action=Highlander,
+            help="set the default compression of the repository, see the output of the "
+            '"borg help compression" command for details. Default: no repository default (lz4 is used).',
+        )
+        subparser.add_argument(
+            "--chunker-params",
+            metavar="PARAMS",
+            dest="chunker_params",
+            type=ChunkerParams,
+            default=None,
+            action=Highlander,
+            help="set the default chunker parameters of the repository (same format as for borg create). "
+            "Default: no repository default (%s,%d,%d,%d,%d is used)." % CHUNKER_PARAMS,
         )
         subparser.add_argument(
             "--copy-crypt-key",

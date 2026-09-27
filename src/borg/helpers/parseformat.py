@@ -318,8 +318,8 @@ def ChunkerParams(s):
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
             raise ArgumentTypeError("block_size and header_size must not exceed MAX_DATA_SIZE [%d]" % MAX_DATA_SIZE)
         return algo, block_size, header_size
-    if algo == "default" and count == 1:  # default
-        return CHUNKER_PARAMS
+    if algo == "default" and count == 1:  # the repository default or CHUNKER_PARAMS, see with_repository
+        return DEFAULT_CHUNKER_PARAMS
     if algo == CH_BUZHASH64:
         # buzhash64, chunk_min, chunk_max, chunk_mask, window_size, nc_level
         # use nc_level 0 to disable normalized chunking.

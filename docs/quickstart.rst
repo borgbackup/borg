@@ -352,6 +352,14 @@ specified algorithm::
 You'll need to experiment a bit to find the best compression for your use case.
 Keep an eye on CPU load and throughput.
 
+Instead of giving ``--compression`` to every command, you can set a default compression
+for the repository when creating it::
+
+    $ borg repo-create --encryption aes256-ocb --compression zstd,3
+
+Commands that compress data use this default when you do not give ``--compression``.
+``borg repo-create --chunker-params`` sets the default chunker parameters in the same way.
+
 .. _encrypted_repos:
 
 Repository encryption

@@ -252,8 +252,9 @@ class CheckMixIn:
         soft-deleted archives), it means that an entry was lost.
         Unless ``borg compact`` is called, these archives can be fully restored with
         ``--repair``. Please note that ``--find-lost-archives`` must look at every
-        object in the repository and is thus very time-consuming. You cannot use
-        ``--find-lost-archives`` with ``--repository-only``.
+        object in the repository and is thus very time-consuming. With ``--verify-data``,
+        it only reads the archive metadata objects found while verifying the data. You
+        cannot use ``--find-lost-archives`` with ``--repository-only``.
 
         You can influence how the archive part of the ``Analyzing archive ...`` output is
         formatted by giving a custom format using ``--format`` (see the ``borg repo-list``

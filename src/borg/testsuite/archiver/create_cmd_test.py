@@ -739,6 +739,41 @@ def test_progress_on(archivers, request):
     assert "0 B O 0 B U 0 N" in output
 
 
+def test_progress_json_final_statistics(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "create", "test", "input", "--progress", "--log-json")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    final = [msg for msg in messages if msg["type"] == "archive_progress"][-1]
+    # the progress is rate limited, so only the final object tells about everything that was processed.
+    assert final["finished"] and "path" not in final
+    assert final["nfiles"] == 2 and final["original_size"] == 1024 * 81
+    assert final["files_stats"] == {"A": 2, "d": 1}
+
+
+def test_progress_dry_run(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "1000000")  # no rate limit: the progress is reported after each item
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "dir/file2", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "create", "--dry-run", "test", "input", "--progress", "--log-json")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    progress = [msg for msg in messages if msg["type"] == "archive_progress"]
+    # a dry-run reports what would be backed up: the files and their size. it can not know what is new.
+    assert [msg["nfiles"] for msg in progress] == [1, 2, 2]
+    assert sorted(msg["path"] for msg in progress[:-1]) == ["input/dir/file2", "input/file1"]
+    final = progress[-1]
+    assert final["finished"] and "path" not in final
+    assert final["original_size"] == 1024 * 81 and "deduplicated_size" not in final
+    # the text progress works also
+    output = cmd(archiver, "create", "--dry-run", "test", "input", "--progress")
+    assert "82.94 kB O 0 B U 2 N input/" in output
+    assert not cmd(archiver, "repo-list")  # still no archive
+
+
 def test_progress_off(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

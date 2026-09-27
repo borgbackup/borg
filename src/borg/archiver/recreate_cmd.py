@@ -31,6 +31,7 @@ class RecreateMixIn:
             # args.compression is not passed here: the with_repository decorator has already
             # set repo_objs.compressor from it, which compresses everything newly written.
             progress=args.progress,
+            log_json=args.log_json,
             stats=args.stats,
             file_status_printer=self.print_file_status,
             dry_run=args.dry_run,

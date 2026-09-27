@@ -197,6 +197,12 @@ New features:
 - mount: support Windows using WinFsp (via mfusepy), #2316
 - import-tar --strip-components: strip leading path components, #6461
 - add the BORG_NEW_PASSCOMMAND and BORG_NEW_PASSPHRASE_FD env vars
+- extract/export-tar --list --log-json: output a file_status JSON object per listed item,
+  like create does. The text listing of export-tar has the same "+" prefix as extract's now.
+  prune/delete/undelete --list --log-json: output an archive_status JSON object per listed
+  archive, #9454.
+- create/recreate --dry-run --progress: show the progress (also as archive_progress JSON
+  objects with --log-json), it showed nothing
 
 Fixes:
 
@@ -247,6 +253,14 @@ Fixes:
 - locking: try at least once before a lock acquire times out, also with --lock-wait 0
 - repoobj: catch get() errors in --find-lost-archives, #10318
 
+- recreate/transfer --log-json --progress: output archive_progress JSON objects (as
+  documented), not text progress lines
+- import-tar/recreate: count the items by their status, like create does. The counts
+  were always 0: "Added files" of import-tar --stats, files_stats in the JSON output.
+- --log-json: the final archive_progress object (finished: true) has the final statistics.
+  The progress output is rate limited, so a frontend could not know what was processed
+  after the previous object (or at all, for a short operation), see also #6570.
+
 Other changes:
 
 - update pyinstaller to 6.22.3
@@ -274,6 +288,12 @@ Other changes:
   but was never really used)
 - security: drop the manifest timestamp replay check (not needed anymore)
 - debug get-obj, put-obj, delete-obj: need the key now (to access the chunk index)
+- cockpit: process borg's --log-json output (progress, file list, log messages, prompts)
+  instead of parsing text lines, #9454. The display depends on the command: archive
+  statistics for create/import-tar/recreate/transfer (with the final statistics from
+  --json), a progress bar for extract/export-tar, the progress phases for the other
+  commands. Yes/no prompts are shown as a dialog. The cockpit exits with the exit code
+  of the borg command.
 - docs:
 
   - extract: document the metadata that can only be restored as root, #8088
@@ -283,6 +303,7 @@ Other changes:
   - derive the borg passphrase from a YubiKey (challenge-response), #4549
   - protect the borg passphrase with age (which also supports crypto tokens,
     TPM, Apple Secure Enclave, ... via age plugins), #4549
+  - add a usage page for the cockpit TUI, #9454
 - tests:
 
   - add an archiver-level test for BORG_WORKAROUNDS=authenticated_no_key

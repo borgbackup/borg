@@ -331,6 +331,68 @@ def test_recreate_list_output(archivers, request):
     assert "- input/file5" not in output
 
 
+def test_recreate_progress_json(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "recreate", "-a", "test", "--log-json", "--progress", "-e", "input/file2")
+    lines = output.splitlines()
+    messages = [json.loads(line) for line in lines if line.startswith("{")]
+    progress = [msg for msg in messages if msg["type"] == "archive_progress"]
+    # with --log-json, the progress of the archive being created consists of archive_progress objects ...
+    assert len(progress) >= 2
+    assert not progress[0]["finished"] and progress[-1]["finished"]
+    assert {"nfiles", "original_size", "deduplicated_size", "path"} <= set(progress[0])
+    # the final object has the final statistics: file2 was excluded.
+    assert progress[-1]["nfiles"] == 1 and progress[-1]["files_stats"] == {"A": 1, "d": 1}
+    # ... and not of text lines like "1.02 kB O 0 B U 1 N input/file1".
+    assert not any(re.search(r" O .* U \d+ N ", line) for line in lines if not line.startswith("{"))
+
+
+def test_recreate_dry_run_progress(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "1000000")  # no rate limit: the progress is reported after each item
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    create_regular_file(archiver.input_path, "dir/file3", size=1024)
+    cmd(archiver, "create", "test", "input")
+    archives_before = cmd(archiver, "repo-list")
+    output = cmd(archiver, "recreate", "-a", "test", "--dry-run", "--log-json", "--progress", "-e", "input/file2")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    progress = [msg for msg in messages if msg["type"] == "archive_progress"]
+    # a dry-run reports what would be in the new archive: file2 is excluded. it can not know what would be new.
+    assert len(progress) == 5  # input, input/dir, 2 files, the final object
+    counts = [msg["nfiles"] for msg in progress]
+    assert counts == sorted(counts) and counts[0] == 0 and counts[-1] == 2
+    assert sorted(msg["path"] for msg in progress[:-1]) == ["input", "input/dir", "input/dir/file3", "input/file1"]
+    final = progress[-1]
+    assert final["finished"] and "path" not in final
+    assert final["original_size"] == 1024 * 81 and "deduplicated_size" not in final
+    # the text progress works also
+    output = cmd(archiver, "recreate", "-a", "test", "--dry-run", "--progress", "-e", "input/file2")
+    assert "82.94 kB O 0 B U 2 N input/" in output
+    assert cmd(archiver, "repo-list") == archives_before  # nothing was changed
+
+
+def test_recreate_files_stats(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "1000000")  # no rate limit: the progress is reported after each item
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    create_regular_file(archiver.input_path, "dir/file3", size=1024)
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "recreate", "-a", "test", "--log-json", "--progress", "-e", "input/file2")
+    messages = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
+    progress = [msg for msg in messages if msg["type"] == "archive_progress" and not msg["finished"]]
+    # the items of the new archive are counted by their status (as --list shows it), the excluded one is not.
+    assert progress[-1]["files_stats"] == {"A": 2, "d": 2}
+    assert progress[-1]["nfiles"] == 2
+
+
 def test_comment(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

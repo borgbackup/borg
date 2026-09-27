@@ -3446,18 +3446,19 @@ def test_create_failure_leaves_no_store_behind(tmp_path, monkeypatch):
     assert os.path.exists(os.path.join(location, "config", "config"))
 
 
-def store_damaged_pack(repository, objs, *, listed, flip=(), tail=b""):
+def store_damaged_pack(repository, objs, *, listed, flip=(), tail=b"", size=100):
     """Store objs as one pack named by the store hash of their bytes, then damage it.
 
     The byte at each position in flip is flipped and tail is appended, so a flip or a tail makes the
-    pack fail its store hash. The objects at the indexes in listed get chunk index entries.
-    Returns (pack_id, offsets of objs).
+    pack fail its store hash. The objects at the indexes in listed get chunk index entries, with
+    plaintext size <size> (the tests' chunks hold 100 bytes).
+    Returns pack_id.
     """
     pack = b"".join(obj for _, obj in objs)
     pack_id = store_hash(pack).digest()
     offsets = []
     offset = 0
-    for chunk_id, obj in objs:
+    for _, obj in objs:
         offsets.append(offset)
         offset += len(obj)
     damaged = bytearray(pack)
@@ -3467,9 +3468,9 @@ def store_damaged_pack(repository, objs, *, listed, flip=(), tail=b""):
     for i in listed:
         chunk_id, obj = objs[i]
         repository.chunks[chunk_id] = ChunkIndexEntry(
-            flags=ChunkIndex.F_USED, size=len(obj), pack_id=pack_id, obj_offset=offsets[i], obj_size=len(obj)
+            flags=ChunkIndex.F_USED, size=size, pack_id=pack_id, obj_offset=offsets[i], obj_size=len(obj)
         )
-    return pack_id, offsets
+    return pack_id
 
 
 def last_byte_offset(objs, i):
@@ -3505,7 +3506,7 @@ def three_objects(repo_objs):
 def test_salvage_pack_leaves_an_intact_pack_alone(salvage_repository):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3))
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3))
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
     called = []
 
@@ -3524,7 +3525,7 @@ def test_salvage_pack_drops_an_object_failing_authentication(salvage_repository)
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
     (id0, obj0), (id1, obj1), (id2, obj2) = objs
-    pack_id, offsets = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
     list(salvage_repository.get_many([id0]))  # loads the pack into the pack cache
 
     result = salvage(salvage_repository, repo_objs, pack_id)
@@ -3539,14 +3540,41 @@ def test_salvage_pack_drops_an_object_failing_authentication(salvage_repository)
     assert id1 not in salvage_repository.chunks
     assert bytes(salvage_repository.get(id0)) == obj0
     assert bytes(salvage_repository.get(id2)) == obj2
-    assert salvage_repository.chunks[id2].size == len(obj2)  # a repointed entry keeps its size
+    assert salvage_repository.chunks[id2].size == 100  # a repointed entry keeps its size
+
+
+@pytest.mark.parametrize("field", ["magic", "metadata"])
+def test_salvage_pack_drops_an_object_the_walk_skips(salvage_repository, field):
+    # a flipped byte in the header magic or in the metadata slot of the middle object: the walk rejects
+    # its header, resyncs at the next object and never yields the damaged one to authenticate.
+    repo_objs = plain_repo_objs()
+    objs = three_objects(repo_objs)
+    (id0, obj0), (id1, obj1), (id2, obj2) = objs
+    start = last_byte_offset(objs, 0) + 1  # the first byte of objs[1]
+    pos = {"magic": start, "metadata": start + RepoObj.obj_header.size + repo_objs.key.PAYLOAD_OVERHEAD}[field]
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[pos])
+    authenticate = whole_object_authenticator(repo_objs)
+    authenticated = []
+
+    def spy_authenticate(chunk_id, obj):
+        authenticated.append(chunk_id)
+        return authenticate(chunk_id, obj)
+
+    result = salvage(salvage_repository, repo_objs, pack_id, authenticate=spy_authenticate)
+
+    assert result.status == SALVAGE_DONE
+    assert authenticated == [id0, id2]
+    assert result.kept == [(id0, 0, len(obj0)), (id2, len(obj0), len(obj2))]
+    assert result.dropped_bytes == len(obj1)
+    assert result.removed_ids == [id1]
+    assert store_contents(salvage_repository) == {bin_to_hex(result.new_pack_id): obj0 + obj2}
 
 
 def test_salvage_pack_keeps_an_object_the_index_does_not_list(salvage_repository):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
     (id0, obj0), (id1, obj1), (id2, obj2) = objs
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=[0, 2], flip=[last_byte_offset(objs, 2)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=[0, 2], flip=[last_byte_offset(objs, 2)])
 
     result = salvage(salvage_repository, repo_objs, pack_id)
 
@@ -3563,7 +3591,7 @@ def test_salvage_pack_leaves_a_pack_alone_if_nothing_authenticates(salvage_repos
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
     flip = [last_byte_offset(objs, i) for i in range(3)]
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=flip)
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=flip)
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
 
     result = salvage(salvage_repository, repo_objs, pack_id)
@@ -3578,7 +3606,7 @@ def test_salvage_pack_leaves_a_pack_alone_if_nothing_authenticates(salvage_repos
 def test_salvage_pack_drops_uncovered_trailing_bytes(salvage_repository, tail):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), tail=tail)
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), tail=tail)
     index_before = index_contents(salvage_repository.chunks)
     called = []
 
@@ -3604,7 +3632,7 @@ def test_salvage_pack_refuses_with_a_pack_store_cache(tmp_path, monkeypatch):
         repository.chunks = ChunkIndex()
         repo_objs = plain_repo_objs()
         objs = three_objects(repo_objs)
-        pack_id, _ = store_damaged_pack(repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+        pack_id = store_damaged_pack(repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
         with pytest.raises(Error, match="BORG_STORE_CACHE"):
             salvage(repository, repo_objs, pack_id)
         assert bin_to_hex(pack_id) in store_contents(repository)
@@ -3613,7 +3641,7 @@ def test_salvage_pack_refuses_with_a_pack_store_cache(tmp_path, monkeypatch):
 def test_salvage_pack_refuses_without_write_permission(salvage_repository):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
     salvage_repository.permissions = {"packs": "lrw", "index": "lrwWD"}  # packs/ has no delete
     with pytest.raises(Repository.PermissionDenied):
@@ -3626,7 +3654,7 @@ def test_salvage_pack_leaves_a_pack_alone_if_two_reads_differ(salvage_repository
     # the first load has an extra flipped byte in object 0, the second load does not.
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
     load = salvage_repository.store.load
     loads = []
@@ -3656,7 +3684,7 @@ def test_salvage_pack_leaves_a_pack_that_reads_intact_alone(salvage_repository, 
     # is authenticated.
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3))
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3))
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
     monkeypatch.setattr(salvage_repository.store, "hash", lambda name, algorithm: "0" * 64)
     authenticated = []
@@ -3682,7 +3710,7 @@ def test_salvage_pack_leaves_a_pack_that_reads_intact_alone(salvage_repository, 
 def test_salvage_pack_leaves_a_pack_alone_on_a_read_error(salvage_repository, monkeypatch, method, error):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
 
     def failing(*args, **kwargs):
@@ -3705,7 +3733,7 @@ def test_salvage_pack_leaves_a_pack_alone_on_a_read_error(salvage_repository, mo
 def test_salvage_pack_raises_other_backend_errors(salvage_repository, monkeypatch, method, error):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
 
     def failing(*args, **kwargs):
@@ -3729,7 +3757,7 @@ def test_salvage_pack_raises_if_the_pack_is_missing(salvage_repository):
 def test_salvage_pack_updates_the_given_chunk_index(salvage_repository):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
     chunks = salvage_repository.chunks
     salvage_repository.chunks = ChunkIndex()
 
@@ -3742,16 +3770,16 @@ def test_salvage_pack_updates_the_given_chunk_index(salvage_repository):
 
 
 def test_salvage_pack_indexes_duplicates(salvage_repository):
-    # a chunk id indexed in another pack keeps its entry. A listed object that is dropped is pointed at
-    # a kept copy of the same chunk id in the pack.
+    # a chunk id indexed in another pack keeps its entry. The entry of a dropped object is pointed at a
+    # kept copy of the same chunk id in the pack.
     repo_objs = plain_repo_objs()
     id_a, obj_a = real_chunk(repo_objs, b"A" * 100)
     id_b, obj_b = real_chunk(repo_objs, b"B" * 100)
     id_c, obj_c = real_chunk(repo_objs, b"C" * 100)
-    other_pack_id, _ = store_damaged_pack(salvage_repository, [(id_a, obj_a)], listed=[0])
+    other_pack_id = store_damaged_pack(salvage_repository, [(id_a, obj_a)], listed=[0])
     objs = [(id_a, obj_a), (id_b, obj_b), (id_b, obj_b), (id_c, obj_c)]
     # id_a is unlisted here, id_b is listed at its damaged first copy, id_c is listed and its only copy is damaged.
-    pack_id, _ = store_damaged_pack(
+    pack_id = store_damaged_pack(
         salvage_repository, objs, listed=[1, 3], flip=[last_byte_offset(objs, 1), last_byte_offset(objs, 3)]
     )
 
@@ -3771,7 +3799,7 @@ def test_salvage_pack_order_of_changes(salvage_repository, monkeypatch):
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
     id0 = objs[0][0]
-    pack_id, _ = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
     events = []
     store_store, store_delete = salvage_repository.store_store, salvage_repository.store_delete
 

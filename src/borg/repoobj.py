@@ -295,12 +295,11 @@ def object_validator(repo_objs):
 def whole_object_authenticator(repo_objs):
     """Return authenticate(chunk_id, obj): True if obj is the whole repo object with id chunk_id.
 
-    obj is an object's header, metadata slot and data slot (object_validator gets the header and the
-    metadata slot only). Parsing it checks that the header's sizes add up to len(obj) and verifies
-    the tags of both slots, each computed over the slot and over the header prefix (magic, version,
-    chunk id) and chunk_id as AAD (additional authenticated data: bytes the tag covers without being
-    part of the ciphertext). Only the tags are checked: an object whose plaintext does not hash to
-    chunk_id is accepted.
+    obj is an object's header, metadata slot and data slot. Parsing it checks that the header's sizes
+    add up to len(obj) and verifies the tag of each slot. A slot's tag is computed over the slot and
+    over header_aad + slot_tag + chunk_id as AAD (additional authenticated data: bytes the tag covers
+    without being part of the ciphertext), see OBJ_VERSION_HEADER_AAD. Only the tags are verified, not
+    that the plaintext hashes to chunk_id.
 
     Raises Error for an "authenticated-*" key with the authenticated_no_key workaround, which skips
     the tag verification.

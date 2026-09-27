@@ -537,7 +537,9 @@ def test_whole_object_authenticator_checks_both_slots(key_class):
     authenticate = whole_object_authenticator(repo_objs)
     assert authenticate(chunk_id, obj)
     assert authenticate(chunk_id, memoryview(obj))
-    for pos in (RepoObj.obj_header.size, len(obj) - 1):  # first byte of the metadata slot, last of the data slot
+    # the first byte after the metadata slot's envelope header and tag, and the last byte of the data slot:
+    # each is covered by its slot's tag.
+    for pos in (RepoObj.obj_header.size + key.PAYLOAD_OVERHEAD, len(obj) - 1):
         bad = bytearray(obj)
         bad[pos] ^= 0x01
         assert not authenticate(chunk_id, bytes(bad))

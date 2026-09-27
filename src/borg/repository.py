@@ -2393,8 +2393,10 @@ class Repository:
             slot and data slot) is the repo object with id chunk_id, see repoobj.whole_object_authenticator.
             It must verify the tags of both slots.
         chunks: the ChunkIndex to update. Default: self.chunks.
-        before_old_pack_delete: callable without arguments, called once just before the old pack is deleted,
-            see SALVAGE_DONE.
+        before_old_pack_delete: callable without arguments, called once after the replacement pack is
+            stored and before chunks is updated and the old pack is deleted; use it to invalidate stored
+            chunk indexes for crash safety (see #9748). Not called if the old pack is not deleted, see
+            SALVAGE_DONE.
 
         Every object the walk yields and authenticate accepts is kept, whether the chunk index lists
         it or not. Everything else is dropped: objects authenticate rejects, byte ranges the walk
@@ -2410,7 +2412,8 @@ class Repository:
         - SALVAGE_DONE: the replacement pack is stored, before_old_pack_delete is called, chunks is
           updated, then the old pack is deleted. If the replacement pack has the old pack's name
           (the kept bytes are the undamaged pack), storing it overwrites the old pack, and
-          before_old_pack_delete and the delete are skipped.
+          before_old_pack_delete and the delete are skipped. An exception in one of these steps leaves
+          the steps before it done.
 
         The chunk index update: an entry of this pack is pointed at the kept object at its offset,
         or else at a kept copy of the same chunk id, or else removed. A kept object whose chunk id
@@ -2418,9 +2421,12 @@ class Repository:
         of other packs and F_PENDING entries stay as they are.
 
         Raises Error before any store access if uses_pack_store_cache is set (then two loads can
-        return the same cached copy). Raises PermissionDenied unless the repo permissions allow
-        compaction (see assert_writable), and StoreObjectNotFound if the pack is missing. Other store
-        backend errors propagate. Requires the exclusive lock.
+        return the same cached copy). Raises Repository.PermissionDenied unless the repo permissions
+        allow compaction (see assert_writable), and StoreObjectNotFound if the pack is missing. Other
+        store backend errors propagate.
+
+        Updates the in-memory chunk index only; the caller holds the exclusive lock and writes the
+        index back to the store afterwards.
         """
         if self.uses_pack_store_cache:
             raise Error("Pack salvage refused: with BORG_STORE_CACHE, pack reads may return the cached copy.")

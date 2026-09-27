@@ -2254,6 +2254,8 @@ class ArchiveChecker:
         self.chunks_modified = False
         # ids of the packs repair wrote: stored by put() and flush(), or written by delete() rewriting a pack.
         self.written_packs = set()
+        # ids of the archive metadata objects verify_data found, None if verify_data did not run to the end.
+        self.archive_meta_ids = None
 
     def record_stored(self, results):
         """Add the pack ids in results to written_packs.
@@ -2435,6 +2437,7 @@ class ArchiveChecker:
         errors = 0
         verified = 0  # chunks actually verified
         defect_chunks = []
+        archive_meta_ids = set()
         pi = ProgressIndicatorPercent(
             total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
@@ -2451,13 +2454,15 @@ class ArchiveChecker:
                         # we must decompress, so it'll call assert_id() in there.
                         # this is the audit that re-certifies the id/content invariant, so it reads at its
                         # own place, which always verifies and can not be switched off, see BORG_ASSERT_ID.
-                        self.repo_objs.parse(
+                        meta, _ = self.repo_objs.parse(
                             chunk_id,
                             encrypted_data,
                             decompress=True,
                             ro_type=ROBJ_DONTCARE,
                             assert_id_place="verify_data",
                         )
+                        if meta["type"] == ROBJ_ARCHIVE_META:
+                            archive_meta_ids.add(chunk_id)
                     except IntegrityErrorBase as integrity_error:
                         self.error_found = True
                         errors += 1
@@ -2498,7 +2503,7 @@ class ArchiveChecker:
                     try:
                         encrypted_data = self.repository.get(defect_chunk)
                         # we must decompress, so it'll call assert_id() in there (see above):
-                        self.repo_objs.parse(
+                        meta, _ = self.repo_objs.parse(
                             defect_chunk,
                             encrypted_data,
                             decompress=True,
@@ -2519,11 +2524,16 @@ class ArchiveChecker:
                             self.written_packs.add(new_pack_id)
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
+                        if meta["type"] == ROBJ_ARCHIVE_META:
+                            archive_meta_ids.add(defect_chunk)
                 pi.finish()
             else:
                 logger.warning("Found defect chunks. Run with --repair to remove them.")
                 for defect_chunk in defect_chunks:
                     logger.debug("chunk %s is defect.", bin_to_hex(defect_chunk))
+        if not sig_int:
+            # an interrupted pass did not parse all objects, its ids are incomplete.
+            self.archive_meta_ids = archive_meta_ids
         log = logger.error if errors else logger.info
         if sig_int:
             log(
@@ -2543,11 +2553,13 @@ class ArchiveChecker:
     def rebuild_archives_directory(self):
         """Rebuild the archives directory, undeleting archives.
 
-        Iterates through all objects in the repository looking for archive metadata blocks.
-        When finding some that do not have a corresponding archives directory entry (either
-        a normal entry for an "existing" archive, or a soft-deleted entry for a "deleted"
-        archive), it will create that entry (making the archives directory consistent with
-        the repository).
+        Reads the archive metadata objects in the repository. When finding some that do not
+        have a corresponding archives directory entry (either a normal entry for an "existing"
+        archive, or a soft-deleted entry for a "deleted" archive), it will create that entry
+        (making the archives directory consistent with the repository).
+
+        If self.archive_meta_ids is not None, only these objects are read. Otherwise, the
+        metadata of all objects is read to find the archive metadata objects.
         """
 
         def valid_archive(obj):
@@ -2555,41 +2567,24 @@ class ArchiveChecker:
                 return False
             return REQUIRED_ARCHIVE_KEYS.issubset(obj)
 
-        logger.info("Rebuilding missing archives directory entries, this might take some time...")
-        pi = ProgressIndicatorPercent(
-            total=len(self.chunks),
-            msg="Rebuilding missing archives directory entries %6.2f%%",
-            step=0.01,
-            msgid="check.rebuild_archives_directory",
-        )
-        for chunk_id, _ in self.chunks.iteritems():
-            if sig_int:
-                break
-            pi.show()
-            try:
-                cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
-                meta = self.repo_objs.parse_meta(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
-            except IntegrityErrorBase as exc:
-                logger.error("Skipping corrupted chunk: %s", exc)
-                self.error_found = True
-                continue
-            if meta["type"] != ROBJ_ARCHIVE_META:
-                continue
-            # now we know it is an archive metadata chunk, load the full object from the repo:
+        def check_archive_meta(chunk_id):
+            """Load the archive metadata object chunk_id. If it has no archives directory entry, create one
+            (with repair) or warn.
+            """
             cdata = self.repository.get(chunk_id)
             try:
                 meta, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
             except IntegrityErrorBase as exc:
                 logger.error("Skipping corrupted chunk: %s", exc)
                 self.error_found = True
-                continue
+                return
             if meta["type"] != ROBJ_ARCHIVE_META:
-                continue  # should never happen
+                return  # should never happen
             try:
                 archive = msgpack.unpackb(data)
             # Ignore exceptions that might be raised when feeding msgpack with invalid data
             except msgpack.UnpackException:
-                continue
+                return
             if valid_archive(archive):
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
@@ -2608,6 +2603,41 @@ class ArchiveChecker:
                         self.create_archive_entry(name, archive_id, archive.time)
                     else:
                         logger.warning(f"Would create archives directory entry for {name} {archive_id_hex}.")
+
+        if self.archive_meta_ids is not None:
+            logger.info("Rebuilding missing archives directory entries...")
+            logger.debug("Using the %d archive metadata objects found by verify_data.", len(self.archive_meta_ids))
+            total = len(self.archive_meta_ids)
+        else:
+            logger.info("Rebuilding missing archives directory entries, this might take some time...")
+            total = len(self.chunks)
+        pi = ProgressIndicatorPercent(
+            total=total,
+            msg="Rebuilding missing archives directory entries %6.2f%%",
+            step=0.01,
+            msgid="check.rebuild_archives_directory",
+        )
+        if self.archive_meta_ids is not None:
+            for chunk_id in self.archive_meta_ids:
+                if sig_int:
+                    break
+                pi.show()
+                check_archive_meta(chunk_id)
+        else:
+            for chunk_id, _ in self.chunks.iteritems():
+                if sig_int:
+                    break
+                pi.show()
+                try:
+                    cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
+                    meta = self.repo_objs.parse_meta(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
+                except IntegrityErrorBase as exc:
+                    logger.error("Skipping corrupted chunk: %s", exc)
+                    self.error_found = True
+                    continue
+                if meta["type"] != ROBJ_ARCHIVE_META:
+                    continue
+                check_archive_meta(chunk_id)
 
         pi.finish()
         if sig_int:

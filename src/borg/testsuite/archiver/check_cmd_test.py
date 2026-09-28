@@ -1985,7 +1985,7 @@ def test_verify_data_interrupted_collects_no_archive_meta_ids(archivers, request
         orig_get_many = repository.get_many
 
         def get_many_then_interrupt(ids, **kwargs):
-            # set before the first object is yielded, the generator is not resumed after its last object.
+            # Ctrl-C before the first object is verified.
             sig_int._sig_int_triggered = True
             yield from orig_get_many(ids, **kwargs)
 
@@ -1998,7 +1998,7 @@ def test_verify_data_interrupted_collects_no_archive_meta_ids(archivers, request
         assert checker.archive_meta_ids is None
 
 
-def test_verify_data_repair_collects_archive_meta_id_of_retried_chunk(archivers, request, monkeypatch):
+def test_verify_data_repair_collects_archive_meta_ids_of_retried_chunks(archivers, request, monkeypatch):
     """Objects that fail once, but not on the --repair retry, are kept. Only archive metadata ids are collected."""
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
@@ -2024,6 +2024,19 @@ def test_verify_data_repair_collects_archive_meta_id_of_retried_chunk(archivers,
         assert failed == flaky_ids
         assert all(id in repository.chunks for id in flaky_ids)  # not deleted, the retry succeeded
         assert checker.archive_meta_ids == archive_ids
+
+
+@pytest.mark.parametrize("verify_data_args", [[], ["--verify-data"]])
+def test_check_find_lost_archives_corrupt_archive_meta(archivers, request, verify_data_args):
+    """A corrupt archive metadata object is reported by --verify-data or else by the search for lost archives."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive_ids = [bytes.fromhex(line) for line in cmd(archiver, "repo-list", "--short").splitlines()]
+    with open_repository(archiver) as repository:
+        corrupt_chunk_on_disk(repository, min(archive_ids))
+    output = cmd(archiver, "check", "--find-lost-archives", *verify_data_args, exit_code=1)
+    assert (f"chunk {bin_to_hex(min(archive_ids))}, integrity error" in output) == bool(verify_data_args)
+    assert ("Skipping corrupted chunk" in output) == (not verify_data_args)
 
 
 @pytest.mark.parametrize("verify_data", [False, True])

@@ -1034,6 +1034,7 @@ Operations
       a corrupt index.
     - check.index
     - check.packs
+    - check.salvage_packs
     - check.verify_data
     - check.rebuild_archives
     - check.rebuild_archives_directory

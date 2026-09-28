@@ -110,7 +110,7 @@ class PackRecompressor:
         if corrupt_packs:
             logger.warning(
                 f'{len(corrupt_packs)} pack(s) recorded corrupt by "borg check" are not rewritten. '
-                'Run "borg check --repair --verify-data". Damage outside of chunks is not repaired yet, see #10026.'
+                'Run "borg check --repair" to salvage them.'
             )
             for pack_id in sorted(corrupt_packs):
                 logger.debug(f"Corrupt pack: {bin_to_hex(pack_id)}")
@@ -236,11 +236,10 @@ class RepoCompressMixIn:
         might be chosen; such chunks are kept as they are.
 
         ``borg repo-compress`` does not rewrite packs that ``borg check`` recorded as corrupt
-        and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by
-        rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
-        pack): a pack with such damage and no corrupt chunk stays recorded corrupt and is not rewritten,
-        a pack that also has a corrupt chunk is rewritten with that damage copied into the new pack
-        (refs #10026).
+        and warns about them. ``borg check --repair`` salvages such a pack: it replaces it by a pack
+        holding only the objects that authenticate with the key, which drops the corrupt chunks and any
+        damage outside a chunk (e.g. bytes appended to the pack). A pack in which no object authenticates
+        stays recorded corrupt and is not rewritten.
 
         Rewriting a pack invalidates every client's cached chunk index, so the next borg
         operation of each client will re-fetch the chunk index from the repository.

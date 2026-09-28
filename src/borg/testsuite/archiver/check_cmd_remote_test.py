@@ -27,3 +27,22 @@ def test_repository_check_detects_corrupted_pack(archivers, request):
 
     output = cmd(archiver, "check", "--repository-only", exit_code=1)
     assert "is corrupted" in output
+
+
+def test_repository_check_repair_salvages_corrupted_pack(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith(src_file):
+                corrupt_chunk_on_disk(repository, item.chunks[-1].id)
+                break
+        else:
+            pytest.fail("should not happen")
+
+    # the corrupt chunk is lost, so a repository-only repair fails.
+    output = cmd(archiver, "check", "--repair", "--repository-only", exit_code=1)
+    assert "Salvaged corrupt pack" in output
+    assert "corrupt pack(s) salvaged, chunks may be lost" in output
+    cmd(archiver, "check", "--repository-only", exit_code=0)

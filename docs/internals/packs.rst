@@ -119,9 +119,11 @@ it can not be read back.
 The walk rebuilds the index from the pack as it is: the damaged bytes stay where
 they are, as a gap no index entry covers. A pack is named by the store hash of its
 content, so a pack damaged in the store keeps failing the store-level check that
-``borg check`` runs over ``packs/``, also after ``borg check --repair`` has
-rebuilt the index from it. Rewriting such a pack is repository-level repair, see
-:issue:`10026`.
+``borg check`` runs over ``packs/`` until it is rewritten. ``borg check --repair``
+rewrites it before any index rebuild: it replaces the pack by one holding only the
+blobs the walk finds and whose metadata and data slots both authenticate, which
+drops the damaged bytes (see ``Repository.salvage_pack``). A pack in which no blob
+authenticates is left as it is.
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
 only when it validates like any walked header. Validating needs the key, which

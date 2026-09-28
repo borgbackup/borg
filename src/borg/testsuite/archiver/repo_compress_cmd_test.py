@@ -266,7 +266,7 @@ def test_repo_compress_keeps_corrupt_pack(archiver, corrupt_ctype):
 
     output = cmd(archiver, "repo-compress", "-v", "--stats", "-C", "none", exit_code=EXIT_WARNING)
     assert '1 pack(s) recorded corrupt by "borg check" are not rewritten.' in output
-    assert "Damage outside of chunks is not repaired yet, see #10026." in output
+    assert 'Run "borg check --repair" to salvage them.' in output
     assert "rewritten, 1 skipped (recorded corrupt)." in output
     with open_repository(archiver) as repository:
         packs_after = {info.name for info in repository.store_list("packs")}

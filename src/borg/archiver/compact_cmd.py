@@ -389,7 +389,7 @@ class ArchiveGarbageCollector:
         if kept_corrupt:
             logger.warning(
                 f'{len(kept_corrupt)} pack(s) recorded corrupt by "borg check" are not rewritten or merged. '
-                'Run "borg check --repair --verify-data". Damage outside of chunks is not repaired yet, see #10026.'
+                'Run "borg check --repair" to salvage them.'
             )
             for pid in sorted(kept_corrupt):
                 logger.debug(f"Corrupt pack: {bin_to_hex(pid)}")
@@ -516,11 +516,10 @@ class CompactMixIn:
             only reclaimed when ``borg compact`` rewrites their pack to reclaim unused indexed objects.
 
             ``borg compact`` does not rewrite or merge packs that ``borg check`` recorded as corrupt
-            and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by
-            rewriting their packs. It does not remove damage outside any chunk (e.g. bytes appended to a
-            pack): a pack with such damage and no corrupt chunk stays recorded corrupt and ``borg compact``
-            warns about it on every run, a pack that also has a corrupt chunk is rewritten with that damage
-            copied into the new pack (refs #10026).
+            and warns about them. ``borg check --repair`` salvages such a pack: it replaces it by a pack
+            holding only the objects that authenticate with the key, which drops the corrupt chunks and
+            any damage outside a chunk (e.g. bytes appended to the pack). A pack in which no object
+            authenticates stays recorded corrupt and ``borg compact`` warns about it on every run.
 
             You usually do not want to run ``borg compact`` after every write operation, but
             either regularly (e.g., once a month, possibly together with ``borg check``) or

@@ -952,19 +952,21 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request, mode, message):
 
 
 def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, request):
-    # A corrupt index and a corrupt pack: a full --repair rebuilds and stores the index in the archives check.
-    # The corrupt pack stays recorded corrupt, so a following check still fails on it, refs #10434.
+    # A corrupt index and a pack the salvage can not fix: a full --repair rebuilds and stores the index in
+    # the archives check. The pack stays recorded corrupt, so a following check still fails on it, refs #10434.
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     with open_repository(archiver) as repository:
         bad_pack = sorted(info.name for info in repository.store_list("packs"))[0]
         name = f"packs/{bad_pack}"
-        repository.store_store(name, corrupt(repository.store_load(name), -1))
+        # zero the whole pack: no object in it authenticates, so the salvage leaves it as it is.
+        repository.store_store(name, bytes(len(repository.store_load(name))))
         for info in repository.store_list("index"):  # rot every index fragment
             name = f"index/{info.name}"
             repository.store_store(name, corrupt(repository.store_load(name), 0))
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "corrupt pack(s) found; index corrupt, the archives check rebuilds it from the packs." in output
+    assert f"Corrupt pack {bad_pack} was not salvaged: nothing authenticates." in output
+    assert "corrupt pack(s) left; index corrupt, the archives check rebuilds it from the packs." in output
     with open_repository(archiver) as repository:
         index_infos = list(repository.store_list("index"))
         assert index_infos  # a fresh index was stored
@@ -1165,11 +1167,11 @@ def test_extra_chunks(archivers, request):
 
 @pytest.mark.parametrize("damaged_field", ["magic", "data_size"])
 def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, damaged_field):
-    """--repair rebuilds the chunks index from a pack whose object header is damaged.
+    """--repair salvages a pack whose object header is damaged.
 
-    A damaged header loses the object boundaries, so the rebuild scans for the next object that
+    A damaged header loses the object boundaries, so the salvage walk scans for the next object that
     authenticates and continues there. Authenticating needs the key, which --repair reads first.
-    A damaged data_size leaves the header parseable, so the rebuild catches it against the csize
+    A damaged data_size leaves the header parseable, so the walk catches it against the csize
     in the authenticated metadata.
     """
     archiver = request.getfixturevalue(archivers)
@@ -1202,20 +1204,22 @@ def test_repair_resyncs_pack_with_corrupt_object_header(archivers, request, dama
     problems = {"magic": "no object header", "data_size": "object header or metadata does not authenticate"}
     problem = problems[damaged_field]
     assert f"{problem} at offset {damaged_offset}" in output
-    assert f"continuing at the object at offset {next_offset}" in output  # the rebuild resumed at the next object
-    # the resync dropped an object, so the summary reports a problem.
+    assert f"continuing at the object at offset {next_offset}" in output  # the walk resumed at the next object
+    assert f"Salvaged corrupt pack {bin_to_hex(pack_id)}" in output
+    # the salvage dropped an object, so the summary reports a problem.
     assert "Archive consistency check complete, problems found." in output
     with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         assert damaged_id not in repository.chunks  # the damaged object can not be read back, so it is not indexed
-        assert repository.chunks[next_id].obj_offset == next_offset  # the one after it is
-        # the damaged object is the only one of its pack the rebuild lost.
+        # the one after it moved into the replacement pack, to where the dropped object began.
+        assert repository.chunks[next_id].pack_id != pack_id
+        assert repository.chunks[next_id].obj_offset == damaged_offset
+        # the damaged object is the only one of its pack the salvage lost.
         for _, chunk_id in objs:
             assert (chunk_id in repository.chunks) == (chunk_id != damaged_id)
+        assert bin_to_hex(pack_id) not in {info.name for info in repository.store_list("packs")}
     cmd(archiver, "list", "archive1", exit_code=0)  # the archives are readable
-    # the pack still holds the damaged bytes, so it keeps failing the store-level check: a pack is
-    # named by the store hash of its content. Repairing that is repository-level repair (#10026).
-    output = cmd(archiver, "check", "--repository-only", exit_code=1)
-    assert f"Store object packs/{bin_to_hex(pack_id)} is corrupted" in output
+    # the replacement pack holds no damaged bytes, so it passes the store-level check.
+    cmd(archiver, "check", "--repository-only", exit_code=0)
 
 
 def test_find_lost_archives_skips_chunk_with_corrupt_object_header(archivers, request):
@@ -1330,9 +1334,36 @@ def test_repo_list_aborts_cleanly_on_corrupt_pack(archivers, request):
     assert f"no object header at offset {damaged_offset}" in output
     assert "Archive consistency check complete, problems found." in output
 
-    # --repair passes a validator, so it resyncs past the damaged header instead of aborting.
-    # TODO: it does not rewrite the pack yet, so a later rebuild hits the same header again.
-    cmd(archiver, "check", "--repair", exit_code=0)
+    # --repair passes a validator, so it resyncs past the damaged header instead of aborting, and it
+    # salvages the pack: a later rebuild does not hit the damaged header again.
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert f"Salvaged corrupt pack {bin_to_hex(pack_id)}" in output
+    cmd(archiver, "check", "--repository-only", exit_code=0)
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        delete_chunkindex_from_repo(repository)
+    cmd(archiver, "repo-list", fork=True, exit_code=0)
+
+
+def test_repair_does_not_salvage_with_authenticated_no_key(archivers, request, monkeypatch):
+    """BORG_WORKAROUNDS=authenticated_no_key skips the tag verification, so --repair salvages no pack."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("inspects the store directly")
+    check_cmd_setup(archiver)
+    shutil.rmtree(archiver.repository_path)
+    # borg evaluates BORG_WORKAROUNDS at import time, thus the borg invocations below are forked.
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256", fork=True)
+    create_src_archive(archiver, "archive1")
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        chunk_id = next(iter(repository.chunks.keys()))
+        pack_id = repository.chunks[chunk_id].pack_id
+        corrupt_chunk_on_disk(repository, chunk_id)
+
+    monkeypatch.setenv("BORG_WORKAROUNDS", "authenticated_no_key")
+    output = cmd(archiver, "check", "--repair", "--repository-only", fork=True, exit_code=1)
+    assert "Corrupt packs are not salvaged." in output
+    assert "Not salvaging 1 corrupt pack(s): objects can not be authenticated." in output
+    assert bin_to_hex(pack_id) in list_packs(archiver)
 
 
 def test_repair_finish_flushes_pack_writer(archivers, request):
@@ -1434,8 +1465,9 @@ def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
     walked = record_finish_walks(monkeypatch)
     # the BUFFER_SIZE check_cmd_setup used: rebuild_archives re-chunks the item metadata into the same
     # chunks, so it stores nothing and the rewritten pack is the only pack the repair writes.
+    # --archives-only: the repository check salvages the pack, which drops the defect chunk.
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
-        output = cmd(archiver, "check", "--repair", "--verify-data", "--info", exit_code=0)
+        output = cmd(archiver, "check", "--repair", "--archives-only", "--verify-data", "--info", exit_code=0)
     assert f"{bin_to_hex(defect_id)}, integrity error" in output
     assert "Re-reading 1 pack(s) written by the repair." in output
 
@@ -1735,9 +1767,10 @@ def test_verify_data(archivers, request, init_args):
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
 
-    # repair will find the defect chunk and remove it
+    # repair salvages the pack, dropping the defect chunk; the archives check reports it missing.
     output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
-    assert f"{bin_to_hex(chunk.id)}, integrity error" in output
+    assert "Salvaged corrupt pack" in output
+    assert f"{bin_to_hex(chunk.id)}, integrity error" not in output  # it was gone before --verify-data ran
     assert "The following chunks are missing in the repository:" in output
     assert bin_to_hex(chunk.id) in output
     assert src_file in output
@@ -1903,9 +1936,9 @@ def test_corrupted_file_chunk(archivers, request, init_args):
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output
 
-    # repair: the defect chunk will be removed.
+    # repair: the pack is salvaged, the defect chunk is dropped.
     output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
-    assert f"{bin_to_hex(chunk.id)}, integrity error" in output
+    assert "Salvaged corrupt pack" in output
     assert "The following chunks are missing in the repository:" in output
     assert bin_to_hex(chunk.id) in output
     assert src_file in output

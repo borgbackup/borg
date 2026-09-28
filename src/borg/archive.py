@@ -2528,7 +2528,7 @@ class ArchiveChecker:
 
         def check_archive_meta(chunk_id):
             """Load the archive metadata object chunk_id. If it has no archives directory entry, create one
-            (with repair) or warn.
+            (with --repair) or log that it would create one.
             """
             cdata = self.repository.get(chunk_id)
             try:
@@ -2566,9 +2566,12 @@ class ArchiveChecker:
         if self.archive_meta_ids is not None:
             logger.info("Rebuilding missing archives directory entries...")
             logger.debug("Using the %d archive metadata objects found by verify_data.", len(self.archive_meta_ids))
-            total = len(self.archive_meta_ids)
+            # sorted, so the entries are logged in the same order on every run.
+            chunk_ids = sorted(self.archive_meta_ids)
+            total = len(chunk_ids)
         else:
             logger.info("Rebuilding missing archives directory entries, this might take some time...")
+            chunk_ids = (chunk_id for chunk_id, _ in self.chunks.iteritems())
             total = len(self.chunks)
         pi = ProgressIndicatorPercent(
             total=total,
@@ -2576,17 +2579,11 @@ class ArchiveChecker:
             step=0.01,
             msgid="check.rebuild_archives_directory",
         )
-        if self.archive_meta_ids is not None:
-            for chunk_id in self.archive_meta_ids:
-                if sig_int:
-                    break
-                pi.show()
-                check_archive_meta(chunk_id)
-        else:
-            for chunk_id, _ in self.chunks.iteritems():
-                if sig_int:
-                    break
-                pi.show()
+        for chunk_id in chunk_ids:
+            if sig_int:
+                break
+            pi.show()
+            if self.archive_meta_ids is None:
                 try:
                     cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
                     meta = self.repo_objs.parse_meta(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
@@ -2596,7 +2593,7 @@ class ArchiveChecker:
                     continue
                 if meta["type"] != ROBJ_ARCHIVE_META:
                     continue
-                check_archive_meta(chunk_id)
+            check_archive_meta(chunk_id)
 
         pi.finish()
         if sig_int:

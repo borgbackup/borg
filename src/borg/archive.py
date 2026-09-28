@@ -2903,7 +2903,11 @@ class ArchiveChecker:
         # is unindexed does not depend on the order the packs are read in.
         found_in = {}  # pack_id -> (chunk_id, obj_offset, obj_size) of the objects in the pack
         not_found_in = {}  # pack_id -> sorted index entries naming an object the pack does not hold
+        pi = ProgressIndicatorPercent(
+            total=len(pack_ids), msg="Re-reading written packs %3.0f%%", msgid="check.verify_written_packs"
+        )
         for pack_id in pack_ids:
+            pi.show()
             # PackReader reads from the store, which does not refresh the repository lock.
             self.repository._lock_refresh()
             expected = indexed[pack_id]
@@ -2924,6 +2928,7 @@ class ArchiveChecker:
                 del self.chunks[chunk_id]
             found_in[pack_id] = found
             not_found_in[pack_id] = not_found
+        pi.finish()
         # pass 2 indexes each unindexed object, so of several unindexed copies of a chunk, the first in pack id and
         # offset order is indexed and the others are superseded duplicates.
         for pack_id, found in found_in.items():

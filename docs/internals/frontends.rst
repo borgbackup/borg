@@ -1041,6 +1041,7 @@ Operations
     - check.remove_defect_chunks
     - check.rebuild_archives
     - check.rebuild_archives_directory
+    - check.verify_written_packs
     - repository.merge_packs
     - compact.analyze_archives
     - compact.compact_packs

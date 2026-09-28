@@ -1038,6 +1038,7 @@ Operations
     - check.packs
     - check.salvage_packs
     - check.verify_data
+    - check.remove_defect_chunks
     - check.rebuild_archives
     - check.rebuild_archives_directory
     - repository.merge_packs

@@ -23,7 +23,7 @@ from ...cache import (
 )
 from ...crypto.key import RepositoryKeyInfoMissing
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, hex_to_bin, CommandError, CorruptPack, Error, sig_int
+from ...helpers import bin_to_hex, hex_to_bin, CommandError, CorruptPack, Error, ProgressIndicatorPercent, sig_int
 from ...helpers import BackupDamagedChunksError
 from ...helpers.passphrase import PassphraseWrong
 from ...hashindex import ChunkIndex
@@ -1477,6 +1477,47 @@ def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
     with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
         assert defect_id not in repository.chunks
         assert bin_to_hex(repository.chunks[bystander_id].pack_id) in new_packs
+    cmd(archiver, "check", exit_code=0)
+
+
+@pytest.mark.parametrize("n_defect", [0, 2])
+def test_repair_verify_data_progress_for_defect_chunk_removal(archiver, monkeypatch, n_defect):
+    """--verify-data --repair shows progress for removing defect chunks, one step per defect chunk."""
+    # local-only: this patches in-process archive internals.
+    check_cmd_setup(archiver)
+    # a bystander object and n_defect defect objects in one pack that no archive references.
+    contents = [b"bystander"] + [b"defect%d" % i for i in range(n_defect)]
+    ids, _ = put_objects_in_one_pack(archiver, contents)
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        for defect_id in ids[1:]:
+            corrupt_chunk_on_disk(repository, defect_id)
+
+    indicators = []
+
+    class RecordingPI(ProgressIndicatorPercent):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.finished = False
+            indicators.append(self)
+
+        def finish(self):
+            self.finished = True
+            super().finish()
+
+    monkeypatch.setattr(archive_module, "ProgressIndicatorPercent", RecordingPI)
+    # --archives-only: the repository check salvages the pack, which drops the defect chunks.
+    cmd(archiver, "check", "--repair", "--archives-only", "--verify-data", exit_code=0)
+    removal = [pi for pi in indicators if pi.msgid == "check.remove_defect_chunks"]
+    if n_defect == 0:
+        assert removal == []
+    else:
+        assert len(removal) == 1
+        assert removal[0].total == n_defect
+        assert removal[0].counter == n_defect
+        assert removal[0].finished
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        for defect_id in ids[1:]:
+            assert defect_id not in repository.chunks
     cmd(archiver, "check", exit_code=0)
 
 

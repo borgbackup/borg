@@ -2448,7 +2448,11 @@ class ArchiveChecker:
             if self.repair:
                 logger.warning("Found defect chunks, removing them from the repository.")
                 validate = object_validator(self.repo_objs)
+                pi = ProgressIndicatorPercent(
+                    total=len(defect_chunks), msg="Removing defect chunks %3.0f%%", msgid="check.remove_defect_chunks"
+                )
                 for defect_chunk in defect_chunks:
+                    pi.show()
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
                     # local repo (fs): as the loop above usually pumps a lot of data through,
@@ -2478,6 +2482,7 @@ class ArchiveChecker:
                             self.written_packs.add(new_pack_id)
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
+                pi.finish()
             else:
                 logger.warning("Found defect chunks. Run with --repair to remove them.")
                 for defect_chunk in defect_chunks:

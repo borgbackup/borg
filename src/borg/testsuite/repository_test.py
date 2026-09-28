@@ -1911,8 +1911,8 @@ def test_check_repair_rebuild_validates_objects(tmp_path, caplog):
 
 
 def test_check_repair_refuses_when_pack_corrupt(tmp_path):
-    # A repair without authenticate can not salvage a corrupt pack: it leaves the index and the pack
-    # untouched (no lossy rebuild, nothing dropped) and fails on a repository-only run, refs #10026.
+    # a repair without authenticate leaves a corrupt pack and the index unchanged and fails on a
+    # repository-only run.
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         repository.put(H(1), fchunk(b"GOOD-CHUNK", chunk_id=H(1)))
@@ -3904,7 +3904,7 @@ def create_repo_with_real_packs(location, repo_objs, packs=1):
             objs = [real_chunk(repo_objs, bytes([p, i]) * 100) for i in range(3)]
             for chunk_id, obj in objs:
                 repository.put(chunk_id, obj)
-            repository.flush()  # seal a pack holding these objects
+            repository.flush()  # store a pack holding these objects
             pack_id = repository.chunks[objs[0][0]].pack_id
             assert all(repository.chunks[chunk_id].pack_id == pack_id for chunk_id, _ in objs)
             result.append((objs, pack_id))
@@ -3941,8 +3941,9 @@ def pack_names(repository):
 @pytest.mark.parametrize("repo_only", [True, False])
 def test_check_repair_salvages_a_corrupt_pack(tmp_path, caplog, repo_only):
     # a repair replaces a corrupt pack by one holding its objects that authenticate, removes the index
-    # entry of the dropped object, clears the pack's record and stores the index. The chunk is lost, so
-    # a repository-only run fails.
+    # entry of the dropped object and clears the pack's record. A repository-only run stores the index,
+    # a full run leaves it marked invalid for the archives phase. The chunk is lost, so a repository-only
+    # run fails.
     repo_objs = plain_repo_objs()
     location = os.fspath(tmp_path / "repo")
     [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
@@ -3957,8 +3958,8 @@ def test_check_repair_salvages_a_corrupt_pack(tmp_path, caplog, repo_only):
         assert "corrupt pack(s) salvaged, chunks may be lost" in caplog.text
         assert pack_names(repository) == {bin_to_hex(new_pack_id)}
         assert PackTracker.load(repository).corrupt_ids() == []
-        assert not chunkindex_is_invalid(repository)
-    with Repository(location, exclusive=True) as repository:  # the stored index
+        assert chunkindex_is_invalid(repository) is not repo_only
+    with Repository(location, exclusive=True) as repository:  # the stored or the rebuilt index
         assert id1 not in repository.chunks
         assert repository.chunks[id0][2:] == (new_pack_id, 0, len(obj0))
         assert repository.chunks[id2][2:] == (new_pack_id, len(obj0), len(obj2))
@@ -4008,7 +4009,8 @@ def test_check_repair_salvages_before_rebuilding_a_corrupt_index(tmp_path, caplo
 
 
 def test_check_repair_salvages_without_a_stored_index(tmp_path):
-    # without index/ fragments, salvage uses a scratch index and marks no index invalid.
+    # without index/ fragments, the salvage updates an empty ChunkIndex, stores no index and writes no
+    # invalid marker.
     repo_objs = plain_repo_objs()
     location = os.fspath(tmp_path / "repo")
     [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
@@ -4033,10 +4035,70 @@ def test_check_repair_without_authenticate_leaves_a_corrupt_pack(tmp_path, caplo
     with Repository(location, exclusive=True) as repository:
         with caplog.at_level(logging.ERROR, logger="borg.repository"):
             assert check_repair(repository, repo_objs, repo_only=True, authenticate=None) is False
-        assert "Not salvaging 1 corrupt pack(s): objects can not be authenticated." in caplog.text
+        assert "Not salvaging 1 corrupt pack(s): objects can not be authenticated" in caplog.text
         assert "corrupt pack(s) left" in caplog.text
         assert pack_names(repository) == {bin_to_hex(pack_id)}
         assert PackTracker.load(repository).corrupt_ids() == [pack_id]
+
+
+def test_check_repair_skips_the_record_of_a_pack_gone(tmp_path):
+    # a pack recorded corrupt, then deleted (e.g. by compact, which deletes a pack whose objects are all
+    # unused): the repair salvages no pack and drops the record.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    create_repo_with_real_packs(location, repo_objs)
+    gone_id = bytes(32)
+    with Repository(location, exclusive=True) as repository:
+        tracker = PackTracker.load(repository)
+        tracker.record(gone_id, False)
+        tracker.save()
+    with Repository(location, exclusive=True) as repository:
+        assert check_repair(repository, repo_objs, repo_only=True) is True
+        assert PackTracker.load(repository).corrupt_ids() == []
+
+
+def test_check_repair_does_not_salvage_without_delete_permission(tmp_path, caplog, monkeypatch):
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
+    with Repository(location, exclusive=True) as repository:
+        damage_pack(repository, pack_id, flip=[last_byte_offset(objs, 1)])
+    monkeypatch.setenv("BORG_REPO_PERMISSIONS", "no-delete")
+    with Repository(location, exclusive=True) as repository:
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=True) is False
+        assert "Not salvaging 1 corrupt pack(s): Repository permission denied" in caplog.text
+        assert pack_names(repository) == {bin_to_hex(pack_id)}
+        assert PackTracker.load(repository).corrupt_ids() == [pack_id]
+        assert not chunkindex_is_invalid(repository)
+
+
+def test_check_repair_salvage_error_keeps_the_records_current(tmp_path, monkeypatch):
+    # an exception in the salvage of the second pack: the record of the first, salvaged pack is dropped,
+    # the second pack stays recorded corrupt and the stored index stays marked invalid.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    packs = create_repo_with_real_packs(location, repo_objs, packs=2)
+    with Repository(location, exclusive=True) as repository:
+        for objs, pack_id in packs:
+            damage_pack(repository, pack_id, flip=[last_byte_offset(objs, 1)])
+    salvage_pack = Repository.salvage_pack
+    salvaged = []
+
+    def salvage_pack_then_fail(self, pack_id, **kwargs):
+        if salvaged:
+            raise OSError("store failure")
+        salvaged.append(pack_id)
+        return salvage_pack(self, pack_id, **kwargs)
+
+    monkeypatch.setattr(Repository, "salvage_pack", salvage_pack_then_fail)
+    with Repository(location, exclusive=True) as repository:
+        with pytest.raises(OSError):
+            check_repair(repository, repo_objs, repo_only=True)
+    with Repository(location, exclusive=True) as repository:
+        [done_id] = salvaged
+        assert PackTracker.load(repository).corrupt_ids() == [p for _, p in packs if p != done_id]
+        assert chunkindex_is_invalid(repository)
 
 
 def test_check_repair_leaves_a_pack_nothing_in_which_authenticates(tmp_path, caplog):

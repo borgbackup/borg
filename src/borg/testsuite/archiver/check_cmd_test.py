@@ -1334,8 +1334,8 @@ def test_repo_list_aborts_cleanly_on_corrupt_pack(archivers, request):
     assert f"no object header at offset {damaged_offset}" in output
     assert "Archive consistency check complete, problems found." in output
 
-    # --repair passes a validator, so it resyncs past the damaged header instead of aborting, and it
-    # salvages the pack: a later rebuild does not hit the damaged header again.
+    # --repair walks from the damaged header to the next object that validates and salvages the pack,
+    # which drops the damaged header.
     output = cmd(archiver, "check", "--repair", exit_code=0)
     assert f"Salvaged corrupt pack {bin_to_hex(pack_id)}" in output
     cmd(archiver, "check", "--repository-only", exit_code=0)
@@ -1361,8 +1361,7 @@ def test_repair_does_not_salvage_with_authenticated_no_key(archivers, request, m
 
     monkeypatch.setenv("BORG_WORKAROUNDS", "authenticated_no_key")
     output = cmd(archiver, "check", "--repair", "--repository-only", fork=True, exit_code=1)
-    assert "Corrupt packs are not salvaged." in output
-    assert "Not salvaging 1 corrupt pack(s): objects can not be authenticated." in output
+    assert "Not salvaging 1 corrupt pack(s): objects can not be authenticated" in output
     assert bin_to_hex(pack_id) in list_packs(archiver)
 
 

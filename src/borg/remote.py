@@ -13,6 +13,7 @@ import tempfile
 import textwrap
 import time
 import traceback
+from collections import deque
 from subprocess import Popen, PIPE, TimeoutExpired
 
 from . import __version__
@@ -557,7 +558,7 @@ class RemoteRepository:
     def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False,
                  make_parent_dirs=False, args=None):
         self.location = self._location = location
-        self.preload_ids = []
+        self.preload_ids = deque()
         self.msgid = 0
         self.rx_bytes = 0
         self.tx_bytes = 0
@@ -836,8 +837,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             else:
                 raise self.RPCError(unpacked)
 
-        calls = list(calls)
-        waiting_for = []
+        calls = deque(calls)
+        waiting_for = deque()
         maximum_to_send = 0 if wait else self.upload_buffer_size_limit
         send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
         try:
@@ -851,7 +852,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 while waiting_for:
                     try:
                         unpacked = self.responses.pop(waiting_for[0])
-                        waiting_for.pop(0)
+                        waiting_for.popleft()
                         if b'exception_class' in unpacked:
                             handle_error(unpacked)
                         else:
@@ -926,9 +927,9 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                             if is_preloaded:
                                 assert cmd == 'get', "is_preload is only supported for 'get'"
                                 if calls[0]['id'] in self.chunkid_to_msgids:
-                                    waiting_for.append(pop_preload_msgid(calls.pop(0)['id']))
+                                    waiting_for.append(pop_preload_msgid(calls.popleft()['id']))
                             else:
-                                args = calls.pop(0)
+                                args = calls.popleft()
                                 if cmd == 'get' and args['id'] in self.chunkid_to_msgids:
                                     waiting_for.append(pop_preload_msgid(args['id']))
                                 else:
@@ -939,7 +940,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                                     else:
                                         self.to_send.push_back(msgpack.packb((1, self.msgid, cmd, self.named_to_positional(cmd, args))))
                         if not self.to_send and self.preload_ids:
-                            chunk_id = self.preload_ids.pop(0)
+                            chunk_id = self.preload_ids.popleft()
                             args = {'id': chunk_id}
                             self.msgid += 1
                             self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
@@ -1088,7 +1089,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             return resp
 
     def preload(self, ids):
-        self.preload_ids += ids
+        self.preload_ids.extend(ids)
 
 
 def handle_remote_line(line):

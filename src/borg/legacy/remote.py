@@ -10,6 +10,7 @@ import sys
 import textwrap
 import time
 import traceback
+from collections import deque
 from subprocess import Popen, PIPE
 
 import borg.logger
@@ -462,8 +463,8 @@ class LegacyRemoteRepository:
             else:
                 raise self.RPCError(unpacked)
 
-        calls = list(calls)
-        waiting_for = []
+        calls = deque(calls)
+        waiting_for = deque()
         send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
         try:
             while wait or calls:
@@ -479,7 +480,7 @@ class LegacyRemoteRepository:
                 while waiting_for:
                     try:
                         unpacked = self.responses.pop(waiting_for[0])
-                        waiting_for.pop(0)
+                        waiting_for.popleft()
                         handle_error(unpacked)
                         result = unpacked[RESULT]
                         if self.borg1_server and cmd in BYTES_RESULT_METHODS:
@@ -565,7 +566,7 @@ class LegacyRemoteRepository:
                             _logger.warning("stderr: " + line.decode().strip())
                 if w:
                     while not self.to_send and calls and len(waiting_for) < MAX_INFLIGHT:
-                        args = calls.pop(0)
+                        args = calls.popleft()
                         self.msgid += 1
                         waiting_for.append(self.msgid)
                         self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))

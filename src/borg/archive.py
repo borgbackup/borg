@@ -2254,7 +2254,8 @@ class ArchiveChecker:
         self.chunks_modified = False
         # ids of the packs repair wrote: stored by put() and flush(), or written by delete() rewriting a pack.
         self.written_packs = set()
-        # ids of the archive metadata objects verify_data found, None if verify_data did not run to the end.
+        # ids of the objects with ro_type ROBJ_ARCHIVE_META that verify_data found.
+        # None if verify_data did not run or was interrupted.
         self.archive_meta_ids = None
 
     def record_stored(self, results):
@@ -2532,7 +2533,7 @@ class ArchiveChecker:
                 for defect_chunk in defect_chunks:
                     logger.debug("chunk %s is defect.", bin_to_hex(defect_chunk))
         if not sig_int:
-            # an interrupted pass did not parse all objects, its ids are incomplete.
+            # the ids of an interrupted pass are incomplete.
             self.archive_meta_ids = archive_meta_ids
         log = logger.error if errors else logger.info
         if sig_int:
@@ -2553,13 +2554,13 @@ class ArchiveChecker:
     def rebuild_archives_directory(self):
         """Rebuild the archives directory, undeleting archives.
 
-        Reads the archive metadata objects in the repository. When finding some that do not
-        have a corresponding archives directory entry (either a normal entry for an "existing"
-        archive, or a soft-deleted entry for a "deleted" archive), it will create that entry
-        (making the archives directory consistent with the repository).
+        Reads the archive metadata objects (ro_type ROBJ_ARCHIVE_META) in the repository. When
+        finding some that do not have a corresponding archives directory entry (either a normal
+        entry for an "existing" archive, or a soft-deleted entry for a "deleted" archive), it will
+        create that entry (making the archives directory consistent with the repository).
 
-        If self.archive_meta_ids is not None, only these objects are read. Otherwise, the
-        metadata of all objects is read to find the archive metadata objects.
+        If self.archive_meta_ids is not None, it reads only these objects. Otherwise, it reads the
+        meta dict (ro_type and other object metadata, without the data) of every object to find them.
         """
 
         def valid_archive(obj):

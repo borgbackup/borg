@@ -4101,6 +4101,31 @@ def test_check_repair_salvage_error_keeps_the_records_current(tmp_path, monkeypa
         assert chunkindex_is_invalid(repository)
 
 
+def test_check_repair_salvage_stores_an_empty_index(tmp_path, monkeypatch):
+    # a salvage that leaves the index empty: the repair stores the empty index, deleting the old
+    # fragments, before it deletes the invalid marker.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
+    with Repository(location, exclusive=True) as repository:
+        damage_pack(repository, pack_id, flip=[last_byte_offset(objs, 1)])
+    salvage_pack = Repository.salvage_pack
+
+    def salvage_pack_then_empty_the_index(self, pack_id, **kwargs):
+        result = salvage_pack(self, pack_id, **kwargs)
+        chunks = kwargs["chunks"]
+        for chunk_id in [chunk_id for chunk_id, _ in chunks.iteritems()]:
+            del chunks[chunk_id]
+        return result
+
+    monkeypatch.setattr(Repository, "salvage_pack", salvage_pack_then_empty_the_index)
+    with Repository(location, exclusive=True) as repository:
+        check_repair(repository, repo_objs, repo_only=True)
+        assert not chunkindex_is_invalid(repository)
+    with Repository(location, exclusive=True) as repository:  # the stored index
+        assert len(repository.chunks) == 0
+
+
 def test_check_repair_leaves_a_pack_nothing_in_which_authenticates(tmp_path, caplog):
     repo_objs = plain_repo_objs()
     location = os.fspath(tmp_path / "repo")

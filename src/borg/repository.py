@@ -2635,7 +2635,7 @@ class Repository:
             elif result.status == SALVAGE_DONE:
                 salvaged += 1
                 # with an empty index, which chunks the dropped bytes held is unknown.
-                lossy += bool(result.removed_ids) or chunks is None
+                lossy += bool(result.removed_ids or chunks is None)
                 tracker.forget(pack_id)  # pack_id is deleted, or holds the replacement pack
                 present_pack_ids.discard(pack_id)
                 present_pack_ids.add(result.new_pack_id)
@@ -2655,8 +2655,9 @@ class Repository:
             return salvaged, lossy
         if salvaged:
             # the old index/ fragments hold entries salvage_pack changed or removed, so store every entry
-            # (incremental=False) and delete the old fragments (delete_other=True).
-            write_chunkindex_to_repo(self, chunks, incremental=False, delete_other=True)
+            # (incremental=False), also if there is none (force_write=True), and delete the old fragments
+            # (delete_other=True).
+            write_chunkindex_to_repo(self, chunks, incremental=False, force_write=True, delete_other=True)
         if marked:
             # the stored index is current again; write_chunkindex_to_repo deletes the marker only if it
             # deleted a fragment.

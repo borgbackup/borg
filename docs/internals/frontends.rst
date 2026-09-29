@@ -829,6 +829,8 @@ Errors
         Got Ctrl-C / SIGINT: the chunk index rebuild was interrupted.
     EfficientCollectionQueue.SizeUnderflow rc: 2 traceback: no
         Could not pop the first {} elements; collection only has {} elements.
+    ObjectsNotAuthenticatable rc: 2 traceback: no
+        Objects can not be authenticated with BORG_WORKAROUNDS=authenticated_no_key.
     RTError rc: 2 traceback: no
         Runtime error: {}
 

@@ -2588,7 +2588,7 @@ class Repository:
             return 0, 0
         if authenticate is None:
             logger.error(
-                f"Not salvaging {len(corrupt_ids)} corrupt pack(s): objects can not be authenticated, e.g. with "
+                f"Not salvaging {len(corrupt_ids)} corrupt pack(s): objects can not be authenticated with "
                 "BORG_WORKAROUNDS=authenticated_no_key."
             )
             return 0, 0

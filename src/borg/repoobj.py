@@ -292,6 +292,10 @@ def object_validator(repo_objs):
     return validate
 
 
+class ObjectsNotAuthenticatable(Error):
+    """Objects can not be authenticated with BORG_WORKAROUNDS=authenticated_no_key."""
+
+
 def whole_object_authenticator(repo_objs):
     """Return authenticate(chunk_id, obj): True if obj is the whole repo object with id chunk_id.
 
@@ -301,13 +305,13 @@ def whole_object_authenticator(repo_objs):
     without being part of the ciphertext), see OBJ_VERSION_HEADER_AAD. Only the tags are verified, not
     that the plaintext hashes to chunk_id.
 
-    Raises Error for an "authenticated-*" key with the authenticated_no_key workaround, which skips
-    the tag verification.
+    Raises ObjectsNotAuthenticatable for an "authenticated-*" key with the authenticated_no_key
+    workaround, which skips the tag verification.
     """
     from .crypto.key import MACKeyBase  # crypto.key imports this module
 
     if AUTHENTICATED_NO_KEY and isinstance(repo_objs.key, MACKeyBase):
-        raise Error("Objects can not be authenticated with BORG_WORKAROUNDS=authenticated_no_key.")
+        raise ObjectsNotAuthenticatable
 
     def authenticate(chunk_id, obj):
         try:

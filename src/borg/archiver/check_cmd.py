@@ -8,7 +8,7 @@ from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error
 from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.time import archive_ts_now, calculate_relative_offset
-from ..repoobj import RepoObj, object_validator, whole_object_authenticator
+from ..repoobj import RepoObj, ObjectsNotAuthenticatable, object_validator, whole_object_authenticator
 from ..repository import Repository, DEFAULTS_NAME
 
 from ..logger import create_logger
@@ -118,7 +118,9 @@ class CheckMixIn:
             if args.repair:
                 try:
                     authenticate = whole_object_authenticator(repo_objs)
-                except Error:  # raised with BORG_WORKAROUNDS=authenticated_no_key; no pack is salvaged then.
+                except ObjectsNotAuthenticatable:
+                    # no key material to verify an object's tags with, so no pack is salvaged;
+                    # Repository._salvage_corrupt_packs reports that.
                     pass
             if not repository.check(
                 repair=args.repair,

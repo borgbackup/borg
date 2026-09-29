@@ -1,9 +1,11 @@
+import errno
 import os
+import stat
 
 import pytest
 
 from ..platform.xattr import buffer, split_lstring
-from ..xattr import is_enabled, getxattr, setxattr, listxattr, XATTR_FAKEROOT
+from ..xattr import is_enabled, getxattr, setxattr, listxattr, get_all, XATTR_FAKEROOT
 from ..platformflags import is_linux, is_sunos
 
 # Whether xattrs can be set on a symlink itself:
@@ -81,6 +83,22 @@ def test_getxattr_buffer_growth(tempfile_symlink):
     got_value = getxattr(tmp_fn, b"user.big")
     assert value == got_value
     assert len(buffer) == 128
+
+
+@pytest.mark.skipif(not is_sunos, reason="illumos/Solaris only")
+@pytest.mark.parametrize("kind", [stat.S_IFBLK, stat.S_IFCHR])
+def test_device_node_is_not_opened(tmp_path, kind):
+    # Reaching the attribute directory of a device node would open the device itself,
+    # which fails with ENXIO for a device number without a driver (like this one).
+    path = os.fsencode(tmp_path / "dev")
+    try:
+        os.mknod(path, 0o600 | kind, os.makedev(30, 40))
+    except PermissionError:
+        pytest.skip("creating device nodes requires root")
+    with pytest.raises(OSError) as excinfo:
+        listxattr(path)
+    assert excinfo.value.errno == errno.ENOTSUP
+    assert get_all(path) == {}
 
 
 @pytest.mark.parametrize(

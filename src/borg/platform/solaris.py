@@ -5,10 +5,14 @@ On these platforms, the extended attributes of a file are regular files inside a
 attribute directory attached to that file. The attribute directory is opened by giving
 O_XATTR to open(2)/openat(2), see fsattr(7) — xattr names/values map to the names/contents
 of the files in there. There are no xattr namespaces, so names are used verbatim.
+
+Block and character device nodes are treated as not supporting extended attributes:
+reaching their attribute directory would require opening the device itself.
 """
 
 import errno
 import os
+import stat
 
 from .base import ENOATTR
 
@@ -32,6 +36,11 @@ def _open_attrdir(path, follow_symlinks):
     # referring to the file, so for a path, the file itself must be opened first.
     if isinstance(path, int):
         return os.open(".", os.O_RDONLY | O_XATTR, dir_fd=path)
+    # Opening a device node runs the open routine of its driver, which might fail (ENXIO if
+    # there is no such device), block or have side effects (e.g. a tape rewinding on close).
+    st = os.stat(path, follow_symlinks=follow_symlinks)
+    if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode):
+        raise OSError(errno.ENOTSUP, os.strerror(errno.ENOTSUP), path)
     flags = os.O_RDONLY | os.O_NONBLOCK  # O_NONBLOCK: do not hang on FIFOs
     if not follow_symlinks:
         flags |= os.O_NOFOLLOW

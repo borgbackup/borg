@@ -1879,3 +1879,54 @@ def test_items_with_unknown_keys_are_kept(archivers, request):
     assert items[0].as_dict()["newkey"] == "future"
     output = cmd(archiver, "check", "--archives-only", exit_code=0)
     assert "keys unknown to this borg version" in output  # still just the warning
+
+
+def fill_store_cache(archiver, monkeypatch):
+    """Set BORG_STORE_CACHE, extract archive1 to cache its packs and return the cached pack files."""
+    cache_dir = archiver.tmpdir / "storecache"
+    monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(cache_dir))
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "archive1")
+    cached_packs = sorted(path for path in (cache_dir / "packs").rglob("*") if path.is_file())
+    assert cached_packs
+    return cached_packs
+
+
+def repository_packs(archiver):
+    return sorted(path.name for path in Path(archiver.repository_path, "packs").rglob("*") if path.is_file())
+
+
+def test_check_verify_data_ignores_a_corrupt_store_cache(archivers, request, monkeypatch):
+    # damaged cached packs, intact repository: check reports no error and --repair deletes no pack, #10397.
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    for path in fill_store_cache(archiver, monkeypatch):
+        path.write_bytes(corrupt(path.read_bytes(), path.stat().st_size // 2))
+    packs_before = repository_packs(archiver)
+    output = cmd(archiver, "check", "--verify-data", exit_code=0)
+    assert "integrity error:" not in output
+    monkeypatch.setenv("BORG_CHECK_I_KNOW_WHAT_I_AM_DOING", "YES")
+    output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
+    assert "integrity error:" not in output
+    # --repair can add packs holding rewritten archive metadata, so check only that no pack was removed.
+    assert set(packs_before) <= set(repository_packs(archiver))
+
+
+def test_check_archives_only_verify_data_ignores_an_intact_store_cache(archivers, request, monkeypatch):
+    # damaged repository pack, intact cached copy: check reports the integrity error, #10397.
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    fill_store_cache(archiver, monkeypatch)
+    # writethrough also writes the cache, so damage the repository pack with BORG_STORE_CACHE unset.
+    monkeypatch.delenv("BORG_STORE_CACHE")
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith(src_file):
+                corrupt_chunk_on_disk(repository, item.chunks[-1].id)
+                break
+        else:
+            pytest.fail("should not happen")
+    monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(archiver.tmpdir / "storecache"))
+    output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
+    assert "integrity error:" in output

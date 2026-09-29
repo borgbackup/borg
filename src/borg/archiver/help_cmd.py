@@ -740,6 +740,9 @@ class HelpMixIn:
                 use that directory (it is created if it does not exist). Packs are named by
                 content hash, so one cache directory can safely hold packs of multiple repositories.
                 If it is not set, no such caching happens.
+                The cached packs are not verified against the repository: a damaged cache file makes
+                reads fail as if the repository was damaged, until the cache directory is deleted.
+                ``borg check`` and ``borg repo-compress`` always read the packs from the repository.
             BORG_PACK_CACHE_SIZE
                 When set to a numeric value, limit the pack cache to that many bytes.
                 Only has an effect if BORG_STORE_CACHE is set.

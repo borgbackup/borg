@@ -205,7 +205,10 @@ class PackRecompressor:
 
 
 class RepoCompressMixIn:
-    @with_repository(manifest=True, exclusive=True)
+    # store_cache=False: the cached packs are not verified against the repository. transform_pack copies
+    # objects that already use the target compression into the new pack without authenticating them,
+    # then deletes the old pack.
+    @with_repository(manifest=True, exclusive=True, store_cache=False)
     def do_repo_compress(self, args, repository, manifest):
         """Repository (re-)compression."""
         if not isinstance(repository, Repository):
@@ -231,6 +234,7 @@ class RepoCompressMixIn:
         if it holds objects that need recompression, rewritten as a whole - objects already
         using the desired compression are copied into the rewritten pack unchanged. A pack
         whose objects all already use the desired compression is not touched at all.
+        The packs are always read from the repository, also if ``BORG_STORE_CACHE`` is set.
         Please note that the outcome of recompressing a chunk might not always be the
         desired compression type/level - if no compression gives a shorter output, that
         might be chosen; such chunks are kept as they are.

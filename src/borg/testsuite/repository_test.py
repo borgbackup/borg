@@ -3984,6 +3984,40 @@ def test_check_repair_salvage_drops_appended_bytes(tmp_path, caplog):
         assert repository.check(repair=False) is True
 
 
+def test_check_repair_reports_a_pack_that_reads_intact(tmp_path, caplog, monkeypatch):
+    # a pack whose first read hashes wrong and whose next read is intact: nothing is salvaged and the
+    # pack's record is set to intact, but the run fails, because no repair fixes unreliable storage.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
+    pack_hex = bin_to_hex(pack_id)
+    with Repository(location, exclusive=True) as repository:
+        index_before = dict(repository.chunks.iteritems())
+        store_hash_of = repository.store.hash
+        faulty_read = True
+
+        def hash(name, algorithm):
+            # only the pack check's read of this pack returns a wrong hash, the salvage's read is intact.
+            nonlocal faulty_read
+            if name == f"packs/{pack_hex}" and faulty_read:
+                faulty_read = False
+                return "0" * 64
+            return store_hash_of(name, algorithm)
+
+        monkeypatch.setattr(repository.store, "hash", hash)
+        with caplog.at_level(logging.WARNING, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=True) is False
+        assert f"Pack {pack_hex} read corrupt, then intact" in caplog.text
+        assert "1 pack(s) read corrupt, then intact" in caplog.text
+        assert "the storage or the transfer may be unreliable" in caplog.text
+        assert "repaired" not in caplog.text
+        assert pack_names(repository) == {pack_hex}
+        assert PackTracker.load(repository).corrupt_ids() == []
+    with Repository(location, exclusive=True) as repository:
+        assert dict(repository.chunks.iteritems()) == index_before
+        assert repository.check(repair=False) is True
+
+
 def test_check_repair_salvages_before_rebuilding_a_corrupt_index(tmp_path, caplog):
     # a corrupt index and a corrupt pack: a repository-only repair salvages the pack, then rebuilds the
     # index from the packs. The index can not tell what the dropped bytes held, so the run fails.

@@ -76,9 +76,10 @@ cache/
     key's store object envelope (see below). Records are kept across checks:
     ``check --max-age`` skips packs whose intact record is younger than the given age, and partial checks
     (``--max-duration``) verify the least-recently-checked packs first so repeated
-    runs cover the whole repository. Records of corrupt packs are kept for repair and
-    always re-verified. Records of packs no longer listed in packs/ are pruned when a
-    check finishes.
+    runs cover the whole repository. Records of corrupt packs are always re-verified;
+    ``check --repair`` salvages each pack still recorded corrupt (see :ref:`packs`) and
+    records a pack that reads intact at the salvage as intact. Records of packs no longer
+    listed in packs/ are pruned when a check finishes.
   referenced-by-archive.<hex-encoded archive ID>
     what one archive references (object ID -> plaintext object size), plus the file
     count and content size of that archive, in the key's store object envelope (see
@@ -88,9 +89,9 @@ cache/
     a marker object: while it is present, the chunks index in ``index/`` is considered
     invalid, because its fragments may be missing entries or point at deleted packs.
     It is written before deleting index fragments, before a single-object delete removes
-    the old pack, and by ``borg check --repair`` after storing packs, before it re-reads
-    them and stores the index. It is removed after the last fragment is deleted or once
-    the complete current index is stored.
+    the old pack, by ``borg check --repair`` after storing packs, before it re-reads
+    them and stores the index, and before the first pack a salvage deletes. It is removed
+    after the last fragment is deleted or once the complete current index is stored.
 
 Note that this ``cache/`` namespace is inside the repository (and thus shared by
 all clients); it is not the client-local cache described in

@@ -819,6 +819,24 @@ def test_gather_many_one_gather_for_many_packs(tmp_path, monkeypatch, variant):
         assert repository.store.stats["load_calls"] == loads_before
 
 
+@pytest.mark.parametrize("variant", ["file", "ssh"])
+@pytest.mark.parametrize("store_cache", [True, False])
+def test_store_cache_argument(tmp_path, monkeypatch, variant, store_cache):
+    # store_cache=False ignores BORG_STORE_CACHE: no cache directory is made and pack reads go to the repository.
+    cache_dir = tmp_path / "storecache"
+    monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(cache_dir))
+    path = os.fspath(tmp_path / "repository")
+    location = Location(f"ssh://__testsuite__/{path}" if variant == "ssh" else path)
+    chunk = fchunk(b"payload", chunk_id=H(0))
+    with Repository(location, exclusive=True, create=True, store_cache=store_cache) as repository:
+        assert repository.uses_pack_store_cache is store_cache
+        repository.put(H(0), chunk)
+        repository.flush()
+        assert list(repository.get_many([H(0)])) == [chunk]
+        assert (repository.store.stats["cache_load_calls"] > 0) is store_cache
+    assert cache_dir.exists() is store_cache
+
+
 def test_gather_many_batches(repo_fixtures, request, monkeypatch):
     # gather_many ends a batch at GATHER_MAX_COUNT objects or once a batch has GATHER_MAX_SIZE bytes.
     objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(5)}

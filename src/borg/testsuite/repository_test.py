@@ -1938,6 +1938,37 @@ def test_check_repair_refuses_when_pack_corrupt(tmp_path):
         assert repository.check(repair=False) is False  # index was not rebuilt; still corrupt
 
 
+def test_check_full_repair_defers_corrupt_index_with_corrupt_pack(tmp_path, caplog):
+    # check(repair=True, repo_only=False) with a corrupt index and a corrupt pack succeeds and stores no
+    # index: the archives phase rebuilds the index and repairs what the corrupt pack held, refs #10434.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository.put(H(1), fchunk(b"GOOD-CHUNK", chunk_id=H(1)))
+        repository.flush()  # seal a pack holding H(1)
+        repository.put(H(2), fchunk(b"LOST-CHUNK", chunk_id=H(2)))
+        repository.flush()  # seal a separate pack holding H(2)
+    with reopen(repository) as repository:
+        bad_pack_id = repository.chunks[H(2)].pack_id
+        bad_pack_name = "packs/" + bin_to_hex(bad_pack_id)
+        data = bytearray(repository.store_load(bad_pack_name))
+        data[-1] ^= 0xFF  # rot the pack holding H(2): its content no longer matches its store hash name
+        repository.store_store(bad_pack_name, bytes(data))
+        for info in repository.store_list("index"):  # rot every fragment
+            name = f"index/{info.name}"
+            idata = bytearray(repository.store_load(name))
+            idata[0] ^= 0xFF
+            repository.store_store(name, bytes(idata))
+    with reopen(repository) as repository:
+        index_before = {info.name for info in repository.store_list("index")}
+        with caplog.at_level(logging.INFO, logger="borg.repository"):
+            assert repository.check(repair=True, repo_only=False, validate=validate_any) is True
+        assert "and 2 packs (1 errors)." in caplog.text
+        assert "corrupt pack(s) found; index corrupt, the archives check rebuilds it from the packs." in caplog.text
+        assert {info.name for info in repository.store_list("index")} == index_before  # nothing stored
+        assert bad_pack_name in [f"packs/{info.name}" for info in repository.store_list("packs")]  # not dropped
+        assert PackTracker.load(repository).corrupt_ids() == [bad_pack_id]  # recorded corrupt
+
+
 @pytest.mark.parametrize("repo_only", [True, False])
 def test_check_repair_leaves_index_when_interrupted(tmp_path, caplog, monkeypatch, repo_only):
     # an interrupted repair (SIGINT before every pack is verified) must not rebuild the index from

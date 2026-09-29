@@ -1489,9 +1489,9 @@ class Repository:
         rebuilds and persists it (see ArchiveChecker.check and ArchiveChecker.finish), refs #10434. Packs
         are verified by the store hash, which is content-addressing rather than a MAC, so that check
         detects accidental corruption but not tampering; the rebuild therefore checks every object with
-        validate, see below, refs #9901, #10026. If any pack is corrupt the index is not rebuilt, refs
-        #10026. Pack ids found corrupt are kept in cache/checked-packs, refs #9696. That object is stored
-        in the key's envelope, too, so check() needs the key (see set_key).
+        validate, see below, refs #9901, #10026. With repo_only, if any pack is corrupt, the index is not
+        rebuilt, refs #10026. Pack ids found corrupt are kept in cache/checked-packs, refs #9696. That
+        object is stored in the key's envelope, too, so check() needs the key (see set_key).
 
         A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
         it. The record clears at the check that finds the pack intact again or gone (removed by
@@ -1810,7 +1810,8 @@ class Repository:
             else:
                 # a full check's archives phase reads archive/item metadata (and file content with
                 # --verify-data), so it repairs a corrupt pack holding such objects; warn rather than fail.
-                logger.warning(f"{done} {mode} repository check, corrupt pack(s) found{so_far}.")
+                deferred = "; index corrupt, the archives check rebuilds it from the packs" if index_deferred else ""
+                logger.warning(f"{done} {mode} repository check, corrupt pack(s) found{deferred}{so_far}.")
         elif drops:
             # drops come from a repository-only rebuild only; no archives phase follows it.
             logger.error(

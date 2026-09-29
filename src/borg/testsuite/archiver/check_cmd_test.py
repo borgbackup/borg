@@ -951,6 +951,32 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request, mode, message):
     assert "archive1" in cmd(archiver, "repo-list")  # and remains usable
 
 
+def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, request):
+    # A corrupt index and a corrupt pack: a full --repair rebuilds and stores the index in the archives check.
+    # The corrupt pack stays recorded corrupt, so a following check still fails on it, refs #10434.
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        bad_pack = sorted(info.name for info in repository.store_list("packs"))[0]
+        name = f"packs/{bad_pack}"
+        repository.store_store(name, corrupt(repository.store_load(name), -1))
+        for info in repository.store_list("index"):  # rot every index fragment
+            name = f"index/{info.name}"
+            repository.store_store(name, corrupt(repository.store_load(name), 0))
+    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+    assert "corrupt pack(s) found; index corrupt, the archives check rebuilds it from the packs." in output
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        index_infos = list(repository.store_list("index"))
+        assert index_infos  # a fresh index was stored
+        for info in index_infos:  # each fragment's content matches its store hash name
+            assert repository.store.hash(f"index/{info.name}", algorithm=STORE_HASH_NAME) == info.name
+    output = cmd(archiver, "check", "-v", exit_code=1)
+    assert "Checked 1 index files (0 errors)" in output
+    assert f"Corrupt pack: {bad_pack}" in output
+
+
 def test_check_repair_walks_packs_once_for_corrupt_index(archiver, monkeypatch):
     # A full --repair with a corrupt index walks the objects of each pack once, for the index rebuild in the
     # archives check, refs #10434.

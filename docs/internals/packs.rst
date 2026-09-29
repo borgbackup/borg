@@ -90,6 +90,9 @@ exception: given a validator it reads and decrypts each metadata slot, and thus 
     per-blob tag, which authenticates magic/version/chunk_id as additional
     authenticated data.
 
+TODO: redraw this figure and ``pack-layout.png``: they show sha256 instead of the
+store hash, and this one the format version ``0x01`` instead of ``0x02``.
+
 A reader locates the next blob by advancing::
 
     next_blob_offset = current_blob_offset + REPOOBJ_HEADER_SIZE + meta_size + data_size
@@ -180,11 +183,12 @@ Writing packs
 ~~~~~~~~~~~~~
 
 ``Repository.put()`` adds each blob to the in-memory buffer of the pack writer
-(``PackWriter``). When the buffered blobs reach the pack size limit -- 50 MB by
-default (``DEFAULT_PACK_MAX_SIZE``), see ``BORG_PACK_MAX_SIZE`` and
-``BORG_PACK_MAX_COUNT`` -- the buffer is stored as one pack. The blob that reaches
-the limit is part of that pack, so a pack can be larger than the limit by less
-than one blob.
+(``PackWriter``). When the buffered blobs reach the pack limit, the buffer is
+stored as one pack. By default the limit is a size of 50 MB (``DEFAULT_PACK_MAX_SIZE``).
+``BORG_PACK_MAX_SIZE`` sets the size limit and ``BORG_PACK_MAX_COUNT`` a blob count
+limit; with only ``BORG_PACK_MAX_COUNT`` set, packs are bound by count only, see
+:ref:`env_vars`. The blob that reaches the limit is part of that pack, so a pack can
+be larger than the size limit by less than one blob.
 
 A full pack is hashed and stored by a background thread, while the pack writer
 buffers the blobs of the next pack. At most one pack is stored at a time: the
@@ -193,7 +197,8 @@ pack. The ChunkIndex gets the pack locations of a pack's blobs when the thread
 storing it is joined. ``Repository.flush()`` joins that thread and stores the
 partially filled buffer as a pack, so afterwards every blob put before it has its
 pack location (see ``F_PENDING`` in :ref:`pack-index-entry`).
-``BORG_PACK_ASYNC=no`` stores each full pack in the calling thread instead.
+``BORG_PACK_ASYNC=no`` stores each full pack in the calling thread instead, a
+debugging aid.
 
 
 .. _pack-index-entry:
@@ -226,8 +231,9 @@ Reading a chunk whose entry is ``F_PENDING`` first joins the thread storing its
 pack. A chunk that is still in the buffer has no pack location, reading it raises
 ``PackLocationUnknown``.
 
-``Repository.get()`` reads one blob with one range request. Two methods read
-many blobs:
+``Repository.get()`` reads one blob with one range request, or slices it from the
+whole pack if ``get_many()`` already loaded that pack. With ``read_data=False`` it
+reads only the blob header and the metadata slot. Two methods read many blobs:
 
 - ``get_many()`` loads the whole pack of each requested chunk and keeps the
   ``PACK_READER_CACHE_SIZE`` (3) most recently used packs in memory, for reading
@@ -249,6 +255,10 @@ on a cache miss and serves later reads of that pack from there.
     The archive pointer write (``archives/<archive_id>``) is the commit point; a
     crash before it leaves only objects no archive references.
 
+TODO: redraw this figure: it shows sha256 instead of the store hash, and says the
+objects a crash leaves are "reclaimed by borg compact", which holds for blobs no
+index entry covers only after ``borg check --repair``, see below.
+
 Pack data must be stored before any archive pointer references it.
 The required write order is:
 
@@ -265,11 +275,19 @@ stored as index fragment(s).
 
 A crash between steps 1 and 2 leaves blobs in ``packs/`` that no index entry covers
 (see `Gap bytes`_). No archive references these chunks. As the index does not
-list them, a later backup stores them again, which makes the blobs in the gaps
+list them, a later backup stores the chunks it needs again, which makes those blobs
 superseded duplicates. ``borg compact`` reclaims unused indexed objects, and the
 superseded duplicates in the packs it rewrites; a pack without index entries is not
-rewritten, so its bytes stay (a tiny one is merged as a whole).
-TODO: reclaim these bytes, see :issue:`10026`.
+rewritten, so its bytes stay (a tiny one can be merged as a whole).
+
+A full ``borg check --repair`` (``--repository-only`` rebuilds the index only if it
+is corrupt) rebuilds the index from the packs (see :ref:`pack-recovery`) and indexes
+one copy per chunk id, so the blobs whose chunk id had no index entry become indexed,
+and ``borg compact`` reclaims them once unused. The other copies stay superseded
+duplicates and are only reclaimed when ``borg compact`` rewrites their pack to reclaim
+unused indexed objects.
+TODO: count superseded duplicates as reclaimable, so ``borg compact`` also rewrites a
+pack that holds only used objects and superseded duplicates, see :issue:`10471`.
 
 A crash between steps 2 and 3 leaves index entries for objects no archive
 references. They point to valid, fully-written pack data, and ``borg compact``
@@ -366,11 +384,11 @@ would be missing chunks that do exist in the repository. The merge is attempted 
 ``CHUNKINDEX_MERGE_ATTEMPTS`` (3) times: a fragment that vanishes mid-merge (a
 concurrent consolidation replaced it) ends the attempt, and after the last attempt
 the index is rebuilt from the pack files. A corrupt fragment (it fails the
-authentication or does not deserialize) aborts the command: run ``borg check
---repair`` to rebuild the index from the pack files. Only the commands that rewrite
-the whole index anyway, under an exclusive lock (``borg compact`` without
-``--dry-run``, ``borg repo-compress``), rebuild it from the pack files instead of
-aborting.
+authentication or does not deserialize) aborts the command: run
+``borg check --repair`` to rebuild the index from the pack files. Only the commands
+that rewrite the whole index anyway, under an exclusive lock (``borg compact``
+without ``--dry-run``, ``borg repo-compress``), rebuild it from the pack files
+instead of aborting.
 
 Because every backup appends a fragment, small fragments would pile up over time.
 ``repack_chunkindex()`` (run at cache close, and by anything that loads the index and
@@ -385,12 +403,12 @@ small fragments have accumulated, so a slowly growing fragment is not rewritten 
 every backup.
 
 ``borg compact`` flags the chunks the archives reference as used; the other indexed
-chunks are unused (see :ref:`pack-write-order` for which packs it changes). ``borg
-compact`` and ``borg repo-compress`` rewrite the ``index/`` namespace as a whole:
-before their first change to the pack files, they delete all fragments, and after
-their last one, they store the complete index as bounded fragments. After a crash in
-between, there are no fragments, so the next load rebuilds the index from the pack
-files.
+chunks are unused (see :ref:`write order <pack-write-order>` for which packs it
+changes). ``borg compact`` and ``borg repo-compress`` rewrite the ``index/``
+namespace as a whole: before their first change to the pack files, they delete all
+fragments, and after their last one, they store the complete index as bounded
+fragments. After a crash in between, there are no fragments, so the next load
+rebuilds the index from the pack files.
 
 A deletion that could drop entries -- dropping the index entirely, or the full rewrite
 above -- is guarded by a marker object, ``cache/chunkindex-invalid``, written before
@@ -416,7 +434,10 @@ Recovery Path
 The ChunkIndex can always be reconstructed by forward-scanning all pack files in
 ``packs/``. A command rebuilds it this way when there are no ``index/`` fragments,
 the ``cache/chunkindex-invalid`` marker is present, or fragments kept vanishing while
-being merged (see :ref:`pack-index-namespace`). The archives phase of
+being merged (see :ref:`pack-index-namespace`). ``borg compact`` (without
+``--dry-run``) and ``borg repo-compress`` also rebuild it this way when a fragment is
+corrupt. The repository phase of ``borg check --repair`` rebuilds it when the index
+is corrupt and every pack passed the check. The archives phase of
 ``borg check --repair`` always rebuilds it from the packs, so it can find archives
 referencing chunks whose pack has gone missing.
 

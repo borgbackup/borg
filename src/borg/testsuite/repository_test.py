@@ -3941,9 +3941,8 @@ def pack_names(repository):
 @pytest.mark.parametrize("repo_only", [True, False])
 def test_check_repair_salvages_a_corrupt_pack(tmp_path, caplog, repo_only):
     # a repair replaces a corrupt pack by one holding its objects that authenticate, removes the index
-    # entry of the dropped object and clears the pack's record. A repository-only run stores the index,
-    # a full run leaves it marked invalid for the archives phase. The chunk is lost, so a repository-only
-    # run fails.
+    # entry of the dropped object, clears the pack's record and stores the index. The chunk is lost, so
+    # a repository-only run fails.
     repo_objs = plain_repo_objs()
     location = os.fspath(tmp_path / "repo")
     [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
@@ -3958,8 +3957,8 @@ def test_check_repair_salvages_a_corrupt_pack(tmp_path, caplog, repo_only):
         assert "corrupt pack(s) salvaged, chunks may be lost" in caplog.text
         assert pack_names(repository) == {bin_to_hex(new_pack_id)}
         assert PackTracker.load(repository).corrupt_ids() == []
-        assert chunkindex_is_invalid(repository) is not repo_only
-    with Repository(location, exclusive=True) as repository:  # the stored or the rebuilt index
+        assert not chunkindex_is_invalid(repository)  # the salvage stored the index
+    with Repository(location, exclusive=True) as repository:  # the stored index
         assert id1 not in repository.chunks
         assert repository.chunks[id0][2:] == (new_pack_id, 0, len(obj0))
         assert repository.chunks[id2][2:] == (new_pack_id, len(obj0), len(obj2))

@@ -1488,8 +1488,8 @@ class Repository:
         rebuild re-reads every pack anyway - so a read-only check just stops and reports it instead of
         continuing. A read-only check never rebuilds the index: reading every pack to do so would be
         far too slow and expensive for a routine (e.g. cron) check. With repair=True, every pack is
-        verified, then each pack recorded corrupt is salvaged (see authenticate). With repo_only, the
-        index updated by the salvage is stored, and if no pack is left corrupt, a corrupt index is then
+        verified, then each pack recorded corrupt is salvaged (see authenticate) and the index updated by
+        the salvage is stored. With repo_only, and if no pack is left corrupt, a corrupt index is then
         rebuilt from the packs' object headers and stored. Without repo_only, the archives phase rebuilds
         and stores the index (see ArchiveChecker.check and ArchiveChecker.finish), refs #10434. Packs are
         verified by the store hash, which is content-addressing rather than a MAC, so that check detects
@@ -1739,14 +1739,8 @@ class Repository:
             # salvage before the index rebuild below, which rebuilds only if no pack is left corrupt.
             try:
                 if repair and not sig_int and pack_files == len(pack_infos):
-                    # without repo_only, the archives phase rebuilds the index from the packs and stores it.
                     salvaged, salvage_lossy = self._salvage_corrupt_packs(
-                        tracker,
-                        present_pack_ids,
-                        chunks,
-                        validate=validate,
-                        authenticate=authenticate,
-                        store_index=repo_only,
+                        tracker, present_pack_ids, chunks, validate=validate, authenticate=authenticate
                     )
             finally:
                 # also on an exception: drop the records of the packs salvaged so far.
@@ -2564,7 +2558,7 @@ class Repository:
         self._pack_cache.pop(pack_id, None)
         return SalvageResult(SALVAGE_DONE, new_pack_id, kept, dropped_bytes, removed_ids)
 
-    def _salvage_corrupt_packs(self, tracker, present_pack_ids, chunks, *, validate, authenticate, store_index):
+    def _salvage_corrupt_packs(self, tracker, present_pack_ids, chunks, *, validate, authenticate):
         """Salvage each pack in packs/ that tracker records corrupt with salvage_pack.
 
         tracker: the PackTracker. The record of a salvaged pack is dropped, a pack that reads intact is
@@ -2572,10 +2566,10 @@ class Repository:
         present_pack_ids: the set of pack ids in packs/. Only these packs are salvaged. The id of a
             salvaged pack is replaced by the id of its replacement pack.
         chunks: the ChunkIndex read from the index/ fragments, or None if it could not be read. It is
-            updated. If None, salvage_pack updates an empty ChunkIndex, which is not stored.
+            updated and, after a salvage, stored, so the repository index is current as soon as this
+            returns. If None, salvage_pack updates an empty ChunkIndex, which is not stored, and the
+            stored index stays marked invalid (see write_chunkindex_invalid).
         validate, authenticate: passed to salvage_pack. If authenticate is None, no pack is salvaged.
-        store_index: if True and chunks is not None, chunks is stored after a salvage. Otherwise a stored
-            index stays marked invalid (see write_chunkindex_invalid).
 
         Returns (number of packs salvaged, number of those that may have lost chunks). A salvage may have
         lost chunks if it removed index entries, or if chunks is None.
@@ -2651,7 +2645,7 @@ class Repository:
         else:
             pi.show(current=len(corrupt_ids))  # finish at 100%
         pi.finish()
-        if not store_index or chunks is None:
+        if chunks is None:
             return salvaged, lossy
         if salvaged:
             # the old index/ fragments hold entries salvage_pack changed or removed, so store every entry

@@ -321,14 +321,21 @@ class ArchiveGarbageCollector:
                 logger.error(f"{stale_used} of them are still in use: repository data is missing!")
                 set_ec(EXIT_ERROR)
 
-        # bytes no index entry covers. compact_pack reclaims the redundant duplicates among them while
-        # rewriting a pack; reclaiming the rest is tracked in #8572.
+        # unindexed bytes: pack bytes no index entry covers, e.g. the objects of an interrupted borg create.
+        # superseded duplicates are unindexed objects whose chunk id the index maps to another location.
+        # compact_pack drops those when it rewrites a pack and keeps the other unindexed objects, as
+        # "borg check --repair" can recover them (#9868). A full check --repair (--repository-only rebuilds
+        # the index only if it is corrupt) indexes one copy per chunk id, so objects whose chunk id had no
+        # index entry become reclaimable once unused, and the other copies stay superseded duplicates.
+        # TODO(#10471): count superseded duplicates as reclaimable, so compact rewrites a pack that holds only
+        # used objects and superseded duplicates, e.g. after a crashed borg create was re-run.
         unindexed = sum(total - pack_indexed[pid] for pid, total in pack_total.items() if total > pack_indexed[pid])
         if unindexed:
             logger.info(
-                f"{format_file_size(unindexed)} in pack files is not covered by the index; "
-                "redundant copies are reclaimed on pack rewrite, reclaiming the rest is tracked in "
-                "https://github.com/borgbackup/borg/issues/8572."
+                f"{format_file_size(unindexed)} in pack files is not covered by the index. "
+                '"borg check --repair" (without --repository-only) indexes the objects whose chunk id has no '
+                'index entry, so "borg compact" reclaims them once unused. Copies of chunks indexed elsewhere '
+                "are only reclaimed when compact rewrites their pack."
             )
 
         # packs recorded corrupt in PackTracker that are still in the store
@@ -502,8 +509,11 @@ class CompactMixIn:
             ``borg compact`` reclaims objects the chunk index knows about, plus redundant copies of
             indexed chunks (e.g. written by concurrent backups) that it finds while rewriting a pack.
             Other bytes no index entry covers, such as packs left behind by a backup that crashed
-            before recording its objects, are re-indexed by ``borg check --repair`` and reclaimed by
-            the next ``borg compact``.
+            before recording its objects, are kept. ``borg check --repair`` (without
+            ``--repository-only``) indexes one copy per chunk id, so ``borg compact`` reclaims the
+            objects whose chunk id had no index entry once they are unused. The remaining copies of
+            chunks indexed elsewhere (e.g. when the crashed backup was re-run) stay unindexed and are
+            only reclaimed when ``borg compact`` rewrites their pack to reclaim unused indexed objects.
 
             ``borg compact`` does not rewrite or merge packs that ``borg check`` recorded as corrupt
             and warns about them. ``borg check --repair --verify-data`` deletes the corrupt chunks by

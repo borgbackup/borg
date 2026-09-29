@@ -1874,7 +1874,7 @@ def test_check_repair_rebuild_validates_objects(tmp_path, caplog, repo_only):
 
 def test_check_repair_refuses_when_pack_corrupt(tmp_path):
     # A repair that finds any corrupt pack leaves the index and the pack untouched (no lossy rebuild,
-    # nothing dropped) and fails on a repository-only run, refs #8572, #10026.
+    # nothing dropped) and fails on a repository-only run, refs #10026.
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True) as repository:
         repository.put(H(1), fchunk(b"GOOD-CHUNK", chunk_id=H(1)))
@@ -1995,7 +1995,7 @@ def delete_pack(repository, pack_id):
 def test_check_repair_removes_missing_pack_entries(tmp_path, caplog, repo_only):
     # a repair removes the index entries of the chunks in a missing pack and stores the index. It fails
     # a repository-only run, as the chunks are lost; a full check defers them to the archives phase
-    # (refs #9898, #8572).
+    # (refs #9898).
     location = os.fspath(tmp_path / "repo")
     pack_ids = create_repo_one_pack_per_chunk(location)
     with Repository(location, exclusive=True) as repository:

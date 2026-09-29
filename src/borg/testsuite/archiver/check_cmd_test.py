@@ -956,8 +956,7 @@ def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, reques
     # The corrupt pack stays recorded corrupt, so a following check still fails on it, refs #10434.
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
-    archive, repository = open_archive(archiver.repository_path, "archive1")
-    with repository:
+    with open_repository(archiver) as repository:
         bad_pack = sorted(info.name for info in repository.store_list("packs"))[0]
         name = f"packs/{bad_pack}"
         repository.store_store(name, corrupt(repository.store_load(name), -1))
@@ -966,8 +965,7 @@ def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, reques
             repository.store_store(name, corrupt(repository.store_load(name), 0))
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "corrupt pack(s) found; index corrupt, the archives check rebuilds it from the packs." in output
-    archive, repository = open_archive(archiver.repository_path, "archive1")
-    with repository:
+    with open_repository(archiver) as repository:
         index_infos = list(repository.store_list("index"))
         assert index_infos  # a fresh index was stored
         for info in index_infos:  # each fragment's content matches its store hash name

@@ -2147,6 +2147,12 @@ class TarfileObjectProcessors:
 # to look alike. this is what the resync heuristic checks a candidate first key against.
 ITEM_KEY_CHARS = frozenset(b"abcdefghijklmnopqrstuvwxyz0123456789_")
 
+# valid_msgpacked_dict reads at most this many bytes: map16 header (3) + str8 header (2) + str8 key (255).
+MAX_ITEM_HEADER_LEN = 3 + 2 + 255
+
+# RobustUnpacker._try_item_start result: the data ends within the msgpacked object.
+INCOMPLETE = object()
+
 
 def valid_msgpacked_dict(d):
     """check if the data <d> looks like a msgpacked item dict
@@ -2188,22 +2194,38 @@ def valid_msgpacked_dict(d):
 
 
 class RobustUnpacker:
-    """A restartable/robust version of the streaming msgpack unpacker"""
+    """A restartable/robust version of the streaming msgpack unpacker
+
+    After resync(), the fed data is searched for an item start: an offset where valid_msgpacked_dict matches and
+    the data unpacks to an object that the validator accepts. Unpacking continues with that object.
+
+    An incomplete item start is an offset where valid_msgpacked_dict matches, but the fed data ends within the
+    msgpacked object. It is tried again after each feed() while it is at most MAX_PENDING_ITEM_LEN bytes before the
+    end of the fed data. Random data (e.g. chunk ids) can form an incomplete item start declaring a length of up to
+    4 GiB, MAX_PENDING_ITEM_LEN limits how much data is buffered for it.
+    """
+
+    MAX_PENDING_ITEM_LEN = 4 * 1024 * 1024
 
     def __init__(self, validator):
         super().__init__()
         self.validator = validator
-        self._buffered_data = []
         self._resync = False
         self._unpacker = msgpack.Unpacker(object_hook=StableDict)
+        self._reset_search()
+
+    def _reset_search(self):
+        self._buffered_data = bytearray()  # fed data, from the first offset that may still be an item start on
+        self._search_offset = 0  # offset in _buffered_data where the valid_msgpacked_dict checks continue
+        self._pending_offsets = []  # ascending offsets of incomplete item starts in _buffered_data
 
     def resync(self):
-        self._buffered_data = []
+        self._reset_search()
         self._resync = True
 
     def feed(self, data):
         if self._resync:
-            self._buffered_data.append(data)
+            self._buffered_data += data
         else:
             self._unpacker.feed(data)
 
@@ -2211,29 +2233,70 @@ class RobustUnpacker:
         return self
 
     def __next__(self):
-        if self._resync:
-            data = b"".join(self._buffered_data)
-            while self._resync:
-                if not data:
-                    raise StopIteration
-                # Abort early if the data does not look like a serialized item dict
-                if not valid_msgpacked_dict(data):
-                    data = data[1:]
-                    continue
-                self._unpacker = msgpack.Unpacker(object_hook=StableDict)
-                self._unpacker.feed(data)
-                try:
-                    item = next(self._unpacker)
-                except (msgpack.UnpackException, StopIteration):
-                    # as long as we are resyncing, we also ignore StopIteration
-                    pass
-                else:
-                    if self.validator(item):
-                        self._resync = False
-                        return item
-                data = data[1:]
-        else:
+        if not self._resync:
             return next(self._unpacker)
+        item = self._search()
+        if item is None:
+            raise StopIteration
+        self._resync = False
+        self._reset_search()
+        return item
+
+    def _search(self):
+        """Search _buffered_data for an item start, return the item or None."""
+        data_len = len(self._buffered_data)
+        # valid_msgpacked_dict returns False if the data ends within the map header, key header or key (together at
+        # most MAX_ITEM_HEADER_LEN bytes), so the offsets from searched_end on are checked again after the next feed().
+        searched_end = max(self._search_offset, data_len - MAX_ITEM_HEADER_LEN)
+        pending_offsets = [o for o in self._pending_offsets if data_len - o <= self.MAX_PENDING_ITEM_LEN]
+        self._pending_offsets = []
+        with memoryview(self._buffered_data) as data:
+            for offset in pending_offsets:
+                item = self._try_item_start(data, offset)
+                if item is INCOMPLETE:
+                    self._pending_offsets.append(offset)
+                elif item is not None:
+                    return item
+            for offset in range(self._search_offset, data_len):
+                if not valid_msgpacked_dict(data[offset:]):
+                    continue
+                item = self._try_item_start(data, offset)
+                if item is INCOMPLETE:
+                    if offset < searched_end:
+                        self._pending_offsets.append(offset)
+                elif item is not None:
+                    return item
+        # drop the data before the first incomplete item start and before searched_end.
+        drop_len = min(self._pending_offsets[:1] + [searched_end])
+        del self._buffered_data[:drop_len]
+        self._search_offset = searched_end - drop_len
+        self._pending_offsets = [o - drop_len for o in self._pending_offsets]
+        return None
+
+    def _try_item_start(self, data, offset):
+        """Unpack an object from memoryview <data> at <offset>.
+
+        Return INCOMPLETE if <data> ends within the object, None if it is not unpackable or the validator rejects
+        it. Otherwise, set up self._unpacker to continue after the object and return the object.
+        """
+        with data[offset:] as view:
+            try:
+                item = msgpack.unpackb(view, object_hook=StableDict)
+            except msgpack.UnpackException as e:
+                error = e.args[0] if e.args else None
+                if isinstance(error, msgpack.ExtraData):
+                    item = error.unpacked
+                # unpackb limits the element count of arrays/maps to the data length and raises "exceeds max_..._len"
+                # for a larger count, so this error also means that the data ends within the object.
+                elif type(error) is ValueError and ("incomplete input" in str(error) or "exceeds max_" in str(error)):
+                    return INCOMPLETE
+                else:
+                    return None
+            if not self.validator(item):
+                return None
+            self._unpacker = msgpack.Unpacker(object_hook=StableDict)
+            self._unpacker.feed(view)
+        return next(self._unpacker)
 
 
 class ArchiveChecker:

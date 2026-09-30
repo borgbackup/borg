@@ -837,6 +837,20 @@ def test_store_cache_argument(tmp_path, monkeypatch, variant, store_cache):
     assert cache_dir.exists() is store_cache
 
 
+def test_store_cache_default_directory(tmp_path, monkeypatch):
+    # BORG_STORE_CACHE=1 caches the packs in <cache_dir>/storecache.
+    monkeypatch.setenv("BORG_CACHE_DIR", os.fspath(tmp_path / "cache"))
+    monkeypatch.setenv("BORG_STORE_CACHE", "1")
+    chunk = fchunk(b"payload", chunk_id=H(0))
+    with Repository(Location(os.fspath(tmp_path / "repository")), exclusive=True, create=True) as repository:
+        assert repository.uses_pack_store_cache
+        repository.put(H(0), chunk)
+        repository.flush()
+        assert list(repository.get_many([H(0)])) == [chunk]
+        assert repository.store.stats["cache_load_calls"] > 0
+    assert any(path.is_file() for path in (tmp_path / "cache" / "storecache").rglob("*"))
+
+
 def test_gather_many_batches(repo_fixtures, request, monkeypatch):
     # gather_many ends a batch at GATHER_MAX_COUNT objects or once a batch has GATHER_MAX_SIZE bytes.
     objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(5)}

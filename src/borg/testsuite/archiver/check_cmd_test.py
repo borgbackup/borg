@@ -1848,6 +1848,63 @@ def test_repair_repository_only_removes_missing_pack_entries(archivers, request)
     cmd(archiver, "check", exit_code=0)
 
 
+@pytest.mark.parametrize("lost", ["archive-metadata", "item-ptrs", "item-metadata", "file-content"])
+@pytest.mark.parametrize(
+    "options", [[], ["--find-lost-archives"], ["--verify-data"]], ids=["plain", "find-lost-archives", "verify-data"]
+)
+def test_archives_only_reports_a_missing_pack(archivers, request, monkeypatch, lost, options):
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1")  # a pack per object: removing a pack removes one object
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        if lost == "archive-metadata":
+            chunk_id = archive.id
+            message = f"Archive metadata block {bin_to_hex(chunk_id)} is missing!"
+        elif lost == "item-ptrs":
+            chunk_id = archive.metadata.item_ptrs[0]
+            message = f"Archive archive1: item pointers chunk 0 {bin_to_hex(chunk_id)} is missing!"
+        elif lost == "item-metadata":
+            chunk_id = archive.item_ids[0]
+            message = f"item metadata chunk missing [chunk: 000000_{bin_to_hex(chunk_id)}]"
+        else:
+            item = next(item for item in archive.iter_items() if item.path.endswith(src_file))
+            chunk_id = item.chunks[-1].id
+            message = f"Missing chunk detected: {bin_to_hex(chunk_id)}"
+        pack_hex = bin_to_hex(repository.chunks[chunk_id].pack_id)
+        repository.store_delete("packs/" + pack_hex)
+    output = cmd(archiver, "check", "--archives-only", *options, exit_code=1)
+    assert f"Missing pack: {pack_hex}" in output
+    assert message in output
+    # the stored index still references the pack.
+    output = cmd(archiver, "check", "--repository-only", exit_code=1)
+    assert f"Missing pack: {pack_hex}" in output
+    # the repository check removes the entries of the pack before the archives check runs.
+    output = cmd(archiver, "check", exit_code=1)
+    assert output.count(f"Missing pack: {pack_hex}") == 1
+    assert message in output
+    cmd(archiver, "check", "--archives-only", "--repair", exit_code=0)
+    # the repair drops the archives and items whose metadata is lost; lost file content stays reported.
+    cmd(archiver, "check", exit_code=1 if lost == "file-content" else 0)
+
+
+def test_remove_missing_packs_confirms_a_missing_pack(archivers, request, monkeypatch):
+    """A pack the packs/ listing lacks, but that store.info() finds, is not missing."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+        pack_hex = bin_to_hex(next(repository.chunks.iter_packs())[0])
+        listing = [info for info in repository.store_list("packs") if info.name != pack_hex]
+        monkeypatch.setattr(repository, "store_list", lambda name, **kwargs: listing)
+        chunks_count = len(repository.chunks)
+
+        checker.remove_missing_packs()
+
+        assert not checker.error_found
+        assert len(repository.chunks) == chunks_count
+
+
 def test_items_with_unknown_keys_are_kept(archivers, request):
     # items with keys this borg version does not know (e.g. written by a newer borg) are not an error:
     # check warns about them once per archive (rc stays 0) and --repair writes them back unchanged.

@@ -54,7 +54,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
 from .hashindex import ChunkIndex, ChunkIndexEntry
-from .repository import Repository, PackReader
+from .repository import Repository, PackReader, remove_missing_pack_entries
 from .repoobj import RepoObj, object_validator
 
 # macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
@@ -2356,6 +2356,9 @@ class ArchiveChecker:
             # could not be noticed afterwards. So everything read here is read at the "repair" place, which
             # re-certifies chunkid == id_hash(content) by default, see BORG_ASSERT_ID.
             self.repo_objs.set_assert_id_place("repair")
+        else:
+            # --repair builds the index from the packs present in packs/, so it references no missing pack.
+            self.remove_missing_packs()
         if verify_data:
             self.verify_data()
         self.manifest = Manifest.load(repository, key=self.key)
@@ -2390,6 +2393,35 @@ class ArchiveChecker:
     def make_key(self, repository):
         """Return the key of repository, see key_factory."""
         return key_factory(repository)
+
+    def remove_missing_packs(self):
+        """Remove the entries of the chunks stored in missing packs from self.chunks and log these packs as errors.
+
+        A missing pack is a pack the index references, but that is absent from packs/. The archives check then
+        reports the objects stored in it as missing. The stored index is not changed.
+        """
+        present_names = {info.name for info in self.repository.store_list("packs")}
+        # F_PENDING marks a chunk whose pack location is unresolved: its pack_id is a placeholder.
+        referenced_pack_ids = {
+            entry.pack_id for _, entry in self.chunks.iteritems() if not (entry.flags & ChunkIndex.F_PENDING)
+        }
+        # store.info() confirms that each pack the listing lacks is missing.
+        missing_pack_ids = sorted(
+            pack_id
+            for pack_id in referenced_pack_ids
+            if bin_to_hex(pack_id) not in present_names
+            and not self.repository.store.info("packs/" + bin_to_hex(pack_id)).exists
+        )
+        if not missing_pack_ids:
+            return
+        removed = remove_missing_pack_entries(self.chunks, missing_pack_ids)
+        self.error_found = True
+        # one id per line (the list can be long).
+        logger.error(f"{len(missing_pack_ids)} pack(s) referenced by the index are missing:")
+        for pack_id in missing_pack_ids:
+            logger.error(f"Missing pack: {bin_to_hex(pack_id)}")
+        logger.error(f"The {removed} chunk(s) stored in these packs are lost.")
+        logger.error('Run "borg check --repair" to remove their entries from the repository index.')
 
     def verify_data(self):
         logger.info("Starting cryptographic data integrity verification...")

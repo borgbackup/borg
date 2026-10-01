@@ -3210,6 +3210,18 @@ def test_superseded_gap_ranges_reports_an_authenticated_duplicate(tmp_path):
     assert gap_ranges(obj, chunks, None) == []  # no validator, nothing to report
 
 
+def test_superseded_gap_ranges_keeps_a_duplicate_indexed_in_an_untrusted_pack(tmp_path):
+    repo_objs = aead_repo_objs(tmp_path)
+    (obj,), chunks = gap_pack(repo_objs, [b"superseded"])
+    reader = PackReader(pack_contents=obj)
+    validate = object_validator(repo_objs)
+
+    ranges = superseded_gap_ranges(
+        reader, chunks, THIS_PACK, [], len(obj), validate=validate, untrusted_pack_ids={OTHER_PACK}
+    )
+    assert ranges == []
+
+
 def test_superseded_gap_ranges_rejects_a_forged_chunk_id(tmp_path):
     # the header's chunk id is replaced by the id of another indexed chunk, which the metadata
     # slot's tag does not authenticate.

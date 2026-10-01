@@ -260,7 +260,9 @@ Rewriting a pack (``compact_pack``, ``transform_pack``) drops the superseded gap
 header and metadata slot validate, checked as in the repair walk above
 (``repoobj.object_validator``), and copies all other gap bytes into the new pack.
 Validation covers ``meta_size`` and ``data_size``, so a dropped range is exactly one blob.
-Without a validator (``validate=None``), no gap bytes are dropped.
+Without a validator (``validate=None``), no gap bytes are dropped. ``borg compact`` and
+``borg repo-compress`` also keep a superseded blob whose indexed copy is in a pack missing
+from the store or recorded corrupt, as that copy may be unreadable.
 
 The walk over a gap steps from header to header by the blob size each header states. It ends
 at a header that does not parse or that reaches past the gap. The rest of that gap is kept,

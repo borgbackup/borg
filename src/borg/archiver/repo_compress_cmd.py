@@ -120,6 +120,7 @@ class PackRecompressor:
             total=len(packs), msg="Recompressing %3.1f%%", step=0.1, msgid="repo_compress.recompress"
         )
         validate = object_validator(self.repo_objs)
+        untrusted_pack_ids = stale_packs | corrupt_packs
         for i, (pack_id, pack_size) in enumerate(packs):
             if sig_int:
                 break  # stop cleanly at a pack boundary: save the index below, then raise
@@ -133,6 +134,7 @@ class PackRecompressor:
                     chunks=self.chunks,
                     before_change=self.invalidate_stored_index,
                     validate=validate,
+                    untrusted_pack_ids=untrusted_pack_ids,
                 )
                 if new_pack_id != pack_id:
                     self.packs_rewritten += 1

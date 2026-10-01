@@ -237,8 +237,9 @@ archive pointer write is the commit point: archives are listed from the
 ``archives/`` namespace, so data not referenced by any archive pointer is
 unreachable and treated as garbage by ``borg compact``.
 
-Pack files are removed by ``borg compact`` (dropping packs whose indexed objects are
-all unused, rewriting packs above ``--threshold`` and merging tiny packs),
+Pack files are removed by ``borg compact`` (dropping packs that hold only unused
+objects and superseded gap blobs, see `Gap bytes`_, rewriting packs above
+``--threshold`` and merging tiny packs),
 ``borg check --repair`` (when it drops a defective object, and when it salvages a
 pack recorded corrupt), ``borg repo-compress`` (``Repository.transform_pack`` stores
 the re-compressed pack under its new content-addressed name and deletes the old one)
@@ -265,6 +266,11 @@ Validation covers ``meta_size`` and ``data_size``, so a dropped range is exactly
 Without a validator (``validate=None``), no gap bytes are dropped. ``borg compact`` and
 ``borg repo-compress`` also keep a superseded blob whose indexed copy is in a pack missing
 from the store or recorded corrupt, as that copy may be unreadable.
+
+``borg compact`` walks the gaps of every pack not recorded corrupt and adds the superseded
+gap blobs to the pack's unused indexed bytes. The sum decides whether the pack is rewritten
+(``--threshold``), and a pack holding only unused indexed objects and superseded gap blobs is
+deleted.
 
 The walk over a gap steps from header to header by the blob size each header states. It ends
 at a header that does not parse or that reaches past the gap. The rest of that gap is kept,

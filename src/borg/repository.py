@@ -2199,8 +2199,6 @@ class Repository:
         # record the dropped objects' byte ranges; every other byte (kept objects and gaps that no
         # index entry covers) is copied into the new pack unchanged. superseded duplicates found in
         # the gaps are dropped along with them (see superseded_gap_ranges).
-        # TODO(#9868 follow-up): classify gaps in compact_packs pass 1 too, so superseded bytes count
-        # toward the rewrite threshold and a wholly superseded orphan pack can be dropped outright.
         drop_ranges = [(offset, size) for offset, _, size, keep in located if not keep]
         reader = PackReader(store=self.store, pack_id=pack_id)
         drop_ranges += superseded_gap_ranges(

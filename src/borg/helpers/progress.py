@@ -6,7 +6,7 @@ import time
 from shutil import get_terminal_size
 
 from .parseformat import ellipsis_truncate
-from ..logger import create_logger, JSONProgressFormatter
+from ..logger import create_logger, JSONProgressFormatter, StderrHandler
 
 logger = create_logger()
 
@@ -29,6 +29,11 @@ def get_progress_dt():
             _warned_fps.add(fps_str)
             logger.warning(f"Invalid BORG_PROGRESS_FPS value {fps_str!r}, must be a number > 0. Ignoring it.")
     return 1.0 / DEFAULT_PROGRESS_FPS
+
+
+def progress_wanted():
+    """Is the progress logger at INFO level (--progress)?"""
+    return logging.getLogger(ProgressIndicatorBase.LOGGER).isEnabledFor(logging.INFO)
 
 
 class ProgressIndicatorBase:
@@ -179,8 +184,11 @@ class ProgressIndicatorSpinner(ProgressIndicatorBase):
     very often is cheap: it costs one time.monotonic() per call and repaints at most that often.
 
     On a terminal, the spinner frame and the message are repainted in place, in borg green.
+    The animation needs --progress or a log level of INFO (or lower). A log record written to
+    stderr removes the spinner line first, the next show() paints it again below that record.
     Without a terminal (or with --log-json), an animation is pointless, so nothing is repainted:
-    only message changes are logged, in the same way ProgressIndicatorMessage does it.
+    only message changes are logged, in the same way ProgressIndicatorMessage does it. That
+    needs --progress.
 
     Usage:
 
@@ -255,7 +263,7 @@ class ProgressIndicatorSpinner(ProgressIndicatorBase):
 
     def paint(self):
         """Repaint the spinner line in place."""
-        if not self.logger.isEnabledFor(logging.INFO):  # e.g. --quiet
+        if not (progress_wanted() or logging.getLogger("borg").isEnabledFor(logging.INFO)):
             return
         frame = self.frames[self.index % len(self.frames)]
         self.index += 1
@@ -267,6 +275,13 @@ class ProgressIndicatorSpinner(ProgressIndicatorBase):
         self.write(("" if self.painted else ANSI_HIDE_CURSOR) + ANSI_CLEAR_LINE + text)
         self.painted = True
         self.started = True
+        StderrHandler.before_emit = self.clear
+
+    def clear(self):
+        """Remove the spinner line from the terminal and switch the cursor back on."""
+        if self.painted:
+            self.write(ANSI_CLEAR_LINE + ANSI_SHOW_CURSOR)
+            self.painted = False
 
     def write(self, text):
         try:
@@ -281,10 +296,10 @@ class ProgressIndicatorSpinner(ProgressIndicatorBase):
 
     def finish(self):
         """Remove the spinner line from the terminal / log that the operation is finished."""
+        if StderrHandler.before_emit == self.clear:
+            StderrHandler.before_emit = None
         if self.animate:
-            if self.painted:
-                self.write(ANSI_CLEAR_LINE + ANSI_SHOW_CURSOR)
-                self.painted = False
+            self.clear()
             # no JSON "finished" record here: if we animate, nobody is parsing our output anyway
             # and the empty line the text formatter would emit for it is just in the way.
         else:

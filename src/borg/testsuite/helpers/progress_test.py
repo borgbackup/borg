@@ -4,8 +4,9 @@ import logging
 import pytest
 
 from ...helpers import progress
+from ...logger import StderrHandler
 from ...helpers.progress import ProgressIndicatorBase, ProgressIndicatorPercent, ProgressIndicatorSpinner
-from ...helpers.progress import get_progress_dt
+from ...helpers.progress import get_progress_dt, progress_wanted
 from ...helpers.progress import ANSI_CLEAR_LINE, ANSI_HIDE_CURSOR, ANSI_SHOW_CURSOR, GREEN_16, GREEN_TRUECOLOR
 
 
@@ -241,11 +242,60 @@ def test_spinner_colour(tty, monkeypatch, env, colour):
     assert tty.getvalue().endswith(f"{colour}▫{progress.ANSI_RESET if colour else ''} Working")
 
 
-def test_spinner_quiet(tty, progress_logger):
+@pytest.fixture
+def borg_logger():
+    """The "borg" logger, its level restored afterwards."""
+    logger = logging.getLogger("borg")
+    level = logger.level
+    yield logger
+    logger.setLevel(level)
+
+
+def test_spinner_quiet(tty, progress_logger, borg_logger):
     spinner = ProgressIndicatorSpinner("Working", stream=tty)
-    progress_logger.setLevel("WARN")  # e.g. --quiet
+    progress_logger.setLevel("WARN")  # no --progress
+    borg_logger.setLevel("WARNING")  # the default log level
     show_force(spinner)
     assert tty.getvalue() == ""
+
+
+def test_spinner_info_level_without_progress(tty, progress_logger, borg_logger):
+    spinner = ProgressIndicatorSpinner("Working", stream=tty)
+    progress_logger.setLevel("WARN")  # no --progress
+    borg_logger.setLevel("INFO")  # --info
+    show_force(spinner)
+    assert tty.getvalue() == ANSI_HIDE_CURSOR + ANSI_CLEAR_LINE + "▫ Working"
+    spinner.finish()
+
+
+def test_spinner_no_tty_without_progress(capfd, progress_logger, borg_logger):
+    spinner = ProgressIndicatorSpinner("Working")  # stderr is not a tty here
+    progress_logger.setLevel("WARN")  # no --progress
+    borg_logger.setLevel("INFO")  # --info
+    show_force(spinner)
+    spinner.finish()
+    out, err = capfd.readouterr()
+    assert err == ""
+
+
+def test_spinner_log_record_removes_spinner_line(tty):
+    handler = StderrHandler()
+    spinner = ProgressIndicatorSpinner("Working", stream=tty)
+    show_force(spinner)
+    assert StderrHandler.before_emit == spinner.clear
+    tty.truncate(0), tty.seek(0)
+    handler.emit(logging.LogRecord("borg", logging.WARNING, __file__, 0, "a warning", None, None))
+    assert tty.getvalue() == ANSI_CLEAR_LINE + ANSI_SHOW_CURSOR
+    show_force(spinner)  # painted again, below the log record
+    assert tty.getvalue().endswith(ANSI_HIDE_CURSOR + ANSI_CLEAR_LINE + "▪ Working")
+    spinner.finish()
+    assert StderrHandler.before_emit is None
+
+
+def test_progress_wanted(progress_logger):
+    assert progress_wanted()
+    progress_logger.setLevel("WARN")
+    assert not progress_wanted()
 
 
 def test_spinner_broken_stream(tty):

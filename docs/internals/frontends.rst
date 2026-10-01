@@ -1027,6 +1027,9 @@ Operations
     - cache.close
 
       Saving the local cache (files cache, chunks index, cache config) at the end of a command.
+    - cache.merge_chunkindex_fragments
+
+      Loading the chunk index by merging the index fragments stored in the repository.
     - cache.build_chunkindex_from_repo
 
       Rebuilding the chunk index by reading all pack file headers from the repository, e.g. when

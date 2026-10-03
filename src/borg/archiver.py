@@ -193,7 +193,8 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
                     if 'compression' in args:
                         kwargs['key'].compressor = args.compression.compressor
                     if secure:
-                        assert_secure(repository, kwargs['manifest'], self.lock_wait)
+                        # --bypass-lock also skips the cache lock, we only read the cache config here, see #7255
+                        assert_secure(repository, kwargs['manifest'], self.lock_wait, lock=lock)
                 if cache:
                     with Cache(repository, kwargs['key'], kwargs['manifest'],
                                progress=getattr(args, 'progress', False), lock_wait=self.lock_wait,

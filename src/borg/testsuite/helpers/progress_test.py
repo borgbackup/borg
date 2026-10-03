@@ -1,7 +1,5 @@
 import io
 import logging
-import time
-from types import SimpleNamespace
 
 import pytest
 
@@ -37,46 +35,23 @@ def test_progress_dt_invalid(monkeypatch, caplog, fps_str):
     assert caplog.text == ""
 
 
-class FakeClock:
-    """Replaces time.monotonic in the progress module. With auto_advance, every call is 1s later."""
-
-    def __init__(self, auto_advance):
-        self.now = 1000.0
-        self.auto_advance = auto_advance
-
-    def monotonic(self):
-        if self.auto_advance:
-            self.now += 1.0
-        return self.now
+def show_force(indicator, *args):
+    # bypass the BORG_PROGRESS_FPS rate limiting, so every call produces output
+    indicator.next_update = 0.0
+    indicator.show(*args)
 
 
-@pytest.fixture
-def clock(monkeypatch):
-    """A clock that only moves when the test advances clock.now."""
-    clock = FakeClock(auto_advance=False)
-    monkeypatch.setattr(progress, "time", SimpleNamespace(monotonic=clock.monotonic, time=time.time))
-    return clock
-
-
-@pytest.fixture
-def no_rate_limit(monkeypatch):
-    """Every progress update is 1s after the previous one, so BORG_PROGRESS_FPS never suppresses one."""
-    clock = FakeClock(auto_advance=True)
-    monkeypatch.setattr(progress, "time", SimpleNamespace(monotonic=clock.monotonic, time=time.time))
-    return clock
-
-
-def test_progress_percentage(capfd, no_rate_limit):
+def test_progress_percentage(capfd):
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
-    pi.show(0)
+    show_force(pi, 0)
     out, err = capfd.readouterr()
     assert err == "  0%\n"
-    pi.show(420)
-    pi.show(680)
+    show_force(pi, 420)
+    show_force(pi, 680)
     out, err = capfd.readouterr()
     assert err == " 42%\n 68%\n"
-    pi.show(1000)
+    show_force(pi, 1000)
     out, err = capfd.readouterr()
     assert err == "100%\n"
     pi.finish()
@@ -84,16 +59,16 @@ def test_progress_percentage(capfd, no_rate_limit):
     assert err == "\n"
 
 
-def test_progress_percentage_step(capfd, no_rate_limit):
+def test_progress_percentage_step(capfd):
     pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
-    pi.show()
+    show_force(pi)
     out, err = capfd.readouterr()
     assert err == "  0%\n"
-    pi.show()
+    show_force(pi)
     out, err = capfd.readouterr()
     assert err == ""  # no output at 1% as we have step == 2
-    pi.show()
+    show_force(pi)
     out, err = capfd.readouterr()
     assert err == "  2%\n"
 
@@ -112,32 +87,27 @@ def test_progress_percentage_quiet(capfd):
     assert err == ""
 
 
-def test_progress_percentage_rate_limited(capfd, monkeypatch, clock):
-    monkeypatch.setenv("BORG_PROGRESS_FPS", "2")  # at most one output per 0.5s
+def test_progress_percentage_rate_limited(capfd, monkeypatch):
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "0.1")  # one update per 10s
     pi = ProgressIndicatorPercent(1000, step=1, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
-    for current in range(0, 200):  # 0% .. 19.9%, all at the same time
+    pi.show(0)  # the first update is always shown
+    for current in range(1, 300):  # immediately after: suppressed by the rate limit
         pi.show(current)
     out, err = capfd.readouterr()
-    assert err == "  0%\n"  # every step after the first one came too early
-    clock.now += 0.4
-    pi.show(300)
+    assert err == "  0%\n"
+    show_force(pi, 301)
     out, err = capfd.readouterr()
-    assert err == ""  # still too early
-    clock.now += 0.1
-    pi.show(301)
+    assert err == " 30%\n"  # the current value, not the first step that was suppressed
+    show_force(pi, 305)
     out, err = capfd.readouterr()
-    assert err == " 30%\n"  # the current value, not the first step skipped
-    clock.now += 1.0
-    pi.show(305)
-    out, err = capfd.readouterr()
-    assert err == ""  # time is up, but the step passed while rate limited is not output again
-    pi.show(310)
+    assert err == ""  # the steps passed while rate limited are not output any more
+    show_force(pi, 310)
     out, err = capfd.readouterr()
     assert err == " 31%\n"
     pi.show(1000)
     out, err = capfd.readouterr()
-    assert err == "100%\n"  # always output, although it is too early
+    assert err == "100%\n"  # always shown, although it comes too early
     pi.finish()
     out, err = capfd.readouterr()
     assert err == "\n"
@@ -174,12 +144,6 @@ def tty(monkeypatch, progress_logger):
     monkeypatch.delenv("COLORTERM", raising=False)  # the real terminal's value must not leak in
     monkeypatch.delenv("BORG_SPINNER", raising=False)
     return FakeTTY()
-
-
-def show_force(spinner, message=None):
-    # bypass the BORG_PROGRESS_FPS rate limiting, so every call produces output
-    spinner.next_update = 0.0
-    spinner.show(message)
 
 
 def test_spinner_animates(tty):

@@ -4218,3 +4218,59 @@ def test_check_repair_salvage_interrupted(tmp_path, monkeypatch):
         done_objs = next(objs for objs, pack_id in packs if pack_id == done_id)
         assert repository.chunks[done_objs[0][0]].pack_id == new_pack_id
         assert done_objs[1][0] not in repository.chunks
+
+
+def test_check_repair_max_age_skips_a_pack_recorded_intact(tmp_path, monkeypatch):
+    # a repair reuses intact records: a pack recorded intact within max_age is not re-verified.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
+    with Repository(location, exclusive=True) as repository:
+        tracker = PackTracker.new(repository)
+        tracker.record(pack_id, ok=True)  # fresh timestamp
+        tracker.save()
+    with Repository(location, exclusive=True) as repository:
+        hashed_keys = _spy_hash(repository, monkeypatch)
+        assert check_repair(repository, repo_objs, repo_only=True, max_age=3600) is True
+        assert "packs/" + bin_to_hex(pack_id) not in hashed_keys
+
+
+def test_check_repair_max_age_salvages_the_pack_recorded_corrupt(tmp_path, caplog, monkeypatch):
+    # a pack recorded corrupt is re-verified and salvaged, also when max_age skips every other pack.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    (objs_a, pack_a), (objs_b, pack_b) = create_repo_with_real_packs(location, repo_objs, packs=2)
+    with Repository(location, exclusive=True) as repository:
+        damage_pack(repository, pack_b, flip=[last_byte_offset(objs_b, 1)])
+        tracker = PackTracker.new(repository)
+        tracker.record(pack_a, ok=True)  # fresh timestamp
+        tracker.record(pack_b, ok=False)
+        tracker.save()
+    new_pack_b = store_hash(objs_b[0][1] + objs_b[2][1]).digest()
+    with Repository(location, exclusive=True) as repository:
+        hashed_keys = _spy_hash(repository, monkeypatch)
+        with caplog.at_level(logging.WARNING, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=False, max_age=3600) is True
+        assert "packs/" + bin_to_hex(pack_a) not in hashed_keys  # its intact record is fresh
+        assert "packs/" + bin_to_hex(pack_b) in hashed_keys  # recorded corrupt, so re-verified
+        assert f"Salvaged corrupt pack {bin_to_hex(pack_b)}" in caplog.text
+        assert pack_names(repository) == {bin_to_hex(pack_a), bin_to_hex(new_pack_b)}
+
+
+def test_check_repair_repo_only_ignores_max_age_with_a_corrupt_index(tmp_path, caplog, monkeypatch):
+    # a repository-only repair rebuilds the corrupt index from the packs it verified in this run, so it
+    # verifies every pack and reuses no record.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
+    with Repository(location, exclusive=True) as repository:
+        rot_index(repository)
+        tracker = PackTracker.new(repository)
+        tracker.record(pack_id, ok=True)  # fresh timestamp
+        tracker.save()
+    with Repository(location, exclusive=True) as repository:
+        hashed_keys = _spy_hash(repository, monkeypatch)
+        with caplog.at_level(logging.INFO, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=True, max_age=3600) is True
+        assert "Ignoring --max-age" in caplog.text
+        assert "packs/" + bin_to_hex(pack_id) in hashed_keys

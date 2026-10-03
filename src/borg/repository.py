@@ -1516,7 +1516,9 @@ class Repository:
 
         max_age (seconds, 0 = verify every pack): skip packs whose intact record is younger than
         max_age, accepting a future timestamp up to MAX_CLOCK_SKEW (clock skew). Results are recorded
-        regardless of max_age.
+        regardless of max_age. Packs recorded corrupt are never skipped, so a repair sees a current
+        result for every pack it salvages. max_age is ignored if repair and repo_only run with a
+        corrupt index, because the index is rebuilt from the packs verified in this run (see above).
 
         repo_only: whether this is a repository-only run. Required if repair. In repair mode, if True, a
         corrupt index is rebuilt here (see above), and damage repair does not fix, i.e. a corrupt pack left
@@ -1614,14 +1616,18 @@ class Repository:
         index_pi.finish()
         if index_errors == 0 or repair:
             # verify the packs; during repair, rebuild the corrupt index from them afterwards.
-            # --repair forbids --max-duration and --max-age, so the partial and max_age handling in
-            # the loop stays inactive during a repair.
+            # --repair forbids --max-duration, so the partial handling in the loop stays inactive
+            # during a repair. max_age reuse is active, except in the branch right below.
             packs_scanned = True
             if index_errors and repo_only:
                 logger.warning(
                     "Repository index is corrupted; verifying all packs before deciding whether to "
                     "rebuild it from them."
                 )
+                if max_age:
+                    # the rebuild below reads the packs of this run, so no intact record is reused.
+                    logger.info("Ignoring --max-age: every pack is verified for the index rebuild.")
+                    max_age = 0
             elif index_errors:
                 logger.warning(
                     "Repository index is corrupted; verifying all packs, the archives check rebuilds the index."
@@ -1741,7 +1747,9 @@ class Repository:
             pack_pi.finish()
             # salvage before the index rebuild below, which rebuilds only if no pack is left corrupt.
             try:
-                if repair and not sig_int and pack_files == len(pack_infos):
+                if repair and not sig_int and pack_files + pack_skipped == len(pack_infos):
+                    # a pack skipped by max_age has an intact record, so it is not salvaged anyway and
+                    # counts as scanned here; only an interrupted or time-boxed loop must block a salvage.
                     salvaged, salvage_lossy, reread_intact = self._salvage_corrupt_packs(
                         tracker, present_pack_ids, chunks, validate=validate, authenticate=authenticate
                     )
@@ -1750,7 +1758,8 @@ class Repository:
                 tracker.prune(present_pack_ids)
             # rebuild only on a repository-only repair, if no pack is left corrupt and every pack was verified
             # this run: sig_int breaks the loop early, so "no corrupt pack" must be paired with "all packs
-            # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs.
+            # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs. max_age was
+            # set to 0 above for exactly this path, so no pack was skipped.
             if (
                 repair
                 and repo_only

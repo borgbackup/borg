@@ -30,6 +30,7 @@ from ...helpers.parseformat import (
     PlaceholderError,
     replace_placeholders,
     swidth_slice,
+    ellipsis_truncate,
     eval_escapes,
     ChunkerParams,
     DigestAlgos,
@@ -853,6 +854,23 @@ def test_swidth_slice_mixed_characters():
     string = "나윤a선나윤선나윤선나윤선나윤선"
     assert swidth_slice(string, 5) == "나윤a"
     assert swidth_slice(string, 6) == "나윤a"
+
+
+@pytest.mark.skipif(not working_swidth(), reason="swidth() is not supported / active")
+@pytest.mark.parametrize(
+    "msg", ["나윤선나윤선나윤선나윤선나윤선", "나윤a선나윤선나윤선나윤선나윤선", "a" * 40, "short"]
+)
+@pytest.mark.parametrize("space", [8, 9, 20, 21])
+def test_ellipsis_truncate_width(msg, space):
+    from ...platform import swidth
+
+    # the result always fills the space, so it overwrites a longer line printed before it.
+    result = ellipsis_truncate(msg, space)
+    assert swidth(result) == space
+    if swidth(msg) > space:
+        assert "..." in result
+    else:
+        assert result == msg + " " * (space - swidth(msg))
 
 
 def test_eval_escapes():

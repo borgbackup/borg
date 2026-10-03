@@ -1,5 +1,7 @@
 import io
 import logging
+import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -35,7 +37,36 @@ def test_progress_dt_invalid(monkeypatch, caplog, fps_str):
     assert caplog.text == ""
 
 
-def test_progress_percentage(capfd):
+class FakeClock:
+    """Replaces time.monotonic in the progress module. With auto_advance, every call is 1s later."""
+
+    def __init__(self, auto_advance):
+        self.now = 1000.0
+        self.auto_advance = auto_advance
+
+    def monotonic(self):
+        if self.auto_advance:
+            self.now += 1.0
+        return self.now
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """A clock that only moves when the test advances clock.now."""
+    clock = FakeClock(auto_advance=False)
+    monkeypatch.setattr(progress, "time", SimpleNamespace(monotonic=clock.monotonic, time=time.time))
+    return clock
+
+
+@pytest.fixture
+def no_rate_limit(monkeypatch):
+    """Every progress update is 1s after the previous one, so BORG_PROGRESS_FPS never suppresses one."""
+    clock = FakeClock(auto_advance=True)
+    monkeypatch.setattr(progress, "time", SimpleNamespace(monotonic=clock.monotonic, time=time.time))
+    return clock
+
+
+def test_progress_percentage(capfd, no_rate_limit):
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
     pi.show(0)
@@ -53,7 +84,7 @@ def test_progress_percentage(capfd):
     assert err == "\n"
 
 
-def test_progress_percentage_step(capfd):
+def test_progress_percentage_step(capfd, no_rate_limit):
     pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
     pi.show()
@@ -79,6 +110,37 @@ def test_progress_percentage_quiet(capfd):
     pi.finish()
     out, err = capfd.readouterr()
     assert err == ""
+
+
+def test_progress_percentage_rate_limited(capfd, monkeypatch, clock):
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "2")  # at most one output per 0.5s
+    pi = ProgressIndicatorPercent(1000, step=1, start=0, msg="%3.0f%%")
+    pi.logger.setLevel("INFO")
+    for current in range(0, 200):  # 0% .. 19.9%, all at the same time
+        pi.show(current)
+    out, err = capfd.readouterr()
+    assert err == "  0%\n"  # every step after the first one came too early
+    clock.now += 0.4
+    pi.show(300)
+    out, err = capfd.readouterr()
+    assert err == ""  # still too early
+    clock.now += 0.1
+    pi.show(301)
+    out, err = capfd.readouterr()
+    assert err == " 30%\n"  # the current value, not the first step skipped
+    clock.now += 1.0
+    pi.show(305)
+    out, err = capfd.readouterr()
+    assert err == ""  # time is up, but the step passed while rate limited is not output again
+    pi.show(310)
+    out, err = capfd.readouterr()
+    assert err == " 31%\n"
+    pi.show(1000)
+    out, err = capfd.readouterr()
+    assert err == "100%\n"  # always output, although it is too early
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == "\n"
 
 
 class FakeStream(io.StringIO):

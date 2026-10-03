@@ -35,17 +35,23 @@ def test_progress_dt_invalid(monkeypatch, caplog, fps_str):
     assert caplog.text == ""
 
 
+def show_force(indicator, *args):
+    # bypass the BORG_PROGRESS_FPS rate limiting, so every call produces output
+    indicator.next_update = 0.0
+    indicator.show(*args)
+
+
 def test_progress_percentage(capfd):
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
-    pi.show(0)
+    show_force(pi, 0)
     out, err = capfd.readouterr()
     assert err == "  0%\n"
-    pi.show(420)
-    pi.show(680)
+    show_force(pi, 420)
+    show_force(pi, 680)
     out, err = capfd.readouterr()
     assert err == " 42%\n 68%\n"
-    pi.show(1000)
+    show_force(pi, 1000)
     out, err = capfd.readouterr()
     assert err == "100%\n"
     pi.finish()
@@ -56,13 +62,13 @@ def test_progress_percentage(capfd):
 def test_progress_percentage_step(capfd):
     pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
-    pi.show()
+    show_force(pi)
     out, err = capfd.readouterr()
     assert err == "  0%\n"
-    pi.show()
+    show_force(pi)
     out, err = capfd.readouterr()
     assert err == ""  # no output at 1% as we have step == 2
-    pi.show()
+    show_force(pi)
     out, err = capfd.readouterr()
     assert err == "  2%\n"
 
@@ -79,6 +85,32 @@ def test_progress_percentage_quiet(capfd):
     pi.finish()
     out, err = capfd.readouterr()
     assert err == ""
+
+
+def test_progress_percentage_rate_limited(capfd, monkeypatch):
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "0.1")  # one update per 10s
+    pi = ProgressIndicatorPercent(1000, step=1, start=0, msg="%3.0f%%")
+    pi.logger.setLevel("INFO")
+    pi.show(0)  # the first update is always shown
+    for current in range(1, 300):  # immediately after: suppressed by the rate limit
+        pi.show(current)
+    out, err = capfd.readouterr()
+    assert err == "  0%\n"
+    show_force(pi, 301)
+    out, err = capfd.readouterr()
+    assert err == " 30%\n"  # the current value, not the first step that was suppressed
+    show_force(pi, 305)
+    out, err = capfd.readouterr()
+    assert err == ""  # the steps passed while rate limited are not output any more
+    show_force(pi, 310)
+    out, err = capfd.readouterr()
+    assert err == " 31%\n"
+    pi.show(1000)
+    out, err = capfd.readouterr()
+    assert err == "100%\n"  # always shown, although it comes too early
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == "\n"
 
 
 class FakeStream(io.StringIO):
@@ -112,12 +144,6 @@ def tty(monkeypatch, progress_logger):
     monkeypatch.delenv("COLORTERM", raising=False)  # the real terminal's value must not leak in
     monkeypatch.delenv("BORG_SPINNER", raising=False)
     return FakeTTY()
-
-
-def show_force(spinner, message=None):
-    # bypass the BORG_PROGRESS_FPS rate limiting, so every call produces output
-    spinner.next_update = 0.0
-    spinner.show(message)
 
 
 def test_spinner_animates(tty):

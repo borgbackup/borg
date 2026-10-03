@@ -76,12 +76,15 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
         :param step: step size in percent.
         :param start: at which percent value to start.
         :param msg: output message; must contain one %f placeholder for the percentage.
+
+        The output is also rate limited to BORG_PROGRESS_FPS, except for 100%, which is always output.
         """
         self.counter = 0  # 0 .. (total-1)
         self.total = total
         self.trigger_at = start  # output next percentage value when reaching (at least) this
         self.step = step
         self.msg = msg
+        self.next_update = 0.0  # time.monotonic() value from which on the next output is due
 
         super().__init__(msgid=msgid)
 
@@ -91,7 +94,13 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
         pct = self.counter * 100 / self.total
         self.counter += increase
         if pct >= self.trigger_at:
-            self.trigger_at += self.step
+            now = time.monotonic()
+            if now < self.next_update and pct < 100:
+                return None  # too early, see BORG_PROGRESS_FPS
+            self.next_update = now + get_progress_dt()
+            # skip the steps passed while rate limited, so the next output needs another step of progress.
+            while self.trigger_at <= pct:
+                self.trigger_at += self.step
             return pct
 
     def show(self, current=None, increase=1, info=None):

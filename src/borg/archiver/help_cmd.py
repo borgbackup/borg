@@ -703,7 +703,8 @@ class HelpMixIn:
                 second (default: 5). Fractional values are allowed, e.g.
                 ``BORG_PROGRESS_FPS=0.1`` limits it to one update every 10 seconds.
                 Lower values are useful when the output goes into a logfile rather than
-                to an interactive terminal.
+                to an interactive terminal. A percentage progress indicator always outputs
+                when it reaches 100%.
             BORG_SPINNER
                 Controls the spinner borg animates on a terminal while doing work of unknown
                 duration:

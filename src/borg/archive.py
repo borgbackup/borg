@@ -2312,7 +2312,8 @@ class ArchiveChecker:
         # each index object's store hash, and the index is the authoritative record of which chunks exist,
         # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
         # --repair does rebuild from the packs (slow_rebuild=repair), working from the real packs so it
-        # can detect and fix archives that reference chunks whose pack has gone missing.
+        # can detect and fix archives that reference chunks whose pack has gone missing. It also replaces a
+        # corrupt index, see Repository.check.
         # The rebuild validates every object header it walks, because a corrupt data_size parses fine
         # and points the walk into the middle of the pack. That costs one metadata slot read and one
         # decryption per object and it needs the key, so read the key here if we do not have it yet.

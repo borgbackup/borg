@@ -18,7 +18,7 @@ from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_ch
 from ..compress import CNONE
 from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
 from ..crypto.key import AESOCBKey, AuthenticatedKey, Blake3AuthenticatedKey, CHPOKey
-from ..helpers import Error, IntegrityError, Location, bin_to_hex
+from ..helpers import Error, IntegrityError, Location, bin_to_hex, hex_to_bin
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..platform import get_process_id
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
@@ -1810,7 +1810,7 @@ def test_check_reports_invalid_pack_name(tmp_path, caplog):
 
 
 def test_check_repair_rebuilds_corrupt_index(tmp_path, caplog):
-    # check(repair=True) rebuilds a corrupt index from the packs' object headers.
+    # check(repair=True, repo_only=True) rebuilds a corrupt index from the packs' object headers.
     location = os.fspath(tmp_path / "repo")
     ids = [H(x) for x in range(10)]
     with Repository(location, exclusive=True, create=True) as repository:
@@ -1828,7 +1828,8 @@ def test_check_repair_rebuilds_corrupt_index(tmp_path, caplog):
     with reopen(repository) as repository:
         caplog.clear()
         with caplog.at_level(logging.INFO, logger="borg.repository"):
-            assert repository.check(repair=True, validate=validate_any) is True  # repair rebuilds the index
+            # repair rebuilds the index
+            assert repository.check(repair=True, repo_only=True, validate=validate_any) is True
         # each rotted fragment is counted once (the cross-check does not load the known corrupt index).
         assert f"Checked {len(index_names)} index files ({len(index_names)} errors)" in caplog.text
     with reopen(repository) as repository:
@@ -1837,10 +1838,47 @@ def test_check_repair_rebuilds_corrupt_index(tmp_path, caplog):
             assert pdchunk(repository.get(cid)) == bytes([i]) * 20  # every chunk is indexed and resolves
 
 
-@pytest.mark.parametrize("repo_only", [True, False])
-def test_check_repair_rebuild_validates_objects(tmp_path, caplog, repo_only):
-    # check(repair=True, validate=...) does not index an object validate rejects and reports it, refs
-    # #9901. That fails a repository-only run only.
+def test_check_full_repair_leaves_corrupt_index_to_archives_phase(tmp_path, caplog, monkeypatch):
+    # check(repair=True, repo_only=False) with a corrupt index verifies every pack, walks no pack objects,
+    # stores no index and succeeds: the archives phase rebuilds the index, refs #10434.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+            repository.flush()  # seal a separate pack per chunk
+    with reopen(repository) as repository:
+        for info in repository.store_list("index"):  # rot every fragment
+            name = f"index/{info.name}"
+            data = bytearray(repository.store_load(name))
+            data[0] ^= 0xFF
+            repository.store_store(name, bytes(data))
+    orig_iter_headers = PackReader.iter_headers
+    walked = []
+
+    def counting_iter_headers(self, **kwargs):
+        walked.append(self.pack_id)
+        return orig_iter_headers(self, **kwargs)
+
+    monkeypatch.setattr(PackReader, "iter_headers", counting_iter_headers)
+    with reopen(repository) as repository:
+        pack_ids = {hex_to_bin(info.name) for info in repository.store_list("packs")}
+        index_before = {info.name for info in repository.store_list("index")}
+        with caplog.at_level(logging.INFO, logger="borg.repository"):
+            assert repository.check(repair=True, repo_only=False, validate=validate_any) is True
+        assert "and 3 packs (0 errors)." in caplog.text  # every pack was verified
+        assert "Finished full repository check, index corrupt; the archives check rebuilds it" in caplog.text
+        assert "has been rebuilt" not in caplog.text
+        assert walked == []  # no pack object was walked
+        assert {info.name for info in repository.store_list("index")} == index_before  # nothing stored
+        tracker = PackTracker.load(repository)
+        assert {pack_id for pack_id in pack_ids if tracker.get(pack_id).result} == pack_ids  # recorded intact
+    with reopen(repository) as repository:
+        assert repository.check(repair=False) is False  # the index is still corrupt
+
+
+def test_check_repair_rebuild_validates_objects(tmp_path, caplog):
+    # check(repair=True, repo_only=True, validate=...) does not index an object validate rejects, reports it
+    # and fails, refs #9901.
     location = os.fspath(tmp_path / "repo")
     ids = [H(x) for x in range(10)]
     rejected_id = ids[4]
@@ -1862,7 +1900,7 @@ def test_check_repair_rebuild_validates_objects(tmp_path, caplog, repo_only):
 
     caplog.set_level(logging.INFO)
     with reopen(repository) as repository:
-        assert repository.check(repair=True, repo_only=repo_only, validate=validate) is not repo_only
+        assert repository.check(repair=True, repo_only=True, validate=validate) is False
     assert set(ids) <= set(validated)
     assert "skipped 1 pack byte range(s) it could not authenticate" in caplog.text
     with reopen(repository) as repository:
@@ -1900,9 +1938,42 @@ def test_check_repair_refuses_when_pack_corrupt(tmp_path):
         assert repository.check(repair=False) is False  # index was not rebuilt; still corrupt
 
 
-def test_check_repair_leaves_index_when_interrupted(tmp_path, caplog, monkeypatch):
+def test_check_full_repair_defers_corrupt_index_with_corrupt_pack(tmp_path, caplog):
+    # check(repair=True, repo_only=False) with a corrupt index and a corrupt pack succeeds and stores no
+    # index: the archives phase rebuilds the index and repairs what the corrupt pack held, refs #10434.
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository.put(H(1), fchunk(b"GOOD-CHUNK", chunk_id=H(1)))
+        repository.flush()  # seal a pack holding H(1)
+        repository.put(H(2), fchunk(b"LOST-CHUNK", chunk_id=H(2)))
+        repository.flush()  # seal a separate pack holding H(2)
+    with reopen(repository) as repository:
+        bad_pack_id = repository.chunks[H(2)].pack_id
+        bad_pack_name = "packs/" + bin_to_hex(bad_pack_id)
+        data = bytearray(repository.store_load(bad_pack_name))
+        data[-1] ^= 0xFF  # rot the pack holding H(2): its content no longer matches its store hash name
+        repository.store_store(bad_pack_name, bytes(data))
+        for info in repository.store_list("index"):  # rot every fragment
+            name = f"index/{info.name}"
+            idata = bytearray(repository.store_load(name))
+            idata[0] ^= 0xFF
+            repository.store_store(name, bytes(idata))
+    with reopen(repository) as repository:
+        index_before = {info.name for info in repository.store_list("index")}
+        with caplog.at_level(logging.INFO, logger="borg.repository"):
+            assert repository.check(repair=True, repo_only=False, validate=validate_any) is True
+        assert "and 2 packs (1 errors)." in caplog.text
+        assert "corrupt pack(s) found; index corrupt, the archives check rebuilds it from the packs." in caplog.text
+        assert {info.name for info in repository.store_list("index")} == index_before  # nothing stored
+        assert bad_pack_name in [f"packs/{info.name}" for info in repository.store_list("packs")]  # not dropped
+        assert PackTracker.load(repository).corrupt_ids() == [bad_pack_id]  # recorded corrupt
+
+
+@pytest.mark.parametrize("repo_only", [True, False])
+def test_check_repair_leaves_index_when_interrupted(tmp_path, caplog, monkeypatch, repo_only):
     # an interrupted repair (SIGINT before every pack is verified) must not rebuild the index from
-    # packs it did not confirm intact: it leaves the corrupt index in place and fails.
+    # packs it did not confirm intact: it leaves the corrupt index in place and fails. A full check fails, too:
+    # an interrupted check skips the archives phase.
     location = os.fspath(tmp_path / "repo")
     ids = [H(x) for x in range(10)]
     with Repository(location, exclusive=True, create=True) as repository:
@@ -1919,7 +1990,7 @@ def test_check_repair_leaves_index_when_interrupted(tmp_path, caplog, monkeypatc
         monkeypatch.setattr("borg.repository.sig_int", True)  # simulate a SIGINT before the pack loop
         with caplog.at_level(logging.ERROR, logger="borg.repository"):
             # interrupted: index not rebuilt, so it fails
-            assert repository.check(repair=True, validate=validate_any) is False
+            assert repository.check(repair=True, repo_only=repo_only, validate=validate_any) is False
         assert "index still corrupt" in caplog.text
     with reopen(repository) as repository:
         assert repository.check(repair=False) is False  # repair left the index corrupt
@@ -1966,7 +2037,7 @@ def test_check_repair_index_rebuild_interrupted(tmp_path, caplog, monkeypatch, v
         assert len(repository.store_list("packs")) > 1  # there is a pack boundary to stop at
         index_before = set(info.name for info in repository.store_list("index"))
         with caplog.at_level(logging.WARNING, logger="borg.repository"):
-            assert repository.check(repair=True, validate=validate) is False
+            assert repository.check(repair=True, repo_only=True, validate=validate) is False
         assert "Index rebuild interrupted" in caplog.text
         assert "Interrupted full repository check, index still corrupt so far." in caplog.text
         assert "index rebuilt" not in caplog.text
@@ -2207,7 +2278,7 @@ def test_check_repairs_index_fragment_failing_authentication(tmp_path, caplog, t
             assert repository.check(repair=False) is False
         assert f"Store object index/{name} is corrupted" in caplog.text
         assert name in {info.name for info in repository.store_list("index")}  # a check does not write.
-        assert repository.check(repair=True, validate=accept_all) is True
+        assert repository.check(repair=True, repo_only=True, validate=accept_all) is True
         assert name not in {info.name for info in repository.store_list("index")}
         assert repository.check(repair=False) is True
 

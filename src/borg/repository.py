@@ -767,6 +767,10 @@ class PackTracker:
     def record(self, pack_id, ok):
         self.table[pack_id] = self.Entry(timestamp=int(time.time()), result=int(ok))
 
+    def forget(self, pack_id):
+        """Drop the record of pack_id, if any."""
+        self.table.pop(pack_id, None)
+
     def corrupt_ids(self):
         """Return the ids of the packs recorded corrupt, sorted."""
         return sorted(pack_id for pack_id, entry in self.table.items() if not entry.result)
@@ -1469,7 +1473,7 @@ class Repository:
         info = dict(id=self.id, version=self.version)
         return info
 
-    def check(self, repair=False, max_duration=0, max_age=0, repo_only=None, validate=None):
+    def check(self, repair=False, max_duration=0, max_age=0, repo_only=None, validate=None, authenticate=None):
         """Check repository consistency.
 
         packs/ and index/ objects are named by the store hash of their content, so a pack or index
@@ -1483,19 +1487,19 @@ class Repository:
         with a corrupt index, but a corrupt index already means the user has to repair it, and that
         rebuild re-reads every pack anyway - so a read-only check just stops and reports it instead of
         continuing. A read-only check never rebuilds the index: reading every pack to do so would be
-        far too slow and expensive for a routine (e.g. cron) check. With repair=True and a corrupt
-        index, every pack is verified. With repo_only, and if every pack is intact, the index is then
-        rebuilt from the packs' object headers and persisted. Without repo_only, the archives phase
-        rebuilds and persists it (see ArchiveChecker.check and ArchiveChecker.finish), refs #10434. Packs
-        are verified by the store hash, which is content-addressing rather than a MAC, so that check
-        detects accidental corruption but not tampering; the rebuild therefore checks every object with
-        validate, see below, refs #9901, #10026. With repo_only, if any pack is corrupt, the index is not
-        rebuilt, refs #10026. Pack ids found corrupt are kept in cache/checked-packs, refs #9696. That
-        object is stored in the key's envelope, too, so check() needs the key (see set_key).
+        far too slow and expensive for a routine (e.g. cron) check. With repair=True, every pack is
+        verified, then each pack recorded corrupt is salvaged (see authenticate) and the index updated by
+        the salvage is stored. With repo_only, and if no pack is left corrupt, a corrupt index is then
+        rebuilt from the packs' object headers and stored. Without repo_only, the archives phase rebuilds
+        and stores the index (see ArchiveChecker.check and ArchiveChecker.finish), refs #10434. Packs are
+        verified by the store hash, which is content-addressing rather than a MAC, so that check detects
+        accidental corruption but not tampering; the rebuild therefore checks every object with validate,
+        see below, refs #9901, #10026. Pack ids found corrupt are kept in cache/checked-packs, refs #9696.
+        That object is stored in the key's envelope, too, so check() needs the key (see set_key).
 
         A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
         it. The record clears at the check that finds the pack intact again or gone (removed by
-        compact; TODO: also when repair salvages and drops it, refs #10026); prune() does this from packs/.
+        compact, or replaced by a salvaged pack); prune() does this from packs/.
 
         It also reports missing packs (refs #9898): pack ids the chunk index references but that are
         absent from packs/. The index is read from its fragments only and its referenced pack ids are
@@ -1515,18 +1519,28 @@ class Repository:
         regardless of max_age.
 
         repo_only: whether this is a repository-only run. Required if repair. In repair mode, if True, a
-        corrupt index is rebuilt here (see above), and damage repair does not fix, i.e. a corrupt pack, a
-        missing pack or a skipped pack byte range (see validate), fails the check. If False, both are left
-        to the archives phase: it rebuilds the index, can repair a corrupt pack holding metadata (or file
-        content with --verify-data), and reports and repairs the archives that reference chunks the index
-        lacks.
+        corrupt index is rebuilt here (see above), and damage repair does not fix, i.e. a corrupt pack left
+        unsalvaged, a missing pack, a skipped pack byte range (see validate) or a salvage that may have
+        lost chunks (see authenticate), fails the check. If False, these are left to the archives phase: it
+        rebuilds the index, can repair a corrupt pack holding metadata (or file content with
+        --verify-data), and reports and repairs the archives that reference chunks the index lacks.
 
         validate: validate(chunk_id, obj) -> bool, True if obj (an object's header plus its metadata
         slot) is the repo object with id chunk_id, see repoobj.object_validator. Required if repair.
-        The index rebuild checks every object with it and leaves an object it rejects out of the index.
+        The pack salvage (see salvage_pack) and the index rebuild check every object with it; the rebuild
+        leaves an object it rejects out of the index.
         A skipped pack byte range is the pack content the rebuild discards at one place: a rejected
         object plus the bytes up to the next object it accepts, or the rest of the pack if it accepts
         none. Each skipped range counts as one error.
+
+        authenticate: authenticate(chunk_id, obj) -> bool, True if obj (an object's header, metadata slot
+        and data slot) is the repo object with id chunk_id, see repoobj.whole_object_authenticator. In
+        repair mode, each pack recorded corrupt is salvaged with validate and authenticate (see
+        _salvage_corrupt_packs). If None, no pack is salvaged. A salvage may have lost chunks if it removed
+        index entries, or if the index could not be read from its fragments: which chunks the dropped bytes
+        held is unknown then. A pack that reads intact at the salvage is recorded intact and fails the
+        check, repo_only or not: its content is fine, but two reads of it disagreed, which is a fault of
+        the storage or the transfer that no repair fixes.
         """
         assert validate is not None or not repair
         assert repo_only is not None or not repair
@@ -1567,6 +1581,10 @@ class Repository:
         t_last_checkpoint = t_start
         index_files = index_errors = 0
         pack_files = pack_errors = pack_skipped = 0
+        invalid_pack_names = 0  # objects in packs/ whose name is not a valid pack name, counted in pack_errors
+        salvaged = salvage_lossy = 0  # packs salvaged, and those of them that may have lost chunks
+        reread_intact = 0  # packs that failed the pack check and read intact at the salvage
+        chunks = None  # the index read from its fragments; None if it was not read
         missing_pack_ids = []  # packs referenced by the index but absent from packs/ (refs #9898)
         stale_entries = 0  # number of index entries removed for missing_pack_ids
         index_repaired = False
@@ -1619,6 +1637,7 @@ class Repository:
                 else:
                     logger.error(f"Store object packs/{info.name} has an invalid name.")
                     pack_errors += 1
+                    invalid_pack_names += 1
             pack_infos = valid_pack_infos
             present_pack_ids = {hex_to_bin(info.name) for info in pack_infos}
             # cross-check the chunk index against packs/ to find referenced-but-absent packs (refs #9898).
@@ -1719,16 +1738,25 @@ class Repository:
                 if pack_infos:
                     pack_pi.show(current=len(pack_infos))  # finish at 100%
                 logger.info("Finished checking packs.")
-            tracker.prune(present_pack_ids)
             pack_pi.finish()
-            # rebuild only on a repository-only repair, if the index was the sole problem and every pack was
-            # verified intact this run: sig_int breaks the loop early, so "no pack errors" must be paired with
-            # "all packs scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs.
+            # salvage before the index rebuild below, which rebuilds only if no pack is left corrupt.
+            try:
+                if repair and not sig_int and pack_files == len(pack_infos):
+                    salvaged, salvage_lossy, reread_intact = self._salvage_corrupt_packs(
+                        tracker, present_pack_ids, chunks, validate=validate, authenticate=authenticate
+                    )
+            finally:
+                # also on an exception: drop the records of the packs salvaged so far.
+                tracker.prune(present_pack_ids)
+            # rebuild only on a repository-only repair, if no pack is left corrupt and every pack was verified
+            # this run: sig_int breaks the loop early, so "no corrupt pack" must be paired with "all packs
+            # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs.
             if (
                 repair
                 and repo_only
                 and index_errors
-                and pack_errors == 0
+                and invalid_pack_names == 0
+                and not tracker.corrupt_ids()
                 and not sig_int
                 and pack_files == len(pack_infos)
             ):
@@ -1782,6 +1810,8 @@ class Repository:
             logger.info("Repository index was corrupted and has been rebuilt from the packs.")
         if drops:
             logger.error(f"The index rebuild skipped {drops} pack byte range(s) it could not authenticate.")
+        if salvaged:
+            logger.warning(f"Salvaged {salvaged} corrupt pack(s), {salvage_lossy} of them may have lost chunks.")
         # corrupt_ids() includes packs recorded corrupt in earlier runs; report them only when this
         # run scanned the packs.
         corrupt_ids = tracker.corrupt_ids() if packs_scanned else []
@@ -1798,20 +1828,15 @@ class Repository:
             logger.info(f"{done} {mode} repository check, no problems found{so_far}.")
         elif not repair:
             logger.error(f"{done} {mode} repository check, errors found{so_far}.")
-        elif index_repaired and not (pack_errors or corrupt_ids or missing_pack_ids or drops):
-            # the index was the only problem and it has been rebuilt from the packs.
-            logger.info(f"{done} {mode} repository check, repaired{so_far}.")
-        elif pack_errors or corrupt_ids:
+        elif invalid_pack_names or corrupt_ids:
+            # corrupt packs not salvaged, e.g. packs in which no object authenticates.
             if repo_only:
-                logger.error(
-                    f"{done} {mode} repository check, corrupt pack(s) found{so_far}; repairing a repository "
-                    "with corrupt packs is not implemented yet (refs #10026)."
-                )
+                logger.error(f"{done} {mode} repository check, corrupt pack(s) left{so_far}.")
             else:
                 # a full check's archives phase reads archive/item metadata (and file content with
                 # --verify-data), so it repairs a corrupt pack holding such objects; warn rather than fail.
                 deferred = "; index corrupt, the archives check rebuilds it from the packs" if index_deferred else ""
-                logger.warning(f"{done} {mode} repository check, corrupt pack(s) found{deferred}{so_far}.")
+                logger.warning(f"{done} {mode} repository check, corrupt pack(s) left{deferred}{so_far}.")
         elif drops:
             # drops come from a repository-only rebuild only; no archives phase follows it.
             logger.error(
@@ -1826,21 +1851,44 @@ class Repository:
             # the index is corrupt but was not rebuilt, e.g. the pack verification was interrupted
             # before every pack was confirmed intact; the corrupt index is left in place.
             logger.error(f"{done} {mode} repository check, index still corrupt{so_far}.")
-        elif repo_only:
+        elif missing_pack_ids and repo_only:
             # missing packs: archives may still reference their chunks, a full check repairs these archives.
             logger.error(
                 f'{done} {mode} repository check, missing pack(s) found{so_far}; run "borg check --repair" '
                 "without --repository-only to repair the archives that reference their chunks."
             )
-        else:
+        elif missing_pack_ids:
             # missing packs: the archives phase repairs the archives that reference their chunks.
             logger.warning(f"{done} {mode} repository check, missing pack(s) found{so_far}.")
-        # in repair mode, a corrupt index neither rebuilt here nor deferred fails; a corrupt or missing pack,
-        # or a skipped pack byte range, fails a repository-only run, a full check defers it to the archives phase.
+        elif salvage_lossy and repo_only:
+            # archives may still reference the lost chunks, a full check repairs these archives.
+            logger.error(
+                f"{done} {mode} repository check, corrupt pack(s) salvaged, chunks may be lost{so_far}; run "
+                '"borg check --repair" without --repository-only to repair the archives that reference them.'
+            )
+        elif salvage_lossy:
+            # the archives phase repairs the archives that reference the lost chunks.
+            logger.warning(f"{done} {mode} repository check, corrupt pack(s) salvaged, chunks may be lost{so_far}.")
+        elif reread_intact:
+            # the pack content is intact, so there is nothing to repair, but one read of it returned
+            # different bytes than the next: the storage or the transfer dropped or changed them.
+            logger.warning(
+                f"{done} {mode} repository check, {reread_intact} pack(s) read corrupt, then intact{so_far}; "
+                "the storage or the transfer may be unreliable."
+            )
+        else:
+            # the corrupt index was rebuilt and/or the corrupt packs were salvaged without losing chunks.
+            logger.info(f"{done} {mode} repository check, repaired{so_far}.")
+        # in repair mode, a corrupt index neither rebuilt here nor deferred fails, as does a pack that read
+        # corrupt and then intact: no repair fixes unreliable storage, so the run must not pass silently. a
+        # corrupt pack left, a missing pack, a skipped pack byte range or a salvage that may have lost chunks
+        # fails a repository-only run, a full check defers it to the archives phase.
         if repair:
             if index_errors and not index_repaired and not index_deferred:
                 return False
-            return not (repo_only and (pack_errors or corrupt_ids or missing_pack_ids or drops))
+            if reread_intact:
+                return False
+            return not (repo_only and (invalid_pack_names or corrupt_ids or missing_pack_ids or drops or salvage_lossy))
         return not problems
 
     def list(self, limit=None, marker=None):
@@ -2522,6 +2570,110 @@ class Repository:
             self.store_delete(pack_key)
         self._pack_cache.pop(pack_id, None)
         return SalvageResult(SALVAGE_DONE, new_pack_id, kept, dropped_bytes, removed_ids)
+
+    def _salvage_corrupt_packs(self, tracker, present_pack_ids, chunks, *, validate, authenticate):
+        """Salvage each pack in packs/ that tracker records corrupt with salvage_pack.
+
+        tracker: the PackTracker. The record of a salvaged pack is dropped, a pack that reads intact is
+            recorded intact and counted (see the return value).
+        present_pack_ids: the set of pack ids in packs/. Only these packs are salvaged. The id of a
+            salvaged pack is replaced by the id of its replacement pack.
+        chunks: the ChunkIndex read from the index/ fragments, or None if it could not be read. It is
+            updated and, after a salvage, stored, so the repository index is current as soon as this
+            returns. If None, salvage_pack updates an empty ChunkIndex, which is not stored, and the
+            stored index stays marked invalid (see write_chunkindex_invalid).
+        validate, authenticate: passed to salvage_pack. If authenticate is None, no pack is salvaged.
+
+        Returns (number of packs salvaged, number of those that may have lost chunks, number of packs that
+        read intact). A salvage may have lost chunks if it removed index entries, or if chunks is None.
+        """
+        from .cache import list_chunkindex_hashes, chunkindex_is_invalid, write_chunkindex_to_repo
+        from .cache import write_chunkindex_invalid, delete_chunkindex_invalid
+
+        corrupt_ids = [pack_id for pack_id in tracker.corrupt_ids() if pack_id in present_pack_ids]
+        if not corrupt_ids:
+            return 0, 0, 0
+        if authenticate is None:
+            logger.error(
+                f"Not salvaging {len(corrupt_ids)} corrupt pack(s): objects can not be authenticated with "
+                "BORG_WORKAROUNDS=authenticated_no_key."
+            )
+            return 0, 0, 0
+        if self.uses_pack_store_cache:
+            logger.error(f"Not salvaging {len(corrupt_ids)} corrupt pack(s): BORG_STORE_CACHE is set.")
+            return 0, 0, 0
+        try:
+            self.assert_writable()
+        except self.PermissionDenied as err:
+            logger.error(f"Not salvaging {len(corrupt_ids)} corrupt pack(s): {err}")
+            return 0, 0, 0
+        index = chunks if chunks is not None else ChunkIndex()
+        # the stored index points at the packs salvage_pack deletes, so mark it invalid before the first
+        # delete, unless there is none or it is marked invalid already.
+        mark_needed = bool(list_chunkindex_hashes(self)) and not chunkindex_is_invalid(self)
+        marked = False
+
+        def mark_index_invalid():
+            nonlocal marked
+            if mark_needed and not marked:
+                write_chunkindex_invalid(self)
+                marked = True
+
+        salvaged = lossy = reread_intact = 0
+        pi = ProgressIndicatorPercent(
+            total=len(corrupt_ids), msg="Salvaging packs %3.0f%%", msgid="check.salvage_packs"
+        )
+        for pack_id in corrupt_ids:
+            if sig_int:
+                logger.info(f"Interrupted pack salvage, {salvaged} pack(s) salvaged so far.")
+                break
+            pi.show(increase=1)
+            pack_hex = bin_to_hex(pack_id)
+            result = self.salvage_pack(
+                pack_id,
+                validate=validate,
+                authenticate=authenticate,
+                chunks=index,
+                before_old_pack_delete=mark_index_invalid,
+            )
+            if result.status == SALVAGE_INTACT:
+                tracker.record(pack_id, True)
+                reread_intact += 1
+                logger.warning(
+                    f"Pack {pack_hex} read corrupt, then intact; it is kept as it is. The storage or the "
+                    "transfer may be unreliable."
+                )
+            elif result.status == SALVAGE_DONE:
+                salvaged += 1
+                # with an empty index, which chunks the dropped bytes held is unknown.
+                lossy += bool(result.removed_ids or chunks is None)
+                tracker.forget(pack_id)  # pack_id is deleted, or holds the replacement pack
+                present_pack_ids.discard(pack_id)
+                present_pack_ids.add(result.new_pack_id)
+                logger.warning(
+                    f"Salvaged corrupt pack {pack_hex}: kept {len(result.kept)} object(s) in pack "
+                    f"{bin_to_hex(result.new_pack_id)}, dropped {result.dropped_bytes} byte(s), removed "
+                    f"{len(result.removed_ids)} index entry(s)."
+                )
+                for chunk_id in result.removed_ids:
+                    logger.debug(f"Removed index entry: {bin_to_hex(chunk_id)}")
+            else:
+                logger.error(f"Corrupt pack {pack_hex} was not salvaged: {result.status}.")
+        else:
+            pi.show(current=len(corrupt_ids))  # finish at 100%
+        pi.finish()
+        if chunks is None:
+            return salvaged, lossy, reread_intact
+        if salvaged:
+            # the old index/ fragments hold entries salvage_pack changed or removed, so store every entry
+            # (incremental=False), also if there is none (force_write=True), and delete the old fragments
+            # (delete_other=True).
+            write_chunkindex_to_repo(self, chunks, incremental=False, force_write=True, delete_other=True)
+        if marked:
+            # the stored index is current again; write_chunkindex_to_repo deletes the marker only if it
+            # deleted a fragment.
+            delete_chunkindex_invalid(self)
+        return salvaged, lossy, reread_intact
 
     def acquire_lock(self):
         """Lock the repository (as requested by open()), loading its key first if no key was set yet.

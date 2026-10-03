@@ -119,9 +119,11 @@ it can not be read back.
 The walk rebuilds the index from the pack as it is: the damaged bytes stay where
 they are, as a gap no index entry covers. A pack is named by the store hash of its
 content, so a pack damaged in the store keeps failing the store-level check that
-``borg check`` runs over ``packs/``, also after ``borg check --repair`` has
-rebuilt the index from it. Rewriting such a pack is repository-level repair, see
-:issue:`10026`.
+``borg check`` runs over ``packs/`` until it is rewritten. ``borg check --repair``
+rewrites it before any index rebuild: it replaces the pack by one holding only the
+blobs the walk finds and whose metadata and data slots both authenticate, which
+drops the damaged bytes (see ``Repository.salvage_pack``). A pack in which no blob
+authenticates is left as it is.
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
 only when it validates like any walked header. Validating needs the key, which
@@ -237,12 +239,12 @@ unreachable and treated as garbage by ``borg compact``.
 
 Pack files are removed by ``borg compact`` (dropping packs whose indexed objects are
 all unused, rewriting packs above ``--threshold`` and merging tiny packs),
-``borg check --repair`` (when it drops a defective object), ``borg repo-compress``
-(``Repository.transform_pack`` stores the re-compressed pack under its new
-content-addressed name and deletes the old one) and ``borg debug delete-obj``. A
-single blob cannot be removed from a pack in place: all of these paths write a new
-pack file without it and then delete the old one, so store-level deletion always
-operates at pack granularity.
+``borg check --repair`` (when it drops a defective object, and when it salvages a
+pack recorded corrupt), ``borg repo-compress`` (``Repository.transform_pack`` stores
+the re-compressed pack under its new content-addressed name and deletes the old one)
+and ``borg debug delete-obj``. A single blob cannot be removed from a pack in place:
+all of these paths write a new pack file without it and then delete the old one, so
+store-level deletion always operates at pack granularity.
 ``borg compact`` (rewriting, merging) and ``borg repo-compress`` skip packs recorded
 corrupt in ``cache/checked-packs``: the rewritten pack would get a new content-addressed
 name that passes ``borg check``, hiding the corruption.

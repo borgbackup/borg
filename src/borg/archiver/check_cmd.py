@@ -8,7 +8,7 @@ from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, Error
 from ..helpers import relative_time_marker_validator, yes, ArchiveFormatter, sig_int
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.time import archive_ts_now, calculate_relative_offset
-from ..repoobj import RepoObj, object_validator
+from ..repoobj import RepoObj, ObjectsNotAuthenticatable, object_validator, whole_object_authenticator
 from ..repository import Repository, DEFAULTS_NAME
 
 from ..logger import create_logger
@@ -89,8 +89,7 @@ class CheckMixIn:
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
         if args.repair and args.max_age is not None:
-            # repair verifies every pack; reusing recorded results during repair needs repository
-            # repair (refs #10026).
+            # repair salvages and rebuilds from the packs this run verified, so it verifies every pack.
             raise CommandError("--repair does not allow the --max-age option.")
         if args.archives_only and args.max_age is not None:
             # --max-age only affects the repository check; --archives-only skips it.
@@ -114,13 +113,22 @@ class CheckMixIn:
             # the repository check has finished, which can take hours.
             ArchiveFormatter.validate_format(format)
         if not args.archives_only:
+            repo_objs = RepoObj(key)
+            authenticate = None
+            if args.repair:
+                try:
+                    authenticate = whole_object_authenticator(repo_objs)
+                except ObjectsNotAuthenticatable:
+                    # no key material to verify an object's tags with, so no pack is salvaged;
+                    # Repository._salvage_corrupt_packs reports that.
+                    pass
             if not repository.check(
                 repair=args.repair,
                 max_duration=args.max_duration,
                 max_age=max_age,
                 repo_only=args.repo_only,
-                # validates each object the index rebuild of a --repository-only repair walks.
-                validate=object_validator(RepoObj(key)),
+                validate=object_validator(repo_objs),
+                authenticate=authenticate,
             ):
                 set_ec(EXIT_WARNING)
             if sig_int:  # repository check interrupted; skip the archive check
@@ -297,18 +305,21 @@ class CheckMixIn:
 
         In practice, repair mode hooks into both the repository and archive checks:
 
-        1. When checking the repository's consistency, repair mode verifies every pack if
-           the index is corrupt. A full ``borg check --repair`` then rebuilds the index from
-           the packs in the archive check (which does so on every ``--repair`` run). With
-           ``--repository-only``, the repository check rebuilds it, provided every pack
-           matches its store hash. If any pack fails its store hash, it leaves the index and
-           the packs untouched and reports it; salvaging the intact objects of such a pack
-           is not implemented yet (refs #10026). Either rebuild authenticates each object's
-           header and metadata with the key, leaves an object that fails this out of the
-           index and reports it as an error. Repair mode also removes the index entries of
-           the chunks stored in missing packs (packs the index references, but that are
-           absent from the repository). Only a full ``borg check --repair`` repairs the
-           archives that reference these chunks, ``--repository-only`` does not.
+        1. When checking the repository's consistency, repair mode verifies every pack. It
+           salvages each pack that fails its store hash (a pack is named by the hash of its
+           content): the pack is replaced by one holding only its objects whose header,
+           metadata and data authenticate with the key, the rest is dropped and the index
+           entries of the dropped objects are removed. A pack in which no object
+           authenticates is left in place and reported. If the index is corrupt, a full
+           ``borg check --repair`` then rebuilds it from the packs in the archive check
+           (which does so on every ``--repair`` run). With ``--repository-only``, the
+           repository check rebuilds it, provided no pack is left corrupt. Either rebuild
+           authenticates each object's header and metadata with the key, leaves an object
+           that fails this out of the index and reports it as an error. Repair mode also
+           removes the index entries of the chunks stored in missing packs (packs the index
+           references, but that are absent from the repository). Only a full
+           ``borg check --repair`` repairs the archives that reference these chunks,
+           ``--repository-only`` does not.
            A missing or corrupt repository defaults object is replaced by empty defaults, so
            the repository can be used again; the commands then use the built-in defaults.
 

@@ -502,14 +502,14 @@ def test_compact_keeps_corrupt_pack(archivers, request):
 
     output = cmd(archiver, "compact", "-v", "--threshold", "0", exit_code=EXIT_WARNING)
     assert '1 pack(s) recorded corrupt by "borg check" are not rewritten or merged.' in output
-    assert "Damage outside of chunks is not repaired yet, see #10026." in output
+    assert 'Run "borg check --repair" to salvage them.' in output
     repository = open_repository(archiver)
     with repository:
         assert repository.store_load(pack_key) == pack_before
     cmd(archiver, "check", exit_code=1)
 
-    # the repair deletes the corrupt chunk: compact reports it missing and no corrupt pack.
-    cmd(archiver, "check", "--repair", "--verify-data", exit_code=EXIT_SUCCESS)
+    # the repair salvages the pack, dropping the corrupt chunk: compact reports it missing and no corrupt pack.
+    cmd(archiver, "check", "--repair", exit_code=EXIT_SUCCESS)
     output = cmd(archiver, "compact", "-v", "--threshold", "0", exit_code=EXIT_ERROR)
     assert "missing objects" in output
     assert "recorded corrupt" not in output

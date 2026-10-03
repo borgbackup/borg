@@ -26,6 +26,7 @@ from ..helpers import StableDict, int_to_bigint, bigint_to_int, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import swidth_slice
+from ..helpers import ellipsis_truncate
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
 from ..helpers import popen_with_error_handling
@@ -1126,6 +1127,19 @@ def test_swidth_slice_mixed_characters():
     string = '나윤a선나윤선나윤선나윤선나윤선'
     assert swidth_slice(string, 5) == '나윤a'
     assert swidth_slice(string, 6) == '나윤a'
+
+
+@pytest.mark.skipif(not working_swidth(), reason='swidth() is not supported / active')
+@pytest.mark.parametrize('msg', ['나윤선나윤선나윤선나윤선나윤선', '나윤a선나윤선나윤선나윤선나윤선', 'a' * 40, 'short'])
+@pytest.mark.parametrize('space', [8, 9, 20, 21])
+def test_ellipsis_truncate_width(msg, space):
+    # the result always fills the space, so it overwrites a longer line printed before it.
+    result = ellipsis_truncate(msg, space)
+    assert platform.swidth(result) == space
+    if platform.swidth(msg) > space:
+        assert '...' in result
+    else:
+        assert result == msg + ' ' * (space - platform.swidth(msg))
 
 
 def utcfromtimestamp(timestamp):

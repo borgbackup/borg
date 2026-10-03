@@ -804,7 +804,10 @@ def test_gather_many_one_gather_for_many_packs(tmp_path, monkeypatch, variant):
         monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(tmp_path / "storecache"))
     location = Location(f"ssh://__testsuite__/{path}" if variant == "ssh" else path)
     objects = {H(i): fchunk(b"payload-%02d" % i, chunk_id=H(i)) for i in range(5)}
-    with Repository(location, exclusive=True, create=True) as repository:
+    with Repository(location, exclusive=True, create=True):
+        pass
+    with Repository(location, exclusive=True) as repository:
+        assert repository.uses_pack_store_cache == (variant == "storecache")
         repository._pack_writer.max_count = 2  # three packs: {H0,H1} {H2,H3} {H4}
         for chunk_id, chunk in objects.items():
             repository.put(chunk_id, chunk)
@@ -3518,6 +3521,78 @@ def test_create_failure_leaves_no_store_behind(tmp_path, monkeypatch):
     assert os.path.exists(os.path.join(location, "config", "config"))
 
 
+def files_below(path):
+    # relative paths of all files below path.
+    paths = [os.path.join(dirpath, name) for dirpath, _, names in os.walk(path) for name in names]
+    return sorted(os.path.relpath(p, path) for p in paths)
+
+
+def repo_location(path, proto):
+    return Location(os.fspath(path) if proto == "file" else f"ssh://__testsuite__/{os.fspath(path)}")
+
+
+@pytest.fixture()
+def filled_store_cache(tmp_path, monkeypatch):
+    # a BORG_STORE_CACHE directory holding a cached pack of the repository "other" and a file borg did not put there.
+    cache_dir = tmp_path / "storecache"
+    monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(cache_dir))
+    other = os.fspath(tmp_path / "other")
+    with Repository(other, exclusive=True, create=True):
+        pass
+    with Repository(other, exclusive=True) as repository:
+        repository.put(H(0), fchunk(b"other", chunk_id=H(0)))
+        repository.flush()
+    (cache_dir / "foreign").mkdir()
+    (cache_dir / "foreign" / "file").write_text("foreign")
+    files = files_below(cache_dir)
+    assert len(files) == 2 and any(name.startswith("packs") for name in files)
+    return cache_dir
+
+
+@pytest.mark.parametrize("proto", ["file", "ssh"])
+def test_create_with_a_filled_store_cache(tmp_path, filled_store_cache, proto):
+    cached = files_below(filled_store_cache)
+    location = repo_location(tmp_path / "repo", proto)
+    with Repository(location, exclusive=True, create=True) as repository:
+        assert not repository.uses_pack_store_cache
+    assert files_below(filled_store_cache) == cached
+    with Repository(location, exclusive=True) as repository:
+        assert repository.uses_pack_store_cache
+
+
+@pytest.mark.parametrize("proto", ["file", "ssh"])
+def test_destroy_keeps_the_store_cache(tmp_path, filled_store_cache, proto):
+    location = repo_location(tmp_path / "repo", proto)
+    with Repository(location, exclusive=True, create=True):
+        pass
+    with Repository(location, exclusive=True) as repository:
+        repository.put(H(1), fchunk(b"repo", chunk_id=H(1)))
+        repository.flush()
+    cached = files_below(filled_store_cache)
+    assert len(cached) == 3  # the pack of this repository was cached, too
+    with Repository(location, exclusive=True) as repository:
+        repository.destroy()
+    assert not os.path.exists(tmp_path / "repo")
+    assert files_below(filled_store_cache) == cached
+
+
+@pytest.mark.parametrize("failing", ["save_config", "open"])
+def test_create_failure_keeps_the_store_cache(tmp_path, filled_store_cache, monkeypatch, failing):
+    # failing: the Repository method that fails after the store was created.
+    def fail(self, *args, **kwargs):
+        raise OSError("simulated failure")
+
+    cached = files_below(filled_store_cache)
+    location = os.fspath(tmp_path / "repo")
+    with monkeypatch.context() as m:
+        m.setattr(Repository, failing, fail)
+        with pytest.raises(OSError, match="simulated failure"):
+            with Repository(location, exclusive=True, create=True):
+                pass
+    assert not os.path.exists(location)
+    assert files_below(filled_store_cache) == cached
+
+
 def store_damaged_pack(repository, objs, *, listed, flip=(), tail=b"", size=100):
     """Store objs as one pack named by the store hash of their bytes, then damage it.
 
@@ -3700,7 +3775,9 @@ def test_salvage_pack_drops_uncovered_trailing_bytes(salvage_repository, tail):
 def test_salvage_pack_refuses_with_a_pack_store_cache(tmp_path, monkeypatch):
     # with BORG_STORE_CACHE, both loads of a pack can return the same cached copy.
     monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(tmp_path / "cache"))
-    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True):
+        pass
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True) as repository:
         repository.chunks = ChunkIndex()
         repo_objs = plain_repo_objs()
         objs = three_objects(repo_objs)

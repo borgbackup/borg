@@ -96,12 +96,19 @@ class StderrHandler(logging.StreamHandler):
     sys.stderr at handler construction time.
     """
 
+    before_emit = None  # callable or None, called before each record is written
+
     def __init__(self, stream=None):
         logging.Handler.__init__(self)
 
     @property
     def stream(self):
         return sys.stderr
+
+    def emit(self, record):
+        if self.before_emit is not None:
+            self.before_emit()
+        super().emit(record)
 
 
 class TextProgressFormatter(logging.Formatter):

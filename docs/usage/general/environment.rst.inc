@@ -116,7 +116,8 @@ General:
         - ``off``: do not animate, only output the messages next to the spinner
 
         The spinner is animated only on an interactive terminal anyway (and never
-        with ``--log-json``), and its colour follows the usual ``NO_COLOR`` and
+        with ``--log-json``), and only with ``--progress`` or with a log level of
+        ``--info`` or ``--debug``. Its colour follows the usual ``NO_COLOR`` and
         ``COLORTERM`` conventions. See also ``BORG_PROGRESS_FPS``: it also gives
         the spinner its frame rate.
     BORG_DEBUG_PROFILE

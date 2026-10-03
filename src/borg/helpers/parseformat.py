@@ -124,6 +124,10 @@ def ChunkerParams(s):
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
             raise argparse.ArgumentTypeError('block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE)
         return algo, block_size, header_size
+    if algo == CH_FAIL and count == 3:  # fail, block_size, map (only for testing the error handling)
+        block_size = int(params[1])
+        map = str(params[2])
+        return algo, block_size, map
     if algo == 'default' and count == 1:  # default
         return CHUNKER_PARAMS
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):

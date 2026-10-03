@@ -23,7 +23,7 @@ from ...cache import (
 )
 from ...crypto.key import RepositoryKeyInfoMissing
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, hex_to_bin, CommandError, CorruptPack, Error, sig_int
+from ...helpers import bin_to_hex, hex_to_bin, CommandError, CorruptPack, Error, ProgressIndicatorPercent, sig_int
 from ...helpers import BackupDamagedChunksError
 from ...helpers.passphrase import PassphraseWrong
 from ...hashindex import ChunkIndex
@@ -1480,6 +1480,56 @@ def test_repair_finish_reads_only_the_rewritten_pack(archiver, monkeypatch):
     cmd(archiver, "check", exit_code=0)
 
 
+def record_progress_indicators(monkeypatch):
+    """Return a list that collects every ProgressIndicatorPercent archive.py creates.
+
+    Each one has a finished attribute, True once its finish() ran.
+    """
+    indicators = []
+
+    class RecordingPI(ProgressIndicatorPercent):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.finished = False
+            indicators.append(self)
+
+        def finish(self):
+            self.finished = True
+            super().finish()
+
+    monkeypatch.setattr(archive_module, "ProgressIndicatorPercent", RecordingPI)
+    return indicators
+
+
+@pytest.mark.parametrize("n_defect", [0, 2])
+def test_repair_verify_data_progress_for_defect_chunk_removal(archiver, monkeypatch, n_defect):
+    """--verify-data --repair shows progress for removing defect chunks, one step per defect chunk."""
+    # local-only: this patches in-process archive internals.
+    check_cmd_setup(archiver)
+    # one intact object and n_defect objects that get corrupted, all in one pack that no archive references.
+    contents = [b"intact"] + [b"defect%d" % i for i in range(n_defect)]
+    ids, _ = put_objects_in_one_pack(archiver, contents)
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        for defect_id in ids[1:]:
+            corrupt_chunk_on_disk(repository, defect_id)
+
+    indicators = record_progress_indicators(monkeypatch)
+    # --archives-only: the repository check salvages the pack, which drops the defect chunks.
+    cmd(archiver, "check", "--repair", "--archives-only", "--verify-data", exit_code=0)
+    removal = [pi for pi in indicators if pi.msgid == "check.remove_defect_chunks"]
+    if n_defect == 0:
+        assert removal == []
+    else:
+        assert len(removal) == 1
+        assert removal[0].total == n_defect
+        assert removal[0].counter == n_defect
+        assert removal[0].finished
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        for defect_id in ids[1:]:
+            assert defect_id not in repository.chunks
+    cmd(archiver, "check", exit_code=0)
+
+
 def test_repair_finish_reads_no_pack_after_deleting_a_whole_pack(archiver, monkeypatch):
     """--verify-data --repair removes a defect chunk that is alone in its pack; finish() re-reads no pack.
 
@@ -1740,6 +1790,44 @@ def test_verify_written_packs_does_not_depend_on_the_pack_order(archiver, monkey
             expected.obj_offset,
             expected.obj_size,
         )
+
+
+def test_verify_written_packs_progress(archiver, monkeypatch):
+    """verify_written_packs shows progress for re-reading the written packs, one step per pack.
+
+    A missing pack also counts as a step.
+    """
+    # local-only: this patches in-process archive internals.
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1")  # a pack per object
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with Repository(archiver.repository_location, exclusive=True) as repository:
+        manifest = Manifest.load(repository)
+        for data in [b"aaa", b"bbb"]:
+            chunk_id = manifest.key.id_hash(data)
+            repository.put(chunk_id, manifest.repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        pack_ids = {repository.chunks[manifest.key.id_hash(data)].pack_id for data in [b"aaa", b"bbb"]}
+        assert len(pack_ids) == 2
+
+        checker = ArchiveChecker()
+        checker.repair = True
+        checker.repository = repository
+        checker.key = manifest.key
+        checker.repo_objs = manifest.repo_objs
+        checker.chunks = repository.chunks
+        indicators = record_progress_indicators(monkeypatch)
+
+        checker.written_packs = set()
+        checker.verify_written_packs()
+        assert indicators == []
+
+        checker.written_packs = pack_ids | {bytes(32)}  # bytes(32): a pack that does not exist
+        checker.verify_written_packs()
+        (pi,) = indicators
+        assert pi.msgid == "check.verify_written_packs"
+        assert pi.total == 3
+        assert pi.counter == 3
+        assert pi.finished
 
 
 @pytest.mark.parametrize("init_args", [["--encryption=aes256-ocb"], ["--encryption", "authenticated-sha256"]])

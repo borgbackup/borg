@@ -2448,7 +2448,11 @@ class ArchiveChecker:
             if self.repair:
                 logger.warning("Found defect chunks, removing them from the repository.")
                 validate = object_validator(self.repo_objs)
+                pi = ProgressIndicatorPercent(
+                    total=len(defect_chunks), msg="Removing defect chunks %3.0f%%", msgid="check.remove_defect_chunks"
+                )
                 for defect_chunk in defect_chunks:
+                    pi.show()
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
                     # as the chunk will be retransmitted from remote server.
                     # local repo (fs): as the loop above usually pumps a lot of data through,
@@ -2478,6 +2482,7 @@ class ArchiveChecker:
                             self.written_packs.add(new_pack_id)
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
+                pi.finish()
             else:
                 logger.warning("Found defect chunks. Run with --repair to remove them.")
                 for defect_chunk in defect_chunks:
@@ -2898,7 +2903,11 @@ class ArchiveChecker:
         # is unindexed does not depend on the order the packs are read in.
         found_in = {}  # pack_id -> (chunk_id, obj_offset, obj_size) of the objects in the pack
         not_found_in = {}  # pack_id -> sorted index entries naming an object the pack does not hold
+        pi = ProgressIndicatorPercent(
+            total=len(pack_ids), msg="Re-reading written packs %3.0f%%", msgid="check.verify_written_packs"
+        )
         for pack_id in pack_ids:
+            pi.show()
             # PackReader reads from the store, which does not refresh the repository lock.
             self.repository._lock_refresh()
             expected = indexed[pack_id]
@@ -2919,6 +2928,7 @@ class ArchiveChecker:
                 del self.chunks[chunk_id]
             found_in[pack_id] = found
             not_found_in[pack_id] = not_found
+        pi.finish()
         # pass 2 indexes each unindexed object, so of several unindexed copies of a chunk, the first in pack id and
         # offset order is indexed and the others are superseded duplicates.
         for pack_id, found in found_in.items():

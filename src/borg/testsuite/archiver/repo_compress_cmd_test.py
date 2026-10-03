@@ -349,6 +349,34 @@ def test_transform_pack_drops_superseded_gap(tmp_path):
         assert pdchunk(repository.get(H(1))) == b"XXXX"  # the authoritative copy in pack B
 
 
+def test_repo_compress_keeps_duplicate_indexed_in_missing_pack(archiver):
+    # X is indexed in pack B, pack A holds another copy of X in a gap. With pack B missing from the
+    # store, the copy in pack A is the only one left: repo-compress keeps it (#10474).
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with open_repository(archiver) as repository:
+        repo_objs = Manifest.load(repository).repo_objs
+        w, x = b"W" * 1000, b"X" * 1000
+        w_id, x_id = repo_objs.id_hash(w), repo_objs.id_hash(x)
+        repository._pack_writer.max_count = 2  # one flush() -> one pack
+        for cid, data in [(w_id, w), (x_id, x)]:
+            repository.put(cid, repo_objs.format(cid, {}, data, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        pack_a = repository.chunks[w_id].pack_id
+        repository.put(x_id, repo_objs.format(x_id, {}, x, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        pack_b = repository.chunks[x_id].pack_id
+        assert pack_b != pack_a
+        repository.store_delete("packs/" + bin_to_hex(pack_b))
+
+    cmd(archiver, "repo-compress", "-C", "none")
+
+    with open_repository(archiver) as repository:
+        new_pack = repository.chunks[w_id].pack_id
+        assert new_pack != pack_a  # W was recompressed, pack A was rewritten
+        reader = PackReader(store=repository.store, pack_id=new_pack)
+        assert x_id in [chunk_id for chunk_id, _, _ in reader.iter_headers()]  # the gap copy of X is kept
+
+
 def test_transform_pack_unchanged_pack_untouched(tmp_path):
     # if every transform keeps its object, the store must not be touched at all:
     # no pack write, no pack delete, no before_change call.

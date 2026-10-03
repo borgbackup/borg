@@ -7,9 +7,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from . import rejected_dotdot_paths, is_utime_fully_supported, make_test_key
+from . import rejected_dotdot_paths, is_utime_fully_supported, make_test_key, set_test_key_on_open
 from ..cache import ChunkListEntry
-from ..constants import ROBJ_FILE_STREAM, zeros
+from ..constants import ROBJ_ARCHIVE_STREAM, ROBJ_FILE_STREAM, zeros
 from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacker, valid_msgpacked_dict
 from ..archive import ITEM_KEYS, Statistics
 from ..archive import zero_chunk_flags, zero_chunk_id, zero_chunk_ids
@@ -19,6 +19,7 @@ from ..helpers import msgpack
 from ..repoobj import RepoObj
 from ..item import Item, ArchiveItem
 from ..manifest import Archives, Manifest
+from ..repository import Repository
 from ..platform import uid2user, gid2group, is_win32
 
 
@@ -351,6 +352,41 @@ def test_download_pipeline_zero_chunks_served_locally():
     result = list(pipeline.fetch_many([ChunkListEntry(other_id, other_size)], ro_type=ROBJ_FILE_STREAM))
     assert result == [zeros[:other_size]]
     assert repository.requested_ids == [other_id]
+
+
+def test_download_pipeline_item_stream_reads_ranges(tmp_path, monkeypatch):
+    # item metadata chunks share packs with file content chunks: reading an archive's items gathers just
+    # their byte ranges, while file content is still read by loading the whole pack.
+    set_test_key_on_open(monkeypatch)  # the index/ objects need a key, see Repository.set_key
+    key = make_test_key(None)
+    repo_objs = RepoObj(key)
+    items = [Item(path=f"file{i}", mode=0o100644) for i in range(3)]
+    stream = b"".join(msgpack.packb(item.as_dict()) for item in items)
+    item_chunks = [stream[:20], stream[20:]]
+    content = os.urandom(10000)
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        content_id = repo_objs.id_hash(content)
+        repository.put(content_id, repo_objs.format(content_id, {}, content, ro_type=ROBJ_FILE_STREAM))
+        item_ids = []
+        for data in item_chunks:
+            item_id = repo_objs.id_hash(data)
+            repository.put(item_id, repo_objs.format(item_id, {}, data, ro_type=ROBJ_ARCHIVE_STREAM))
+            item_ids.append(item_id)
+        repository.flush()
+        assert len({repository.chunks[id].pack_id for id in item_ids + [content_id]}) == 1  # all in one pack
+        pipeline = DownloadPipeline(repository, repo_objs)
+
+        loads_before, gathers_before = repository.store.stats["load_calls"], repository.store.stats["gather_calls"]
+        assert [item.path for item in pipeline.unpack_many(item_ids)] == [item.path for item in items]
+        assert repository.store.stats["gather_calls"] - gathers_before == 1
+        assert repository.store.stats["load_calls"] == loads_before  # no whole-pack load
+
+        loads_before = repository.store.stats["load_calls"]
+        assert list(pipeline.fetch_many([ChunkListEntry(content_id, len(content))], ro_type=ROBJ_FILE_STREAM)) == [
+            content
+        ]
+        assert repository.store.stats["load_calls"] - loads_before == 1  # the whole pack
+        assert len(repository._pack_cache) == 1
 
 
 def test_zero_chunk_flags():

@@ -242,7 +242,9 @@ reads only the blob header and the metadata slot. Two methods read many blobs:
   most blobs of a pack.
 - ``gather_many()`` reads the ranges of up to 1000 blobs (or about 16 MiB) from any
   number of packs with one ``store.gather`` call, for many small blobs spread over
-  many packs, like the archive metadata objects.
+  many packs, like the archive metadata objects and the item metadata chunks of an
+  archive (stored in the same packs as the file content chunks). Reading an archive's
+  items uses it, so it does not load the whole packs around them.
 
 With ``BORG_STORE_CACHE``, borgstore loads a whole pack into a local cache directory
 on a cache miss and serves later reads of that pack from there.

@@ -90,7 +90,7 @@ class CheckMixIn:
             raise CommandError("--repair does not allow --max-duration argument.")
         if args.repair and args.max_age is not None:
             # repair verifies every pack; reusing recorded results during repair needs repository
-            # repair (refs #8572).
+            # repair (refs #10026).
             raise CommandError("--repair does not allow the --max-age option.")
         if args.archives_only and args.max_age is not None:
             # --max-age only affects the repository check; --archives-only skips it.
@@ -301,7 +301,7 @@ class CheckMixIn:
            index from the packs if the index is corrupt, provided every pack matches its
            store hash. If any pack fails its store hash, the repository check leaves the
            index and the packs untouched and reports it; salvaging the intact objects of
-           such a pack is not implemented yet (refs #8572). The rebuild authenticates
+           such a pack is not implemented yet (refs #10026). The rebuild authenticates
            each object's header and metadata with the key, leaves an object that fails
            this out of the index and reports it as an error. Repair mode also removes the
            index entries of the chunks stored in missing packs (packs the index references,

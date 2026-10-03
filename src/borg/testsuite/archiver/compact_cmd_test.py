@@ -373,10 +373,10 @@ def test_compact_keeps_unindexed_waste(tmp_path):
         assert pdchunk(repository.get(H(2))) == b"CCCC"
 
 
-def test_compact_reclaims_indexed_waste_only(tmp_path):
+def test_compact_reclaims_indexed_waste_only(tmp_path, caplog):
     # compact reclaims a pack's indexed-but-unused bytes, but leaves alone a pack whose only waste is
     # unindexed (bytes no index entry covers): those may be live data "borg check --repair" can
-    # recover (#9868).
+    # recover (#9868). It logs what a full "borg check --repair" does about them (#10429).
     from ...archiver.compact_cmd import ArchiveGarbageCollector
 
     location = os.fspath(tmp_path / "repo")
@@ -400,8 +400,11 @@ def test_compact_reclaims_indexed_waste_only(tmp_path):
 
         gc = ArchiveGarbageCollector(repository, gc_manifest(repository), stats=False, threshold=10)
         gc.chunks = repository.chunks
-        gc.compact_packs()
+        with caplog.at_level(logging.INFO):
+            gc.compact_packs()
 
+        assert "in pack files is not covered by the index" in caplog.text
+        assert '"borg check --repair" (without --repository-only) indexes the objects' in caplog.text
         pack_names = [info.name for info in repository.store_list("packs")]
         # indexed waste -> compacted, kept object still readable
         assert bin_to_hex(waste_pack) not in pack_names

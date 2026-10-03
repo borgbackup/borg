@@ -1489,13 +1489,13 @@ class Repository:
         ArchiveChecker.finish. Packs are verified by the store hash, which is content-addressing rather
         than a MAC, so that check detects accidental corruption but not tampering; the rebuild therefore
         checks every object with validate, see below, refs #9901, #10026. If any pack is corrupt the index
-        is not rebuilt, refs #8572, #10026. Pack ids found corrupt are kept in cache/checked-packs,
+        is not rebuilt, refs #10026. Pack ids found corrupt are kept in cache/checked-packs,
         refs #9696. That object is stored in the key's envelope, too, so check() needs the key (see
         set_key).
 
         A pack recorded corrupt fails the check, also on a partial run that stops before re-reaching
         it. The record clears at the check that finds the pack intact again or gone (removed by
-        compact; TODO: also when repair salvages and drops it, refs #8572); prune() does this from packs/.
+        compact; TODO: also when repair salvages and drops it, refs #10026); prune() does this from packs/.
 
         It also reports missing packs (refs #9898): pack ids the chunk index references but that are
         absent from packs/. The index is read from its fragments only and its referenced pack ids are
@@ -1790,7 +1790,7 @@ class Repository:
             if repo_only:
                 logger.error(
                     f"{done} {mode} repository check, corrupt pack(s) found{so_far}; repairing a repository "
-                    "with corrupt packs is not implemented yet (refs #8572)."
+                    "with corrupt packs is not implemented yet (refs #10026)."
                 )
             else:
                 # a full check's archives phase reads archive/item metadata (and file content with

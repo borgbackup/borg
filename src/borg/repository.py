@@ -936,6 +936,7 @@ class Repository:
         send_log_cb=None,
         permissions=None,
         key_loader=None,
+        store_cache=True,
     ):
         if isinstance(path_or_location, Location):
             location = path_or_location
@@ -968,13 +969,15 @@ class Repository:
         # BORG_STORE_CACHE sets the cache directory ("1" means <cache_dir>/storecache); the
         # directory holds the whole store's cache, currently just the packs/ namespace.
         # BORG_PACK_CACHE_SIZE limits the pack cache size in bytes.
+        # The cached packs are not verified against the repository.
+        # store_cache=False: ignore BORG_STORE_CACHE, read all packs from the repository.
         cache_url = None
-        store_cache = os.environ.get("BORG_STORE_CACHE")
-        if store_cache:
-            if store_cache == "1":
+        store_cache_dir = os.environ.get("BORG_STORE_CACHE") if store_cache else None
+        if store_cache_dir:
+            if store_cache_dir == "1":
                 cache_dir = Path(get_cache_dir("storecache"))
             else:
-                cache_dir = Path(store_cache)
+                cache_dir = Path(store_cache_dir)
                 cache_dir.mkdir(parents=True, exist_ok=True)
             ns_config["packs/"]["cache"] = "writethrough"
             cache_size = os.environ.get("BORG_PACK_CACHE_SIZE")

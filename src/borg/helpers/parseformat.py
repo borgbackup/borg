@@ -1568,6 +1568,8 @@ def ellipsis_truncate(msg, space):
     """
     shorten a long string by adding ellipsis between it and return it, example:
     this_is_a_very_long_string -------> this_is..._string
+
+    The result is padded with spaces to a width of *space* terminal cells (if *space* >= 3).
     """
     from ..platform import swidth
 
@@ -1577,7 +1579,9 @@ def ellipsis_truncate(msg, space):
         # if there is very little space, just show ...
         return "..." + " " * (space - ellipsis_width)
     if space < ellipsis_width + msg_width:
-        return f"{swidth_slice(msg, space // 2 - ellipsis_width)}...{swidth_slice(msg, -space // 2)}"
+        # swidth_slice does not split a wide character, so a slice can be one cell short: pad below.
+        msg = f"{swidth_slice(msg, space // 2 - ellipsis_width)}...{swidth_slice(msg, -space // 2)}"
+        msg_width = swidth(msg)
     return msg + " " * (space - msg_width)
 
 

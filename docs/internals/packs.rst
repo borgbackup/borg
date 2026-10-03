@@ -90,8 +90,8 @@ exception: given a validator it reads and decrypts each metadata slot, and thus 
     per-blob tag, which authenticates magic/version/chunk_id as additional
     authenticated data.
 
-TODO: redraw this figure and ``pack-layout.png``: they show sha256 instead of the
-store hash, and this one the format version ``0x01`` instead of ``0x02``.
+TODO: redraw this figure: it shows sha256 instead of the store hash, and the format
+version ``0x01`` instead of ``0x02``.
 
 A reader locates the next blob by advancing::
 

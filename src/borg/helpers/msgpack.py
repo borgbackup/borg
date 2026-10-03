@@ -61,6 +61,7 @@ from msgpack import version as mp_version
 
 from msgpack import ExtType, Timestamp
 from msgpack import OutOfData
+from msgpack import ExtraData as ExtraData
 
 
 version = mp_version

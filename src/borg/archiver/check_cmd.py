@@ -184,8 +184,11 @@ class CheckMixIn:
            archive data (requires ``--verify-data``). This includes ensuring that the
            repository manifest exists, the archive metadata chunk is present, and that
            all chunks referencing files (items) in the archive exist. This requires
-           reading archive and file metadata, but not data. To scan for archives whose
-           entries were lost from the archive directory, pass ``--find-lost-archives``.
+           reading archive and file metadata, but not data. Without ``--repair``, this step
+           first reports the packs the chunk index references, but that are missing from
+           the repository; the objects stored in them are then reported as missing. To scan
+           for archives whose entries were lost from the archive directory, pass
+           ``--find-lost-archives``.
            It has to look at the metadata of every object in the repository (only for the
            archive metadata objects it finds that way, it also reads the object data), so
            it is very time-consuming for big repositories.

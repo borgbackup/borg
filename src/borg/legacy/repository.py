@@ -1152,6 +1152,10 @@ class LegacyRepository:
         for id_ in ids:
             yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
 
+    def gather_many(self, ids, raise_missing=True):
+        # a legacy repository has no packs, so this is just get_many (same interface as Repository).
+        return self.get_many(ids, raise_missing=raise_missing)
+
     def put(self, id, data, wait=True):
         """put a repo object
 

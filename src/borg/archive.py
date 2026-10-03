@@ -434,7 +434,12 @@ class DownloadPipeline:
         # All-zero chunks can be served directly from the zeros constant, without repository access.
         zero_flags = zero_chunk_flags(ids, sizes, self.repo_objs.key.id_hash)
         fetch_ids = [id for id, zero in zip(ids, zero_flags) if not zero]
-        fetched = self.repository.get_many(fetch_ids, raise_missing=False)
+        if ro_type == ROBJ_ARCHIVE_STREAM:
+            # item metadata chunks are small and spread over packs that mostly hold file content chunks,
+            # so read just their byte ranges instead of loading whole packs.
+            fetched = self.repository.gather_many(fetch_ids, raise_missing=False)
+        else:
+            fetched = self.repository.get_many(fetch_ids, raise_missing=False)
         for id, size, zero in zip(ids, sizes, zero_flags):
             if zero:
                 yield zeros[:size]
@@ -547,7 +552,7 @@ def archive_get_items(metadata, *, repo_objs, repository):
     if "item_ptrs" in metadata:  # looks like a v2+ archive
         assert "items" not in metadata
         items = []
-        for id, cdata in zip(metadata.item_ptrs, repository.get_many(metadata.item_ptrs)):
+        for id, cdata in zip(metadata.item_ptrs, repository.gather_many(metadata.item_ptrs)):
             _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_CHUNKIDS)
             ids = msgpack.unpackb(data)
             items.extend(ids)
@@ -2770,7 +2775,7 @@ class ArchiveChecker:
                     continue
                 if state > 0:
                     unpacker.resync()
-                for chunk_id, cdata in zip(items, self.repository.get_many(items)):
+                for chunk_id, cdata in zip(items, self.repository.gather_many(items)):
                     try:
                         _, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_ARCHIVE_STREAM)
                         unpacker.feed(data)

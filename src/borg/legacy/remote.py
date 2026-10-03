@@ -619,6 +619,10 @@ class LegacyRemoteRepository:
         # note: legacy remote protocol does not support raise_missing parameter, so we ignore it here
         yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids])
 
+    def gather_many(self, ids, raise_missing=True):
+        # a legacy repository has no packs, so this is just get_many (same interface as Repository).
+        return self.get_many(ids, raise_missing=raise_missing)
+
     @api(since=parse_version("1.0.0"))
     def put(self, id, data, wait=True):
         """actual remoting is done via self.call in the @api decorator"""

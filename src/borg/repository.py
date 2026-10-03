@@ -2019,7 +2019,8 @@ class Repository:
         One store.gather call reads the byte ranges of up to GATHER_MAX_COUNT objects (or about GATHER_MAX_SIZE
         bytes) from any number of packs, so a backend that supports it (e.g. REST) needs one roundtrip per batch
         instead of one per object. This suits many small objects spread over many packs, like the archive
-        metadata objects (each usually in a tiny pack of its own). get_many() loads whole packs instead, which
+        metadata objects (each usually in a tiny pack of its own) and the item metadata chunks of an archive
+        (written into the packs between file content chunks). get_many() loads whole packs instead, which
         suits reading most of the objects of a pack.
 
         raise_missing: like for get(). Ids whose objects cannot be gathered (unknown or still buffered ids, and

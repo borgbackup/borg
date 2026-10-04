@@ -1487,8 +1487,8 @@ class Repository:
         with a corrupt index, but a corrupt index already means the user has to repair it, and that
         rebuild re-reads every pack anyway - so a read-only check just stops and reports it instead of
         continuing. A read-only check never rebuilds the index: reading every pack to do so would be
-        far too slow and expensive for a routine (e.g. cron) check. With repair=True, every pack is
-        verified, then each pack recorded corrupt is salvaged (see authenticate) and the index updated by
+        far too slow and expensive for a routine (e.g. cron) check. With repair=True, the packs are
+        verified (see max_age), then each pack recorded corrupt is salvaged (see authenticate) and the index updated by
         the salvage is stored. With repo_only, and if no pack is left corrupt, a corrupt index is then
         rebuilt from the packs' object headers and stored. Without repo_only, the archives phase rebuilds
         and stores the index (see ArchiveChecker.check and ArchiveChecker.finish), refs #10434. Packs are
@@ -1518,7 +1518,8 @@ class Repository:
         max_age, accepting a future timestamp up to MAX_CLOCK_SKEW (clock skew). Results are recorded
         regardless of max_age. Packs recorded corrupt are never skipped, so a repair sees a current
         result for every pack it salvages. max_age is ignored if repair and repo_only run with a
-        corrupt index, because the index is rebuilt from the packs verified in this run (see above).
+        corrupt index (an index error of the store hash check or of the cross-check), because the
+        index is rebuilt from the packs verified in this run (see above).
 
         repo_only: whether this is a repository-only run. Required if repair. In repair mode, if True, a
         corrupt index is rebuilt here (see above), and damage repair does not fix, i.e. a corrupt pack left
@@ -1617,21 +1618,8 @@ class Repository:
         if index_errors == 0 or repair:
             # verify the packs; during repair, rebuild the corrupt index from them afterwards.
             # --repair forbids --max-duration, so the partial handling in the loop stays inactive
-            # during a repair. max_age reuse is active, except in the branch right below.
+            # during a repair. max_age reuse is active, unless it is reset after the cross-check below.
             packs_scanned = True
-            if index_errors and repo_only:
-                logger.warning(
-                    "Repository index is corrupted; verifying all packs before deciding whether to "
-                    "rebuild it from them."
-                )
-                if max_age:
-                    # the rebuild below reads the packs of this run, so no intact record is reused.
-                    logger.info("Ignoring --max-age: every pack is verified for the index rebuild.")
-                    max_age = 0
-            elif index_errors:
-                logger.warning(
-                    "Repository index is corrupted; verifying all packs, the archives check rebuilds the index."
-                )
             # packs are the bulk of the work and the part --max-duration spreads over several checks.
             pack_infos = store_list("packs")
             # drop objects whose name is not a valid pack name and count them as errors; the code
@@ -1700,6 +1688,20 @@ class Repository:
                         logger.info(f"{len(orphan_pack_ids)} pack(s) are not referenced by the index.")
                         for pack_id in orphan_pack_ids:
                             logger.debug(f"Orphan pack: {bin_to_hex(pack_id)}")
+            # index_errors is final here: the cross-check above can add to the errors of the store hash check.
+            if repair and index_errors and repo_only:
+                logger.warning(
+                    "Repository index is corrupted; verifying all packs before deciding whether to "
+                    "rebuild it from them."
+                )
+                if max_age:
+                    # the rebuild below reads the packs of this run, so no intact record is reused.
+                    logger.info("Ignoring --max-age: every pack is verified for the index rebuild.")
+                    max_age = 0
+            elif repair and index_errors:
+                logger.warning(
+                    "Repository index is corrupted; verifying the packs, the archives check rebuilds the index."
+                )
             if partial:
                 # a partial check stops after max_duration; verify the least-recently-checked packs
                 # first so repeated runs cover every pack. sort by recorded check time, unrecorded
@@ -1759,7 +1761,7 @@ class Repository:
             # rebuild only on a repository-only repair, if no pack is left corrupt and every pack was verified
             # this run: sig_int breaks the loop early, so "no corrupt pack" must be paired with "all packs
             # scanned" (pack_files == len(pack_infos)) to not rebuild from unverified packs. max_age was
-            # set to 0 above for exactly this path, so no pack was skipped.
+            # set to 0 after the index cross-check for exactly this path, so no pack was skipped.
             if (
                 repair
                 and repo_only

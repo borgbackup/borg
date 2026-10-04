@@ -308,7 +308,8 @@ class CheckMixIn:
 
         In practice, repair mode hooks into both the repository and archive checks:
 
-        1. When checking the repository's consistency, repair mode verifies every pack. It
+        1. When checking the repository's consistency, repair mode verifies the packs (all
+           of them, or with ``--max-age`` those without a recent intact result). It
            salvages each pack that fails its store hash (a pack is named by the hash of its
            content): the pack is replaced by one holding only its objects whose header,
            metadata and data authenticate with the key, the rest is dropped and the index

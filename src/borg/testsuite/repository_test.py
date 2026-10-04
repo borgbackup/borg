@@ -4274,3 +4274,28 @@ def test_check_repair_repo_only_ignores_max_age_with_a_corrupt_index(tmp_path, c
             assert check_repair(repository, repo_objs, repo_only=True, max_age=3600) is True
         assert "Ignoring --max-age" in caplog.text
         assert "packs/" + bin_to_hex(pack_id) in hashed_keys
+
+
+def test_check_repair_repo_only_ignores_max_age_with_a_fragment_failing_authentication(tmp_path, caplog, monkeypatch):
+    # a fragment that matches its name, but fails the authentication, is found by the index cross-check
+    # only. The repair then also verifies every pack, reuses no record and rebuilds the index.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    [(objs, pack_id)] = create_repo_with_real_packs(location, repo_objs)
+    with Repository(location, exclusive=True) as repository:
+        with io.BytesIO() as f:
+            ChunkIndex().write(f)
+            data = f.getvalue()  # plaintext, not in the key's envelope
+        name = store_hash(data).hexdigest()
+        repository.store_store(f"index/{name}", data)
+        tracker = PackTracker.new(repository)
+        tracker.record(pack_id, ok=True)  # fresh timestamp
+        tracker.save()
+    with Repository(location, exclusive=True) as repository:
+        hashed_keys = _spy_hash(repository, monkeypatch)
+        with caplog.at_level(logging.INFO, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=True, max_age=3600) is True
+        assert "Ignoring --max-age" in caplog.text
+        assert "packs/" + bin_to_hex(pack_id) in hashed_keys
+        assert name not in {info.name for info in repository.store_list("index")}
+        assert repository.check(repair=False) is True

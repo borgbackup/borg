@@ -2286,8 +2286,9 @@ class RobustUnpacker:
                 error = e.args[0] if e.args else None
                 if isinstance(error, msgpack.ExtraData):
                     item = error.unpacked
-                # unpackb limits the element count of arrays/maps to the data length and raises "exceeds max_..._len"
-                # for a larger count, so this error also means that the data ends within the object.
+                # unpackb limits array/map element counts (the pure-Python msgpack: also bin/str/ext lengths) to the
+                # data length and raises "exceeds max_..._len" for a larger value, so this error also means that the
+                # data ends within the object.
                 elif type(error) is ValueError and ("incomplete input" in str(error) or "exceeds max_" in str(error)):
                     return INCOMPLETE
                 else:

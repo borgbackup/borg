@@ -61,7 +61,7 @@ from msgpack import version as mp_version
 
 from msgpack import ExtType, Timestamp
 from msgpack import OutOfData
-from msgpack import ExtraData as ExtraData
+from msgpack import ExtraData  # NOQA
 
 
 version = mp_version

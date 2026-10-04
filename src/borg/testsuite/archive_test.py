@@ -512,6 +512,15 @@ def test_resync_item_spanning_feeds():
     assert feed_and_unpack(unpacker, split(data, 16)) == [item, {"path": "bar"}]
 
 
+def test_resync_item_with_long_chunk_list_spanning_feeds():
+    # the chunks array header declares more elements than bytes are fed when the item start is tried.
+    item = {"chunks": [[bytes(32), 1000]] * 1000, "path": "foo"}
+    unpacker = RobustUnpacker(validator=_validator)
+    unpacker.resync()
+    data = b"garbage" + msgpack.packb(item) + make_chunks(["bar"])
+    assert feed_and_unpack(unpacker, split(data, 16)) == [item, {"path": "bar"}]
+
+
 def test_resync_forgets_long_incomplete_item():
     item = {"acl_access": b"x" * 1000, "path": "foo"}
     unpacker = RobustUnpacker(validator=_validator)

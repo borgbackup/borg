@@ -24,7 +24,7 @@ from ...cache import (
 from ...crypto.key import RepositoryKeyInfoMissing
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, hex_to_bin, CommandError, CorruptPack, Error, ProgressIndicatorPercent, sig_int
-from ...helpers import BackupDamagedChunksError
+from ...helpers import BackupDamagedChunksError, IntegrityError
 from ...helpers.passphrase import PassphraseWrong
 from ...hashindex import ChunkIndex
 from ...item import Item
@@ -1093,7 +1093,8 @@ def test_check_repository_only_repair_aborts_on_wrong_passphrase(archivers, requ
         cmd(archiver, "check", "-v", "--repository-only", "--repair")
 
 
-def test_check_undelete_archives(archivers, request):
+@pytest.mark.parametrize("verify_data_args", [[], ["--verify-data"]])
+def test_check_undelete_archives(archivers, request, verify_data_args):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)  # creates archive1 and archive2
     existing_archive_ids = set(cmd(archiver, "repo-list", "--short").splitlines())
@@ -1106,14 +1107,19 @@ def test_check_undelete_archives(archivers, request):
     assert "archive2" in output
     assert "archive3" not in output
     # borg check will re-discover archive3 and create a new archives directory entry.
-    cmd(archiver, "check", "--repair", "--find-lost-archives", exit_code=0)
+    output = cmd(archiver, "check", "--repair", "--find-lost-archives", *verify_data_args, "--debug", exit_code=0)
+    # with --verify-data, the search uses the 3 archive metadata objects verify_data found.
+    reused = "Using the 3 archive metadata objects found by verify_data." in output
+    assert reused == bool(verify_data_args)
+    assert f"Creating archives directory entry for archive3 {new_archive_id_hex}." in output
     output = cmd(archiver, "repo-list")
     assert "archive1" in output
     assert "archive2" in output
     assert "archive3" in output
 
 
-def test_spoofed_archive(archivers, request):
+@pytest.mark.parametrize("verify_data_args", [[], ["--verify-data"]])
+def test_spoofed_archive(archivers, request, verify_data_args):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
@@ -1144,7 +1150,7 @@ def test_spoofed_archive(archivers, request):
         repository.flush()  # make the put durable before close()/the check below
     # the attacker would hope that the search for lost archives picks the fake archive up, but
     # borg notices that the object has the wrong ro_type.
-    cmd(archiver, "check", "--repair", "--find-lost-archives", "--debug", exit_code=0)
+    cmd(archiver, "check", "--repair", "--find-lost-archives", *verify_data_args, "--debug", exit_code=0)
     output = cmd(archiver, "repo-list")
     assert "archive1" in output
     assert "archive2" in output
@@ -1938,6 +1944,157 @@ def test_verify_data_reports_a_missing_pack(archivers, request, monkeypatch):
         # each pack was loaded once, the missing one included, and the scan continued past it.
         packs = {entry.pack_id for _, entry in repository.chunks.iteritems()}
         assert sorted(loaded) == sorted("packs/" + bin_to_hex(pack_id) for pack_id in packs)
+
+
+def test_verify_data_collects_archive_meta_ids(archivers, request, monkeypatch):
+    """verify_data() collects the archive metadata object ids, rebuild_archives_directory() then reads only these."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    cmd(archiver, "delete", "-a", "archive2")  # a soft-deleted archive is found, too
+    archive_ids = {bytes.fromhex(line) for line in cmd(archiver, "repo-list", "--short", "--deleted").splitlines()}
+    archive_ids |= {bytes.fromhex(line) for line in cmd(archiver, "repo-list", "--short").splitlines()}
+    assert len(archive_ids) == 2
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+
+        checker.verify_data()
+
+        assert checker.archive_meta_ids == archive_ids
+        checker.manifest = Manifest.load(repository, key=checker.key)
+        orig_get = repository.get
+        read_data_args = []
+
+        def get(id, read_data=True, **kwargs):
+            read_data_args.append(read_data)
+            return orig_get(id, read_data=read_data, **kwargs)
+
+        monkeypatch.setattr(repository, "get", get)
+
+        checker.rebuild_archives_directory()
+
+        assert not checker.error_found  # both archives have their archives directory entry
+        assert read_data_args == [True, True]  # one full read per archive metadata object
+
+
+def test_verify_data_interrupted_collects_no_archive_meta_ids(archivers, request, monkeypatch):
+    """An interrupted verify_data() leaves archive_meta_ids at None."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+        orig_get_many = repository.get_many
+
+        def get_many_then_interrupt(ids, **kwargs):
+            # Ctrl-C before the first object is verified.
+            sig_int._sig_int_triggered = True
+            yield from orig_get_many(ids, **kwargs)
+
+        monkeypatch.setattr(repository, "get_many", get_many_then_interrupt)
+        try:
+            checker.verify_data()
+        finally:
+            sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+
+        assert checker.archive_meta_ids is None
+
+
+def test_verify_data_repair_collects_archive_meta_ids_of_retried_chunks(archivers, request, monkeypatch):
+    """Objects that fail once, but not on the --repair retry, are kept. Only archive metadata ids are collected."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive_ids = {bytes.fromhex(line) for line in cmd(archiver, "repo-list", "--short").splitlines()}
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+        checker.repair = True
+        other_id = next(id for id, _ in checker.chunks.iteritems() if id not in archive_ids)
+        flaky_ids = {min(archive_ids), other_id}
+        orig_parse = checker.repo_objs.parse
+        failed = set()
+
+        def parse_failing_once(id, *args, **kwargs):
+            if id in flaky_ids and id not in failed:
+                failed.add(id)
+                raise IntegrityError("simulated transient read error")
+            return orig_parse(id, *args, **kwargs)
+
+        monkeypatch.setattr(checker.repo_objs, "parse", parse_failing_once)
+
+        checker.verify_data()
+
+        assert failed == flaky_ids
+        assert all(id in repository.chunks for id in flaky_ids)  # not deleted, the retry succeeded
+        assert checker.archive_meta_ids == archive_ids
+
+
+@pytest.mark.parametrize("verify_data_args", [[], ["--verify-data"]])
+def test_check_find_lost_archives_corrupt_archive_meta(archivers, request, verify_data_args):
+    """A corrupt archive metadata object is reported by --verify-data or else by the search for lost archives."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive_ids = [bytes.fromhex(line) for line in cmd(archiver, "repo-list", "--short").splitlines()]
+    with open_repository(archiver) as repository:
+        corrupt_chunk_on_disk(repository, min(archive_ids))
+    output = cmd(archiver, "check", "--find-lost-archives", *verify_data_args, exit_code=1)
+    assert (f"chunk {bin_to_hex(min(archive_ids))}, integrity error" in output) == bool(verify_data_args)
+    assert ("Skipping corrupted chunk" in output) == (not verify_data_args)
+
+
+@pytest.mark.parametrize("verify_data", [False, True])
+def test_rebuild_archives_directory_interrupted(archivers, request, monkeypatch, verify_data):
+    """With sig_int set, rebuild_archives_directory() reads no object."""
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+        if verify_data:
+            checker.verify_data()
+            assert checker.archive_meta_ids is not None
+        checker.manifest = Manifest.load(repository, key=checker.key)
+        read_ids = []
+
+        def get(id, **kwargs):
+            read_ids.append(id)
+
+        monkeypatch.setattr(repository, "get", get)
+        sig_int._sig_int_triggered = True
+        try:
+            checker.rebuild_archives_directory()
+        finally:
+            sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+
+        assert read_ids == []
+
+
+@pytest.mark.parametrize(
+    "damage, error_found", [("corrupt", True), ("not_archive_meta", False), ("invalid_msgpack", False)]
+)
+def test_rebuild_archives_directory_skips_unusable_archive_meta_ids(archivers, request, damage, error_found):
+    """rebuild_archives_directory() skips an archive_meta_ids object it can not use as archive metadata.
+
+    Only a corrupt object sets error_found.
+    """
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive_ids = {bytes.fromhex(line) for line in cmd(archiver, "repo-list", "--short").splitlines()}
+    with open_repository(archiver) as repository:
+        checker = _archive_checker(repository)
+        checker.verify_data()
+        assert checker.archive_meta_ids == archive_ids
+        checker.manifest = Manifest.load(repository, key=checker.key)
+        if damage == "corrupt":
+            corrupt_chunk_on_disk(repository, min(archive_ids))
+        elif damage == "not_archive_meta":
+            checker.archive_meta_ids.add(next(id for id, _ in checker.chunks.iteritems() if id not in archive_ids))
+        else:
+            data = b"\xc1"  # a byte msgpack never uses
+            id = checker.repo_objs.id_hash(data)
+            repository.put(id, checker.repo_objs.format(id, {}, data, ro_type=ROBJ_ARCHIVE_META))
+            repository.flush()
+            checker.archive_meta_ids.add(id)
+
+        checker.rebuild_archives_directory()
+
+        assert checker.error_found == error_found
 
 
 def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):

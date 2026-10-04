@@ -88,9 +88,6 @@ class CheckMixIn:
             max_age = 0
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
-        if args.repair and args.max_age is not None:
-            # repair salvages and rebuilds from the packs this run verified, so it verifies every pack.
-            raise CommandError("--repair does not allow the --max-age option.")
         if args.archives_only and args.max_age is not None:
             # --max-age only affects the repository check; --archives-only skips it.
             raise CommandError("--archives-only does not allow the --max-age option.")
@@ -215,7 +212,13 @@ class CheckMixIn:
         ``1y``). Check results are recorded in any case; ``--max-age`` only controls
         their reuse. Packs recorded corrupt are always re-verified. ``--max-age``
         affects only the repository check and cannot be combined with
-        ``--archives-only`` or ``--repair``.
+        ``--archives-only``.
+
+        ``--repair`` reuses intact results in the same way. It always re-verifies the
+        packs recorded corrupt, which are the ones it salvages. With
+        ``--repository-only``, a corrupt repository index makes the repair verify every
+        pack and ignore ``--max-age``, because it rebuilds the index from the packs it
+        verified in that run.
 
         The ``--max-duration`` option splits a long-running repository check into
         several partial checks. After the given number of seconds, the check is
@@ -309,7 +312,8 @@ class CheckMixIn:
 
         In practice, repair mode hooks into both the repository and archive checks:
 
-        1. When checking the repository's consistency, repair mode verifies every pack. It
+        1. When checking the repository's consistency, repair mode verifies the packs (all
+           of them, or with ``--max-age`` those without a recent intact result). It
            salvages each pack that fails its store hash (a pack is named by the hash of its
            content): the pack is replaced by one holding only its objects whose header,
            metadata and data authenticate with the key, the rest is dropped and the index

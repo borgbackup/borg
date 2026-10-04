@@ -17,7 +17,8 @@ from ...constants import *  # NOQA
 from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal, Location, RTError
 from ...platformflags import is_win32
-from .. import has_lchflags, has_any_fuse, ENOATTR
+from ...fuse_impl import has_any_fuse
+from .. import has_lchflags, ENOATTR
 from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import fakeroot_detected, skipif_not_linux, skipif_fakeroot_detected

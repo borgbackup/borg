@@ -9,11 +9,14 @@ import builtins
 import errno
 import importlib
 import os
+import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
 
-from . import has_llfuse, has_pyfuse3, has_mfusepy, ENOATTR
+from ..fuse_impl import has_llfuse, has_pyfuse3, has_mfusepy
+from . import ENOATTR
 
 skipif_no_llfuse_api = pytest.mark.skipif(not (has_llfuse or has_pyfuse3), reason="llfuse/pyfuse3 not available")
 skipif_no_mfusepy = pytest.mark.skipif(not has_mfusepy, reason="mfusepy not available")
@@ -184,3 +187,10 @@ def test_fuse_import_errors_recorded():
             }
     finally:
         importlib.reload(borg.fuse_impl)  # restore the real state
+
+
+def test_fuse_not_imported_by_archiver():
+    """Only borg mount loads a FUSE library: libfuse warns on every fork of a threaded process."""
+    code = "import sys, borg.archiver; print(sorted(m for m in sys.modules if 'fuse' in m))"
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert result.stdout.strip() == "[]"

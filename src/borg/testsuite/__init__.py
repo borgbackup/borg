@@ -20,15 +20,11 @@ try:
 except:  # noqa
     raises = None
 
-from ..fuse_impl import llfuse, has_any_fuse, has_llfuse, has_pyfuse3, has_mfusepy, ENOATTR  # NOQA
 from .. import platform
 
 # import these directly: the borg.testsuite.platform subpackage shadows the platform name above.
-from ..platform import get_birthtime_ns, set_times
+from ..platform import get_birthtime_ns, set_times, ENOATTR  # NOQA
 from ..platformflags import is_win32, is_darwin
-
-# Does this version of llfuse support ns precision?
-have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, "st_mtime_ns") if llfuse else False
 
 has_mknod = hasattr(os, "mknod")
 

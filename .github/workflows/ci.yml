@@ -1066,6 +1066,14 @@ jobs:
               pkgman install -y lz4_devel openssl3_devel
               pkgman install -y rust_bin
 
+              # haiku r1beta6 corrupts data: a write() from a memory mapped file can silently
+              # store stale pages, see https://dev.haiku-os.org/ticket/20392. That breaks rust
+              # builds (rustc copies mapped object files into its .rlib archives). The shim
+              # replaces private file mappings by anonymous memory filled via pread(), we
+              # preload it into everything we run here.
+              gcc -O2 -Wall -shared -fPIC -o /boot/home/haiku_mmap_pread_shim.so scripts/haiku_mmap_pread_shim.c
+              export LD_PRELOAD=/boot/home/haiku_mmap_pread_shim.so
+
               python3 -m ensurepip --upgrade
               python3 -m pip install --upgrade pip wheel
               python3 -m venv .venv
@@ -1075,30 +1083,8 @@ jobs:
               export BORG_LIBLZ4_PREFIX=/system/develop
               export BORG_OPENSSL_PREFIX=/system/develop
 
-              # this VM corrupts data every now and then: rustc crashed on crate metadata it
-              # had written itself ("assertion failed: bytes[len] == STR_SENTINEL") and pip
-              # found sha256 mismatches reading big wheels back from its own cache. Build
-              # outside /boot/system/cache/tmp (haiku's /tmp) and run one rustc at a time,
-              # in case that corruption comes from disk or memory pressure.
-              export TMPDIR=/boot/home/borg-tmp
-              mkdir -p "$TMPDIR"
-              export CARGO_TARGET_DIR="$TMPDIR/cargo-target"
-              export CARGO_BUILD_JOBS=1
-
-              # retry a pip install that hit a corrupted file, dropping the cached (possibly
-              # corrupted) files first, so one of them does not fail the whole job - and does
-              # not end up in the actions cache, failing every following run, too.
-              pip_install() {
-                for attempt in 1 2 3; do
-                  pip install "$@" && return 0
-                  echo "*** pip install failed (attempt $attempt), purging the pip cache and retrying ***"
-                  pip cache purge || true
-                done
-                return 1
-              }
-
-              pip_install -r requirements.d/development.lock.txt
-              pip_install -e .
+              pip install -r requirements.d/development.lock.txt
+              pip install -e .
 
               # troubles with either tox or pytest xdist, so we run pytest manually:
               pytest -v -n auto -rs --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml --benchmark-skip -k "not remote and not socket"

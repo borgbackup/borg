@@ -6,7 +6,7 @@ import pytest
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, hex_to_bin, sig_int, Error, CompressionSpec, IntegrityError
 from ...repository import Repository, PackReader, PackTracker, repo_lister
-from ...cache import list_chunkindex_hashes
+from ...cache import list_chunkindex_hashes, write_chunkindex_to_repo
 from ...manifest import Manifest
 from ...compress import ZSTD, ZLIB, LZ4, CNONE
 from ...archiver.repo_compress_cmd import PackRecompressor
@@ -349,26 +349,27 @@ def test_transform_pack_drops_superseded_gap(tmp_path):
         assert pdchunk(repository.get(H(1))) == b"XXXX"  # the authoritative copy in pack B
 
 
-@pytest.mark.parametrize("untrusted", ("missing", "corrupt", "truncated"))
+@pytest.mark.parametrize("untrusted", ("missing", "corrupt", "truncated", "overlap"))
 def test_repo_compress_keeps_duplicate_indexed_in_untrusted_pack(archiver, untrusted):
-    # X is indexed in pack B, pack A holds another copy of X in a gap. With pack B missing from the
-    # store, recorded corrupt or truncated before the end of X, the copy in pack A may be the only
-    # readable one: repo-compress keeps it (#10474).
+    # X and Z are indexed in pack B, pack A holds another copy of X in a gap. With pack B missing from
+    # the store, recorded corrupt, truncated or with overlapping index entries, the copy in pack A may
+    # be the only readable one: repo-compress keeps it (#10474).
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     with open_repository(archiver) as repository:
         repo_objs = Manifest.load(repository).repo_objs
-        w, x = b"W" * 1000, b"X" * 1000
-        w_id, x_id = repo_objs.id_hash(w), repo_objs.id_hash(x)
+        w, x, z = b"W" * 1000, b"X" * 1000, b"Z" * 1000
+        w_id, x_id, z_id = repo_objs.id_hash(w), repo_objs.id_hash(x), repo_objs.id_hash(z)
         repository._pack_writer.max_count = 2  # one flush() -> one pack
         for cid, data in [(w_id, w), (x_id, x)]:
             repository.put(cid, repo_objs.format(cid, {}, data, ro_type=ROBJ_FILE_STREAM))
         repository.flush()
         pack_a = repository.chunks[w_id].pack_id
         # repo-compress processes the packs in pack id order and stops with an error at a truncated
-        # pack: pack A must be rewritten before, so pack B needs the higher pack id. The pack id
-        # depends on the random nonce of X.
+        # pack or at one with overlapping index entries: pack A must be rewritten before, so pack B
+        # needs the higher pack id. The pack id depends on the random nonces of X and Z.
         while True:
-            repository.put(x_id, repo_objs.format(x_id, {}, x, ro_type=ROBJ_FILE_STREAM))
+            for cid, data in [(x_id, x), (z_id, z)]:
+                repository.put(cid, repo_objs.format(cid, {}, data, ro_type=ROBJ_FILE_STREAM))
             repository.flush()
             pack_b = repository.chunks[x_id].pack_id
             key_b = "packs/" + bin_to_hex(pack_b)
@@ -381,11 +382,16 @@ def test_repo_compress_keeps_duplicate_indexed_in_untrusted_pack(archiver, untru
             tracker = PackTracker.load(repository)
             tracker.record(pack_b, False)
             tracker.save()
-        else:
+        elif untrusted == "truncated":
             repository.store_store(key_b, repository.store_load(key_b)[:-1])
+        else:
+            chunks = repository.chunks
+            chunks[z_id] = chunks[z_id]._replace(obj_offset=chunks[x_id].obj_offset + 1)
+            write_chunkindex_to_repo(repository, chunks, incremental=False, force_write=True, delete_other=True)
 
-    if untrusted == "truncated":
-        with pytest.raises(IntegrityError, match="object extends past end of file"):
+    if untrusted in ("truncated", "overlap"):
+        error = "object extends past end of file" if untrusted == "truncated" else "overlapping objects"
+        with pytest.raises(IntegrityError, match=error):
             cmd(archiver, "repo-compress", "-C", "none")
     else:
         cmd(archiver, "repo-compress", "-C", "none", exit_code=EXIT_WARNING if untrusted == "corrupt" else 0)

@@ -46,6 +46,9 @@ RESYNC_WINDOW_SIZE = 1024 * 1024
 # how much to read to get an object's header plus, at the usual metadata slot sizes, its metadata
 # slot in the same read.
 META_READ_SIZE = 1024
+# how much of a gap superseded_gap_ranges reads at once after an object smaller than this, so that
+# small objects share a read. after a larger object, it reads META_READ_SIZE.
+GAP_READ_SIZE = 64 * 1024
 # the largest metadata slot a validating read fetches. a slot holds a few compression fields, packed
 # and encrypted, i.e. some tens of bytes, so this is a generous bound and it keeps a corrupt
 # meta_size, which only MAX_DATA_SIZE bounds, from triggering a large read.
@@ -575,6 +578,16 @@ class PackReader:
             offset += obj_size
 
 
+def decode_ranges(ranges):
+    """Return the (offset, size) tuples of byte ranges encoded as offset << 32 | size.
+
+    borg compact and borg repo-compress keep the byte ranges of all index entries, so they store each
+    as one int in an array. Offset and size are below 2**32, like obj_offset and obj_size in the
+    chunks index.
+    """
+    return [(r >> 32, r & 0xFFFFFFFF) for r in ranges]
+
+
 def check_pack_objects(pack_hex, obj_ranges, pack_size):
     """Validate a pack's indexed objects against the pack's file size.
 
@@ -604,10 +617,13 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
     the stored size of the indexed copy.
 
     Each gap is walked from object header to object header, stepping by the object size the header
-    states. An object is reported when it is a superseded duplicate and validate accepts it. The
-    walk over a gap ends at a header that does not parse or that reaches past the gap. Objects
-    validate rejects are kept, and so is the rest of a gap where the walk ends early; both are
-    logged as a warning with the pack id and the offset.
+    states. A read starts at an object header. It is GAP_READ_SIZE bytes at the start of a gap and
+    after an object smaller than that, so small objects share a read, and META_READ_SIZE bytes after
+    a larger object.
+    An object is reported when it is a superseded duplicate and validate accepts it. The walk over
+    a gap ends at a header that does not parse or that reaches past the gap. Objects validate
+    rejects are kept, and so is the rest of a gap where the walk ends early; both are logged as a
+    warning with the pack id and the offset.
 
     reader: PackReader of the pack.
     chunks: the chunks index (chunk id -> ChunkIndexEntry).
@@ -640,11 +656,15 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
     drop_ranges = []  # (obj_offset, obj_size) of superseded duplicates, offset-ordered
     hdr_size = RepoObj.obj_header.size
     for gstart, gend in gaps:
+        buf, buf_offset = memoryview(b""), gstart  # buf holds the gap bytes from buf_offset on
+        read_size = GAP_READ_SIZE
         offset = gstart
         while offset < gend:
-            # one read for the header and the metadata slot after it.
-            buf = reader.read(offset, min(gend - offset, META_READ_SIZE))
-            hdr, problem = PackReader._parse_header(buf[:hdr_size], offset, pack_size)
+            pos = offset - buf_offset  # position of the object in buf
+            if pos + META_READ_SIZE > len(buf) and buf_offset + len(buf) < gend:
+                # buf does not hold the header and the usual metadata slot of this object: read from here on.
+                buf, buf_offset, pos = memoryview(reader.read(offset, min(gend - offset, read_size))), offset, 0
+            hdr, problem = PackReader._parse_header(buf[pos : pos + hdr_size], offset, pack_size)
             if hdr is not None and offset + hdr_size + hdr.meta_size + hdr.data_size > gend:
                 hdr, problem = None, "object reaching past its gap"
             if hdr is None:
@@ -660,7 +680,7 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
                 and entry.pack_id not in untrusted_pack_ids
                 and (entry.pack_id != pack_id or entry.obj_offset != offset)
             ):
-                problem = reader._validation_problem(hdr, offset, buf, offset, validate)
+                problem = reader._validation_problem(hdr, offset, buf, buf_offset, validate)
                 if problem is None:
                     drop_ranges.append((offset, obj_size))
                 else:
@@ -672,6 +692,7 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
             # be a copy of an object inside another object's unencrypted data, whose range can cover
             # bytes of the gap objects after it, which would then be dropped.
             offset += obj_size
+            read_size = GAP_READ_SIZE if obj_size < GAP_READ_SIZE else META_READ_SIZE
     return drop_ranges
 
 
@@ -2160,6 +2181,7 @@ class Repository:
         chunks=None,
         before_old_pack_delete=None,
         untrusted_pack_ids=frozenset(),
+        superseded_ranges=None,
     ):
         """Rewrite pack <pack_id>, keeping <keep_ids> and dropping <drop_ids>, then delete the old pack.
 
@@ -2171,6 +2193,9 @@ class Repository:
         before_old_pack_delete: callable without arguments, called once just before the old pack is deleted.
             Not called when no bytes are dropped, since the old pack then stays.
         untrusted_pack_ids: passed to superseded_gap_ranges.
+        superseded_ranges: the (offset, size) ranges of the superseded duplicates to drop, as superseded_gap_ranges
+            returned them for this pack and this index. Default: superseded_gap_ranges is called here. If given,
+            validate and untrusted_pack_ids are not used.
 
         Together, keep_ids and drop_ids must cover every object the chunk index lists for this pack;
         an unlisted indexed object would keep its bytes in the new pack but its index entry would go
@@ -2214,13 +2239,20 @@ class Repository:
         # record the dropped objects' byte ranges; every other byte (kept objects and gaps that no
         # index entry covers) is copied into the new pack unchanged. superseded duplicates found in
         # the gaps are dropped along with them (see superseded_gap_ranges).
-        # TODO(#9868 follow-up): classify gaps in compact_packs pass 1 too, so superseded bytes count
-        # toward the rewrite threshold and a wholly superseded orphan pack can be dropped outright.
         drop_ranges = [(offset, size) for offset, _, size, keep in located if not keep]
-        reader = PackReader(store=self.store, pack_id=pack_id)
-        drop_ranges += superseded_gap_ranges(
-            reader, chunks, pack_id, obj_ranges, pack_size, validate=validate, untrusted_pack_ids=untrusted_pack_ids
-        )
+        if superseded_ranges is None:
+            reader = PackReader(store=self.store, pack_id=pack_id)
+            superseded_ranges = superseded_gap_ranges(
+                reader, chunks, pack_id, obj_ranges, pack_size, validate=validate, untrusted_pack_ids=untrusted_pack_ids
+            )
+        else:
+            # superseded duplicates lie in gaps: they overlap neither the listed objects nor each other.
+            covered = 0
+            for offset, size in sorted(obj_ranges + superseded_ranges):
+                assert offset >= covered, "superseded_ranges overlap an indexed object or each other"
+                covered = offset + size
+            assert covered <= pack_size, "superseded_ranges reach past the end of the pack"
+        drop_ranges += superseded_ranges
         drop_ranges.sort()
         dropped_bytes = sum(size for _, size in drop_ranges)  # on-disk bytes this rewrite frees, for --stats
 

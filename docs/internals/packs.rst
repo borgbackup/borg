@@ -280,18 +280,14 @@ stored as index fragment(s).
 A crash between steps 1 and 2 leaves blobs in ``packs/`` that no index entry covers
 (see `Gap bytes`_). No archive references these chunks. As the index does not
 list them, a later backup stores the chunks it needs again, which makes those blobs
-superseded duplicates. ``borg compact`` reclaims unused indexed objects, and the
-superseded duplicates in the packs it rewrites; a pack without index entries is not
-rewritten, so its bytes stay (a tiny one can be merged as a whole).
+superseded duplicates. ``borg compact`` reclaims unused indexed objects and superseded
+duplicates; the other blobs no index entry covers stay.
 
 A full ``borg check --repair`` (``--repository-only`` rebuilds the index only if it
 is corrupt) rebuilds the index from the packs (see :ref:`pack-recovery`) and indexes
 one copy per chunk id, so the blobs whose chunk id had no index entry become indexed,
 and ``borg compact`` reclaims them once unused. The other copies stay superseded
-duplicates and are only reclaimed when ``borg compact`` rewrites their pack to reclaim
-unused indexed objects.
-TODO: count superseded duplicates as reclaimable, so ``borg compact`` also rewrites a
-pack that holds only used objects and superseded duplicates, see :issue:`10471`.
+duplicates, which ``borg compact`` reclaims as well.
 
 A crash between steps 2 and 3 leaves index entries for objects no archive
 references. They point to valid, fully-written pack data, and ``borg compact``
@@ -302,8 +298,9 @@ archive pointer write is the commit point: archives are listed from the
 ``archives/`` namespace, so data not referenced by any archive pointer is
 unreachable, and ``borg compact`` treats its indexed objects as unused.
 
-Pack files are removed by ``borg compact`` (dropping packs whose indexed objects are
-all unused, rewriting packs above ``--threshold`` and merging tiny packs),
+Pack files are removed by ``borg compact`` (dropping packs that hold only unused
+objects and superseded gap blobs, see `Gap bytes`_, rewriting packs above
+``--threshold`` and merging tiny packs),
 ``borg check --repair`` (when it drops a defective object, and when it salvages a
 pack recorded corrupt), ``borg repo-compress`` (``Repository.transform_pack`` stores
 the re-compressed pack under its new content-addressed name and deletes the old one)
@@ -332,14 +329,27 @@ Validation covers ``meta_size`` and ``data_size``, so a dropped range is exactly
 Without a validator (``validate=None``), no gap bytes are dropped. A superseded blob is
 also kept when its indexed copy may be unreadable: ``borg compact`` and ``borg repo-compress``
 keep it when that copy is in a pack that is missing from the store, recorded corrupt, or
-shorter than its index entries state, ``borg check --repair --verify-data`` when that copy is
-in a missing pack or in a pack holding a defect chunk. Merging packs (``merge_packs``) copies
+whose index entries overlap or reach past the end of the pack file,
+``borg check --repair --verify-data`` when that copy is in a missing pack or in a pack holding
+a defect chunk. Merging packs (``merge_packs``) copies
 whole pack files, so it keeps all gap bytes.
 
-The walk over a gap steps from header to header by the blob size each header states. It ends
-at a header that does not parse or that reaches past the gap. The rest of that gap is kept,
-and so is a superseded blob that does not validate; both are logged as a warning with the
-pack id and the offset.
+``borg compact`` walks the gaps of every pack not recorded corrupt and adds the superseded
+gap blobs to the pack's unused indexed bytes. The sum decides whether the pack is rewritten
+(``--threshold``), and a pack holding only unused indexed objects and superseded gap blobs is
+deleted. A rewrite drops the superseded gap blobs that this walk found. ``borg compact``
+checks the index entries of every pack: a pack in which they overlap or reach past the end
+of the pack file is logged as an error and left unchanged; its gaps are not walked, and a
+gap blob whose indexed copy is in such a pack is kept. If the space to reclaim in the whole
+repository is too small for ``borg compact`` to delete or rewrite packs, a tiny pack whose
+indexed objects are all used is merged, superseded gap blobs included.
+
+The walk over a gap steps from header to header by the blob size each header states. A read
+starts at a blob header. It is ``GAP_READ_SIZE`` (64 kiB) at the start of a gap and after a
+blob smaller than that, so small blobs share a store request, and ``META_READ_SIZE`` (1 kiB)
+after a larger blob. The walk ends at a header that does not parse or that reaches past the gap. The rest of
+that gap is kept, and so is a superseded blob that does not validate; both are logged as a
+warning with the pack id and the offset.
 
 
 .. _pack-index-namespace:

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import get_cache_dir, bin_to_hex, sig_int, Error
+from ...helpers import get_cache_dir, bin_to_hex, hex_to_bin, sig_int, Error
 from ...hashindex import ChunkIndex
 from ...repoobj import RepoObj
 from ...repository import Repository, PackReader, PackTracker
@@ -314,11 +314,11 @@ def test_compact_superseded_duplicate(tmp_path):
         assert new_size == pack_a_size - y_size - x_size
 
 
-@pytest.mark.parametrize("untrusted", ("missing", "corrupt"))
+@pytest.mark.parametrize("untrusted", ("missing", "corrupt", "truncated"))
 def test_compact_keeps_duplicate_indexed_in_untrusted_pack(tmp_path, untrusted):
     # X is indexed in pack B, pack A holds another copy of X in a gap. With pack B missing from the
-    # store or recorded corrupt, the copy in pack A may be the only readable one: rewriting pack A
-    # (for its unused Y) keeps it (#10474).
+    # store, recorded corrupt or truncated before the end of X, the copy in pack A may be the only
+    # readable one: rewriting pack A (for its unused Y) keeps it (#10474).
     location = os.fspath(tmp_path / "repo")
     with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
         manifest = gc_manifest(repository)
@@ -336,10 +336,13 @@ def test_compact_keeps_duplicate_indexed_in_untrusted_pack(tmp_path, untrusted):
         repository.flush()
         pack_b = repository.chunks[x_id].pack_id
         assert pack_b != pack_a
+        key_b = "packs/" + bin_to_hex(pack_b)
         if untrusted == "missing":
-            repository.store_delete("packs/" + bin_to_hex(pack_b))
-        else:
+            repository.store_delete(key_b)
+        elif untrusted == "corrupt":
             record_corrupt(repository, pack_b)
+        else:
+            repository.store_store(key_b, repository.store_load(key_b)[:-1])
         for cid in (w_id, x_id, y_id):
             flags = ChunkIndex.F_NONE if cid == y_id else ChunkIndex.F_USED
             repository.chunks[cid] = repository.chunks[cid]._replace(flags=flags)
@@ -348,11 +351,12 @@ def test_compact_keeps_duplicate_indexed_in_untrusted_pack(tmp_path, untrusted):
         gc.chunks = repository.chunks
         gc.compact_packs()
 
-        new_pack = repository.chunks[w_id].pack_id
-        assert new_pack != pack_a  # pack A was rewritten
-        new_size = next(i.size for i in repository.store_list("packs") if i.name == bin_to_hex(new_pack))
+        # the packs other than pack B: only the pack that replaced pack A.
+        packs = {i.name: i.size for i in repository.store_list("packs") if i.name != bin_to_hex(pack_b)}
+        ((new_pack_hex, new_size),) = packs.items()
+        assert new_pack_hex != bin_to_hex(pack_a)  # pack A was rewritten
         assert new_size == pack_a_size - y_size  # only the unused Y was dropped
-        reader = PackReader(store=repository.store, pack_id=new_pack)
+        reader = PackReader(store=repository.store, pack_id=hex_to_bin(new_pack_hex))
         assert x_id in [chunk_id for chunk_id, _, _ in reader.iter_headers()]  # the gap copy of X is kept
 
 

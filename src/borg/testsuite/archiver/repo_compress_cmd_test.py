@@ -4,8 +4,8 @@ import re
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, sig_int, Error, CompressionSpec
-from ...repository import Repository, PackReader, repo_lister
+from ...helpers import bin_to_hex, hex_to_bin, sig_int, Error, CompressionSpec, IntegrityError
+from ...repository import Repository, PackReader, PackTracker, repo_lister
 from ...cache import list_chunkindex_hashes
 from ...manifest import Manifest
 from ...compress import ZSTD, ZLIB, LZ4, CNONE
@@ -349,9 +349,11 @@ def test_transform_pack_drops_superseded_gap(tmp_path):
         assert pdchunk(repository.get(H(1))) == b"XXXX"  # the authoritative copy in pack B
 
 
-def test_repo_compress_keeps_duplicate_indexed_in_missing_pack(archiver):
+@pytest.mark.parametrize("untrusted", ("missing", "corrupt", "truncated"))
+def test_repo_compress_keeps_duplicate_indexed_in_untrusted_pack(archiver, untrusted):
     # X is indexed in pack B, pack A holds another copy of X in a gap. With pack B missing from the
-    # store, the copy in pack A is the only one left: repo-compress keeps it (#10474).
+    # store, recorded corrupt or truncated before the end of X, the copy in pack A may be the only
+    # readable one: repo-compress keeps it (#10474).
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     with open_repository(archiver) as repository:
         repo_objs = Manifest.load(repository).repo_objs
@@ -362,19 +364,39 @@ def test_repo_compress_keeps_duplicate_indexed_in_missing_pack(archiver):
             repository.put(cid, repo_objs.format(cid, {}, data, ro_type=ROBJ_FILE_STREAM))
         repository.flush()
         pack_a = repository.chunks[w_id].pack_id
-        repository.put(x_id, repo_objs.format(x_id, {}, x, ro_type=ROBJ_FILE_STREAM))
-        repository.flush()
-        pack_b = repository.chunks[x_id].pack_id
-        assert pack_b != pack_a
-        repository.store_delete("packs/" + bin_to_hex(pack_b))
+        # repo-compress processes the packs in pack id order and stops with an error at a truncated
+        # pack: pack A must be rewritten before, so pack B needs the higher pack id. The pack id
+        # depends on the random nonce of X.
+        while True:
+            repository.put(x_id, repo_objs.format(x_id, {}, x, ro_type=ROBJ_FILE_STREAM))
+            repository.flush()
+            pack_b = repository.chunks[x_id].pack_id
+            key_b = "packs/" + bin_to_hex(pack_b)
+            if pack_b > pack_a:
+                break
+            repository.store_delete(key_b)
+        if untrusted == "missing":
+            repository.store_delete(key_b)
+        elif untrusted == "corrupt":
+            tracker = PackTracker.load(repository)
+            tracker.record(pack_b, False)
+            tracker.save()
+        else:
+            repository.store_store(key_b, repository.store_load(key_b)[:-1])
 
-    cmd(archiver, "repo-compress", "-C", "none")
+    if untrusted == "truncated":
+        with pytest.raises(IntegrityError, match="object extends past end of file"):
+            cmd(archiver, "repo-compress", "-C", "none")
+    else:
+        cmd(archiver, "repo-compress", "-C", "none", exit_code=EXIT_WARNING if untrusted == "corrupt" else 0)
 
     with open_repository(archiver) as repository:
-        new_pack = repository.chunks[w_id].pack_id
-        assert new_pack != pack_a  # W was recompressed, pack A was rewritten
-        reader = PackReader(store=repository.store, pack_id=new_pack)
-        assert x_id in [chunk_id for chunk_id, _, _ in reader.iter_headers()]  # the gap copy of X is kept
+        # the packs other than pack B: only the pack that replaced pack A.
+        (new_pack_hex,) = {info.name for info in repository.store_list("packs")} - {bin_to_hex(pack_b)}
+        assert new_pack_hex != bin_to_hex(pack_a)  # W was recompressed, pack A was rewritten
+        reader = PackReader(store=repository.store, pack_id=hex_to_bin(new_pack_hex))
+        # W and the gap copy of X are kept.
+        assert [chunk_id for chunk_id, _, _ in reader.iter_headers()] == [w_id, x_id]
 
 
 def test_transform_pack_unchanged_pack_untouched(tmp_path):

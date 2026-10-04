@@ -300,6 +300,7 @@ class ArchiveGarbageCollector:
         pack_indexed = defaultdict(int)  # pack_id -> bytes of all its index entries, used or not
         stale_ids = []  # index entries referencing a pack file that is not in the store
         stale_packs = set()  # ids of those missing pack files
+        short_packs = set()  # ids of the pack files that end before one of their index entries does
         stale_used = 0  # how many of those were still flagged used (lost data)
         for id, entry in self.chunks.iteritems():
             pid = entry.pack_id
@@ -310,6 +311,8 @@ class ArchiveGarbageCollector:
                     stale_used += 1
             else:
                 pack_indexed[pid] += entry.obj_size
+                if entry.obj_offset + entry.obj_size > pack_total[pid]:
+                    short_packs.add(pid)
                 if entry.flags & ChunkIndex.F_USED:
                     pack_used[pid] += entry.obj_size
 
@@ -457,7 +460,7 @@ class ArchiveGarbageCollector:
             progress += 1
             pi.show(progress)  # report after the work, so the final pack lands on 100%
         validate = object_validator(self.manifest.repo_objs)
-        untrusted_pack_ids = stale_packs | corrupt_packs
+        untrusted_pack_ids = stale_packs | corrupt_packs | short_packs
         for pid in rewrite_packs:
             if sig_int:
                 break

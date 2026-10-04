@@ -620,7 +620,8 @@ def superseded_gap_ranges(reader, chunks, pack_id, obj_ranges, pack_size, *, val
         id, meta_size and data_size are verified, so the reported range is exactly the object.
         With None, nothing is reported.
     untrusted_pack_ids: ids of packs whose objects may be unreadable, e.g. packs missing from the
-        store or recorded corrupt. A gap object whose chunk id the index maps into one of them is kept.
+        store, recorded corrupt, or shorter than their index entries state. A gap object whose chunk
+        id the index maps into one of them is kept.
     """
     if validate is None:
         return []
@@ -2105,7 +2106,7 @@ class Repository:
         # PackWriter shares this repository's index, so add() triggers the lazy build itself.
         return self._pack_writer.add(id, data)
 
-    def delete(self, id, *, validate, update_index=True):
+    def delete(self, id, *, validate, update_index=True, untrusted_pack_ids=frozenset()):
         """Delete a single repo object by rewriting its pack without it (via compact_pack).
 
         The rewrite deletes the old pack, so the index/ fragments point the pack's other objects at a
@@ -2118,6 +2119,7 @@ class Repository:
         validate: passed to compact_pack.
         update_index: True: store the full chunk index and delete the invalid marker. False: update the
             in-memory index only; the marker stays until the index is stored and the marker deleted.
+        untrusted_pack_ids: passed to compact_pack.
 
         Returns compact_pack's (new_pack_id, dropped_bytes): the id of the pack holding the other objects
         of the old pack (None if there were none), and the number of bytes the rewrite dropped.
@@ -2139,6 +2141,7 @@ class Repository:
             drop_ids={id},
             validate=validate,
             before_old_pack_delete=lambda: write_chunkindex_invalid(self),
+            untrusted_pack_ids=untrusted_pack_ids,
         )
         if update_index:
             # close() only persists new entries incrementally, so write the full index here to record

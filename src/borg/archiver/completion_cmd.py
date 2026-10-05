@@ -56,7 +56,8 @@ The following argument types have intelligent, context-aware completion:
 
 12. Repositories (location_validator):
    - Completes directories for -r/--repo and --other-repo (a local repository is a
-     directory; remote locations like ssh://... just do not match one)
+     directory), but nothing once the value starts with a URL scheme other than
+     file: (e.g. ssh://... or rclone:...)
 
 13. Encryption modes (the --encryption choices):
    - Completes the repo-create encryption modes, in zsh and fish with a short
@@ -79,6 +80,7 @@ from ..crypto.key import encryption_argument_names
 from ..helpers import (
     archivename_validator,
     location_validator,
+    Location,
     SortBySpec,
     FilesCacheMode,
     PathSpec,
@@ -95,6 +97,16 @@ from ..helpers.argparsing import ActionSubCommands
 from ..helpers.time import timestamp
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
+
+# URL schemes of the repository locations that are not local directories, see Location.
+REPO_URL_SCHEMES = [scheme for scheme in Location.BORG_SCHEMES + Location.BORGSTORE_SCHEMES if scheme != "file"]
+
+# tcsh completion rule completing nothing for a repository URL (e.g. ssh://...): the rules of the
+# repository options complete directories, and tcsh can not make that depend on the current word.
+# But tcsh uses the first rule that matches, and this one comes first. A current word rule matches
+# the beginning of the word being completed, so it covers --repo=URL (-r=URL, --other-repo=URL) as
+# well as a URL being a word of its own (--repo URL, but also any other word starting with a URL).
+TCSH_REPO_URL_RULE = "'c/{--repo=,-r=,--other-repo=,}{" + ",".join(REPO_URL_SCHEMES) + "}:/n/'"
 
 # Global bash preamble that is prepended to the generated completion script.
 # It aggregates only what we need:
@@ -184,6 +196,13 @@ _borg_complete_encryption() {
   local choices="{ENCRYPTION_CHOICES}"
   local IFS=$' \t\n'
   compgen -W "${choices}" -- "$1"
+}
+
+# Complete local repository directories, but nothing for a URL like ssh://... or rclone:...
+# The name must contain "_dir", so that shtab completes the results as filenames (e.g. adds a "/").
+_borg_complete_repo_dirs() {
+  [[ "$1" =~ ^({REPO_URL_SCHEMES}): ]] && return 0
+  compgen -d -- "$1"
 }
 
 # Complete tags from repository
@@ -433,6 +452,12 @@ _borg_complete_encryption() {
   compadd -V 'encryption modes' -Q -l -d descriptions -a choices
 }
 
+# Complete local repository directories, but nothing for a URL like ssh://... or rclone:...
+_borg_complete_repo_dirs() {
+  [[ "$PREFIX" == ({REPO_URL_SCHEMES}):* ]] && return 1
+  _files -/
+}
+
 # Complete tags from repository
 _borg_complete_tags() {
   local cur
@@ -647,6 +672,17 @@ end
 # Complete encryption modes, with a short description of each mode
 function _borg_complete_encryption
     printf '%s\n' {ENCRYPTION_DESCRIPTIONS}
+end
+
+# Complete local repository directories, but nothing for a URL like ssh://... or rclone:...
+# (fish's directory completion would complete the part after the ":" as a path, e.g. ssh://etc/).
+function _borg_complete_repo_dirs
+    # the value being completed: without a leading --repo= (-r=, --other-repo=) or -r
+    set -l cur (commandline -ct | string replace -r -- '^(-[^=]*=|-r)' '')
+    if string match -qr -- '^({REPO_URL_SCHEMES}):' $cur
+        return
+    end
+    __fish_complete_directories
 end
 
 # Complete relative time markers
@@ -1005,10 +1041,11 @@ class CompletionMixIn:
             return {"bash": fn_name, "zsh": fn_name, "tcsh": f"`{tcsh_fn or fn_name}`", "fish": f"({fn_name})"}
 
         _attach_completion(parser, archivename_validator, for_all_shells("_borg_complete_archive"))
-        # -r/--repo and --other-repo: complete local repository directories (remote locations
-        # like ssh://... simply do not match anything then), see #3086.
-        _attach_completion(parser, location_validator(other=False), shtab.DIRECTORY)
-        _attach_completion(parser, location_validator(other=True), shtab.DIRECTORY)
+        # -r/--repo and --other-repo: complete local repository directories, see #3086, but no
+        # directories for a URL like ssh://..., see #10460 (tcsh: see TCSH_REPO_URL_RULE).
+        repo_dirs = for_all_shells("_borg_complete_repo_dirs") | {"tcsh": shtab.DIRECTORY["tcsh"]}
+        _attach_completion(parser, location_validator(other=False), repo_dirs)
+        _attach_completion(parser, location_validator(other=True), repo_dirs)
         for sortby_type, sortby_fn, _ in SORTBY_COMPLETERS:
             _attach_completion(parser, sortby_type, for_all_shells(sortby_fn, tcsh_fn=TCSH_SORTBY_FN))
         _attach_completion(parser, FilesCacheMode, for_all_shells("_borg_complete_filescachemode"))
@@ -1092,6 +1129,7 @@ class CompletionMixIn:
             "RELATIVE_TIME_CHOICES": relative_time_choices_str,
             "FILE_SIZE_CHOICES": file_size_choices_str,
             "HELP_CHOICES": help_choices,
+            "REPO_URL_SCHEMES": "|".join(REPO_URL_SCHEMES),
             "SH_COMPLETE": TCSH_SH_COMPLETE,
             # after SH_COMPLETE, so that the {PROG} in there is substituted as well
             "PROG": completion_prog,
@@ -1107,7 +1145,11 @@ class CompletionMixIn:
         template = preamble_templates.get(args.shell)
         # Build the preamble using partial_format to avoid escaping braces etc.
         preambles = [partial_format(template, mapping)] if template else []
-        print(parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles))
+        script = parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles)
+        if args.shell == "tcsh":
+            complete_cmd = f"complete {completion_prog} \\\n"
+            script = script.replace(complete_cmd, f"{complete_cmd}        {TCSH_REPO_URL_RULE} \\\n", 1)
+        print(script)
 
     def build_parser_completion(self, subparsers, common_parser, mid_common_parser):
         shells = tuple(shtab.SUPPORTED_SHELLS)

@@ -1,11 +1,11 @@
 # Contributors
 
-375 people have contributed to Borg, with 11,457 commits in total.
+375 people have contributed to Borg, with 11,515 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-09-28 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-10-05 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,15 +21,15 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,782 | 105,782 | 529 |
+| Thomas Waldmann | 7,813 | 105,941 | 530 |
 | Marian Beermann | 1,140 | 7,566 | 156 |
-| Jonas Borgström | 560 | 960 | 38 |
+| Jonas Borgström | 560 | 941 | 38 |
+| Mrityunjay Raj | 305 | 14,111 | 111 |
 | Antoine Beaupré | 285 | 437 | 33 |
-| Mrityunjay Raj | 281 | 12,530 | 109 |
 | Andrey Bienkowski | 72 | 200 | 16 |
 | Ted Lawson | 71 | 4,361 | 39 |
 | Thalian | 63 | 560 | 28 |
-| dependabot[bot] | 53 | 24 | 7 |
+| dependabot[bot] | 55 | 25 | 8 |
 | Martin Hostettler | 46 | 2,558 | 9 |
 | Milkey Mouse | 42 | 239 | 12 |
 | Dan Christensen | 40 | 5 | 2 |
@@ -44,17 +44,17 @@ show up there, so the number understates early contributions.  Generated files
 | SanskritFritz | 17 | 0 | 0 |
 | Lee Bousfield | 14 | 157 | 9 |
 | Alan Jenkins | 14 | 35 | 2 |
-| Daniel Rudolf | 13 | 215 | 14 |
+| Daniel Rudolf | 13 | 214 | 14 |
 | Robin Schneider | 13 | 18 | 8 |
 | Elmar Hoffmann | 12 | 90 | 6 |
 | Jürg Rast | 12 | 72 | 11 |
 | Ronny Pfannschmidt | 12 | 20 | 4 |
 | mh4ckt3mh4ckt1c4s | 11 | 0 | 0 |
+| ThomasWaldmann | 10 | 180 | 1 |
 | finefoot | 10 | 18 | 3 |
 | Teemu Toivanen | 10 | 14 | 2 |
 | Lauri Niskanen | 10 | 5 | 2 |
 | James Buren | 10 | 2 | 2 |
-| ThomasWaldmann | 9 | 180 | 1 |
 | Emmo Emminghaus | 9 | 60 | 9 |
 | Ed Blackman | 9 | 12 | 3 |
 | rugk | 9 | 9 | 4 |
@@ -198,7 +198,7 @@ show up there, so the number understates early contributions.  Generated files
 | ebabcock93 | 1 | 84 | 1 |
 | Rohan salunke | 1 | 62 | 8 |
 | Xiaocheng Song | 1 | 60 | 4 |
-| mrityunjay | 1 | 49 | 5 |
+| mrityunjay | 1 | 46 | 5 |
 | borkd | 1 | 37 | 1 |
 | James Vasile | 1 | 36 | 1 |
 | Mike Mason | 1 | 36 | 3 |

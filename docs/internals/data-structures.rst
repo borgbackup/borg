@@ -138,6 +138,35 @@ missing or fails the authentication, ``borg check --repair`` replaces it by empt
 (see :ref:`repo_defaults`). The ``chunkindex-invalid`` marker has no content and is
 stored as is.
 
+.. _sealed_stream:
+
+Sealed streams
+~~~~~~~~~~~~~~
+
+Data that may be too big to be kept in memory twice is protected as a **sealed
+stream** (``borg.crypto.sealed_stream``): the byte stream is cut into frames of 1 MiB
+(the last frame holds the rest, it may be empty), and every frame is put into the
+key's envelope, so it is encrypted and authenticated in the encrypting modes and
+authenticated only in the ``authenticated-*`` modes::
+
+    stream := frame+
+    frame  := flag (1 byte: 0 = more frames follow, 1 = last frame)
+              length (4 bytes, unsigned, little endian: the length of the envelope)
+              envelope (the key's encrypt_oneshot() of the payload, empty id)
+
+The AAD of a frame's envelope is a *context* given by the user of the sealed stream,
+followed by the frame number (8 bytes, big endian, counting from 0) and the flag (1
+byte). The context starts with a domain prefix of its own and contains what the stream
+belongs to (e.g. the repository id and a name). So a frame can not be changed, moved
+to another position or into another stream, and a stream that ends before its last
+frame, claims an earlier frame to be the last one or has data after its last frame is
+rejected. What a sealed stream can not detect is the replacement of the whole stream
+by an older stream with the same context.
+
+Every frame is sealed in a one-off session (a new random session id, IV 0), so
+sealed streams can be used from any thread. Each frame costs a session key derivation
+(a few microseconds), which is negligible for 1 MiB of payload.
+
 
 Keys
 ~~~~

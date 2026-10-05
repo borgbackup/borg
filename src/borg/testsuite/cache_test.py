@@ -639,13 +639,16 @@ def two_fragment_repo(tmp_path):
 
 @pytest.fixture
 def progress_output(monkeypatch):
-    """Progress output as --progress gives it: the progress logger at INFO level, restored afterwards."""
-    progress_logger = logging.getLogger("borg.output.progress")
-    level = progress_logger.level
-    progress_logger.setLevel(logging.INFO)
+    """Progress output as --progress gives it, and nothing else: all loggers at INFO level, restored afterwards."""
+    # "borg" and "borgstore" inherit the root logger level, which is DEBUG after an in-process borg --debug run.
+    loggers = [logging.getLogger(name) for name in ("borg.output.progress", "borg", "borgstore")]
+    levels = [logger.level for logger in loggers]
+    for logger in loggers:
+        logger.setLevel(logging.INFO)
     monkeypatch.setattr(progress, "get_progress_dt", lambda: 0.0)  # no rate limit, every step is output
     yield
-    progress_logger.setLevel(level)
+    for logger, level in zip(loggers, levels):
+        logger.setLevel(level)
 
 
 def test_build_chunkindex_fragment_merge_progress(tmp_path, capfd, progress_output):

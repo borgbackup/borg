@@ -595,6 +595,25 @@ def test_build_chunkindex_aborts_when_nothing_validates(tmp_path):
             build_chunkindex_from_repo(repository, slow_rebuild=True, validate=lambda chunk_id, obj: False)
 
 
+def test_build_chunkindex_reports_duplicates(tmp_path):
+    """on_duplicate gets the pack of the copy the index named before, for each further copy of a chunk id."""
+    from .repository_test import accept_all, fchunk
+
+    duplicates = []
+    with Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True) as repository:
+        # the packs are walked in pack id order.
+        repository.store_store("packs/" + bin_to_hex(H(1)), fchunk(b"x", chunk_id=H(90)) + fchunk(b"y", chunk_id=H(91)))
+        repository.store_store("packs/" + bin_to_hex(H(2)), fchunk(b"x", chunk_id=H(90)))
+        repository.store_store("packs/" + bin_to_hex(H(3)), fchunk(b"x", chunk_id=H(90)) + fchunk(b"x", chunk_id=H(90)))
+        index = build_chunkindex_from_repo(
+            repository, slow_rebuild=True, validate=accept_all, on_duplicate=lambda *args: duplicates.append(args)
+        )
+        assert duplicates == [(H(90), H(1)), (H(90), H(2)), (H(90), H(3))]
+        assert index[H(90)].pack_id == H(3)
+        assert index[H(90)].obj_offset == len(fchunk(b"x", chunk_id=H(90)))
+        assert index[H(91)].pack_id == H(1)
+
+
 def test_build_chunkindex_reports_a_pack_without_any_object_header(tmp_path):
     """A pack whose bytes hold no object header is reported through on_drop and yields no entries."""
     drops = []

@@ -2318,6 +2318,11 @@ class ArchiveChecker:
         self.chunks_modified = False
         # ids of the packs repair wrote: stored by put() and flush(), or written by delete() rewriting a pack.
         self.written_packs = set()
+        # chunk id -> ids of the packs holding a copy of the chunk that the index built by repair does not name.
+        # One entry per chunk id stored more than once, about 400 bytes each (the id, a set, a pack id).
+        self.other_copies = {}
+        # True if check() was called with verify_data.
+        self.verifying_data = False
         # ids of the objects with ro_type ROBJ_ARCHIVE_META that verify_data found.
         # None if verify_data did not run or was interrupted.
         self.archive_meta_ids = None
@@ -2338,6 +2343,10 @@ class ArchiveChecker:
         """
         self.record_stored(self.repository.flush())
         self.manifest.archives.create(name, id, ts)
+
+    def note_other_copy(self, chunk_id, pack_id):
+        """Record that pack <pack_id> holds a copy of chunk <chunk_id> that the index does not name."""
+        self.other_copies.setdefault(chunk_id, set()).add(pack_id)
 
     def note_dropped_objects(self):
         # The chunk index rebuild skipped repository content to get past a corrupt object header.
@@ -2378,6 +2387,7 @@ class ArchiveChecker:
         logger.info("Starting archive consistency check...")
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
+        self.verifying_data = verify_data
         self.format = format
         self.repository = repository
         # A normal (non-repair) archives check trusts the in-repo index: the repository check verified
@@ -2410,6 +2420,8 @@ class ArchiveChecker:
                 validate=validate,
                 # dropped content is a check finding, with or without --repair.
                 on_drop=self.note_dropped_objects,
+                # verify_data looks for an intact copy of each defect chunk it removes.
+                on_duplicate=self.note_other_copy if repair and verify_data else None,
                 write_immediately=False,
                 # Ctrl-C aborts the rebuild and with it the check, #10042.
                 interruptible=True,
@@ -2434,6 +2446,7 @@ class ArchiveChecker:
             self.remove_missing_packs()
         if verify_data:
             self.verify_data()
+            self.other_copies.clear()  # verify_data is their only user.
         self.manifest = Manifest.load(repository, key=self.key)
         # On Ctrl-C, skip any scan not yet started; a scan already running stops at its own boundary.
         if find_lost_archives and not sig_int:
@@ -2558,6 +2571,8 @@ class ArchiveChecker:
             if self.repair:
                 logger.warning("Found defect chunks, removing them from the repository.")
                 validate = object_validator(self.repo_objs)
+                removed_chunks = []
+                replaced_packs = {}  # id of a pack delete() removed -> id of the pack replacing it, or None
                 pi = ProgressIndicatorPercent(
                     total=len(defect_chunks), msg="Removing defect chunks %3.0f%%", msgid="check.remove_defect_chunks"
                 )
@@ -2591,6 +2606,8 @@ class ArchiveChecker:
                             defect_chunk, update_index=False, validate=validate, untrusted_pack_ids=untrusted_pack_ids
                         )
                         self.chunks_modified = True
+                        removed_chunks.append(defect_chunk)
+                        replaced_packs[old_pack_id] = new_pack_id
                         self.written_packs.discard(old_pack_id)  # delete() removed the old pack
                         if new_pack_id is not None:
                             self.written_packs.add(new_pack_id)
@@ -2600,6 +2617,8 @@ class ArchiveChecker:
                         if meta["type"] == ROBJ_ARCHIVE_META:
                             archive_meta_ids.add(defect_chunk)
                 pi.finish()
+                # a removed chunk gets indexed again if another copy of it is intact.
+                archive_meta_ids.update(self.index_other_copies(removed_chunks, replaced_packs))
             else:
                 logger.warning("Found defect chunks. Run with --repair to remove them.")
                 for defect_chunk in defect_chunks:
@@ -2622,6 +2641,70 @@ class ArchiveChecker:
                 verified,
                 errors,
             )
+
+    def index_other_copies(self, chunk_ids, replaced_packs):
+        """Index an intact other copy of each chunk in chunk_ids, if the repository holds one.
+
+        chunk_ids: ids of the defect chunks verify_data removed; the index has no entry for them.
+        replaced_packs: id of each pack removed with them -> id of the pack replacing it, or None.
+
+        The packs other_copies names for these chunks are walked, a replaced pack by its replacement. Of the
+        objects with one of these chunk ids, the first one in pack id and offset order that passes
+        verify_object is indexed. A copy that fails it is logged and not indexed here.
+
+        Returns the ids of the indexed chunks with ro_type ROBJ_ARCHIVE_META.
+        """
+        archive_meta_ids = set()
+        wanted = set()
+        pack_ids = set()
+        for chunk_id in chunk_ids:
+            for pack_id in self.other_copies.get(chunk_id, ()):
+                while pack_id in replaced_packs:
+                    pack_id = replaced_packs[pack_id]
+                if pack_id is not None:
+                    wanted.add(chunk_id)
+                    pack_ids.add(pack_id)
+        validate = object_validator(self.repo_objs)
+        for pack_id in sorted(pack_ids):
+            # PackReader reads from the store, which does not refresh the repository lock.
+            self.repository._lock_refresh()
+            reader = PackReader(self.repository.store, pack_id)
+            for chunk_id, obj_offset, obj_size in reader.iter_headers(validate=validate):
+                if chunk_id not in wanted or chunk_id in self.chunks:
+                    continue
+                chunk_hex = bin_to_hex(chunk_id)
+                location = f"pack {bin_to_hex(pack_id)}, offset {obj_offset}"
+                try:
+                    meta = self.verify_object(chunk_id, pack_id, obj_offset, obj_size)
+                except IntegrityErrorBase as integrity_error:
+                    logger.error("chunk %s, copy in %s, integrity error: %s", chunk_hex, location, integrity_error)
+                    continue
+                # size=0: the object header does not hold the plaintext size.
+                self.chunks[chunk_id] = ChunkIndexEntry(
+                    flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+                )
+                logger.warning("chunk %s: indexed the intact copy in %s.", chunk_hex, location)
+                if meta["type"] == ROBJ_ARCHIVE_META:
+                    archive_meta_ids.add(chunk_id)
+        return archive_meta_ids
+
+    def verify_object(self, chunk_id, pack_id, obj_offset, obj_size):
+        """Read the object at this location of pack <pack_id> like verify_data reads a chunk, return its meta dict.
+
+        Raises IntegrityErrorBase if the object does not authenticate, decompress or match chunk_id.
+
+        The object is read once. verify_data removes an indexed chunk only after it failed two reads, as a
+        failed read can be transient. Here, a failed read keeps the object out of the index: a transient
+        failure leaves an intact copy unindexed, and no defect copy gets indexed.
+        """
+        # PackReader reads from the store, which does not refresh the repository lock.
+        self.repository._lock_refresh()
+        cdata = PackReader(self.repository.store, pack_id).read(obj_offset, obj_size)
+        # we must decompress, so it'll call assert_id() in there (see verify_data).
+        meta, _ = self.repo_objs.parse(
+            chunk_id, cdata, decompress=True, ro_type=ROBJ_DONTCARE, assert_id_place="verify_data"
+        )
+        return meta
 
     def rebuild_archives_directory(self):
         """Rebuild the archives directory, undeleting archives.
@@ -3014,11 +3097,13 @@ class ArchiveChecker:
 
         put() and delete() compute the index entries of the packs they write from the data they write.
         This compares the (chunk_id, obj_offset, obj_size) of each object header in a written pack, read
-        with a validator, with the index entries that name the pack. Each difference sets error_found, is
-        logged and is fixed in the index:
+        with a validator, with the index entries that name the pack. Each difference sets error_found and is
+        logged. The index is fixed, except for an object that fails verify_object, which stays unindexed:
 
         - an index entry names an object the pack does not hold: the entry is removed.
-        - the pack holds an object whose chunk id is not indexed: the object is indexed.
+        - the pack holds an object whose chunk id is not indexed: the object is indexed. With verifying_data,
+          only an object that passes verify_object is indexed: a pack delete() wrote can hold a copy of a
+          defect chunk verify_data removed, and that copy can be defect too.
         - the pack does not exist: its index entries are removed.
 
         A superseded duplicate is an object whose chunk id is indexed at another location. It is logged at
@@ -3067,7 +3152,8 @@ class ArchiveChecker:
             not_found_in[pack_id] = not_found
         pi.finish()
         # pass 2 indexes each unindexed object, so of several unindexed copies of a chunk, the first in pack id and
-        # offset order is indexed and the others are superseded duplicates.
+        # offset order is indexed and the others are superseded duplicates. With verifying_data, that is the
+        # first one passing verify_object.
         for pack_id, found in found_in.items():
             pack_hex = bin_to_hex(pack_id)
             expected = indexed[pack_id]
@@ -3083,6 +3169,16 @@ class ArchiveChecker:
                         "superseded duplicate"
                     )
                     continue
+                if self.verifying_data:
+                    try:
+                        self.verify_object(chunk_id, pack_id, obj_offset, obj_size)
+                    except IntegrityErrorBase as integrity_error:
+                        self.error_found = True
+                        logger.error(
+                            f"chunk {bin_to_hex(chunk_id)}, copy in pack {pack_hex}, offset {obj_offset}, "
+                            f"integrity error: {integrity_error}"
+                        )
+                        continue
                 unindexed.append(obj)
                 # size=0: the object header does not hold the plaintext size.
                 self.chunks[chunk_id] = ChunkIndexEntry(
@@ -3092,7 +3188,7 @@ class ArchiveChecker:
                 continue
             self.error_found = True
             # an object the pack holds whose index entry has a wrong offset or size counts in both numbers,
-            # unless pass 2 indexed another copy of it first.
+            # unless pass 2 indexed another copy of it first or the object failed verify_object.
             logger.error(
                 f"pack {pack_hex}: the chunks index does not match the pack. Indexed objects not in the pack: "
                 f"{len(not_found)}, objects in the pack with an unindexed chunk id: {len(unindexed)}. "

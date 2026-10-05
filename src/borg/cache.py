@@ -901,6 +901,7 @@ def build_chunkindex_from_repo(
     fragments_only=False,
     validate=None,
     on_drop=None,
+    on_duplicate=None,
     write_immediately=False,
     init_flags=ChunkIndex.F_USED,
     interruptible=False,
@@ -915,10 +916,14 @@ def build_chunkindex_from_repo(
     # the rebuild skips the objects that fail it; without one, a corrupt object header raises CorruptPack.
     # on_drop: a callable or None, passed to PackReader.iter_headers, called once per byte range the
     # validating walk skips.
+    # on_duplicate: a callable or None, called with (chunk_id, pack_id) once per object of the slow rebuild
+    # whose chunk id is indexed already. The index then names the object walked last; pack_id is the pack of
+    # the copy it named before.
     # interruptible: on Ctrl-C / SIGINT, stop the pack walk before the next object, discard the index
     # built so far (it lacks the chunks of the packs not walked yet) and raise ChunkIndexRebuildInterrupted.
     assert not (slow_rebuild and fragments_only)
     assert not (fragments_only and write_immediately)  # fragments_only never writes to the repo
+    assert on_duplicate is None or slow_rebuild  # an index built from the fragments reports no duplicates
     # first, try to build a fresh, mostly complete chunk index from centrally stored index fragments:
     if not slow_rebuild:
         # a concurrent repack_chunkindex (another client, shared lock) deletes the small fragments it
@@ -1045,6 +1050,10 @@ def build_chunkindex_from_repo(
                     if not show_percent:
                         pi.show()
                     num_chunks += 1
+                    if on_duplicate is not None:
+                        previous = chunks.get(chunk_id)
+                        if previous is not None:
+                            on_duplicate(chunk_id, previous.pack_id)
                     chunks[chunk_id] = ChunkIndexEntry(
                         flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
                     )

@@ -2174,6 +2174,126 @@ def test_verify_data_wrong_chunk_content(archivers, request, monkeypatch):
     assert "1 chunk(s) missing or corrupted in the repository, replaced by all-zero data" in output
 
 
+def put_copy_in_later_pack(repository, repo_objs, chunk_id, data, pack_id):
+    """Store data as another copy of chunk <chunk_id> in a new pack of its own, return the id of that pack.
+
+    The id of the new pack is greater than pack_id, so a chunk index rebuild, which walks the packs in pack id
+    order and indexes the copy it walks last, indexes the new copy rather than a copy in pack <pack_id>. The
+    pack id depends on the random nonce of the copy.
+    """
+    while True:
+        repository.put(chunk_id, repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        new_pack_id = repository.chunks[chunk_id].pack_id
+        if new_pack_id > pack_id:
+            return new_pack_id
+        repository.store_delete("packs/" + bin_to_hex(new_pack_id))
+
+
+@pytest.mark.parametrize(
+    "damage, check_args",
+    [
+        # a flipped byte breaks the store hash of the pack, which the repository check acts on: skip it.
+        ("bit_flip", ("--archives-only",)),
+        # wrong content authenticates and matches the pack's store hash, so the repository check keeps the pack.
+        ("wrong_content", ()),
+    ],
+)
+def test_verify_data_repair_indexes_other_copy_of_a_defect_chunk(archivers, request, damage, check_args):
+    """--verify-data --repair indexes an intact copy of a defect chunk that is stored in another pack, #10491.
+
+    A file content chunk X is stored in pack A and again in pack B. The rebuilt index maps X to pack B, where
+    X is defect. Removing the defect X leaves the copy in pack A, which is verified and indexed before the
+    archives are checked, so the file is not reported as damaged.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith(src_file):
+                x_id = item.chunks[-1].id
+                break
+        x = read_chunk(archive, repository, x_id)
+        pack_a = repository.chunks[x_id].pack_id
+        if damage == "bit_flip":
+            pack_b = put_copy_in_later_pack(repository, archive.repo_objs, x_id, x, pack_a)
+            corrupt_chunk_on_disk(repository, x_id)  # the indexed copy, in pack B
+        else:
+            pack_b = put_copy_in_later_pack(repository, archive.repo_objs, x_id, corrupt(x, 0), pack_a)
+
+    output = cmd(archiver, "check", "--repair", "--verify-data", *check_args, exit_code=0)
+    assert f"{bin_to_hex(x_id)}, integrity error" in output
+    assert f"chunk {bin_to_hex(x_id)}: indexed the intact copy in pack {bin_to_hex(pack_a)}" in output
+    assert "missing" not in output
+
+    with repository:
+        assert repository.chunks[x_id].pack_id == pack_a
+        assert not repository.store.info("packs/" + bin_to_hex(pack_b)).exists
+        assert read_chunk(archive, repository, x_id) == x
+    cmd(archiver, "check", "--verify-data", exit_code=0)
+
+
+def test_verify_data_repair_does_not_index_a_defect_other_copy(archivers, request):
+    """--verify-data --repair does not index another copy of a defect chunk that is defect too."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with open_repository(archiver) as repository:
+        repo_objs = Manifest.load(repository).repo_objs
+        w, x = b"other", b"duplicate"
+        w_id, x_id = repo_objs.id_hash(w), repo_objs.id_hash(x)
+        for cid, data in [(w_id, w), (x_id, x)]:
+            repository.put(cid, repo_objs.format(cid, {}, data, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        pack_a = repository.chunks[x_id].pack_id
+        corrupt_chunk_on_disk(repository, x_id)  # the copy in pack A
+        put_copy_in_later_pack(repository, repo_objs, x_id, x, pack_a)
+        corrupt_chunk_on_disk(repository, x_id)  # the indexed copy, in pack B
+
+    # --archives-only: a repository check would salvage pack A and drop its defect copy of X.
+    output = cmd(archiver, "check", "--archives-only", "--repair", "--verify-data", exit_code=0)
+    assert f"chunk {bin_to_hex(x_id)}, copy in pack {bin_to_hex(pack_a)}" in output
+    assert "indexed the intact copy" not in output
+
+    with open_repository(archiver) as repository:
+        assert x_id not in repository.chunks
+        assert repo_objs.parse(w_id, repository.get(w_id), ro_type=ROBJ_FILE_STREAM)[1] == w
+
+
+@pytest.mark.parametrize("replaced", [True, False])
+def test_index_other_copies_follows_replaced_packs(archivers, request, replaced):
+    """index_other_copies walks the pack replacing a removed pack, and no pack for a pack removed without one."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, calls ArchiveChecker")
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with open_repository(archiver) as repository:
+        repo_objs = Manifest.load(repository).repo_objs
+        x = b"duplicate"
+        x_id = repo_objs.id_hash(x)
+        repository.put(x_id, repo_objs.format(x_id, {}, x, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        new_pack = repository.chunks[x_id].pack_id
+        del repository.chunks[x_id]  # as after verify_data removed the indexed copy of X
+        checker = ArchiveChecker()
+        checker.repository, checker.repo_objs, checker.chunks = repository, repo_objs, repository.chunks
+        removed_pack = bytes(32)  # the rebuild saw the other copy of X in this pack
+        checker.other_copies = {x_id: {removed_pack}}
+        checker.index_other_copies([x_id], {removed_pack: new_pack if replaced else None})
+        if replaced:
+            assert repository.chunks[x_id].pack_id == new_pack
+            assert repo_objs.parse(x_id, repository.get(x_id), ro_type=ROBJ_FILE_STREAM)[1] == x
+        else:
+            assert x_id not in repository.chunks
+
+
 def test_repair_wrong_item_metadata_chunk_content(archivers, request, monkeypatch):
     # check --repair re-packs the item metadata stream it reads into new chunks with freshly computed ids,
     # so it re-certifies the id/content invariant, even though reads do not check it by default, see #9994.

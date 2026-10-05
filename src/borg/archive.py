@@ -2318,6 +2318,9 @@ class ArchiveChecker:
         self.chunks_modified = False
         # ids of the packs repair wrote: stored by put() and flush(), or written by delete() rewriting a pack.
         self.written_packs = set()
+        # chunk id -> ids of the packs holding a copy of the chunk that the index built by repair does not name.
+        # One entry per chunk id stored more than once.
+        self.other_copies = {}
         # ids of the objects with ro_type ROBJ_ARCHIVE_META that verify_data found.
         # None if verify_data did not run or was interrupted.
         self.archive_meta_ids = None
@@ -2338,6 +2341,10 @@ class ArchiveChecker:
         """
         self.record_stored(self.repository.flush())
         self.manifest.archives.create(name, id, ts)
+
+    def note_other_copy(self, chunk_id, pack_id):
+        """Record that pack <pack_id> holds a copy of chunk <chunk_id> that the index does not name."""
+        self.other_copies.setdefault(chunk_id, set()).add(pack_id)
 
     def note_dropped_objects(self):
         # The chunk index rebuild skipped repository content to get past a corrupt object header.
@@ -2410,6 +2417,8 @@ class ArchiveChecker:
                 validate=validate,
                 # dropped content is a check finding, with or without --repair.
                 on_drop=self.note_dropped_objects,
+                # verify_data looks for an intact copy of each defect chunk it removes.
+                on_duplicate=self.note_other_copy if repair and verify_data else None,
                 write_immediately=False,
                 # Ctrl-C aborts the rebuild and with it the check, #10042.
                 interruptible=True,
@@ -2558,6 +2567,8 @@ class ArchiveChecker:
             if self.repair:
                 logger.warning("Found defect chunks, removing them from the repository.")
                 validate = object_validator(self.repo_objs)
+                removed_chunks = []
+                replaced_packs = {}  # id of a pack delete() removed -> id of the pack replacing it, or None
                 pi = ProgressIndicatorPercent(
                     total=len(defect_chunks), msg="Removing defect chunks %3.0f%%", msgid="check.remove_defect_chunks"
                 )
@@ -2591,6 +2602,8 @@ class ArchiveChecker:
                             defect_chunk, update_index=False, validate=validate, untrusted_pack_ids=untrusted_pack_ids
                         )
                         self.chunks_modified = True
+                        removed_chunks.append(defect_chunk)
+                        replaced_packs[old_pack_id] = new_pack_id
                         self.written_packs.discard(old_pack_id)  # delete() removed the old pack
                         if new_pack_id is not None:
                             self.written_packs.add(new_pack_id)
@@ -2600,6 +2613,8 @@ class ArchiveChecker:
                         if meta["type"] == ROBJ_ARCHIVE_META:
                             archive_meta_ids.add(defect_chunk)
                 pi.finish()
+                # a removed chunk gets indexed again if another copy of it is intact.
+                archive_meta_ids.update(self.index_other_copies(removed_chunks, replaced_packs))
             else:
                 logger.warning("Found defect chunks. Run with --repair to remove them.")
                 for defect_chunk in defect_chunks:
@@ -2622,6 +2637,59 @@ class ArchiveChecker:
                 verified,
                 errors,
             )
+
+    def index_other_copies(self, chunk_ids, replaced_packs):
+        """Index an intact other copy of each chunk in chunk_ids, if the repository holds one.
+
+        chunk_ids: ids of the defect chunks verify_data removed; the index has no entry for them.
+        replaced_packs: id of each pack removed with them -> id of the pack replacing it, or None.
+
+        The packs other_copies names for these chunks are walked, a replaced pack by its replacement. Of the
+        objects with one of these chunk ids, the first one in pack id and offset order that passes the
+        verify_data read is indexed. A copy that fails it is logged and not indexed.
+
+        Returns the ids of the indexed chunks with ro_type ROBJ_ARCHIVE_META.
+        """
+        archive_meta_ids = set()
+        wanted = set()
+        pack_ids = set()
+        for chunk_id in chunk_ids:
+            for pack_id in self.other_copies.get(chunk_id, ()):
+                while pack_id in replaced_packs:
+                    pack_id = replaced_packs[pack_id]
+                if pack_id is not None:
+                    wanted.add(chunk_id)
+                    pack_ids.add(pack_id)
+        validate = object_validator(self.repo_objs)
+        for pack_id in sorted(pack_ids):
+            # PackReader reads from the store, which does not refresh the repository lock.
+            self.repository._lock_refresh()
+            reader = PackReader(self.repository.store, pack_id)
+            for chunk_id, obj_offset, obj_size in reader.iter_headers(validate=validate):
+                if chunk_id not in wanted or chunk_id in self.chunks:
+                    continue
+                chunk_hex = bin_to_hex(chunk_id)
+                location = f"pack {bin_to_hex(pack_id)}, offset {obj_offset}"
+                try:
+                    # we must decompress, so it'll call assert_id() in there (see verify_data).
+                    meta, _ = self.repo_objs.parse(
+                        chunk_id,
+                        reader.read(obj_offset, obj_size),
+                        decompress=True,
+                        ro_type=ROBJ_DONTCARE,
+                        assert_id_place="verify_data",
+                    )
+                except IntegrityErrorBase as integrity_error:
+                    logger.error("chunk %s, copy in %s, integrity error: %s", chunk_hex, location, integrity_error)
+                    continue
+                # size=0: the object header does not hold the plaintext size.
+                self.chunks[chunk_id] = ChunkIndexEntry(
+                    flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+                )
+                logger.warning("chunk %s: indexed the intact copy in %s.", chunk_hex, location)
+                if meta["type"] == ROBJ_ARCHIVE_META:
+                    archive_meta_ids.add(chunk_id)
+        return archive_meta_ids
 
     def rebuild_archives_directory(self):
         """Rebuild the archives directory, undeleting archives.

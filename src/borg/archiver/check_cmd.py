@@ -252,6 +252,10 @@ class CheckMixIn:
         which normal reads do not do by default (see ``BORG_ASSERT_ID``). Running it periodically
         is therefore recommended.
 
+        With ``--repair``, ``--verify-data`` removes each chunk that fails the verification twice.
+        If the repository holds another copy of such a chunk and that copy passes the
+        verification, borg indexes it instead, so the archives referencing the chunk stay intact.
+
         The ``--find-lost-archives`` option tells Borg to search for lost archive
         metadata. If Borg encounters any archive metadata that does not match an
         archive directory entry (including soft-deleted archives), it means that an

@@ -32,7 +32,10 @@ from ..cache import (
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey, AuthenticatedKey
+from ..crypto import sealed_stream
+from ..crypto.sealed_stream import SealedStreamWriter, read_sealed_stream
 from ..helpers import CorruptPack, Error, bin_to_hex, progress, safe_ns
+from ..helpers import msgpack
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import PackReader, Repository
@@ -120,12 +123,110 @@ class TestAdHocWithFilesCache:
         path_hash = H(42)
         files = {path_hash: cache.compress_entry(entry)}
         assert cache._newest_cmtime is None  # nothing was chunked in this backup
-        integrity_data = cache._write_files_cache(files)
-        cache.cache_config.integrity[cache.files_cache_name()] = integrity_data
+        cache._write_files_cache(files)
         # with the bug (initial value 0 instead of None) the cutoff would be the epoch and the
         # entry would be dropped; after the fix the entry must still be there:
         loaded = cache._read_files_cache()
         assert path_hash in loaded
+
+    def write_files_cache(self, manifest, *, archive_name="test", count=3):
+        """Write a files cache with *count* entries, return the cache and the entries (path_hash -> entry)."""
+        cache = AdHocWithFilesCache(manifest, cache_mode="cis", archive_name=archive_name)
+        # the chunk that the cached files reference (needed so the entries can be (de)compressed):
+        cache.add_chunk(H(5), {}, b"5678", stats=Statistics())
+        ts = int_to_timestamp(safe_ns(time.time_ns()))
+        entries = {
+            H(1000 + i): FileCacheEntry(
+                age=0, inode=i, size=4, ctime=ts, mtime=ts, chunks=[(H(5), 4)], digests={"sha256": H(2000 + i)}
+            )
+            for i in range(count)
+        }
+        cache._write_files_cache({path_hash: cache.compress_entry(entry) for path_hash, entry in entries.items()})
+        return cache, entries
+
+    def files_cache_path(self, cache):
+        return cache.path / cache.files_cache_name()
+
+    def test_files_cache_roundtrip(self, manifest, monkeypatch):
+        monkeypatch.setattr(sealed_stream, "FRAME_SIZE", 100)  # many frames, entries straddle frames
+        cache, entries = self.write_files_cache(manifest, count=50)
+        with open(self.files_cache_path(cache), "rb") as fd:
+            assert len(list(read_sealed_stream(fd, cache.key, cache._files_cache_context()))) > 10
+        loaded = cache._read_files_cache()
+        assert {path_hash: cache.decompress_entry(entry) for path_hash, entry in loaded.items()} == {
+            path_hash: entry._replace(age=1) for path_hash, entry in entries.items()
+        }
+
+    def test_files_cache_empty(self, manifest):
+        cache, _ = self.write_files_cache(manifest, count=0)
+        assert cache._read_files_cache() == {}
+
+    def test_files_cache_missing(self, manifest, caplog):
+        cache = AdHocWithFilesCache(manifest, cache_mode="cis", archive_name="test")
+        with caplog.at_level(logging.WARNING, logger="borg.cache"):
+            assert cache._read_files_cache() is None
+        assert caplog.text == ""  # no files cache yet is normal
+
+    def test_files_cache_encrypted(self, manifest):
+        cache, entries = self.write_files_cache(manifest)
+        data = self.files_cache_path(cache).read_bytes()
+        assert H(5) not in data
+        for path_hash, entry in entries.items():
+            assert path_hash not in data
+            assert entry.digests["sha256"] not in data
+
+    def check_ignored(self, cache, caplog, reason="corrupted"):
+        with caplog.at_level(logging.WARNING, logger="borg.cache"):
+            assert cache._read_files_cache() is None
+        assert f"Ignoring {reason} files cache {cache.files_cache_name()}" in caplog.text
+
+    def test_files_cache_tampered(self, manifest, caplog):
+        cache, _ = self.write_files_cache(manifest)
+        path = self.files_cache_path(cache)
+        data = bytearray(path.read_bytes())
+        data[len(data) // 2] ^= 0x01
+        path.write_bytes(bytes(data))
+        self.check_ignored(cache, caplog)
+
+    def test_files_cache_other_series(self, manifest, caplog):
+        cache_a, _ = self.write_files_cache(manifest, archive_name="series-a")
+        cache_b = AdHocWithFilesCache(manifest, cache_mode="cis", archive_name="series-b")
+        self.files_cache_path(cache_b).write_bytes(self.files_cache_path(cache_a).read_bytes())
+        self.check_ignored(cache_b, caplog)
+
+    def test_files_cache_other_repository(self, manifest, monkeypatch, caplog):
+        cache, _ = self.write_files_cache(manifest)
+        # a files cache written for another repository using the same key material:
+        monkeypatch.setattr(cache.repository, "id", bytes(32))
+        self.check_ignored(cache, caplog)
+
+    def test_files_cache_plaintext(self, manifest, caplog):
+        cache, entries = self.write_files_cache(manifest)
+        # a files cache in the format of borg versions without sealed files caches: a plain msgpack stream.
+        with open(self.files_cache_path(cache), "wb") as fd:
+            for path_hash, entry in entries.items():
+                msgpack.pack((path_hash, entry), fd)
+        self.check_ignored(cache, caplog)
+
+    def test_files_cache_invalid_content(self, manifest, caplog):
+        cache = AdHocWithFilesCache(manifest, cache_mode="cis", archive_name="test")
+        # authentic, but not a stream of (path_hash, entry) tuples:
+        with open(self.files_cache_path(cache), "wb") as fd:
+            writer = SealedStreamWriter(fd, cache.key, cache._files_cache_context())
+            msgpack.pack([1, 2, 3], writer)
+            writer.finish()
+        self.check_ignored(cache, caplog, reason="invalid")
+
+    def test_cache_config(self, manifest):
+        cache, _ = self.write_files_cache(manifest)
+        config_path = cache.path / "config"
+        config = config_path.read_text()
+        assert "[cache]" in config and "[integrity]" not in config
+        st = config_path.stat()
+        cache.close()
+        # nothing in the config changes after its creation, so close() does not rewrite it:
+        assert config_path.stat().st_ino == st.st_ino and config_path.stat().st_mtime_ns == st.st_mtime_ns
+        assert config_path.read_text() == config
 
 
 def test_delete_chunkindex_from_repo_missing(tmp_path):

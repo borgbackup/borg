@@ -214,7 +214,6 @@ Saving the local cache at the end of :ref:`borg_create`::
 
     {"message": "Saving files cache", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": false, "time": 1787900398.719723}
     {"message": "Saving index", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": false, "time": 1787900398.728792}
-    {"message": "Saving cache config", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": false, "time": 1787900398.7294679}
     {"message": "", "operation": 1, "msgid": "cache.close", "type": "progress_message", "finished": true, "time": 1787900398.739775}
 
 A debug log message::
@@ -1028,7 +1027,7 @@ Warnings
 Operations
     - cache.close
 
-      Saving the local cache (files cache, chunks index, cache config) at the end of a command.
+      Saving the local cache (files cache, chunks index) at the end of a command.
     - cache.merge_chunkindex_fragments
 
       Loading the chunk index by merging the index fragments stored in the repository.

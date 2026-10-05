@@ -641,13 +641,20 @@ Make sure that only you have access to the Borg data directory.
 Do I need to take security precautions regarding the cache?
 -----------------------------------------------------------
 
-The cache contains a lot of metadata information about the files in
-your repositories and it is not encrypted.
+The files cache contains a lot of metadata about the files in your backups
+(file sizes, timestamps, the chunk lists of the files and, if you use
+``borg create --digests``, digests of the file contents). It is protected with the
+repository key, like the data in the repository: it is encrypted and authenticated
+(authenticated only in the ``authenticated-*`` modes), so someone who can read the
+cache directory, but does not have the key, can not read it, and a modified files
+cache is detected (borg ignores it with a warning and rebuilds it). The pack cache
+(``BORG_STORE_CACHE``) only holds copies of the encrypted packs of the repository.
 
-However, the assumption is that the cache is being stored on the very
-same system which also contains the original files which are being
-backed up. So someone with access to the cache files would also have
-access the original files anyway.
+What is not protected: the names, sizes and timestamps of the files in the cache
+directory, the repository id (the cache directory is named after it) and the cache
+``config`` file (it only contains the cache version and the repository id). Someone
+who can write to the cache directory can delete files there, which only makes the
+next backup slower.
 
 The Internals section contains more details about :ref:`cache`. If you ever need to move the cache
 to a different location, this can be achieved by using the appropriate :ref:`env_vars`.

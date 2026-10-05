@@ -758,11 +758,27 @@ Borg can also work without using the files cache (saves memory if you have a
 lot of files or not much RAM free), then all files are assumed to have changed.
 This is usually much slower than with files cache.
 
-The on-disk format of the files cache is a stream of msgpacked tuples (key, value).
-There, the chunks list is stored in its uncompressed form (chunk id and size), as
-the chunks index indexes are only valid for one specific in-memory chunks index.
-Loading the files cache involves reading the file, one msgpack object at a time,
-unpacking it, and compressing the entry as described above.
+On disk, the files cache is a stream of msgpacked tuples (key, value). There, the
+chunks list is stored in its uncompressed form (chunk id and size), as the chunks
+index indexes are only valid for one specific in-memory chunks index. This stream
+is stored as a :ref:`sealed stream <sealed_stream>`, so it is encrypted and
+authenticated with the repository key (authenticated only in the ``authenticated-*``
+modes), like the objects in the repository. The context of the sealed stream is
+``b"borg-files-cache\0"``, followed by the repository id and the file name of the files
+cache (``files.<SUFFIX>``): a files cache copied from another repository (using the
+same key material) or from another archive series is rejected. Loading the files
+cache involves reading and verifying the file frame by frame, unpacking one msgpack
+object at a time and compressing the entry as described above.
+
+Without the key, one can only see the names, sizes and timestamps of the files
+cache files. A files cache that fails the verification (it is corrupted, was
+modified, or was not written with the key of this repository) is ignored with a
+warning: borg then rebuilds the files cache from the most recent archive of the
+series in the repository, or, failing that, starts with an empty files cache. The
+same happens, without a warning, if there is no files cache file (yet). Replacing a
+files cache file by an older version of it is not detected, but harmless: its
+entries were correct when it was written, and entries that refer to chunks that are
+no longer in the repository are dropped when loading it.
 
 .. _index:
 
@@ -1287,19 +1303,14 @@ just retry later.
 Checksumming data structures
 ----------------------------
 
-As detailed in the previous sections, Borg generates and stores files
-containing important meta data, currently the files cache.
-
-Data corruption in the files cache could create incorrect archives, e.g. due
-to wrong object IDs or sizes in the files cache.
-
-Therefore, Borg calculates checksums when writing these files and tests checksums
-when reading them. Checksums are generally 256-bit sha256 hashes.
+Borg 2 protects its own local files with the repository key (see :ref:`the files
+cache <cache>`). Checksums are only used for reading borg 1.x repositories (see
+``borg transfer``): borg 1.x stores the repository index and hints files of such a
+repository (``index.N``, ``hints.N``) with checksums, so that data corruption in them
+is detected. Checksums are generally 256-bit sha256 hashes.
 Checksums are stored as hexadecimal ASCII strings.
 
 For compatibility, checksums are not required and absent checksums do not trigger errors.
-The mechanisms have been designed to avoid false-positives when various Borg
-versions are used alternately on the same repositories.
 
 Checksums are a data safety mechanism. They are not a security mechanism.
 
@@ -1328,9 +1339,8 @@ mixed into the checksum state first (encoded as an ASCII string via `%10d`
 printf format), then the name of the part is mixed in as an UTF-8 string.
 Lastly, the current position (length) in the file is mixed in as well.
 
-Borg 2 uses parts only when reading a borg 1.x repository (see ``borg
-transfer``): its index and hints files have a ``HashHeader`` part. The files
-cache is written and read as a single part.
+The index file of a borg 1.x repository has a ``HashHeader`` part, its hints file
+is a single part.
 
 The checksum state is not reset at part boundaries.
 
@@ -1367,35 +1377,13 @@ DetachedIntegrityCheckedFile, which automatically writes and reads it from a
 Upper layer
 ~~~~~~~~~~~
 
-.. rubric:: The files cache
+The integrity data of ``index.N`` and ``hints.N`` is stored in ``integrity.N`` next
+to them, a msgpacked dict with the integrity data version (2) and the integrity data
+of both files (keys ``index`` and ``hints``). Without an ``integrity.N`` file, or if
+its version is unknown, the files are read without checking them.
 
-The files cache is the only file borg 2 protects this way. Its integrity data
-is stored in the ``[integrity]`` section of the cache ``config`` file, keyed by
-the file's name (see :ref:`the files cache <cache>` about that name):
-
-.. code-block:: none
-
-    [cache]
-    version = 1
-    repository = 3c4...e59
-
-    [integrity]
-    files.9f8...a08 = {"algorithm": "SHA256", "digests": {"final": "e2a...b24"}}
-
-The chunks index is not in this list: it is not a local file, but lives in the
-repository below ``index/`` and has its own integrity mechanism, see
-:ref:`pack-index-namespace`.
-
-The cache config file is read in its entirety (using the Python ConfigParser),
-modified and written back, so sections and values a Borg version does not
-understand are preserved. There is no guard against an older Borg version
-updating the files cache without updating its integrity data: every Borg
-version that can open a version 5 repository knows the ``[integrity]`` section.
-
-A files cache that fails its integrity check (or can not be read at all) is
-discarded, not used: borg then rebuilds the files cache from the most recent
-archive of the series in the repository, or, failing that, starts with an empty
-files cache.
+If the index or hints file fails its integrity check, borg rebuilds the index
+and hints from the segments, as for any other error reading them.
 
 
 HardLinkManager and the hlid concept

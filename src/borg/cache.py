@@ -37,8 +37,8 @@ from .helpers import sig_int
 from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
-from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .crypto.key import store_hash
+from .crypto.sealed_stream import SealedStreamWriter, SealedStreamError, read_sealed_stream
 from .manifest import Manifest
 from .platform import SaveFile
 from .repository import Repository, StoreObjectNotFound, PackReader
@@ -98,6 +98,9 @@ def discover_files_cache_names(path, files_cache_name="files"):
 # digests has a default, so that a files cache written by a borg without it still loads.
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks digests", defaults=(None,))
 
+# domain prefix of the sealed stream context of a files cache, see FilesCacheMixin._files_cache_context.
+FILES_CACHE_AAD = b"borg-files-cache\0"
+
 
 def cache_dir(repository, path=None):
     return Path(path) if path else Path(get_cache_dir()) / repository.id_str
@@ -126,7 +129,6 @@ class CacheConfig:
         config.add_section("cache")
         config.set("cache", "version", "1")
         config.set("cache", "repository", self.repository.id_str)
-        config.add_section("integrity")
         with SaveFile(self.config_path) as fd:
             config.write(fd)
 
@@ -139,20 +141,6 @@ class CacheConfig:
             self._config.read_file(fd)
         self._check_upgrade(self.config_path)
         self.id = self._config.get("cache", "repository")
-        try:
-            self.integrity = dict(self._config.items("integrity"))
-        except configparser.NoSectionError:
-            logger.debug("Cache integrity: no [integrity] section in the cache config, no integrity data.")
-            self.integrity = {}
-
-    def save(self, with_integrity=False):
-        if with_integrity:
-            if not self._config.has_section("integrity"):
-                self._config.add_section("integrity")
-            for file, integrity_data in self.integrity.items():
-                self._config.set("integrity", file, integrity_data)
-        with SaveFile(self.config_path) as fd:
-            self._config.write(fd)
 
     def close(self):
         pass
@@ -367,6 +355,15 @@ class FilesCacheMixin:
     def discover_files_cache_names(self, path):
         return discover_files_cache_names(path, self.FILES_CACHE_NAME)
 
+    def _files_cache_context(self):
+        """
+        Return the sealed stream context of the files cache (see borg.crypto.sealed_stream).
+
+        It binds the files cache to the repository and to its file name, so a files cache copied from
+        another repository (using the same key material) or from another archive series is rejected.
+        """
+        return FILES_CACHE_AAD + self.repository.id + self.files_cache_name().encode()
+
     def _read_files_cache(self):
         """read files cache from cache directory"""
         if "d" in self.cache_mode:  # d(isabled)
@@ -375,18 +372,14 @@ class FilesCacheMixin:
         files = {}
         logger.debug("Reading files cache ...")
         files_cache_logger.debug("FILES-CACHE-LOAD: starting...")
-        msg = None
+        name = self.files_cache_name()
+        msg = warning = None
         try:
-            with IntegrityCheckedFile(
-                path=str(self.path / self.files_cache_name()),
-                write=False,
-                integrity_data=self.cache_config.integrity.get(self.files_cache_name()),
-            ) as fd:
+            with open(self.path / name, "rb") as fd:
                 u = msgpack.Unpacker(use_list=True)
-                while True:
-                    data = fd.read(64 * 1024)
-                    if not data:
-                        break
+                # the payloads are only trustworthy once the whole stream is read, so `files` is
+                # discarded below if reading the sealed stream fails at any frame.
+                for data in read_sealed_stream(fd, self.key, self._files_cache_context()):
                     u.feed(data)
                     try:
                         for path_hash, entry in u:
@@ -398,12 +391,17 @@ class FilesCacheMixin:
                                 # repo is missing a chunk referenced from entry
                                 logger.debug(f"compress_entry failed for {entry}, skipping.")
                     except (TypeError, ValueError) as exc:
-                        msg = "The files cache seems invalid. [%s]" % str(exc)
+                        # authenticated, but not what we expect - only possible through a bug.
+                        warning = f"Ignoring invalid files cache {name} [{exc}], it will be rebuilt."
                         break
         except OSError as exc:
             msg = "The files cache can't be read. [%s]" % str(exc)
-        except FileIntegrityError as fie:
-            msg = "The files cache is corrupted. [%s]" % str(fie)
+        except SealedStreamError as exc:
+            # corrupted, tampered with, or not written with this repository's key.
+            warning = f"Ignoring corrupted files cache {name} [{exc}], it will be rebuilt."
+        if warning is not None:
+            logger.warning(warning)
+            files = None
         if msg is not None:
             logger.debug(msg)
             files = None
@@ -422,49 +420,48 @@ class FilesCacheMixin:
         files_cache_logger.debug("FILES-CACHE-SAVE: starting...")
         cache_path = str(self.path / self.files_cache_name())
         with SaveFile(cache_path, binary=True) as sync_file:
-            with IntegrityCheckedFile(path=cache_path, write=True, override_fd=sync_file) as fd:
-                entries = 0
-                age_discarded = 0
-                race_discarded = 0
-                broken_discarded = 0
-                for path_hash, entry in files.items():
-                    try:
-                        entry = self.decompress_entry(entry)
-                    except KeyError:
-                        # the entry references a chunk that is no longer in the chunks index (e.g.
-                        # after an aborted / out-of-space backup rolled back pending chunks). such an
-                        # entry is unusable; drop it rather than crash while saving the cache — the
-                        # file will simply be re-chunked in a future backup. this mirrors the
-                        # compress_entry KeyError handling in _read_files_cache.
-                        broken_discarded += 1
-                        continue
-                    if entry.age == 0:  # current entries
-                        if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
-                            # Only keep files seen in this backup that old enough not to suffer race conditions
-                            # relating to filesystem snapshots and ctime/mtime granularity or being modified
-                            # while we read them.
-                            keep = True
-                        else:
-                            keep = False
-                            race_discarded += 1
-                    else:  # old entries
-                        if entry.age < ttl:
-                            # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
-                            keep = True
-                        else:
-                            keep = False
-                            age_discarded += 1
-                    if keep:
-                        msgpack.pack((path_hash, entry), fd)
-                        entries += 1
-            integrity_data = fd.integrity_data
+            writer = SealedStreamWriter(sync_file, self.key, self._files_cache_context())
+            entries = 0
+            age_discarded = 0
+            race_discarded = 0
+            broken_discarded = 0
+            for path_hash, entry in files.items():
+                try:
+                    entry = self.decompress_entry(entry)
+                except KeyError:
+                    # the entry references a chunk that is no longer in the chunks index (e.g.
+                    # after an aborted / out-of-space backup rolled back pending chunks). such an
+                    # entry is unusable; drop it rather than crash while saving the cache — the
+                    # file will simply be re-chunked in a future backup. this mirrors the
+                    # compress_entry KeyError handling in _read_files_cache.
+                    broken_discarded += 1
+                    continue
+                if entry.age == 0:  # current entries
+                    if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
+                        # Only keep files seen in this backup that old enough not to suffer race conditions
+                        # relating to filesystem snapshots and ctime/mtime granularity or being modified
+                        # while we read them.
+                        keep = True
+                    else:
+                        keep = False
+                        race_discarded += 1
+                else:  # old entries
+                    if entry.age < ttl:
+                        # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
+                        keep = True
+                    else:
+                        keep = False
+                        age_discarded += 1
+                if keep:
+                    msgpack.pack((path_hash, entry), writer)
+                    entries += 1
+            writer.finish()
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {age_discarded} entries with age >= TTL [{ttl}]")
         if broken_discarded:
             files_cache_logger.debug(f"FILES-CACHE-KILL: removed {broken_discarded} entries referencing missing chunks")
         t_str = datetime.fromtimestamp(discard_after / 1e9, UTC).isoformat()
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {race_discarded} entries with ctime/mtime >= {t_str}")
         files_cache_logger.debug(f"FILES-CACHE-SAVE: finished, {entries} remaining entries saved.")
-        return integrity_data
 
     def file_known_and_unchanged(self, hashed_path, path_hash, st):
         """
@@ -1378,14 +1375,12 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         pi = ProgressIndicatorMessage(msgid="cache.close")
         if self._files is not None:
             pi.output("Saving files cache")
-            integrity_data = self._write_files_cache(self._files)
-            self.cache_config.integrity[self.files_cache_name()] = integrity_data
+            self._write_files_cache(self._files)
             self._files = None  # release the (potentially large) files cache dict, like _chunks below
         if self._chunks is not None:
             for key, value in sorted(self._chunks.stats.items()):
                 logger.debug(f"Chunks index stats: {key}: {value}")
             pi.output("Saving index")
-            # note: index/* in repo has a different integrity mechanism
             now = datetime.now(UTC)
             self._maybe_write_chunks_index(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
@@ -1403,8 +1398,6 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             # repository's reference too, so a later .chunks access rebuilds it from the repo instead
             # of seeing a valid-looking but empty index (and so is_chunk_index_loaded reports False).
             self.repository.invalidate_chunk_index()
-        pi.output("Saving cache config")
-        self.cache_config.save(with_integrity=True)
         self.cache_config.close()
         pi.finish()
         self.cache_config = None

@@ -6,10 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import get_cache_dir, bin_to_hex, sig_int, Error
+from ...helpers import get_cache_dir, bin_to_hex, hex_to_bin, sig_int, Error
 from ...hashindex import ChunkIndex
 from ...repoobj import RepoObj
-from ...repository import Repository, PackTracker
+from ...repository import Repository, PackReader, PackTracker
 from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
 from ...cache import delete_chunkindex_from_repo, write_chunkindex_to_repo
 from ...manifest import Manifest
@@ -312,6 +312,52 @@ def test_compact_superseded_duplicate(tmp_path):
         new_pack = repository.chunks[w_id].pack_id
         new_size = next(i.size for i in repository.store_list("packs") if i.name == bin_to_hex(new_pack))
         assert new_size == pack_a_size - y_size - x_size
+
+
+@pytest.mark.parametrize("untrusted", ("missing", "corrupt", "truncated"))
+def test_compact_keeps_duplicate_indexed_in_untrusted_pack(tmp_path, untrusted):
+    # X is indexed in pack B, pack A holds another copy of X in a gap. With pack B missing from the
+    # store, recorded corrupt or truncated before the end of X, the copy in pack A may be the only
+    # readable one: rewriting pack A (for its unused Y) keeps it (#10474).
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
+        manifest = gc_manifest(repository)
+        repo_objs = manifest.repo_objs
+        w, x, y = b"WWWW", b"XXXX", os.urandom(1000)
+        w_id, x_id, y_id = (repo_objs.id_hash(data) for data in (w, x, y))
+        repository._pack_writer.max_count = 4  # one flush() -> one pack
+        for cid, data in [(w_id, w), (x_id, x), (y_id, y)]:
+            repository.put(cid, repo_objs.format(cid, {}, data, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        pack_a = repository.chunks[w_id].pack_id
+        pack_a_size = next(i.size for i in repository.store_list("packs") if i.name == bin_to_hex(pack_a))
+        y_size = repository.chunks[y_id].obj_size
+        repository.put(x_id, repo_objs.format(x_id, {}, x, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        pack_b = repository.chunks[x_id].pack_id
+        assert pack_b != pack_a
+        key_b = "packs/" + bin_to_hex(pack_b)
+        if untrusted == "missing":
+            repository.store_delete(key_b)
+        elif untrusted == "corrupt":
+            record_corrupt(repository, pack_b)
+        else:
+            repository.store_store(key_b, repository.store_load(key_b)[:-1])
+        for cid in (w_id, x_id, y_id):
+            flags = ChunkIndex.F_NONE if cid == y_id else ChunkIndex.F_USED
+            repository.chunks[cid] = repository.chunks[cid]._replace(flags=flags)
+
+        gc = ArchiveGarbageCollector(repository, manifest, stats=False, threshold=10)
+        gc.chunks = repository.chunks
+        gc.compact_packs()
+
+        # the packs other than pack B: only the pack that replaced pack A.
+        packs = {i.name: i.size for i in repository.store_list("packs") if i.name != bin_to_hex(pack_b)}
+        ((new_pack_hex, new_size),) = packs.items()
+        assert new_pack_hex != bin_to_hex(pack_a)  # pack A was rewritten
+        assert new_size == pack_a_size - y_size  # only the unused Y was dropped
+        reader = PackReader(store=repository.store, pack_id=hex_to_bin(new_pack_hex))
+        assert x_id in [chunk_id for chunk_id, _, _ in reader.iter_headers()]  # the gap copy of X is kept
 
 
 def test_compact_keeps_orphan_pack(tmp_path):

@@ -299,15 +299,20 @@ class ArchiveGarbageCollector:
         pack_used = defaultdict(int)
         pack_indexed = defaultdict(int)  # pack_id -> bytes of all its index entries, used or not
         stale_ids = []  # index entries referencing a pack file that is not in the store
+        stale_packs = set()  # ids of those missing pack files
+        short_packs = set()  # ids of the pack files that end before one of their index entries does
         stale_used = 0  # how many of those were still flagged used (lost data)
         for id, entry in self.chunks.iteritems():
             pid = entry.pack_id
             if pid not in pack_total:
                 stale_ids.append(id)
+                stale_packs.add(pid)
                 if entry.flags & ChunkIndex.F_USED:
                     stale_used += 1
             else:
                 pack_indexed[pid] += entry.obj_size
+                if entry.obj_offset + entry.obj_size > pack_total[pid]:
+                    short_packs.add(pid)
                 if entry.flags & ChunkIndex.F_USED:
                     pack_used[pid] += entry.obj_size
 
@@ -455,13 +460,19 @@ class ArchiveGarbageCollector:
             progress += 1
             pi.show(progress)  # report after the work, so the final pack lands on 100%
         validate = object_validator(self.manifest.repo_objs)
+        untrusted_pack_ids = stale_packs | corrupt_packs | short_packs
         for pid in rewrite_packs:
             if sig_int:
                 break
             # chunks=self.chunks: the index updates (repoint kept objects, remove dropped ones)
             # must land in the index that save_chunk_index() persists (#9850).
             _, dropped = self.repository.compact_pack(
-                pid, keep_ids=keep[pid], drop_ids=drop[pid], chunks=self.chunks, validate=validate
+                pid,
+                keep_ids=keep[pid],
+                drop_ids=drop[pid],
+                chunks=self.chunks,
+                validate=validate,
+                untrusted_pack_ids=untrusted_pack_ids,
             )
             freed += dropped  # unused indexed objects plus superseded duplicates
             progress += 1

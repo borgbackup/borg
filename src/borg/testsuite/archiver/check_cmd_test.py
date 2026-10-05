@@ -20,6 +20,7 @@ from ...cache import (
     list_chunkindex_hashes,
     read_chunkindex_from_repo,
     write_chunkindex_invalid,
+    write_chunkindex_to_repo,
 )
 from ...crypto.key import RepositoryKeyInfoMissing
 from ...constants import *  # NOQA
@@ -1672,6 +1673,48 @@ def test_repair_finish_accepts_a_superseded_duplicate_in_a_rewritten_pack(archiv
         # the second copy: the first one starts where the dropped object ends.
         assert entry.obj_offset > dropped.obj_size
     cmd(archiver, "check", exit_code=0)
+
+
+def test_verify_data_repair_keeps_gap_copy_of_a_defect_chunk(archiver):
+    """--verify-data --repair keeps a gap object whose chunk id the index maps to a defect chunk.
+
+    Pack A holds a defect chunk D and an intact copy of X that no index entry covers. The index maps X
+    to pack B, where X is defect. Removing D rewrites pack A and keeps its copy of X, which finish()
+    indexes after the defect X was removed.
+    """
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        repo_objs = Manifest.load(repository).repo_objs
+        d, w, x = b"defect", b"other", b"duplicate"
+        d_id, w_id, x_id = (repo_objs.id_hash(data) for data in (d, w, x))
+        for cid, data in [(d_id, d), (w_id, w), (x_id, x)]:
+            repository.put(cid, repo_objs.format(cid, {}, data, ro_type=ROBJ_FILE_STREAM))
+        repository.flush()
+        pack_a = repository.chunks[d_id].pack_id
+        assert repository.chunks[x_id].pack_id == pack_a
+        # verify_data removes the defect chunks in pack id order: D must be removed while the index maps X
+        # to pack B, so pack B needs the higher pack id. The pack id depends on the random nonce of X.
+        while True:
+            repository.put(x_id, repo_objs.format(x_id, {}, x, ro_type=ROBJ_FILE_STREAM))
+            repository.flush()
+            pack_b = repository.chunks[x_id].pack_id
+            if pack_b > pack_a:
+                break
+            repository.store_delete("packs/" + bin_to_hex(pack_b))
+        # a full index, so that the check loads X as indexed in pack B.
+        write_chunkindex_to_repo(repository, repository.chunks, incremental=False, force_write=True, delete_other=True)
+        corrupt_chunk_on_disk(repository, d_id)
+        corrupt_chunk_on_disk(repository, x_id)  # the indexed copy, in pack B
+
+    output = cmd(archiver, "check", "--archives-only", "--repair", "--verify-data", exit_code=0)
+    assert f"{bin_to_hex(d_id)}, integrity error" in output
+    assert f"{bin_to_hex(x_id)}, integrity error" in output
+
+    with KeyedRepository(archiver.repository_location, exclusive=True) as repository:
+        repo_objs = Manifest.load(repository).repo_objs
+        assert d_id not in repository.chunks
+        assert repository.chunks[x_id].pack_id not in (pack_a, pack_b)
+        assert repo_objs.parse(x_id, repository.get(x_id), ro_type=ROBJ_FILE_STREAM)[1] == x
 
 
 def record_verify_findings(monkeypatch, tamper=None):

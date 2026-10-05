@@ -2503,6 +2503,7 @@ class ArchiveChecker:
         verified = 0  # chunks actually verified
         defect_chunks = []
         archive_meta_ids = set()
+        untrusted_pack_ids = set()  # ids of the packs that are missing or hold a defect chunk
         pi = ProgressIndicatorPercent(
             total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
@@ -2533,11 +2534,13 @@ class ArchiveChecker:
                         errors += 1
                         logger.error("chunk %s, integrity error: %s", bin_to_hex(chunk_id), integrity_error)
                         defect_chunks.append(chunk_id)
+                        untrusted_pack_ids.add(pack_id)
             except Repository.PackNotFound:
                 # the pack is gone, thus every chunk the index places in it is lost. get_many() loads the
                 # whole pack for the first chunk, so it raises before any chunk of this pack was read.
                 # one error line for the pack, the chunk ids at debug level: a pack holds thousands of them.
                 self.error_found = True
+                untrusted_pack_ids.add(pack_id)
                 lost = len(chunk_ids)
                 errors += lost
                 verified += lost  # they are not read, but they are accounted for, like a failed read
@@ -2580,13 +2583,18 @@ class ArchiveChecker:
                         # keeping the other chunks, and removes it from self.chunks, so rebuild_archives
                         # reports the file it belongs to. update_index=False: finish() stores the index
                         # and clears the invalid marker delete() writes.
+                        # untrusted_pack_ids: the rewrite keeps an object of the pack that no index entry
+                        # covers, if the index maps its chunk id into one of these packs.
                         old_pack_id = self.chunks[defect_chunk].pack_id
                         # new_pack_id: the pack holding the other objects of the old pack, None if there were none.
-                        new_pack_id, _ = self.repository.delete(defect_chunk, update_index=False, validate=validate)
+                        new_pack_id, _ = self.repository.delete(
+                            defect_chunk, update_index=False, validate=validate, untrusted_pack_ids=untrusted_pack_ids
+                        )
                         self.chunks_modified = True
                         self.written_packs.discard(old_pack_id)  # delete() removed the old pack
                         if new_pack_id is not None:
                             self.written_packs.add(new_pack_id)
+                            untrusted_pack_ids.add(new_pack_id)  # it may hold other defect chunks of the old pack
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
                         if meta["type"] == ROBJ_ARCHIVE_META:

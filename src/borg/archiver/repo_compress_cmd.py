@@ -82,15 +82,21 @@ class PackRecompressor:
         logger.info(f"Recompressing repository to {format_compression_spec(*self.wanted)}...")
         self.chunks = build_chunkindex_from_repo(self.repository, write_immediately=True)
 
-        # group the indexed objects per pack; transform_pack requires each pack's complete id list.
-        per_pack = defaultdict(list)  # pack_id -> [chunk_id, ...]
-        for id, entry in self.chunks.iteritems():
-            per_pack[entry.pack_id].append(id)
-
         # the pack files actually in the store; sorted, so the processing order is reproducible.
         packs = sorted(
             (hex_to_bin(info.name), info.size) for info in map(ItemInfo._make, self.repository.store_list("packs"))
         )
+        pack_sizes = dict(packs)
+
+        # group the indexed objects per pack; transform_pack requires each pack's complete id list.
+        per_pack = defaultdict(list)  # pack_id -> [chunk_id, ...]
+        short_packs = set()  # ids of the pack files that end before one of their index entries does
+        for id, entry in self.chunks.iteritems():
+            per_pack[entry.pack_id].append(id)
+            pack_size = pack_sizes.get(entry.pack_id)
+            if pack_size is not None and entry.obj_offset + entry.obj_size > pack_size:
+                short_packs.add(entry.pack_id)
+
         self.packs_count = len(packs)
         size_before = sum(size for _, size in packs)
         size_after = size_before
@@ -120,6 +126,7 @@ class PackRecompressor:
             total=len(packs), msg="Recompressing %3.1f%%", step=0.1, msgid="repo_compress.recompress"
         )
         validate = object_validator(self.repo_objs)
+        untrusted_pack_ids = stale_packs | corrupt_packs | short_packs
         for i, (pack_id, pack_size) in enumerate(packs):
             if sig_int:
                 break  # stop cleanly at a pack boundary: save the index below, then raise
@@ -133,6 +140,7 @@ class PackRecompressor:
                     chunks=self.chunks,
                     before_change=self.invalidate_stored_index,
                     validate=validate,
+                    untrusted_pack_ids=untrusted_pack_ids,
                 )
                 if new_pack_id != pack_id:
                     self.packs_rewritten += 1

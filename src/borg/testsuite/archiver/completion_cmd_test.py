@@ -8,7 +8,7 @@ import tempfile
 import pytest
 
 import borg
-from ...archiver.completion_cmd import TCSH_SORTBY_FN
+from ...archiver.completion_cmd import TCSH_REPO_URL_RULE, TCSH_SORTBY_FN
 from ...archiver.repo_create_cmd import ENCRYPTION_DESCRIPTIONS
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 
@@ -632,12 +632,13 @@ def test_zsh_repo_url_no_directories(archivers, request):
     archiver = request.getfixturevalue(archivers)
     script = cmd(archiver, "completion", "zsh")
     # stub the zsh directory completion, it needs the whole completion system
-    setup = "_files() { print -r -- COMPLETING-DIRS }\n"
+    setup = '_files() { print -r -- COMPLETING-DIRS "$@" }\n'
     for url in REPO_URLS:
         result = _run_zsh_completion_fn(script, setup + f"PREFIX='{url}'\n_borg_complete_repo_dirs\n")
         assert "COMPLETING-DIRS" not in result.stdout, f"directories offered for {url}"
-    result = _run_zsh_completion_fn(script, setup + "PREFIX=/some/dir\n_borg_complete_repo_dirs\n")
-    assert "COMPLETING-DIRS" in result.stdout
+    # the arguments (_arguments gives the description of the option value) are passed on
+    result = _run_zsh_completion_fn(script, setup + "PREFIX=/some/dir\n_borg_complete_repo_dirs -X REPO\n")
+    assert result.stdout.split() == ["COMPLETING-DIRS", "-/", "-X", "REPO"]
 
 
 @needs_fish
@@ -655,7 +656,7 @@ def test_fish_repo_url_no_directories(archivers, request):
 def test_tcsh_repo_url_no_directories(archivers, request):
     """tcsh uses the first matching rule, the one completing nothing for URLs must precede the directory ones."""
     lines = [line.strip().rstrip(" \\") for line in completion_lines(archivers, request, "tcsh")]
-    url_rule = lines.index("'c/{--repo=,-r=,--other-repo=,}{ssh,sftp,http,https,s3,b2,rclone}:/n/'")
+    url_rule = lines.index(TCSH_REPO_URL_RULE)
     for repo_rule in ("'c/--repo=/d/'", "'n/--repo/d/'", "'n/-r/d/'", "'c/--other-repo=/d/'", "'n/--other-repo/d/'"):
         assert url_rule < lines.index(repo_rule)
 
@@ -673,6 +674,9 @@ def test_fish_repo_directory_completion(archivers, request, tmp_path):
         candidates = _fish_complete_candidates(script, f"borg list {option} {prefix}")
         assert any(c.rstrip("/").endswith("somerepo") for c in candidates), f"repo dir missing: {candidates}"
         assert not any(c.endswith("somefile.txt") for c in candidates), f"file offered: {candidates}"
+    # the value attached to the short option
+    candidates = _fish_complete_candidates(script, f"borg list -r{prefix}")
+    assert [c.rstrip("/") for c in candidates] == [f"-r{prefix}repo"]
 
 
 @needs_fish

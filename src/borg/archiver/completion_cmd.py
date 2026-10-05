@@ -455,7 +455,7 @@ _borg_complete_encryption() {
 # Complete local repository directories, but nothing for a URL like ssh://... or rclone:...
 _borg_complete_repo_dirs() {
   [[ "$PREFIX" == ({REPO_URL_SCHEMES}):* ]] && return 1
-  _files -/
+  _files -/ "$@"
 }
 
 # Complete tags from repository
@@ -682,7 +682,7 @@ function _borg_complete_repo_dirs
     if string match -qr -- '^({REPO_URL_SCHEMES}):' $cur
         return
     end
-    __fish_complete_directories
+    __fish_complete_directories $cur
 end
 
 # Complete relative time markers

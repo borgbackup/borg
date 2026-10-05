@@ -32,7 +32,7 @@ from ..cache import (
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey, AuthenticatedKey
-from ..helpers import CorruptPack, Error, bin_to_hex, safe_ns
+from ..helpers import CorruptPack, Error, bin_to_hex, progress, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import PackReader, Repository
@@ -623,6 +623,119 @@ def test_build_chunkindex_drops_a_pack_that_validates_nothing_when_others_do(tmp
         index = build_chunkindex_from_repo(repository, slow_rebuild=True, validate=accept_good)
         assert H(93) in index
         assert H(94) not in index
+
+
+def two_fragment_repo(tmp_path):
+    """A repository with two chunk index fragments: H(1) in one, H(2) in the other."""
+    repository = Repository(os.fspath(tmp_path / "repository"), exclusive=True, create=True)
+    with repository:
+        for i in 1, 2:
+            ci = ChunkIndex()
+            ci[H(i)] = ChunkIndexEntry(ChunkIndex.F_NEW, 0, H(i), 0, 4)
+            write_chunkindex_to_repo(repository, ci, incremental=False, force_write=True)
+        assert len(list_chunkindex_hashes(repository)) == 2
+    return repository
+
+
+@pytest.fixture
+def progress_output(monkeypatch):
+    """Progress output as --progress gives it, and nothing else: all loggers at INFO level, restored afterwards."""
+    # "borg" and "borgstore" inherit the root logger level, which is DEBUG after an in-process borg --debug run.
+    loggers = [logging.getLogger(name) for name in ("borg.output.progress", "borg", "borgstore")]
+    levels = [logger.level for logger in loggers]
+    for logger in loggers:
+        logger.setLevel(logging.INFO)
+    monkeypatch.setattr(progress, "get_progress_dt", lambda: 0.0)  # no rate limit, every step is output
+    yield
+    for logger, level in zip(loggers, levels):
+        logger.setLevel(level)
+
+
+def test_build_chunkindex_fragment_merge_progress(tmp_path, capfd, progress_output):
+    with two_fragment_repo(tmp_path) as repository:
+        capfd.readouterr()
+        chunks = build_chunkindex_from_repo(repository)
+    assert H(1) in chunks and H(2) in chunks
+    out, err = capfd.readouterr()
+    # the last line is the "finished" record
+    assert err == "Loading chunk index   0%\nLoading chunk index  50%\nLoading chunk index 100%\n\n"
+
+
+def test_build_chunkindex_slow_rebuild_progress(tmp_path, capfd, progress_output):
+    with two_pack_repo(tmp_path) as repository:
+        capfd.readouterr()
+        build_chunkindex_from_repo(repository, slow_rebuild=True)
+    out, err = capfd.readouterr()
+    assert err == "Rebuilding chunk index   0%\nRebuilding chunk index  50%\nRebuilding chunk index 100%\n\n"
+
+
+class RecordingSpinner:
+    """Stands in for ProgressIndicatorSpinner, records the calls of all instances."""
+
+    instances: list = []
+
+    def __init__(self, message, msgid=None):
+        self.message = message
+        self.msgid = msgid
+        self.shown = 0
+        self.finished = 0
+        self.instances.append(self)
+
+    def show(self):
+        assert not self.finished
+        self.shown += 1
+
+    def finish(self):
+        self.finished += 1
+
+
+@pytest.fixture
+def spinners(monkeypatch):
+    """The spinners build_chunkindex_from_repo creates without --progress."""
+    monkeypatch.setattr(RecordingSpinner, "instances", [])
+    monkeypatch.setattr(cache_mod, "ProgressIndicatorSpinner", RecordingSpinner)
+    monkeypatch.setattr(cache_mod, "progress_wanted", lambda: False)
+    return RecordingSpinner.instances
+
+
+def test_build_chunkindex_fragment_merge_spinner(tmp_path, spinners):
+    with two_fragment_repo(tmp_path) as repository:
+        build_chunkindex_from_repo(repository)
+    [spinner] = spinners
+    assert (spinner.message, spinner.msgid) == ("Loading chunk index", "cache.merge_chunkindex_fragments")
+    assert spinner.shown == 2  # once per fragment
+    assert spinner.finished == 1
+
+
+def test_build_chunkindex_fragment_merge_spinner_finished_on_corrupt_fragment(tmp_path, spinners):
+    with two_fragment_repo(tmp_path) as repository:
+        repository.store_encrypt_store("index", b"not a serialized chunk index", hashed_name=True)
+        with pytest.raises(CorruptChunkIndexFragment):
+            build_chunkindex_from_repo(repository)
+    [spinner] = spinners
+    assert spinner.finished == 1
+
+
+def test_build_chunkindex_slow_rebuild_spinner(tmp_path, spinners):
+    with two_pack_repo(tmp_path) as repository:
+        build_chunkindex_from_repo(repository, slow_rebuild=True)
+    [spinner] = spinners
+    assert (spinner.message, spinner.msgid) == ("Rebuilding chunk index", "cache.build_chunkindex_from_repo")
+    assert spinner.shown == 6  # once per pack and once per object
+    assert spinner.finished == 1
+
+
+def test_build_chunkindex_slow_rebuild_spinner_finished_on_interrupt(tmp_path, monkeypatch, spinners):
+    from .repository_test import Interrupter
+
+    interrupter = Interrupter()
+    monkeypatch.setattr(cache_mod, "sig_int", interrupter)
+    interrupt_after(monkeypatch, interrupter, objects=1)
+    with two_pack_repo(tmp_path) as repository:
+        with pytest.raises(ChunkIndexRebuildInterrupted):
+            build_chunkindex_from_repo(repository, slow_rebuild=True, interruptible=True)
+    [spinner] = spinners
+    assert spinner.finished == 1
 
 
 def two_pack_repo(tmp_path):

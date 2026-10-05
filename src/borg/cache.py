@@ -32,7 +32,7 @@ from .helpers import CorruptPack, IntegrityError
 from .helpers import hex_to_bin, bin_to_hex
 from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
-from .helpers import ProgressIndicatorMessage, ProgressIndicatorPercent
+from .helpers import ProgressIndicatorMessage, ProgressIndicatorPercent, ProgressIndicatorSpinner, progress_wanted
 from .helpers import sig_int
 from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
@@ -948,20 +948,33 @@ def build_chunkindex_from_repo(
             chunks = ChunkIndex()  # we'll merge all fragments into this
             complete = True
             corrupt_fragment = None
-            for hash in hashes:
-                try:
-                    chunks_to_merge = read_chunkindex_from_repo(repository, hash)
-                except CorruptChunkIndexFragment as err:
-                    corrupt_fragment = err
-                    break
-                if chunks_to_merge is None:
-                    logger.debug(f"chunk index fragment {hash} vanished, restarting the merge...")
-                    complete = False
-                    break
-                logger.debug(f"chunk index fragment {hash} gets merged...")
-                for k, v in chunks_to_merge.items():
-                    chunks[k] = v
-                chunks_to_merge.clear()
+            msgid = "cache.merge_chunkindex_fragments"
+            show_percent = progress_wanted()
+            if show_percent:
+                pi = ProgressIndicatorPercent(total=len(hashes), msg="Loading chunk index %3.0f%%", msgid=msgid)
+            else:
+                pi = ProgressIndicatorSpinner("Loading chunk index", msgid=msgid)
+            try:
+                for hash in hashes:
+                    pi.show()
+                    try:
+                        chunks_to_merge = read_chunkindex_from_repo(repository, hash)
+                    except CorruptChunkIndexFragment as err:
+                        corrupt_fragment = err
+                        break
+                    if chunks_to_merge is None:
+                        logger.debug(f"chunk index fragment {hash} vanished, restarting the merge...")
+                        complete = False
+                        break
+                    logger.debug(f"chunk index fragment {hash} gets merged...")
+                    for k, v in chunks_to_merge.items():
+                        chunks[k] = v
+                    chunks_to_merge.clear()
+                else:
+                    if show_percent:
+                        pi.show(current=len(hashes))  # finish at 100%
+            finally:
+                pi.finish()
             if corrupt_fragment is not None:
                 # retrying would re-read the same corrupt fragment. abort, unless the index gets rewritten
                 # anyway: then rebuild the whole index from the packs.
@@ -1002,9 +1015,12 @@ def build_chunkindex_from_repo(
     # it iterates this same index we are building, so it would recurse. The headers also give each
     # object's real (chunk_id, offset, size), so every object in a pack is indexed individually.
     pack_infos = repository.store_list("packs")
-    pi = ProgressIndicatorPercent(
-        total=len(pack_infos), msg="Rebuilding chunk index %3.0f%%", msgid="cache.build_chunkindex_from_repo"
-    )
+    msgid = "cache.build_chunkindex_from_repo"
+    show_percent = progress_wanted()
+    if show_percent:
+        pi = ProgressIndicatorPercent(total=len(pack_infos), msg="Rebuilding chunk index %3.0f%%", msgid=msgid)
+    else:
+        pi = ProgressIndicatorSpinner("Rebuilding chunk index", msgid=msgid)
     headers_parsed = 0
 
     def stop_if_interrupted(packs_done):
@@ -1012,32 +1028,35 @@ def build_chunkindex_from_repo(
         if interruptible and sig_int:
             logger.info(f"Chunk index rebuild interrupted after {packs_done} of {len(pack_infos)} packs.")
             chunks.clear()
-            pi.finish()
             raise ChunkIndexRebuildInterrupted
 
-    for packs_done, info in enumerate(pack_infos):
-        stop_if_interrupted(packs_done)
-        # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
-        repository._lock_refresh()
-        pi.show(increase=1)
-        pack_id = hex_to_bin(info.name)
-        reader = PackReader(repository.store, pack_id)
-        try:
-            for chunk_id, obj_offset, obj_size in reader.iter_headers(validate=validate, on_drop=on_drop):
-                # every object header is a store request, so also stop within a pack.
-                stop_if_interrupted(packs_done)
-                num_chunks += 1
-                chunks[chunk_id] = ChunkIndexEntry(
-                    flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
-                )
-        except IntegrityError as err:
-            # the walk stopped at a corrupt object header, so this index would be incomplete: abort
-            # and point at "borg check --repair", which resyncs past the damage.
-            raise CorruptPack(err) from err
-        headers_parsed += reader.headers_parsed
-    if pack_infos:
-        pi.show(current=len(pack_infos))  # finish at 100%
-    pi.finish()
+    try:
+        for packs_done, info in enumerate(pack_infos):
+            stop_if_interrupted(packs_done)
+            # PackReader uses the store directly, so refresh the lock here; a full rebuild can be slow.
+            repository._lock_refresh()
+            pi.show()
+            pack_id = hex_to_bin(info.name)
+            reader = PackReader(repository.store, pack_id)
+            try:
+                for chunk_id, obj_offset, obj_size in reader.iter_headers(validate=validate, on_drop=on_drop):
+                    # every object header is a store request, so also stop within a pack.
+                    stop_if_interrupted(packs_done)
+                    if not show_percent:
+                        pi.show()
+                    num_chunks += 1
+                    chunks[chunk_id] = ChunkIndexEntry(
+                        flags=init_flags, size=0, pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size
+                    )
+            except IntegrityError as err:
+                # the walk stopped at a corrupt object header, so this index would be incomplete: abort
+                # and point at "borg check --repair", which resyncs past the damage.
+                raise CorruptPack(err) from err
+            headers_parsed += reader.headers_parsed
+        if show_percent and pack_infos:
+            pi.show(current=len(pack_infos))  # finish at 100%
+    finally:
+        pi.finish()
     if validate is not None and headers_parsed and num_chunks == 0:
         # the packs hold object headers, yet not one object validated: the key does not belong to
         # these packs, or the validator is broken. Returning this index would empty the chunk lists

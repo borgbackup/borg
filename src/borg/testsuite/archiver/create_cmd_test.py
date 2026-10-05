@@ -739,6 +739,15 @@ def test_progress_on(archivers, request):
     assert "0 B O 0 B U 0 N" in output
 
 
+def test_progress_chunk_index_loaded_first(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")  # writes a chunk index fragment
+    output = cmd(archiver, "create", "test2", "input", "--progress")
+    assert output.index("Loading chunk index 100%") < output.index("0 B O 0 B U 0 N")
+
+
 def test_progress_off(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

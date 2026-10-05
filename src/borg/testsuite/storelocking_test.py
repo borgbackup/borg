@@ -13,6 +13,7 @@ from .fslocking_test import free_pid  # NOQA
 from ..crypto.key import AESOCBKey, store_hash
 from ..platform import get_process_id
 from .. import storelocking
+from ..helpers import Error
 from ..storelocking import NotLocked, LockTimeout
 
 LOCK_KEY = AESOCBKey(None)
@@ -472,6 +473,33 @@ def test_lock_object_is_sealed(lockstore):
     plain = json.loads(unseal(content))
     assert (plain["hostid"], plain["processid"], plain["threadid"]) == ("secret-host@1234", 4711, 0)
     assert info.name != store_hash(json.dumps(plain).encode()).hexdigest()
+    lock.release()
+
+
+@pytest.mark.parametrize("value, expected", [(None, 0.01), ("", 0.01), ("0", 0.0), ("2", 2.0), ("0.5", 0.5)])
+def test_race_recheck_delay_from_env(monkeypatch, value, expected):
+    if value is None:
+        monkeypatch.delenv("BORG_LOCK_RECHECK_DELAY", raising=False)
+    else:
+        monkeypatch.setenv("BORG_LOCK_RECHECK_DELAY", value)
+    assert storelocking.get_race_recheck_delay() == expected
+
+
+@pytest.mark.parametrize("value", ["abc", "-1", "nan", "inf"])
+def test_race_recheck_delay_from_env_invalid(monkeypatch, lockstore, value):
+    monkeypatch.setenv("BORG_LOCK_RECHECK_DELAY", value)
+    with pytest.raises(Error, match="BORG_LOCK_RECHECK_DELAY"):
+        Lock(lockstore, exclusive=True, id=ID1)
+
+
+@pytest.mark.parametrize("exclusive", [True, False])
+def test_acquire_waits_race_recheck_delay(monkeypatch, lockstore, exclusive):
+    # acquire() waits for the configured delay between creating its lock object and listing again.
+    monkeypatch.setenv("BORG_LOCK_RECHECK_DELAY", "1.5")
+    sleeps = []
+    monkeypatch.setattr(storelocking.time, "sleep", sleeps.append)
+    lock = Lock(lockstore, exclusive=exclusive, id=ID1).acquire()
+    assert sleeps == [1.5]
     lock.release()
 
 

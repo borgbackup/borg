@@ -26,6 +26,18 @@ creating theirs at the same time: an exclusive acquirer backs off if another exc
 up (and otherwise waits for remaining shared locks to go away), a shared acquirer backs off if an
 exclusive lock showed up. This is tried at least once, then retried until the timeout.
 
+This needs a store with list-after-write consistency: a listing started after a lock object was
+written must contain it. Then, of two clients racing for the lock, at least the one that created its
+lock object last sees the other's in its second listing, so they can not both get an exclusive lock
+(they might both back off, then they retry). Local filesystems, sftp, rest (``borg serve --rest``)
+and S3 as provided by AWS or MinIO give this guarantee.
+
+Between creating the lock object and the second listing, acquire() waits for the "race recheck
+delay" (default: 0.01s, BORG_LOCK_RECHECK_DELAY overrides it). With list-after-write consistency, it
+is not needed for correctness. Some stores only show a new object in listings after a lag, e.g. NFS
+clients caching directory listings or some cloud storages behind rclone: there, a delay of at least
+that lag is needed so that the client that created its lock object last still sees the other one.
+
 Staleness
 ---------
 A lock whose owner died (crash, power loss, suspended laptop, ...) must not block others forever, so
@@ -83,6 +95,8 @@ might have acquired its own lock meanwhile), so there is no safe way to continue
 
 import datetime
 import json
+import math
+import os
 import random
 import threading
 import time
@@ -103,6 +117,23 @@ logger = create_logger(__name__)
 # lock listings, None until harvested), plus time.monotonic() at its creation. always replaced as a
 # whole, so concurrent readers (e.g. a LockRefresher thread) never see a torn mix of its fields.
 LockAnchor = namedtuple("LockAnchor", "key dt mtime monotonic")
+
+DEFAULT_RACE_RECHECK_DELAY = 0.01  # [s], enough for stores with list-after-write consistency
+
+
+def get_race_recheck_delay():
+    """Return the race recheck delay [s]: BORG_LOCK_RECHECK_DELAY if set, else the default, see "Acquiring"."""
+    value = os.environ.get("BORG_LOCK_RECHECK_DELAY")
+    if not value:
+        return DEFAULT_RACE_RECHECK_DELAY
+    try:
+        delay = float(value)
+    except ValueError:
+        raise Error(f"BORG_LOCK_RECHECK_DELAY must be a number of seconds, but is: {value!r}") from None
+    if not math.isfinite(delay) or delay < 0:
+        raise Error(f"BORG_LOCK_RECHECK_DELAY must be a finite, non-negative number of seconds, but is: {value!r}")
+    return delay
+
 
 # why a refresh gives up: our own lock object is gone, see refresh().
 LOCK_KILLED_MSG = (
@@ -199,7 +230,7 @@ class Lock:
         self.is_exclusive = exclusive
         self.sleep = sleep
         self.timeout = timeout
-        self.race_recheck_delay = 0.01  # local: 0.01, network/slow remote: >= 1.0
+        self.race_recheck_delay = get_race_recheck_delay()
         self.other_locks_go_away_delay = 0.1  # local: 0.1, network/slow remote: >= 1.0
         self.retry_delay_min = 1.0
         self.retry_delay_max = 5.0

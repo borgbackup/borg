@@ -671,6 +671,16 @@ class HelpMixIn:
             BORG_LOCK_WAIT
                 You can set the default value for the ``--lock-wait`` option with this, so
                 you do not need to give it as a command line option.
+            BORG_LOCK_RECHECK_DELAY
+                When acquiring the repository lock, borg creates its lock object, waits for this
+                many seconds (default: 0.01) and then lists the lock objects again to detect other
+                clients that created theirs at the same time. The default is fine for storage that
+                lists a new object immediately (local filesystems, sftp, ssh / rest, AWS S3, MinIO).
+                If your storage lists new objects only after a lag (e.g. NFS shared by several
+                clients, which caches directory listings, or some cloud storages used via rclone),
+                set this to at least that lag (e.g. 2 for a lag of up to 2 seconds) on all clients
+                using the repository, so that concurrent clients do not both get an exclusive lock.
+                See :ref:`storelocking`.
             BORG_LOGGING_CONF
                 When set, use the given filename as INI-style logging configuration (see
                 https://docs.python.org/3/library/logging.config.html#configuration-file-format).

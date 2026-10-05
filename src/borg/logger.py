@@ -94,6 +94,10 @@ class StderrHandler(logging.StreamHandler):
     This class is like a StreamHandler using sys.stderr, but always uses
     whatever sys.stderr is currently set to rather than the value of
     sys.stderr at handler construction time.
+
+    before_emit is a single slot shared by all StderrHandler instances. A ProgressIndicatorSpinner
+    stores its clear() there while its line is painted and resets the slot to None in finish(),
+    so the slot serves one spinner at a time.
     """
 
     before_emit = None  # callable or None, called before each record is written

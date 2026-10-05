@@ -321,6 +321,7 @@ class CreateMixIn:
                 archive_name=args.name,
                 archive_group_by=tuple(args.group_by.split(",")),
             ) as cache:
+                cache.chunks  # load the chunk index now, its progress output must precede the archive progress
                 archive = Archive(
                     manifest,
                     args.name,

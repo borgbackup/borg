@@ -32,7 +32,7 @@ from ..cache import (
 )
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey, AuthenticatedKey
-from ..helpers import CorruptPack, Error, bin_to_hex, safe_ns
+from ..helpers import CorruptPack, Error, bin_to_hex, progress, safe_ns
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
 from ..repository import PackReader, Repository
@@ -643,6 +643,7 @@ def progress_output(monkeypatch):
     progress_logger = logging.getLogger("borg.output.progress")
     level = progress_logger.level
     progress_logger.setLevel(logging.INFO)
+    monkeypatch.setattr(progress, "get_progress_dt", lambda: 0.0)  # no rate limit, every step is output
     yield
     progress_logger.setLevel(level)
 

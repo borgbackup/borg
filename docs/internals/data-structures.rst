@@ -1216,6 +1216,22 @@ Where the storage backend provides object timestamps (file, sftp, s3 and
 current rest servers - but not rclone), borg additionally uses the lock
 object's store-side mtime, which is stamped by the storage's clock.
 
+To acquire a lock, borg lists the lock objects, creates its own lock object if
+nothing forbids it, waits for the race recheck delay and lists again, to detect
+other clients that created theirs at the same time (if so, it backs off and
+retries). This needs storage with list-after-write consistency: a listing started
+after a lock object was written must contain it. Then, of two clients racing for
+the lock, at least the one that created its lock object last sees the other's, so
+they can not both get an exclusive lock. Local filesystems, sftp, rest
+(``borg serve --rest``) and S3 as provided by AWS or MinIO give this guarantee and
+the default delay (0.01s) is fine.
+
+If the storage only lists a new object after a lag (e.g. NFS clients caching
+directory listings, or some cloud storages used via rclone), set
+``BORG_LOCK_RECHECK_DELAY`` to at least that lag (in seconds) on all clients
+using the repository: then, the client that created its lock object last still
+sees the other one.
+
 Using that information, borg implements:
 
 - lock auto-removal if the owner process is dead. the primary purpose of this

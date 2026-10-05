@@ -40,6 +40,11 @@ clocks of concurrently active clients differ by more than a few minutes.
 The storage's own clock does not need to be correct - it is only used as a
 common reference between the clients.
 
+Concurrent clients rely on the storage listing a newly written lock object
+immediately. If it only does so after a lag (e.g. NFS shared by several clients,
+or some cloud storages used via rclone), set ``BORG_LOCK_RECHECK_DELAY`` on all
+clients, see :ref:`storelocking`.
+
 Can I back up to multiple swapped backup targets?
 --------------------------------------------------
 

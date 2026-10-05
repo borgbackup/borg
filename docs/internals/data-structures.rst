@@ -232,9 +232,10 @@ Compaction
 - free space one pack file at a time - a single object can not be removed from
   a pack file, only a whole pack file can be deleted or rewritten:
 
-  - a pack file whose indexed objects are all unused is deleted
-  - a pack file with some unused objects is rewritten without them, but only if
-    the wasted bytes reach the ``--threshold`` percentage
+  - a pack file holding only unused objects and superseded duplicates (copies of
+    chunks the chunks index records at another location) is deleted
+  - a pack file with some unused objects or superseded duplicates is rewritten
+    without them, but only if their bytes reach the ``--threshold`` percentage
   - very small pack files are merged into bigger ones
   - a pack file recorded corrupt by ``borg check`` is not rewritten or merged,
     it is only deleted if its indexed objects are all unused

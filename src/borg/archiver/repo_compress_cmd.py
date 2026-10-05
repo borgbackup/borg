@@ -1,4 +1,5 @@
 import logging
+from array import array
 from collections import defaultdict
 
 from borgstore.store import ItemInfo
@@ -8,10 +9,10 @@ from ..cache import build_chunkindex_from_repo, delete_chunkindex_from_repo, wri
 from ..compress import ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..constants import *  # NOQA
 from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec, set_ec, EXIT_WARNING
-from ..helpers import format_file_size, bin_to_hex, hex_to_bin
+from ..helpers import format_file_size, bin_to_hex, hex_to_bin, IntegrityError
 from ..helpers.argparsing import ArgumentParser
 from ..repoobj import object_validator
-from ..repository import Repository, PackTracker
+from ..repository import Repository, PackTracker, check_pack_objects, decode_ranges
 
 from ..logger import create_logger
 
@@ -90,12 +91,20 @@ class PackRecompressor:
 
         # group the indexed objects per pack; transform_pack requires each pack's complete id list.
         per_pack = defaultdict(list)  # pack_id -> [chunk_id, ...]
-        short_packs = set()  # ids of the pack files that end before one of their index entries does
+        pack_ranges = {pack_id: array("Q") for pack_id in pack_sizes}  # pack_id -> byte ranges of its index entries
         for id, entry in self.chunks.iteritems():
             per_pack[entry.pack_id].append(id)
-            pack_size = pack_sizes.get(entry.pack_id)
-            if pack_size is not None and entry.obj_offset + entry.obj_size > pack_size:
-                short_packs.add(entry.pack_id)
+            ranges = pack_ranges.get(entry.pack_id)
+            if ranges is not None:
+                ranges.append(entry.obj_offset << 32 | entry.obj_size)
+
+        # transform_pack raises IntegrityError for these packs.
+        inconsistent_packs = set()  # ids of the packs whose index entries overlap or reach past the end of the file
+        for pack_id, pack_size in packs:
+            try:
+                check_pack_objects(bin_to_hex(pack_id), decode_ranges(sorted(pack_ranges.pop(pack_id))), pack_size)
+            except IntegrityError:
+                inconsistent_packs.add(pack_id)
 
         self.packs_count = len(packs)
         size_before = sum(size for _, size in packs)
@@ -126,7 +135,7 @@ class PackRecompressor:
             total=len(packs), msg="Recompressing %3.1f%%", step=0.1, msgid="repo_compress.recompress"
         )
         validate = object_validator(self.repo_objs)
-        untrusted_pack_ids = stale_packs | corrupt_packs | short_packs
+        untrusted_pack_ids = stale_packs | corrupt_packs | inconsistent_packs
         for i, (pack_id, pack_size) in enumerate(packs):
             if sig_int:
                 break  # stop cleanly at a pack boundary: save the index below, then raise

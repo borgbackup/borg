@@ -22,7 +22,7 @@ from ..helpers import Error, IntegrityError, Location, bin_to_hex, hex_to_bin
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..platform import get_process_id
 from ..repository import Repository, MAX_DATA_SIZE, MAX_VALIDATED_META_SIZE, propagate_rsh, rest_serve_command
-from ..repository import PackWriter, PackReader, PackTracker, superseded_gap_ranges
+from ..repository import ArchiveTracker, PackWriter, PackReader, PackTracker, superseded_gap_ranges
 from ..repository import SALVAGE_DONE, SALVAGE_INTACT, SALVAGE_NOTHING_AUTHENTICATES
 from ..repository import SALVAGE_READ_ERROR, SALVAGE_READS_DIFFER, StoreObjectNotFound
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION, object_validator, whole_object_authenticator
@@ -2334,6 +2334,53 @@ def test_check_checked_packs_bound_to_its_name(tmp_path, caplog):
         with caplog.at_level(logging.WARNING):
             assert len(PackTracker.load(repository)) == 0
         assert "Ignoring corrupted checked-packs set." in caplog.text
+
+
+def test_checked_archives_roundtrip(tmp_path, caplog):
+    # the archive records are stored apart from the pack records and are bound to their own name.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        tracker = ArchiveTracker.new(repository)
+        tracker.record(H(1), ok=True)
+        tracker.record(H(2), ok=False)
+        tracker.save()
+        assert len(PackTracker.load(repository)) == 0
+        loaded = ArchiveTracker.load(repository)
+        assert len(loaded) == 2
+        assert loaded.failed_ids() == [H(2)]
+        assert loaded.is_recent(H(1), 3600)
+        assert not loaded.is_recent(H(1), 0)
+        assert not loaded.is_recent(H(2), 3600)  # a failed record is never recent
+        assert not loaded.is_recent(H(3), 3600)
+        repository.store_store(PackTracker.NAME, repository.store_load(ArchiveTracker.NAME))
+        with caplog.at_level(logging.WARNING):
+            assert len(PackTracker.load(repository)) == 0
+        assert "Ignoring corrupted checked-packs set." in caplog.text
+        loaded.prune({H(2)})
+        assert [id for id, _ in ArchiveTracker.load(repository).table.items()] == [H(2)]
+        loaded.prune(set())
+        assert not repository.store.info(ArchiveTracker.NAME).exists
+
+
+@pytest.mark.parametrize("damage", ["none", "corrupt-pack", "missing-pack"])
+def test_check_clears_checked_archives_on_pack_damage(tmp_path, damage):
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True) as repository:
+        for x in range(3):
+            repository.put(H(x), fchunk(b"DATA-%02d" % x, chunk_id=H(x)))
+        repository.flush()  # flush before close persists the index
+    with Repository(location, exclusive=True) as repository:
+        tracker = ArchiveTracker.new(repository)
+        tracker.record(H(9), ok=True)
+        tracker.save()
+        pack_key = "packs/" + bin_to_hex(repository.chunks[H(0)].pack_id)
+        if damage == "corrupt-pack":
+            pack = bytearray(repository.store_load(pack_key))
+            pack[-1] ^= 0xFF
+            repository.store_store(pack_key, bytes(pack))
+        elif damage == "missing-pack":
+            repository.store_delete(pack_key)
+        assert repository.check(repair=False) is (damage == "none")
+        assert len(ArchiveTracker.load(repository)) == (1 if damage == "none" else 0)
 
 
 def test_check_partial_rechecks_pack_sorting_before_checked_one(tmp_path):

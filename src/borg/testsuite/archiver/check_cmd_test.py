@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 import shutil
 import struct
+import time
 import weakref
 from unittest.mock import patch
 
@@ -11,6 +12,7 @@ import pytest
 
 from ...crypto.key import store_hash, STORE_HASH_NAME
 from ... import archive as archive_module
+from ...archiver import check_cmd as check_cmd_module
 from ...archive import Archive, ArchiveChecker, ChunkBuffer
 from ...cache import (
     Cache,
@@ -31,7 +33,7 @@ from ...hashindex import ChunkIndex
 from ...item import Item
 from ...manifest import Archives, Manifest
 from ...repoobj import RepoObj
-from ...repository import PackReader, PackTracker, Repository
+from ...repository import ArchiveTracker, PackReader, PackTracker, Repository
 from .. import changedir
 from ..repoobj_test import DATA_SIZE_OFFSET
 from ..repository_test import fchunk, corrupt_chunk_on_disk
@@ -383,19 +385,18 @@ def test_check_max_age(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
 
-    # --archives-only does not allow --max-age; 0d is a valid value (resolves to no reuse).
-    # --max-duration needs --repository-only, but not --max-age: a partial check advances on its own.
-    if archiver.FORK_DEFAULT:
-        cmd(archiver, "check", "--archives-only", "--max-age=1d", exit_code=CommandError().exit_code)
-        cmd(archiver, "check", "--max-duration=3600", exit_code=CommandError().exit_code)
-    else:
-        with pytest.raises(CommandError):
-            cmd(archiver, "check", "--archives-only", "--max-age=1d")
-        with pytest.raises(CommandError):
-            cmd(archiver, "check", "--max-duration=3600")
+    # --max-duration does not allow the scans of the whole repository.
+    for option in "--verify-data", "--find-lost-archives":
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, "check", "--max-duration=3600", option, exit_code=CommandError().exit_code)
+        else:
+            with pytest.raises(CommandError):
+                cmd(archiver, "check", "--max-duration=3600", option)
 
-    # a partial check runs without --max-age.
+    # a partial check runs without --max-age and without --repository-only.
     cmd(archiver, "check", "--repository-only", "--max-duration=3600", exit_code=0)
+    cmd(archiver, "check", "--max-duration=3600", exit_code=0)
+    cmd(archiver, "check", "--archives-only", "--max-duration=3600", "--max-age=0d", exit_code=0)
 
     # a check records its results, a later one with --max-age reuses them.
     output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)
@@ -2521,3 +2522,210 @@ def test_items_with_unknown_keys_are_kept(archivers, request):
     assert items[0].as_dict()["newkey"] == "future"
     output = cmd(archiver, "check", "--archives-only", exit_code=0)
     assert "keys unknown to this borg version" in output  # still just the warning
+
+
+def archive_records(archiver):
+    """Return {archive name or id: result} of the records in cache/checked-archives.
+
+    The key is the name for an archive in archives/, else the binary archive id.
+    """
+    with open_repository(archiver) as repository:
+        manifest = Manifest.load(repository)
+        names = {info.id: info.name for info in manifest.archives.list()}
+        return {names.get(id, id): entry.result for id, entry in ArchiveTracker.load(repository).table.items()}
+
+
+def test_check_archives_max_age(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    assert archive_records(archiver) == {}
+    output = cmd(archiver, "check", "-v", "--archives-only", exit_code=0)
+    assert "Analyzed 2 archive(s)." in output
+    assert archive_records(archiver) == {"archive1": 1, "archive2": 1}
+    output = cmd(archiver, "check", "-v", "--archives-only", "--max-age=1d", exit_code=0)
+    assert "Analyzed 0 archive(s). Reused 2 recent archive check result(s)." in output
+    # a full check reuses them too.
+    output = cmd(archiver, "check", "-v", "--max-age=1d", exit_code=0)
+    assert "Analyzed 0 archive(s). Reused 2 recent archive check result(s)." in output
+    # an archive without a record is analyzed.
+    create_src_archive(archiver, "archive3")
+    output = cmd(archiver, "check", "-v", "--archives-only", "--max-age=1d", exit_code=0)
+    assert "Analyzed 1 archive(s). Reused 2 recent archive check result(s)." in output
+    assert archive_records(archiver) == {"archive1": 1, "archive2": 1, "archive3": 1}
+    # no reuse without --max-age, with --verify-data and with --repair.
+    for options in [], ["--verify-data", "--max-age=1d"], ["--repair", "--max-age=1d"]:
+        output = cmd(archiver, "check", "-v", "--archives-only", *options, exit_code=0)
+        assert "Analyzed 3 archive(s)." in output
+        assert "Reused" not in output
+    assert archive_records(archiver) == {"archive1": 1, "archive2": 1, "archive3": 1}
+
+
+def test_check_archives_records_follow_the_archives_directory(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", "--archives-only", exit_code=0)
+    # the record of a soft-deleted archive is kept, so it is reused after an undelete.
+    cmd(archiver, "delete", "-a", "archive1")
+    output = cmd(archiver, "check", "-v", "--archives-only", "--max-age=1d", exit_code=0)
+    assert "Analyzed 0 archive(s). Reused 1 recent archive check result(s)." in output
+    cmd(archiver, "undelete", "-a", "archive1")
+    output = cmd(archiver, "check", "-v", "--archives-only", "--max-age=1d", exit_code=0)
+    assert "Analyzed 0 archive(s). Reused 2 recent archive check result(s)." in output
+    with open_repository(archiver) as repository:
+        old_ids = set(Manifest.load(repository).archives.ids())
+        assert {id for id, _ in ArchiveTracker.load(repository).table.items()} == old_ids
+    # the repair rewrites the item metadata with the default ChunkBuffer size, so the archives get new
+    # ids, which it records.
+    cmd(archiver, "check", "--archives-only", "--repair", exit_code=0)
+    with open_repository(archiver) as repository:
+        new_ids = set(Manifest.load(repository).archives.ids())
+        assert not new_ids & old_ids
+        assert {id for id, _ in ArchiveTracker.load(repository).table.items()} == new_ids
+    assert archive_records(archiver) == {"archive1": 1, "archive2": 1}
+    # compact removes the soft-deleted archives, the next check drops their records.
+    cmd(archiver, "delete", "-a", "archive1")
+    cmd(archiver, "compact")
+    cmd(archiver, "check", "--archives-only", "--max-age=1d", exit_code=0)
+    assert archive_records(archiver) == {"archive2": 1}
+
+
+def test_check_archives_records_a_problem(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    create_regular_file(archiver.input_path, "only_in_archive3", contents=b"only in archive3")
+    cmd(archiver, "create", "archive3", "input")
+    archive, repository = open_archive(archiver.repository_path, "archive3")
+    with repository:
+        item = next(item for item in archive.iter_items() if item.path.endswith("only_in_archive3"))
+        repository.delete(item.chunks[0].id, validate=None)
+    expected = {"archive1": 1, "archive2": 1, "archive3": 0}
+    output = cmd(archiver, "check", "-v", "--archives-only", exit_code=1)
+    assert "Analyzed 3 archive(s)." in output
+    assert archive_records(archiver) == expected
+    # the archive recorded with a problem is analyzed again.
+    output = cmd(archiver, "check", "-v", "--archives-only", "--max-age=1d", exit_code=1)
+    assert "Analyzed 1 archive(s). Reused 2 recent archive check result(s)." in output
+    assert f"Missing chunk detected: {bin_to_hex(item.chunks[0].id)}" in output
+    assert archive_records(archiver) == expected
+
+
+@pytest.mark.parametrize("options", [["--archives-only"], []], ids=["archives-only", "full"])
+def test_check_archives_missing_pack_clears_the_records(archivers, request, monkeypatch, options):
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "1")  # a pack per object: removing a pack removes one object
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", "--archives-only", exit_code=0)
+    assert archive_records(archiver) == {"archive1": 1, "archive2": 1}
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        item = next(item for item in archive.iter_items() if item.path.endswith(src_file))
+        chunk_id = item.chunks[-1].id
+        repository.store_delete("packs/" + bin_to_hex(repository.chunks[chunk_id].pack_id))
+    # the ok records do not hide the chunk that is lost now.
+    output = cmd(archiver, "check", "-v", *options, "--max-age=1d", exit_code=1)
+    assert f"Missing chunk detected: {bin_to_hex(chunk_id)}" in output
+    assert "Analyzed 2 archive(s)." in output
+    assert "archive check result(s)" not in output
+    if options:
+        # the archives check found the missing pack itself, so it stores no result.
+        assert archive_records(archiver) == {}
+    else:
+        # the repository check removed the entries of the lost chunks from the index the archives check uses.
+        assert archive_records(archiver) == {"archive1": 0, "archive2": 0}
+
+
+def test_check_archives_verify_data_error_clears_the_records(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", "--archives-only", exit_code=0)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        item = next(item for item in archive.iter_items() if item.path.endswith(src_file))
+        corrupt_chunk_on_disk(repository, item.chunks[-1].id)
+    # the defect chunk is still in the index, so the archives pass and no result is stored.
+    cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
+    assert archive_records(archiver) == {}
+
+
+def test_check_archives_stores_no_records_while_a_pack_is_recorded_corrupt(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    cmd(archiver, "check", exit_code=0)
+    assert archive_records(archiver) == {"archive1": 1, "archive2": 1}
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    with repository:
+        item = next(item for item in archive.iter_items() if item.path.endswith(src_file))
+        corrupt_chunk_on_disk(repository, item.chunks[-1].id)
+    # the repository check records the pack corrupt. the chunk is still in the index, so the archives pass.
+    output = cmd(archiver, "check", "-v", exit_code=1)
+    assert "Analyzed 2 archive(s)." in output
+    assert archive_records(archiver) == {}
+    output = cmd(archiver, "check", "-v", "--archives-only", "--max-age=1d", exit_code=0)
+    assert "Analyzed 2 archive(s)." in output
+    assert archive_records(archiver) == {}
+
+
+class SteppingClock:
+    """Stands in for the time module: monotonic() returns 1, 2, 3, ..."""
+
+    def __init__(self):
+        self.now = 0
+
+    def __getattr__(self, name):
+        return getattr(time, name)
+
+    def monotonic(self):
+        self.now += 1
+        return self.now
+
+
+def test_check_archives_max_duration(archiver, monkeypatch):
+    check_cmd_setup(archiver)
+    check_args = dict(sort_by="ts", format="{archive}")
+    with KeyedRepository(archiver.repository_path, exclusive=True) as repository:
+        archives = Manifest.load(repository).archives
+        archive1_id, archive2_id = archives.get_one(["archive1"]).id, archives.get_one(["archive2"]).id
+        tracker = ArchiveTracker.new(repository)
+        tracker.table[archive2_id] = ArchiveTracker.Entry(timestamp=1000, result=1)
+        tracker.save()
+
+        def run(deadline):
+            # rebuild_archives analyzes the first archive, then it reads the clock once before each
+            # further archive.
+            monkeypatch.setattr(archive_module, "time", SteppingClock())
+            checker = ArchiveChecker()
+            ok = checker.check(repository, deadline=deadline, **check_args)
+            return ok, checker, ArchiveTracker.load(repository)
+
+        # archive1 has no record, so it goes first. the deadline has passed, the check analyzes one
+        # archive anyway and stops before archive2.
+        ok, checker, tracker = run(0.5)
+        assert ok and checker.stopped_at_deadline
+        assert tracker.get(archive1_id).result == 1
+        assert tuple(tracker.get(archive2_id)) == (1000, 1)
+        # an archive recorded with a problem fails a run that does not reach it.
+        tracker.forget(archive1_id)
+        tracker.table[archive2_id] = ArchiveTracker.Entry(timestamp=2**40, result=0)
+        tracker.save()
+        ok, checker, tracker = run(0.5)
+        assert not ok and checker.stopped_at_deadline
+        assert tracker.get(archive1_id).result == 1
+        assert tuple(tracker.get(archive2_id)) == (2**40, 0)
+        # it goes before the archive recorded ok and is recorded ok again.
+        ok, checker, tracker = run(0.5)
+        assert ok and checker.stopped_at_deadline
+        assert tracker.get(archive2_id).result == 1
+        # with time left, and without a deadline, every archive is analyzed.
+        for deadline in 1.5, None:
+            ok, checker, tracker = run(deadline)
+            assert ok and not checker.stopped_at_deadline
+
+
+def test_check_max_duration_used_up_by_the_repository_check(archiver, monkeypatch):
+    check_cmd_setup(archiver)
+    # do_check reads the clock for the deadline (1 + 1) and again after the repository check (2).
+    monkeypatch.setattr(check_cmd_module, "time", SteppingClock())
+    output = cmd(archiver, "check", "-v", "--max-duration=1", exit_code=0)
+    assert "Skipping the archive check: the repository check used up --max-duration." in output
+    assert "Starting archive consistency check" not in output
+    assert archive_records(archiver) == {}

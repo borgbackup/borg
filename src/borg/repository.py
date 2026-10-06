@@ -17,6 +17,7 @@ from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendConnectionError as StoreBackendConnectionError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
+from borgstore.backends.errors import PermissionDenied as StorePermissionDenied
 
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
@@ -795,6 +796,18 @@ class CheckTracker:
     def record(self, id, ok):
         self.table[id] = self.Entry(timestamp=int(time.time()), result=int(ok))
 
+    def is_recent(self, id, max_age):
+        """Return True if id has an ok record younger than max_age seconds (0 = never).
+
+        The timestamp is set by the client that ran the earlier check, so a future one (negative age)
+        is accepted up to MAX_CLOCK_SKEW.
+        """
+        entry = self.table.get(id)
+        if entry is None or not entry.result or not max_age:
+            return False
+        age = time.time() - entry.timestamp
+        return -min(MAX_CLOCK_SKEW, max_age) <= age < max_age
+
     def forget(self, id):
         """Drop the record of id, if any."""
         self.table.pop(id, None)
@@ -842,6 +855,34 @@ class PackTracker(CheckTracker):
     def corrupt_ids(self):
         """Return the ids of the packs recorded corrupt, sorted."""
         return self.failed_ids()
+
+
+class ArchiveTracker(CheckTracker):
+    """Archive check results, mapping archive_id -> (timestamp, result).
+
+    result=1: the archives check read all metadata of the archive and found every chunk it references
+    in the chunk index. Archives checks run with max_age reuse such a record. result=0: the check found
+    a problem, such an archive is always checked again.
+    A check that finds a corrupt or missing pack or salvages a pack, and an archives check that
+    repairs, clear all records: chunks the archives reference may be gone then. An archives check
+    stores no records while a pack is recorded corrupt. Records of archives no longer in archives/
+    (soft-deleted ones included) are pruned when an archives check finishes.
+    """
+
+    NAME = "cache/checked-archives"
+
+    def save(self):
+        # a client without write permission for cache/ can still check archives, it just keeps no records.
+        try:
+            super().save()
+        except StorePermissionDenied:
+            logger.warning(f"Not storing the archive check results: no permission to write {self.NAME}.")
+
+    def clear(self):
+        try:
+            super().clear()
+        except StorePermissionDenied:
+            logger.warning(f"Not clearing the archive check results: no permission to delete {self.NAME}.")
 
 
 class _ConfigMissing(Exception):
@@ -1544,6 +1585,9 @@ class Repository:
         it. The record clears at the check that finds the pack intact again or gone (removed by
         compact, or replaced by a salvaged pack); prune() does this from packs/.
 
+        A run that finds a corrupt or missing pack, salvages a pack or skips a pack byte range in the
+        index rebuild clears cache/checked-archives (see ArchiveTracker), refs #10025.
+
         It also reports missing packs (refs #9898): pack ids the chunk index references but that are
         absent from packs/. The index is read from its fragments only and its referenced pack ids are
         compared with the packs present in the store; store.info() confirms that each pack the listing
@@ -1762,15 +1806,10 @@ class Repository:
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
-                entry = tracker.get(pack_id)
-                # skip a pack recorded intact within the last max_age seconds. the timestamp is set
-                # by the client that ran the earlier check; accept a future one (negative age) up to
-                # MAX_CLOCK_SKEW, and re-verify anything at or past max_age.
-                if entry is not None and entry.result and max_age:
-                    age = time.time() - entry.timestamp
-                    if -min(MAX_CLOCK_SKEW, max_age) <= age < max_age:
-                        pack_skipped += 1
-                        continue
+                # skip a pack recorded intact within the last max_age seconds.
+                if tracker.is_recent(pack_id, max_age):
+                    pack_skipped += 1
+                    continue
                 pack_files += 1
                 ok = verify("packs", info.name)
                 if not ok:
@@ -1843,6 +1882,9 @@ class Repository:
         # index_deferred: the archives phase rebuilds the corrupt index; it runs only if this check was not interrupted.
         index_deferred = bool(index_errors) and repair and not repo_only and not sig_int
         objs_errors = index_errors + pack_errors + len(missing_pack_ids) + drops
+        if pack_errors or missing_pack_ids or salvaged or drops:
+            # chunks the archives reference may be damaged or gone, so no archive check result holds.
+            ArchiveTracker.new(self).clear()
         summary = (
             f"Checked {index_files} index files ({index_errors} errors) "
             f"and {pack_files} packs ({pack_errors} errors)."

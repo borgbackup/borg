@@ -389,8 +389,9 @@ used:
     client never ends up using key material of the attacker's choice.
 - ``keys/<store hash>`` -- in ``repokey`` mode, the borg key(s), encrypted with the
   passphrase-derived KEK (see :ref:`key_encryption`).
-- ``cache/*``: ``cache/checked-packs`` (the ``borg check`` results per pack) and the
-  per-archive reference caches ``cache/referenced-by-archive.<hex(archive_id)>``
+- ``cache/*``: ``cache/checked-packs`` and ``cache/checked-archives`` (the ``borg check``
+  results per pack and per archive) and the per-archive reference caches
+  ``cache/referenced-by-archive.<hex(archive_id)>``
   (written by ``borg compact`` and ``borg analyze``, they list the object ids and
   plaintext sizes an archive references) are in the key's store object envelope, like
   the index. The envelope binds each object to its repository and name, so the store

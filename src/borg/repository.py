@@ -730,21 +730,19 @@ SALVAGE_READ_ERROR = "read error"  # reading the pack failed
 SalvageResult = namedtuple("SalvageResult", "status new_pack_id kept dropped_bytes removed_ids")
 
 
-class PackTracker:
-    """Pack verification results, mapping pack_id -> (timestamp, result).
+class CheckTracker:
+    """Check results, mapping a 32-byte id -> (timestamp, result).
 
-    Records are kept across checks: intact records (result=1) are reused by checks run with
-    max_age, corrupt records (result=0) are kept for repair and always re-verified. Records of
-    packs no longer listed in packs/ are pruned when a check finishes scanning packs/.
-    Stored at cache/checked-packs as the serialized table in the repository key's envelope (see
+    Stored at NAME as the serialized table in the repository key's envelope (see
     Repository.store_encrypt_store). new() starts an empty tracker, load() reads the stored one.
+    Subclasses set NAME.
     """
 
-    NAME = "cache/checked-packs"
-    KEY_SIZE = 32  # pack id
+    NAME: str
+    KEY_SIZE = 32
     Entry = namedtuple("Entry", "timestamp result")
     EntryFormatT = namedtuple("EntryFormatT", "timestamp result")
-    _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=corrupt
+    _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=failed
 
     def __init__(self, repository, table):
         self.repository = repository
@@ -760,21 +758,22 @@ class PackTracker:
     def load(cls, repository):
         """Return a tracker holding the stored table.
 
-        Return an empty one if cache/checked-packs is missing, fails the authentication of the key's
+        Return an empty one if the object at NAME is missing, fails the authentication of the key's
         envelope, does not deserialize, or its entries do not have this class's key size and Entry layout.
         """
+        label = cls.NAME.rpartition("/")[2]
         try:
             data = repository.store_load_decrypt(cls.NAME)
         except StoreObjectNotFound:
             return cls.new(repository)
         except IntegrityError:
-            logger.warning("Ignoring corrupted checked-packs set.")
+            logger.warning(f"Ignoring corrupted {label} set.")
             return cls.new(repository)
         try:
             with io.BytesIO(data) as f:
                 table = HashTableNT.read(f)
         except ValueError:
-            logger.warning("Ignoring unreadable checked-packs set.")
+            logger.warning(f"Ignoring unreadable {label} set.")
             return cls.new(repository)
         # read() takes key size and value type from the blob itself, so the table needs a layout check
         # against Entry here. All entries in a table share one layout, so checking one entry suffices.
@@ -782,35 +781,35 @@ class PackTracker:
         if sample is not None:
             key, value = sample
             if len(key) != cls.KEY_SIZE or value._fields != cls.Entry._fields:
-                logger.warning("Ignoring checked-packs set with an unexpected layout.")
+                logger.warning(f"Ignoring {label} set with an unexpected layout.")
                 return cls.new(repository)
         return cls(repository, table)
 
     def __len__(self):
         return len(self.table)
 
-    def get(self, pack_id):
-        """Return the Entry for pack_id, or None if it is not recorded."""
-        return self.table.get(pack_id)
+    def get(self, id):
+        """Return the Entry for id, or None if it is not recorded."""
+        return self.table.get(id)
 
-    def record(self, pack_id, ok):
-        self.table[pack_id] = self.Entry(timestamp=int(time.time()), result=int(ok))
+    def record(self, id, ok):
+        self.table[id] = self.Entry(timestamp=int(time.time()), result=int(ok))
 
-    def forget(self, pack_id):
-        """Drop the record of pack_id, if any."""
-        self.table.pop(pack_id, None)
+    def forget(self, id):
+        """Drop the record of id, if any."""
+        self.table.pop(id, None)
 
-    def corrupt_ids(self):
-        """Return the ids of the packs recorded corrupt, sorted."""
-        return sorted(pack_id for pack_id, entry in self.table.items() if not entry.result)
+    def failed_ids(self):
+        """Return the ids recorded with result=0, sorted."""
+        return sorted(id for id, entry in self.table.items() if not entry.result)
 
-    def prune(self, pack_ids):
-        """Drop the records whose pack id is not in pack_ids (the set of pack ids listed in packs/),
-        then store the remaining records (or delete the stored object if none remain).
+    def prune(self, ids):
+        """Drop the records whose id is not in ids, then store the remaining records (or delete the
+        stored object if none remain).
         """
         # the keys are collected first because the table must not be mutated while iterating it.
-        for pack_id in [pack_id for pack_id, _ in self.table.items() if pack_id not in pack_ids]:
-            del self.table[pack_id]
+        for id in [id for id, _ in self.table.items() if id not in ids]:
+            del self.table[id]
         if len(self.table):
             self.save()
         else:
@@ -828,6 +827,21 @@ class PackTracker:
             self.repository.store_delete(self.NAME)
         except StoreObjectNotFound:
             pass
+
+
+class PackTracker(CheckTracker):
+    """Pack verification results, mapping pack_id -> (timestamp, result).
+
+    Records are kept across checks: intact records (result=1) are reused by checks run with
+    max_age, corrupt records (result=0) are kept for repair and always re-verified. Records of
+    packs no longer listed in packs/ are pruned when a check finishes scanning packs/.
+    """
+
+    NAME = "cache/checked-packs"
+
+    def corrupt_ids(self):
+        """Return the ids of the packs recorded corrupt, sorted."""
+        return self.failed_ids()
 
 
 class _ConfigMissing(Exception):

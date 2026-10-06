@@ -16,7 +16,7 @@ from ..crypto.key import store_hash
 from .. import repository as repository_module
 from ..cache import chunkindex_is_invalid, delete_chunkindex_from_repo, write_chunkindex_invalid
 from ..compress import CNONE
-from ..constants import MAX_CLOCK_SKEW, ROBJ_FILE_STREAM
+from ..constants import DEFAULT_PACK_MAX_SIZE, MAX_CLOCK_SKEW, MAX_PACK_SIZE_LIMIT, ROBJ_FILE_STREAM
 from ..crypto.key import AESOCBKey, AuthenticatedKey, Blake3AuthenticatedKey, CHPOKey
 from ..helpers import Error, IntegrityError, Location, bin_to_hex, hex_to_bin
 from ..hashindex import ChunkIndex, ChunkIndexEntry
@@ -1452,6 +1452,78 @@ class FailingPackStore:
 
     def __getattr__(self, name):
         return getattr(self._inner, name)
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc", str(MAX_PACK_SIZE_LIMIT), ""])
+def test_borg_pack_max_size_rejected(tmp_path, monkeypatch, value):
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pass
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", value)
+    with pytest.raises(Error, match="BORG_PACK_MAX_SIZE"):
+        with reopen(repository):
+            pass
+
+
+@pytest.mark.parametrize("name", ["BORG_PACK_MAX_SIZE", "BORG_PACK_MAX_COUNT"])
+def test_borg_pack_limits_rejected_before_create(tmp_path, monkeypatch, name):
+    monkeypatch.setenv(name, "0")
+    with pytest.raises(Error, match=name):
+        with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True):
+            pass
+    assert not (tmp_path / "repo").exists()
+
+
+def test_borg_pack_max_size_just_below_limit(tmp_path, monkeypatch):
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pass
+    accepted = MAX_PACK_SIZE_LIMIT - 1
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", str(accepted))
+    with reopen(repository) as repository:
+        assert repository._pack_writer.max_size == accepted
+        assert repository.pack_max_size == accepted
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nope", ""])
+def test_borg_pack_max_count_rejected(tmp_path, monkeypatch, value):
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pass
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", value)
+    with pytest.raises(Error, match="BORG_PACK_MAX_COUNT"):
+        with reopen(repository):
+            pass
+
+
+def test_borg_pack_max_count_only_keeps_size_ceiling(tmp_path, monkeypatch):
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pass
+    monkeypatch.delenv("BORG_PACK_MAX_SIZE", raising=False)
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "4")
+    with reopen(repository) as repository:
+        assert repository._pack_writer.max_count == 4
+        assert repository._pack_writer.max_size == MAX_PACK_SIZE_LIMIT - 1
+        assert repository.pack_max_size == DEFAULT_PACK_MAX_SIZE
+
+
+def test_borg_pack_limits_default_when_unset(tmp_path, monkeypatch):
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pass
+    monkeypatch.delenv("BORG_PACK_MAX_COUNT", raising=False)
+    monkeypatch.delenv("BORG_PACK_MAX_SIZE", raising=False)
+    with reopen(repository) as repository:
+        assert repository._pack_writer.max_count is None
+        assert repository._pack_writer.max_size == DEFAULT_PACK_MAX_SIZE
+        assert repository.pack_max_size == DEFAULT_PACK_MAX_SIZE
+
+
+def test_borg_pack_count_and_size_both_passed_through(tmp_path, monkeypatch):
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pass
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "5")
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", "100000")
+    with reopen(repository) as repository:
+        assert repository._pack_writer.max_count == 5
+        assert repository._pack_writer.max_size == 100000
+        assert repository.pack_max_size == 100000
 
 
 def test_pack_writer_returns_none_when_not_full():

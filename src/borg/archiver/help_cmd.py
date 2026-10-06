@@ -745,14 +745,18 @@ class HelpMixIn:
                 When set to a numeric value, limit the pack cache to that many bytes.
                 Only has an effect if BORG_STORE_CACHE is set.
             BORG_PACK_MAX_SIZE
-                When set to a numeric value, cap packs (the repository objects that batch up many
+                When set to a positive integer, cap packs (the repository objects that batch up many
                 chunks, see the internals documentation about pack files) at that many bytes
                 instead of the default of 50000000.
+                The value must be below 2126512128 (2 GiB - 20 MiB), which keeps packs
+                clear of OS bugs with files of 2 GiB or more. A non-integer, a non-positive
+                value, or a value that reaches that limit is rejected.
                 Smaller packs mean more (but smaller) repository objects and more
                 fine-grained uploads; bigger packs mean fewer objects and fewer stores.
             BORG_PACK_MAX_COUNT
-                When set to a numeric value, cap packs at that many objects per pack.
-                If BORG_PACK_MAX_SIZE is not also set, packs are then bound by count only.
+                When set to a positive integer, cap packs at that many objects per pack.
+                A non-integer or non-positive value is rejected.
+                If BORG_PACK_MAX_SIZE is not set, packs still stay below 2 GiB.
             BORG_PACK_ASYNC
                 When set to ``no``, disable the background thread that stores a finished pack
                 while the next one is being assembled, and store packs synchronously instead.

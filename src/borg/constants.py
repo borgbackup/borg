@@ -87,6 +87,11 @@ MIN_PACK_SIZE = DEFAULT_PACK_MAX_SIZE // 50  # 1 MB
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module
 
+# BORG_PACK_MAX_SIZE must stay below this to keep packs below 2 GiB and avoid OS bugs.
+# PackWriter.add includes the object that crosses the cap, so the
+# largest accepted size is one less than this limit.
+MAX_PACK_SIZE_LIMIT = 2**31 - MAX_OBJECT_SIZE
+
 # Clock skew is the difference between the clocks of the machines writing to a repository (seconds).
 # A check result timestamp up to this far in the future still counts as recent; further ahead than
 # this, the pack is re-verified.

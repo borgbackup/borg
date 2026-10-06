@@ -623,6 +623,22 @@ def test_roundtrip_pax_timestamps(archivers, request):
     assert pax_mtime == f"{src_times['mtime'] // 10**9}.{src_times['mtime'] % 10**9:09d}"
 
 
+def test_import_tar_invalid_pax_timestamp(archivers, request):
+    """import-tar ignores invalid PAX timestamps (tarfile ignores them, too)."""
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        tarinfo = tarfile.TarInfo("file")
+        tarinfo.pax_headers = {"atime": "garbage", "ctime": "1700000000.5"}
+        tar.addfile(tarinfo, io.BytesIO())
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "import-tar", "dst", "input.tar")
+    archive_obj, repository = open_archive(archiver.repository_path, "dst")
+    with repository:
+        item = next(archive_obj.iter_items())
+    assert "atime" not in item
+    assert item.ctime == 1700000000_500000000
+
+
 def _sparse_entries(sizes):
     return [ChunkListEntry(id=bytes([i]) * 32, size=size) for i, size in enumerate(sizes)]
 

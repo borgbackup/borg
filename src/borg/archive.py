@@ -1692,12 +1692,12 @@ class TarfileObjectProcessors:
             xattrs = StableDict()
             for key, value in ph.items():
                 if key.startswith(SCHILY_XATTR):
-                    key = key[len(SCHILY_XATTR):]
+                    key = key.removeprefix(SCHILY_XATTR)
                     if key.startswith('system.posix_acl_'):
                         # like borg create, we store the POSIX ACLs separately, not as xattrs.
                         continue
                     # the tarfile code gives us str keys and str values,
-                    # but we need bytes keys and bytes (or None for empty, like xattr.get_all) values.
+                    # but we need bytes keys and bytes values (or None for an empty value, like xattr.get_all).
                     bkey = key.encode('utf-8', errors='surrogateescape')
                     bvalue = value.encode('utf-8', errors='surrogateescape')
                     xattrs[bkey] = bvalue or None

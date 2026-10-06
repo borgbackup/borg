@@ -1,4 +1,5 @@
 import json
+import os
 from collections import OrderedDict
 from datetime import datetime, timezone
 from io import StringIO
@@ -14,6 +15,7 @@ from ..helpers import Manifest
 from ..helpers import msgpack
 from ..item import Item, ArchiveItem
 from ..platform import uid2user, gid2group
+from ..platformflags import is_win32
 
 
 @pytest.fixture()
@@ -372,18 +374,27 @@ def test_get_item_uid_gid():
 
 @pytest.mark.parametrize('acl, expected', [
     # GNU tar: newline separated, no numeric id for named entries
-    ('user::rw-\nuser:{user0}:rw-\ngroup::r--\nmask::rw-\nother::r--\n',
-     'user::rw-\nuser:{user0}:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
-    # star: comma separated, numeric id appended (also what borg export-tar writes, but newline separated)
-    ('user::rw-,user:{user0}:rw-:0,group::r--,mask::rw-,other::r--',
-     'user::rw-\nuser:{user0}:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
-    # unknown names fall back to the name
-    ('group:nosuchgroup-borgtest:r--', 'group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest'),
+    ('user::rw-\nuser:{user}:rw-\ngroup::r--\nmask::rw-\nother::r--\n',
+     'user::rw-\nuser:{user}:rw-:{uid}\ngroup::r--\nmask::rw-\nother::r--'),
+    # star: comma separated, numeric id appended
+    ('user::rw-,user:root:rw-:0,group::r--,mask::rw-,other::r--',
+     'user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
+    # borg export-tar: newline separated, numeric id appended
+    ('user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--',
+     'user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
+    # unknown names fall back to the name (no name lookups on Windows)
+    pytest.param('group:nosuchgroup-borgtest:r--', 'group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest',
+                 marks=pytest.mark.skipif(is_win32, reason='no name lookups on Windows')),
     # comments get removed
-    ('user:{user0}:r--\t#effective:r--\n', 'user:{user0}:r--:0'),
+    ('user:{user}:r--\t#effective:r--\n', 'user:{user}:r--:{uid}'),
     ('', ''),
 ])
 def test_tar_acl_to_borg(acl, expected):
-    # test requires that a name for user 0 exists, usually root (but e.g. user on Haiku).
-    user0 = uid2user(0)
-    assert tar_acl_to_borg(acl.format(user0=user0)) == expected.format(user0=user0).encode()
+    # the name lookups need an existing user, e.g. Haiku has no "root" user.
+    try:
+        uid = os.getuid()  # UNIX only
+    except AttributeError:
+        uid = 0
+    user = uid2user(uid)
+    acl, expected = acl.format(user=user, uid=uid), expected.format(user=user, uid=uid)
+    assert tar_acl_to_borg(acl) == expected.encode()

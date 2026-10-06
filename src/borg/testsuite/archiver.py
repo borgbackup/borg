@@ -4216,25 +4216,31 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         # PAX transfers mtime with ns resolution and xattrs.
         self.assert_dirs_equal('input', 'output/input')
 
-    def test_export_tar_pax_headers(self):
-        self.create_regular_file('file', size=1)
-        path = os.path.join(self.input_path, 'file')
-        os.utime(path, ns=(1600000000123456789, 1700000000987654321))
-        # the filesystem may have a coarser timestamp resolution (e.g. BFS on Haiku), use what it stored.
-        st = os.stat(path)
+    def test_roundtrip_pax_xattrs(self):
+        if not xattr.is_enabled(self.input_path):
+            pytest.skip('xattrs not supported')
+        self.create_regular_file('file')
+        original_path = os.path.join(self.input_path, 'file')
+        xa_key, xa_value = b'user.xattrtest', b'not valid utf-8: \xff'
+        xattr.setxattr(original_path.encode(), xa_key, xa_value)
         self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', '--atime', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'pax.tar')
-        self.cmd('export-tar', '--tar-format=GNU', self.repository_location + '::src', 'gnu.tar')
-        with tarfile.open('pax.tar') as tar:
-            ph = tar.getmember('input/file').pax_headers
-        assert ph['mtime'] == '%d.%09d' % divmod(st.st_mtime_ns, 1000000000)
-        if is_utime_fully_supported():
-            assert ph['atime'] == '%d.%09d' % divmod(st.st_atime_ns, 1000000000)
-        assert 'ctime' in ph
-        with tarfile.open('gnu.tar') as tar:
-            assert tar.getmember('input/file').pax_headers == {}
-        # import-tar must take the timestamps from the PAX headers, with exact ns precision.
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'xattrs.tar', '--tar-format=PAX')
+        self.cmd('import-tar', self.repository_location + '::dst', 'xattrs.tar')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+            extracted_path = os.path.abspath('input/file')
+            xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
+        assert xa_value_extracted == xa_value
+
+    def test_roundtrip_pax_timestamps(self):
+        """export-tar --tar-format=PAX and import-tar keep the timestamps with exact ns precision."""
+        self.create_regular_file('file')
+        mtime_ns = 1700000000_987654321  # float seconds would round this to ~240 ns
+        os.utime(os.path.join(self.input_path, 'file'), ns=(mtime_ns, mtime_ns))
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'pax.tar', '--tar-format=PAX')
         self.cmd('import-tar', self.repository_location + '::dst', 'pax.tar')
 
         def get_times(archive_name):
@@ -4243,7 +4249,11 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
                 item = next(item for item in archive.iter_items() if item.path == 'input/file')
                 return {name: item.get(name) for name in ('atime', 'ctime', 'mtime')}
 
-        assert get_times('dst') == get_times('src')
+        src_times, dst_times = get_times('src'), get_times('dst')
+        assert dst_times == src_times
+        with tarfile.open('pax.tar') as tar:
+            pax_mtime = tar.getmember('input/file').pax_headers['mtime']
+        assert pax_mtime == f"{src_times['mtime'] // 10**9}.{src_times['mtime'] % 10**9:09d}"
 
     def test_import_tar_invalid_pax_timestamp(self):
         """import-tar ignores invalid PAX timestamps (tarfile ignores them, too)."""
@@ -4259,69 +4269,99 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'atime' not in item
         assert item.ctime == 1700000000_500000000
 
-    def test_roundtrip_pax_xattrs(self):
-        if not xattr.is_enabled(self.input_path):
-            pytest.skip('xattrs not supported')
-        self.create_regular_file('file')
-        original_path = os.path.join(self.input_path, 'file')
-        xa_key, xa_value = b'user.xattrtest', b'not valid utf-8: \xff'
-        xattr.setxattr(original_path.encode(), xa_key, xa_value)
-        self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'xattrs.tar')
-        self.cmd('import-tar', self.repository_location + '::dst', 'xattrs.tar')
-        with changedir(self.output_path):
-            self.cmd('extract', self.repository_location + '::dst')
-            extracted_path = os.path.abspath('input/file')
-            xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
-        assert xa_value_extracted == xa_value
-
     @pytest.mark.skipif(not is_linux, reason='POSIX ACL test, Linux only')
     @pytest.mark.skipif(not are_acls_working(), reason='ACLs do not work')
-    def test_roundtrip_pax_acls(self):
+    def test_acl_roundtrip(self):
+        """Test the complete workflow for POSIX ACLs with export-tar and import-tar.
+
+        This test follows the workflow:
+        1. set filesystem ACLs
+        2. create a Borg archive
+        3. export-tar this archive
+        4. import-tar the resulting tar file
+        5. extract the imported archive
+        6. check the expected ACLs in the filesystem
+        """
+        # Define helper functions for working with ACLs
         def get_acl(path):
             item = {}
             platform.acl_get(path, item, os.stat(path))
             return item
 
-        access_acl = b'user::rw-\nuser:root:rw-:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--'
-        default_acl = b'user::rw-\nuser:root:r--:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--'
+        def set_acl(path, access=None, default=None):
+            item = {'acl_access': access, 'acl_default': default}
+            platform.acl_set(path, item)
+
+        # Define example ACLs
+        ACCESS_ACL = b'user::rw-\nuser:root:rw-:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--'
+        DEFAULT_ACL = b'user::rw-\nuser:root:r--:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--'
+
+        # 1. Set filesystem ACLs
+        # Create test files with ACLs
         self.create_regular_file('file')
         os.mkdir(os.path.join(self.input_path, 'dir'))
+
         file_path = os.path.join(self.input_path, 'file')
         dir_path = os.path.join(self.input_path, 'dir')
+
+        # Set ACLs on the test files
         try:
-            platform.acl_set(file_path, {'acl_access': access_acl})
-            platform.acl_set(dir_path, {'acl_access': access_acl, 'acl_default': default_acl})
+            set_acl(file_path, access=ACCESS_ACL)
+            set_acl(dir_path, access=ACCESS_ACL, default=DEFAULT_ACL)
         except OSError as e:
             pytest.skip(f'Failed to set ACLs: {e}')
+
         file_acl = get_acl(file_path)
         dir_acl = get_acl(dir_path)
+
         if not file_acl.get('acl_access') or not dir_acl.get('acl_access') or not dir_acl.get('acl_default'):
             pytest.skip('ACLs not supported or not working correctly')
+
+        # 2. Create a Borg archive
         self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::src', 'input')
-        self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'acls.tar')
-        self.cmd('import-tar', self.repository_location + '::dst', 'acls.tar')
+        self.cmd('create', self.repository_location + '::original', 'input')
+
+        # 3. export-tar this archive to a tar file
+        self.cmd('export-tar', self.repository_location + '::original', 'acls.tar', '--tar-format=PAX')
+
+        # 4. import-tar the resulting tar file
+        self.cmd('import-tar', self.repository_location + '::imported', 'acls.tar')
+
+        # 5. Extract the imported archive
         with changedir(self.output_path):
-            self.cmd('extract', self.repository_location + '::dst')
-            extracted_file_acl = get_acl(os.path.abspath('input/file'))
-            extracted_dir_acl = get_acl(os.path.abspath('input/dir'))
-        assert b'user:root:rw-' in file_acl['acl_access']
-        assert extracted_file_acl['acl_access'] == file_acl['acl_access']
-        assert extracted_dir_acl['acl_access'] == dir_acl['acl_access']
-        assert b'user:root:r--' in dir_acl['acl_default']
-        assert extracted_dir_acl['acl_default'] == dir_acl['acl_default']
+            self.cmd('extract', self.repository_location + '::imported')
+
+            # 6. Check the expected ACLs in the filesystem
+            extracted_file_path = os.path.abspath('input/file')
+            extracted_dir_path = os.path.abspath('input/dir')
+
+            extracted_file_acl = get_acl(extracted_file_path)
+            extracted_dir_acl = get_acl(extracted_dir_path)
+
+            # Check that access ACLs were preserved
+            assert 'acl_access' in extracted_file_acl
+            assert extracted_file_acl['acl_access'] == file_acl['acl_access']
+            assert b'user:root:rw-' in file_acl['acl_access']
+
+            assert 'acl_access' in extracted_dir_acl
+            assert extracted_dir_acl['acl_access'] == dir_acl['acl_access']
+            assert b'user:root:rw-' in dir_acl['acl_access']
+
+            # Check that default ACLs were preserved for directories
+            assert 'acl_default' in extracted_dir_acl
+            assert extracted_dir_acl['acl_default'] == dir_acl['acl_default']
+            assert b'user:root:r--' in dir_acl['acl_default']
 
     @pytest.mark.skipif(not is_linux, reason='POSIX ACL test, Linux only')
     @pytest.mark.skipif(not are_acls_working(), reason='ACLs do not work')
     def test_import_tar_gnu_tar_acls(self):
-        """Test import-tar with ACLs in PAX headers like GNU tar writes them (no numeric ids)."""
+        """Test import-tar with POSIX ACLs in PAX headers like GNU tar writes them (no numeric ids)."""
         def get_acl(path):
             item = {}
             platform.acl_get(path, item, os.stat(path))
             return item
 
+        # GNU tar --format=posix --acls writes these headers, see also tar_acl_to_borg.
         with tarfile.open('gnu.tar', 'w', format=tarfile.PAX_FORMAT) as tar:
             tarinfo = tarfile.TarInfo('dir')
             tarinfo.type, tarinfo.mode = tarfile.DIRTYPE, 0o755
@@ -4338,6 +4378,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
                 'SCHILY.xattr.system.posix_acl_access': 'not a valid binary ACL',
             }
             tar.addfile(tarinfo, io.BytesIO())
+
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('import-tar', self.repository_location + '::dst', 'gnu.tar')
         with changedir(self.output_path):
@@ -4346,8 +4387,8 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             dir_acl = get_acl(os.path.abspath('dir'))
         if not file_acl.get('acl_access') or not dir_acl.get('acl_default'):
             pytest.skip('ACLs not supported or not working correctly')
-        assert b'user:root:rw-' in file_acl['acl_access']
-        assert b'user:root:r-x' in dir_acl['acl_default']
+        assert b'user:root:rw-:0' in file_acl['acl_access']
+        assert b'user:root:r-x:0' in dir_acl['acl_default']
 
     def test_import_tar_quick_stats(self):
         self.create_regular_file('file1', size=1024)

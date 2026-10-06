@@ -807,32 +807,39 @@ def test_get_item_uid_gid():
     [
         # GNU tar: newline separated, no numeric id for named entries
         (
-            "user::rw-\nuser:root:rw-\ngroup::r--\nmask::rw-\nother::r--\n",
-            b"user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
+            "user::rw-\nuser:{user}:rw-\ngroup::r--\nmask::rw-\nother::r--\n",
+            "user::rw-\nuser:{user}:rw-:{uid}\ngroup::r--\nmask::rw-\nother::r--",
         ),
         # star: comma separated, numeric id appended
         (
             "user::rw-,user:root:rw-:0,group::r--,mask::rw-,other::r--",
-            b"user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
+            "user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
         ),
         # borg export-tar: newline separated, numeric id appended
         (
             "user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
-            b"user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
+            "user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
         ),
         # unknown names fall back to the name (Windows maps every name to 0)
         pytest.param(
             "group:nosuchgroup-borgtest:r--",
-            b"group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest",
+            "group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest",
             marks=pytest.mark.skipif(is_win32, reason="no name lookups on Windows"),
         ),
         # comments get removed
-        ("user:root:r--\t#effective:r--\n", b"user:root:r--:0"),
-        ("", b""),
+        ("user:{user}:r--\t#effective:r--\n", "user:{user}:r--:{uid}"),
+        ("", ""),
     ],
 )
 def test_tar_acl_to_borg(acl, expected):
-    assert tar_acl_to_borg(acl) == expected
+    # the name lookups need an existing user, e.g. Haiku has no "root" user.
+    try:
+        uid = os.getuid()  # UNIX only
+    except AttributeError:
+        uid = 0
+    user = uid2user(uid)
+    acl, expected = acl.format(user=user, uid=uid), expected.format(user=user, uid=uid)
+    assert tar_acl_to_borg(acl) == expected.encode()
 
 
 def test_reject_non_sanitized_item():

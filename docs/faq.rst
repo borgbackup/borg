@@ -122,10 +122,13 @@ Which file types, attributes, etc. are *not* preserved?
       misses a UDS!
     * The precise on-disk (or rather: not-on-disk) representation of the holes
       in a sparse file.
-      Archive creation has no special support for sparse files, holes are
-      backed up as (deduplicated and compressed) runs of zero bytes.
-      Archive extraction has optional support to extract all-zero chunks as
-      holes in a sparse file.
+      ``borg create --sparse`` detects the holes and seeks over them instead of
+      reading them, but the archive does not record which ranges were holes:
+      holes are backed up as (deduplicated and compressed) runs of zero bytes,
+      like zero bytes that are stored in the file.
+      ``borg extract --sparse`` creates holes from all-zero chunks, so the
+      extracted file can have holes where the original had stored zero bytes
+      and vice versa.
     * Some filesystem specific attributes, like btrfs NOCOW, see :ref:`platforms`.
 
 Are there other known limitations?

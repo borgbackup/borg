@@ -27,7 +27,7 @@ from ..helpers import DigestAlgos
 from ..helpers import FilesystemPathSpec
 from ..helpers import make_path_safe
 from ..helpers import remove_surrogates
-from ..helpers import timestamp, archive_ts_now
+from ..helpers import timestamp, archive_ts_now, ns_to_pax_time
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
 from ..helpers.argparsing import ArgumentParser
@@ -130,11 +130,11 @@ def item_to_paxheaders(format, item):
     #
     ph = {}
     # note: for mtime this is a bit redundant as it is already done by tarfile module,
-    #       but we just do it in our way to be consistent for sure.
+    #       but it only has a float, so we do it in our way to have exact ns precision.
     for name in "atime", "ctime", "mtime":
         if hasattr(item, name):
             ns = getattr(item, name)
-            ph[name] = str(ns / 1e9)
+            ph[name] = ns_to_pax_time(ns)
     if hasattr(item, "xattrs"):
         for bkey, bvalue in item.xattrs.items():
             # we have bytes key and bytes value, but the tarfile code

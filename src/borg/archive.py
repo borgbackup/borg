@@ -42,7 +42,7 @@ from .helpers import ArchiveFormatter
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
 from .helpers import StableDict
 from .helpers import bin_to_hex
-from .helpers import safe_ns
+from .helpers import safe_ns, pax_time_to_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
 from .helpers import os_open, flags_normal, flags_dir, O_, SpecialFileReader
 from .helpers import MAP_DATA, MAP_ZERO, MAP_SAME, input_map_check_size
@@ -2080,12 +2080,12 @@ class TarfileObjectProcessors:
             if tarinfo.gname:
                 item.group = tarinfo.gname
             if ph:
-                # note: for mtime this is a bit redundant as it is already done by tarfile module,
-                #       but we just do it in our way to be consistent for sure.
+                # the tarfile module only gives us float timestamps, parse the original strings for full precision.
                 for name in "atime", "ctime", "mtime":
                     if name in ph:
-                        ns = s_to_ns(ph[name])
-                        setattr(item, name, ns)
+                        ns = pax_time_to_ns(ph[name])
+                        if ns is not None:
+                            setattr(item, name, ns)
                 xattrs = StableDict()
                 for key, value in ph.items():
                     if key.startswith(SCHILY_XATTR):

@@ -599,6 +599,30 @@ def test_roundtrip_pax_xattrs(archivers, request):
     assert xa_value_extracted == xa_value
 
 
+def test_roundtrip_pax_timestamps(archivers, request):
+    """export-tar --tar-format=PAX and import-tar keep the timestamps with exact ns precision."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file")
+    mtime_ns = 1700000000_987654321  # float seconds would round this to ~240 ns
+    os.utime(os.path.join(archiver.input_path, "file"), ns=(mtime_ns, mtime_ns))
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "pax.tar", "--tar-format=PAX")
+    cmd(archiver, "import-tar", "dst", "pax.tar")
+
+    def get_times(archive):
+        archive_obj, repository = open_archive(archiver.repository_path, archive)
+        with repository:
+            item = next(item for item in archive_obj.iter_items() if item.path == "input/file")
+            return {name: item.get(name) for name in ("atime", "ctime", "mtime")}
+
+    src_times, dst_times = get_times("src"), get_times("dst")
+    assert dst_times == src_times
+    with tarfile.open("pax.tar") as tar:
+        pax_mtime = tar.getmember("input/file").pax_headers["mtime"]
+    assert pax_mtime == f"{src_times['mtime'] // 10**9}.{src_times['mtime'] % 10**9:09d}"
+
+
 def _sparse_entries(sizes):
     return [ChunkListEntry(id=bytes([i]) * 32, size=size) for i, size in enumerate(sizes)]
 

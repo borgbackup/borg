@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from ...helpers.time import safe_ns, safe_s, safe_timestamp, SUPPORT_32BIT_PLATFORMS, calculate_relative_offset
 from ...helpers.time import format_time, format_time_ns, OutputTimestamp
+from ...helpers.time import ns_to_pax_time, pax_time_to_ns
 
 
 def utcfromtimestamp(timestamp):
@@ -75,3 +76,34 @@ def test_output_timestamp_without_ns_isoformat():
     ns = 1000000000_000123_456
     ots = OutputTimestamp(safe_timestamp(ns))  # no ns given
     assert ots.isoformat() == safe_timestamp(ns).astimezone().isoformat(timespec="microseconds")
+
+
+@pytest.mark.parametrize(
+    "ns, expected",
+    [
+        (0, "0.000000000"),
+        (1, "0.000000001"),
+        (1700000000_987654321, "1700000000.987654321"),
+        (-1, "-0.000000001"),
+        (-1500000000, "-1.500000000"),
+    ],
+)
+def test_ns_to_pax_time(ns, expected):
+    assert ns_to_pax_time(ns) == expected
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("1700000000.987654321", 1700000000_987654321),
+        ("1700000000", 1700000000_000000000),
+        ("1700000000.5", 1700000000_500000000),
+        ("-1.5", 0),  # safe_ns clamps
+        ("", None),
+        ("garbage", None),
+        ("NaN", None),
+        ("Infinity", None),
+    ],
+)
+def test_pax_time_to_ns(value, expected):
+    assert pax_time_to_ns(value) == expected

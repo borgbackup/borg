@@ -85,6 +85,7 @@ try:
     from .helpers import sig_int, ignore_sigint
     from .helpers import iter_separated
     from .helpers import get_tar_filter
+    from .helpers import ns_to_pax_time
     from .helpers import ignore_invalid_archive_tam
     from .helpers.parseformat import BorgJsonEncoder, safe_decode
     from .nanorst import rst_to_terminal
@@ -246,6 +247,40 @@ class Highlander(argparse.Action):
         if getattr(namespace, self.dest, None) != self.default:
             raise argparse.ArgumentError(self, 'There can be only one.')
         setattr(namespace, self.dest, values)
+
+
+def item_to_paxheaders(item):
+    """Transform (parts of) a Borg *item* into a pax_headers dict."""
+    # PAX format
+    # ----------
+    # When using the PAX (POSIX) format, we can support some things that aren't possible
+    # with classic tar formats, including GNU tar, such as:
+    # - atime, ctime, mtime with ns precision (DONE)
+    # - xattrs, POSIX ACLs (DONE)
+    # - various additions supported by GNU tar in POSIX mode (TODO)
+    #
+    ph = {}
+    # note: for mtime this is a bit redundant as it is already done by tarfile module,
+    #       but it only has a float, so we do it in our way to have exact ns precision.
+    for name in 'atime', 'ctime', 'mtime':
+        if hasattr(item, name):
+            ns = getattr(item, name)
+            ph[name] = ns_to_pax_time(ns)
+    if hasattr(item, 'xattrs'):
+        for bkey, bvalue in item.xattrs.items():
+            # we have bytes key and bytes value (or None for an empty value), but the tarfile code
+            # expects str key and str value.
+            key = SCHILY_XATTR + bkey.decode('utf-8', errors='surrogateescape')
+            value = (bvalue or b'').decode('utf-8', errors='surrogateescape')
+            ph[key] = value
+    # Add POSIX access and default ACL if present
+    acl_access = item.get('acl_access')
+    if acl_access is not None:
+        ph[SCHILY_ACL_ACCESS] = acl_access.decode('utf-8', errors='surrogateescape')
+    acl_default = item.get('acl_default')
+    if acl_default is not None:
+        ph[SCHILY_ACL_DEFAULT] = acl_default.decode('utf-8', errors='surrogateescape')
+    return ph
 
 
 class Archiver:
@@ -1054,7 +1089,8 @@ class Archiver:
 
         # The | (pipe) symbol instructs tarfile to use a streaming mode of operation
         # where it never seeks on the passed fileobj.
-        tar = tarfile.open(fileobj=tarstream, mode='w|', format=tarfile.GNU_FORMAT)
+        tar_format = dict(GNU=tarfile.GNU_FORMAT, PAX=tarfile.PAX_FORMAT)[args.tar_format]
+        tar = tarfile.open(fileobj=tarstream, mode='w|', format=tar_format)
 
         if progress:
             pi = ProgressIndicatorPercent(msg='%5.1f%% Processing: %s', step=0.1, msgid='extract')
@@ -1085,13 +1121,6 @@ class Archiver:
             the file contents, if any, and is None otherwise. When *tarinfo* is None, the *item*
             cannot be represented as a TarInfo object and should be skipped.
             """
-
-            # If we would use the PAX (POSIX) format (which we currently don't),
-            # we can support most things that aren't possible with classic tar
-            # formats, including GNU tar, such as:
-            # atime, ctime, possibly Linux capabilities (security.* xattrs)
-            # and various additions supported by GNU tar in POSIX mode.
-
             stream = None
             tarinfo = tarfile.TarInfo()
             tarinfo.name = item.path
@@ -1159,6 +1188,8 @@ class Archiver:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
             tarinfo, stream = item_to_tarinfo(item, orig_path)
             if tarinfo:
+                if args.tar_format == 'PAX':
+                    tarinfo.pax_headers = item_to_paxheaders(item)
                 if output_list:
                     logging.getLogger('borg.output.list').info(remove_surrogates(orig_path))
                 tar.addfile(tarinfo, stream)
@@ -4448,12 +4479,17 @@ class Archiver:
         read the uncompressed tar stream from stdin and write a compressed/filtered
         tar stream to stdout.
 
-        The generated tarball uses the GNU tar format.
+        Depending on the ``--tar-format`` option, these formats are created:
 
-        export-tar is a lossy conversion:
-        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-        otherwise supported by Borg.
+        +--------------+---------------------------+----------------------------+
+        | --tar-format | Specification             | Metadata                   |
+        +--------------+---------------------------+----------------------------+
+        | PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
+        |              |                           | + xattrs, POSIX ACLs       |
+        +--------------+---------------------------+----------------------------+
+        | GNU          | GNU tar format            | mtime s, no atime/ctime,   |
+        |              |                           | no ACLs/xattrs/bsdflags    |
+        +--------------+---------------------------+----------------------------+
 
         A ``--sparse`` option (as found in ``borg extract``) is not supported.
 
@@ -4476,6 +4512,9 @@ class Archiver:
                                help='filter program to pipe data through')
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
+        subparser.add_argument('--tar-format', metavar='FMT', dest='tar_format', default='GNU',
+                               choices=('PAX', 'GNU'), action=Highlander,
+                               help='select tar format: PAX or GNU (default: GNU)')
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to export')
@@ -5619,15 +5658,17 @@ class Archiver:
         Most documentation of ``borg create`` applies. Note that this command does not
         support excluding files.
 
-        import-tar is a lossy conversion:
-        BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
-        Timestamp resolution is limited to whole seconds, not the nanosecond resolution
-        otherwise supported by Borg.
-
         A ``--sparse`` option (as found in borg create) is not supported.
 
-        import-tar reads POSIX.1-1988 (ustar), POSIX.1-2001 (pax), GNU tar, UNIX V7 tar
-        and SunOS tar with extended attributes.
+        About tar formats and metadata conservation or loss, please see ``borg export-tar``.
+
+        import-tar reads these tar formats:
+
+        - PAX: POSIX.1-2001
+        - GNU: GNU tar
+        - POSIX.1-1988 (ustar)
+        - UNIX V7 tar
+        - SunOS tar with extended attributes
 
         To import multiple tarballs into a single archive, they can be simply
         concatenated (e.g. using "cat") into a single file, and imported with an

@@ -645,7 +645,7 @@ def data_cache_capacity():
     return max(1, capacity)
 
 
-def build_item_filter(args):
+def build_item_filter(args, strip_components):
     """Build the item filter selecting the paths/patterns given on the command line."""
     # lazy import: pulling in the archiver package at module import time would be heavy
     # (it defines all subcommands) and risks an import cycle.
@@ -653,7 +653,7 @@ def build_item_filter(args):
 
     # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
     matcher = build_matcher(getattr(args, "patterns", None) or [], getattr(args, "paths", None) or [])
-    return build_filter(matcher, getattr(args, "strip_components", 0))
+    return build_filter(matcher, strip_components)
 
 
 def pop_option(options, key, present, not_present, wanted_type, int_base=0):
@@ -731,6 +731,10 @@ def parse_mount_options(args, mountpoint, mount_options):
         uid_forced = pop_option(options, "uid", None, None, int)
         gid_forced = pop_option(options, "gid", None, None, int)
         default_dir_uid, default_dir_gid = os.getuid(), os.getgid()
+    # the strip_components mount option is for fstab / autofs entries, which can only give mount options.
+    strip_components = pop_option(options, "strip_components", None, None, int)
+    if strip_components is None:
+        strip_components = getattr(args, "strip_components", 0)
     vfs_options = VFSOptions(
         allow_damaged_files=pop_option(options, "allow_damaged_files", True, False, bool),
         versions=pop_option(options, "versions", True, False, bool),
@@ -738,8 +742,8 @@ def parse_mount_options(args, mountpoint, mount_options):
         gid_forced=gid_forced,
         umask=pop_option(options, "umask", 0, 0, int, int_base=8),  # umask is octal, e.g. 222 or 0222
         numeric_ids=getattr(args, "numeric_ids", False),
-        strip_components=getattr(args, "strip_components", 0),
-        item_filter=build_item_filter(args),
+        strip_components=strip_components,
+        item_filter=build_item_filter(args, strip_components),
     )
     dir_uid = vfs_options.uid_forced if vfs_options.uid_forced is not None else default_dir_uid
     dir_gid = vfs_options.gid_forced if vfs_options.gid_forced is not None else default_dir_gid

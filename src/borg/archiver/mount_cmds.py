@@ -167,6 +167,9 @@ class MountMixIn:
         - ``ignore_permissions``: for security reasons the ``default_permissions`` mount
           option is internally enforced by Borg. ``ignore_permissions`` can be given to
           not enforce ``default_permissions``.
+        - ``strip_components=NUMBER``: same as ``--strip-components NUMBER``; useful for
+          fstab / autofs entries, which can only give mount options. If both are given,
+          the mount option is used.
 
         On Windows, ``borg mount`` needs `WinFsp <https://winfsp.dev/>`_ and mfusepy.
         MOUNTPOINT must either be an unused drive (like ``X:``) or a not yet existing

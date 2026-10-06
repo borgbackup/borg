@@ -13,6 +13,7 @@ import socket
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import unittest
@@ -59,7 +60,8 @@ from ..repository import Repository
 from . import has_lchflags, has_mknod, llfuse
 from . import BaseTestCase, changedir, environment_variable, filter_xattrs, same_ts_ns, granularity_sleep
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected, is_darwin, is_freebsd, is_netbsd, is_win32, is_haiku
+from .platform import fakeroot_detected, is_darwin, is_freebsd, is_linux, is_netbsd, is_win32, is_haiku
+from .platform import are_acls_working
 from .upgrader import make_attic_repo
 from . import key
 
@@ -4201,6 +4203,132 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
+
+    def test_import_tar_pax(self):
+        self.create_test_files()
+        os.unlink('input/flagfile')
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'simple.tar')
+        self.cmd('import-tar', self.repository_location + '::dst', 'simple.tar')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+        # PAX transfers mtime with ns resolution and xattrs.
+        self.assert_dirs_equal('input', 'output/input')
+
+    def test_export_tar_pax_headers(self):
+        self.create_regular_file('file', size=1)
+        path = os.path.join(self.input_path, 'file')
+        atime_ns, mtime_ns = 1600000000123456789, 1700000000987654321
+        os.utime(path, ns=(atime_ns, mtime_ns))
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', '--atime', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'pax.tar')
+        self.cmd('export-tar', '--tar-format=GNU', self.repository_location + '::src', 'gnu.tar')
+        with tarfile.open('pax.tar') as tar:
+            ph = tar.getmember('input/file').pax_headers
+        assert ph['mtime'] == '1700000000.987654321'
+        if is_utime_fully_supported():
+            assert ph['atime'] == '1600000000.123456789'
+        assert 'ctime' in ph
+        with tarfile.open('gnu.tar') as tar:
+            assert tar.getmember('input/file').pax_headers == {}
+        # import-tar must take the timestamps from the PAX headers.
+        self.cmd('import-tar', self.repository_location + '::dst', 'pax.tar')
+        fmt = '--format={path} {isomtime} {isoatime} {isoctime}{NL}'
+        src = self.cmd('list', fmt, self.repository_location + '::src')
+        dst = self.cmd('list', fmt, self.repository_location + '::dst')
+        assert src == dst
+
+    def test_roundtrip_pax_xattrs(self):
+        if not xattr.is_enabled(self.input_path):
+            pytest.skip('xattrs not supported')
+        self.create_regular_file('file')
+        original_path = os.path.join(self.input_path, 'file')
+        xa_key, xa_value = b'user.xattrtest', b'not valid utf-8: \xff'
+        xattr.setxattr(original_path.encode(), xa_key, xa_value)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'xattrs.tar')
+        self.cmd('import-tar', self.repository_location + '::dst', 'xattrs.tar')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+            extracted_path = os.path.abspath('input/file')
+            xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
+        assert xa_value_extracted == xa_value
+
+    @pytest.mark.skipif(not is_linux, reason='POSIX ACL test, Linux only')
+    @pytest.mark.skipif(not are_acls_working(), reason='ACLs do not work')
+    def test_roundtrip_pax_acls(self):
+        def get_acl(path):
+            item = {}
+            platform.acl_get(path, item, os.stat(path))
+            return item
+
+        access_acl = b'user::rw-\nuser:root:rw-:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--'
+        default_acl = b'user::rw-\nuser:root:r--:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--'
+        self.create_regular_file('file')
+        os.mkdir(os.path.join(self.input_path, 'dir'))
+        file_path = os.path.join(self.input_path, 'file')
+        dir_path = os.path.join(self.input_path, 'dir')
+        try:
+            platform.acl_set(file_path, {'acl_access': access_acl})
+            platform.acl_set(dir_path, {'acl_access': access_acl, 'acl_default': default_acl})
+        except OSError as e:
+            pytest.skip(f'Failed to set ACLs: {e}')
+        file_acl = get_acl(file_path)
+        dir_acl = get_acl(dir_path)
+        if not file_acl.get('acl_access') or not dir_acl.get('acl_access') or not dir_acl.get('acl_default'):
+            pytest.skip('ACLs not supported or not working correctly')
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'acls.tar')
+        self.cmd('import-tar', self.repository_location + '::dst', 'acls.tar')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+            extracted_file_acl = get_acl(os.path.abspath('input/file'))
+            extracted_dir_acl = get_acl(os.path.abspath('input/dir'))
+        assert b'user:root:rw-' in file_acl['acl_access']
+        assert extracted_file_acl['acl_access'] == file_acl['acl_access']
+        assert extracted_dir_acl['acl_access'] == dir_acl['acl_access']
+        assert b'user:root:r--' in dir_acl['acl_default']
+        assert extracted_dir_acl['acl_default'] == dir_acl['acl_default']
+
+    @pytest.mark.skipif(not is_linux, reason='POSIX ACL test, Linux only')
+    @pytest.mark.skipif(not are_acls_working(), reason='ACLs do not work')
+    def test_import_tar_gnu_tar_acls(self):
+        """Test import-tar with ACLs in PAX headers like GNU tar writes them (no numeric ids)."""
+        def get_acl(path):
+            item = {}
+            platform.acl_get(path, item, os.stat(path))
+            return item
+
+        with tarfile.open('gnu.tar', 'w', format=tarfile.PAX_FORMAT) as tar:
+            tarinfo = tarfile.TarInfo('dir')
+            tarinfo.type, tarinfo.mode = tarfile.DIRTYPE, 0o755
+            tarinfo.pax_headers = {
+                'SCHILY.acl.access': 'user::rwx\ngroup::r-x\nother::r-x\n',
+                'SCHILY.acl.default': 'user::rwx\nuser:root:r-x\ngroup::r-x\nmask::r-x\nother::r-x\n',
+            }
+            tar.addfile(tarinfo)
+            tarinfo = tarfile.TarInfo('dir/file')
+            tarinfo.mode = 0o644
+            tarinfo.pax_headers = {
+                'SCHILY.acl.access': 'user::rw-\nuser:root:rw-\ngroup::r--\nmask::rw-\nother::r--\n',
+                # GNU tar --xattrs-include='*' also stores the ACLs as raw xattrs, these must be ignored.
+                'SCHILY.xattr.system.posix_acl_access': 'not a valid binary ACL',
+            }
+            tar.addfile(tarinfo, io.BytesIO())
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('import-tar', self.repository_location + '::dst', 'gnu.tar')
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+            file_acl = get_acl(os.path.abspath('dir/file'))
+            dir_acl = get_acl(os.path.abspath('dir'))
+        if not file_acl.get('acl_access') or not dir_acl.get('acl_default'):
+            pytest.skip('ACLs not supported or not working correctly')
+        assert b'user:root:rw-' in file_acl['acl_access']
+        assert b'user:root:r-x' in dir_acl['acl_default']
 
     def test_import_tar_quick_stats(self):
         self.create_regular_file('file1', size=1024)

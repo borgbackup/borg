@@ -9,7 +9,7 @@ import pytest
 from . import BaseTestCase
 from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
-from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
+from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid, tar_acl_to_borg
 from ..helpers import Manifest
 from ..helpers import msgpack
 from ..item import Item, ArchiveItem
@@ -368,3 +368,20 @@ def test_get_item_uid_gid():
     # because item uid/gid seems valid, do not use the given uid/gid defaults
     assert uid == 9
     assert gid == 10
+
+
+@pytest.mark.parametrize('acl, expected', [
+    # GNU tar: newline separated, no numeric id for named entries
+    ('user::rw-\nuser:root:rw-\ngroup::r--\nmask::rw-\nother::r--\n',
+     b'user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
+    # star: comma separated, numeric id appended (also what borg export-tar writes, but newline separated)
+    ('user::rw-,user:root:rw-:0,group::r--,mask::rw-,other::r--',
+     b'user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
+    # unknown names fall back to the name
+    ('group:nosuchgroup-borgtest:r--', b'group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest'),
+    # comments get removed
+    ('user:root:r--\t#effective:r--\n', b'user:root:r--:0'),
+    ('', b''),
+])
+def test_tar_acl_to_borg(acl, expected):
+    assert tar_acl_to_borg(acl) == expected

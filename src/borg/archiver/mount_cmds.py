@@ -142,8 +142,8 @@ class MountMixIn:
 
         Borg's default behavior is to use the archived user and group names of each
         file and map them to the system's respective user and group IDs.
-        Alternatively, using ``numeric-ids`` will instead use the archived user and
-        group IDs without any mapping.
+        Alternatively, using ``--numeric-ids`` (or the ``numeric_ids`` mount option)
+        will instead use the archived user and group IDs without any mapping.
 
         The ``uid`` and ``gid`` mount options (implemented by Borg) can be used to
         override the user and group IDs of all files (i.e., ``borg mount -o
@@ -170,6 +170,8 @@ class MountMixIn:
         - ``strip_components=NUMBER``: same as ``--strip-components NUMBER``; useful for
           fstab / autofs entries, which can only give mount options. If both are given,
           the mount option is used.
+        - ``numeric_ids``: same as ``--numeric-ids``; useful for fstab / autofs entries.
+          ``numeric_ids=no`` overrides ``--numeric-ids``.
 
         On Windows, ``borg mount`` needs `WinFsp <https://winfsp.dev/>`_ and mfusepy.
         MOUNTPOINT must either be an unused drive (like ``X:``) or a not yet existing

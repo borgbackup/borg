@@ -731,17 +731,21 @@ def parse_mount_options(args, mountpoint, mount_options):
         uid_forced = pop_option(options, "uid", None, None, int)
         gid_forced = pop_option(options, "gid", None, None, int)
         default_dir_uid, default_dir_gid = os.getuid(), os.getgid()
-    # the strip_components mount option is for fstab / autofs entries, which can only give mount options.
+    # the strip_components and numeric_ids mount options are for fstab / autofs entries,
+    # which can only give mount options.
     strip_components = pop_option(options, "strip_components", None, None, int)
     if strip_components is None:
         strip_components = getattr(args, "strip_components", 0)
+    numeric_ids = pop_option(options, "numeric_ids", True, None, bool)
+    if numeric_ids is None:
+        numeric_ids = getattr(args, "numeric_ids", False)
     vfs_options = VFSOptions(
         allow_damaged_files=pop_option(options, "allow_damaged_files", True, False, bool),
         versions=pop_option(options, "versions", True, False, bool),
         uid_forced=uid_forced,
         gid_forced=gid_forced,
         umask=pop_option(options, "umask", 0, 0, int, int_base=8),  # umask is octal, e.g. 222 or 0222
-        numeric_ids=getattr(args, "numeric_ids", False),
+        numeric_ids=numeric_ids,
         strip_components=strip_components,
         item_filter=build_item_filter(args, strip_components),
     )

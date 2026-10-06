@@ -146,6 +146,25 @@ def test_parse_mount_options_strip_components(cli_strip_components, mount_option
 
 
 @pytest.mark.parametrize(
+    "cli_numeric_ids, mount_options, expected",
+    [
+        (False, None, False),
+        (True, None, True),
+        (False, "numeric_ids", True),
+        (False, "numeric_ids=yes", True),
+        (True, "numeric_ids=no", False),
+    ],
+)
+def test_parse_mount_options_numeric_ids(cli_numeric_ids, mount_options, expected):
+    args = MountArgs()
+    args.numeric_ids = cli_numeric_ids
+    options, vfs_options = parse_mount_options(args, "/mnt/point", mount_options)
+    # numeric_ids is implemented by borg, so it is not passed on to libfuse.
+    assert not [option for option in options if option.startswith("numeric_ids")]
+    assert vfs_options.numeric_ids is expected
+
+
+@pytest.mark.parametrize(
     "mount_options, expected",
     [
         (None, ["uid=-1", "gid=-1"]),  # default: everything belongs to the user who mounts

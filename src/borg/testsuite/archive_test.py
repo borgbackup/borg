@@ -15,7 +15,7 @@ from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacke
 from ..archive import ITEM_KEYS, Statistics
 from ..archive import zero_chunk_flags, zero_chunk_id, zero_chunk_ids
 from ..archive import BackupOSError, BackupRaceConditionError, backup_io, backup_io_iter, get_item_uid_gid
-from ..archive import stat_update_check
+from ..archive import stat_update_check, tar_acl_to_borg
 from ..helpers import msgpack, StableDict
 from ..repoobj import RepoObj
 from ..item import Item, ArchiveItem
@@ -800,6 +800,39 @@ def test_get_item_uid_gid():
     # As there is nothing, it will fall back to uid_default/gid_default.
     assert uid == 0
     assert gid == 16
+
+
+@pytest.mark.parametrize(
+    "acl, expected",
+    [
+        # GNU tar: newline separated, no numeric id for named entries
+        (
+            "user::rw-\nuser:root:rw-\ngroup::r--\nmask::rw-\nother::r--\n",
+            b"user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
+        ),
+        # star: comma separated, numeric id appended
+        (
+            "user::rw-,user:root:rw-:0,group::r--,mask::rw-,other::r--",
+            b"user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
+        ),
+        # borg export-tar: newline separated, numeric id appended
+        (
+            "user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
+            b"user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--",
+        ),
+        # unknown names fall back to the name (Windows maps every name to 0)
+        pytest.param(
+            "group:nosuchgroup-borgtest:r--",
+            b"group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest",
+            marks=pytest.mark.skipif(is_win32, reason="no name lookups on Windows"),
+        ),
+        # comments get removed
+        ("user:root:r--\t#effective:r--\n", b"user:root:r--:0"),
+        ("", b""),
+    ],
+)
+def test_tar_acl_to_borg(acl, expected):
+    assert tar_acl_to_borg(acl) == expected
 
 
 def test_reject_non_sanitized_item():

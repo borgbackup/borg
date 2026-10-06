@@ -657,7 +657,7 @@ class TarMixIn:
         | BORG         | BORG specific, like PAX   | all as supported by borg   |
         +--------------+---------------------------+----------------------------+
         | PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
-        |              |                           | + xattrs                   |
+        |              |                           | + xattrs, POSIX ACLs       |
         +--------------+---------------------------+----------------------------+
         | GNU          | GNU tar format            | mtime s, no atime/ctime,   |
         |              |                           | no ACLs/xattrs/bsdflags    |

@@ -937,3 +937,44 @@ def test_acl_roundtrip(archivers, request):
         assert "acl_default" in extracted_dir_acl
         assert extracted_dir_acl["acl_default"] == dir_acl["acl_default"]
         assert b"user:root:r--" in dir_acl["acl_default"]
+
+
+@skipif_not_linux
+@skipif_acls_not_working
+def test_import_tar_gnu_tar_acls(archivers, request):
+    """Test import-tar with POSIX ACLs in PAX headers like GNU tar writes them (no numeric ids)."""
+    archiver = request.getfixturevalue(archivers)
+
+    def get_acl(path):
+        item = {}
+        acl_get(path, item, os.stat(path))
+        return item
+
+    # GNU tar --format=posix --acls writes these headers, see also tar_acl_to_borg.
+    with tarfile.open("gnu.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        tarinfo = tarfile.TarInfo("dir")
+        tarinfo.type, tarinfo.mode = tarfile.DIRTYPE, 0o755
+        tarinfo.pax_headers = {
+            "SCHILY.acl.access": "user::rwx\ngroup::r-x\nother::r-x\n",
+            "SCHILY.acl.default": "user::rwx\nuser:root:r-x\ngroup::r-x\nmask::r-x\nother::r-x\n",
+        }
+        tar.addfile(tarinfo)
+        tarinfo = tarfile.TarInfo("dir/file")
+        tarinfo.mode = 0o644
+        tarinfo.pax_headers = {
+            "SCHILY.acl.access": "user::rw-\nuser:root:rw-\ngroup::r--\nmask::rw-\nother::r--\n",
+            # GNU tar --xattrs-include='*' also stores the ACLs as raw xattrs, these must be ignored.
+            "SCHILY.xattr.system.posix_acl_access": "not a valid binary ACL",
+        }
+        tar.addfile(tarinfo, io.BytesIO())
+
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "import-tar", "dst", "gnu.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+        file_acl = get_acl(os.path.abspath("dir/file"))
+        dir_acl = get_acl(os.path.abspath("dir"))
+    if not file_acl.get("acl_access") or not dir_acl.get("acl_default"):
+        pytest.skip("ACLs not supported or not working correctly")
+    assert b"user:root:rw-:0" in file_acl["acl_access"]
+    assert b"user:root:r-x:0" in dir_acl["acl_default"]

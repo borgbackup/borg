@@ -4234,12 +4234,30 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'ctime' in ph
         with tarfile.open('gnu.tar') as tar:
             assert tar.getmember('input/file').pax_headers == {}
-        # import-tar must take the timestamps from the PAX headers.
+        # import-tar must take the timestamps from the PAX headers, with exact ns precision.
         self.cmd('import-tar', self.repository_location + '::dst', 'pax.tar')
-        fmt = '--format={path} {isomtime} {isoatime} {isoctime}{NL}'
-        src = self.cmd('list', fmt, self.repository_location + '::src')
-        dst = self.cmd('list', fmt, self.repository_location + '::dst')
-        assert src == dst
+
+        def get_times(archive_name):
+            archive, repository = self.open_archive(archive_name)
+            with repository:
+                item = next(item for item in archive.iter_items() if item.path == 'input/file')
+                return {name: item.get(name) for name in ('atime', 'ctime', 'mtime')}
+
+        assert get_times('dst') == get_times('src')
+
+    def test_import_tar_invalid_pax_timestamp(self):
+        """import-tar ignores invalid PAX timestamps (tarfile ignores them, too)."""
+        with tarfile.open('input.tar', 'w', format=tarfile.PAX_FORMAT) as tar:
+            tarinfo = tarfile.TarInfo('file')
+            tarinfo.pax_headers = {'atime': 'garbage', 'ctime': '1700000000.5'}
+            tar.addfile(tarinfo, io.BytesIO())
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('import-tar', self.repository_location + '::dst', 'input.tar')
+        archive, repository = self.open_archive('dst')
+        with repository:
+            item = next(archive.iter_items())
+        assert 'atime' not in item
+        assert item.ctime == 1700000000_500000000
 
     def test_roundtrip_pax_xattrs(self):
         if not xattr.is_enabled(self.input_path):

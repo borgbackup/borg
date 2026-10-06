@@ -4219,17 +4219,18 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_export_tar_pax_headers(self):
         self.create_regular_file('file', size=1)
         path = os.path.join(self.input_path, 'file')
-        atime_ns, mtime_ns = 1600000000123456789, 1700000000987654321
-        os.utime(path, ns=(atime_ns, mtime_ns))
+        os.utime(path, ns=(1600000000123456789, 1700000000987654321))
+        # the filesystem may have a coarser timestamp resolution (e.g. BFS on Haiku), use what it stored.
+        st = os.stat(path)
         self.cmd('init', '--encryption=none', self.repository_location)
         self.cmd('create', '--atime', self.repository_location + '::src', 'input')
         self.cmd('export-tar', '--tar-format=PAX', self.repository_location + '::src', 'pax.tar')
         self.cmd('export-tar', '--tar-format=GNU', self.repository_location + '::src', 'gnu.tar')
         with tarfile.open('pax.tar') as tar:
             ph = tar.getmember('input/file').pax_headers
-        assert ph['mtime'] == '1700000000.987654321'
+        assert ph['mtime'] == '%d.%09d' % divmod(st.st_mtime_ns, 1000000000)
         if is_utime_fully_supported():
-            assert ph['atime'] == '1600000000.123456789'
+            assert ph['atime'] == '%d.%09d' % divmod(st.st_atime_ns, 1000000000)
         assert 'ctime' in ph
         with tarfile.open('gnu.tar') as tar:
             assert tar.getmember('input/file').pax_headers == {}

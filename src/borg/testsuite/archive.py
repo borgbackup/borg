@@ -372,16 +372,18 @@ def test_get_item_uid_gid():
 
 @pytest.mark.parametrize('acl, expected', [
     # GNU tar: newline separated, no numeric id for named entries
-    ('user::rw-\nuser:root:rw-\ngroup::r--\nmask::rw-\nother::r--\n',
-     b'user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
+    ('user::rw-\nuser:{user0}:rw-\ngroup::r--\nmask::rw-\nother::r--\n',
+     'user::rw-\nuser:{user0}:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
     # star: comma separated, numeric id appended (also what borg export-tar writes, but newline separated)
-    ('user::rw-,user:root:rw-:0,group::r--,mask::rw-,other::r--',
-     b'user::rw-\nuser:root:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
+    ('user::rw-,user:{user0}:rw-:0,group::r--,mask::rw-,other::r--',
+     'user::rw-\nuser:{user0}:rw-:0\ngroup::r--\nmask::rw-\nother::r--'),
     # unknown names fall back to the name
-    ('group:nosuchgroup-borgtest:r--', b'group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest'),
+    ('group:nosuchgroup-borgtest:r--', 'group:nosuchgroup-borgtest:r--:nosuchgroup-borgtest'),
     # comments get removed
-    ('user:root:r--\t#effective:r--\n', b'user:root:r--:0'),
-    ('', b''),
+    ('user:{user0}:r--\t#effective:r--\n', 'user:{user0}:r--:0'),
+    ('', ''),
 ])
 def test_tar_acl_to_borg(acl, expected):
-    assert tar_acl_to_borg(acl) == expected
+    # test requires that a name for user 0 exists, usually root (but e.g. user on Haiku).
+    user0 = uid2user(0)
+    assert tar_acl_to_borg(acl.format(user0=user0)) == expected.format(user0=user0).encode()

@@ -88,7 +88,7 @@ class ExtractMixIn:
                     while dirs and not item.path.startswith(dirs[-1].path):
                         dir_item = dirs.pop(-1)
                         try:
-                            archive.extract_item(dir_item, stdout=stdout)
+                            archive.extract_item(dir_item, stdout=stdout, continue_extraction=continue_extraction)
                         except BackupError as e:
                             self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
 
@@ -122,7 +122,7 @@ class ExtractMixIn:
                 pi.show()
                 dir_item = dirs.pop(-1)
                 try:
-                    archive.extract_item(dir_item, stdout=stdout)
+                    archive.extract_item(dir_item, stdout=stdout, continue_extraction=continue_extraction)
                 except BackupError as e:
                     self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
         for pattern in matcher.get_unmatched_include_patterns():
@@ -170,8 +170,10 @@ class ExtractMixIn:
         ``--continue`` extracts into a non-empty directory. It is made for continuing a previously
         interrupted extraction of the same archive into the same directory: an existing regular
         file that has the same type, permissions (mode), size and modification time as the
-        archived file is considered to be fully extracted already and is skipped. Everything else
-        is extracted, replacing existing files. Files that are in the directory, but not in the
+        archived file is considered to be fully extracted already and is skipped. Likewise, the
+        metadata of an existing directory that has the same permissions (mode) and modification
+        time as the archived directory is not restored again. Everything else is extracted,
+        replacing existing files. Files that are in the directory, but not in the
         archive, are left as they are. ``--continue`` is thus also needed to restore files into an
         existing directory tree. Note that a file that was damaged without a change of its size
         and modification time (e.g. by bit rot) is skipped, not replaced: remove it before

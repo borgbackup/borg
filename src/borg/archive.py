@@ -1031,6 +1031,8 @@ Duration: {0.duration}
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
                 # we already have fully extracted this file in a previous run.
+                if pi:
+                    pi.show(increase=item.get_size(), info=[remove_surrogates(item.path)])
                 if "hlid" not in item or not has_link:
                     return  # done!
                 # it is part of a group of hard links, keep the group together:

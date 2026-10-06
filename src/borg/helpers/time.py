@@ -1,6 +1,7 @@
 import os
 import re
 from datetime import UTC, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
 
@@ -92,6 +93,21 @@ def safe_ns(ts):
         return 0
     else:
         return MAX_NS
+
+
+def ns_to_pax_time(ns):
+    """Format a nanoseconds timestamp as an exact decimal seconds string for a tar PAX header."""
+    sign = "-" if ns < 0 else ""
+    s, ns = divmod(abs(ns), 1000000000)
+    return f"{sign}{s}.{ns:09d}"
+
+
+def pax_time_to_ns(value):
+    """Parse a tar PAX header timestamp (decimal seconds string) into nanoseconds, return None if invalid."""
+    try:
+        return safe_ns(int(Decimal(value).scaleb(9)))
+    except (InvalidOperation, ValueError, OverflowError):
+        return None
 
 
 def safe_timestamp(item_timestamp_ns):

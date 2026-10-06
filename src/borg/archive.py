@@ -42,7 +42,7 @@ from .helpers import ArchiveFormatter
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
 from .helpers import StableDict
 from .helpers import bin_to_hex
-from .helpers import safe_ns
+from .helpers import safe_ns, pax_time_to_ns
 from .helpers import ellipsis_truncate, ProgressIndicatorPercent, log_multi, get_progress_dt
 from .helpers import os_open, flags_normal, flags_dir, O_, SpecialFileReader
 from .helpers import MAP_DATA, MAP_ZERO, MAP_SAME, input_map_check_size
@@ -2001,6 +2001,28 @@ class FilesystemObjectProcessors:
                 return status
 
 
+def tar_acl_to_borg(acl):
+    """Convert a POSIX ACL text from a tar PAX header (SCHILY.acl.*) to borg's ACL format.
+
+    Borg separates entries by newlines and appends the numeric uid/gid as a 4th field to
+    named user/group entries (user:name:perms:uid), see acl_get on Linux and FreeBSD.
+    star appends it too, but separates entries by commas. GNU tar separates entries by
+    newlines and does not append the numeric id, so we look it up locally (like borg create
+    does), falling back to the name.
+    """
+    entries = []
+    for entry in acl.replace(",", "\n").split("\n"):
+        entry = entry.split("#", 1)[0].strip()  # remove comments
+        if not entry:
+            continue
+        fields = entry.split(":")
+        if len(fields) == 3 and fields[1] and fields[0] in ("user", "group"):
+            name = fields[1]
+            fields.append(str(user2uid(name, name) if fields[0] == "user" else group2gid(name, name)))
+        entries.append(":".join(fields))
+    return "\n".join(entries).encode("utf-8", errors="surrogateescape")
+
+
 class TarfileObjectProcessors:
     def __init__(
         self,
@@ -2058,27 +2080,28 @@ class TarfileObjectProcessors:
             if tarinfo.gname:
                 item.group = tarinfo.gname
             if ph:
-                # note: for mtime this is a bit redundant as it is already done by tarfile module,
-                #       but we just do it in our way to be consistent for sure.
+                # the tarfile module only gives us float timestamps, parse the original strings for full precision.
                 for name in "atime", "ctime", "mtime":
                     if name in ph:
-                        ns = s_to_ns(ph[name])
-                        setattr(item, name, ns)
+                        ns = pax_time_to_ns(ph[name])
+                        if ns is not None:
+                            setattr(item, name, ns)
                 xattrs = StableDict()
                 for key, value in ph.items():
                     if key.startswith(SCHILY_XATTR):
                         key = key.removeprefix(SCHILY_XATTR)
+                        if key.startswith("system.posix_acl_"):
+                            # like borg create, we store the POSIX ACLs separately, not as xattrs.
+                            continue
                         # the tarfile code gives us str keys and str values,
                         # but we need bytes keys and bytes values.
                         bkey = key.encode("utf-8", errors="surrogateescape")
                         bvalue = value.encode("utf-8", errors="surrogateescape")
                         xattrs[bkey] = bvalue
                     elif key == SCHILY_ACL_ACCESS:
-                        # Process POSIX access ACL
-                        item.acl_access = value.encode("utf-8", errors="surrogateescape")
+                        item.acl_access = tar_acl_to_borg(value)
                     elif key == SCHILY_ACL_DEFAULT:
-                        # Process POSIX default ACL
-                        item.acl_default = value.encode("utf-8", errors="surrogateescape")
+                        item.acl_default = tar_acl_to_borg(value)
                 if xattrs:
                     item.xattrs = xattrs
         if self.strip_components:

@@ -23,6 +23,9 @@ Examples
     root-2016-02-14  root-2016-02-15
     $ borg umount /tmp/mymountpoint
 
+    # The archive_dir_format mount option does the same, e.g. for fstab / autofs entries:
+    $ borg mount -o 'archive_dir_format={name}-{time:%Y-%m-%d}' /tmp/mymountpoint
+
     # The "versions view" merges all archives in the repository
     # and provides a versioned view on files.
     $ borg mount -o versions /tmp/mymountpoint

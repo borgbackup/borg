@@ -66,7 +66,9 @@ class VFSOptions:
     *numeric_ids*, *uid_forced*, *gid_forced* and *umask* control the ownership and
     permissions mapping, *strip_components* and *item_filter* which items are shown,
     *allow_damaged_files* whether reads of files with missing or corrupted chunks return
-    zeros instead of failing, and *dir_item* is the item used for synthesized directories.
+    zeros instead of failing, *archive_dir_format* how the archive directories are named
+    (None: as given by BORG_MOUNT_ARCHIVE_DIR_FORMAT) and *dir_item* is the item used for
+    synthesized directories.
     """
 
     def __init__(
@@ -80,6 +82,7 @@ class VFSOptions:
         allow_damaged_files=False,
         strip_components=0,
         item_filter=None,
+        archive_dir_format=None,
         dir_item=None,
     ):
         self.versions = versions
@@ -90,6 +93,7 @@ class VFSOptions:
         self.allow_damaged_files = allow_damaged_files
         self.strip_components = strip_components
         self.item_filter = item_filter
+        self.archive_dir_format = archive_dir_format
         self.dir_item = dir_item
 
 
@@ -263,12 +267,15 @@ class ArchiveVFS:
 
     def _archive_dir_names(self, archives):
         """The root directory names of *archives*, see BORG_MOUNT_ARCHIVE_DIR_FORMAT (borg mount --help)."""
-        format = os.environ.get("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{name}")
+        if self.options.archive_dir_format is not None:
+            format, source = self.options.archive_dir_format, "archive_dir_format mount option"
+        else:
+            format, source = os.environ.get("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{name}"), "BORG_MOUNT_ARCHIVE_DIR_FORMAT"
         try:
             formatter = ArchiveFormatter(format, self.repository, self.manifest, self.manifest.key)
             names = [formatter.format_item(archive) for archive in archives]
         except (CommandError, ValueError) as err:  # unknown placeholder, malformed format string / format spec
-            raise Error(f"BORG_MOUNT_ARCHIVE_DIR_FORMAT: {err}") from None
+            raise Error(f"{source}: {err}") from None
         # "/" and NUL can not be part of a directory name
         return [name.replace("/", "_").replace("\0", "_") for name in names]
 
@@ -731,14 +738,15 @@ def parse_mount_options(args, mountpoint, mount_options):
         uid_forced = pop_option(options, "uid", None, None, int)
         gid_forced = pop_option(options, "gid", None, None, int)
         default_dir_uid, default_dir_gid = os.getuid(), os.getgid()
-    # the strip_components and numeric_ids mount options are for fstab / autofs entries,
-    # which can only give mount options.
+    # the strip_components, numeric_ids and archive_dir_format mount options are for fstab / autofs
+    # entries, which can only give mount options.
     strip_components = pop_option(options, "strip_components", None, None, int)
     if strip_components is None:
         strip_components = getattr(args, "strip_components", 0)
     numeric_ids = pop_option(options, "numeric_ids", True, None, bool)
     if numeric_ids is None:
         numeric_ids = getattr(args, "numeric_ids", False)
+    archive_dir_format = pop_option(options, "archive_dir_format", None, None, str)
     vfs_options = VFSOptions(
         allow_damaged_files=pop_option(options, "allow_damaged_files", True, False, bool),
         versions=pop_option(options, "versions", True, False, bool),
@@ -748,6 +756,7 @@ def parse_mount_options(args, mountpoint, mount_options):
         numeric_ids=numeric_ids,
         strip_components=strip_components,
         item_filter=build_item_filter(args, strip_components),
+        archive_dir_format=archive_dir_format,
     )
     dir_uid = vfs_options.uid_forced if vfs_options.uid_forced is not None else default_dir_uid
     dir_gid = vfs_options.gid_forced if vfs_options.gid_forced is not None else default_dir_gid

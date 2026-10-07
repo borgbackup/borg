@@ -166,6 +166,17 @@ def test_parse_mount_options_numeric_ids(cli_numeric_ids, mount_options, expecte
 
 @pytest.mark.parametrize(
     "mount_options, expected",
+    [(None, None), ("allow_other", None), ("archive_dir_format={name}-{time:%Y-%m-%d}", "{name}-{time:%Y-%m-%d}")],
+)
+def test_parse_mount_options_archive_dir_format(mount_options, expected):
+    options, vfs_options = parse_mount_options(MountArgs(), "/mnt/point", mount_options)
+    # archive_dir_format is implemented by borg, so it is not passed on to libfuse.
+    assert not [option for option in options if option.startswith("archive_dir_format")]
+    assert vfs_options.archive_dir_format == expected
+
+
+@pytest.mark.parametrize(
+    "mount_options, expected",
     [
         (None, ["uid=-1", "gid=-1"]),  # default: everything belongs to the user who mounts
         # what the user gives comes after the defaults, WinFsp uses the later ones:

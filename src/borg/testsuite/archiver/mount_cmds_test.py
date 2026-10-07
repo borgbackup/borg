@@ -6,6 +6,7 @@
 
 import errno
 import os
+import shlex
 import stat
 import sys
 import time
@@ -27,6 +28,7 @@ from ..repository_test import corrupt_chunk_on_disk
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 from . import Archiver
+from ...archiver.mount_cmds import use_passcommand_mount_option
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -679,3 +681,74 @@ def test_borg_mount_has_no_repository_positional():
     assert args.mountpoint == "/mnt/point"
     assert args.paths == ["some/path"]
     assert not args.location.valid
+
+
+def print_passphrase_command(passphrase):
+    """Return a passcommand printing *passphrase* (shlex syntax, run without a shell, no commas)."""
+    python = sys.executable.replace("\\", "/")  # see set_empty_passphrase
+    return f"{shlex.quote(python)} -c \"print('{passphrase}')\""
+
+
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+def test_fuse_passcommand_mount_option(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive")
+    passphrase = os.environ["BORG_PASSPHRASE"]
+    monkeypatch.delenv("BORG_PASSPHRASE")
+    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
+    with fuse_mount(archiver, mountpoint, "-o", f"passcommand={print_passphrase_command(passphrase)}"):
+        assert os.listdir(mountpoint) == ["archive"]
+
+
+class PasscommandArgs:
+    """Minimal stand-in for the parsed borg mount arguments."""
+
+    def __init__(self, options):
+        self.options = options
+
+
+@pytest.fixture
+def no_passphrase_env(monkeypatch):
+    for var in "BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD":
+        monkeypatch.delenv(var, raising=False)
+
+
+@pytest.mark.parametrize(
+    "options, remaining",
+    [
+        ("passcommand=/usr/local/sbin/pass backup1", None),
+        ("allow_other,passcommand=/usr/local/sbin/pass backup1,versions", "allow_other,versions"),
+    ],
+)
+def test_passcommand_mount_option(no_passphrase_env, options, remaining):
+    args = PasscommandArgs(options)
+    use_passcommand_mount_option(args)
+    # it is not a FUSE mount option, so it must not stay in the mount options:
+    assert args.options == remaining
+    assert os.environ["BORG_PASSCOMMAND"] == "/usr/local/sbin/pass backup1"
+
+
+@pytest.mark.parametrize("options", [None, "", "allow_other,versions"])
+def test_passcommand_mount_option_not_given(no_passphrase_env, options):
+    args = PasscommandArgs(options)
+    use_passcommand_mount_option(args)
+    assert args.options == options
+    assert "BORG_PASSCOMMAND" not in os.environ
+
+
+@pytest.mark.parametrize("options", ["passcommand", "passcommand="])
+def test_passcommand_mount_option_empty(no_passphrase_env, options):
+    with pytest.raises(RTError, match="no command given"):
+        use_passcommand_mount_option(PasscommandArgs(options))
+    assert "BORG_PASSCOMMAND" not in os.environ
+
+
+@pytest.mark.parametrize("var", ["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"])
+def test_passcommand_mount_option_exclusive(no_passphrase_env, monkeypatch, var):
+    # like the passphrase environment variables, the passcommand mount option is mutually exclusive with them.
+    monkeypatch.setenv(var, "0")
+    args = PasscommandArgs("allow_other,passcommand=/usr/local/sbin/pass")
+    with pytest.raises(RTError, match=f"The passcommand mount option and {var} are mutually exclusive"):
+        use_passcommand_mount_option(args)
+    assert os.environ[var] == "0"

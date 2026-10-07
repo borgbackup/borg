@@ -424,6 +424,37 @@ needs to be ascertained and fixed.
 issues. We recommend to first run without ``--repair`` to assess the situation.
 If the found issues and proposed repairs seem right, re-run "check" with ``--repair`` enabled.
 
+The recommended order of operations is:
+
+1. Run ``borg check`` without ``--repair``. It only reads the repository and reports
+   the extent of the damage: corrupt or missing packs, missing chunks and the files
+   and archives that reference them.
+
+2. Run ``borg check --repair``, preferably after making a copy of the repository.
+
+   At the repository level, it salvages each corrupt pack: the pack is replaced by one
+   holding only the objects whose header, metadata and data still authenticate with
+   the key. It rebuilds the chunk index and removes the index entries of the chunks
+   stored in missing packs.
+
+   At the archive level, it might remove archives whose archive metadata chunk is
+   corrupt or lost, and it reports the files that reference missing chunks.
+
+3. Run another backup of the same data. A file in an archive refers to its content
+   chunks by their ids, so a missing chunk that ``borg create`` stores again makes
+   every archive referencing it complete again at once. A following ``borg check``
+   reports the chunks that are still missing.
+
+4. Chunks that are still missing then belong to data that is permanently lost.
+   ``borg extract`` writes all-zero data in place of such a chunk and reports the
+   affected file with a warning. To get rid of the affected files, remove them from
+   the archives with :ref:`borg_recreate`. Always look at what would be removed first::
+
+       borg -r REPO recreate --dry-run --list --exclude 'path/to/damaged-file'
+
+   If the output is as intended, run the same command without ``--dry-run``.
+   Excluding files only rewrites archive metadata, so this is comparatively fast.
+
 How probable is it to get a hash collision problem?
 ---------------------------------------------------
 

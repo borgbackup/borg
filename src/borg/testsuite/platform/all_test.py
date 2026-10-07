@@ -1,6 +1,10 @@
 import io
+import os
 
-from ...platform import swidth, SyncFile
+import pytest
+
+from ...platform import swidth, SyncFile, on_different_mounts
+from ...platformflags import is_win32
 
 
 def test_swidth_ascii():
@@ -38,3 +42,23 @@ def test_syncfile_close_idempotent(tmp_path):
     sf.write(b"data")
     sf.close()
     sf.close()  # must not raise
+
+
+@pytest.mark.skipif(is_win32, reason="can not open directories on windows")
+def test_on_different_mounts(tmp_path):
+    (tmp_path / "subdir").mkdir()
+    # a directory that is usually a separately mounted filesystem (devtmpfs, devfs, procfs, tmpfs, ...):
+    other_mount = next((p for p in ("/dev", "/proc", "/tmp") if os.stat(p).st_dev != os.stat("/").st_dev), None)
+    fds = {}
+    try:
+        for path in "/", other_mount, tmp_path, tmp_path / "subdir":
+            if path is not None:
+                fds[path] = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        assert on_different_mounts(fds[tmp_path], fds[tmp_path / "subdir"]) is False
+        assert on_different_mounts(fds[tmp_path], fds[tmp_path]) is False
+        if other_mount is None:
+            pytest.skip("found no separately mounted filesystem")
+        assert on_different_mounts(fds["/"], fds[other_mount]) is True
+    finally:
+        for fd in fds.values():
+            os.close(fd)

@@ -35,7 +35,7 @@ from .helpers import HardLinkManager
 from .helpers import archive_hostname, archive_username
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec, sig_int
-from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
+from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns, on_different_mounts
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import ArchiveFormatter
@@ -347,6 +347,27 @@ def stat_update_check(st_old, st_curr):
         return StatOrigAtime(st_curr, st_old)
     # looks ok, we are still dealing with the same thing - return current stat:
     return st_curr
+
+
+def is_automount(st_old, st_curr, parent_fd, fd):
+    """
+    Check whether opening the directory triggered an automount, see #6652.
+
+    stat() does not trigger an automount (e.g. autofs, systemd automount units or the ZFS
+    snapshot directories in .zfs/snapshot), but opening the directory does. st_old is then the
+    stat of the automount point and st_curr (the fstat() of fd) is the stat of the root directory
+    of the filesystem that got mounted there, so they look like a different inode.
+
+    We only accept this if both are directories and if fd (the opened directory) is on a
+    different mount than parent_fd (its parent directory).
+    """
+    if parent_fd is None or fd is None:
+        return False
+    if not (stat.S_ISDIR(st_old.st_mode) and stat.S_ISDIR(st_curr.st_mode)):
+        return False
+    if st_old.st_ino == st_curr.st_ino and st_old.st_dev == st_curr.st_dev:
+        return False
+    return on_different_mounts(parent_fd, fd) is True
 
 
 @contextmanager

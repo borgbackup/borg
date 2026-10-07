@@ -1568,6 +1568,56 @@ def test_create_exclude_dataless(archivers, request, monkeypatch):
     assert "A input/cloudfile" in output
 
 
+@pytest.mark.skipif(is_win32, reason="no fd-based directory checks on windows")
+@pytest.mark.parametrize("mounted", [False, True])
+@pytest.mark.parametrize("one_file_system", [False, True])
+def test_create_automount(archivers, request, monkeypatch, mounted, one_file_system):
+    """Opening an automount point mounts a filesystem there, so stat and fstat differ, see #6652."""
+    import borg.archive as archive_module
+    import borg.archiver.create_cmd as create_cmd_module
+    from ...helpers import BackupRaceConditionError
+
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    create_regular_file(archiver.input_path, "automnt/file", contents=b"hello")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    class AutomountPointStat:
+        # stat() of an automount point: a different inode (here even on a different st_dev, like
+        # for an autofs direct mount) than the root directory of the filesystem mounted there.
+        def __init__(self, st):
+            self._st = st
+            self.st_ino = st.st_ino + 1000000
+            self.st_dev = st.st_dev + 1
+
+        def __getattr__(self, name):
+            return getattr(self._st, name)
+
+    real_os_stat = create_cmd_module.os_stat
+
+    def fake_os_stat(*, path=None, parent_fd=None, name=None, follow_symlinks=False):
+        st = real_os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=follow_symlinks)
+        return AutomountPointStat(st) if name == "automnt" else st
+
+    monkeypatch.setattr(create_cmd_module, "os_stat", fake_os_stat)
+    monkeypatch.setattr(archive_module, "on_different_mounts", lambda fd1, fd2: mounted)
+    args = ["create", "--list", "test", "input"] + (["--one-file-system"] if one_file_system else [])
+    if mounted:
+        # we archive the mounted filesystem and recurse into it (because it is on the same st_dev as
+        # input, even with --one-file-system - the automount point would have been on another st_dev).
+        output = cmd(archiver, *args)
+        assert "race condition" not in output
+        assert "input/automnt/file" in cmd(archiver, "list", "test", "--short")
+    else:
+        # no mount there, so this is a real race condition and we skip the directory.
+        exc = BackupRaceConditionError("file inode changed (race condition), skipping file")
+        output = cmd(archiver, *args, exit_code=BackupWarning("input/automnt", exc).exit_code)
+        assert "input/automnt: file type or inode changed" in output
+        assert "E input/automnt\n" in output
+        assert "input/automnt" not in cmd(archiver, "list", "test", "--short")
+
+
 def test_exclude_nodump_dir_with_file(archivers, request):
     """A directory flagged NODUMP and its contents must not be archived."""
     archiver = request.getfixturevalue(archivers)

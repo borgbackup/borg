@@ -25,6 +25,7 @@ if is_linux:  # pragma: linux only
     from .linux import acl_get, acl_set
     from .linux import acl_text_to_xattr  # type: ignore[no-redef]
     from .linux import set_flags, get_flags
+    from .linux import on_different_mounts
     from .linux import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -34,6 +35,7 @@ elif is_freebsd:  # pragma: freebsd only
     from .freebsd import listxattr, getxattr, setxattr
     from .freebsd import acl_get, acl_set
     from .freebsd import set_flags
+    from .base import on_different_mounts
     from .base import get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
@@ -44,6 +46,7 @@ elif is_netbsd:  # pragma: netbsd only
     from .netbsd import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
+    from .base import on_different_mounts
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -54,6 +57,7 @@ elif is_darwin:  # pragma: darwin only
     from .darwin import acl_get, acl_set
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
     from .darwin import set_flags
+    from .base import on_different_mounts
     from .darwin import fdatasync, sync_dir  # type: ignore[no-redef]
     from .base import get_flags
     from .base import SyncFile
@@ -65,6 +69,7 @@ elif is_sunos:  # pragma: sunos only
     from .solaris import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
+    from .base import on_different_mounts
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -75,6 +80,7 @@ elif not is_win32:  # pragma: posix only
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
+    from .base import on_different_mounts
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -85,6 +91,7 @@ else:  # pragma: win32 only
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
+    from .base import on_different_mounts
     from .windows import SyncFile
     from .windows import set_times  # type: ignore[no-redef]
     from .windows import process_alive, local_pid_alive

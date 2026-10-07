@@ -1454,7 +1454,7 @@ class FailingPackStore:
         return getattr(self._inner, name)
 
 
-@pytest.mark.parametrize("value", ["0", "-1", "abc", str(MAX_PACK_SIZE_LIMIT), ""])
+@pytest.mark.parametrize("value", ["0", "-1", "abc", str(MAX_PACK_SIZE_LIMIT)])
 def test_borg_pack_max_size_rejected(tmp_path, monkeypatch, value):
     with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
         pass
@@ -1483,7 +1483,7 @@ def test_borg_pack_max_size_just_below_limit(tmp_path, monkeypatch):
         assert repository.pack_max_size == accepted
 
 
-@pytest.mark.parametrize("value", ["0", "-1", "nope", ""])
+@pytest.mark.parametrize("value", ["0", "-1", "nope"])
 def test_borg_pack_max_count_rejected(tmp_path, monkeypatch, value):
     with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
         pass
@@ -1509,6 +1509,17 @@ def test_borg_pack_limits_default_when_unset(tmp_path, monkeypatch):
         pass
     monkeypatch.delenv("BORG_PACK_MAX_COUNT", raising=False)
     monkeypatch.delenv("BORG_PACK_MAX_SIZE", raising=False)
+    with reopen(repository) as repository:
+        assert repository._pack_writer.max_count is None
+        assert repository._pack_writer.max_size == DEFAULT_PACK_MAX_SIZE
+        assert repository.pack_max_size == DEFAULT_PACK_MAX_SIZE
+
+
+def test_borg_pack_limits_empty_means_unset(tmp_path, monkeypatch):
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        pass
+    monkeypatch.setenv("BORG_PACK_MAX_COUNT", "")
+    monkeypatch.setenv("BORG_PACK_MAX_SIZE", "")
     with reopen(repository) as repository:
         assert repository._pack_writer.max_count is None
         assert repository._pack_writer.max_size == DEFAULT_PACK_MAX_SIZE

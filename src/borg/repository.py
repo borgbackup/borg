@@ -987,13 +987,14 @@ class Repository:
         # pack-sizing overrides: BORG_PACK_MAX_COUNT sets the max object count per pack,
         # BORG_PACK_MAX_SIZE the max pack size in bytes. Default: size-bound only.
         # They are validated here, so a bad value fails before the store is created, opened or locked.
-        # A non-integer or non-positive value is rejected. The size must also stay below
+        # An empty value counts as unset, like BORG_PACK_CACHE_SIZE. A non-integer or non-positive
+        # value is rejected. The size must also stay below
         # MAX_PACK_SIZE_LIMIT: add() keeps the object that crosses the cap, so this keeps packs
         # below 2 GiB, clear of OS bugs with files of 2 GiB or more. Count-only mode still passes
         # that ceiling (minus one) as max_size. pack_max_size remembers the configured size, or the
         # default when the user did not set one, so the safety ceiling does not become the compact target.
-        max_count_env = os.environ.get("BORG_PACK_MAX_COUNT")
-        max_size_env = os.environ.get("BORG_PACK_MAX_SIZE")
+        max_count_env = os.environ.get("BORG_PACK_MAX_COUNT") or None
+        max_size_env = os.environ.get("BORG_PACK_MAX_SIZE") or None
         if max_count_env is None:
             max_count = None
         else:

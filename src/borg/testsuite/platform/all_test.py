@@ -48,7 +48,8 @@ def test_syncfile_close_idempotent(tmp_path):
 def test_on_different_mounts(tmp_path):
     (tmp_path / "subdir").mkdir()
     # a directory that is usually a separately mounted filesystem (devtmpfs, devfs, procfs, tmpfs, ...):
-    other_mount = next((p for p in ("/dev", "/proc", "/tmp") if os.stat(p).st_dev != os.stat("/").st_dev), None)
+    candidates = [p for p in ("/dev", "/proc", "/tmp") if os.path.isdir(p)]
+    other_mount = next((p for p in candidates if os.stat(p).st_dev != os.stat("/").st_dev), None)
     fds = {}
     try:
         for path in "/", other_mount, tmp_path, tmp_path / "subdir":

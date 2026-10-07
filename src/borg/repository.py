@@ -1013,6 +1013,41 @@ class Repository:
         # True if packs are cached locally (BORG_STORE_CACHE): store.load() of a pack may return the cached copy.
         self.uses_pack_store_cache = cache_url is not None
 
+        # pack-sizing overrides: BORG_PACK_MAX_COUNT sets the max object count per pack,
+        # BORG_PACK_MAX_SIZE the max pack size in bytes. Default: size-bound only.
+        # They are validated here, so a bad value fails before the store is created, opened or locked.
+        # An empty value counts as unset, like BORG_PACK_CACHE_SIZE. A non-integer or non-positive
+        # value is rejected. The size must also stay below
+        # MAX_PACK_SIZE_LIMIT: add() keeps the object that crosses the cap, so this keeps packs
+        # below 2 GiB, clear of OS bugs with files of 2 GiB or more. Count-only mode still passes
+        # that ceiling (minus one) as max_size. pack_max_size remembers the configured size, or the
+        # default when the user did not set one, so the safety ceiling does not become the compact target.
+        max_count_env = os.environ.get("BORG_PACK_MAX_COUNT") or None
+        max_size_env = os.environ.get("BORG_PACK_MAX_SIZE") or None
+        if max_count_env is None:
+            max_count = None
+        else:
+            try:
+                max_count = int(max_count_env)
+            except ValueError:
+                raise Error(f"BORG_PACK_MAX_COUNT must be an integer, but is: {max_count_env!r}") from None
+            if max_count <= 0:
+                raise Error(f"BORG_PACK_MAX_COUNT must be positive, but is: {max_count}")
+        self._pack_max_count = max_count
+        if max_size_env is None:
+            self._pack_max_size = (MAX_PACK_SIZE_LIMIT - 1) if max_count is not None else DEFAULT_PACK_MAX_SIZE
+            self._configured_pack_max_size = DEFAULT_PACK_MAX_SIZE
+        else:
+            try:
+                max_size = int(max_size_env)
+            except ValueError:
+                raise Error(f"BORG_PACK_MAX_SIZE must be an integer, but is: {max_size_env!r}") from None
+            if max_size <= 0:
+                raise Error(f"BORG_PACK_MAX_SIZE must be positive, but is: {max_size}")
+            if max_size >= MAX_PACK_SIZE_LIMIT:
+                raise Error(f"BORG_PACK_MAX_SIZE must be below {MAX_PACK_SIZE_LIMIT}, but is: {max_size}")
+            self._pack_max_size = self._configured_pack_max_size = max_size
+
         propagate_rsh()  # borgstore shall use the same remote shell command as borg
 
         try:
@@ -1353,26 +1388,21 @@ class Repository:
             else:
                 self.acquire_lock()
         self._chunks = None
-        # pack-sizing overrides: BORG_PACK_MAX_COUNT sets the max object count per pack,
-        # BORG_PACK_MAX_SIZE the max pack size in bytes. Default: size-bound only.
-        max_count_env = os.environ.get("BORG_PACK_MAX_COUNT")
-        max_size_env = os.environ.get("BORG_PACK_MAX_SIZE")
-        max_count = int(max_count_env) if max_count_env is not None else None
-        if max_size_env is not None:
-            max_size = int(max_size_env)
-        else:
-            max_size = None if max_count is not None else DEFAULT_PACK_MAX_SIZE
         # BORG_PACK_ASYNC=no disables the background store-thread (debugging aid, see PackWriter).
         async_store = os.environ.get("BORG_PACK_ASYNC", "yes") != "no"
         self._pack_writer = PackWriter(
-            self.store, repository=self, max_count=max_count, max_size=max_size, async_store=async_store
+            self.store,
+            repository=self,
+            max_count=self._pack_max_count,
+            max_size=self._pack_max_size,
+            async_store=async_store,
         )
         self.opened = True
 
     @property
     def pack_max_size(self):
-        """The configured byte cap for a pack (BORG_PACK_MAX_SIZE, or the default if count-bound)."""
-        return self._pack_writer.max_size or DEFAULT_PACK_MAX_SIZE
+        """The configured byte cap for a pack (BORG_PACK_MAX_SIZE, or the default if it was not set)."""
+        return self._configured_pack_max_size
 
     @property
     def chunks(self):

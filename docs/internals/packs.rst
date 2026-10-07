@@ -188,7 +188,9 @@ Writing packs
 (``PackWriter``). When the buffered blobs reach the pack limit, the buffer is
 stored as one pack. By default the limit is a size of 50 MB (``DEFAULT_PACK_MAX_SIZE``).
 ``BORG_PACK_MAX_SIZE`` sets the size limit and ``BORG_PACK_MAX_COUNT`` a blob count
-limit; with only ``BORG_PACK_MAX_COUNT`` set, packs are bound by count only, see
+limit. ``BORG_PACK_MAX_SIZE`` must be below ``MAX_PACK_SIZE_LIMIT``, which is
+2126512128 bytes (2 GiB - 20 MiB); with only ``BORG_PACK_MAX_COUNT`` set, packs are
+still capped at ``MAX_PACK_SIZE_LIMIT - 1`` (2126512127) bytes, see
 :ref:`env_vars`. The blob that reaches the limit is part of that pack, so a pack can
 be larger than the size limit by less than one blob.
 

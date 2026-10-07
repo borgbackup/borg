@@ -2574,12 +2574,13 @@ def test_check_archives_records_follow_the_archives_directory(archivers, request
     with open_repository(archiver) as repository:
         old_ids = set(Manifest.load(repository).archives.ids())
         assert {id for id, _ in ArchiveTracker.load(repository).table.items()} == old_ids
-    # the repair rewrites the item metadata with the default ChunkBuffer size, so the archives get new
-    # ids, which it records.
+    # the repair records the archives under the ids they have after it rewrote the item metadata.
     cmd(archiver, "check", "--archives-only", "--repair", exit_code=0)
     with open_repository(archiver) as repository:
         new_ids = set(Manifest.load(repository).archives.ids())
-        assert not new_ids & old_ids
+        if not archiver.EXE:  # borg.exe does not see check_cmd_setup's small ChunkBuffer.BUFFER_SIZE
+            # the rewrite uses the default buffer size, so the item metadata chunks and the ids change.
+            assert not new_ids & old_ids
         assert {id for id, _ in ArchiveTracker.load(repository).table.items()} == new_ids
     assert archive_records(archiver) == {"archive1": 1, "archive2": 1}
     # compact removes the soft-deleted archives, the next check drops their records.

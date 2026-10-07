@@ -339,6 +339,11 @@ class CheckMixIn:
            remove whole archives from the manifest if their archive metadata chunk is
            corrupt or lost. Borg will also report files that reference missing chunks.
 
+        An item's chunk id list always refers to the correct chunks of the file content.
+        Thus, if a later ``borg create`` of the same data stores a missing chunk again,
+        every archive referencing that chunk is complete again at once, without a further
+        ``borg check --repair`` run.
+
         If ``--repair --find-lost-archives`` is given, previously lost entries will
         be recreated in the archive directory. This is only possible before
         ``borg compact`` would remove the archives' data completely.

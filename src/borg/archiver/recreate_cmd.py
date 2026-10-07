@@ -99,10 +99,10 @@ class RecreateMixIn:
         at least the entire deduplicated size of the archives using the previous
         chunker params.
 
-        If your most recent borg check found missing chunks, please first run another
-        backup for the same data, before doing any rechunking. If you are lucky, that
-        will recreate the missing chunks. Optionally, do another borg check to see
-        if the chunks are still missing.
+        If your most recent borg check found missing chunks, first run another backup of
+        the same data, before doing any rechunking. A missing chunk that this backup stores
+        again is picked up by all archives referencing it. A following borg check reports
+        the chunks that are still missing.
         """
         )
         subparser = ArgumentParser(

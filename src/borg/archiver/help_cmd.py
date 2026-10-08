@@ -750,6 +750,9 @@ class HelpMixIn:
                 Set it to ``1`` to use ``$BORG_CACHE_DIR/storecache``, or to a directory path to
                 use that directory (it is created if it does not exist). Packs are named by
                 content hash, so one cache directory can safely hold packs of multiple repositories.
+                ``borg repo-delete`` removes nothing from the cache directory: the cached packs of the
+                deleted repository stay there until they are evicted (see BORG_PACK_CACHE_SIZE) or
+                the directory is removed.
                 If it is not set, no such caching happens.
             BORG_PACK_CACHE_SIZE
                 When set to a numeric value, limit the pack cache to that many bytes.

@@ -997,9 +997,10 @@ class Repository:
         # BORG_STORE_CACHE sets the cache directory ("1" means <cache_dir>/storecache); the
         # directory holds the whole store's cache, currently just the packs/ namespace.
         # BORG_PACK_CACHE_SIZE limits the pack cache size in bytes.
+        # create=True: no cache, Store.create() requires an empty cache directory.
         cache_url = None
         store_cache = os.environ.get("BORG_STORE_CACHE")
-        if store_cache:
+        if store_cache and not create:
             if store_cache == "1":
                 cache_dir = Path(get_cache_dir("storecache"))
             else:
@@ -1123,7 +1124,7 @@ class Repository:
                 self.close(aborting=True)
                 if self.created:
                     # we just created the store, but could not open it: do not leave it behind (see create()).
-                    self.store.destroy()
+                    self._destroy_store()
                 raise
         except StoreBackendError as e:
             if self._location.proto != "ssh":
@@ -1188,7 +1189,7 @@ class Repository:
         except BaseException:
             # do not leave the just created store behind (see above); the original error is what matters.
             try:
-                self.store.destroy()
+                self._destroy_store()
             except Exception as exc:
                 logger.warning("could not remove the incompletely created store: %s", exc)
             raise
@@ -1350,10 +1351,14 @@ class Repository:
         except StoreObjectNotFound:
             pass
 
+    def _destroy_store(self):
+        """Destroy the store's backend. The pack cache directory (BORG_STORE_CACHE) is kept."""
+        self.store.backend.destroy()
+
     def destroy(self):
         """Destroy the repository"""
         self.close()
-        self.store.destroy()
+        self._destroy_store()
 
     def open(self, *, exclusive, lock_wait=None, lock=True):
         assert lock_wait is not None

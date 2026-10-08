@@ -50,7 +50,9 @@ def check_repository_defaults(repository, *, repair):
 
 
 class CheckMixIn:
-    @with_repository(exclusive=True, manifest=False)
+    # store_cache=False: the cached packs are not verified against the repository. check must verify the
+    # packs in the repository, and --repair deletes the objects that fail verification.
+    @with_repository(exclusive=True, manifest=False, store_cache=False)
     def do_check(self, args, repository):
         """Checks repository consistency."""
         if args.repair:
@@ -255,6 +257,9 @@ class CheckMixIn:
         With ``--repair``, ``--verify-data`` removes each chunk that fails the verification twice.
         If the repository holds another copy of such a chunk and that copy passes the
         verification, borg indexes it instead, so the archives referencing the chunk stay intact.
+
+        ``borg check`` always reads the packs from the repository, also if ``BORG_STORE_CACHE``
+        is set.
 
         The ``--find-lost-archives`` option tells Borg to search for lost archive
         metadata. If Borg encounters any archive metadata that does not match an

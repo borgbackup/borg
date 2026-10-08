@@ -11,7 +11,7 @@ from ...manifest import Manifest
 from ...compress import ZSTD, ZLIB, LZ4, CNONE
 from ...archiver.repo_compress_cmd import PackRecompressor
 
-from .. import make_test_key
+from .. import changedir, make_test_key
 from . import create_regular_file, cmd, open_repository, RK_ENCRYPTION
 from ..repository_test import H, accept_all, fchunk, pdchunk, corrupt_chunk_on_disk
 
@@ -426,3 +426,28 @@ def test_transform_pack_unchanged_pack_untouched(tmp_path):
         assert {info.name for info in repository.store_list("packs")} == pack_names_before
         assert pdchunk(repository.get(H(0))) == b"WWWW"
         assert pdchunk(repository.get(H(1))) == b"XXXX"
+
+
+def test_repo_compress_ignores_a_corrupt_store_cache(archiver, monkeypatch):
+    # damaged cached packs, intact repository: repo-compress rewrites the packs from the repository, #10397.
+    create_regular_file(archiver.input_path, "compressible", contents=b"compressible " * 10000)
+    create_regular_file(archiver.input_path, "random", contents=os.urandom(1000000))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # "compressible" is stored lz4-compressed, "random" uncompressed: -C none recompresses "compressible"
+    # and copies "random", which holds the middle of the pack, unchanged into the new pack.
+    cmd(archiver, "create", "test", "input", "-C", "auto,lz4")
+    cache_dir = archiver.tmpdir / "storecache"
+    monkeypatch.setenv("BORG_STORE_CACHE", os.fspath(cache_dir))
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "test")  # fills the store cache
+    cached_packs = [path for path in (cache_dir / "packs").rglob("*") if path.is_file()]
+    assert cached_packs
+    for path in cached_packs:
+        data = bytearray(path.read_bytes())
+        data[len(data) // 2] ^= 0xFF
+        path.write_bytes(data)
+
+    output = cmd(archiver, "repo-compress", "-C", "none", "--stats")
+    assert re.search(r"Packs: \d+ total, [1-9]\d* rewritten", output)
+    output = cmd(archiver, "check", "--verify-data", exit_code=0)
+    assert "integrity error:" not in output

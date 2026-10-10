@@ -1404,8 +1404,9 @@ class AEADKeyBase(KeyBase):
         This does not use or change the key's current session (self.sessionid, self.cipher, the IV counter),
         so it is safe to call from any thread, also concurrently with encrypt(): two threads sharing the
         session's IV counter could otherwise encrypt two messages with the same IV. decrypt() reads the
-        result like any other envelope. Each call derives a new session key, so this is meant for rare,
-        small objects (e.g. the repository lock objects), not for chunks.
+        result like any other envelope. Each call derives a new session key (a few microseconds), so this
+        is meant for objects that are few compared to their size (e.g. the repository lock objects or the
+        ~1 MiB frames of a sealed stream, see sealed_stream.py), not for millions of chunks.
         """
         sessionid = os.urandom(24)
         iv = 0

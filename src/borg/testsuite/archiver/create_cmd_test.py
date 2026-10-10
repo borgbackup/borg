@@ -2061,14 +2061,35 @@ def test_chunkindex_covers_committed_archive(archiver, monkeypatch):
     assert_dirs_equal("input", "output/input")
 
 
-def _remove_files_cache(archiver, archive_name):
-    """Remove the local files cache of an archive series, forcing a rebuild from the repository."""
+def _files_cache_path(archiver, archive_name):
+    """Return the path of the local files cache of an archive series."""
     from ...cache import files_cache_name
     from ...helpers import get_cache_dir
 
     repo_id = json.loads(cmd(archiver, "repo-info", "--json"))["repository"]["id"]
-    cache_file = Path(get_cache_dir(repo_id, create=False)) / files_cache_name(archive_name)
-    cache_file.unlink()
+    return Path(get_cache_dir(repo_id, create=False)) / files_cache_name(archive_name)
+
+
+def _remove_files_cache(archiver, archive_name):
+    """Remove the local files cache of an archive series, forcing a rebuild from the repository."""
+    _files_cache_path(archiver, archive_name).unlink()
+
+
+def test_files_cache_corrupted(archivers, request):
+    """A corrupted files cache is ignored with a warning and rebuilt from the previous archive."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    granularity_sleep()  # file2 must have newer timestamps than file1
+    create_regular_file(archiver.input_path, "file2", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "home", "input")
+    cache_file = _files_cache_path(archiver, "home")
+    data = bytearray(cache_file.read_bytes())
+    data[len(data) // 2] ^= 0x01
+    cache_file.write_bytes(bytes(data))
+    output = cmd(archiver, "create", "--list", "home", "input")  # rc 0: the warning does not change it
+    assert f"Ignoring corrupted files cache {cache_file.name}" in output
+    assert "U input/file1" in output  # known from the files cache rebuilt from the previous archive
 
 
 def test_files_cache_rebuild_ignores_other_hosts(archivers, request, monkeypatch):

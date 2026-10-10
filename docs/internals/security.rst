@@ -42,6 +42,14 @@ includes the store objects borg keeps next to the packs: the chunk index fragmen
 and the per-archive reference caches are encrypted with the key, too, see
 :ref:`store object envelope <store_object_envelope>`.
 
+The client-local files cache (see :ref:`the files cache <cache>`) is protected with
+the key as well, as a :ref:`sealed stream <sealed_stream>`: someone who can read the
+borg cache directory, but does not have the key, can not read the file sizes,
+timestamps, chunk lists and content digests stored in it (in the encrypting modes),
+and a files cache that was modified is detected in all modes (it is ignored with a
+warning and rebuilt). The names, sizes and timestamps of the files cache files are
+not protected.
+
 The attacker can always impose a denial of service by definition (they could
 block connections to the repository, or delete it partly or entirely).
 

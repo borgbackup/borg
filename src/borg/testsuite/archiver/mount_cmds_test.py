@@ -339,6 +339,9 @@ def test_fuse_archive_dir_format(archivers, request, monkeypatch):
     monkeypatch.setenv("BORG_MOUNT_ARCHIVE_DIR_FORMAT", "{hostname}")
     with fuse_mount(archiver, mountpoint):
         assert set(os.listdir(mountpoint)) == {f"{hostname}-{id[:8]}" for name, hostname, id in archives}
+    # the archive_dir_format mount option does the same, it wins over BORG_MOUNT_ARCHIVE_DIR_FORMAT:
+    with fuse_mount(archiver, mountpoint, "-o", "archive_dir_format={name}-{id}"):
+        assert set(os.listdir(mountpoint)) == {f"{name}-{id}" for name, hostname, id in archives}
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")

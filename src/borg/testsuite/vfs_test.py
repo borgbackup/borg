@@ -131,6 +131,51 @@ def test_parse_mount_options_posix(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    "cli_strip_components, mount_options, expected",
+    [(0, None, 0), (2, None, 2), (0, "strip_components=3", 3), (2, "strip_components=3", 3)],
+)
+def test_parse_mount_options_strip_components(cli_strip_components, mount_options, expected):
+    args = MountArgs()
+    args.strip_components = cli_strip_components
+    options, vfs_options = parse_mount_options(args, "/mnt/point", mount_options)
+    # strip_components is implemented by borg, so it is not passed on to libfuse.
+    assert not [option for option in options if option.startswith("strip_components")]
+    assert vfs_options.strip_components == expected
+    # the item filter also uses it: it skips paths with no more than strip_components elements.
+    assert vfs_options.item_filter(Item(path="a/b/c")) == (expected < 3)
+
+
+@pytest.mark.parametrize(
+    "cli_numeric_ids, mount_options, expected",
+    [
+        (False, None, False),
+        (True, None, True),
+        (False, "numeric_ids", True),
+        (False, "numeric_ids=yes", True),
+        (True, "numeric_ids=no", False),
+    ],
+)
+def test_parse_mount_options_numeric_ids(cli_numeric_ids, mount_options, expected):
+    args = MountArgs()
+    args.numeric_ids = cli_numeric_ids
+    options, vfs_options = parse_mount_options(args, "/mnt/point", mount_options)
+    # numeric_ids is implemented by borg, so it is not passed on to libfuse.
+    assert not [option for option in options if option.startswith("numeric_ids")]
+    assert vfs_options.numeric_ids is expected
+
+
+@pytest.mark.parametrize(
+    "mount_options, expected",
+    [(None, None), ("allow_other", None), ("archive_dir_format={name}-{time:%Y-%m-%d}", "{name}-{time:%Y-%m-%d}")],
+)
+def test_parse_mount_options_archive_dir_format(mount_options, expected):
+    options, vfs_options = parse_mount_options(MountArgs(), "/mnt/point", mount_options)
+    # archive_dir_format is implemented by borg, so it is not passed on to libfuse.
+    assert not [option for option in options if option.startswith("archive_dir_format")]
+    assert vfs_options.archive_dir_format == expected
+
+
+@pytest.mark.parametrize(
     "mount_options, expected",
     [
         (None, ["uid=-1", "gid=-1"]),  # default: everything belongs to the user who mounts

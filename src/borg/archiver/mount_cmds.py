@@ -93,10 +93,10 @@ class MountMixIn:
         By default, these top directories are named like the archives; as the archives
         of a series all have the same name, ``-{id:.8}`` (the first 8 hex digits of the
         archive id) is appended whenever a name is not unique. To name them differently,
-        set the ``BORG_MOUNT_ARCHIVE_DIR_FORMAT`` environment variable to a format string
-        using the placeholders of ``borg repo-list --format``, e.g.
-        ``{name}-{time:%Y-%m-%dT%H:%M:%S}`` or ``{hostname}-{name}``; names that are
-        still not unique get ``-{id:.8}`` appended.
+        set the ``BORG_MOUNT_ARCHIVE_DIR_FORMAT`` environment variable (or the
+        ``archive_dir_format`` mount option) to a format string using the placeholders
+        of ``borg repo-list --format``, e.g. ``{name}-{time:%Y-%m-%dT%H:%M:%S}`` or
+        ``{hostname}-{name}``; names that are still not unique get ``-{id:.8}`` appended.
 
         .. note::
 
@@ -142,8 +142,8 @@ class MountMixIn:
 
         Borg's default behavior is to use the archived user and group names of each
         file and map them to the system's respective user and group IDs.
-        Alternatively, using ``numeric-ids`` will instead use the archived user and
-        group IDs without any mapping.
+        Alternatively, using ``--numeric-ids`` (or the ``numeric_ids`` mount option)
+        will instead use the archived user and group IDs without any mapping.
 
         The ``uid`` and ``gid`` mount options (implemented by Borg) can be used to
         override the user and group IDs of all files (i.e., ``borg mount -o
@@ -167,6 +167,14 @@ class MountMixIn:
         - ``ignore_permissions``: for security reasons the ``default_permissions`` mount
           option is internally enforced by Borg. ``ignore_permissions`` can be given to
           not enforce ``default_permissions``.
+        - ``strip_components=NUMBER``: same as ``--strip-components NUMBER``; useful for
+          fstab / autofs entries, which can only give mount options. If both are given,
+          the mount option is used.
+        - ``numeric_ids``: same as ``--numeric-ids``; useful for fstab / autofs entries.
+          ``numeric_ids=no`` overrides ``--numeric-ids``.
+        - ``archive_dir_format=FORMAT``: same as ``BORG_MOUNT_ARCHIVE_DIR_FORMAT=FORMAT``;
+          useful for fstab / autofs entries. If both are given, the mount option is used.
+          As mount options are separated by commas, FORMAT can not contain a comma.
 
         On Windows, ``borg mount`` needs `WinFsp <https://winfsp.dev/>`_ and mfusepy.
         MOUNTPOINT must either be an unused drive (like ``X:``) or a not yet existing

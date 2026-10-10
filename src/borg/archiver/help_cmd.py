@@ -991,7 +991,8 @@ class HelpMixIn:
                 Giving the format of the archive directory names when ``borg mount`` or
                 ``borg webdav`` show a whole repository, default: ``{name}``. The placeholders
                 are the ones of ``borg repo-list --format``; names that are not unique get
-                ``-{id:.8}`` appended. See ``borg mount --help``.
+                ``-{id:.8}`` appended. ``borg mount`` also has an ``archive_dir_format`` mount
+                option for this, which overrides this variable. See ``borg mount --help``.
             BORG_JSON_INDENT
                 Indentation of the ``--json`` output (default: ``4``).
                 A number gives that many spaces per nesting level (``0`` still puts every item on

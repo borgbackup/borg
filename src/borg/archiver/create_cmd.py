@@ -230,7 +230,6 @@ class CreateMixIn:
                         with backup_io("stat"):
                             # symlinks given this way are never followed, see #4737.
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
-                            st = stat_dir_mounted(path, st)
                         status = self._process_any(
                             path=path,
                             parent_fd=None,

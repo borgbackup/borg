@@ -10,6 +10,7 @@ from ..item import Item
 from ..platform import acl_text_to_xattr
 from ..platformflags import is_win32
 from ..vfs import VFSNode, item_getxattr, item_listxattr, lookup_child, parse_mount_options, versioned_name
+from ..vfs import is_borgfs_mount
 from .platform.platform_test import skipif_not_linux
 
 ACCESS_ACL = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:0\ngroup:root:rw-:0\n"
@@ -124,10 +125,57 @@ class MountArgs:
 def test_parse_mount_options_posix(monkeypatch):
     monkeypatch.setattr("borg.vfs.is_win32", False)
     monkeypatch.setattr("borg.vfs.is_darwin", False)
+    monkeypatch.setattr("borg.vfs.is_linux", False)
     options, vfs_options = parse_mount_options(MountArgs(), "/mnt/point", "uid=0,gid=0,allow_other")
     # uid and gid are implemented by borg, so they are not passed on to libfuse.
     assert options == ["fsname=borgfs", "ro", "default_permissions", "allow_other"]
     assert (vfs_options.uid_forced, vfs_options.gid_forced) == (0, 0)
+
+
+@pytest.mark.skipif(is_win32, reason="needs os.getuid / os.getgid")
+def test_parse_mount_options_linux_subtype(monkeypatch):
+    # on Linux, the subtype makes the file system type "fuse.borgfs", so the mount can be recognized
+    # (is_borgfs_mount) even if the user overrides fsname.
+    monkeypatch.setattr("borg.vfs.is_win32", False)
+    monkeypatch.setattr("borg.vfs.is_darwin", False)
+    monkeypatch.setattr("borg.vfs.is_linux", True)
+    options, vfs_options = parse_mount_options(MountArgs(), "/mnt/point", "fsname=other")
+    assert options == ["fsname=borgfs", "ro", "default_permissions", "subtype=borgfs", "fsname=other"]
+
+
+@pytest.mark.parametrize(
+    "source, fstype, expected",
+    [
+        ("borgfs", "fuse.borgfs", True),  # Linux
+        ("other", "fuse.borgfs", True),  # Linux, -o fsname=other
+        ("borgfs", "fuse", True),  # illumos (and Linux before subtype=borgfs was given)
+        ("borgfs", "macfuse", True),  # macOS
+        ("borgfs", "fusefs", True),  # FreeBSD
+        ("/dev/puffs", "puffs|borgfs", True),  # NetBSD: the fsname ends up in the fstype
+        ("/dev/puffs", "puffs|sshfs", False),
+        ("sshfs#user@host:", "fuse.sshfs", False),
+        ("/dev/sda1", "ext4", False),
+        ("borgfs", "nfs", True),  # the rule only looks at the names, not at the plausibility
+    ],
+)
+def test_is_borgfs_mount(monkeypatch, source, fstype, expected):
+    monkeypatch.setattr("borg.vfs.is_win32", False)
+    assert is_borgfs_mount(source, fstype) is expected
+
+
+@pytest.mark.parametrize(
+    "source, fstype, expected",
+    [
+        ("point (borgfs)", "FUSE", True),  # the default volname for a directory mountpoint
+        ("borgfs", "FUSE", True),  # the default volname for a drive mountpoint
+        ("backup", "FUSE", False),  # -o volname=backup
+        ("Windows", "NTFS", False),
+        ("borgfs", "NTFS", False),
+    ],
+)
+def test_is_borgfs_mount_win32(monkeypatch, source, fstype, expected):
+    monkeypatch.setattr("borg.vfs.is_win32", True)
+    assert is_borgfs_mount(source, fstype) is expected
 
 
 @pytest.mark.parametrize(

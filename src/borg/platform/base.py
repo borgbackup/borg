@@ -9,7 +9,10 @@ import uuid
 from pathlib import Path
 
 from ..helpers import safe_unlink
+from ..logger import create_logger
 from ..platformflags import is_win32
+
+logger = create_logger()
 
 """
 platform base module
@@ -148,6 +151,17 @@ def set_flags(path, bsd_flags, fd=None):
 def get_flags(path, st, fd=None):
     """Return BSD-style file flags for path or stat without following symlinks."""
     return getattr(st, "st_flags", 0)
+
+
+def list_mounts():
+    """
+    Return the mount table: a list of MountEntry (source, fstype, mountpoint) tuples, one per
+    mounted file system, as the OS reports them (see platform/mounts.py for the per-OS details).
+
+    Not supported on this platform: returns an empty list after warning about it.
+    """
+    logger.warning("Listing the mounted file systems is not supported on this platform.")
+    return []
 
 
 def set_times(path, *, atime_ns, mtime_ns, birthtime_ns=None, fd=None, follow_symlinks=True):

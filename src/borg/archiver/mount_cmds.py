@@ -5,9 +5,10 @@ from ..constants import *  # NOQA
 from ..helpers import RTError
 from ..helpers import PathSpec, FilesystemDirSpec
 from ..helpers import location_validator
-from ..helpers import umount
+from ..helpers import umount, json_print
 from ..helpers.argparsing import ArgumentParser
 from ..platformflags import is_win32
+from .. import platform
 
 from ..logger import create_logger
 
@@ -38,9 +39,26 @@ def use_passcommand_mount_option(args):
     os.environ["BORG_PASSCOMMAND"] = passcommand
 
 
+def list_borgfs_mounts():
+    """Return the mount table entries of the file systems mounted by borg mount, see platform.list_mounts()."""
+    from ..vfs import is_borgfs_mount
+
+    return [entry for entry in platform.list_mounts() if is_borgfs_mount(entry.source, entry.fstype)]
+
+
 class MountMixIn:
     def do_mount(self, args):
-        """Mounts an archive or an entire repository as a FUSE filesystem."""
+        """Mounts an archive or an entire repository as a FUSE filesystem, or lists the borg mounts."""
+        if args.mountpoint is None:
+            # Just list the mounted borg file systems. This needs neither a repository nor FUSE.
+            mounts = list_borgfs_mounts()
+            if args.json:
+                json_print([entry._asdict() for entry in mounts])
+            else:
+                for entry in mounts:
+                    print(entry.mountpoint)
+            return
+
         # Perform these checks before opening the repository and asking for a passphrase.
 
         from ..fuse_impl import llfuse, has_mfusepy, BORG_FUSE_IMPL, fuse_import_errors
@@ -102,6 +120,13 @@ class MountMixIn:
             """
         This command mounts a repository or an archive as a FUSE filesystem.
         This can be useful for browsing or restoring individual files.
+
+        Without a MOUNTPOINT, it lists the mountpoints of all file systems currently
+        mounted by ``borg mount`` (on Windows: only the mounts on a drive letter, there is
+        no way to find the directory mountpoints), one per line. ``--json`` gives a JSON
+        list instead, with the ``mountpoint``, the ``source`` (what the OS reports as
+        mounted, usually ``borgfs``) and the ``fstype`` (the file system type the OS
+        reports) of each. This does not need a repository or FUSE.
 
         When restoring, take into account that the current FUSE implementation does
         not support special fs flags. On Linux, POSIX ACLs of the archived fs objects
@@ -288,9 +313,22 @@ class MountMixIn:
                 default=None,
                 help="repository to mount (default: as given by -r/--repo or BORG_REPO)",
             )
-        parser.add_argument(
-            "mountpoint", metavar="MOUNTPOINT", type=FilesystemDirSpec, help="where to mount the filesystem"
-        )
+        if borgfs:
+            parser.add_argument(
+                "mountpoint", metavar="MOUNTPOINT", type=FilesystemDirSpec, help="where to mount the filesystem"
+            )
+        else:
+            parser.add_argument(
+                "mountpoint",
+                metavar="MOUNTPOINT",
+                nargs="?",
+                type=FilesystemDirSpec,
+                default=None,
+                help="where to mount the filesystem (default: list the mountpoints of the current borg mounts)",
+            )
+            parser.add_argument(
+                "--json", action="store_true", help="format the list of the current borg mounts as JSON"
+            )
         parser.add_argument(
             "-f", "--foreground", dest="foreground", action="store_true", help="stay in foreground, do not daemonize"
         )

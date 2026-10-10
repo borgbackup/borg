@@ -5,6 +5,7 @@
 # The tox configuration (pyproject.toml) runs these tests with different BORG_FUSE_IMPL settings.
 
 import errno
+import json
 import os
 import shlex
 import stat
@@ -26,9 +27,11 @@ from ..platform.platform_test import fakeroot_detected, skipif_not_linux, skipif
 from ..platform.platform_test import skipif_acls_not_working
 from ..repository_test import corrupt_chunk_on_disk
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
+from . import exec_cmd
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 from . import Archiver
 from ...archiver.mount_cmds import use_passcommand_mount_option
+from ...platform import MountEntry
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -674,6 +677,70 @@ def test_borg_rejects_unknown_config_keys(monkeypatch, tmp_path):
     args = archiver.parse_args(["/path/to/repo", "/mnt/point"])
     assert args.func == archiver.do_mount
     assert args.log_level == "info"
+
+
+# "borg mount" without a MOUNTPOINT lists the mountpoints of the file systems mounted by borg mount:
+# the entries of the mount table (platform.list_mounts) that vfs.is_borgfs_mount recognizes.
+# This needs neither a repository nor FUSE.
+
+FAKE_MOUNT_TABLE = [
+    MountEntry("/dev/sda1", "ext4", "/"),
+    MountEntry("borgfs", "fuse.borgfs", "/mnt/linux"),
+    MountEntry("sshfs#user@host:", "fuse.sshfs", "/mnt/sshfs"),
+    MountEntry("/dev/puffs", "puffs|borgfs", "/mnt/netbsd"),
+]
+
+
+@pytest.fixture
+def fake_mount_table(monkeypatch):
+    monkeypatch.setattr("borg.vfs.is_win32", False)
+    monkeypatch.setattr("borg.platform.list_mounts", lambda: FAKE_MOUNT_TABLE)
+
+
+def test_mount_without_mountpoint_lists_borg_mounts(fake_mount_table):
+    rc, output = exec_cmd("mount", fork=False)
+    assert rc == 0
+    assert output.splitlines() == ["/mnt/linux", "/mnt/netbsd"]
+
+
+def test_mount_without_mountpoint_lists_borg_mounts_json(fake_mount_table):
+    rc, output = exec_cmd("mount", "--json", fork=False)
+    assert rc == 0
+    assert json.loads(output) == [
+        {"source": "borgfs", "fstype": "fuse.borgfs", "mountpoint": "/mnt/linux"},
+        {"source": "/dev/puffs", "fstype": "puffs|borgfs", "mountpoint": "/mnt/netbsd"},
+    ]
+
+
+def test_mount_without_mountpoint_does_not_need_fuse(fake_mount_table, monkeypatch):
+    monkeypatch.setattr("borg.fuse_impl.llfuse", None)
+    monkeypatch.setattr("borg.fuse_impl.has_mfusepy", False)
+    rc, output = exec_cmd("mount", fork=False)
+    assert rc == 0
+    assert output.splitlines() == ["/mnt/linux", "/mnt/netbsd"]
+    # the pre-mount checks (and FUSE) are still needed when a MOUNTPOINT is given.
+    with pytest.raises(RTError, match="no FUSE support"):
+        exec_cmd("mount", "/mnt/point", fork=False)
+
+
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
+@pytest.mark.skipif(is_win32, reason="directory mountpoints can not be listed on Windows")
+def test_fuse_mount_is_listed(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive")
+    mountpoint = os.path.join(archiver.tmpdir, "mount point")
+
+    def listed_mountpoints():
+        # the OS might show the mountpoint with symlinks resolved (e.g. /private/tmp on macOS)
+        return [os.path.realpath(mp) for mp in cmd(archiver, "mount").splitlines()]
+
+    with fuse_mount(archiver, mountpoint):
+        assert os.path.realpath(mountpoint) in listed_mountpoints()
+        mounts = json.loads(cmd(archiver, "mount", "--json"))
+        entry = next(m for m in mounts if os.path.realpath(m["mountpoint"]) == os.path.realpath(mountpoint))
+        assert entry["source"] == "borgfs" or entry["fstype"].endswith("borgfs")
+    assert os.path.realpath(mountpoint) not in listed_mountpoints()
 
 
 def test_borg_mount_has_no_repository_positional():

@@ -14,6 +14,30 @@ from ..logger import create_logger
 logger = create_logger()
 
 
+def use_passcommand_mount_option(args):
+    """Move the passcommand mount option from args.options to BORG_PASSCOMMAND.
+
+    fstab / autofs entries can only give mount options, not environment variables. The key
+    (and thus the passphrase) is loaded before the mount options are processed, so this has
+    to happen before the repository is opened.
+    """
+    from ..vfs import pop_option
+
+    if not args.options:
+        return
+    options = args.options.split(",")
+    passcommand = pop_option(options, "passcommand", "", None, str)
+    if passcommand is None:
+        return
+    if not passcommand:
+        raise RTError("passcommand mount option: no command given")
+    set_vars = [var for var in ("BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD") if var in os.environ]
+    if set_vars:
+        raise RTError(f"The passcommand mount option and {', '.join(set_vars)} are mutually exclusive.")
+    args.options = ",".join(options) or None
+    os.environ["BORG_PASSCOMMAND"] = passcommand
+
+
 class MountMixIn:
     def do_mount(self, args):
         """Mounts an archive or an entire repository as a FUSE filesystem."""
@@ -44,6 +68,7 @@ class MountMixIn:
             if not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
                 raise RTError(f"{args.mountpoint}: Mountpoint must be a **writable** directory")
 
+        use_passcommand_mount_option(args)
         self._do_mount(args)
 
     @with_repository()
@@ -137,6 +162,15 @@ class MountMixIn:
 
         To allow a regular user to use fstab entries, add the ``user`` option:
         ``/path/to/repo /mnt/point fuse.borgfs defaults,noauto,user 0 0``
+
+        fstab / autofs entries can not set environment variables, so for an encrypted
+        repository, use the ``passcommand`` mount option: it works like
+        ``BORG_PASSCOMMAND``, e.g. ``passcommand=/usr/local/sbin/borg-pass-backup1``.
+        As mount options are separated by commas, the command can not contain a comma,
+        so better use a script without arguments. ``passcommand`` is mutually exclusive
+        with ``BORG_PASSPHRASE``, ``BORG_PASSCOMMAND`` and ``BORG_PASSPHRASE_FD``.
+        There is no mount option for the passphrase itself, because mount options are
+        visible to other users (e.g. in /etc/fstab and in the ``ps`` output).
 
         For FUSE configuration and mount options, see the mount.fuse(8) manual page.
 

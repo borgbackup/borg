@@ -630,7 +630,8 @@ class HelpMixIn:
                 passphrase should be initially set when initializing an encrypted repo. Note that the command
                 is executed without a shell. So variables, like ``$HOME`` will work, but ``~`` won't.
                 Mutually exclusive with BORG_PASSPHRASE and BORG_PASSPHRASE_FD, see there.
-                See also BORG_NEW_PASSPHRASE.
+                See also BORG_NEW_PASSPHRASE. For fstab / autofs entries, ``borg mount`` has a
+                ``passcommand`` mount option that works like BORG_PASSCOMMAND.
             BORG_PASSPHRASE_FD (and BORG_NEW_PASSPHRASE_FD, BORG_OTHER_PASSPHRASE_FD)
                 When set, specifies a file descriptor to read a passphrase
                 from. Programs starting borg may choose to open an anonymous pipe

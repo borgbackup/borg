@@ -1,0 +1,171 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.23 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-known-repos" "1" "2026-10-10" "" "borg backup tool"
+.SH Name
+borg-known-repos \- List repositories Borg has local state for (security info and/or cache).
+.SH SYNOPSIS
+.sp
+borg [common options] known\-repos [options]
+.SH DESCRIPTION
+.sp
+This command lists the repositories that this local Borg installation currently
+has state for: security information (key type, last known location) and/or a
+local repository cache.
+.sp
+It inspects only local state \- the security directory and the cache directory,
+each checked both at its current (borg2) default location and, separately, at
+the legacy (borg 1.x) default location those same kinds of state used before the
+borg2 base\-dir rewrite (see \fB$BORG_SECURITY_DIR\fP/\fB$BORG_CACHE_DIR\fP in
+\fBborg help environment\fP for the exact resolution rules, including the platforms
+where the two locations differ by default, e.g. macOS). It does not access any
+repository, locally or remotely, so a repository that is currently unreachable
+(e.g. a disconnected external disk or an unresponsive remote host) will still be
+listed just fine. This also means \-r/\-\-repo has no effect on this command: it
+always lists every locally known repository.
+.sp
+\(dqLayout\(dq reflects which state directory tree the repository was discovered in \-
+\fBborg2\fP or \fBlegacy\fP \- not the repository\(aqs actual on\-disk format version (see
+\fBborg repo\-info\fP\(aqs \(dqRepository version\(dq for that; this command never opens the
+repository, so it cannot report that field at all). The borg2 security entry is
+checked first, then the legacy (borg 1.x) security entry, then \- only when
+neither security entry could be confirmed \- whichever cache root matched (borg2
+cache checked before the legacy cache). \(dqunknown\(dq means neither a security entry
+nor a cache entry could be confirmed for this id \- it was listed as a directory
+name, but this command could not establish which layout (if either) it belongs
+to. If \fB$BORG_SECURITY_DIR\fP/\fB$BORG_CACHE_DIR\fP make the borg2 and legacy
+locations resolve to the same path, only the borg2 scan runs and a legacy (v1)
+repository there is reported with layout \fBborg2\fP\&.
+.sp
+This is useful for auditing which repositories this installation has local state for
+(and, for repository\-encrypted modes, which crypto suite each one uses), finding
+repositories with a local cache that may be taking up unwanted disk space, and general
+housekeeping of stale local Borg state.
+.sp
+The reported cache size is the size of all regular files below the repository\(aqs
+cache directory (symlinks are not followed and not counted) \- for a current (borg2)
+repository that is the files cache plus a small amount of metadata (\fBconfig\fP,
+\fBREADME\fP), not an index of the repository\(aqs chunks; a legacy (borg 1.x) cache
+directory can be considerably larger, since it also holds a local chunks index.
+A repository\-id directory that is a symlink (Borg itself always creates a plain
+directory) is skipped, and a \fBlocation\fP or \fBkey\-type\fP file that is a symlink
+is treated the same as missing; neither is followed.
+.sp
+\(dqCache last written\(dq is the modification time of the cache\(aqs own config file, as
+a best\-effort proxy for when a cache\-using Borg command last ran against this
+repository. It is not a precise \(dqlast backup\(dq or \(dqlast access\(dq time: not every
+Borg command updates the cache, and a repository without a local cache at all
+will not show one.
+.sp
+This command does not list or export any key material: the keys dir
+(\fB$BORG_KEYS_DIR\fP) is not scanned.
+.sp
+\(dqSecurity info\(dq and \(dqLocal cache\(dq are each one of three states, not a plain
+yes/no: \(dqyes\(dq (confirmed present \- for security info, a \fBlocation\fP and/or
+\fBkey\-type\fP file was confirmed to exist there, independent of whether its
+\fIcontent\fP could be read; for cache, a real, non\-symlinked cache directory with a
+\fBconfig\fP file was confirmed to exist), \(dqno\(dq (confirmed absent \- this command
+actually searched the relevant location(s) and found nothing there \- for the
+cache specifically, the legacy root is only checked once the borg2 cache root is
+confirmed absent for this id, so an unreadable borg2 cache entry reports
+\(dqunknown\(dq rather than falling back to check whether a legacy cache exists), or
+\(dqunknown\(dq
+(this command could not determine which of the above is true \- most commonly a
+permission error on the repository\-id directory itself, or on one of the files
+inside it). A file that is simply missing (e.g. a repository with only a
+\(dqlocation\(dq file and no \(dqkey\-type\(dq) does not affect the other field\(aqs state (that
+repository still has \(dqSecurity info: yes\(dq); a security file that exists but
+could not be fully read (a permission error, a file too large, or not valid
+UTF\-8) does not change \(dqSecurity info\(dq away from \(dqyes\(dq either \- existence, not
+readability, is what that field reports. A repository\-id directory that was found
+during the directory listing but that then could not be opened or classified for
+some other reason \- rather than being dropped from the results, as the directory
+listing already proves it exists \- is still listed, with \(dqunknown\(dq for whichever
+of \(dqSecurity info\(dq/\(dqLocal cache\(dq/\(dqLayout\(dq could not be established, so a script
+auditing this output never mistakes \(dqcould not check\(dq for \(dqconfirmed not there\(dq.
+For the cache specifically, once a cache directory\(aqs own existence is confirmed
+(a real, non\-symlinked directory containing a \fBconfig\fP file), a later failure
+to fully list its \fIcontents\fP does not change \(dqLocal cache\(dq away from \(dqyes\(dq \-
+only the reported size becomes a partial count rather than the exact size. Any
+of these inspection failures is both logged as its own warning and counted
+towards a final summary warning, which (unlike a plain log message) makes this
+command exit with a non\-zero return code (usually 1) \- including when the
+failure happened while listing a security or cache root itself (e.g. EIO), which
+can keep a repository that exists only there out of the output entirely, with no
+per\-repository record to point to. A script checking the exit code therefore
+learns only that the scan was incomplete, not that every affected repository is
+still represented somewhere in the output.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.B  \-\-json
+format output as JSON
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+$ borg known\-repos
+Repository ID: 0a2744f216526be75ae14a5fa5b123127bb218558219f6203e09e4f220e45903
+  Layout: borg2
+  Location: /path/to/repo
+  Local cache: yes, 1.23 MB
+  Cache last written: 2026\-10\-07T21:00:00.000000+09:00
+  Security info: yes (aes256\-ocb, sha256)
+
+$ borg known\-repos \-\-json
+{
+    \(dqrepositories\(dq: [
+        {
+            \(dqcache_config_mtime\(dq: \(dq2026\-10\-07T21:00:00.000000+09:00\(dq,
+            \(dqcache_size\(dq: 1234567,
+            \(dqhas_cache\(dq: true,
+            \(dqhas_security_info\(dq: true,
+            \(dqid\(dq: \(dq0a2744f216526be75ae14a5fa5b123127bb218558219f6203e09e4f220e45903\(dq,
+            \(dqkey_type\(dq: \(dqaes256\-ocb, sha256\(dq,
+            \(dqkey_type_raw\(dq: \(dq16\(dq,
+            \(dqlayout\(dq: \(dqborg2\(dq,
+            \(dqlocation\(dq: \(dq/path/to/repo\(dq
+        }
+    ]
+}
+.EE
+.UNINDENT
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

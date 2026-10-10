@@ -12,8 +12,9 @@ The content is stored sealed (see the seal / unseal callables of Lock, Repositor
 them): wrapped in the repository key's envelope, encrypted and authenticated (just authenticated in the
 authenticated-* modes). The object's name is the store hash of the sealed content, so neither the
 content nor the name tells who uses the repository. A lock object that can not be unsealed (corrupt,
-tampered with, or not written by a borg with the repository key) is "unreadable": nothing is known
-about it but its store-side mtime, so it is treated as a foreign exclusive lock (see Staleness).
+tampered with, not written by a borg with the repository key, or not permitted to be read by us) is
+"unreadable": nothing is known about it but its store-side mtime, so it is treated as a foreign
+exclusive lock (see Staleness).
 Where the storage backend provides object timestamps (file, sftp, s3, current rest servers - not
 rclone), a lock object additionally carries a store-side mtime, stamped by the *storage's* clock at
 the same write instant; borgstore reports it as ItemInfo.mtime (0 if unavailable).
@@ -102,6 +103,7 @@ import threading
 import time
 from collections import namedtuple
 
+from borgstore.backends.errors import PermissionDenied
 from borgstore.store import ObjectNotFound
 
 from . import platform
@@ -465,7 +467,11 @@ class Lock:
                 # the lock vanished between our listing and loading it, e.g. it was released
                 # by its owner or another client killed it as stale - so just ignore it.
                 continue
-            lock = self._parse_lock(content)
+            except (PermissionError, PermissionDenied):
+                # e.g. created by another user: we can not tell what it is, so it is unreadable as well.
+                lock = None
+            else:
+                lock = self._parse_lock(content)
             if lock is None:
                 if not self.unreadable_warned:
                     self.unreadable_warned = True

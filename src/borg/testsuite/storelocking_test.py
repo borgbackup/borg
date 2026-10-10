@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from borgstore.backends.errors import PermissionDenied
 from borgstore.store import ObjectNotFound, Store
 
 from .fslocking_test import free_pid  # NOQA
@@ -565,3 +566,23 @@ class TestUnreadableLock:
         assert list(lockstore.list("locks")) == []
         with Lock(lockstore, exclusive=True, id=ID1):
             pass
+
+    @pytest.mark.parametrize("error", [PermissionError, PermissionDenied])
+    def test_permission_denied(self, lockstore, monkeypatch, error):
+        # e.g. a lock object created by root, listed by a non-root user.
+        key = write_unreadable_lock(lockstore, b"garbage")
+        orig_load = lockstore.load
+
+        def load_denied(name, *args, **kwargs):
+            if name == f"locks/{key}":
+                raise error(name)
+            return orig_load(name, *args, **kwargs)
+
+        monkeypatch.setattr(lockstore, "load", load_denied)
+        lock = Lock(lockstore, exclusive=False, id=ID1, timeout=0.2)
+        lock.retry_delay_min = lock.retry_delay_max = 0.05
+        with pytest.raises(LockTimeout, match=f"unreadable lock object locks/{key}"):
+            lock.acquire()
+        assert [info.name for info in lockstore.list("locks")] == [key]  # no lock of ours left behind
+        Lock(lockstore, id=ID1).break_lock()
+        assert list(lockstore.list("locks")) == []

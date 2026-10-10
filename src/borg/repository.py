@@ -17,6 +17,7 @@ from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendConnectionError as StoreBackendConnectionError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
+from borgstore.backends.errors import PermissionDenied as StorePermissionDenied
 
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
@@ -730,21 +731,19 @@ SALVAGE_READ_ERROR = "read error"  # reading the pack failed
 SalvageResult = namedtuple("SalvageResult", "status new_pack_id kept dropped_bytes removed_ids")
 
 
-class PackTracker:
-    """Pack verification results, mapping pack_id -> (timestamp, result).
+class CheckTracker:
+    """Check results, mapping a 32-byte id -> (timestamp, result).
 
-    Records are kept across checks: intact records (result=1) are reused by checks run with
-    max_age, corrupt records (result=0) are kept for repair and always re-verified. Records of
-    packs no longer listed in packs/ are pruned when a check finishes scanning packs/.
-    Stored at cache/checked-packs as the serialized table in the repository key's envelope (see
+    Stored at NAME as the serialized table in the repository key's envelope (see
     Repository.store_encrypt_store). new() starts an empty tracker, load() reads the stored one.
+    Subclasses set NAME.
     """
 
-    NAME = "cache/checked-packs"
-    KEY_SIZE = 32  # pack id
+    NAME: str
+    KEY_SIZE = 32
     Entry = namedtuple("Entry", "timestamp result")
     EntryFormatT = namedtuple("EntryFormatT", "timestamp result")
-    _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=corrupt
+    _EntryFormat = EntryFormatT(timestamp="Q", result="B")  # unix ts, 1=ok 0=failed
 
     def __init__(self, repository, table):
         self.repository = repository
@@ -760,21 +759,22 @@ class PackTracker:
     def load(cls, repository):
         """Return a tracker holding the stored table.
 
-        Return an empty one if cache/checked-packs is missing, fails the authentication of the key's
+        Return an empty one if the object at NAME is missing, fails the authentication of the key's
         envelope, does not deserialize, or its entries do not have this class's key size and Entry layout.
         """
+        label = cls.NAME.rpartition("/")[2]
         try:
             data = repository.store_load_decrypt(cls.NAME)
         except StoreObjectNotFound:
             return cls.new(repository)
         except IntegrityError:
-            logger.warning("Ignoring corrupted checked-packs set.")
+            logger.warning(f"Ignoring corrupted {label} set.")
             return cls.new(repository)
         try:
             with io.BytesIO(data) as f:
                 table = HashTableNT.read(f)
         except ValueError:
-            logger.warning("Ignoring unreadable checked-packs set.")
+            logger.warning(f"Ignoring unreadable {label} set.")
             return cls.new(repository)
         # read() takes key size and value type from the blob itself, so the table needs a layout check
         # against Entry here. All entries in a table share one layout, so checking one entry suffices.
@@ -782,35 +782,47 @@ class PackTracker:
         if sample is not None:
             key, value = sample
             if len(key) != cls.KEY_SIZE or value._fields != cls.Entry._fields:
-                logger.warning("Ignoring checked-packs set with an unexpected layout.")
+                logger.warning(f"Ignoring {label} set with an unexpected layout.")
                 return cls.new(repository)
         return cls(repository, table)
 
     def __len__(self):
         return len(self.table)
 
-    def get(self, pack_id):
-        """Return the Entry for pack_id, or None if it is not recorded."""
-        return self.table.get(pack_id)
+    def get(self, id):
+        """Return the Entry for id, or None if it is not recorded."""
+        return self.table.get(id)
 
-    def record(self, pack_id, ok):
-        self.table[pack_id] = self.Entry(timestamp=int(time.time()), result=int(ok))
+    def record(self, id, ok):
+        self.table[id] = self.Entry(timestamp=int(time.time()), result=int(ok))
 
-    def forget(self, pack_id):
-        """Drop the record of pack_id, if any."""
-        self.table.pop(pack_id, None)
+    def is_recent(self, id, max_age):
+        """Return True if id has an ok record younger than max_age seconds (0 = never).
 
-    def corrupt_ids(self):
-        """Return the ids of the packs recorded corrupt, sorted."""
-        return sorted(pack_id for pack_id, entry in self.table.items() if not entry.result)
+        The timestamp is set by the client that ran the earlier check, so a future one (negative age)
+        is accepted up to MAX_CLOCK_SKEW.
+        """
+        entry = self.table.get(id)
+        if entry is None or not entry.result or not max_age:
+            return False
+        age = time.time() - entry.timestamp
+        return -min(MAX_CLOCK_SKEW, max_age) <= age < max_age
 
-    def prune(self, pack_ids):
-        """Drop the records whose pack id is not in pack_ids (the set of pack ids listed in packs/),
-        then store the remaining records (or delete the stored object if none remain).
+    def forget(self, id):
+        """Drop the record of id, if any."""
+        self.table.pop(id, None)
+
+    def failed_ids(self):
+        """Return the ids recorded with result=0, sorted."""
+        return sorted(id for id, entry in self.table.items() if not entry.result)
+
+    def prune(self, ids):
+        """Drop the records whose id is not in ids, then store the remaining records (or delete the
+        stored object if none remain).
         """
         # the keys are collected first because the table must not be mutated while iterating it.
-        for pack_id in [pack_id for pack_id, _ in self.table.items() if pack_id not in pack_ids]:
-            del self.table[pack_id]
+        for id in [id for id, _ in self.table.items() if id not in ids]:
+            del self.table[id]
         if len(self.table):
             self.save()
         else:
@@ -828,6 +840,49 @@ class PackTracker:
             self.repository.store_delete(self.NAME)
         except StoreObjectNotFound:
             pass
+
+
+class PackTracker(CheckTracker):
+    """Pack verification results, mapping pack_id -> (timestamp, result).
+
+    Records are kept across checks: intact records (result=1) are reused by checks run with
+    max_age, corrupt records (result=0) are kept for repair and always re-verified. Records of
+    packs no longer listed in packs/ are pruned when a check finishes scanning packs/.
+    """
+
+    NAME = "cache/checked-packs"
+
+    def corrupt_ids(self):
+        """Return the ids of the packs recorded corrupt, sorted."""
+        return self.failed_ids()
+
+
+class ArchiveTracker(CheckTracker):
+    """Archive check results, mapping archive_id -> (timestamp, result).
+
+    result=1: the archives check read all metadata of the archive and found every chunk it references
+    in the chunk index. Archives checks run with max_age reuse such a record. result=0: the check found
+    a problem, such an archive is always checked again.
+    A check that finds a corrupt or missing pack or salvages a pack, and an archives check that
+    repairs, clear all records: chunks the archives reference may be gone then. An archives check
+    stores no records while a pack is recorded corrupt. Records of archives no longer in archives/
+    (soft-deleted ones included) are pruned when an archives check finishes.
+    """
+
+    NAME = "cache/checked-archives"
+
+    def save(self):
+        # a client without write permission for cache/ can still check archives, it just keeps no records.
+        try:
+            super().save()
+        except StorePermissionDenied:
+            logger.warning(f"Not storing the archive check results: no permission to write {self.NAME}.")
+
+    def clear(self):
+        try:
+            super().clear()
+        except StorePermissionDenied:
+            logger.warning(f"Not clearing the archive check results: no permission to delete {self.NAME}.")
 
 
 class _ConfigMissing(Exception):
@@ -1560,6 +1615,9 @@ class Repository:
         it. The record clears at the check that finds the pack intact again or gone (removed by
         compact, or replaced by a salvaged pack); prune() does this from packs/.
 
+        A run that finds a corrupt or missing pack, salvages a pack or skips a pack byte range in the
+        index rebuild clears cache/checked-archives (see ArchiveTracker), refs #10025.
+
         It also reports missing packs (refs #9898): pack ids the chunk index references but that are
         absent from packs/. The index is read from its fragments only and its referenced pack ids are
         compared with the packs present in the store; store.info() confirms that each pack the listing
@@ -1778,15 +1836,10 @@ class Repository:
                 self._lock_refresh()
                 pack_pi.show(increase=1)  # advance for skipped packs too, so the bar tracks packs/, not work done
                 pack_id = hex_to_bin(info.name)
-                entry = tracker.get(pack_id)
-                # skip a pack recorded intact within the last max_age seconds. the timestamp is set
-                # by the client that ran the earlier check; accept a future one (negative age) up to
-                # MAX_CLOCK_SKEW, and re-verify anything at or past max_age.
-                if entry is not None and entry.result and max_age:
-                    age = time.time() - entry.timestamp
-                    if -min(MAX_CLOCK_SKEW, max_age) <= age < max_age:
-                        pack_skipped += 1
-                        continue
+                # skip a pack recorded intact within the last max_age seconds.
+                if tracker.is_recent(pack_id, max_age):
+                    pack_skipped += 1
+                    continue
                 pack_files += 1
                 ok = verify("packs", info.name)
                 if not ok:
@@ -1859,6 +1912,9 @@ class Repository:
         # index_deferred: the archives phase rebuilds the corrupt index; it runs only if this check was not interrupted.
         index_deferred = bool(index_errors) and repair and not repo_only and not sig_int
         objs_errors = index_errors + pack_errors + len(missing_pack_ids) + drops
+        if pack_errors or missing_pack_ids or salvaged or drops:
+            # chunks the archives reference may be damaged or gone, so no archive check result holds.
+            ArchiveTracker.new(self).clear()
         summary = (
             f"Checked {index_files} index files ({index_errors} errors) "
             f"and {pack_files} packs ({pack_errors} errors)."

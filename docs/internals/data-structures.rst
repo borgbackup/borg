@@ -80,6 +80,18 @@ cache/
     ``check --repair`` salvages each pack still recorded corrupt (see :ref:`packs`) and
     records a pack that reads intact at the salvage as intact. Records of packs no longer
     listed in packs/ are pruned when a check finishes.
+  checked-archives
+    archives check results (archive id -> timestamp, result), in the same format as
+    ``checked-packs``. A result is ok if the check could read all metadata of the archive
+    and found every chunk it references in the chunks index. ``check --max-age`` skips
+    archives whose ok record is younger than the given age, and partial checks
+    (``--max-duration``) check the archives without an ok record first, then the
+    least-recently-checked ones. ``check --repair`` and ``check --verify-data`` check every
+    archive. All records are removed when a check finds a corrupt or missing pack or a
+    defect chunk, when it salvages a pack, and when the archives check starts with
+    ``--repair``. No records are stored while a pack is recorded corrupt in
+    ``checked-packs``. Records of archives no longer in archives/ (soft-deleted ones
+    included) are pruned when an archives check finishes.
   referenced-by-archive.<hex-encoded archive ID>
     what one archive references (object ID -> plaintext object size), plus the file
     count and content size of that archive, in the key's store object envelope (see
@@ -114,7 +126,7 @@ locks/
 
 .. _store_object_envelope:
 
-The index fragments, the lock objects, ``checked-packs``, the
+The index fragments, the lock objects, ``checked-packs``, ``checked-archives``, the
 ``referenced-by-archive.*`` objects and ``config/defaults`` are stored in the **store object envelope**: the repository key's ``encrypt()``,
 exactly as for the metadata and data slots of the objects in a pack (see
 :ref:`security_encryption`), with an empty id and an AAD of

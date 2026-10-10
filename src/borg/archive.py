@@ -54,7 +54,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, set_times, swidth
 from .hashindex import ChunkIndex, ChunkIndexEntry
-from .repository import Repository, PackReader, remove_missing_pack_entries
+from .repository import Repository, PackReader, ArchiveTracker, PackTracker, remove_missing_pack_entries
 from .repoobj import RepoObj, object_validator
 
 # macOS: SF_DATALESS marks dataless placeholder files (e.g. cloud files not materialized locally).
@@ -2349,6 +2349,12 @@ class ArchiveChecker:
         # ids of the objects with ro_type ROBJ_ARCHIVE_META that verify_data found.
         # None if verify_data did not run or was interrupted.
         self.archive_meta_ids = None
+        # the archive check results, see ArchiveTracker. None until check() loads them.
+        self.tracker = None
+        # False if this run stores no archive check results, see check().
+        self.keep_results = True
+        # True if rebuild_archives stopped at the deadline before it reached every archive.
+        self.stopped_at_deadline = False
 
     def record_stored(self, results):
         """Add the pack ids in results to written_packs.
@@ -2392,6 +2398,8 @@ class ArchiveChecker:
         newer=None,
         oldest=None,
         newest=None,
+        max_age=0,
+        deadline=None,
     ):
         """Perform a set of checks on 'repository'
 
@@ -2403,6 +2411,20 @@ class ArchiveChecker:
         :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
         :param format: format string used to describe an archive in the log output
+        :param max_age: seconds, 0 = check every archive. Skip the archives whose ok record (see
+            ArchiveTracker) is younger than max_age. Ignored with repair or verify_data, and if this run
+            stores no archive check results (see below).
+        :param deadline: time.monotonic() value at which to stop, None = no limit. The check then
+            analyzes the archives without an ok record first, then the least recently checked ones, and
+            stops between two archives. It analyzes at least one archive, as the repository check
+            verifies at least one pack, so that every run makes progress.
+
+        Each analyzed archive is recorded in cache/checked-archives. repair clears the records first,
+        because it rebuilds the index and rewrites the archives. A run clears the records and stores
+        none if a pack is recorded corrupt (see PackTracker), or if it runs without repair and has a
+        finding before it analyzes the archives (a missing pack, content the index rebuild dropped, a
+        verify_data or find_lost_archives error): the chunk index may name chunks that are lost or
+        defect then.
         """
         if not isinstance(repository, Repository):
             logger.error("Checking legacy repositories is not supported.")
@@ -2413,6 +2435,9 @@ class ArchiveChecker:
         self.verifying_data = verify_data
         self.format = format
         self.repository = repository
+        self.tracker = ArchiveTracker.load(repository)
+        if repair:
+            self.tracker.clear()
         # A normal (non-repair) archives check trusts the in-repo index: the repository check verified
         # each index object's store hash, and the index is the authoritative record of which chunks exist,
         # so we do not rebuild it from the packs (reading every pack is far too slow for a routine check).
@@ -2474,6 +2499,11 @@ class ArchiveChecker:
         # On Ctrl-C, skip any scan not yet started; a scan already running stops at its own boundary.
         if find_lost_archives and not sig_int:
             self.rebuild_archives_directory()
+        if (self.error_found and not repair) or PackTracker.load(repository).corrupt_ids():
+            self.keep_results = False
+            self.tracker.clear()
+        if repair or verify_data or not self.keep_results:
+            max_age = 0
         if not sig_int:
             self.rebuild_archives(
                 match=match,
@@ -2484,6 +2514,8 @@ class ArchiveChecker:
                 oldest=oldest,
                 newer=newer,
                 newest=newest,
+                max_age=max_age,
+                deadline=deadline,
             )
         # finish() writes a consistent chunk index; run it on Ctrl-C too (#9850).
         self.finish()
@@ -2493,7 +2525,12 @@ class ArchiveChecker:
             else:
                 logger.info("Archive consistency check interrupted, no problems found so far.")
             raise Error("Got Ctrl-C / SIGINT.")
-        if self.error_found:
+        if self.stopped_at_deadline:
+            if self.error_found:
+                logger.error("Archive consistency check stopped by --max-duration, problems found so far.")
+            else:
+                logger.info("Archive consistency check stopped by --max-duration, no problems found so far.")
+        elif self.error_found:
             logger.error("Archive consistency check complete, problems found.")
         else:
             logger.info("Archive consistency check complete, no problems found.")
@@ -2822,9 +2859,37 @@ class ArchiveChecker:
             logger.info("Rebuilding missing archives directory entries completed.")
 
     def rebuild_archives(
-        self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None
+        self,
+        first=0,
+        last=0,
+        sort_by="",
+        match=None,
+        older=None,
+        newer=None,
+        oldest=None,
+        newest=None,
+        max_age=0,
+        deadline=None,
     ):
-        """Analyze and rebuild archives, expecting some damage and trying to make stuff consistent again."""
+        """Analyze and rebuild archives, expecting some damage and trying to make stuff consistent again.
+
+        max_age, deadline: see check().
+        """
+        tracker = self.tracker
+        analyzed = 0  # archives analyzed in this run
+        reused = 0  # archives skipped because of a recent ok record
+
+        def record_result(archive_id, found_before, *, complete=True):
+            """Record the result of the archive just analyzed, then merge it into error_found.
+
+            error_found holds the findings of this archive only while it is analyzed: the loop below
+            resets it for each archive and passes its previous value as found_before.
+            An archive that was not analyzed to its end (complete=False) gets a record only if it has a
+            finding.
+            """
+            if complete or self.error_found:
+                tracker.record(archive_id, not self.error_found)
+            self.error_found = self.error_found or found_before
 
         # Missing file chunks, collected during the per-archive checks and reported grouped as
         # chunk -> files -> archives after all archives were analyzed. Bounded by
@@ -3037,6 +3102,16 @@ class ArchiveChecker:
         else:
             archive_infos = self.manifest.archives.list(sort_by=sort_by)
         num_archives = len(archive_infos)
+        if deadline is not None:
+            # archives without an ok record first, then the least recently checked ones, so that
+            # repeated runs reach every archive. The sort is stable, so sort_by orders equal keys.
+            def check_order(info):
+                entry = tracker.get(info.id)
+                if entry is None:
+                    return False, 0
+                return bool(entry.result), entry.timestamp
+
+            archive_infos.sort(key=check_order)
         formatter = ArchiveFormatter(self.format, self.repository, self.manifest, self.key)
 
         pi = ProgressIndicatorPercent(
@@ -3050,8 +3125,16 @@ class ArchiveChecker:
                 if sig_int:
                     # --repair rewrites each archive as a whole, so with --repair the check stops only here.
                     break
+                if deadline is not None and analyzed and time.monotonic() >= deadline:
+                    self.stopped_at_deadline = True
+                    break
                 pi.show(i)
                 archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
+                if tracker.is_recent(archive_id, max_age):
+                    reused += 1
+                    continue
+                analyzed += 1
+                found_before, self.error_found = self.error_found, False
                 try:
                     formatted = formatter.format_item(info, jsonline=False)
                     # the formatter uses defaults for keys like {comment} if it has no archive metadata.
@@ -3071,6 +3154,7 @@ class ArchiveChecker:
                         self.manifest.archives.delete_by_id(archive_id)
                     else:
                         logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    record_result(archive_id, found_before)
                     continue
                 cdata = self.repository.get(archive_id)
                 try:
@@ -3083,6 +3167,7 @@ class ArchiveChecker:
                         self.manifest.archives.delete_by_id(archive_id)
                     else:
                         logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    record_result(archive_id, found_before)
                     continue
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
@@ -3090,9 +3175,11 @@ class ArchiveChecker:
                     raise Exception("Unknown archive metadata version")
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
+                complete = True
                 for item in robust_iterator(archive):
                     if sig_int and not self.repair:
                         # without --repair the archive is only read, so the check also stops within it.
+                        complete = False
                         break
                     if "chunks" in item:
                         verify_file_chunks(info.name, item)
@@ -3111,9 +3198,28 @@ class ArchiveChecker:
                     self.create_archive_entry(info.name, new_archive_id, info.ts)
                     if archive_id != new_archive_id:
                         self.manifest.archives.delete_by_id(archive_id)
+                        archive_id = new_archive_id
+                record_result(archive_id, found_before, complete=complete)
         finally:
             pi.finish()
             report_missing_chunks()
+            if self.stopped_at_deadline:
+                # like a pack recorded corrupt, an archive recorded with a problem fails the check until
+                # a check finds it ok again.
+                unchecked = archive_infos[analyzed + reused :]
+                failed_ids = set(tracker.failed_ids())
+                failed = sum(1 for info in unchecked if info.id in failed_ids)
+                if failed:
+                    self.error_found = True
+                    logger.error(f"{failed} archive(s) recorded with problems were not checked again in this run.")
+                logger.info(f"Stopping the archive check after --max-duration, {len(unchecked)} archive(s) left.")
+            summary = f"Analyzed {analyzed} archive(s)."
+            if reused:
+                summary += f" Reused {reused} recent archive check result(s)."
+            logger.info(summary)
+            if self.keep_results:
+                archives = self.manifest.archives
+                tracker.prune(set(archives.ids()) | set(archives.ids(deleted=True)))
 
     def verify_written_packs(self):
         """Read the object headers of the packs in written_packs and make the chunks index match them.

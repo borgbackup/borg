@@ -125,6 +125,10 @@ def test_repository_permissions_read_only(archivers, request, monkeypatch):
     extracted_files = os.listdir("output")
     assert len(extracted_files) > 0
 
+    # Check the archives: this works, but the check results cannot be stored.
+    output = cmd(archiver, "check", "--archives-only", exit_code=0)
+    assert "Not storing the archive check results" in output
+
     # Try to create a new archive, which should fail.
     with pytest.raises(PermissionDenied):
         cmd(archiver, "create", "archive3", "input")

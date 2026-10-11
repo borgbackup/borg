@@ -1,6 +1,22 @@
+import os
+
+from libc cimport errno
+from libc.stdlib cimport malloc, free
+
+from .base import MountEntry
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
 
+
+cdef extern from "sys/statvfs.h":
+    # only the members we use, the header defines the struct (and it maps getvfsstat to the libc
+    # symbol of the current struct layout, __getvfsstat90 since NetBSD 9)
+    cdef struct statvfs:
+        char f_fstypename[32]  # _VFS_NAMELEN
+        char f_mntonname[1024]  # _VFS_MNAMELEN
+        char f_mntfromname[1024]  # _VFS_MNAMELEN
+    int getvfsstat(statvfs *buf, size_t bufsize, int flags)
+    int ST_NOWAIT
 
 cdef extern from "sys/extattr.h":
     ssize_t c_extattr_list_file "extattr_list_file" (const char *path, int attrnamespace, void *data, size_t nbytes)
@@ -87,3 +103,27 @@ def setxattr(path, name, value, *, follow_symlinks=False):
         pass
     else:
         _setxattr_inner(func, path, name, value)
+
+
+def list_mounts():
+    """See platform.base.list_mounts, NetBSD implementation via getvfsstat(2)."""
+    cdef statvfs *buf
+    cdef int count, i
+    # getvfsstat returns the number of mounted file systems: all of them if buf is NULL, else as many as
+    # fit into buf. ST_NOWAIT: do not ask the file systems for fresh statistics, we only need the names.
+    count = getvfsstat(NULL, 0, ST_NOWAIT)
+    if count < 0:
+        raise OSError(errno.errno, "getvfsstat failed")
+    buf = <statvfs *> malloc(count * sizeof(statvfs))
+    if buf == NULL:
+        raise MemoryError
+    try:
+        count = getvfsstat(buf, count * sizeof(statvfs), ST_NOWAIT)
+        if count < 0:
+            raise OSError(errno.errno, "getvfsstat failed")
+        return [
+            MountEntry(os.fsdecode(buf[i].f_mntfromname), os.fsdecode(buf[i].f_fstypename), os.fsdecode(buf[i].f_mntonname))
+            for i in range(count)
+        ]
+    finally:
+        free(buf)

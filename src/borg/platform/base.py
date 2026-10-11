@@ -7,9 +7,13 @@ import stat
 import unicodedata
 import uuid
 from pathlib import Path
+from typing import NamedTuple
 
 from ..helpers import safe_unlink
+from ..logger import create_logger
 from ..platformflags import is_win32
+
+logger = create_logger()
 
 """
 platform base module
@@ -148,6 +152,37 @@ def set_flags(path, bsd_flags, fd=None):
 def get_flags(path, st, fd=None):
     """Return BSD-style file flags for path or stat without following symlinks."""
     return getattr(st, "st_flags", 0)
+
+
+class MountEntry(NamedTuple):
+    """An entry of the mount table, see list_mounts()."""
+
+    source: str  # what is mounted ("device"), e.g. /dev/sda1, borgfs, /dev/puffs; on Windows: the volume label
+    fstype: str  # file system type, e.g. ext4, fuse.borgfs, macfuse, fusefs, puffs|borgfs; on Windows: FUSE, NTFS
+    mountpoint: str  # where it is mounted; on Windows: the drive, e.g. X:
+
+
+def list_mounts():
+    """
+    Return the mount table: a list of MountEntry (source, fstype, mountpoint) tuples, one per
+    mounted file system, as the OS reports them. The platform modules implement this via
+    /proc/self/mountinfo (Linux), /etc/mnttab (illumos), getmntinfo() (macOS, FreeBSD),
+    getvfsstat() (NetBSD) or the drive letters (Windows: only mounts on a drive letter are found,
+    a file system mounted on a directory is not).
+
+    How a FUSE file system mounted with ``-o fsname=borgfs`` looks like per platform (measured):
+
+    - Linux: source ``borgfs``, fstype ``fuse`` (``fuse.borgfs`` with the ``subtype=borgfs`` option)
+    - macOS (macFUSE): source ``borgfs``, fstype ``macfuse``
+    - FreeBSD: source ``borgfs``, fstype ``fusefs``
+    - NetBSD (librefuse / puffs): source ``/dev/puffs``, fstype ``puffs|borgfs``
+    - illumos (libfuse): source ``borgfs``, fstype ``fuse``
+    - Windows (WinFsp): the fs name is ``FUSE``, the volume label comes from the ``volname`` option
+
+    Not supported on this platform: returns an empty list after warning about it.
+    """
+    logger.warning("Listing the mounted file systems is not supported on this platform.")
+    return []
 
 
 def set_times(path, *, atime_ns, mtime_ns, birthtime_ns=None, fd=None, follow_symlinks=True):

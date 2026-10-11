@@ -6,6 +6,7 @@ import os
 import platform
 
 from .base import SyncFile as BaseSyncFile
+from .base import MountEntry
 
 
 cdef extern from 'windows.h':
@@ -196,3 +197,25 @@ def process_alive(host, pid, thread):
 def local_pid_alive(pid):
     """Return whether *pid* is alive."""
     raise NotImplementedError
+
+
+def list_mounts():
+    """See platform.base.list_mounts, Windows implementation: the volumes mounted on drive letters.
+
+    A file system mounted on a directory (a WinFsp directory mountpoint is a junction pointing to the
+    volume) is not found this way, there is no API to enumerate these mountpoints.
+    """
+    buf = ctypes.create_unicode_buffer(1024)
+    length = _kernel32.GetLogicalDriveStringsW(len(buf) - 1, buf)
+    if not length:
+        raise ctypes.WinError(ctypes.get_last_error())
+    entries = []
+    for root in buf[:length].split("\0"):  # e.g. "C:\\", "X:\\" - GetVolumeInformationW needs the backslash
+        if not root:
+            continue
+        label = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH + 1)
+        fsname = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH + 1)
+        if not _kernel32.GetVolumeInformationW(root, label, len(label), None, None, None, fsname, len(fsname)):
+            continue  # e.g. a drive without media or a disconnected network drive
+        entries.append(MountEntry(label.value, fsname.value, root.rstrip("\\")))
+    return entries

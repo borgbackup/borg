@@ -5,6 +5,7 @@ from libc cimport errno
 from posix.time cimport timespec
 
 from . import posix_ug
+from .base import MountEntry
 from ..helpers import safe_decode, safe_encode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 
@@ -21,6 +22,16 @@ cdef extern from *:
     int DARWIN_FEATURE_64_BIT_INODE_DEFINED
 
 is_darwin_feature_64_bit_inode = DARWIN_FEATURE_64_BIT_INODE_DEFINED != 0
+
+cdef extern from "sys/mount.h":
+    # only the members we use (the header defines the struct; with 64-bit inodes - the default on
+    # current SDKs - getmntinfo maps to getmntinfo$INODE64 on x86_64, the header takes care of that)
+    cdef struct statfs:
+        char f_fstypename[16]  # MFSTYPENAMELEN
+        char f_mntonname[1024]  # MAXPATHLEN
+        char f_mntfromname[1024]  # MAXPATHLEN
+    int getmntinfo(statfs **mntbufp, int mode)
+    int MNT_NOWAIT
 
 cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size, int flags)
@@ -285,3 +296,19 @@ def sync_dir(path):
             raise
     finally:
         os.close(fd)
+
+
+def list_mounts():
+    """See platform.base.list_mounts, macOS implementation via getmntinfo(3)."""
+    cdef statfs *mntbuf
+    # getmntinfo points mntbuf to an array (allocated by libc, not to be freed) of count struct statfs.
+    # MNT_NOWAIT: do not ask the file systems for fresh statistics, we only need the names.
+    cdef int count = getmntinfo(&mntbuf, MNT_NOWAIT)
+    if count <= 0:
+        raise OSError(errno.errno, "getmntinfo failed")
+    return [
+        MountEntry(
+            os.fsdecode(mntbuf[i].f_mntfromname), os.fsdecode(mntbuf[i].f_fstypename), os.fsdecode(mntbuf[i].f_mntonname)
+        )
+        for i in range(count)
+    ]

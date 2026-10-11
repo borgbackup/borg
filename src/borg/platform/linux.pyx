@@ -8,7 +8,7 @@ from . import posix_ug
 from ..helpers import workarounds
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
-from .base import safe_fadvise
+from .base import safe_fadvise, MountEntry
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 try:
     from .syncfilerange import sync_file_range, SYNC_FILE_RANGE_WRITE, SYNC_FILE_RANGE_WAIT_BEFORE, SYNC_FILE_RANGE_WAIT_AFTER
@@ -475,3 +475,39 @@ else:
             # tell the OS that it does not need to cache what we just wrote,
             # avoids spoiling the cache for the OS and other processes.
             safe_fadvise(self.fd, 0, 0, 'DONTNEED')
+
+
+_MOUNTINFO_ESCAPE_RE = re.compile(rb"\\([0-7]{3})")
+
+
+def _unescape_mountinfo(field):
+    # /proc/self/mountinfo escapes space, tab, newline and backslash as \040, \011, \012 and \134.
+    # It escapes bytes, so unescape bytes and decode the result, not the other way round.
+    return os.fsdecode(_MOUNTINFO_ESCAPE_RE.sub(lambda m: bytes([int(m.group(1), 8)]), field))
+
+
+def parse_mountinfo(lines):
+    """Parse the lines of /proc/self/mountinfo (bytes), see proc_pid_mountinfo(5).
+
+    Each line is: mount ID, parent ID, major:minor, root, mountpoint, mount options, zero or
+    more optional fields, a lone "-", fstype, source, super options. As the number of optional
+    fields varies, the fields after the separator are found from the separator, not from the start.
+    """
+    entries = []
+    for line in lines:
+        fields = line.split()
+        try:
+            sep = fields.index(b"-")
+        except ValueError:
+            continue  # not a mountinfo line
+        if sep < 5 or len(fields) < sep + 3:
+            continue
+        mountpoint, fstype, source = fields[4], fields[sep + 1], fields[sep + 2]
+        entries.append(MountEntry(_unescape_mountinfo(source), os.fsdecode(fstype), _unescape_mountinfo(mountpoint)))
+    return entries
+
+
+def list_mounts():
+    """See platform.base.list_mounts, Linux implementation via /proc/self/mountinfo."""
+    with open("/proc/self/mountinfo", "rb") as f:
+        return parse_mountinfo(f.read().splitlines())

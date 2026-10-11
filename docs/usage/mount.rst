@@ -45,6 +45,11 @@ Examples
     $ borg mount -r /path/to/repo /tmp/mymountpoint only/that/path
     $ borg mount --exclude '...' /tmp/mymountpoint
 
+    # Without a mountpoint, "borg mount" lists the current borg mounts.
+    $ borg mount
+    /tmp/mymountpoint
+    $ borg umount /tmp/mymountpoint
+
 
 borgfs
 ++++++

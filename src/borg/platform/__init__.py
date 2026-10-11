@@ -13,6 +13,7 @@ from .base import SaveFile, sync_dir, fdatasync, safe_fadvise
 from .base import get_process_id, get_hostname, get_fqdn, get_hostid, swidth
 from .base import acl_text_to_xattr  # overridden below for platforms supporting it
 from .base import set_times  # overridden below for win32
+from .base import list_mounts, MountEntry  # list_mounts is overridden below for the platforms supporting it
 
 
 # work around pyinstaller "forgetting" to include the xattr module
@@ -30,6 +31,7 @@ if is_linux:  # pragma: linux only
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
+    from .linux import list_mounts  # type: ignore[no-redef]
 elif is_freebsd:  # pragma: freebsd only
     from .freebsd import listxattr, getxattr, setxattr
     from .freebsd import acl_get, acl_set
@@ -40,6 +42,7 @@ elif is_freebsd:  # pragma: freebsd only
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
+    from .freebsd import list_mounts  # type: ignore[no-redef]
 elif is_netbsd:  # pragma: netbsd only
     from .netbsd import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
@@ -49,6 +52,7 @@ elif is_netbsd:  # pragma: netbsd only
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
+    from .netbsd import list_mounts  # type: ignore[no-redef]
 elif is_darwin:  # pragma: darwin only
     from .darwin import listxattr, getxattr, setxattr
     from .darwin import acl_get, acl_set
@@ -61,6 +65,7 @@ elif is_darwin:  # pragma: darwin only
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
+    from .darwin import list_mounts  # type: ignore[no-redef]
 elif is_sunos:  # pragma: sunos only
     from .solaris import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
@@ -70,6 +75,7 @@ elif is_sunos:  # pragma: sunos only
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
+    from .solaris import list_mounts  # type: ignore[no-redef]
 elif not is_win32:  # pragma: posix only
     # Generic code for all other POSIX OSes
     from .base import listxattr, getxattr, setxattr
@@ -89,6 +95,7 @@ else:  # pragma: win32 only
     from .windows import set_times  # type: ignore[no-redef]
     from .windows import process_alive, local_pid_alive
     from .windows import getosusername
+    from .windows import list_mounts  # type: ignore[no-redef]
     from . import windows_ug as platform_ug
 
 

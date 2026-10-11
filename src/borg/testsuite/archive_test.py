@@ -516,6 +516,19 @@ def test_key_length_msgpacked_items():
     assert valid_msgpacked_dict(msgpack.packb(data))
 
 
+def test_valid_msgpacked_dict_offset():
+    packed = msgpack.packb({"path": b"/a/b/c"})
+    data = b"garbage" + packed
+    assert valid_msgpacked_dict(data, len(b"garbage"))
+    assert not valid_msgpacked_dict(data, 0)
+    # the data ends within the key (fixmap header 1 byte, fixstr header 1 byte, key "path" 4 bytes)
+    assert not valid_msgpacked_dict(data[: len(b"garbage") + 1 + 1 + 3], len(b"garbage"))
+    assert not valid_msgpacked_dict(data, len(data))
+    # a memoryview is only indexed, never sliced (see valid_msgpacked_dict)
+    with memoryview(data) as view:
+        assert valid_msgpacked_dict(view, len(b"garbage"))
+
+
 def test_resync_on_item_with_unknown_first_key():
     # after damage, an item whose first key is unknown to this borg version is still found as a resync point.
     item = {"aaa": 1, "path": "foo"}  # "aaa" sorts before all known item keys

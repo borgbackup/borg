@@ -175,6 +175,8 @@ Fixes:
 - legacy remote: use deques for the RPC call queues (performance fix for
   transfer), #10450
 - check --repair: RobustUnpacker: resync in linear time (performance fix), #10459
+- check --repair: RobustUnpacker: release all memoryviews of the resync buffer before
+  resizing it (BufferError on PyPy nightly)
 - import-tar: convert PAX ACLs to borg's ACL format
 - validate BORG_PACK_MAX_SIZE and BORG_PACK_MAX_COUNT, #10485
 - completion: repository directory completion fixes, #10460

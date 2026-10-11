@@ -2205,21 +2205,25 @@ MAX_ITEM_HEADER_LEN = 3 + 2 + 255
 INCOMPLETE = object()
 
 
-def valid_msgpacked_dict(d):
-    """check if the data <d> looks like a msgpacked item dict
+def valid_msgpacked_dict(d, offset=0):
+    """check if the data <d> at <offset> looks like a msgpacked item dict
 
     That is: a msgpack map whose first key is a msgpack str that looks like an item key. Items are
     packed with sorted keys, so the first key is the alphabetically smallest key of the item. The key
     is not checked against a list of known keys, so items written by a newer borg version (with keys
     this version does not know) are found as well.
+
+    <d> is only indexed, never sliced: so <d> can be a memoryview and no child views of it are created
+    (on PyPy, a child view that was not released keeps the viewed object exported, i.e. not resizable,
+    until the garbage collector collects the view).
     """
     d_len = len(d)
-    if d_len == 0:
+    if d_len <= offset:
         return False
-    if d[0] & 0xF0 == 0x80:  # object is a fixmap (up to 15 elements)
-        offs = 1
-    elif d[0] == 0xDE:  # object is a map16 (up to 2^16-1 elements)
-        offs = 3
+    if d[offset] & 0xF0 == 0x80:  # object is a fixmap (up to 15 elements)
+        offs = offset + 1
+    elif d[offset] == 0xDE:  # object is a map16 (up to 2^16-1 elements)
+        offs = offset + 3
     else:
         # object is not a map (dict)
         # note: we must not have dicts with > 2^16-1 elements
@@ -2237,11 +2241,11 @@ def valid_msgpacked_dict(d):
     else:
         # key is not a (short) str
         return False
-    key = d[key_offs : key_offs + key_len]
-    if key_len == 0 or len(key) < key_len:
+    key_end = key_offs + key_len
+    if key_len == 0 or d_len < key_end:
         return False
     # does the key look like an item key?
-    return all(c in ITEM_KEY_CHARS for c in key)
+    return all(d[i] in ITEM_KEY_CHARS for i in range(key_offs, key_end))
 
 
 class RobustUnpacker:
@@ -2301,6 +2305,10 @@ class RobustUnpacker:
         searched_end = max(self._search_offset, data_len - MAX_ITEM_HEADER_LEN)
         pending_offsets = [o for o in self._pending_offsets if data_len - o <= self.MAX_PENDING_ITEM_LEN]
         self._pending_offsets = []
+        # _buffered_data is resized below (and by feed()), which fails while a memoryview of it exists. CPython
+        # frees an unreferenced view at once, PyPy only when the garbage collector runs, so every view of
+        # _buffered_data is released explicitly: data here, the slice in _try_item_start. valid_msgpacked_dict
+        # gets (data, offset) instead of a slice of data, it only indexes data.
         with memoryview(self._buffered_data) as data:
             for offset in pending_offsets:
                 item = self._try_item_start(data, offset)
@@ -2309,7 +2317,7 @@ class RobustUnpacker:
                 elif item is not None:
                     return item
             for offset in range(self._search_offset, data_len):
-                if not valid_msgpacked_dict(data[offset:]):
+                if not valid_msgpacked_dict(data, offset):
                     continue
                 item = self._try_item_start(data, offset)
                 if item is INCOMPLETE:

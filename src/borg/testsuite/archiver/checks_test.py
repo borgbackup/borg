@@ -9,7 +9,7 @@ from ...crypto.key import keyfile_format, keyfile_parse
 from ...helpers import Location, get_security_dir, bin_to_hex
 from ...helpers import EXIT_ERROR
 from ...repository import Repository
-from .. import changedir
+from .. import changedir, are_symlinks_supported
 from . import cmd, _extract_repository_id, create_test_files
 from . import create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
 from . import set_empty_passphrase
@@ -170,6 +170,33 @@ def test_repository_move(archivers, request, monkeypatch):
     # it will re-create security-related infos in the security dir:
     for file in ("location", "key-type"):
         assert os.path.exists(os.path.join(security_dir, file))
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+def test_repository_access_via_symlink(archiver, monkeypatch):
+    # accessing the same repository directory via a different path (here: a symlink) is not a relocation.
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    security_dir = get_security_directory(archiver.repository_path)
+    repo_location = archiver.repository_location
+    symlink_location = archiver.repository_path + "_symlink"
+    os.symlink(archiver.repository_path, symlink_location)
+    monkeypatch.setenv("BORG_RELOCATED_REPO_ACCESS_IS_OK", "no")
+    for location in (repo_location, symlink_location, repo_location):
+        archiver.repository_location = location
+        cmd(archiver, "repo-info")
+    # the stored location is not updated.
+    with open(os.path.join(security_dir, "location")) as fd:
+        assert fd.read() == Location(repo_location).canonical_path()
+
+
+def test_repository_previously_remote(archiver):
+    # a repository previously accessed via a URL, now accessed via a local path, is a relocation.
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    security_dir = get_security_directory(archiver.repository_path)
+    with open(os.path.join(security_dir, "location"), "w") as fd:
+        fd.write(Location("ssh://__testsuite__/" + archiver.repository_path).canonical_path())
+    with pytest.raises(Cache.RepositoryAccessAborted):
+        cmd(archiver, "repo-info")
 
 
 def test_unknown_unencrypted(archivers, request, monkeypatch):

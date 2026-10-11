@@ -1,3 +1,4 @@
+import os
 import shutil
 from pathlib import Path
 
@@ -130,7 +131,11 @@ class SecurityManager:
         # produced in different normalization forms (NFC when typed, NFD when derived from the filesystem),
         # which would otherwise be mistaken for a repository relocation (see issue #2913). Normalizing is
         # idempotent and applied symmetrically, so it never creates a spurious mismatch for remote repos.
-        if previous_location and normalize_local_path(previous_location) != normalize_local_path(repository_location):
+        if (
+            previous_location
+            and normalize_local_path(previous_location) != normalize_local_path(repository_location)
+            and not self._is_same_local_directory(previous_location, repository_location)
+        ):
             msg = (
                 "Warning: The repository at location {} was previously located at {}\n".format(
                     repository_location, previous_location
@@ -149,6 +154,26 @@ class SecurityManager:
             logger.debug("security: updating location stored in security dir")
             with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
+
+    def _is_same_local_directory(self, previous_location, repository_location):
+        """Return True if both locations are local paths that refer to the same existing directory.
+
+        The same local repository directory can be reached via different paths, e.g. through a symlink,
+        a bind mount or a different letter case on a case-insensitive filesystem (see issue #8188).
+        This is not a relocation, so no warning is needed. The stored location is not updated.
+        """
+        if self.repository._location.proto != "file":
+            return False
+        if "://" in previous_location or not os.path.isabs(previous_location):
+            return False
+        try:
+            previous_st = os.stat(previous_location)
+            current_st = os.stat(repository_location)
+        except OSError:
+            # the previous path does not exist anymore (e.g. the repository was moved or renamed).
+            return False
+        # some filesystems report st_ino == 0 for everything, which would make any two paths look the same.
+        return previous_st.st_ino != 0 and os.path.samestat(previous_st, current_st)
 
     def assert_key_type(self, key):
         # Make sure an encrypted repository has not been swapped for an unencrypted repository

@@ -27,7 +27,6 @@ from ..platform.platform_test import fakeroot_detected, skipif_not_linux, skipif
 from ..platform.platform_test import skipif_acls_not_working
 from ..repository_test import corrupt_chunk_on_disk
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
-from . import exec_cmd
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 from . import Archiver
 from ...archiver.mount_cmds import use_passcommand_mount_option
@@ -697,30 +696,28 @@ def fake_mount_table(monkeypatch):
     monkeypatch.setattr("borg.platform.list_mounts", lambda: FAKE_MOUNT_TABLE)
 
 
-def test_mount_without_mountpoint_lists_borg_mounts(fake_mount_table):
-    rc, output = exec_cmd("mount", fork=False)
-    assert rc == 0
+def test_mount_without_mountpoint_lists_borg_mounts(archiver, fake_mount_table):
+    # note: the repository the archiver fixture refers to does not exist (and is not needed).
+    output = cmd(archiver, "mount")
     assert output.splitlines() == ["/mnt/linux", "/mnt/netbsd"]
 
 
-def test_mount_without_mountpoint_lists_borg_mounts_json(fake_mount_table):
-    rc, output = exec_cmd("mount", "--json", fork=False)
-    assert rc == 0
+def test_mount_without_mountpoint_lists_borg_mounts_json(archiver, fake_mount_table):
+    output = cmd(archiver, "mount", "--json")
     assert json.loads(output) == [
         {"source": "borgfs", "fstype": "fuse.borgfs", "mountpoint": "/mnt/linux"},
         {"source": "/dev/puffs", "fstype": "puffs|borgfs", "mountpoint": "/mnt/netbsd"},
     ]
 
 
-def test_mount_without_mountpoint_does_not_need_fuse(fake_mount_table, monkeypatch):
+def test_mount_without_mountpoint_does_not_need_fuse(archiver, fake_mount_table, monkeypatch):
     monkeypatch.setattr("borg.fuse_impl.llfuse", None)
     monkeypatch.setattr("borg.fuse_impl.has_mfusepy", False)
-    rc, output = exec_cmd("mount", fork=False)
-    assert rc == 0
+    output = cmd(archiver, "mount")
     assert output.splitlines() == ["/mnt/linux", "/mnt/netbsd"]
     # the pre-mount checks (and FUSE) are still needed when a MOUNTPOINT is given.
     with pytest.raises(RTError, match="no FUSE support"):
-        exec_cmd("mount", "/mnt/point", fork=False)
+        cmd(archiver, "mount", "/mnt/point")
 
 
 @pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")

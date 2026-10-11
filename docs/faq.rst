@@ -1362,6 +1362,10 @@ interacts with the repository (e.g., via ``borg repo-list``), depending on the v
 of ``BORG_RELOCATED_REPO_ACCESS_IS_OK``, borg may warn you that the repository
 has been moved. You will be given a prompt to confirm you are OK with this.
 
+Accessing the same local repository directory via a different path (e.g., via a
+symlink, a bind mount or a different letter case on a case-insensitive filesystem)
+is not considered a relocation, as long as the previous path still exists.
+
 If ``BORG_RELOCATED_REPO_ACCESS_IS_OK`` is unset, borg will interactively ask for
 each repository whether it's OK.
 

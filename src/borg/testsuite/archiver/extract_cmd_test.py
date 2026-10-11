@@ -1035,6 +1035,7 @@ def test_extract_continue(archivers, request):
         assert file3_st.st_mtime_ns == new_file3_st.st_mtime_ns  # file3 was extracted again
         # windows has a strange ctime behaviour when deleting and recreating a file
         if not is_win32:
+            assert dir1_st.st_ctime_ns == now_dir1_st.st_ctime_ns  # dir1 metadata not restored again
             assert file1_st.st_ctime_ns == now_file1_st.st_ctime_ns  # file not extracted again
             assert file2_st.st_ctime_ns != new_file2_st.st_ctime_ns  # file extracted again
             assert file3_st.st_ctime_ns != new_file3_st.st_ctime_ns  # file extracted again
@@ -1045,6 +1046,22 @@ def test_extract_continue(archivers, request):
             assert f.read() == CONTENTS2
         with open("input/dir3/file3", "rb") as f:
             assert f.read() == CONTENTS3
+
+
+def test_extract_continue_progress(archivers, request, monkeypatch):
+    # --progress must count the files that --continue skips as extracted.
+    archiver = request.getfixturevalue(archivers)
+    monkeypatch.setenv("BORG_PROGRESS_FPS", "1000000")  # do not rate limit the progress output
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=900 * 1024)
+    create_regular_file(archiver.input_path, "file2", size=100 * 1024)
+    cmd(archiver, "create", "arch", "input/file1", "input/file2")  # extract file1 before file2
+    with changedir("output"):
+        cmd(archiver, "extract", "arch")
+        os.truncate("input/file2", 123)  # file1 is fully extracted, file2 is not
+        output = cmd(archiver, "extract", "arch", "--continue", "--progress")
+    # file2 has a single chunk, its extraction starts after the skipped 90% of the data in file1:
+    assert " 90.0% Extracting: input/file2" in output
 
 
 @requires_hardlinks

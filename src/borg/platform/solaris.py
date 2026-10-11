@@ -14,7 +14,7 @@ import errno
 import os
 import stat
 
-from .base import ENOATTR
+from .base import ENOATTR, MountEntry
 
 # CPython exposes os.O_XATTR on Solaris-derived platforms; 0x4000 is its value on illumos
 # and Oracle Solaris (belt and braces in case the os module does not have it).
@@ -108,3 +108,24 @@ def setxattr(path, name, value, *, follow_symlinks=False):
             os.close(fd)
     finally:
         os.close(dirfd)
+
+
+def parse_mnttab(lines):
+    """Parse the lines of /etc/mnttab (str), see mnttab(5).
+
+    Each line has 5 tab-separated fields: special (source), mount point, fstype, options, time.
+    """
+    entries = []
+    for line in lines:
+        fields = line.rstrip("\n").split("\t")
+        if len(fields) < 3:
+            continue  # not a mnttab line
+        source, mountpoint, fstype = fields[:3]
+        entries.append(MountEntry(source, fstype, mountpoint))
+    return entries
+
+
+def list_mounts():
+    """See platform.base.list_mounts, illumos / Solaris implementation via /etc/mnttab."""
+    with open("/etc/mnttab", encoding="utf-8", errors="surrogateescape") as f:
+        return parse_mnttab(f)

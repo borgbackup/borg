@@ -5,10 +5,10 @@ import stat
 
 import pytest
 
-from ...platformflags import is_darwin, is_freebsd, is_linux, is_win32
+from ...platformflags import is_darwin, is_freebsd, is_linux, is_netbsd, is_sunos, is_win32
 from ...platform import acl_get, acl_set
 from ...platform import get_process_id, process_alive
-from ...platform import base
+from ...platform import base, list_mounts, MountEntry
 from .. import unopened_tempfile
 from ..fslocking_test import free_pid  # NOQA
 
@@ -175,3 +175,20 @@ def test_base_set_flags_no_current_flags(monkeypatch):
     monkeypatch.setattr(os, "lchflags", lambda p, f: calls.append(f), raising=False)
     base.set_flags(FLAGS_TESTFILE, stat.UF_NODUMP)
     assert calls == []
+
+
+@pytest.mark.skipif(
+    not (is_linux or is_darwin or is_freebsd or is_netbsd or is_sunos or is_win32),
+    reason="listing the mounted file systems is not supported on this platform",
+)
+def test_list_mounts():
+    mounts = list_mounts()
+    assert mounts and all(isinstance(entry, MountEntry) for entry in mounts)
+    root = os.environ.get("SystemDrive", "C:") if is_win32 else "/"
+    entry = next(entry for entry in mounts if entry.mountpoint == root)
+    assert entry.fstype  # e.g. ext4, apfs, ufs, ffs, zfs, NTFS
+
+
+def test_list_mounts_unsupported():
+    # the base implementation (used on the platforms without support) warns and returns an empty list.
+    assert base.list_mounts() == []

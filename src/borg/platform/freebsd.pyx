@@ -4,10 +4,26 @@ import stat
 from libc cimport errno
 
 from .posix import posix_acl_use_stored_uid_gid
+from .base import MountEntry
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
 
+
+cdef extern from "sys/param.h":
+    pass
+
+cdef extern from "sys/ucred.h":
+    pass
+
+cdef extern from "sys/mount.h":
+    # only the members we use, the header defines the struct
+    cdef struct statfs:
+        char f_fstypename[16]  # MFSNAMELEN
+        char f_mntfromname[1024]  # MNAMELEN
+        char f_mntonname[1024]  # MNAMELEN
+    int getmntinfo(statfs **mntbufp, int mode)
+    int MNT_NOWAIT
 
 cdef extern from "sys/extattr.h":
     ssize_t c_extattr_list_file "extattr_list_file" (const char *path, int attrnamespace, void *data, size_t nbytes)
@@ -283,3 +299,19 @@ def set_flags(path, bsd_flags, fd=None):
             mask = OWNER_SETTABLE_FLAGS_MASK
             continue
         raise OSError(err, os.strerror(err), path)
+
+
+def list_mounts():
+    """See platform.base.list_mounts, FreeBSD implementation via getmntinfo(3)."""
+    cdef statfs *mntbuf
+    # getmntinfo points mntbuf to an array (allocated by libc, not to be freed) of count struct statfs.
+    # MNT_NOWAIT: do not ask the file systems for fresh statistics, we only need the names.
+    cdef int count = getmntinfo(&mntbuf, MNT_NOWAIT)
+    if count <= 0:
+        raise OSError(errno.errno, "getmntinfo failed")
+    return [
+        MountEntry(
+            os.fsdecode(mntbuf[i].f_mntfromname), os.fsdecode(mntbuf[i].f_fstypename), os.fsdecode(mntbuf[i].f_mntonname)
+        )
+        for i in range(count)
+    ]

@@ -205,6 +205,33 @@ def get_flags(path, st, fd=None):
     return bsd_flags
 
 
+def _get_mnt_id(fd):
+    """Return the id of the mount the open file descriptor fd is on (Linux >= 3.15), or None."""
+    try:
+        with open(f"/proc/self/fdinfo/{fd}", "rb") as f:
+            for line in f:
+                if line.startswith(b"mnt_id:"):
+                    return int(line.split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def on_different_mounts(fd1, fd2):
+    """
+    Return whether the open file descriptors *fd1* and *fd2* are on different mounts.
+
+    Returns True or False, or None if this can not be determined.
+
+    Comparing st_dev is not good enough on Linux, e.g. btrfs subvolumes have their own st_dev,
+    so we compare the mount ids. While both fds are open, both mounts exist, so their ids are unique.
+    """
+    mnt_id1, mnt_id2 = _get_mnt_id(fd1), _get_mnt_id(fd2)
+    if mnt_id1 is None or mnt_id2 is None:
+        return None
+    return mnt_id1 != mnt_id2
+
+
 def acl_use_local_uid_gid(acl):
     """Replace the user/group field with the local uid/gid if possible
     """

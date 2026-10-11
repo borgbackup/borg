@@ -15,7 +15,7 @@ from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacke
 from ..archive import ITEM_KEYS, Statistics
 from ..archive import zero_chunk_flags, zero_chunk_id, zero_chunk_ids
 from ..archive import BackupOSError, BackupRaceConditionError, backup_io, backup_io_iter, get_item_uid_gid
-from ..archive import stat_update_check, tar_acl_to_borg
+from ..archive import stat_update_check, is_automount, tar_acl_to_borg
 from ..helpers import msgpack, StableDict
 from ..repoobj import RepoObj
 from ..item import Item, ArchiveItem
@@ -700,6 +700,27 @@ def test_stat_update_check_race_conditions(tmpdir):
         stat_update_check(st_file, st_dir)
     with pytest.raises(BackupRaceConditionError):  # inode changed
         stat_update_check(st_file, st_other)
+
+
+@pytest.mark.parametrize("mounted", [False, True, None])
+def test_is_automount(tmp_path, monkeypatch, mounted):
+    import borg.archive as archive_module
+
+    monkeypatch.setattr(archive_module, "on_different_mounts", lambda fd1, fd2: mounted)
+    (tmp_path / "dir1").mkdir()
+    (tmp_path / "dir2").mkdir()
+    (tmp_path / "file").touch()
+    st_dir1, st_dir2, st_file = (os.stat(tmp_path / name) for name in ("dir1", "dir2", "file"))
+    parent_fd, fd = 3, 4  # only passed through to on_different_mounts
+    # a different directory is only accepted if it is on a different mount than its parent:
+    assert is_automount(st_dir1, st_dir2, parent_fd, fd) is (mounted is True)
+    # the same directory is no automount, but the normal case:
+    assert is_automount(st_dir1, st_dir1, parent_fd, fd) is False
+    # a file type change is never accepted:
+    assert is_automount(st_file, st_dir2, parent_fd, fd) is False
+    assert is_automount(st_dir1, st_file, parent_fd, fd) is False
+    # without a parent fd (recursion roots), we can not check:
+    assert is_automount(st_dir1, st_dir2, None, fd) is False
 
 
 def test_get_item_uid_gid():

@@ -177,6 +177,11 @@ New features:
   - archive_dir_format
   - numeric_ids
 
+- mount: without a MOUNTPOINT, list the mountpoints of the current borg mounts
+  (``--json`` for a JSON list), #2579. Linux, macOS, FreeBSD, NetBSD, illumos
+  and Windows (drive letter mounts only) are supported.
+  On Linux, borg mounts now have the file system type ``fuse.borgfs``.
+
 Fixes:
 
 - legacy remote: use deques for the RPC call queues (performance fix for

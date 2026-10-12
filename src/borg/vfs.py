@@ -693,6 +693,20 @@ def pop_option(options, key, present, not_present, wanted_type, int_base=0):
         return not_present
 
 
+def is_borgfs_mount(source, fstype):
+    """Is this mount table entry (see platform.list_mounts) a file system mounted by borg mount?
+
+    parse_mount_options gives libfuse "fsname=borgfs" (and "subtype=borgfs" on Linux), which the OSes
+    show as source "borgfs" (Linux, macOS, FreeBSD, illumos) or as fstype "puffs|borgfs" (NetBSD) resp.
+    "fuse.borgfs" (Linux, independent of the fsname). WinFsp ignores fsname, there the file system name
+    is always "FUSE" and the volume label comes from the volname option, which defaults to "<basename>
+    (borgfs)" or "borgfs".
+    """
+    if is_win32:
+        return fstype == "FUSE" and "borgfs" in source
+    return source == "borgfs" or fstype.endswith("borgfs")
+
+
 def parse_mount_options(args, mountpoint, mount_options):
     """Process the "borg mount" options; returns (libfuse options, VFSOptions).
 
@@ -705,6 +719,10 @@ def parse_mount_options(args, mountpoint, mount_options):
     # When not using allow_other or allow_root, access is limited to the
     # mounting user anyway.
     options = ["fsname=borgfs", "ro", "default_permissions"]
+    if is_linux:
+        # the file system type then is "fuse.borgfs" (that is also what fstab entries use), so a borg
+        # mount can be recognized in the mount table even if the user overrides fsname, see is_borgfs_mount.
+        options.append("subtype=borgfs")
     if is_win32:
         # WinFsp builds the Windows security descriptor of a file from its uid, gid and mode and checks
         # all access against it. The archived uids / gids do not refer to anybody on a Windows machine,

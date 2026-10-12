@@ -1,5 +1,12 @@
 import json
+import os
+import subprocess
+import sys
+
+import pytest
+
 from borg import __version__
+from borg.helpers import EXIT_ERROR
 from borg.version import format_version, parse_version
 from borg.testsuite.archiver import Archiver, cmd
 
@@ -31,3 +38,21 @@ def test_from_borg1_default_off():
     args = archiver.parse_args(["-r", "/mnt/backup", "version"])
     assert args.func == archiver.do_version
     assert args.v1_legacy is False
+
+
+@pytest.mark.parametrize(
+    "python_opts, pythonoptimize", [(["-O"], None), ([], "1")], ids=["option-O", "env-PYTHONOPTIMIZE"]
+)
+def test_refuses_to_run_without_assertions(python_opts, pythonoptimize):
+    """borg must not run with assertions disabled (see the guard at the top of borg.archiver)."""
+    env = os.environ.copy()
+    env.pop("PYTHONOPTIMIZE", None)
+    if pythonoptimize is not None:
+        env["PYTHONOPTIMIZE"] = pythonoptimize
+    python = sys.executable or "python3"
+    result = subprocess.run(
+        [python, *python_opts, "-m", "borg", "--version"], env=env, capture_output=True, text=True, timeout=60
+    )
+    assert result.returncode == EXIT_ERROR
+    assert "Borg requires working assertions" in result.stderr
+    assert result.stdout == ""

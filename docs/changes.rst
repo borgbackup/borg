@@ -168,26 +168,40 @@ Version 2.0.0b26 (not released yet)
 
 New features:
 
-- BORG_LOCK_RECHECK_DELAY sets the race recheck delay, #9899
+- encrypt/authenticate the files cache with the repository key, #5041
+- add BORG_LOCK_RECHECK_DELAY env var to set the lock race recheck delay, #9899
+- mount: add new mount options:
+
+  - passcommand, #6804
+  - strip_components, #4880
+  - archive_dir_format
+  - numeric_ids
 
 Fixes:
 
 - legacy remote: use deques for the RPC call queues (performance fix for
   transfer), #10450
-- check --repair: RobustUnpacker: resync in linear time (performance fix), #10459
-- check --repair: RobustUnpacker: release all memoryviews of the resync buffer before
-  resizing it (BufferError on PyPy nightly)
 - import-tar: convert PAX ACLs to borg's ACL format
 - validate BORG_PACK_MAX_SIZE and BORG_PACK_MAX_COUNT, #10485
 - completion: repository directory completion fixes, #10460
-- illumos/Solaris: do not open device nodes to get their xattrs
 - check/compact/repo-compress: keep a superseded duplicate indexed in a pack
   with a defective chunk or in a truncated pack
 - check:
 
   - --verify-data --repair indexes an intact other copy of a defective chunk, #10491
   - --archives-only reports missing packs instead of crashing, #10466
+  - --repair: RobustUnpacker: resync in linear time (performance fix), #10459
   - --repair: misc. fixes, #10026
+  - --max-age and --max-duration cover the archives check, #10025, #10356
+  - show progress while --repair removes defective chunks and re-reads the written
+    packs, #9443
+  - --find-lost-archives reuses the archive metadata ids found by --verify-data, #8478
+  - --repair rebuilds a corrupt index only once, in the archives phase, #10434
+- extract --continue: skip complete dirs, count skipped files in --progress, #6857
+- create: back up automounted directories, #6652
+- security: same local repo dir via another path is not a relocation, #8188
+- locking: treat a lock object we are not permitted to read as unreadable
+- illumos/Solaris: do not open device nodes to get their xattrs
 
 Other changes:
 
@@ -199,26 +213,20 @@ Other changes:
 - ProgressIndicatorPercent: honor BORG_PROGRESS_FPS
 - ellipsis_truncate: pad a truncated string to the full width
 - export-tar/import-tar: exact ns timestamps in PAX headers
-- do not load the FUSE library in every borg process, quicker startup
+- do not load the FUSE library in every borg process, for quicker startup
+- compact:
+
+  - suggest a full check --repair for unindexed pack bytes, #10429
+  - reclaim superseded duplicates left after a full check --repair, #10471
 - docs:
 
   - document repo corruption recovery, #9825
   - faq: update sparse file support, #14
   - update packs internals to match the current code
-- CI: haiku: preload an mmap shim against the file cache corruption, workaround
-  for https://dev.haiku-os.org/ticket/20392
-- tests:
-
-  - extract --continue in test_extract_xattrs_errors
-- check:
-
-  - show progress while --repair removes defective chunks and re-reads the written packs, #9443
-  - --find-lost-archives reuses the archive metadata ids found by --verify-data, #8478
-  - --repair rebuilds a corrupt index once, in the archives phase, #10434
-- compact:
-
-  - suggest a full check --repair for unindexed pack bytes, #10429
-  - reclaim superseded duplicates left after a full check --repair, #10471
+  - add borg sticker design source, #1902
+- CI: haiku: preload an mmap shim as a workaround for the file cache corruption,
+  see https://dev.haiku-os.org/ticket/20392
+- tests: use extract --continue in test_extract_xattrs_errors
 
 
 Version 2.0.0b25 (2026-09-27)

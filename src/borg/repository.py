@@ -737,6 +737,9 @@ class CheckTracker:
     Stored at NAME as the serialized table in the repository key's envelope (see
     Repository.store_encrypt_store). new() starts an empty tracker, load() reads the stored one.
     Subclasses set NAME.
+
+    If the store denies writing or deleting NAME, save() and clear() leave the stored object as it is
+    and log a warning, once per repository object and NAME.
     """
 
     NAME: str
@@ -832,7 +835,10 @@ class CheckTracker:
         with io.BytesIO() as f:
             self.table.write(f)
             data = f.getvalue()
-        self.repository.store_encrypt_store(self.NAME, data)
+        try:
+            self.repository.store_encrypt_store(self.NAME, data)
+        except StorePermissionDenied:
+            self._warn_denied()
 
     def clear(self):
         self.table.clear()
@@ -840,6 +846,16 @@ class CheckTracker:
             self.repository.store_delete(self.NAME)
         except StoreObjectNotFound:
             pass
+        except StorePermissionDenied:
+            self._warn_denied()
+
+    def _warn_denied(self):
+        denied = self.repository.check_results_denied
+        if self.NAME not in denied:
+            denied.add(self.NAME)
+            logger.warning(
+                f"Not updating {self.NAME}: permission denied. The check results stored there stay as they are."
+            )
 
 
 class PackTracker(CheckTracker):
@@ -870,19 +886,6 @@ class ArchiveTracker(CheckTracker):
     """
 
     NAME = "cache/checked-archives"
-
-    def save(self):
-        # a client without write permission for cache/ can still check archives, it just keeps no records.
-        try:
-            super().save()
-        except StorePermissionDenied:
-            logger.warning(f"Not storing the archive check results: no permission to write {self.NAME}.")
-
-    def clear(self):
-        try:
-            super().clear()
-        except StorePermissionDenied:
-            logger.warning(f"Not clearing the archive check results: no permission to delete {self.NAME}.")
 
 
 class _ConfigMissing(Exception):
@@ -1088,6 +1091,8 @@ class Repository:
         # server-side, so the client does not check them (see above).
         self.permissions = None if location.proto == "ssh" else permissions
         self.store_opened = False
+        # NAMEs of the check results the store denied updating, see CheckTracker.
+        self.check_results_denied = set()
         self.version = None
         self.id = None
         # the crypto suite of the repository's key, as recorded in the repository config (see save_config):

@@ -2361,6 +2361,28 @@ def test_checked_archives_roundtrip(tmp_path, caplog):
         assert not repository.store.info(ArchiveTracker.NAME).exists
 
 
+@pytest.mark.parametrize("tracker_cls", [PackTracker, ArchiveTracker])
+def test_check_tracker_store_denied(tmp_path, caplog, tracker_cls):
+    # a store that denies writing and deleting NAME keeps the stored records, each repository object warns once.
+    path = str(tmp_path / "repo")
+    with Repository(path, exclusive=True, create=True) as repository:
+        tracker = tracker_cls.new(repository)
+        tracker.record(H(1), ok=True)
+        tracker.save()
+    message = f"Not updating {tracker_cls.NAME}: permission denied."
+    for _ in range(2):
+        caplog.clear()
+        with Repository(path, exclusive=True, permissions="read-only") as repository:
+            with caplog.at_level(logging.WARNING, logger="borg.repository"):
+                tracker = tracker_cls.load(repository)
+                tracker.record(H(2), ok=True)
+                tracker.save()
+                tracker.prune(set())  # clears
+                tracker_cls.new(repository).clear()
+            assert caplog.text.count(message) == 1
+            assert [id for id, _ in tracker_cls.load(repository).table.items()] == [H(1)]
+
+
 @pytest.mark.parametrize("damage", ["none", "corrupt-pack", "missing-pack"])
 def test_check_clears_checked_archives_on_pack_damage(tmp_path, damage):
     location = os.fspath(tmp_path / "repo")

@@ -125,9 +125,10 @@ def test_repository_permissions_read_only(archivers, request, monkeypatch):
     extracted_files = os.listdir("output")
     assert len(extracted_files) > 0
 
-    # Check the archives: this works, but the check results cannot be stored.
-    output = cmd(archiver, "check", "--archives-only", exit_code=0)
-    assert "Not storing the archive check results" in output
+    # Check the repository and the archives: this works, but the check results cannot be stored.
+    output = cmd(archiver, "check", exit_code=0)
+    assert output.count("Not updating cache/checked-packs: permission denied.") == 1
+    assert output.count("Not updating cache/checked-archives: permission denied.") == 1
 
     # Try to create a new archive, which should fail.
     with pytest.raises(PermissionDenied):

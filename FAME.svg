@@ -16,19 +16,19 @@
 </style>
 <rect class="bg" x="0" y="0" width="760" height="524" rx="6"/>
 <text class="title" x="14" y="26">Borg contributors</text>
-<text class="subtitle" x="14" y="44">top 20 of 374 by commits on the master branch</text>
+<text class="subtitle" x="14" y="44">top 20 of 375 by commits on the master branch</text>
 <text class="name" x="14" y="73">Thomas Waldmann</text>
 <rect class="bar" x="240" y="63" width="436" height="12" rx="2"/>
-<text class="count" x="746" y="73">7,813</text>
+<text class="count" x="746" y="73">7,862</text>
 <text class="name" x="14" y="95">Marian Beermann</text>
-<rect class="bar" x="240" y="85" width="64" height="12" rx="2"/>
+<rect class="bar" x="240" y="85" width="63" height="12" rx="2"/>
 <text class="count" x="746" y="95">1,140</text>
 <text class="name" x="14" y="117">Jonas Borgström</text>
 <rect class="bar" x="240" y="107" width="31" height="12" rx="2"/>
 <text class="count" x="746" y="117">560</text>
 <text class="name" x="14" y="139">Mrityunjay Raj</text>
 <rect class="bar" x="240" y="129" width="17" height="12" rx="2"/>
-<text class="count" x="746" y="139">305</text>
+<text class="count" x="746" y="139">314</text>
 <text class="name" x="14" y="161">Antoine Beaupré</text>
 <rect class="bar" x="240" y="151" width="16" height="12" rx="2"/>
 <text class="count" x="746" y="161">285</text>
@@ -39,7 +39,7 @@
 <rect class="bar" x="240" y="195" width="4" height="12" rx="2"/>
 <text class="count" x="746" y="205">71</text>
 <text class="name" x="14" y="227">Thalian</text>
-<rect class="bar" x="240" y="217" width="4" height="12" rx="2"/>
+<rect class="bar" x="240" y="217" width="3" height="12" rx="2"/>
 <text class="count" x="746" y="227">63</text>
 <text class="name" x="14" y="249">Martin Hostettler</text>
 <rect class="bar" x="240" y="239" width="3" height="12" rx="2"/>

@@ -1,9 +1,11 @@
-"""borg 1.x directory layout, kept only so borg transfer can read v1 repos.
+"""borg 1.x directory layout, kept only so borg transfer (and now also the
+known-repos command) can read v1 repo state.
 
 The borg2 directory functions live in helpers.fs. This module keeps the old
-home/base, config, cache, keys and security dir resolution. borg.security is
-the only caller, and only when repository.version == 1. It goes away with the
-rest of the borg 1.x transfer support.
+home/base, config, cache, keys and security dir resolution. Callers are
+borg.security (only when repository.version == 1) and
+borg.archiver.known_repos_cmd (read-only, create=False). It goes away with
+the rest of the borg 1.x transfer support.
 """
 
 import os
@@ -126,7 +128,7 @@ def get_keys_dir(*, create=True):
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        keys_dir = str(Path(get_config_dir()) / "keys")
+        keys_dir = str(Path(get_config_dir(create=create)) / "keys")
     if create:
         ensure_dir(keys_dir)
     return keys_dir
@@ -137,7 +139,7 @@ def get_security_dir(repository_id=None, *, create=True):
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = str(Path(get_config_dir()) / "security")
+        security_dir = str(Path(get_config_dir(create=create)) / "security")
     if repository_id:
         security_dir = str(Path(security_dir) / repository_id)
     if create:

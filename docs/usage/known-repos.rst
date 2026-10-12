@@ -5,26 +5,23 @@ Examples
 ::
 
     $ borg known-repos
-    Repository ID: 0a2744f216526be75ae14a5fa5b123127bb218558219f6203e09e4f220e45903
-      Layout: borg2
-      Location: /path/to/repo
-      Local cache: yes, 1.23 MB
-      Cache last written: 2026-10-07T21:00:00.000000+09:00
-      Security info: yes (aes256-ocb, sha256)
+    Repository ID     Layout Cache Security           Key files Last written        Location
+    401606173d54eab.. borg2  180 B aes256-ocb, sha256 -         2026-10-12T17:15:19 /path/to/repo
 
     $ borg known-repos --json
     {
         "repositories": [
             {
-                "cache_config_mtime": "2026-10-07T21:00:00.000000+09:00",
-                "cache_size": 1234567,
+                "cache_config_mtime": "2026-10-12T17:15:19.785785+09:00",
+                "cache_size": 180,
                 "has_cache": true,
                 "has_security_info": true,
-                "id": "0a2744f216526be75ae14a5fa5b123127bb218558219f6203e09e4f220e45903",
+                "id": "401606173d54eab22cd98de67278d093e3bae7b187da3af8c6430f18fa1112bb",
+                "key_file_count": 0,
                 "key_type": "aes256-ocb, sha256",
-                "key_type_raw": "16",
                 "layout": "borg2",
-                "location": "/path/to/repo"
+                "location": "/path/to/repo",
+                "location_mismatch": false
             }
         ]
     }

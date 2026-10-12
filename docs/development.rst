@@ -241,6 +241,40 @@ follow their `guide about avoiding ruining git blame`_:
 .. _black: https://black.readthedocs.io/
 .. _guide about avoiding ruining git blame: https://black.readthedocs.io/en/stable/guides/introducing_black_to_your_project.html#avoiding-ruining-git-blame
 
+Using assert
+------------
+
+Use ``assert`` only for conditions that can be false only if borg itself has a bug:
+internal invariants, pre- and postconditions between borg's own functions, types of
+arguments passed by borg's own callers and unreachable branches. A traceback is the
+wanted outcome there.
+
+Anything that can be false without a bug in borg must be checked with
+``if ...: raise ...``, e.g.:
+
+- repository/store objects (authenticated does not mean well-formed),
+- local cache, config and key files,
+- legacy borg 1.x data,
+- responses from a remote server,
+- user input (command line arguments, environment variables, patterns, paths),
+- results from the OS and the filesystem.
+
+Prefer borg's own exception classes there (``IntegrityError``, ``Error`` subclasses with an
+exit code), so that users get an error message and a meaningful return code instead of a
+traceback. Raise ``ValueError`` or ``TypeError`` only where the callers catch them.
+
+Validate such data at the boundary where it enters borg (where it is parsed). Deeper helpers
+that only get the validated data may then keep using ``assert`` for their invariants.
+
+Never use ``assert`` for security decisions (e.g. path sanitizing, authentication, permission
+checks) and never put side effects into an ``assert`` expression.
+
+Borg refuses to start if assertions are disabled (``python -O`` or ``PYTHONOPTIMIZE``). The
+guard for that is at the top of ``src/borg/archiver/__init__.py``, so it only covers code
+paths that import ``borg.archiver``.
+
+The test suite uses plain pytest-style ``assert`` statements.
+
 Continuous Integration
 ----------------------
 

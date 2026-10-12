@@ -35,11 +35,14 @@ def test_index_and_cache_in_the_key_envelope(archivers, request, encryption):
     with open_repository(archiver) as repository:
         ids = [id for id, _ in repository.chunks.iteritems()]
         pack_ids = [hex_to_bin(info.name) for info in repository.store_list("packs")]
+        archive_ids = [hex_to_bin(info.name) for info in repository.store_list("archives")]
         fragments = raw_store_objects(repository, "index")
         caches = raw_store_objects(repository, "cache")
     assert ids and fragments
     references = [data for name, data in caches.items() if name.startswith(REFERENCED_BY_ARCHIVE)]
     checked_packs = caches["checked-packs"]
+    checked_archives = caches["checked-archives"]
+    assert len(archive_ids) == 1
     assert len(references) == 1  # one archive
     for name, data in fragments.items():
         assert store_hash(data).hexdigest() == name  # borg check verifies the fragments by name
@@ -47,10 +50,12 @@ def test_index_and_cache_in_the_key_envelope(archivers, request, encryption):
         assert not any(id in data for data in fragments.values() for id in ids)
         assert not any(id in references[0] for id in ids)
         assert not any(pack_id in checked_packs for pack_id in pack_ids)
+        assert archive_ids[0] not in checked_archives
     else:
         assert all(any(id in data for data in fragments.values()) for id in ids)
         assert any(id in references[0] for id in ids)
         assert all(pack_id in checked_packs for pack_id in pack_ids)
+        assert archive_ids[0] in checked_archives
 
 
 def test_references_cache_of_another_archive(archivers, request):

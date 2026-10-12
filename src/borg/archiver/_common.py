@@ -32,11 +32,22 @@ logger = create_logger(__name__)
 
 
 def get_repository(
-    location, *, create, exclusive, lock_wait, lock, args, v1_legacy, allow_incomplete=False, other=False
+    location,
+    *,
+    create,
+    exclusive,
+    lock_wait,
+    lock,
+    args,
+    v1_legacy,
+    allow_incomplete=False,
+    other=False,
+    store_cache=True,
 ):
     # create_config=False: when creating, the command (repo-create) writes the repository config itself,
     # once the key exists, see Repository.create(). For an existing repository, the flag is irrelevant.
     # other=True: the "other" repository, its key is loaded with the BORG_OTHER_* settings (see key_factory).
+    # store_cache=False: ignore BORG_STORE_CACHE, read all packs from the repository.
     key_loader = functools.partial(key_factory, other=True) if other else None
     if location.proto == "ssh" and v1_legacy:
         # legacy borg 1.x repository, served by a remote "borg serve" via the legacy RPC protocol
@@ -58,6 +69,7 @@ def get_repository(
             lock_wait=lock_wait,
             lock=lock,
             key_loader=key_loader,
+            store_cache=store_cache,
         )
 
     else:
@@ -77,6 +89,7 @@ def get_repository(
                 lock_wait=lock_wait,
                 lock=lock,
                 key_loader=key_loader,
+                store_cache=store_cache,
             )
     return repository
 
@@ -121,6 +134,7 @@ def with_repository(
     secure=True,
     allow_v1=False,
     allow_incomplete=False,
+    store_cache=True,
 ):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
@@ -135,6 +149,8 @@ def with_repository(
     :param allow_v1: (bool) allow legacy Borg 1.x repositories
     :param allow_incomplete: (bool) also open a store without repository config (repository.incomplete is
            True then, nothing else is usable), see Repository.create() - for "borg repo-delete --force".
+    :param store_cache: (bool) use the pack cache configured by BORG_STORE_CACHE.
+           False: ignore BORG_STORE_CACHE, read all packs from the repository.
     """
     # We may need to modify `lock` inside `wrapper`. Therefore we cannot use the
     # `nonlocal` statement to access `lock` as modifications would also
@@ -164,6 +180,7 @@ def with_repository(
                 args=args,
                 v1_legacy=v1_legacy,
                 allow_incomplete=allow_incomplete,
+                store_cache=store_cache,
             )
 
             with repository:

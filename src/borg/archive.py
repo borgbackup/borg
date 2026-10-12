@@ -3175,15 +3175,16 @@ class ArchiveChecker:
                     raise Exception("Unknown archive metadata version")
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
-                complete = True
+                complete = False
                 for item in robust_iterator(archive):
                     if sig_int and not self.repair:
                         # without --repair the archive is only read, so the check also stops within it.
-                        complete = False
                         break
                     if "chunks" in item:
                         verify_file_chunks(info.name, item)
                     items_buffer.add(item)
+                else:
+                    complete = True
                 items_buffer.flush(flush=True)
                 if self.repair:
                     archive.item_ptrs = archive_put_items(

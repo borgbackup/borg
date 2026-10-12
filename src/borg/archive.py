@@ -429,17 +429,19 @@ class DownloadPipeline:
         (recreate, transfer) abort instead of storing all-zero data as if it were the content.
         If *damaged* is a list, the ids of the replaced chunks are appended to it, so the caller
         can report the affected file.
+        A chunk size (ChunkListEntry) that does not match the chunk data, or that is invalid for a
+        replacement chunk, raises IntegrityError.
         """
         assert ro_type is not None
 
         def replacement(id, size, problem):
             # all-zero chunk of the correct size, so the content stream keeps its offsets.
+            if not 0 <= size <= len(zeros):
+                raise IntegrityError(f"chunk {bin_to_hex(id)}: invalid size {size} in chunk list")
             logger.error(f"repository object {bin_to_hex(id)} {problem}, returning {size} zero bytes.")
             if damaged is not None:
                 damaged.append(id)
-            data = zeros[:size]
-            assert len(data) == size, f"replacement chunk size {size} exceeds {len(zeros)}"
-            return data
+            return zeros[:size]
 
         ids = []
         sizes = []
@@ -484,7 +486,10 @@ class DownloadPipeline:
                         data = replacement(id, size, f"corrupted ({err})")
                     else:
                         self.parsed_cache[(id, ro_type)] = data
-            assert data is None or size is None or len(data) == size
+            if data is not None and size is not None and len(data) != size:
+                raise IntegrityError(
+                    f"chunk {bin_to_hex(id)}: size {size} in chunk list does not match data size {len(data)}"
+                )
             yield data
 
 
@@ -704,6 +709,8 @@ class Archive:
         metadata = ArchiveItem(internal_dict=archive)
         if metadata.version not in (1, 2):  # legacy: still need to read v1 archives
             raise Exception("Unknown archive metadata version")
+        if ("item_ptrs" in metadata) == ("items" in metadata):
+            raise IntegrityError(f"archive {bin_to_hex(id)}: metadata needs exactly one of item_ptrs, items")
         return metadata
 
     def load(self, id, *, metadata=None):
@@ -2079,7 +2086,7 @@ class TarfileObjectProcessors:
     def create_helper(self, tarinfo, status=None, type=None):
         ph = tarinfo.pax_headers
         if ph and "BORG.item.version" in ph:
-            assert ph["BORG.item.version"] == "1"
+            assert ph["BORG.item.version"] == "1"  # the caller skips members with other versions
             meta_bin = base64.b64decode(ph["BORG.item.meta"])
             meta_dict = msgpack.unpackb(meta_bin, object_hook=StableDict)
             item = Item(internal_dict=meta_dict)

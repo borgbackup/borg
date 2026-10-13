@@ -1,0 +1,91 @@
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "borg-known-repos" "1" "2026-10-13" "" "borg backup tool"
+.SH Name
+borg-known-repos \- List repositories Borg has local state for (security info and/or cache).
+.SH SYNOPSIS
+.sp
+borg [common options] known\-repos [options]
+.SH DESCRIPTION
+.sp
+Lists the repositories this local Borg installation currently has state for \-
+security info (key type, last known location), a local repository cache, and/or key
+files \- without accessing any repository itself (\-r/\-\-repo has no effect). \(dqLayout\(dq
+is which state was found in (not the on\-disk repository format, see \(dqborg repo\-info\(dq
+for that); \(dqLast written\(dq is the cache config\(aqs mtime, a best\-effort last\-used proxy,
+not an exact timestamp and not a staleness check on its own; a mismatch between a
+legacy repo\(aqs known location and its cache\(aqs last location is flagged; a key file\(aqs
+presence does not by itself mean the repository is still openable. Use \-\-json for a
+machine\-readable version, including the full repository id.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.B  \-\-json
+format output as JSON
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+$ borg known\-repos
+Repository ID     Layout Cache Security           Key files Last written        Location
+401606173d54eab.. borg2  180 B aes256\-ocb, sha256 \-         2026\-10\-12T17:15:19 /path/to/repo
+
+$ borg known\-repos \-\-json
+{
+    \(dqrepositories\(dq: [
+        {
+            \(dqcache_config_mtime\(dq: \(dq2026\-10\-12T17:15:19.785785+09:00\(dq,
+            \(dqcache_size\(dq: 180,
+            \(dqhas_cache\(dq: true,
+            \(dqhas_security_info\(dq: true,
+            \(dqid\(dq: \(dq401606173d54eab22cd98de67278d093e3bae7b187da3af8c6430f18fa1112bb\(dq,
+            \(dqkey_file_count\(dq: 0,
+            \(dqkey_type\(dq: \(dqaes256\-ocb, sha256\(dq,
+            \(dqlayout\(dq: \(dqborg2\(dq,
+            \(dqlocation\(dq: \(dq/path/to/repo\(dq,
+            \(dqlocation_mismatch\(dq: false
+        }
+    ]
+}
+.EE
+.UNINDENT
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH Author
+The Borg Collective
+.\" End of generated man page.

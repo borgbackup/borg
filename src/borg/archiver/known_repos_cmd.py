@@ -340,7 +340,8 @@ class KnownReposMixIn:
     def build_parser_known_repos(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        known_repos_epilog = process_epilog("""
+        known_repos_epilog = process_epilog(
+            """
         Lists the repositories this local Borg installation currently has state for -
         security info (key type, last known location), a local repository cache, and/or key
         files - without accessing any repository itself (-r/--repo has no effect). "Layout"
@@ -350,7 +351,8 @@ class KnownReposMixIn:
         legacy repo's known location and its cache's last location is flagged; a key file's
         presence does not by itself mean the repository is still openable. Use --json for a
         machine-readable version, including the full repository id.
-        """)
+        """
+        )
         subparser = ArgumentParser(
             parents=[common_parser], description=self.do_known_repos.__doc__, epilog=known_repos_epilog
         )

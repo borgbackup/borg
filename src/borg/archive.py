@@ -3204,6 +3204,16 @@ class ArchiveChecker:
                 archive = ArchiveItem(internal_dict=archive)
                 if archive.version != 2:
                     raise Exception("Unknown archive metadata version")
+                if "item_ptrs" not in archive or "items" in archive:
+                    logger.error(f"Archive metadata block {archive_id_hex} is invalid: needs item_ptrs and no items")
+                    self.error_found = True
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    record_result(archive_id, found_before)
+                    continue
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 complete = False

@@ -40,11 +40,12 @@ Lists the repositories this local Borg installation currently has state for \-
 security info (key type, last known location), a local repository cache, and/or key
 files \- without accessing any repository itself (\-r/\-\-repo has no effect). \(dqLayout\(dq
 is which state was found in (not the on\-disk repository format, see \(dqborg repo\-info\(dq
-for that); \(dqLast written\(dq is the cache config\(aqs mtime, a best\-effort last\-used proxy,
-not an exact timestamp and not a staleness check on its own; a mismatch between a
-legacy repo\(aqs known location and its cache\(aqs last location is flagged; a key file\(aqs
-presence does not by itself mean the repository is still openable. Use \-\-json for a
-machine\-readable version, including the full repository id.
+for that) \- a security\-only repo gets \(dqunknown\(dq when $BORG_SECURITY_DIR makes the
+borg2 and legacy security roots coincide; \(dqLast written\(dq is the cache config\(aqs mtime,
+a best\-effort last\-used proxy, not an exact timestamp and not a staleness check on its
+own; a mismatch between a legacy repo\(aqs known location and its cache\(aqs last location
+is flagged; a key file\(aqs presence does not by itself mean the repository is still
+openable. Use \-\-json for a machine\-readable version.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -60,8 +61,8 @@ format output as JSON
 .sp
 .EX
 $ borg known\-repos
-Repository ID     Layout Cache Security           Key files Last written        Location
-401606173d54eab.. borg2  180 B aes256\-ocb, sha256 \-         2026\-10\-12T17:15:19 /path/to/repo
+Repository ID                                                    Layout Cache Security           Key files Last written        Location
+401606173d54eab22cd98de67278d093e3bae7b187da3af8c6430f18fa1112bb borg2  180 B aes256\-ocb, sha256 \-         2026\-10\-12T17:15:19 /path/to/repo
 
 $ borg known\-repos \-\-json
 {

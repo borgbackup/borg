@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -71,7 +72,7 @@ def test_known_repos_lists_repo_with_cache(archivers, request):
     repo_id = info["id"]
 
     result = cmd(archiver, "known-repos")
-    assert repo_id[:15] in result
+    assert repo_id in result.split()
     assert "borg2" in result
 
     result_json = json.loads(cmd(archiver, "known-repos", "--json"))
@@ -449,3 +450,24 @@ def test_known_repos_flags_location_mismatch_between_security_and_cache(archiver
 
     table_result = cmd(archiver, "known-repos")
     assert "(!= cache's last location)" in table_result
+
+
+def test_known_repos_location_mismatch_ignores_nfc_nfd_difference(archivers, request):
+    """Same path, different unicode normalization (NFC vs. NFD, see #2913) in the security
+    location and cache previous_location: not a mismatch on macOS (normalize_local_path()
+    normalizes both), but is one elsewhere (it's a no-op there).
+    """
+    from borg.platformflags import is_darwin
+
+    archiver = request.getfixturevalue(archivers)
+    nfc_path = unicodedata.normalize("NFC", "/absolute/tëst")
+    nfd_path = unicodedata.normalize("NFD", "/absolute/tëst")
+    assert nfc_path != nfd_path  # sanity: the two forms really differ byte-wise
+
+    repo_id = "e" * 64
+    _write_legacy_security(repo_id, nfc_path)
+    _write_legacy_cache(repo_id, previous_location=nfd_path)
+
+    result_json = json.loads(cmd(archiver, "known-repos", "--json"))
+    repo = next(r for r in result_json["repositories"] if r["id"] == repo_id)
+    assert repo["location_mismatch"] is (not is_darwin)

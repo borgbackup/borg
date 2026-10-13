@@ -5,8 +5,8 @@ Examples
 ::
 
     $ borg known-repos
-    Repository ID     Layout Cache Security           Key files Last written        Location
-    401606173d54eab.. borg2  180 B aes256-ocb, sha256 -         2026-10-12T17:15:19 /path/to/repo
+    Repository ID                                                    Layout Cache Security           Key files Last written        Location
+    401606173d54eab22cd98de67278d093e3bae7b187da3af8c6430f18fa1112bb borg2  180 B aes256-ocb, sha256 -         2026-10-12T17:15:19 /path/to/repo
 
     $ borg known-repos --json
     {

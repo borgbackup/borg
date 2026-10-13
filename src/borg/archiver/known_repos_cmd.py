@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..crypto.key import LEGACY_KEY_TYPES, AVAILABLE_KEY_TYPES, KEYFILE_ID
 from ..helpers import format_file_size, json_print, get_security_dir, get_cache_dir, get_keys_dir
-from ..helpers import safe_timestamp, OutputTimestamp
+from ..helpers import safe_timestamp, OutputTimestamp, normalize_local_path
 from ..helpers.argparsing import ArgumentParser
 from ..legacy.fs import get_cache_dir as get_cache_dir_legacy
 from ..legacy.fs import get_security_dir as get_security_dir_legacy
@@ -276,7 +276,13 @@ class KnownReposMixIn:
                     if location is None:
                         location = cache_location
                     else:
-                        location_mismatch = cache_location is not None and cache_location != location
+                        # Compare the two stored location strings the same way
+                        # assert_location_matches() does: normalize both sides' unicode form
+                        # first (a no-op outside macOS), so on macOS an NFC vs. NFD difference
+                        # alone isn't mistaken for a mismatch (#2913).
+                        location_mismatch = cache_location is not None and normalize_local_path(
+                            cache_location
+                        ) != normalize_local_path(location)
 
             repos.append(
                 {
@@ -322,7 +328,7 @@ class KnownReposMixIn:
                 location += " (!= cache's last location)"
             rows.append(
                 (
-                    repo["id"][:15] + "..",
+                    repo["id"],
                     repo["layout"] or "unknown",
                     format_file_size(repo["cache_size"]) if repo["has_cache"] else "-",
                     security,
@@ -346,11 +352,12 @@ class KnownReposMixIn:
         security info (key type, last known location), a local repository cache, and/or key
         files - without accessing any repository itself (-r/--repo has no effect). "Layout"
         is which state was found in (not the on-disk repository format, see "borg repo-info"
-        for that); "Last written" is the cache config's mtime, a best-effort last-used proxy,
-        not an exact timestamp and not a staleness check on its own; a mismatch between a
-        legacy repo's known location and its cache's last location is flagged; a key file's
-        presence does not by itself mean the repository is still openable. Use --json for a
-        machine-readable version, including the full repository id.
+        for that) - a security-only repo gets "unknown" when $BORG_SECURITY_DIR makes the
+        borg2 and legacy security roots coincide; "Last written" is the cache config's mtime,
+        a best-effort last-used proxy, not an exact timestamp and not a staleness check on its
+        own; a mismatch between a legacy repo's known location and its cache's last location
+        is flagged; a key file's presence does not by itself mean the repository is still
+        openable. Use --json for a machine-readable version.
         """
         )
         subparser = ArgumentParser(

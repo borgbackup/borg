@@ -1,5 +1,5 @@
-"""borg 1.x directory layout, kept only so borg transfer (and now also the
-known-repos command) can read v1 repo state.
+"""borg 1.x directory layout, kept only so borg transfer and known-repos can read v1
+repo state.
 
 The borg2 directory functions live in helpers.fs. This module keeps the old
 home/base, config, cache, keys and security dir resolution. Callers are

@@ -172,8 +172,9 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
 
     info "Starting backup"
 
-    # Back up the most important directories into an archive named after
-    # the machine this script is currently running on:
+    # Back up the most important directories into an archive of the
+    # "backup-sys-home" series. The archive name describes the archive content;
+    # borg records the host, user and time of the backup in the archive metadata:
 
     borg create                         \
         --verbose                       \
@@ -186,7 +187,7 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
         --exclude 'home/*/.cache/*'     \
         --exclude 'var/tmp/*'           \
                                         \
-        '{hostname}'                    \
+        backup-sys-home                 \
         /etc                            \
         /home                           \
         /root                           \
@@ -197,12 +198,15 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
     info "Pruning repository"
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. The '{hostname}' matching is very important to
-    # limit prune's operation to archives with exactly that name and not apply
-    # to archives with other names also:
+    # archives of the "backup-sys-home" series. Giving the series name is very
+    # important to limit prune's operation to archives with exactly that name and
+    # not apply to archives with other names also. By default, prune applies the
+    # retention rules separately per archive name and host, so if several machines
+    # back up to the same repository, each machine's archives get their own
+    # retention and do not push out the archives of other machines:
 
     borg prune               \
-        '{hostname}'         \
+        backup-sys-home      \
         --list               \
         --show-rc            \
         --keep-daily    7    \

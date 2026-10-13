@@ -462,9 +462,14 @@ class HelpMixIn:
 
         Examples::
 
-            borg create --repo /path/to/repo {hostname}-{user}-{utcnow} ...
-            borg create --repo /path/to/repo {hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
-            borg prune -a 'sh:{hostname}-*' ...
+            borg --repo /path/to/repo prune -a 'host:{hostname}' ...
+            borg --repo 'sftp://backup@server/repos/{hostname}' create backup-sys-home ...
+
+        Archive names should describe the archive content (e.g. ``backup-sys-home``) and be
+        the same for all archives of a series. Do not put the hostname, user or a timestamp into
+        the archive name - borg stores them in the archive metadata anyway. Varying archive names
+        (e.g. due to ``{now}``) put every archive into a series of its own, which defeats the
+        files cache and makes ``borg prune`` keep all of them.
 
         .. note::
             systemd uses a difficult, non-standard syntax for command lines in unit files (refer to

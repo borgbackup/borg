@@ -40,9 +40,6 @@ Examples
     # Use zlib compression (good, but slow) — default is LZ4 (fast, low compression ratio)
     $ borg create -C zlib,6 --one-file-system root-archive /
 
-    # Backup into an archive name like FQDN-root
-    $ borg create '{fqdn}-root' /
-
     # Back up a remote host locally ("pull" style) using SSHFS
     $ mkdir sshfs-mount
     $ sshfs root@example.com:/ sshfs-mount

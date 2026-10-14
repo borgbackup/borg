@@ -54,13 +54,15 @@ def _archiveinfo(name, id_, ts=TS, *, username="", hostname="", tags=()):
 
 def _stub_matching_info_tuples(infos):
     ar, _, _ = _archives()
-    ar._matching_info_tuples = Mock(side_effect=lambda match_patterns, match_end, deleted=False: list(infos))
+    ar._matching_info_tuples = Mock(
+        side_effect=lambda match_patterns, match_end, deleted=False, tolerate_read_errors=False: list(infos)
+    )
     return ar
 
 
 def _stub_info_tuples(infos):
     ar, _, _ = _archives()
-    ar._info_tuples = Mock(side_effect=lambda deleted=False: iter(infos))
+    ar._info_tuples = Mock(side_effect=lambda deleted=False, tolerate_read_errors=False: iter(infos))
     return ar
 
 
@@ -385,7 +387,9 @@ def test_archive_infos_carry_metadata():
     # the ArchiveInfos made by list(), get() and get_by_id() carry the parsed ArchiveItem.
     archive_item = object()  # stands in for the ArchiveItem
     ar, repo, _ = _archives()
-    ar._infos = Mock(side_effect=lambda deleted=False: iter([(_archive_meta("a", _id(1)), archive_item)]))
+    ar._infos = Mock(
+        side_effect=lambda deleted=False, tolerate_read_errors=False: iter([(_archive_meta("a", _id(1)), archive_item)])
+    )
     ar._get_archive_meta = Mock(side_effect=lambda id_: (_archive_meta("a", _id(1)), archive_item))
     repo.store_list.return_value = [_iteminfo(_id(1))]
     assert [info.metadata for info in ar.list()] == [archive_item]
@@ -501,9 +505,9 @@ def test_list_date_filter():
 
 def test_list_deleted_passes_flag():
     ar, _, _ = _archives()
-    ar._info_tuples = Mock(side_effect=lambda deleted=False: iter([]))
+    ar._info_tuples = Mock(side_effect=lambda deleted=False, tolerate_read_errors=False: iter([]))
     ar.list(deleted=True)
-    ar._info_tuples.assert_called_once_with(deleted=True)
+    ar._info_tuples.assert_called_once_with(deleted=True, tolerate_read_errors=False)
 
 
 def test_list_match_name():
@@ -600,9 +604,10 @@ def test_get_one_multiple_matches_raises():
 def test_get_one_deleted_passes_flag():
     i1 = _archiveinfo("a", _id(1))
     ar, _, _ = _archives()
-    ar._info_tuples = Mock(side_effect=lambda deleted=False: iter([i1]))
+    ar._info_tuples = Mock(side_effect=lambda deleted=False, tolerate_read_errors=False: iter([i1]))
     ar.get_one(["a"], deleted=True)
-    ar._info_tuples.assert_called_once_with(deleted=True)
+    # get_one never opts into tolerance: it must not return a placeholder for an unreadable archive.
+    ar._info_tuples.assert_called_once_with(deleted=True, tolerate_read_errors=False)
 
 
 def test_list_considering_raises_if_name_set():

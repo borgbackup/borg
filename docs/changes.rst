@@ -202,6 +202,13 @@ Fixes:
     packs, #9443
   - --find-lost-archives reuses the archive metadata ids found by --verify-data, #8478
   - --repair rebuilds a corrupt index only once, in the archives phase, #10434
+  - do not crash with a traceback when a repository object can not be read
+    (I/O error, e.g. failing disk or flaky network filesystem). The affected object
+    is reported, the check continues and fails at the end. Such an object is not
+    recorded as corrupt (a later check verifies it again), ``--repair`` refuses to
+    repair around it and ``--verify-data`` no longer deletes chunks it could not
+    read. Other commands stop with the read error instead of working with a
+    partially readable repository, #3509
 - extract --continue: skip complete dirs, count skipped files in --progress, #6857
 - create: back up automounted directories, #6652
 - security: same local repo dir via another path is not a relocation, #8188

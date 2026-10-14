@@ -653,6 +653,34 @@ def test_damaged_archive_item_ptrs_chunk(archivers, request, damage):
     cmd(archiver, "check", "--archives-only", exit_code=0)
 
 
+@pytest.mark.parametrize("ptrs_keys", [[], ["item_ptrs", "items"]], ids=["no-item-ptrs", "items-too"])
+def test_archive_metadata_invalid_item_ptrs(archivers, request, ptrs_keys):
+    # authenticated v2 archive metadata needs item_ptrs and no items: check treats it as broken metadata.
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    repo_objs = archive.repo_objs
+    with repository:
+        archive_dict = archive.metadata.as_dict()
+        archive_dict["name"] = "archive_broken"
+        del archive_dict["item_ptrs"]
+        for key in ptrs_keys:
+            archive_dict[key] = []
+        data = repo_objs.key.pack_metadata(archive_dict)
+        archive_id = repo_objs.id_hash(data)
+        repository.put(archive_id, repo_objs.format(archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META))
+        archive.manifest.archives.create("archive_broken", archive_id, archive.ts)
+    archive_id_hex = bin_to_hex(archive_id)
+    output = cmd(archiver, "check", "-v", "--archives-only", exit_code=1)
+    assert f"Archive metadata block {archive_id_hex} is invalid: " in output
+    assert f"Would delete broken archive archive_broken {archive_id_hex}." in output
+    assert "archive2" in output  # the check continued with the next archive
+    output = cmd(archiver, "check", "--archives-only", "--repair", exit_code=0)
+    assert f"Deleting broken archive archive_broken {archive_id_hex}." in output
+    cmd(archiver, "check", "--archives-only", exit_code=0)
+    assert "archive_broken" not in cmd(archiver, "repo-list")
+
+
 # checker_builds: per index build in ArchiveChecker, whether repository.chunks was loaded at that time.
 # A full check without --repair uses the index the repository check loaded. --repair builds once: finish()
 # re-reads only the packs the repair wrote, see test_repair_finish_reads_only_the_packs_put_wrote.

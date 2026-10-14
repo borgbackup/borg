@@ -73,9 +73,6 @@ Examples
     # Only compress compressible data with lzma,N (N = 0..9)
     $ borg create --compression auto,lzma,N arch ~
 
-    # Use the short hostname and username as the archive name
-    $ borg create '{hostname}-{user}' ~
-
     # Back up relative paths by moving into the correct directory first
     $ cd /home/user/Documents
     # The root directory of the archive will be "projectA"

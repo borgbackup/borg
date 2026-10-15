@@ -20,7 +20,7 @@ from .helpers.time import (
     compile_date_pattern,
     DatePatternError,
 )
-from .helpers.errors import Error, CommandError
+from .helpers.errors import Error, CommandError, IntegrityError
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .item import ArchiveItem
 from .patterns import get_regex_from_pattern
@@ -222,7 +222,14 @@ class Archives:
         else:
             try:
                 _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
+                archive_dict = self.manifest.key.unpack_archive(data)
+                archive_item = ArchiveItem(internal_dict=archive_dict)
+                if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
+                    raise Exception("Unknown archive metadata version")
+                if ("item_ptrs" in archive_item) == ("items" in archive_item):
+                    raise IntegrityError(f"archive {bin_to_hex(id)}: metadata needs exactly one of item_ptrs, items")
             except IntegrityErrorBase:
+                archive_item = None
                 metadata = dict(
                     id=id,
                     name="archive-metadata-has-integrity-error",
@@ -233,10 +240,6 @@ class Archives:
                     tags=(),
                 )
             else:
-                archive_dict = self.manifest.key.unpack_archive(data)
-                archive_item = ArchiveItem(internal_dict=archive_dict)
-                if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
-                    raise Exception("Unknown archive metadata version")
                 # callers expect a dict with dict["key"] access, not ArchiveItem.key access.
                 # also, we need to put the id in there.
                 metadata = dict(

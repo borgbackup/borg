@@ -15,7 +15,8 @@ from ...crypto.key import AESOCBKey, CHPOKey, Blake3AESOCBKey, Blake3CHPOKey
 from ...crypto.key import AES_OCB_MAX_SESSION_BLOCKS
 from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
-from ...crypto.key import RepoKeyNotFoundError
+from ...crypto.key import RepoKeyNotFoundError, KeyfileInvalidError
+from ...crypto.key import legacy_key_factory
 from ...crypto.key import identify_key, key_class_for, key_class_of, key_factory, RepositoryKeyInfoMissing
 from ...crypto.key import AVAILABLE_KEY_TYPES
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -23,7 +24,7 @@ from ...helpers import Error
 from ...helpers import IntegrityError
 from ...helpers import Location
 from ...helpers import msgpack
-from ...constants import KEY_ALGORITHMS, KeyBlobStorage
+from ...constants import KEY_ALGORITHMS, KeyBlobStorage, KeyType
 from ...helpers import hex_to_bin, bin_to_hex
 
 
@@ -190,6 +191,37 @@ class TestKey:
         monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
         key = Blake2AESCTRKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
         assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata) == b"payload"
+
+    @pytest.mark.parametrize(
+        "key_file, cdata, cls, type_byte",
+        (
+            ("keyfile2_key_file", "keyfile2_cdata", Blake2AESCTRKey, KeyType.BLAKE2KEYFILE),
+            ("keyfile_blake2_key_file", "keyfile_blake2_cdata", AESCTRKey, KeyType.KEYFILE),
+        ),
+    )
+    def test_legacy_key_type_mismatch(self, key_file, cdata, cls, type_byte, monkeypatch, keys_dir):
+        # the key class is selected by the unauthenticated key type byte of a borg 1.x manifest,
+        # a wrong one selects a key class that does not match the key material in the borg key.
+        with keys_dir.join("keyfile").open("w") as fd:
+            fd.write(getattr(self, key_file))
+        monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
+        manifest_data = bytes([type_byte]) + getattr(self, cdata)[1:]
+        with pytest.raises(IntegrityError):
+            cls.detect(self.MockRepository(), manifest_data)
+
+    def test_copy_crypt_key_length_mismatch(self, monkeypatch, keys_dir):
+        with keys_dir.join("keyfile").open("w") as fd:
+            fd.write(self.keyfile_blake2_key_file)
+        monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
+        other_key = Blake2AESCTRKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
+        other_key.copy_crypt_key = True
+        assert len(other_key.crypt_key) == 32 + 128
+        # the authenticated-* modes need a crypt key of 32 + 32 bytes.
+        with pytest.raises(Error, match="Copying the crypt key"):
+            AuthenticatedKey.create(self.MockRepository(), self.MockArgs(), other_key=other_key)
+        # the AEAD modes accept both lengths.
+        key = AESOCBKey.create(self.MockRepository(), self.MockArgs(), other_key=other_key)
+        assert key.crypt_key == other_key.crypt_key
 
     def test_legacy_named_keyfile_still_loads(self, monkeypatch, keys_dir):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
@@ -544,6 +576,24 @@ def test_legacy_authenticated_no_key_key_gone(cls, monkeypatch, tmp_path):
     key = cls.detect(repository, envelope)
     assert isinstance(key, cls)
     assert bytes(key.decrypt(None, envelope)) == payload
+
+
+def test_legacy_key_factory_empty_manifest():
+    with pytest.raises(IntegrityError, match="empty"):
+        legacy_key_factory(MagicMock(), b"")
+
+
+@pytest.mark.parametrize("crypt_key_len, id_key_len", ((32, 32), (64, 64), (160, 0)))
+def test_load_invalid_key_lengths(crypt_key_len, id_key_len):
+    repository = TestKey.MockRepository()
+    key = CHPOKey(repository)
+    key.repository_id = repository.id
+    key.crypt_key = bytes(crypt_key_len)
+    key.id_key = bytes(id_key_len)
+    key.chunk_seed = 0
+    key_data = key._save("passphrase", algorithm=KEY_ALGORITHMS["argon2"])
+    with pytest.raises(KeyfileInvalidError):
+        CHPOKey(repository)._load(key_data, "passphrase")
 
 
 def test_decrypt_key_file_unsupported_algorithm():

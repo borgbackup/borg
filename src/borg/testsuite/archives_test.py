@@ -216,6 +216,7 @@ def test_get_archive_meta_success():
         "size": 1024,
         "nfiles": 3,
         "comment": "weekly",
+        "item_ptrs": [],
     }
 
     result, archive_item = ar._get_archive_meta(_id(1))
@@ -243,6 +244,7 @@ def test_get_archive_meta_success_with_tags():
         "username": "",
         "hostname": "",
         "tags": ["beta", "alpha"],
+        "item_ptrs": [],
     }
 
     result, _ = ar._get_archive_meta(_id(1))
@@ -260,6 +262,26 @@ def test_get_archive_meta_bad_version():
 
     with pytest.raises(Exception, match="Unknown archive metadata version"):
         ar._get_archive_meta(_id(1))
+
+
+@pytest.mark.parametrize("items_keys", [{}, {"item_ptrs": [], "items": []}])
+def test_get_archive_meta_needs_exactly_one_of_item_ptrs_items(items_keys):
+    # authentic archive metadata without item pointers (or with both kinds) is treated like corrupted metadata.
+    ar, _, manifest = _archives()
+    manifest.repo_objs.parse.return_value = (None, b"data")
+    manifest.key.unpack_archive.return_value = {
+        "version": 2,
+        "name": "myarchive",
+        "time": TS,
+        "username": "",
+        "hostname": "",
+    } | items_keys
+
+    result, archive_item = ar._get_archive_meta(_id(1))
+
+    assert archive_item is None
+    assert result["exists"] is False
+    assert result["name"] == "archive-metadata-has-integrity-error"
 
 
 def test_infos_gathers_archive_metadata():
@@ -283,6 +305,7 @@ def test_infos_gathers_archive_metadata():
         "time": TS,
         "username": "alice",
         "hostname": "myhost",
+        "item_ptrs": [],
     }
 
     infos, archive_items = zip(*ar._infos())

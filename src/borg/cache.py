@@ -20,7 +20,7 @@ files_cache_logger = create_logger("borg.debug.files_cache")
 
 from borgstore.store import ItemInfo
 
-from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
+from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, MAX_DATA_SIZE, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
 from .constants import CHUNKINDEX_FRAGMENT_ENTRIES_MIN, CHUNKINDEX_FRAGMENT_ENTRIES_MAX
 from .constants import CHUNKINDEX_SMALL_FRAGMENT_CAP, CHUNKINDEX_MERGE_ATTEMPTS, CHUNKINDEX_INVALID_SENTINEL
 from .hashindex import ChunkIndex, ChunkIndexEntry, ChunkIndexEntryFormat
@@ -124,7 +124,9 @@ class CacheConfig:
         return self.config_path.exists()
 
     def create(self):
-        assert not self.exists()
+        if self.exists():
+            # e.g. created by a concurrently running borg process, the content is the same.
+            return
         config = configparser.ConfigParser(interpolation=None)
         config.add_section("cache")
         config.set("cache", "version", "1")
@@ -244,11 +246,14 @@ class FilesCacheMixin:
         assert isinstance(entry, FileCacheEntry)
         compressed_chunks = []
         for id, size in entry.chunks:
+            # the chunk sizes come from an archive's chunk list or from the local files cache.
+            if not 0 < size <= MAX_DATA_SIZE:
+                raise ValueError(f"chunk {bin_to_hex(id)}: invalid size {size}")
             cie = self.chunks[id]  # may raise KeyError if chunk id is not in repo
             if cie.size == 0:  # size is not known in the chunks index yet
                 self.chunks[id] = cie._replace(size=size)
-            else:
-                assert size == cie.size, f"{size} != {cie.size}"
+            elif size != cie.size:
+                raise ValueError(f"chunk {bin_to_hex(id)}: size {size} does not match known size {cie.size}")
             idx = self.chunks.k_to_idx(id)
             compressed_chunks.append(idx)
         entry = entry._replace(chunks=compressed_chunks)
@@ -342,10 +347,15 @@ class FilesCacheMixin:
                     digests=item.get("digests"),
                 )
                 # note: if the repo is an a valid state, next line should not fail with KeyError:
-                files[path_hash] = self.compress_entry(entry)
+                try:
+                    files[path_hash] = self.compress_entry(entry)
+                except ValueError as exc:
+                    # invalid chunk sizes in the item's chunk list: skip the entry, the file will just be
+                    # chunked again (the files cache is only an optimization).
+                    logger.debug(f"compress_entry failed for {item.path} [{exc}], skipping.")
         # deal with special snapshot / timestamp granularity case, see FAQ:
         for path_hash in self._newest_path_hashes:
-            del files[path_hash]
+            files.pop(path_hash, None)  # the entry may have been skipped above
         files_cache_logger.debug("FILES-CACHE-BUILD: finished, %d entries loaded.", len(files))
         return files
 
@@ -1233,17 +1243,22 @@ class ChunksMixin:
         entry = self.chunks.get(id)
         entry_exists = entry is not None
         if entry_exists and size is not None:
+            # *size* may come from an archive's chunk list (e.g. transfer), so it must be checked.
             if entry.size == 0:
                 # AdHocWithFilesCache:
                 # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
+                if not 0 < size <= MAX_DATA_SIZE:
+                    raise IntegrityError(f"chunk {bin_to_hex(id)}: invalid size {size}")
                 self.chunks[id] = entry._replace(size=size)
-            else:
+            elif size != entry.size:
                 # in case we already have a size information in the entry, check consistency:
-                assert size == entry.size
+                raise IntegrityError(f"chunk {bin_to_hex(id)}: size {size} does not match known size {entry.size}")
         return entry_exists
 
     def reuse_chunk(self, id, size, stats):
-        assert isinstance(size, int) and size > 0
+        # *size* may come from an archive's chunk list (e.g. create --reuse-from, recreate, transfer).
+        if not (isinstance(size, int) and 0 < size <= MAX_DATA_SIZE):
+            raise IntegrityError(f"chunk {bin_to_hex(id)}: invalid size {size!r}")
         stats.update(size, False)
         return ChunkListEntry(id, size)
 

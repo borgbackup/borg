@@ -94,7 +94,7 @@ class _Scanner:
 
     def read_text(self, path):
         try:
-            return path.read_text(encoding="utf-8")
+            return path.read_text()
         except FileNotFoundError:
             return None
         except OSError as exc:

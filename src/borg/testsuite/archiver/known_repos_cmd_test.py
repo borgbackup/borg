@@ -7,9 +7,17 @@ from pathlib import Path
 import pytest
 
 from ...helpers import get_cache_dir, get_security_dir
-from . import cmd, create_regular_file, exec_cmd, generate_archiver_tests, RK_ENCRYPTION
+from . import cmd, create_regular_file, exec_cmd, generate_archiver_tests, RK_ENCRYPTION, PURE_PYTHON_MSGPACK_WARNING
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
+
+
+def cmd_without_repo(archiver, *args):
+    """Like cmd(), but without the injected --repo option."""
+    ret, output = exec_cmd(*args, archiver=archiver.archiver, fork=archiver.FORK_DEFAULT, exe=archiver.EXE)
+    assert ret == 0, output
+    # same as cmd(): drop the pure-python msgpack warning (e.g. on PyPy), it would break json.loads().
+    return "".join(line for line in output.splitlines(keepends=True) if PURE_PYTHON_MSGPACK_WARNING not in line)
 
 
 def _write_legacy_security(repo_id, location, key_type="3"):
@@ -54,10 +62,7 @@ def test_known_repos_without_repo_argument(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     repo_id = json.loads(cmd(archiver, "repo-info", "--json"))["repository"]["id"]
 
-    ret, output = exec_cmd(
-        "known-repos", "--json", archiver=archiver.archiver, fork=archiver.FORK_DEFAULT, exe=archiver.EXE
-    )
-    assert ret == 0, output
+    output = cmd_without_repo(archiver, "known-repos", "--json")
     ids = {repo["id"] for repo in json.loads(output)["repositories"]}
     assert ids == {repo_id}
 
@@ -193,25 +198,8 @@ def test_known_repos_multiple_sorted_by_id(archivers, request):
     repo_id1 = json.loads(cmd(archiver, "repo-info", "--json"))["repository"]["id"]
 
     second_repo = str(archiver.repository_path) + "-second"
-    ret, output = exec_cmd(
-        f"--repo={second_repo}",
-        "repo-create",
-        RK_ENCRYPTION,
-        archiver=archiver.archiver,
-        fork=archiver.FORK_DEFAULT,
-        exe=archiver.EXE,
-    )
-    assert ret == 0, output
-    ret, output = exec_cmd(
-        f"--repo={second_repo}",
-        "repo-info",
-        "--json",
-        archiver=archiver.archiver,
-        fork=archiver.FORK_DEFAULT,
-        exe=archiver.EXE,
-    )
-    assert ret == 0, output
-    info2 = json.loads(output)["repository"]
+    cmd_without_repo(archiver, f"--repo={second_repo}", "repo-create", RK_ENCRYPTION)
+    info2 = json.loads(cmd_without_repo(archiver, f"--repo={second_repo}", "repo-info", "--json"))["repository"]
     repo_id2 = info2["id"]
 
     result_json = json.loads(cmd(archiver, "known-repos", "--json"))
@@ -457,7 +445,10 @@ def test_known_repos_location_mismatch_ignores_nfc_nfd_difference(archivers, req
     location and cache previous_location: not a mismatch on macOS (normalize_local_path()
     normalizes both), but is one elsewhere (it's a no-op there).
     """
-    from borg.platformflags import is_darwin
+    from borg.platformflags import is_darwin, is_win32
+
+    if is_win32:
+        pytest.skip("NFD path is not encodable in the Windows locale encoding")
 
     archiver = request.getfixturevalue(archivers)
     nfc_path = unicodedata.normalize("NFC", "/absolute/tëst")

@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 
 from ...helpers.time import safe_ns, safe_s, safe_timestamp, SUPPORT_32BIT_PLATFORMS, calculate_relative_offset
 from ...helpers.time import format_time, format_time_ns, OutputTimestamp
-from ...helpers.time import ns_to_pax_time, pax_time_to_ns
+from ...helpers.time import ns_to_pax_time, pax_time_to_ns, parse_local_timestamp
+from ...helpers import time as time_module
 
 
 def utcfromtimestamp(timestamp):
@@ -107,3 +108,14 @@ def test_ns_to_pax_time(ns, expected):
 )
 def test_pax_time_to_ns(value, expected):
     assert pax_time_to_ns(value) == expected
+
+
+def test_parse_local_timestamp_oserror(monkeypatch):
+    # win32 fails to convert 1970-01-02T00:00:00 to local time east of UTC.
+    class FailingDatetime(datetime):
+        def astimezone(self, tz=None):
+            raise OSError(22, "Invalid argument")
+
+    monkeypatch.setattr(time_module, "datetime", FailingDatetime)
+    with pytest.raises(ValueError, match="cannot convert 1970-01-02T00:00:00 to local time"):
+        parse_local_timestamp("1970-01-02T00:00:00")

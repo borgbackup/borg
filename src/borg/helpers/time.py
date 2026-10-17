@@ -24,7 +24,11 @@ def parse_local_timestamp(timestamp, tzinfo=None):
     """
     dt = datetime.fromisoformat(timestamp)
     if dt.tzinfo is None:
-        dt = dt.astimezone(tz=tzinfo)
+        try:
+            dt = dt.astimezone(tz=tzinfo)
+        except OSError as e:
+            # e.g. win32 local time conversion fails for timestamps close to (or before) the epoch.
+            raise ValueError(f"cannot convert {timestamp} to local time: {e}") from None
     return dt
 
 

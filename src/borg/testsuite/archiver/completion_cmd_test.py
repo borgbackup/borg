@@ -615,12 +615,14 @@ REPO_URLS = ["ssh://", "ssh://host/", "sftp://", "rclone:", "s3:", "b2:", "http:
 def test_bash_repo_url_no_directories(archivers, request, tmp_path):
     archiver = request.getfixturevalue(archivers)
     (tmp_path / "somerepo").mkdir()
-    for url in REPO_URLS:
-        # a local directory looking like the start of the URL, so that plain directory completion finds it
-        (tmp_path / url.split("/")[0]).mkdir(exist_ok=True)
+    # local directories looking like the start of the URLs, so that plain directory completion finds them.
+    # created by bash: on win32, MSYS2/Cygwin map the colon to a valid file name character.
+    dirs = " ".join(sorted({url.split("/")[0] for url in REPO_URLS}))
     script = cmd(archiver, "completion", "bash")
     for url in REPO_URLS:
-        result = _run_bash_completion_fn(script, f'cd "{tmp_path}"\n_borg_complete_repo_dirs "{url}"\n')
+        result = _run_bash_completion_fn(
+            script, f'cd "{tmp_path}"\nmkdir -p {dirs}\n_borg_complete_repo_dirs "{url}"\n'
+        )
         assert result.returncode == 0, f"stderr: {result.stderr}"
         assert result.stdout == "", f"directories offered for {url}: {result.stdout}"
     result = _run_bash_completion_fn(script, f'cd "{tmp_path}"\n_borg_complete_repo_dirs some\n')

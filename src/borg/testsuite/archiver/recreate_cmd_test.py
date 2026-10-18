@@ -262,9 +262,10 @@ def test_recreate_with_given_timestamp(archivers, request):
     # this shall recreate the archive with a different nominal timestamp.
     # --timestamp is the only change requested, so this also checks that a timestamp
     # change alone is enough to make recreate do the work instead of skipping the archive.
-    cmd(archiver, "recreate", "-a", "test0", "--timestamp", "1970-01-02T00:00:00")
+    # not 1970-01-02: win32 cannot convert that to local time east of UTC.
+    cmd(archiver, "recreate", "-a", "test0", "--timestamp", "1970-01-03T00:00:00")
     info = cmd(archiver, "info", "-a", "test0").splitlines()
-    dtime = datetime(1970, 1, 2, 0, 0, 0).astimezone()  # local time in local timezone
+    dtime = datetime(1970, 1, 3, 0, 0, 0).astimezone()  # local time in local timezone
     s_time = dtime.strftime("%Y-%m-%d %H:%M:.. %z").replace("+", r"\+")
     assert any([re.search(r"Time \(nominal\).+ %s" % s_time, item) for item in info])
     # start/end time are just from the recreate operation

@@ -1,11 +1,11 @@
 # Contributors
 
-376 people have contributed to Borg, with 11,579 commits in total.
+376 people have contributed to Borg, with 11,605 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-10-12 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-10-19 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,15 +21,15 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,862 | 107,439 | 533 |
-| Marian Beermann | 1,140 | 7,543 | 156 |
+| Thomas Waldmann | 7,880 | 108,124 | 534 |
+| Marian Beermann | 1,140 | 7,542 | 156 |
 | Jonas Borgström | 560 | 941 | 38 |
-| Mrityunjay Raj | 314 | 15,325 | 115 |
+| Mrityunjay Raj | 319 | 15,832 | 117 |
 | Antoine Beaupré | 285 | 437 | 33 |
 | Andrey Bienkowski | 72 | 200 | 16 |
-| Ted Lawson | 71 | 4,359 | 39 |
+| Ted Lawson | 71 | 4,357 | 39 |
 | Thalian | 63 | 560 | 28 |
-| dependabot[bot] | 57 | 27 | 9 |
+| dependabot[bot] | 59 | 35 | 11 |
 | Martin Hostettler | 46 | 2,558 | 9 |
 | Milkey Mouse | 42 | 239 | 12 |
 | Dan Christensen | 40 | 5 | 2 |
@@ -44,12 +44,12 @@ show up there, so the number understates early contributions.  Generated files
 | SanskritFritz | 17 | 0 | 0 |
 | Lee Bousfield | 14 | 157 | 9 |
 | Alan Jenkins | 14 | 35 | 2 |
-| Daniel Rudolf | 13 | 214 | 14 |
+| Daniel Rudolf | 13 | 213 | 14 |
 | Robin Schneider | 13 | 18 | 8 |
+| ThomasWaldmann | 12 | 181 | 1 |
 | Elmar Hoffmann | 12 | 90 | 6 |
 | Jürg Rast | 12 | 72 | 11 |
 | Ronny Pfannschmidt | 12 | 20 | 4 |
-| ThomasWaldmann | 11 | 180 | 1 |
 | mh4ckt3mh4ckt1c4s | 11 | 0 | 0 |
 | Teemu Toivanen | 10 | 14 | 2 |
 | finefoot | 10 | 12 | 3 |
@@ -66,12 +66,12 @@ show up there, so the number understates early contributions.  Generated files
 | Frank Sachsenheim | 7 | 2 | 1 |
 | Hartmut Goebel | 7 | 0 | 0 |
 | William D. Jones | 6 | 215 | 6 |
-| Michael Deyaso | 6 | 165 | 14 |
+| Michael Deyaso | 6 | 164 | 14 |
 | Peter Gerber | 6 | 102 | 9 |
 | Alf Mikula | 6 | 19 | 1 |
 | Felix Schwarz | 6 | 4 | 2 |
 | Alexander-N | 6 | 0 | 0 |
-| Paul D | 5 | 176 | 41 |
+| Paul D | 5 | 175 | 41 |
 | Simon Frei | 5 | 124 | 3 |
 | Dominik Stadler | 5 | 75 | 1 |
 | elandorr | 5 | 39 | 3 |
@@ -207,7 +207,7 @@ show up there, so the number understates early contributions.  Generated files
 | Uriel | 1 | 30 | 1 |
 | Vedant Patel | 1 | 30 | 3 |
 | Nic Donaldson | 1 | 26 | 1 |
-| vancheese | 1 | 26 | 8 |
+| vancheese | 1 | 24 | 8 |
 | Mike | 1 | 23 | 1 |
 | Sitaram Chamarty | 1 | 23 | 1 |
 | Jonathan Zacsh | 1 | 21 | 1 |
@@ -266,7 +266,6 @@ show up there, so the number understates early contributions.  Generated files
 | MartinKurtz | 1 | 1 | 1 |
 | Peter Zangerl | 1 | 1 | 1 |
 | Robert Marcano | 1 | 1 | 1 |
-| Stefan Majewsky | 1 | 1 | 1 |
 | Svein Ove Aas | 1 | 1 | 1 |
 | Vagrant Cascadian | 1 | 1 | 1 |
 | targhs | 1 | 1 | 1 |
@@ -351,6 +350,7 @@ show up there, so the number understates early contributions.  Generated files
 | Ruben Rodriguez | 1 | 0 | 0 |
 | Sebastiaan Lokhorst | 1 | 0 | 0 |
 | Serghei Iakovlev | 1 | 0 | 0 |
+| Stefan Majewsky | 1 | 0 | 0 |
 | Stefano Probst | 1 | 0 | 0 |
 | Swanand01 | 1 | 0 | 0 |
 | Thiago Macieira | 1 | 0 | 0 |

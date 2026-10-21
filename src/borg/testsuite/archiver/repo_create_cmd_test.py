@@ -168,6 +168,22 @@ def test_repo_create_failure_leaves_nothing_behind(archivers, request, monkeypat
     assert os.listdir(keys_dir)
 
 
+def test_repo_create_with_a_filled_store_cache(archivers, request, monkeypatch):
+    # BORG_STORE_CACHE is one directory for all repositories: repo-create works while it holds cached packs.
+    archiver = request.getfixturevalue(archivers)
+    cache_dir = os.path.join(archiver.tmpdir, "storecache")
+    monkeypatch.setenv("BORG_STORE_CACHE", cache_dir)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "create", "test", "input")
+    assert any(names for _, _, names in os.walk(os.path.join(cache_dir, "packs")))
+    archiver.repository_location += "2"
+    archiver.repository_path += "2"
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    assert "test" in cmd(archiver, "repo-list")
+
+
 def test_repo_create_writes_an_empty_chunk_index(archivers, request):
     # repo-create stores an empty chunk index (in the key's envelope), so the first use of the repository
     # does not have to build it by listing the packs.

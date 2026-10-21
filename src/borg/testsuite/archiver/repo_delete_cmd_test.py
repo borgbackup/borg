@@ -4,7 +4,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers import CancelledByUser, Error
-from . import create_regular_file, cmd, generate_archiver_tests, RK_ENCRYPTION
+from . import changedir, create_regular_file, cmd, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -40,6 +40,37 @@ def test_delete_repo_force(archivers, request):
     cmd(archiver, "repo-delete", "--force")
     # Make sure the repository is gone
     assert not os.path.exists(archiver.repository_path)
+
+
+def test_delete_repo_keeps_the_store_cache(archivers, request, monkeypatch):
+    # BORG_STORE_CACHE is one directory for all repositories: repo-delete removes nothing from it.
+    archiver = request.getfixturevalue(archivers)
+    cache_dir = os.path.join(archiver.tmpdir, "storecache")
+    monkeypatch.setenv("BORG_STORE_CACHE", cache_dir)
+
+    def cache_files():
+        return sorted(os.path.join(dirpath, name) for dirpath, _, names in os.walk(cache_dir) for name in names)
+
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    kept_location, kept_path = archiver.repository_location, archiver.repository_path
+    archiver.repository_location += "2"
+    archiver.repository_path += "2"
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    os.makedirs(os.path.join(cache_dir, "foreign"))
+    with open(os.path.join(cache_dir, "foreign", "file"), "w") as fd:
+        fd.write("foreign")
+    cached = cache_files()
+    assert len(cached) > 1
+    cmd(archiver, "repo-delete")
+    assert not os.path.exists(archiver.repository_path)
+    assert cache_files() == cached
+    archiver.repository_location, archiver.repository_path = kept_location, kept_path
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    assert os.path.exists(os.path.join("output", "input", "file1"))
 
 
 def test_delete_store_without_config(archivers, request):

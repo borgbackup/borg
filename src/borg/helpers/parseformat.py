@@ -13,7 +13,7 @@ import unicodedata
 import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from functools import lru_cache, partial
 from hashlib import sha256
 from string import Formatter
@@ -141,58 +141,17 @@ def nonnegative_seconds(s):
     return seconds
 
 
-def interval(s):
-    """Parse an interval string (e.g. ``7d``, ``2w``, ``30M``) into a timedelta.
-
-    Supported units: y (years, 365d), m (months, 31d), w (weeks), d (days),
-    H (hours), M (minutes), S (seconds).  The value must be nonnegative.
-    """
-    if isinstance(s, timedelta):
-        return s
-
-    seconds_in_a_minute = 60
-    seconds_in_an_hour = 60 * seconds_in_a_minute
-    seconds_in_a_day = 24 * seconds_in_an_hour
-    seconds_in_a_week = 7 * seconds_in_a_day
-    seconds_in_a_month = 31 * seconds_in_a_day
-    seconds_in_a_year = 365 * seconds_in_a_day
-    multiplier = dict(
-        y=seconds_in_a_year,
-        m=seconds_in_a_month,
-        w=seconds_in_a_week,
-        d=seconds_in_a_day,
-        H=seconds_in_an_hour,
-        M=seconds_in_a_minute,
-        S=1,
-    )
-
-    if s.endswith(tuple(multiplier.keys())):
-        number = s[:-1]
-        suffix = s[-1]
-    else:
-        raise ArgumentTypeError(f'Unexpected time unit "{s[-1]}": choose from {", ".join(multiplier)}')
-
-    try:
-        seconds = int(number) * multiplier[suffix]
-    except ValueError:
-        seconds = -1
-
-    if seconds < 0:
-        raise ArgumentTypeError(f'Invalid number "{number}": expected nonnegative integer')
-
-    return timedelta(seconds=seconds)
-
-
 def int_or_interval(s):
     """Parse *s* as an :class:`int` or, failing that, as an interval string.
 
     Returns :class:`int` if *s* can be parsed as an integer (e.g. ``"7"``),
-    or :class:`datetime.timedelta` if *s* is a valid interval (e.g. ``"7d"``).
+    or the validated interval string (e.g. ``"7d"``). Months and years need a
+    reference timestamp before they can be converted to a duration.
 
     Raises :class:`ArgumentTypeError` if *s* is neither an integer nor
     a valid interval.
     """
-    if isinstance(s, (int, timedelta)):
+    if isinstance(s, int):
         return s
 
     # Explicitly check 'all' as a shortcut to 'infinite' sentinel value `-1`.
@@ -205,7 +164,7 @@ def int_or_interval(s):
         pass
 
     try:
-        return interval(s)
+        return relative_time_marker_validator(s)
     except ArgumentTypeError as e:
         raise ArgumentTypeError(f"Value is neither an integer nor an interval: {e}")
 

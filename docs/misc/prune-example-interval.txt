@@ -59,7 +59,7 @@ Calendar view
                                              8  9 10 11 12 13 14
                                      15y16  15 16 17 18 19 20 21
                       17 18 19 20 21 22 23  22 23 24 25 26 27 28
-                      24 25 26 27 28 29 30  29 30 31m
+                      24 25 26 27 28 29 30  29 30 31y
 
                             2026
       January               February               March
@@ -83,12 +83,13 @@ List view
 
 --keep-daily 1w     --keep-weekly 4     --keep-monthly 5m   --keep-yearly 2
 --------------------------------------------------------------------------------
-                                                            1. 2025-11-15 (oldest)
+                                                            1. 2025-12-31
+                                                            2. 2025-11-15 (oldest)
 1. 2026-06-02       1. 2026-05-23       1. 2026-04-30
 2. 2026-06-01       2. 2026-05-17       2. 2026-03-30
 3. 2026-05-31       3. 2026-05-10       3. 2026-02-28
 4. 2026-05-30       4. 2026-05-03       4. 2026-01-31
-5. 2026-05-29                           5. 2025-12-31
+5. 2026-05-29
 6. 2026-05-28
 
 2026-06-04 is additionally kept due to `--from`.
@@ -132,14 +133,12 @@ Since 2026-05-24 and 2026-03-31 were skipped, Borg substitutes the next best
 candidate for each: 2026-05-23 fills the week 21 weekly slot, and 2026-03-30
 fills the March monthly slot.
 
-The implementation of `--keep-monthly 5m` is somewhat special: Borg defines a
-month as a fixed 31-day period, independent of the actual calendar dates
-involved. As a result, `5m` corresponds to 5 × 31 = 155 days. The archive from
-2025-12-31 16:00 is exactly 155 days older than the reference time and is
-therefore retained by `--keep-monthly`.
+The `--keep-monthly 5m` window starts five calendar months before the
+reference time, on 2026-01-04 at 16:00. The archive from 2025-12-31 is
+outside this window, so it is not retained by `--keep-monthly`.
 
-As a result, there are no true yearly candidates. In the absence of a better
-candidate, `--keep-yearly 2` only matches the oldest archive, 2025-11-15.
+Instead, `--keep-yearly 2` keeps 2025-12-31 as its yearly candidate. It
+also keeps the oldest archive, 2025-11-15, to fill the remaining slot.
 
 Since interval rules define time windows rather than competing for a fixed
 number of slots, their interplay is simpler than count-based rules. An archive
@@ -150,6 +149,5 @@ Intervals and counts can be mixed freely. Yearly retention in this example is
 done by retention count instead of intervals. A count rule paired with interval
 rules behaves just as it would if all preceding rules were also counts:
 Archives already kept by earlier rules are excluded from consideration. In this
-example, every yearly slot is consumed by earlier rules; no true yearly
-candidate remains, so the oldest archive at 2025-11-15 is kept to preserve
-rolling backup semantics.
+example, the 2026 yearly slot is consumed by earlier rules. December 31
+fills the 2025 slot, and November 15 is retained as the oldest archive.

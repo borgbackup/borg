@@ -414,11 +414,55 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.5 (2026-07-19)
---------------------------
+Version 1.4.6 (not released yet)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
+
+New features:
+
+- info: add --quick-stats option
+
+  As with create/import-tar/delete/prune, --quick-stats skips the
+  slow repository-wide "All archives" and chunk index statistics.
+
+Fixes:
+
+- extract:
+
+  - remote: use deques for the RPC call queues (performance fix), #10450
+  - never try to remove the extraction directory itself
+- recreate: keep chunker_params if not rechunkifying, #10127
+- let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
+- repository: do not crash on missing segment files/dirs, #3225
+- remote: drain stderr in close(), avoid deadlock, #10165
+- ellipsis_truncate: pad a truncated string to the full width (CJK fix), #10481
+- haiku: tolerate failures reading the lock directory
+- crc32_clmul: only feed full aligned blocks to the folding code, #10151
+
+Other changes:
+
+- support Python 3.15 and msgpack 1.2.3
+- hashindex: read/write buckets in <=256MiB slices, works around #6140
+- platform: determine hostname / fqdn / hostid lazily, refs #9470
+- cache sync: log per-archive messages at debug level, #9659
+- docs:
+
+  - fix init epilog about what none mode can (not) detect
+  - FAQ: chunker params for SQLite databases, #5877
+  - FAQ: document how to limit bandwidth in both directions, #8838
+  - refactor return code docs, #9948
+  - update README, #9931
+  - new borg 1.4 demo screencast
+- tests / CI:
+
+  - fix inode-order dependence in test_multiple_link_exclusion, #8740
+  - CI: misc fixes and performance optimizations
+
+
+Version 1.4.5 (2026-07-19)
+--------------------------
 
 New features:
 

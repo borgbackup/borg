@@ -12,6 +12,8 @@ from ..legacy.fs import (
     get_base_dir as get_base_dir_legacy,
     get_config_dir as get_config_dir_legacy,
     get_cache_dir as get_cache_dir_legacy,
+    get_keys_dir as get_keys_dir_legacy,
+    get_security_dir as get_security_dir_legacy,
 )
 from ..platform import is_win32, is_darwin, is_haiku, is_cygwin
 
@@ -78,3 +80,32 @@ def test_get_cache_dir_compat(monkeypatch):
     assert get_cache_dir(create=False) == get_cache_dir_legacy(create=False)
     monkeypatch.setenv("BORG_CACHE_DIR", "/var/tmp/borg.cache.d")
     assert get_cache_dir(create=False) == get_cache_dir_legacy(create=False)
+
+
+def test_get_keys_dir_does_not_create_config_dir(monkeypatch, tmp_path):
+    """get_keys_dir(create=False) must forward create=False to get_config_dir(), not create
+    the config dir as a side effect (regression).
+    """
+    monkeypatch.delenv("BORG_KEYS_DIR", raising=False)
+    monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
+    monkeypatch.setenv("BORG_BASE_DIR", str(tmp_path))
+
+    config_dir = tmp_path / ".config" / "borg"
+    assert not config_dir.exists()
+    get_keys_dir_legacy(create=False)
+    assert not config_dir.exists()
+
+
+def test_get_security_dir_does_not_create_config_dir(monkeypatch, tmp_path):
+    """Same regression as test_get_keys_dir_does_not_create_config_dir, for
+    get_security_dir(create=False) - what known_repos_cmd.py relies on for its read-only
+    promise.
+    """
+    monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
+    monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
+    monkeypatch.setenv("BORG_BASE_DIR", str(tmp_path))
+
+    config_dir = tmp_path / ".config" / "borg"
+    assert not config_dir.exists()
+    get_security_dir_legacy(create=False)
+    assert not config_dir.exists()

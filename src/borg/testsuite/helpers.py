@@ -29,6 +29,7 @@ from ..helpers import swidth_slice
 from ..helpers import ellipsis_truncate
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
+from ..helpers import ns_to_pax_time, pax_time_to_ns
 from ..helpers import popen_with_error_handling
 from ..helpers import dash_open
 from ..helpers import iter_separated
@@ -1174,6 +1175,31 @@ def test_safe_timestamps():
             utcfromtimestamp(beyond_y10k)
         assert utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2262, 1, 1)
         assert utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2262, 1, 1)
+
+
+@pytest.mark.parametrize('ns, expected', [
+    (0, '0.000000000'),
+    (1, '0.000000001'),
+    (1700000000_987654321, '1700000000.987654321'),
+    (-1, '-0.000000001'),
+    (-1500000000, '-1.500000000'),
+])
+def test_ns_to_pax_time(ns, expected):
+    assert ns_to_pax_time(ns) == expected
+
+
+@pytest.mark.parametrize('value, expected', [
+    ('1700000000.987654321', 1700000000_987654321),
+    ('1700000000', 1700000000_000000000),
+    ('1700000000.5', 1700000000_500000000),
+    ('-1.5', 0),  # safe_ns clamps
+    ('', None),
+    ('garbage', None),
+    ('NaN', None),
+    ('Infinity', None),
+])
+def test_pax_time_to_ns(value, expected):
+    assert pax_time_to_ns(value) == expected
 
 
 class TestPopenWithErrorHandling:

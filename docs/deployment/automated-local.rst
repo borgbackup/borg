@@ -14,8 +14,8 @@ systemd and udev.
 Overview
 --------
 
-A udev rule is created to trigger on the addition of block devices. The rule contains a tag
-that triggers systemd to start a one-shot service. The one-shot service executes a script in
+A udev rule is created to trigger on the addition of a filesystem on one of your registered
+backup drives. The rule contains a tag that triggers systemd to start a one-shot service. The one-shot service executes a script in
 the standard systemd service environment, which automatically captures stdout/stderr and
 logs it to the journal.
 
@@ -29,13 +29,16 @@ Configuring the system
 First, create the ``/etc/backups`` directory (as root).
 All configuration goes into this directory.
 
-Find out the ID of the partition table of your backup disk (here assumed to be /dev/sdz)::
+Then, create an empty ``/etc/backups/80-backup.rules`` file. It will contain one line per
+backup drive, which you will add when adding backup drives (see below). Each line looks like
+this (all on one line)::
 
-    lsblk --fs -o +PTUUID /dev/sdz
+    ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="<filesystem UUID>", TAG+="systemd", ENV{SYSTEMD_WANTS}+="automatic-backup.service"
 
-Then, create ``/etc/backups/80-backup.rules`` with the following content (all on one line)::
-
-    ACTION=="add", SUBSYSTEM=="block", ENV{ID_PART_TABLE_UUID}=="<the PTUUID you just noted>", TAG+="systemd", ENV{SYSTEMD_WANTS}+="automatic-backup.service"
+The rule matches the filesystem on the backup drive by its UUID, which is the same UUID
+that you will also record in ``/etc/backups/backup.disks``. A single line can also match
+several backup drives, if you separate their UUIDs with ``|``, e.g.
+``ENV{ID_FS_UUID}=="<UUID 1>|<UUID 2>"``.
 
 The "systemd" tag in conjunction with the SYSTEMD_WANTS environment variable has systemd
 launch the "automatic-backup" service, which we will create next, as the
@@ -54,12 +57,7 @@ modify it to suit your needs (e.g., more backup sets, dumping databases, etc.).
 
     #!/bin/bash -ue
 
-    # The udev rule is not terribly accurate and may trigger our service before
-    # the kernel has finished probing partitions. Sleep for a bit to ensure
-    # the kernel is done.
-    #
-    # This can be avoided by using a more precise udev rule, e.g. matching
-    # a specific hardware path and partition.
+    # Give the system a moment to settle after the backup drive was connected.
     sleep 5
 
     #
@@ -185,6 +183,13 @@ Find the UUID of the filesystem on which backups should be stored::
     lsblk -o+uuid,label
 
 Record the UUID in the ``/etc/backups/backup.disks`` file.
+
+Add a line for this UUID to ``/etc/backups/80-backup.rules`` (see above), so that connecting
+the drive starts the ``automatic-backup`` service, and reload the udev rules::
+
+    udevadm control --reload
+
+Every backup drive needs both: its UUID in ``backup.disks`` and a matching udev rule.
 
 Mount the drive at /mnt/backup.
 

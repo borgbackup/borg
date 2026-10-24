@@ -2523,13 +2523,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     #    self.assert_in('"--old" has been deprecated. Use "--new" instead', output)
 
     def test_prune_repository(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
+        self.cmd('create', self.repository_location + '::test1', self.input_path)
+        self.cmd('create', self.repository_location + '::test2', self.input_path)
         # these are not really a checkpoints, but they look like some:
-        self.cmd('create', self.repository_location + '::test3.checkpoint', src_dir)
-        self.cmd('create', self.repository_location + '::test3.checkpoint.1', src_dir)
-        self.cmd('create', self.repository_location + '::test4.checkpoint', src_dir)
+        self.cmd('create', self.repository_location + '::test3.checkpoint', self.input_path)
+        self.cmd('create', self.repository_location + '::test3.checkpoint.1', self.input_path)
+        self.cmd('create', self.repository_location + '::test4.checkpoint', self.input_path)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1')
         assert re.search(r'Would prune:\s+test1', output)
         # must keep the latest non-checkpoint archive:
@@ -2552,7 +2553,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('test3.checkpoint.1', output)
         self.assert_in('test4.checkpoint', output)
         # now we supersede the latest checkpoint by a successful backup:
-        self.cmd('create', self.repository_location + '::test5', src_dir)
+        self.cmd('create', self.repository_location + '::test5', self.input_path)
         self.cmd('prune', self.repository_location, '--keep-daily=2')
         output = self.cmd('list', '--consider-checkpoints', self.repository_location)
         # all checkpoints should be gone now:
@@ -2568,10 +2569,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def _create_archive_ts(self, name, y, m, d, H=0, M=0, S=0):
         loc = self.repository_location + '::' + name
-        self.cmd('create', '--timestamp', self._to_utc_timestamp(y, m, d, H, M, S), loc, src_dir)
+        self.cmd('create', '--timestamp', self._to_utc_timestamp(y, m, d, H, M, S), loc, self.input_path)
 
     # This test must match docs/misc/prune-example.txt
     def test_prune_repository_example(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         # Archives that will be kept, per the example
         # Oldest archive
@@ -2640,6 +2642,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # Week number is shown in comment for every row in the below list.
         # Year is also shown when it doesn't match the year given in the
         # date tuple.
+        self.create_regular_file('file1', size=1024)
         test_dates = [
                 (2020, 12, 6), (2021, 1, 3),   # 49, 2020-53
                 (2021, 3, 28), (2021, 4, 25),  # 12, 16
@@ -2703,6 +2706,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     # With an initial and daily backup, prune daily until oldest is replaced by a monthly backup
     def test_prune_retain_and_expire_oldest(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         # Initial backup
         self._create_archive_ts('original_archive', 2020, 9, 1, 11, 15)
@@ -2726,9 +2730,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in('original_archive', output)
 
     def test_prune_repository_save_space(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
+        self.cmd('create', self.repository_location + '::test1', self.input_path)
+        self.cmd('create', self.repository_location + '::test2', self.input_path)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+test2', output)
         assert re.search(r'Would prune:\s+test1', output)
@@ -2741,9 +2746,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('test2', output)
 
     def test_prune_quick_stats(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
+        self.cmd('create', self.repository_location + '::test1', self.input_path)
+        self.cmd('create', self.repository_location + '::test2', self.input_path)
         output = self.cmd('prune', '--quick-stats', '--keep-daily=1', self.repository_location)
         self.assert_in('Deleted data:', output)
         assert 'All archives:' not in output
@@ -2755,19 +2761,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('--stats and --quick-stats are mutually exclusive', output)
 
     def test_prune_dry_run_ignores_quick_stats(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=none', self.repository_location)
-        self.cmd('create', self.repository_location + '::test1', src_dir)
-        self.cmd('create', self.repository_location + '::test2', src_dir)
+        self.cmd('create', self.repository_location + '::test1', self.input_path)
+        self.cmd('create', self.repository_location + '::test2', self.input_path)
         output = self.cmd('prune', '--dry-run', '--quick-stats', '--keep-daily=1', self.repository_location)
         self.assert_in('Ignoring --quick-stats', output)
         assert 'Deleted data:' not in output
 
     def test_prune_repository_prefix(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', src_dir)
-        self.cmd('create', self.repository_location + '::foo-2015-08-12-20:00', src_dir)
-        self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', src_dir)
-        self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', src_dir)
+        self.cmd('create', self.repository_location + '::foo-2015-08-12-10:00', self.input_path)
+        self.cmd('create', self.repository_location + '::foo-2015-08-12-20:00', self.input_path)
+        self.cmd('create', self.repository_location + '::bar-2015-08-12-10:00', self.input_path)
+        self.cmd('create', self.repository_location + '::bar-2015-08-12-20:00', self.input_path)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1', '--prefix=foo-')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00', output)
         assert re.search(r'Would prune:\s+foo-2015-08-12-10:00', output)
@@ -2784,11 +2792,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('bar-2015-08-12-20:00', output)
 
     def test_prune_repository_glob(self):
+        self.create_regular_file('file1', size=1024)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', self.repository_location + '::2015-08-12-10:00-foo', src_dir)
-        self.cmd('create', self.repository_location + '::2015-08-12-20:00-foo', src_dir)
-        self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', src_dir)
-        self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', src_dir)
+        self.cmd('create', self.repository_location + '::2015-08-12-10:00-foo', self.input_path)
+        self.cmd('create', self.repository_location + '::2015-08-12-20:00-foo', self.input_path)
+        self.cmd('create', self.repository_location + '::2015-08-12-10:00-bar', self.input_path)
+        self.cmd('create', self.repository_location + '::2015-08-12-20:00-bar', self.input_path)
         output = self.cmd('prune', '--list', '--dry-run', self.repository_location, '--keep-daily=1', '--glob-archives=2015-*-foo')
         assert re.search(r'Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo', output)
         assert re.search(r'Would prune:\s+2015-08-12-10:00-foo', output)
@@ -5017,6 +5026,28 @@ class RemoteArchiverTestCase(ArchiverTestCase):
 
     @unittest.skip('only works locally')
     def test_migrate_lock_alive(self):
+        pass
+
+    # The prune rules are evaluated client-side, so running these again against a remote repository
+    # adds no coverage. test_prune_repository still exercises prune against a remote repository.
+    @unittest.skip('prune rules are tested locally')
+    def test_prune_repository_example(self):
+        pass
+
+    @unittest.skip('prune rules are tested locally')
+    def test_prune_quarterly(self):
+        pass
+
+    @unittest.skip('prune rules are tested locally')
+    def test_prune_retain_and_expire_oldest(self):
+        pass
+
+    @unittest.skip('prune rules are tested locally')
+    def test_prune_repository_prefix(self):
+        pass
+
+    @unittest.skip('prune rules are tested locally')
+    def test_prune_repository_glob(self):
         pass
 
     def test_remote_repo_strip_components_doesnt_leak(self):

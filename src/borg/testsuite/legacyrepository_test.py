@@ -13,6 +13,7 @@ from ..helpers import msgpack
 from ..fslocking import Lock, LockFailed
 from ..platformflags import is_win32
 from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod, bytes_from_borg1
+from ..legacy.remote import UnexpectedRPCDataFormatFromServer
 from ..manifest import Manifest
 from ..legacy.repository import LegacyRepository, LoggedIO
 from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
@@ -1011,13 +1012,7 @@ remote.RepositoryServer._legacy_rpc_methods = tuple(
 )
 setup_logging(is_serve=True)
 server = remote.RepositoryServer(restrict_to_paths=None, restrict_to_repositories=None)
-try:
-    server.serve()
-except AssertionError:
-    # the legacy server expects a close call before stdin gets closed, borg 1.x did not.
-    if server.repository is None:
-        raise
-    server.repository.close()
+server.serve()
 """
 
 
@@ -1051,3 +1046,14 @@ def test_bytes_from_borg1():
     unpacked = msgpack.unpackb(msgpack.packb(value, use_bin_type=False))
     assert all(isinstance(v, str) for v in unpacked)
     assert bytes_from_borg1(unpacked) == value
+
+
+def test_get_many_rejects_non_bytes_from_server(remote_repository, monkeypatch):
+    # the server must send bytes for "get", anything else is an unexpected RPC data format.
+    with remote_repository:
+        with monkeypatch.context() as m:
+            m.setattr(remote_repository, "call_many", lambda cmd, calls: iter([b"data", 42]))
+            results = remote_repository.get_many([H(1), H(2)])
+            assert next(results) == b"data"
+            with pytest.raises(UnexpectedRPCDataFormatFromServer):
+                next(results)

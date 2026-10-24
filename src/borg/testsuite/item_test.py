@@ -2,7 +2,8 @@ import pytest
 
 from ..cache import ChunkListEntry
 from ..item import MAX_ALIGN_CHUNKS, MAX_ALIGN_WORK, Item, ItemDiff, chunks_contents_equal, chunks_diff_size
-from ..helpers import StableDict
+from ..item import ArchiveItem, EncryptedKey, Key, ManifestItem
+from ..helpers import IntegrityError, StableDict
 from ..helpers.msgpack import Timestamp
 from ..platformflags import is_pypy
 
@@ -62,6 +63,46 @@ def test_item_from_dict(item_dict, path, mode):
 def test_item_invalid(invalid_item, error):
     with pytest.raises(error):
         Item(invalid_item)
+
+
+@pytest.mark.parametrize(
+    "cls, internal_dict",
+    [
+        (Item, {42: "a/b/c"}),  # key is neither str nor bytes
+        (Item, {"path": 42}),  # not a str
+        (Item, {"chunks": b"not a list"}),
+        (Item, {"chunks": [b"not a list"]}),
+        (Item, {"chunks": [[b"id"]]}),  # too few elements
+        (Item, {"chunks": [[b"id", "1000"]]}),  # size is not an int
+        (Item, {"chunks": [[b"id", 1000, "10"]]}),  # csize is not an int
+        (Item, {"mtime": "noon"}),  # timestamp is not an int
+        (Item, {"acl_access": 42}),  # not bytes
+        (Item, {"xattrs": {b"user.foo": 42}}),  # value is not bytes
+        (ArchiveItem, {"version": "2"}),
+        (ArchiveItem, {"cmdline": "borg create"}),  # not a list
+        (ArchiveItem, {"chunker_params": ("buzhash", 1.5)}),  # not str or int
+        (ArchiveItem, {"item_ptrs": [42]}),  # not bytes
+        (ManifestItem, {"version": "1"}),
+        (ManifestItem, {"archives": []}),  # not a dict
+        (ManifestItem, {"archives": {"name": []}}),  # entry is not a dict
+        (ManifestItem, {"archives": {"name": {"id": b"id"}}}),  # time is missing
+        (ManifestItem, {"config": []}),  # not a dict
+        (ManifestItem, {"config": {"tam_required": 1}}),  # not a bool
+        (EncryptedKey, {"version": "1"}),
+        (EncryptedKey, {"salt": 42}),  # not bytes
+        (Key, {"version": "2"}),
+        (Key, {"version": 1, "enc_key": b"k" * 32, "enc_hmac_key": b"h" * 16}),  # invalid legacy key length
+    ],
+)
+def test_invalid_internal_dict(cls, internal_dict):
+    # internal_dict comes from msgpack-unpacked repository / key data, so it is validated.
+    with pytest.raises(IntegrityError):
+        cls(internal_dict=internal_dict)
+
+
+def test_legacy_key_internal_dict():
+    key = Key(internal_dict={"version": 1, "enc_key": b"k" * 32, "enc_hmac_key": b"h" * 32})
+    assert key.crypt_key == b"k" * 32 + b"h" * 32
 
 
 def test_item_from_kw():

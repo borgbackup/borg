@@ -7,7 +7,7 @@ import pytest
 from ...cache import write_chunkindex_to_repo
 from ...constants import *  # NOQA
 from ...crypto.key import RepoKeyNotFoundError
-from ...helpers import bin_to_hex
+from ...helpers import bin_to_hex, CommandError
 from ...helpers.passphrase import PassphraseWrong
 from ...manifest import Manifest
 from .. import changedir
@@ -267,6 +267,21 @@ def test_debug_format_obj_respects_type(archivers, request):
     with open("output/meta.json") as f:
         meta_read = json.load(f)
     assert meta_read["type"] == ROBJ_ARCHIVE_STREAM
+
+
+@pytest.mark.parametrize("meta", [[1, 2, 3], {"type": 42}, {"type": ROBJ_DONTCARE}])
+def test_debug_format_obj_invalid_meta(archivers, request, meta):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "data.bin", contents=b"some data")
+    create_regular_file(archiver.input_path, "meta.json", contents=json.dumps(meta).encode())
+    id_hash = cmd(archiver, "debug", "id-hash", "input/data.bin").strip()
+    args = ("debug", "format-obj", id_hash, "input/data.bin", "input/meta.json", "output/repoobj.bin")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, *args, exit_code=CommandError().exit_code)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, *args)
 
 
 def test_debug_dump_archive(archivers, request):

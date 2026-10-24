@@ -241,9 +241,13 @@ class DebugMixIn:
 
         with open(args.json_path) as f:
             meta = json.load(f)
+        if not isinstance(meta, dict):
+            raise CommandError(f"metadata in {args.json_path} is not a JSON object.")
 
         repo_objs = manifest.repo_objs
         ro_type = meta.pop("type", ROBJ_FILE_STREAM)
+        if not isinstance(ro_type, str) or ro_type == ROBJ_DONTCARE:
+            raise CommandError(f"metadata type {ro_type!r} is invalid.")
         data_encrypted = repo_objs.format(id=id, meta=meta, data=data, ro_type=ro_type)
 
         with open(args.object_path, "wb") as f:

@@ -30,11 +30,12 @@ from ..cache import (
     write_chunkindex_invalid,
     write_chunkindex_to_repo,
 )
+from ..constants import MAX_DATA_SIZE
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..crypto.key import AESOCBKey, AuthenticatedKey
 from ..crypto import sealed_stream
 from ..crypto.sealed_stream import SealedStreamWriter, read_sealed_stream
-from ..helpers import CorruptPack, Error, bin_to_hex, progress, safe_ns
+from ..helpers import CorruptPack, Error, IntegrityError, bin_to_hex, progress, safe_ns
 from ..helpers import msgpack
 from ..helpers.msgpack import int_to_timestamp
 from ..manifest import Manifest
@@ -83,6 +84,36 @@ class TestAdHocWithFilesCache:
     def test_existing_reuse_after_add_chunk(self, cache):
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
         assert cache.reuse_chunk(H(1), 4, Statistics()) == (H(1), 4)
+
+    def test_seen_chunk_size_mismatch(self, cache):
+        # chunk sizes may come from an archive's chunk list (e.g. transfer), they must match the known size.
+        cache.add_chunk(H(3), {}, b"5678", stats=Statistics())
+        assert cache.seen_chunk(H(3), 4)
+        with pytest.raises(IntegrityError, match="does not match known size"):
+            cache.seen_chunk(H(3), 5)
+
+    @pytest.mark.parametrize("size", [0, -1, MAX_DATA_SIZE + 1])
+    def test_seen_chunk_invalid_size(self, cache, size):
+        # H(1) is in the repository, but its size is not known yet (0 in the chunks index).
+        with pytest.raises(IntegrityError, match="invalid size"):
+            cache.seen_chunk(H(1), size)
+
+    @pytest.mark.parametrize("size", [0, -1, MAX_DATA_SIZE + 1, None])
+    def test_reuse_chunk_invalid_size(self, cache, size):
+        with pytest.raises(IntegrityError, match="invalid size"):
+            cache.reuse_chunk(H(1), size, Statistics())
+
+    @pytest.mark.parametrize("sizes", [(4, 5), (0, 0), (-1, -1)])
+    def test_compress_entry_invalid_size(self, cache, sizes):
+        # the first size is added to the chunks index, the second one is in the files cache entry.
+        cache.add_chunk(H(5), {}, b"5678", stats=Statistics())
+        ts = int_to_timestamp(0)
+        entry = FileCacheEntry(age=0, inode=1, size=4, ctime=ts, mtime=ts, chunks=[(H(5), sizes[0])])
+        if sizes[0] > 0:
+            cache.compress_entry(entry)
+        entry = entry._replace(chunks=[(H(5), sizes[1])])
+        with pytest.raises(ValueError):
+            cache.compress_entry(entry)
 
     def test_periodic_index_write_flushes_pending(self, repository, cache):
         # #9900: the periodic index write must flush the pack writer first, so a buffered chunk is
@@ -216,6 +247,14 @@ class TestAdHocWithFilesCache:
             msgpack.pack([1, 2, 3], writer)
             writer.finish()
         self.check_ignored(cache, caplog, reason="invalid")
+
+    def test_cache_config_create_existing(self, manifest):
+        # a concurrently running borg process may have created the cache config already.
+        cache, _ = self.write_files_cache(manifest)
+        config_path = cache.path / "config"
+        config = config_path.read_text()
+        cache.cache_config.create()
+        assert config_path.read_text() == config
 
     def test_cache_config(self, manifest):
         cache, _ = self.write_files_cache(manifest)

@@ -184,6 +184,8 @@ class PackRecompressor:
             return obj_bytes
         meta, data = self.repo_objs.parse(id, obj_bytes, ro_type=ROBJ_DONTCARE)
         ro_type = meta.pop("type", None)
+        if not isinstance(ro_type, str) or ro_type == ROBJ_DONTCARE:
+            raise IntegrityError(f"object {bin_to_hex(id)} has an invalid type: {ro_type!r}")
         if self.wanted[2] == -1:
             # if the object was obfuscated, but should not be in future, remove related metadata
             meta.pop("olevel", None)

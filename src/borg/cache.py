@@ -1264,10 +1264,11 @@ class ChunksMixin:
             # there could be a long time without any repository operations and the repo lock would get stale.
             self.refresh_lock(now)
             return self.reuse_chunk(id, size, stats)
-        cdata = self.repo_objs.format(
+        # the parts may reference data (see format_parts), put() copies what it needs to keep.
+        cdata_parts = self.repo_objs.format_parts(
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
-        pack_results = self.repository.put(id, cdata)
+        pack_results = self.repository.put(id, cdata_parts)
         self.last_refresh_dt = now  # .put also refreshed the lock
         self.chunks.add(id, size)
         self.chunks.update_pack_info(pack_results)

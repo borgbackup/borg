@@ -4,7 +4,7 @@ Examples
 ~~~~~~~~
 ::
 
-    $ borg list root-2016-02-15
+    $ borg list root
     drwxr-xr-x root   root          0 Mon, 2016-02-15 17:44:27 +0100 .
     drwxrwxr-x root   root          0 Mon, 2016-02-15 19:04:49 +0100 bin
     -rwxr-xr-x root   root    1029624 Thu, 2014-11-13 00:08:51 +0100 bin/bash
@@ -12,7 +12,7 @@ Examples
     -rwxr-xr-x root   root       2140 Fri, 2015-03-27 20:24:22 +0100 bin/bzdiff
     ...
 
-    $ borg list root-2016-02-15 --pattern "- bin/ba*"
+    $ borg list root --pattern "- bin/ba*"
     drwxr-xr-x root   root          0 Mon, 2016-02-15 17:44:27 +0100 .
     drwxrwxr-x root   root          0 Mon, 2016-02-15 19:04:49 +0100 bin
     lrwxrwxrwx root   root          6 Fri, 2015-03-27 20:24:26 +0100 bin/bzcmp -> bzdiff

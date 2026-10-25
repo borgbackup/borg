@@ -1,5 +1,5 @@
 pip==26.2.1
-virtualenv==21.9.0
+virtualenv==21.14.13
 build==1.6.1
 tox==4.63.0
 pytest==9.1.1

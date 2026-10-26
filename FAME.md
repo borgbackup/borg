@@ -1,11 +1,11 @@
 # Contributors
 
-376 people have contributed to Borg, with 11,605 commits in total.
+376 people have contributed to Borg, with 11,619 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-10-19 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-10-26 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,15 +21,15 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,880 | 108,124 | 534 |
-| Marian Beermann | 1,140 | 7,542 | 156 |
+| Thomas Waldmann | 7,890 | 108,174 | 534 |
+| Marian Beermann | 1,140 | 7,534 | 156 |
 | Jonas Borgström | 560 | 941 | 38 |
 | Mrityunjay Raj | 319 | 15,832 | 117 |
 | Antoine Beaupré | 285 | 437 | 33 |
 | Andrey Bienkowski | 72 | 200 | 16 |
 | Ted Lawson | 71 | 4,357 | 39 |
 | Thalian | 63 | 560 | 28 |
-| dependabot[bot] | 59 | 35 | 11 |
+| dependabot[bot] | 62 | 35 | 11 |
 | Martin Hostettler | 46 | 2,558 | 9 |
 | Milkey Mouse | 42 | 239 | 12 |
 | Dan Christensen | 40 | 5 | 2 |
@@ -45,8 +45,8 @@ show up there, so the number understates early contributions.  Generated files
 | Lee Bousfield | 14 | 157 | 9 |
 | Alan Jenkins | 14 | 35 | 2 |
 | Daniel Rudolf | 13 | 213 | 14 |
+| ThomasWaldmann | 13 | 181 | 1 |
 | Robin Schneider | 13 | 18 | 8 |
-| ThomasWaldmann | 12 | 181 | 1 |
 | Elmar Hoffmann | 12 | 90 | 6 |
 | Jürg Rast | 12 | 72 | 11 |
 | Ronny Pfannschmidt | 12 | 20 | 4 |
@@ -157,18 +157,18 @@ show up there, so the number understates early contributions.  Generated files
 | Markus Engelbrecht | 2 | 3 | 1 |
 | a1346054 | 2 | 3 | 2 |
 | bbx0 | 2 | 3 | 1 |
-| jan | 2 | 3 | 1 |
 | Fabian Fröhlich | 2 | 2 | 1 |
 | MultisampledNight | 2 | 2 | 1 |
 | Samuel BF | 2 | 2 | 1 |
 | Saurav Sachidanand | 2 | 2 | 1 |
-| azrdev | 2 | 2 | 1 |
 | AJ Jordan | 2 | 1 | 1 |
 | Cam Hutchison | 2 | 1 | 1 |
 | Cthulhux | 2 | 1 | 1 |
 | Leo Famulari | 2 | 1 | 1 |
 | Russell Davis | 2 | 1 | 1 |
 | Sophie Herold | 2 | 1 | 1 |
+| azrdev | 2 | 1 | 1 |
+| jan | 2 | 1 | 1 |
 | textshell | 2 | 1 | 1 |
 | Abogical | 2 | 0 | 0 |
 | Andrew Skalski | 2 | 0 | 0 |

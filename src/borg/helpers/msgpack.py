@@ -219,7 +219,7 @@ def is_supported_msgpack():
 
     if msgpack.version in []:  # < add bad releases here to deny list
         return False
-    return (1, 0, 3) <= msgpack.version[:3] <= (1, 2, 3)
+    return (1, 0, 3) <= msgpack.version[:3] <= (1, 2, 4)
 
 
 def get_limited_unpacker(kind):

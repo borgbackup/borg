@@ -160,6 +160,33 @@ def test_chunkify_short_reads(header_size):
     assert [len(c) for c in chunks] == expected_sizes
 
 
+def test_chunkify_pipe():
+    # reading from a pipe via the OS-level file handle: reads come up short and posix_fadvise()
+    # fails with ESPIPE (e.g. on Linux) - neither must make the chunker stop or fail.
+    import threading
+    import time
+    data = os.urandom(3 * 65536 + 123)
+    r, w = os.pipe()
+
+    def writer():
+        with os.fdopen(w, 'wb') as f:
+            for start in range(0, len(data), 65536):
+                f.write(data[start:start + 65536])
+                f.flush()
+                time.sleep(0.05)  # writer pause: reads on the other side come up short
+
+    t = threading.Thread(target=writer)
+    t.start()
+    try:
+        chunker = ChunkerFixed(131072, sparse=False)
+        chunks = cf(chunker.chunkify(None, r))
+    finally:
+        os.close(r)
+        t.join()
+    assert b''.join(chunks) == data
+    assert [len(c) for c in chunks] == [131072, 65536 + 123]
+
+
 def test_buzhash_chunksize_distribution():
     data = os.urandom(1048576)
     min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB

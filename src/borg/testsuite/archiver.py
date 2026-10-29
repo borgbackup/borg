@@ -5829,3 +5829,14 @@ def test_help_formatting(command, parser):
 def test_help_formatting_helptexts(topic):
     helptext = Archiver.helptext[topic]
     assert str(rst_to_terminal(helptext))
+
+
+@pytest.mark.parametrize('command', list(get_all_parsers().keys()))
+def test_commands_help_invocation(command):
+    if command == 'borgfs':
+        ret, output = exec_cmd('--help', archiver=Archiver(prog='borgfs'), fork=False)
+    else:
+        ret, output = exec_cmd(*command.split(), '--help', fork=False)
+    assert ret == 0
+    assert 'usage:' in output
+    assert 'Traceback (most recent call last):' not in output

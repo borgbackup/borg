@@ -16,6 +16,7 @@ try:
     import argparse
     import collections
     import configparser
+    import errno
     import faulthandler
     import functools
     import inspect
@@ -730,7 +731,7 @@ class Archiver:
                     add_item=archive.add_item, write_checkpoint=archive.write_checkpoint,
                     checkpoint_interval=args.checkpoint_interval, rechunkify=False)
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
-                    process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
+                    process_file_chunks=cp.process_file_chunks, chunks_processor=cp, add_item=archive.add_item,
                     chunker_params=args.chunker_params, show_progress=args.progress, sparse=args.sparse,
                     log_json=args.log_json, iec=args.iec, file_status_printer=self.print_file_status,
                     files_changed=args.files_changed)
@@ -745,55 +746,87 @@ class Archiver:
 
         if dry_run:
             return '-'
-        elif stat.S_ISREG(st.st_mode):
-            return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache, strip_prefix=strip_prefix)
-        elif stat.S_ISDIR(st.st_mode):
-            return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
-        elif stat.S_ISLNK(st.st_mode):
-            if not read_special:
-                return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
-            else:
-                try:
-                    st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
-                except OSError:
-                    special = False
+        # the ChunksProcessor remembers (in last_part_number) whether it has already written checkpoint
+        # part files for the file we are about to process. we must not retry a file once part files have
+        # been written for it, because re-reading it from the start would create duplicate / inconsistent
+        # part files (concatenating all part files would then not yield the complete file any more).
+        cp = fso.chunks_processor  # the ChunksProcessor that fso uses
+        MAX_RETRIES = 10  # count includes the initial try (initial try == "retry 0")
+        for retry in range(MAX_RETRIES):
+            cp.last_part_number = 0  # reset part file tracking for this (re)try of the file
+            last_try = retry == MAX_RETRIES - 1
+            try:
+                if stat.S_ISREG(st.st_mode):
+                    return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache,
+                                            strip_prefix=strip_prefix, last_try=last_try)
+                elif stat.S_ISDIR(st.st_mode):
+                    return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
+                elif stat.S_ISLNK(st.st_mode):
+                    if not read_special:
+                        return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
+                    else:
+                        try:
+                            st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
+                        except OSError:
+                            special = False
+                        else:
+                            special = is_special(st_target.st_mode)
+                        if special:
+                            return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target,
+                                                    cache=cache, flags=flags_special_follow, strip_prefix=strip_prefix,
+                                                    last_try=last_try)
+                        else:
+                            return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
+                elif stat.S_ISFIFO(st.st_mode):
+                    if not read_special:
+                        return fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
+                    else:
+                        return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                                cache=cache, flags=flags_special, strip_prefix=strip_prefix, last_try=last_try)
+                elif stat.S_ISCHR(st.st_mode):
+                    if not read_special:
+                        return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='c', strip_prefix=strip_prefix)
+                    else:
+                        return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                                cache=cache, flags=flags_special, strip_prefix=strip_prefix, last_try=last_try)
+                elif stat.S_ISBLK(st.st_mode):
+                    if not read_special:
+                        return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='b', strip_prefix=strip_prefix)
+                    else:
+                        return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
+                                                cache=cache, flags=flags_special, strip_prefix=strip_prefix, last_try=last_try)
+                elif stat.S_ISSOCK(st.st_mode):
+                    # Ignore unix sockets
+                    return
+                elif stat.S_ISDOOR(st.st_mode):
+                    # Ignore Solaris doors
+                    return
+                elif stat.S_ISPORT(st.st_mode):
+                    # Ignore Solaris event ports
+                    return
                 else:
-                    special = is_special(st_target.st_mode)
-                if special:
-                    return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target,
-                                              cache=cache, flags=flags_special_follow, strip_prefix=strip_prefix)
-                else:
-                    return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
-        elif stat.S_ISFIFO(st.st_mode):
-            if not read_special:
-                return fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
-            else:
-                return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                        cache=cache, flags=flags_special, strip_prefix=strip_prefix)
-        elif stat.S_ISCHR(st.st_mode):
-            if not read_special:
-                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='c', strip_prefix=strip_prefix)
-            else:
-                return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                        cache=cache, flags=flags_special, strip_prefix=strip_prefix)
-        elif stat.S_ISBLK(st.st_mode):
-            if not read_special:
-                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='b', strip_prefix=strip_prefix)
-            else:
-                return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                        cache=cache, flags=flags_special, strip_prefix=strip_prefix)
-        elif stat.S_ISSOCK(st.st_mode):
-            # Ignore unix sockets
-            return
-        elif stat.S_ISDOOR(st.st_mode):
-            # Ignore Solaris doors
-            return
-        elif stat.S_ISPORT(st.st_mode):
-            # Ignore Solaris event ports
-            return
-        else:
-            self.print_warning('Unknown file type: %s', path)
-            return
+                    self.print_warning('Unknown file type: %s', path)
+                    return
+            except BackupError as err:
+                if getattr(err, 'errno', None) in (errno.EPERM, errno.EACCES):
+                    # permission errors will not get better when retrying, so don't waste time on it.
+                    raise
+                if last_try or cp.last_part_number > 0:
+                    # giving up: this was the last try, or we have already written part files for this
+                    # file and thus must not retry. the error will be dealt with (logged) by the caller.
+                    raise
+                # sleep a bit, so temporary problems (e.g. a file briefly being inaccessible or
+                # being modified) might go away before we try to read the file again...
+                sleep_s = 1000.0 / 1e6 * 10 ** (retry / 2)  # retry 0: 1ms, retry 6: 1s, ...
+                time.sleep(sleep_s)
+                logger.warning(
+                    f'{path}: {err}, slept {sleep_s:.3f}s, next: retry: {retry + 1} of {MAX_RETRIES - 1}...'
+                )
+                # We retry by source path, assuming that this path or symlink target has not been
+                # exchanged against a different filesystem object while processing. Refresh the stat
+                # before dispatching again, so temporary changes are reflected in the next attempt.
+                with backup_io('stat'):
+                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
 
     def _rec_walk(self, *, path, parent_fd, name, fso, cache, matcher,
                   exclude_caches, exclude_if_present, keep_exclude_tags,

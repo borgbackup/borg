@@ -202,17 +202,16 @@ class ChunkerFixed:
             while range_size:
                 wanted = min(range_size, self.block_size)
                 if is_data:
-                    # read block from the range
-                    data = dread(offset, wanted, fd, fh)
-                    got = len(data)
-                    while 0 < got < wanted:
-                        # a short read is not EOF (e.g. reading from a pipe), try to read the rest of the block.
-                        # filling the block also keeps the chunk boundaries at fixed offsets.
-                        more = dread(offset + got, wanted - got, fd, fh)
+                    # read block from the range.
+                    # a short read is not EOF (e.g. reading from a pipe), so keep reading until the block
+                    # is complete or EOF is reached. filling the block keeps the chunk boundaries at fixed offsets.
+                    data = b''
+                    while len(data) < wanted:
+                        more = dread(offset + len(data), wanted - len(data), fd, fh)
                         if not more:
                             break  # EOF
                         data += more
-                        got = len(data)
+                    got = len(data)
                     if zeros.startswith(data):
                         data = None
                         allocation = CH_ALLOC

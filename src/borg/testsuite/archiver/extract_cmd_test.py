@@ -549,6 +549,24 @@ def test_extract_hardlinks_twice(archivers, request):
         assert os.stat("input/b/hardlink").st_nlink == 2
 
 
+@requires_hardlinks
+def test_extract_duplicate_hardlink_item(archivers, request):
+    # an archive can have the same hard link item twice (here: same path given twice via stdin).
+    # extracting the duplicate must not remove the file that is the link target of its hard link group (#10393).
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"123456")
+    os.link(os.path.join(archiver.input_path, "file1"), os.path.join(archiver.input_path, "file2"))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--paths-from-stdin", "test", input=b"input/file1\ninput/file1\ninput/file2")
+    assert cmd(archiver, "list", "test", "--format={path}{NL}").splitlines() == ["input/file1"] * 2 + ["input/file2"]
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert os.stat("input/file1").st_nlink == 2
+        assert os.stat("input/file2").st_nlink == 2
+        with open("input/file1", "rb") as f:
+            assert f.read() == b"123456"
+
+
 def test_extract_include_exclude(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

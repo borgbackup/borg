@@ -15,6 +15,10 @@ General:
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         See also BORG_NEW_PASSPHRASE.
+        Borg removes the passphrase-related variables (BORG_PASSPHRASE, BORG_NEW_PASSPHRASE,
+        BORG_PASSCOMMAND and BORG_PASSPHRASE_FD) from the environment of the subprocesses it
+        starts (like the command given in BORG_PASSCOMMAND, ``--paths-from-command`` /
+        ``--content-from-command`` commands, tar filter commands and ``borg with-lock`` commands).
     BORG_PASSCOMMAND
         When set, use the standard output of the command (trailing newlines are stripped) to answer the
         passphrase question for encrypted repositories.

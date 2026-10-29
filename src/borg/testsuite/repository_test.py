@@ -1419,6 +1419,33 @@ def test_max_data_size(repo_fixtures, request):
         repository.delete(H(0), validate=None)
 
 
+def test_max_data_size_parts(repo_fixtures, request):
+    # for an object given as a list of parts, the limit applies to the parts' total size.
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
+        max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)
+        with pytest.raises(IntegrityError):
+            repository.put(H(1), [fchunk(max_data), b"x"])
+
+
+def test_put_parts(tmp_path):
+    # put() takes an object as a list of parts (see RepoObj.format_parts): it stores the joined parts.
+    # parts that are not bytes are copied by put(), so the caller may reuse their buffer right after.
+    chunk0, chunk1 = fchunk(b"DATA0", chunk_id=H(0)), fchunk(b"DATA1", chunk_id=H(1))
+    buffer = bytearray(chunk1)
+    with Repository(os.fspath(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.put(H(0), [chunk0[:10], memoryview(chunk0)[10:20], chunk0[20:]])
+        with memoryview(buffer) as view:
+            repository.put(H(1), [view[:30], view[30:]])
+        buffer[:] = b"\xff" * len(buffer)  # the caller reuses its buffer before the pack is written
+        repository.flush()
+        assert repository.get(H(0)) == chunk0
+        assert repository.get(H(1)) == chunk1
+        entry0, entry1 = repository.chunks[H(0)], repository.chunks[H(1)]
+        assert entry0.pack_id == entry1.pack_id
+        assert (entry0.obj_offset, entry0.obj_size) == (0, len(chunk0))
+        assert (entry1.obj_offset, entry1.obj_size) == (len(chunk0), len(chunk1))
+
+
 def check(repository, repo_path, repair=False, status=True):
     assert repository.check(repair=repair) == status
     # Make sure no tmp files are left behind

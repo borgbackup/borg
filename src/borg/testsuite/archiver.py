@@ -13,6 +13,7 @@ import socket
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import unittest
@@ -4232,6 +4233,32 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'archive' in import_json
         assert 'stats' in import_json['archive']
         assert 'cache' not in import_json
+
+    def test_import_tar_nfiles(self):
+        # Build a tar with 2 regular files, 1 hardlink, 1 directory and 1 symlink.
+        with tarfile.open('input.tar', 'w') as tar:
+            for name in ('dir/file1', 'dir/file2'):
+                data = name.encode()
+                tarinfo = tarfile.TarInfo(name)
+                tarinfo.size = len(data)
+                tar.addfile(tarinfo, io.BytesIO(data))
+            tarinfo = tarfile.TarInfo('dir/hardlink1')
+            tarinfo.type = tarfile.LNKTYPE
+            tarinfo.linkname = 'dir/file1'
+            tar.addfile(tarinfo)
+            tarinfo = tarfile.TarInfo('dir/subdir')
+            tarinfo.type = tarfile.DIRTYPE
+            tar.addfile(tarinfo)
+            tarinfo = tarfile.TarInfo('dir/symlink1')
+            tarinfo.type = tarfile.SYMTYPE
+            tarinfo.linkname = 'file1'
+            tar.addfile(tarinfo)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('import-tar', self.repository_location + '::dst', 'input.tar')
+        info = json.loads(self.cmd('info', '--json', self.repository_location + '::dst'))
+        # as with borg create, each regular file counts once (hardlinks only for their first instance),
+        # directories/symlinks do not.
+        assert info['archives'][0]['stats']['nfiles'] == 2
 
     @requires_gzip
     def test_import_tar_gz(self):

@@ -3098,6 +3098,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'positional arguments' not in self.cmd('help', 'init', '--epilog-only')
         assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
+    def test_main_help_epilog(self):
+        help_output = self.cmd('-h')
+        assert 'Description of additional help topics:' in help_output
+        assert 'patterns' in help_output
+        assert 'placeholders' in help_output
+        assert 'compression' in help_output
+
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse(self):
         def has_noatime(some_file):

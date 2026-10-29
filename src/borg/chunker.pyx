@@ -60,7 +60,12 @@ def dread(offset, size, fd=None, fh=-1):
             # UNIX only and, in case of block sizes that are not a multiple of the
             # system's page size, better be used with a bug fixed linux kernel > 4.6.0,
             # see comment/workaround in _chunker.c and borgbackup issue #907.
-            os.posix_fadvise(fh, offset, len(data), os.POSIX_FADV_DONTNEED)
+            try:
+                os.posix_fadvise(fh, offset, len(data), os.POSIX_FADV_DONTNEED)
+            except OSError:
+                # e.g. ESPIPE when reading from a pipe / FIFO. this is just an optimization of the
+                # cache usage, not critical for correct function, so we ignore these errors.
+                pass
         return data
     else:
         return fd.read(size)

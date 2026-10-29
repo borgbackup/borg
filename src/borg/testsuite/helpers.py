@@ -10,7 +10,7 @@ from time import sleep
 
 import pytest
 
-from .. import platform
+from .. import platform, __version__
 from ..constants import *  # NOQA
 from ..helpers import Location
 from ..helpers import Buffer
@@ -30,7 +30,7 @@ from ..helpers import ellipsis_truncate
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
 from ..helpers import ns_to_pax_time, pax_time_to_ns
-from ..helpers import popen_with_error_handling
+from ..helpers import popen_with_error_handling, prepare_subprocess_env, SUBPROCESS_ENV_REMOVE
 from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
@@ -1225,6 +1225,34 @@ class TestPopenWithErrorHandling:
     def test_shell(self):
         with pytest.raises(AssertionError):
             popen_with_error_handling('', shell=True)
+
+
+class TestPrepareSubprocessEnv:
+    @pytest.mark.parametrize('name', SUBPROCESS_ENV_REMOVE)
+    @pytest.mark.parametrize('system', (True, False))
+    def test_removes_secrets_from_os_environ(self, monkeypatch, name, system):
+        monkeypatch.setenv(name, 'secret')
+        assert name not in prepare_subprocess_env(system=system)
+
+    def test_removes_secrets_from_given_env(self):
+        env = {name: 'secret' for name in SUBPROCESS_ENV_REMOVE}
+        env['BORG_REPO'] = '/path/to/repo'
+        result = prepare_subprocess_env(system=True, env=env)
+        assert not set(result) & set(SUBPROCESS_ENV_REMOVE)
+        assert result['BORG_REPO'] == '/path/to/repo'
+        # the given env must not be modified
+        assert env['BORG_PASSPHRASE'] == 'secret'
+        assert 'BORG_VERSION' not in env
+
+    def test_keeps_other_variables_and_sets_version(self, monkeypatch):
+        monkeypatch.setenv('BORG_REPO', '/path/to/repo')
+        monkeypatch.setenv('BORG_KEY_FILE', '/path/to/keyfile')
+        monkeypatch.setenv('HOME', '/home/user')
+        env = prepare_subprocess_env(system=True)
+        assert env['BORG_REPO'] == '/path/to/repo'
+        assert env['BORG_KEY_FILE'] == '/path/to/keyfile'
+        assert env['HOME'] == '/home/user'
+        assert env['BORG_VERSION'] == __version__
 
 
 def test_dash_open():

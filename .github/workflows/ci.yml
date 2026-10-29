@@ -354,7 +354,6 @@ jobs:
               sudo -E chmod 666 /dev/fuse
               sudo -E pkg install -y rust
               sudo -E pkg install -y git
-              sudo -E pkg install -y python310 py310-sqlite3
               sudo -E pkg install -y python311 py311-sqlite3
               sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
               sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python

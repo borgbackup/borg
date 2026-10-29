@@ -3257,8 +3257,18 @@ class Archiver:
                                    help='paths to extract; patterns are supported')
             define_exclusion_group(parser, strip_components=True)
 
+        additional_help = process_epilog("""
+        Description of additional help topics:
+
+        Use ``borg help <topic>`` to get help on:
+
+          patterns            selection patterns for including/excluding paths
+          placeholders        placeholders in repository URLs, archive names, etc.
+          compression         options and specifications for data compression
+        """)
         parser = argparse.ArgumentParser(prog=self.prog, description='Borg - Deduplicated Backups',
-                                         add_help=False)
+                                         epilog=additional_help, add_help=False,
+                                         formatter_class=argparse.RawDescriptionHelpFormatter)
         # paths and patterns must have an empty list as default everywhere
         parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser),
                             paths=[], patterns=[])

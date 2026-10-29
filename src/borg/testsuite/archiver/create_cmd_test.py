@@ -1055,13 +1055,16 @@ def _drain_fifo_and_join(fifo_fn, thread, size=65536):
 
 @pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
 @pytest.mark.parametrize("timeout_args", ([], ["--read-special-timeout=0"]), ids=["default-timeout", "no-timeout"])
-def test_create_read_special_big_fifo(archivers, request, timeout_args):
+@pytest.mark.parametrize("chunker_args", ([], ["--chunker-params=fixed,1048576"]), ids=["default-chunker", "fixed"])
+def test_create_read_special_big_fifo(archivers, request, timeout_args, chunker_args):
     # os.read() on a fifo returns at most the pipe buffer's content (often just 64 KiB),
     # usually much less than the chunker requests per read - especially with a writer
     # that pauses between bursts. borg must keep reading and not treat a short read as
     # EOF, else the archived fifo content gets truncated.
     # Parametrization covers both read paths: the SpecialFileReader wrapper (default
     # timeout) and the plain blocking reads (--read-special-timeout=0 == wait forever).
+    # The fixed chunker reads via its own code path, which calls posix_fadvise() on the
+    # file handle - that fails with ESPIPE for a fifo and must not make borg skip the fifo.
     archiver = request.getfixturevalue(archivers)
     import time
     from threading import Thread
@@ -1089,7 +1092,7 @@ def test_create_read_special_big_fifo(archivers, request, timeout_args):
     t = Thread(target=fifo_feeder, args=(fifo_fn, data))
     t.start()
     try:
-        cmd(archiver, "create", "--read-special", *timeout_args, "test", "input/fifo")
+        cmd(archiver, "create", "--read-special", *timeout_args, *chunker_args, "test", "input/fifo")
     finally:
         _drain_fifo_and_join(fifo_fn, t)
     with changedir("output"):

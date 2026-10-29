@@ -138,6 +138,28 @@ def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
     get_chunks(fn, sparse=sparse, header_size=header_size) == make_content(sparse_map, header_size=header_size)
 
 
+class ShortReadsFile(BytesIO):
+    """A file object returning at most <limit> bytes per read() call, like a pipe."""
+
+    def __init__(self, data, limit):
+        super().__init__(data)
+        self.limit = limit
+
+    def read(self, size=-1):
+        return super().read(min(size, self.limit) if size >= 0 else self.limit)
+
+
+@pytest.mark.parametrize('header_size', [0, 1000])
+def test_chunkify_short_reads(header_size):
+    # short reads must not be taken for EOF and must not change the fixed block boundaries.
+    data = os.urandom(header_size + 3 * 4096 + 123)
+    chunker = ChunkerFixed(4096, header_size=header_size, sparse=False)
+    chunks = cf(chunker.chunkify(ShortReadsFile(data, 100)))
+    assert b''.join(chunks) == data
+    expected_sizes = ([header_size] if header_size else []) + [4096, 4096, 4096, 123]
+    assert [len(c) for c in chunks] == expected_sizes
+
+
 def test_buzhash_chunksize_distribution():
     data = os.urandom(1048576)
     min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16 KiB, clip at 1 KiB and 64 KiB

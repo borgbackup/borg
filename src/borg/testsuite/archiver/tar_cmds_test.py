@@ -189,6 +189,22 @@ def test_import_tar_nfiles(archivers, request):
     assert info["archives"][0]["stats"]["nfiles"] == 3
 
 
+def test_import_tar_unsupported_borg_item_version(archivers, request):
+    # a BORG tar member with an unknown item metadata version is skipped with a warning.
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        for name, pax_headers in ("dir/file1", {"BORG.item.version": "2"}), ("dir/file2", {}):
+            data = name.encode()
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.size = len(data)
+            tarinfo.pax_headers = pax_headers
+            tar.addfile(tarinfo, io.BytesIO(data))
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "dst", "input.tar", exit_code=EXIT_WARNING)
+    assert "dir/file1: Unsupported BORG.item.version 2" in output
+    assert cmd(archiver, "list", "--short", "dst").splitlines() == ["dir/file2"]
+
+
 def test_import_tar_json(archivers, request):
     """import-tar --json reports the stats of the new archive like create --json does, see #10335."""
     archiver = request.getfixturevalue(archivers)

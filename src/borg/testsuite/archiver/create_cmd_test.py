@@ -14,6 +14,7 @@ from blake3 import blake3
 
 from ... import platform
 from ...constants import *  # NOQA
+from ...archiver.create_cmd import strip_prefix_and_path
 from ...constants import zeros
 from ...manifest import Manifest
 from ...platform import is_win32, is_cygwin
@@ -1391,6 +1392,21 @@ def test_create_dotslash_hack_root_metadata(archivers, request):
     # parent directories must NOT be in the archive.
     assert "input" not in output
     assert "first" not in output
+
+
+@pytest.mark.parametrize(
+    "path, expected",
+    [
+        ("input/first/./second", ("input/first/", "input/first/second")),
+        ("/./", (None, "/")),
+        # the slashdot hack pointing to the root directory strips nothing, like /./ does.
+        ("//./", (None, "//")),  # normpath keeps a leading "//"
+        ("///./", (None, "/")),
+        ("//./etc", ("//", "//etc")),
+    ],
+)
+def test_strip_prefix_and_path(path, expected):
+    assert strip_prefix_and_path(path) == expected
 
 
 def test_log_json(archivers, request):

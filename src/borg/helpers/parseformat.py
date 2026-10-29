@@ -295,7 +295,8 @@ class CompressionSpec:
 
 def ChunkerParams(s):
     if isinstance(s, (list, tuple)):
-        return tuple(s)
+        # e.g. the default value or a YAML list from a config file: validate it like the string form.
+        s = ",".join(str(p) for p in s)
     params = s.strip().split(",")
     count = len(params)
     if count == 0:
@@ -336,6 +337,8 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        if window_size < 1:
+            raise ArgumentTypeError("window_size must be at least 1")
         # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
         # a max. chunk size sized buffer, see the assertion in ChunkerBuzHash64.__cinit__.
         if window_size + 2**chunk_min + 1 > 2**chunk_max:
@@ -409,8 +412,14 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        if window_size < 1:
+            raise ArgumentTypeError("window_size must be at least 1")
         if window_size % 2 == 0:
             raise ArgumentTypeError("window_size must be an uneven (odd) number")
+        # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
+        # a max. chunk size sized buffer, see the assertion in Chunker.__cinit__ (buzhash.pyx).
+        if window_size + 2**chunk_min + 1 > 2**chunk_max:
+            raise ArgumentTypeError("required: window_size + 2^chunk_min + 1 <= 2^chunk_max")
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
     raise ArgumentTypeError("invalid chunker params")
 
@@ -431,7 +440,7 @@ def DigestAlgos(s):
 
 def FilesCacheMode(s):
     ENTRIES_MAP = dict(ctime="c", mtime="m", size="s", inode="i", rechunk="r", disabled="d")
-    VALID_MODES = ("cis", "ims", "cs", "ms", "cr", "mr", "d", "s")  # letters in alpha order
+    VALID_MODES = ("cis", "ims", "cs", "ms", "cr", "mr", "d")  # letters in alpha order
     if s in VALID_MODES:
         return s
     entries = set(s.strip().split(","))

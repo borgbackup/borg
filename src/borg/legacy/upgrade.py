@@ -3,7 +3,7 @@ from types import NoneType
 
 from ..constants import REQUIRED_ITEM_KEYS, CH_BUZHASH
 from ..compress import ZLIB, ZLIB_legacy, ObfuscateSize
-from ..helpers import HardLinkManager, join_cmd
+from ..helpers import HardLinkManager, IntegrityError, join_cmd
 from ..item import Item
 from ..logger import create_logger
 from .helpers import borg1_hardlink_with_content, borg1_hardlink_reference
@@ -72,10 +72,17 @@ class UpgraderFrom12To20:
         for key in "user", "group":
             if key in new_item_dict and new_item_dict[key] is None:
                 del new_item_dict[key]
-        assert not any(value is None for value in new_item_dict.values()), f"found None value in {new_item_dict}"
+        # the item comes from a borg 1.x archive, so it might be malformed.
+        none_keys = sorted(key for key, value in new_item_dict.items() if value is None)
+        if none_keys:
+            where = f"Archive {self.archive.name}, item {item_dict.get('path')!r}"
+            raise IntegrityError(f"{where}: None value for {', '.join(none_keys)}")
         new_item = Item(internal_dict=new_item_dict)
         new_item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
-        assert all(key in new_item for key in REQUIRED_ITEM_KEYS)
+        missing_keys = sorted(key for key in REQUIRED_ITEM_KEYS if key not in new_item)
+        if missing_keys:
+            where = f"Archive {self.archive.name}, item {item_dict.get('path')!r}"
+            raise IntegrityError(f"{where}: missing required keys {', '.join(missing_keys)}")
         return new_item
 
     def upgrade_compressed_chunk(self, meta, data):

@@ -5,7 +5,7 @@ import os
 
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 
@@ -21,7 +21,6 @@ from ...helpers.parseformat import (
     text_validator,
     format_file_size,
     parse_file_size,
-    interval,
     int_or_interval,
     nonnegative_seconds,
     partial_format,
@@ -444,53 +443,6 @@ def test_format_timedelta():
     assert format_timedelta(t1 - t0) == "2 hours 1.100 seconds"
 
 
-@pytest.mark.parametrize(
-    "timeframe, num_secs",
-    [
-        ("0S", timedelta(seconds=0)),
-        ("5S", timedelta(seconds=5)),
-        ("2M", timedelta(minutes=2)),
-        ("1H", timedelta(hours=1)),
-        ("1d", timedelta(days=1)),
-        ("1w", timedelta(days=7)),
-        ("1m", timedelta(days=31)),
-        ("1y", timedelta(days=365)),
-    ],
-)
-def test_interval(timeframe, num_secs):
-    assert interval(timeframe) == num_secs
-
-
-@pytest.mark.parametrize(
-    "invalid_interval, error_tuple",
-    [
-        ("H", ('Invalid number "": expected nonnegative integer',)),
-        ("-1d", ('Invalid number "-1": expected nonnegative integer',)),
-        ("food", ('Invalid number "foo": expected nonnegative integer',)),
-    ],
-)
-def test_interval_time_unit(invalid_interval, error_tuple):
-    with pytest.raises(ArgumentTypeError) as exc:
-        interval(invalid_interval)
-    assert exc.value.args == error_tuple
-
-
-@pytest.mark.parametrize(
-    "invalid_input, error_regex",
-    [
-        ("x", r'^Unexpected time unit "x": choose from'),
-        ("-1t", r'^Unexpected time unit "t": choose from'),
-        ("fool", r'^Unexpected time unit "l": choose from'),
-        ("abc", r'^Unexpected time unit "c": choose from'),
-        (" abc ", r'^Unexpected time unit " ": choose from'),
-    ],
-)
-def test_interval_invalid_time_format(invalid_input, error_regex):
-    with pytest.raises(ArgumentTypeError) as exc:
-        interval(invalid_input)
-    assert re.search(error_regex, exc.value.args[0])
-
-
 @pytest.mark.parametrize("input, result", [("0", 0.0), ("30", 30.0), ("2.5", 2.5), ("1800", 1800.0)])
 def test_nonnegative_seconds(input, result):
     assert nonnegative_seconds(input) == result
@@ -510,14 +462,12 @@ def test_nonnegative_seconds_invalid(invalid_input):
         (" 999 ", 999),
         ("-1", -1),
         ("all", -1),
-        ("0S", timedelta(seconds=0)),
-        ("5S", timedelta(seconds=5)),
-        ("1m", timedelta(days=31)),
+        ("0S", "0S"),
+        ("5S", "5S"),
+        ("1m", "1m"),
         # already-converted values (jsonargparse idempotency)
         (0, 0),
         (5, 5),
-        (timedelta(seconds=5), timedelta(seconds=5)),
-        (timedelta(days=31), timedelta(days=31)),
     ],
 )
 def test_int_or_interval(input, result):
@@ -530,6 +480,10 @@ def test_int_or_interval(input, result):
         ("H", r"Value is neither an integer nor an interval:"),
         ("-1d", r"Value is neither an integer nor an interval:"),
         ("food", r"Value is neither an integer nor an interval:"),
+        ("", r"Value is neither an integer nor an interval:"),
+        ("1t", r"Value is neither an integer nor an interval:"),
+        ("1m2d", r"Value is neither an integer nor an interval:"),
+        ("1.5y", r"Value is neither an integer nor an interval:"),
     ],
 )
 def test_int_or_interval_time_unit(invalid_input, error_regex):
@@ -1021,3 +975,9 @@ def test_diff_formatter_time_precision(ctime1_ns, ctime2_ns):
     assert re.search(r"\.\d{9} ", m.group(1))  # 9-digit fraction is shown
     assert re.search(r"\.\d{9} ", m.group(2))
     assert m.group(1) != m.group(2)  # timestamps are distinguishable
+
+
+@pytest.mark.parametrize("marker", ["0S", "0m", "0y", "5S", "2M", "1H", "7d", "2w", "1m", "12m", "3y"])
+def test_int_or_interval_preserves_calendar_marker(marker):
+    assert int_or_interval(marker) == marker
+    assert int_or_interval(int_or_interval(marker)) == marker

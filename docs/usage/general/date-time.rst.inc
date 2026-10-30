@@ -23,7 +23,15 @@ The ``borg prune`` ``--keep-*`` retention options accept either a plain count
 When using interval-based retention, ``--from`` may be specified to set the
 reference timestamp for the interval (defaults to the current time).
 
-Please note that Borg treats months (e.g. ``12m``) as fixed 31-day periods
-rather than calendar months. As a result, ``12m`` corresponds to
-12 × 31 = 372 days. Similarly, years (e.g. ``2y``) are treated as fixed
-365-day periods and do not take leap years into account.
+Months and years are calendar-aware. For example, ``12m`` before
+2026-07-22 is 2025-07-22, and ``3y`` before 2026-07-22 is 2023-07-22.
+The time of day is preserved. If the target month has fewer days, the date
+is clamped to its last day: one month before March 31 is February 28
+(or February 29 in a leap year).
+
+Weeks, days, hours, minutes, and seconds keep their fixed-length meanings.
+For example, ``1w`` is seven days. Plain counts and ``all`` are unchanged.
+
+When combining interval-based pruning rules, their lengths are compared at
+the same reference timestamp. Thus, ``1m`` can be shorter than, equal to,
+or longer than ``30d`` depending on the month.

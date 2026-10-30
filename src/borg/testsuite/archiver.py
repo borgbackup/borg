@@ -982,6 +982,37 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         for file in ('location', 'key-type', 'manifest-timestamp'):
             assert os.path.exists(os.path.join(security_dir, file))
 
+    @pytest.mark.skipif(not are_symlinks_supported(), reason='symlinks not supported')
+    def test_repository_access_via_symlink(self):
+        # accessing the same repository directory via a different path (here: a symlink) is not a relocation.
+        if self.prefix:
+            pytest.skip('only local repositories are affected')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        security_dir = self.get_security_dir()
+        symlink_location = self.repository_location + '_symlink'
+        os.symlink(self.repository_path, self.repository_path + '_symlink')
+        with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK='no'):
+            for location in (self.repository_location, symlink_location, self.repository_location):
+                self.cmd('info', location)
+        # the stored location is not updated.
+        with open(os.path.join(security_dir, 'location')) as fd:
+            assert fd.read() == Location(self.repository_location).canonical_path()
+
+    def test_repository_previously_remote(self):
+        # a repository previously accessed via a URL, now accessed via a local path, is a relocation.
+        if self.prefix:
+            pytest.skip('only local repositories are affected')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with open(os.path.join(self.get_security_dir(), 'location'), 'w') as fd:
+            fd.write(Location('ssh://__testsuite__' + self.repository_path).canonical_path())
+        shutil.rmtree(self.cache_path)
+        with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK='no'):
+            if self.FORK_DEFAULT:
+                self.cmd('info', self.repository_location, exit_code=EXIT_ERROR)
+            else:
+                with pytest.raises(Cache.RepositoryAccessAborted):
+                    self.cmd('info', self.repository_location)
+
     def test_security_dir_compat(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         with open(os.path.join(self.get_security_dir(), 'location'), 'w') as fd:

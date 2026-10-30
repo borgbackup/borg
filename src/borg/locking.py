@@ -188,7 +188,16 @@ class ExclusiveLock:
         return os.path.exists(self.path)
 
     def by_me(self):
-        return os.path.exists(self.unique_name)
+        # Do not use a stat() based check (e.g. os.path.exists(self.unique_name)) here:
+        # on cygwin, stat() transiently succeeds for a path inside a directory that is
+        # concurrently replaced via rename(), so we would believe we own a lock that
+        # actually is owned by somebody else and exclusivity would be broken, see #7218.
+        # Reading the directory does not show that inconsistency.
+        try:
+            return os.path.basename(self.unique_name) in os.listdir(self.path)
+        except OSError:
+            # directory vanished (or is not readable) -> the lock is not ours.
+            return False
 
     def kill_stale_lock(self):
         try:

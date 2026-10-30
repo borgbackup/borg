@@ -1,6 +1,7 @@
 import argparse
 import binascii
 import errno
+import gc
 import io
 import json
 import logging
@@ -17,6 +18,7 @@ import tarfile
 import tempfile
 import time
 import unittest
+import weakref
 from configparser import ConfigParser
 from datetime import datetime
 from datetime import timezone
@@ -43,7 +45,9 @@ from ..crypto.file_integrity import FileIntegrityError
 from ..hashindex import ChunkIndex
 from ..helpers import Location, get_security_dir
 from ..helpers import Manifest, MandatoryFeatureUnsupported, ArchiveInfo
-from ..helpers import init_ec_warnings
+from ..helpers import init_ec_warnings, get_reset_ec
+from ..helpers import BackupError, BackupOSError, BackupWarning
+from ..helpers.errors import modern_ec
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, Error, CancelledByUser, RTError, CommandError
 from ..helpers import bin_to_hex, hex_to_bin
 from ..helpers import MAX_S
@@ -5849,3 +5853,26 @@ def test_commands_help_invocation(command):
     assert ret == 0
     assert 'usage:' in output
     assert 'Traceback (most recent call last):' not in output
+
+
+def test_print_warning_instance_does_not_retain_exception():
+    """The warnings bookkeeping for the final exit code must not keep the wrapped exception alive.
+
+    An exception references its traceback and thus the frames (with all their locals, e.g. the chunk
+    data that was being written) of the code that failed - keeping that per warning would leak memory.
+    """
+    setup_logging()
+    init_ec_warnings()
+    archiver = Archiver()
+    try:
+        raise BackupOSError("write", OSError(errno.ENOSPC, "No space left on device"))
+    except BackupError as exc:
+        exc_ref = weakref.ref(exc)
+        archiver.print_warning_instance(BackupWarning("input/file", exc))
+    # "except ... as exc" unbinds exc when its block ends, so the exception is only still alive if the
+    # warnings bookkeeping references it. CPython frees it right away (refcounting), PyPy only when
+    # its GC runs, so collect explicitly before looking at the weakref.
+    gc.collect()
+    assert exc_ref() is None
+    # the warning was recorded for the exit code, though.
+    assert get_reset_ec() == (BackupOSError.exit_mcode if modern_ec else EXIT_WARNING)

@@ -3,6 +3,7 @@ import os
 import shutil
 import signal
 import sys
+import unicodedata
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
 from io import StringIO, BytesIO
@@ -12,7 +13,7 @@ import pytest
 
 from .. import platform, __version__
 from ..constants import *  # NOQA
-from ..helpers import Location
+from ..helpers import Location, normalize_local_path
 from ..helpers import Buffer
 from ..helpers import partial_format, format_file_size, parse_file_size, format_timedelta, format_line, PlaceholderError, replace_placeholders
 from ..helpers import make_path_safe, clean_lines
@@ -34,7 +35,7 @@ from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
 from ..helpers import classify_ec, max_ec
-from ..platform import is_win32, swidth, is_cygwin
+from ..platform import is_win32, swidth, is_cygwin, is_darwin
 
 from . import BaseTestCase, FakeInputs
 
@@ -253,6 +254,33 @@ class TestLocationWithoutEnv:
         assert loc_without_archive.archive is None
         assert loc_without_archive.raw == "ssh://user@host:1234/repos/{hostname}"
         assert loc_without_archive.processed == "ssh://user@host:1234/repos/%s" % hostname
+
+
+def test_normalize_local_path():
+    nfc = unicodedata.normalize('NFC', 'tëst')  # composed: ë is a single codepoint
+    nfd = unicodedata.normalize('NFD', 'tëst')  # decomposed: e + combining diaeresis
+    assert nfc != nfd  # sanity: the two unicode forms really differ byte-wise
+    if is_darwin:
+        # on macOS both forms normalize to the same (NFD) form the filesystem uses
+        assert normalize_local_path(nfc) == normalize_local_path(nfd) == nfd
+    else:
+        # elsewhere it is a no-op
+        assert normalize_local_path(nfc) == nfc
+        assert normalize_local_path(nfd) == nfd
+
+
+def test_canonical_path_unicode_normalization(monkeypatch):
+    # regression test for #2913: a file repo path entered in NFC form (e.g. typed as an argument) and
+    # the same path in NFD form (e.g. derived from os.getcwd() on macOS) must yield the same canonical
+    # path, so borg does not mistake identical-looking paths for a repository relocation.
+    monkeypatch.delenv('BORG_REPO', raising=False)
+    nfc = unicodedata.normalize('NFC', '/absolute/tëst')
+    nfd = unicodedata.normalize('NFD', '/absolute/tëst')
+    if is_darwin:
+        assert Location(nfc).canonical_path() == Location(nfd).canonical_path()
+    else:
+        # on other platforms the filesystem does not normalize, so the forms stay distinct
+        assert Location(nfc).canonical_path() != Location(nfd).canonical_path()
 
 
 class TestLocationWithEnv:

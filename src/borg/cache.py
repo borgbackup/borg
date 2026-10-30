@@ -18,6 +18,7 @@ from .helpers import Location
 from .helpers import Error
 from .helpers import Manifest
 from .helpers import get_cache_dir, get_security_dir
+from .helpers import normalize_local_path
 from .helpers import int_to_bigint, bigint_to_int, bin_to_hex, hex_to_bin, parse_stringified_list
 from .helpers import format_file_size
 from .helpers import safe_ns
@@ -119,7 +120,11 @@ class SecurityManager:
             logger.debug('security: using previous_location of cache: %r', previous_location)
 
         repository_location = self.repository._location.canonical_path()
-        if previous_location and previous_location != repository_location:
+        # Normalize the unicode form of both paths before comparing them: on macOS the same path can be
+        # produced in different normalization forms (NFC when typed, NFD when derived from the filesystem),
+        # which would otherwise be mistaken for a repository relocation (see issue #2913). Normalizing is
+        # idempotent and applied symmetrically, so it never creates a spurious mismatch for remote repos.
+        if previous_location and normalize_local_path(previous_location) != normalize_local_path(repository_location):
             msg = ("Warning: The repository at location {} was previously located at {}\n".format(
                 repository_location, previous_location) +
                 "Do you want to continue? [yN] ")

@@ -2382,6 +2382,55 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             output = self.cmd('create', '--list', self.repository_location + '::test2', 'input')
         self.assert_in('A input/cloudfile', output)
 
+    @unittest.skipIf(is_win32, 'no fd-based directory checks on windows')
+    def test_create_automount(self):
+        """Opening an automount point mounts a filesystem there, so stat and fstat differ, see #6652."""
+        import borg.archiver as archiver_module
+
+        self.create_regular_file('automnt/file', contents=b'hello')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        class AutomountPointStat:
+            # stat() of an automount point: a different inode (here even on a different st_dev, like
+            # for an autofs direct mount) than the root directory of the filesystem mounted there.
+            def __init__(self, st):
+                self._st = st
+                self.st_ino = st.st_ino + 1000000
+                self.st_dev = st.st_dev + 1
+
+            def __getattr__(self, name):
+                return getattr(self._st, name)
+
+        real_os_stat = archiver_module.os_stat
+
+        def fake_os_stat(*, path=None, parent_fd=None, name=None, follow_symlinks=False):
+            st = real_os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=follow_symlinks)
+            return AutomountPointStat(st) if name == 'automnt' else st
+
+        for mounted in False, True:
+            for one_file_system in False, True:
+                archive = f'test-{mounted}-{one_file_system}'
+                args = ['create', '--list', self.repository_location + '::' + archive, 'input']
+                args += ['--one-file-system'] if one_file_system else []
+                with patch.object(archiver_module, 'os_stat', fake_os_stat), \
+                        patch('borg.archive.on_different_mounts', lambda fd1, fd2: mounted):
+                    if mounted:
+                        # we archive the mounted filesystem and recurse into it (because it is on the same st_dev
+                        # as input, even with --one-file-system - the automount point would have been on another
+                        # st_dev).
+                        output = self.cmd(*args)
+                        assert 'race condition' not in output
+                    else:
+                        # no mount there, so this is a real race condition and we skip the directory.
+                        output = self.cmd(*args, exit_code=EXIT_WARNING)
+                        assert 'input/automnt: file type or inode changed' in output
+                        assert 'E input/automnt\n' in output
+                listing = self.cmd('list', '--short', self.repository_location + '::' + archive)
+                if mounted:
+                    assert 'input/automnt/file' in listing
+                else:
+                    assert 'input/automnt' not in listing
+
     def test_create_json(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -4598,6 +4647,10 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_create_exclude_dataless(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_automount(self):
         pass
 
     @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')

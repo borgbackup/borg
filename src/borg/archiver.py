@@ -46,6 +46,7 @@ try:
     from .algorithms.checksums import crc32
     from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
     from .archive import BackupError, BackupRaceConditionError, BackupOSError, backup_io, OsOpen, stat_update_check
+    from .archive import is_automount
     from .archive import FilesystemObjectProcessors, TarfileObjectProcessors, MetadataCollector, ChunksProcessor
     from .archive import has_link
     from .cache import Cache, assert_secure, SecurityManager
@@ -238,6 +239,24 @@ def get_func(args):
         if func is not None:
             return func
     raise Exception('expected func attributes not found')
+
+
+def stat_dir_mounted(path, st):
+    """
+    If st (the stat of path) is a directory, open it and return its fstat, otherwise return st.
+
+    stat() does not trigger an automount, but opening the directory does, so we get the stat
+    of the root directory of the filesystem mounted there (not of the automount point), see #6652.
+    """
+    if not stat.S_ISDIR(st.st_mode):
+        return st
+    try:
+        with OsOpen(path=path, flags=flags_dir, noatime=True, op='dir_open') as fd:
+            # fd is None for directories on windows.
+            return st if fd is None else os.fstat(fd)
+    except (BackupOSError, OSError):
+        # the caller opens the directory again later and handles the error there.
+        return st
 
 
 class Highlander(argparse.Action):
@@ -674,6 +693,7 @@ class Archiver:
                     try:
                         with backup_io('stat'):
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
+                        st = stat_dir_mounted(path, st)
                         restrict_dev = st.st_dev if args.one_file_system else None
                         self._rec_walk(path=path, parent_fd=None, name=None,
                                        fso=fso, cache=cache, matcher=matcher,
@@ -858,7 +878,17 @@ class Archiver:
                     # child_fd is None for directories on windows, in that case a race condition check is not possible.
                     if child_fd is not None:
                         with backup_io('fstat'):
-                            st = stat_update_check(st, os.fstat(child_fd))
+                            st_curr = os.fstat(child_fd)
+                            automounted = is_automount(st, st_curr, parent_fd, child_fd)
+                        if automounted:
+                            # opening the directory mounted a filesystem there, see #6652.
+                            # redo the decisions we made based on the stat of the automount point.
+                            st = st_curr
+                            if (st.st_ino, st.st_dev) in skip_inodes:
+                                return
+                            recurse = restrict_dev is None or st.st_dev == restrict_dev
+                        else:
+                            st = stat_update_check(st, st_curr)
                     if recurse:
                         tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present)
                         if tag_names:
@@ -3820,6 +3850,9 @@ class Archiver:
         subvolumes of a Btrfs file system (different device numbers from the parent but not necessarily mount points).
         macOS examples are the APFS mounts of a typical macOS installation.
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
+
+        Automount points (e.g. autofs, systemd automount units, ZFS ``.zfs/snapshot/*``) get mounted when
+        borg opens them. For these, borg uses the device number of the filesystem that got mounted there.
 
 
         Error handling

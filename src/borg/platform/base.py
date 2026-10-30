@@ -95,6 +95,18 @@ def get_flags(path, st, fd=None):
     return getattr(st, 'st_flags', 0)
 
 
+def on_different_mounts(fd1, fd2):
+    """
+    Return whether the open file descriptors *fd1* and *fd2* are on different mounts.
+
+    Returns True or False, or None if this can not be determined.
+
+    This generic implementation compares st_dev. That is only correct on platforms where every
+    st_dev is a separately mounted filesystem (e.g. no btrfs-like subvolumes with their own st_dev).
+    """
+    return os.fstat(fd1).st_dev != os.fstat(fd2).st_dev
+
+
 def sync_dir(path):
     if is_win32:
         # Opening directories is not supported on Windows.

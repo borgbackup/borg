@@ -743,7 +743,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 noatime_used = flags_noatime != flags_normal
                 return noatime_used and same_ts_ns(atime_before, atime_after)
 
-        self.create_test_files()
+        # No hardlinks: input/hardlink would share the inode with input/file1, so anything
+        # touching one of them also changes the atime of the other. That has nothing to do with
+        # what is tested here, it only makes the results hard to interpret.
+        self.create_test_files(create_hardlinks=False)
         atime, mtime = 123456780, 234567890
         have_noatime = has_noatime('input/file1')
         os.utime('input/file1', (atime, mtime))

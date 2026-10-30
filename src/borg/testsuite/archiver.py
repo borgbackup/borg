@@ -31,6 +31,7 @@ import pytest
 import borg
 import borg.helpers.errors
 from .. import xattr, helpers, platform
+from .. import archive as archive_module
 from ..archive import Archive, ChunkBuffer
 from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
 from ..cache import Cache, LocalCache
@@ -760,6 +761,46 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         else:
             # it touched the input file's atime while backing it up
             assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
+    def test_atime_open_updates_atime(self):
+        # simulate a platform where already the open() updates the atime (no O_NOATIME support,
+        # e.g. cygwin) - borg must archive the atime the item had before borg opened it, see #6194.
+        atime, mtime = 123456780, 234567890
+
+        def updates_atime(some_file):
+            os.utime(some_file, (atime, mtime))
+            with open(some_file, 'rb') as f:
+                f.read(1)
+            return os.stat(some_file).st_atime_ns != atime * 10**9
+
+        real_os_open = archive_module.os_open
+
+        def os_open_updating_atime(**kwargs):
+            # open without O_NOATIME (as on a platform not having it), so that reading
+            # updates the atime - and read right away, as if the open() had done that.
+            fd = real_os_open(**dict(kwargs, noatime=False))
+            if fd is not None:
+                try:
+                    os.pread(fd, 1, 0)  # a read updates the atime (but not the ctime)
+                except OSError:
+                    pass  # not seekable / not readable (fifo, directory, ...)
+            return fd
+
+        self.create_test_files()
+        if not updates_atime('input/file1'):
+            pytest.skip('filesystem does not update the atime when reading')
+        os.utime('input/file1', (atime, mtime))
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with patch.object(archive_module, 'os_open', os_open_updating_atime):
+            self.cmd('create', '--atime', self.repository_location + '::test', 'input')
+        # make sure the simulation worked: the open() did update the input file's atime.
+        assert os.stat('input/file1').st_atime_ns != atime * 10**9
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        sto = os.stat('output/input/file1')
+        assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
+        assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     @pytest.mark.skipif(not is_birthtime_fully_supported(), reason='cannot properly setup and execute test without birthtime')
@@ -4598,6 +4639,10 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_create_exclude_dataless(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_atime_open_updates_atime(self):
         pass
 
     @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')

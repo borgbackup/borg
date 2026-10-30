@@ -3733,13 +3733,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         archive = self.repository_location + '::test0'
         self.cmd('create', archive, 'input')
-        self.cmd('recreate', '--timestamp', "1970-01-02T00:00:00", '--comment',
-                 'test', archive)
+        # --timestamp is the only change requested, so this also checks that a timestamp
+        # change alone is enough to make recreate do the work instead of skipping the archive.
+        self.cmd('recreate', '--timestamp', "1970-01-02T00:00:00", archive)
         info = self.cmd('info', archive).splitlines()
         dtime = datetime(1970, 1, 2) + local_timezone.utcoffset(None)
         s_time = dtime.strftime("%Y-%m-%d")
         assert any([re.search(r'Time \(start\).+ %s' % s_time, item) for item in info])
         assert any([re.search(r'Time \(end\).+ %s' % s_time, item) for item in info])
+        # the recreated archive must still contain the original items.
+        assert 'input/file1' in self.cmd('list', '--short', archive)
 
     def test_recreate_dry_run(self):
         self.create_regular_file('compressible', size=10000)

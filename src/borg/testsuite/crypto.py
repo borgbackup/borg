@@ -87,6 +87,20 @@ class CryptoTestCase(BaseTestCase):
         self.assert_raises(IntegrityError,
                            lambda: cs.decrypt(hdr_mac_iv_cdata_corrupted))
 
+    def test_AE_truncated_envelope(self):
+        # a truncated envelope (shorter than header + mac (32) + iv (8)) is corrupted/tampered data
+        # and must raise IntegrityError (not crash or raise some other exception type).
+        mac_key = b'Y' * 32
+        enc_key = b'X' * 32
+        iv = 0
+        data = b'foo' * 10
+        header = b'\x42'
+        cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, iv, header_len=len(header), aad_offset=1)
+        hdr_mac_iv_cdata = cs.encrypt(data, header=header)
+        for length in (0, 1, len(header) + 32 + 8 - 1):
+            cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
+            self.assert_raises(IntegrityError, lambda: cs.decrypt(hdr_mac_iv_cdata[:length]))
+
     # These test vectors come from https://www.kullo.net/blog/hkdf-sha-512-test-vectors/
     # who claims to have verified these against independent Python and C++ implementations.
 

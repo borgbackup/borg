@@ -285,6 +285,10 @@ cdef class AES256_CTR_BASE:
         """
         Authenticate AAD + IV + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
+        if len(envelope) < self.header_len + self.mac_len + self.iv_len_short:
+            # truncated data - handle it like any other corruption or tampering, instead of
+            # computing the MAC over negative lengths below.
+            raise IntegrityError('MAC Authentication failed: envelope too short')
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
         assert hlen == self.header_len

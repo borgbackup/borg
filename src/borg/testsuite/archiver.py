@@ -825,7 +825,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     try:
                         if fd.seek(0, os.SEEK_HOLE) != 0:
                             sparse = False
-                        if fd.seek(0, os.SEEK_DATA) != hole_size:
+                        # FS allocation granularity may report DATA before the actual first
+                        # non-zero byte, so only check it is not after the expected content.
+                        if fd.seek(0, os.SEEK_DATA) > hole_size:
                             sparse = False
                     except OSError:
                         # OS/FS does not really support SEEK_HOLE/SEEK_DATA
@@ -3099,6 +3101,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'positional arguments' not in self.cmd('help', 'init', '--epilog-only')
         assert 'This command initializes' not in self.cmd('help', 'init', '--usage-only')
 
+    def test_main_help_epilog(self):
+        help_output = self.cmd('-h')
+        assert 'Description of additional help topics:' in help_output
+        assert 'patterns' in help_output
+        assert 'placeholders' in help_output
+        assert 'compression' in help_output
+
     @unittest.skipUnless(llfuse, 'llfuse not installed')
     def test_fuse(self):
         def has_noatime(some_file):
@@ -4420,6 +4429,32 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert 'archive' in import_json
         assert 'stats' in import_json['archive']
         assert 'cache' not in import_json
+
+    def test_import_tar_nfiles(self):
+        # Build a tar with 2 regular files, 1 hardlink, 1 directory and 1 symlink.
+        with tarfile.open('input.tar', 'w') as tar:
+            for name in ('dir/file1', 'dir/file2'):
+                data = name.encode()
+                tarinfo = tarfile.TarInfo(name)
+                tarinfo.size = len(data)
+                tar.addfile(tarinfo, io.BytesIO(data))
+            tarinfo = tarfile.TarInfo('dir/hardlink1')
+            tarinfo.type = tarfile.LNKTYPE
+            tarinfo.linkname = 'dir/file1'
+            tar.addfile(tarinfo)
+            tarinfo = tarfile.TarInfo('dir/subdir')
+            tarinfo.type = tarfile.DIRTYPE
+            tar.addfile(tarinfo)
+            tarinfo = tarfile.TarInfo('dir/symlink1')
+            tarinfo.type = tarfile.SYMTYPE
+            tarinfo.linkname = 'file1'
+            tar.addfile(tarinfo)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('import-tar', self.repository_location + '::dst', 'input.tar')
+        info = json.loads(self.cmd('info', '--json', self.repository_location + '::dst'))
+        # as with borg create, each regular file counts once (hardlinks only for their first instance),
+        # directories/symlinks do not.
+        assert info['archives'][0]['stats']['nfiles'] == 2
 
     @requires_gzip
     def test_import_tar_gz(self):
@@ -5990,3 +6025,14 @@ def test_help_formatting(command, parser):
 def test_help_formatting_helptexts(topic):
     helptext = Archiver.helptext[topic]
     assert str(rst_to_terminal(helptext))
+
+
+@pytest.mark.parametrize('command', list(get_all_parsers().keys()))
+def test_commands_help_invocation(command):
+    if command == 'borgfs':
+        ret, output = exec_cmd('--help', archiver=Archiver(prog='borgfs'), fork=False)
+    else:
+        ret, output = exec_cmd(*command.split(), '--help', fork=False)
+    assert ret == 0
+    assert 'usage:' in output
+    assert 'Traceback (most recent call last):' not in output

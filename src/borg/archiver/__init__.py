@@ -79,6 +79,7 @@ from .find_cmd import FindMixIn
 from .help_cmd import HelpMixIn
 from .info_cmd import InfoMixIn
 from .key_cmds import KeysMixIn
+from .known_repos_cmd import KnownReposMixIn
 from .list_cmd import ListMixIn
 from .lock_cmds import LocksMixIn
 from .mount_cmds import MountMixIn
@@ -116,6 +117,7 @@ class Archiver(
     HelpMixIn,
     InfoMixIn,
     KeysMixIn,
+    KnownReposMixIn,
     ListMixIn,
     LocksMixIn,
     MountMixIn,
@@ -310,6 +312,7 @@ class Archiver(
         self.build_parser_help(subparsers, common_parser, mid_common_parser, parser)
         self.build_parser_info(subparsers, common_parser, mid_common_parser)
         self.build_parser_keys(subparsers, common_parser, mid_common_parser)
+        self.build_parser_known_repos(subparsers, common_parser, mid_common_parser)
         self.build_parser_list(subparsers, common_parser, mid_common_parser)
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)

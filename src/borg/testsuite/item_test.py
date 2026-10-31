@@ -1,7 +1,12 @@
+import ast
+from pathlib import Path
+
 import pytest
 
+from .. import item as item_module
 from ..cache import ChunkListEntry
 from ..item import MAX_ALIGN_CHUNKS, MAX_ALIGN_WORK, Item, ItemDiff, chunks_contents_equal, chunks_diff_size
+from ..item import PropDict, PropDictProperty
 from ..helpers import StableDict
 from ..helpers.msgpack import Timestamp
 from ..platformflags import is_pypy
@@ -234,3 +239,35 @@ def test_chunks_diff_size_over_work_limit():
     assert chunks_diff_size(chunks1, chunks2) == (0, 0)
     # a chunk that really was added is still counted correctly.
     assert chunks_diff_size(chunks1, chunks2 + [CC]) == (10, 0)
+
+
+def stub_properties():
+    """Return {class name: {property name: {"get": annotation, "set": annotation}}} as declared in item.pyi."""
+    stub = ast.parse(Path(item_module.__file__).with_name("item.pyi").read_text())
+    classes = {}
+    for cls in stub.body:
+        if not isinstance(cls, ast.ClassDef):
+            continue
+        props = classes[cls.name] = {}
+        for func in cls.body:
+            if not isinstance(func, ast.FunctionDef):
+                continue
+            for decorator in func.decorator_list:
+                if isinstance(decorator, ast.Name) and decorator.id == "property":
+                    props.setdefault(func.name, {})["get"] = ast.unparse(func.returns)
+                elif isinstance(decorator, ast.Attribute) and decorator.attr == "setter":
+                    props.setdefault(func.name, {})["set"] = ast.unparse(func.args.args[1].annotation)
+    return classes
+
+
+@pytest.mark.parametrize("cls", PropDict.__subclasses__(), ids=lambda cls: cls.__name__)
+def test_stub_matches_propdict_properties(cls):
+    """item.pyi is maintained by hand, so check that it agrees with the PropDictProperty table in item.pyx."""
+    stub_props = stub_properties()[cls.__name__]
+    props = {name: value for name, value in vars(cls).items() if isinstance(value, PropDictProperty)}
+    assert sorted(stub_props) == sorted(props)
+    for name, prop in props.items():
+        getter, setter = stub_props[name].get("get"), stub_props[name].get("set")
+        assert getter == setter, f"{cls.__name__}.{name}: getter and setter annotations differ"
+        # compare the base type only, e.g. "list[str]" -> "list".
+        assert getter.split("[")[0] == prop.value_type.__name__, f"{cls.__name__}.{name}: wrong type"

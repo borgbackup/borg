@@ -1,11 +1,12 @@
 import os
-from collections import namedtuple
+from collections.abc import Callable
 from struct import Struct
+from typing import Any, NamedTuple
 
 from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
 from .helpers.errors import Error, IntegrityError
-from .compress import Compressor, LZ4_COMPRESSOR
+from .compress import Compressor, CompressorBase, LZ4_COMPRESSOR
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 
 # Workaround for lost passphrase or key in the "authenticated-*" modes
@@ -31,7 +32,7 @@ BORG_ASSERT_ID_DEFAULT = ("repair", "transfer", "rechunk")
 ASSERT_ID_PLACE_DEFAULT = "read"
 
 
-def get_assert_id_places():
+def get_assert_id_places() -> frozenset[str]:
     """Determine the configurable places that shall verify the chunk id, see the BORG_ASSERT_ID docs."""
     value = os.environ.get("BORG_ASSERT_ID")
     if value is None:
@@ -75,9 +76,20 @@ DATA_AAD_TAG = b"D"
 
 
 class RepoObj:
+    class ObjHeader(NamedTuple):
+        magic: bytes
+        version: int
+        chunk_id: bytes
+        meta_size: int
+        data_size: int
+
     # Object header: magic (8b), format version (1b), chunk_id (32b), meta size (4b), data size (4b).
-    obj_header = Struct("<8sB32sII")
-    ObjHeader = namedtuple("ObjHeader", "magic version chunk_id meta_size data_size")
+    obj_header: Struct = Struct("<8sB32sII")
+
+    key: Any
+    compressor: CompressorBase
+    assert_id_places: frozenset[str]
+    assert_id_place: str
 
     @classmethod
     def parse_header(cls, buf: bytes | memoryview) -> tuple["RepoObj.ObjHeader | None", str | None]:
@@ -97,7 +109,7 @@ class RepoObj:
             return None, f"unsupported object version {hdr.version}"
         return hdr, None
 
-    def __init__(self, key):
+    def __init__(self, key: Any) -> None:
         self.key = key
         # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates
         # the default used by those commands who do take a --compression argument.
@@ -120,13 +132,13 @@ class RepoObj:
     def format(
         self,
         id: bytes,
-        meta: dict,
-        data: bytes,
+        meta: dict[str, Any],
+        data: bytes | memoryview,
         compress: bool = True,
-        size: int = None,
-        ctype: int = None,
-        clevel: int = None,
-        ro_type: str = None,
+        size: int | None = None,
+        ctype: int | None = None,
+        clevel: int | None = None,
+        ro_type: str | None = None,
     ) -> bytes:
         assert isinstance(ro_type, str)
         assert ro_type != ROBJ_DONTCARE
@@ -136,6 +148,7 @@ class RepoObj:
         assert isinstance(meta, dict)
         assert isinstance(data, (bytes, memoryview))
         assert compress or size is not None and ctype is not None and clevel is not None
+        data_compressed: bytes | memoryview
         if compress:
             assert size is None or size == len(data)
             meta, data_compressed = self.compressor.compress(meta, data)
@@ -156,7 +169,7 @@ class RepoObj:
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
 
-    def parse_meta(self, id: bytes, cdata: bytes | memoryview, ro_type: str) -> dict:
+    def parse_meta(self, id: bytes, cdata: bytes | memoryview, ro_type: str) -> dict[str, Any]:
         # when calling parse_meta, enough cdata needs to be supplied to contain completely the
         # meta_len_hdr and the encrypted, packed metadata. it is allowed to provide more cdata.
         assert isinstance(id, bytes)
@@ -187,9 +200,9 @@ class RepoObj:
         cdata: bytes | memoryview,
         decompress: bool = True,
         want_compressed: bool = False,
-        ro_type: str = None,
-        assert_id_place: str = None,
-    ) -> tuple[dict, bytes]:
+        ro_type: str | None = None,
+        assert_id_place: str | None = None,
+    ) -> tuple[dict[str, Any] | None, bytes | None]:
         """
         Parse a repo object into metadata and data (decrypt it, maybe decompress, maybe verify if the chunk plaintext
         corresponds to the chunk id via assert_id()).
@@ -256,7 +269,7 @@ class RepoObj:
         return meta_compressed if want_compressed else meta, data_compressed if want_compressed else data
 
 
-def object_validator(repo_objs):
+def object_validator(repo_objs: RepoObj) -> Callable[[bytes, bytes | memoryview], bool]:
     """Return validate(chunk_id, obj): True if obj is the repo object with id chunk_id.
 
     obj is an object's header plus its metadata slot. Parsing that slot verifies its tag, which is
@@ -272,7 +285,7 @@ def object_validator(repo_objs):
     hdr_size = RepoObj.obj_header.size
     overhead = repo_objs.key.PAYLOAD_OVERHEAD  # the envelope adds a fixed number of bytes to the payload
 
-    def validate(chunk_id, obj):
+    def validate(chunk_id: bytes, obj: bytes | memoryview) -> bool:
         try:
             meta = repo_objs.parse_meta(chunk_id, obj, ro_type=ROBJ_DONTCARE)
         except (IntegrityErrorBase, msgpack.UnpackException):
@@ -296,7 +309,7 @@ class ObjectsNotAuthenticatable(Error):
     """Objects can not be authenticated with BORG_WORKAROUNDS=authenticated_no_key."""
 
 
-def whole_object_authenticator(repo_objs):
+def whole_object_authenticator(repo_objs: RepoObj) -> Callable[[bytes, bytes | memoryview], bool]:
     """Return authenticate(chunk_id, obj): True if obj is the whole repo object with id chunk_id.
 
     obj is an object's header, metadata slot and data slot. Parsing it checks that the header's sizes
@@ -313,7 +326,7 @@ def whole_object_authenticator(repo_objs):
     if AUTHENTICATED_NO_KEY and isinstance(repo_objs.key, MACKeyBase):
         raise ObjectsNotAuthenticatable
 
-    def authenticate(chunk_id, obj):
+    def authenticate(chunk_id: bytes, obj: bytes | memoryview) -> bool:
         try:
             repo_objs.parse(chunk_id, obj, decompress=False, want_compressed=True, ro_type=ROBJ_DONTCARE)
         except (IntegrityErrorBase, msgpack.UnpackException):

@@ -3,6 +3,8 @@
 Moved from borg.repoobj as part of the legacy code separation.
 """
 
+from typing import Any
+
 from ..constants import *  # NOQA
 from ..helpers import workarounds
 from ..compress import Compressor, get_compressor
@@ -12,6 +14,9 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
 class RepoObj1:  # legacy
+    key: Any
+    compressor: Any
+
     def set_assert_id_place(self, place: str) -> None:
         # borg 1.x crypto has no AEAD with the chunk id in the AAD, so the id check is a needed part of
         # the read path here: parse always does it and there is nothing to configure (see BORG_ASSERT_ID).
@@ -22,7 +27,7 @@ class RepoObj1:  # legacy
         # used for crypto type detection
         return data
 
-    def __init__(self, key):
+    def __init__(self, key: Any) -> None:
         self.key = key
         self.compressor = get_compressor("lz4", legacy_mode=True)
 
@@ -32,13 +37,13 @@ class RepoObj1:  # legacy
     def format(
         self,
         id: bytes,
-        meta: dict,
-        data: bytes,
+        meta: dict[str, Any],
+        data: bytes | memoryview,
         compress: bool = True,
-        size: int = None,
-        ctype: int = None,
-        clevel: int = None,
-        ro_type: str = None,
+        size: int | None = None,
+        ctype: int | None = None,
+        clevel: int | None = None,
+        ro_type: str | None = None,
     ) -> bytes:
         assert isinstance(id, bytes)
         assert meta == {}
@@ -54,20 +59,25 @@ class RepoObj1:  # legacy
         data_encrypted = self.key.encrypt(id, data_compressed)
         return data_encrypted
 
-    def parse_meta(self, id: bytes, cdata: bytes) -> dict:
+    def parse_meta(self, id: bytes, cdata: bytes | memoryview) -> dict[str, Any]:
         raise NotImplementedError("parse_meta is not available for RepoObj1")
 
     def parse(
-        self, id: bytes, cdata: bytes, decompress: bool = True, want_compressed: bool = False, ro_type: str = None
-    ) -> tuple[dict, bytes]:
+        self,
+        id: bytes,
+        cdata: bytes | memoryview,
+        decompress: bool = True,
+        want_compressed: bool = False,
+        ro_type: str | None = None,
+    ) -> tuple[dict[str, Any] | None, bytes | None]:
         assert not (not decompress and not want_compressed), "invalid parameter combination!"
         assert isinstance(id, bytes)
-        assert isinstance(cdata, bytes)
+        assert isinstance(cdata, (bytes, memoryview))
         assert ro_type is not None
         data_compressed = self.key.decrypt(id, cdata)
         compressor_cls, compression_level = Compressor.detect(data_compressed[:2])
         compressor = compressor_cls(level=compression_level, legacy_mode=True)
-        meta_compressed = {}
+        meta_compressed: dict[str, Any] = {}
         meta_compressed["ctype"] = compressor.ID
         meta_compressed["clevel"] = compressor.level
         meta_compressed["csize"] = len(data_compressed)

@@ -135,16 +135,25 @@ class _Scanner:
         st = self._stat(path)
         return OutputTimestamp(safe_timestamp(st.st_mtime_ns)) if st is not None else None
 
-    def dir_size(self, path):
+    def cache_stats(self, path):
+        """Walk a cache directory once, returning (total size in bytes, newest mtime_ns of any
+        regular file found, or None if the directory has no regular files). Size counts every
+        entry in os.walk()'s filenames; the mtime is restricted to regular files.
+        """
         total = 0
+        newest = None
         for dirpath, dirnames, filenames in os.walk(path, onerror=self._walk_error):
             for name in filenames:
                 fpath = os.path.join(dirpath, name)
                 try:
-                    total += os.path.getsize(fpath)
+                    st = os.stat(fpath)
                 except OSError as exc:
                     self.warn("known-repos: could not check %s, reported cache size may be incomplete: %s", fpath, exc)
-        return total
+                    continue
+                total += st.st_size
+                if stat.S_ISREG(st.st_mode) and (newest is None or st.st_mtime_ns > newest):
+                    newest = st.st_mtime_ns
+        return total, newest
 
     def _walk_error(self, exc):
         self.warn("known-repos: could not list %s, reported cache size may be incomplete: %s", exc.filename, exc)
@@ -161,7 +170,8 @@ def _scan_security_root(scanner, root):
             continue
         location = scanner.read_text(location_path) if has_location else None
         key_type_raw = scanner.read_text(key_type_path) if has_key_type else None
-        info[repo_id] = (location or None, (key_type_raw.strip() or None) if key_type_raw else None)
+        location_mtime = scanner.mtime(location_path) if has_location else None
+        info[repo_id] = (location or None, (key_type_raw.strip() or None) if key_type_raw else None, location_mtime)
     return info
 
 
@@ -243,14 +253,15 @@ class KnownReposMixIn:
 
         repos = []
         for repo_id in sorted(repo_ids):
+            location_mtime = None
             if repo_id in borg2_security:
-                location, key_type_raw = borg2_security[repo_id]
+                location, key_type_raw, location_mtime = borg2_security[repo_id]
                 has_security_info = True
                 # location/key-type filenames are the same for borg1 and borg2, so a shared
                 # root cannot tell them apart - defer to the cache-based check below.
                 layout = None if security_roots_coincide else "borg2"
             elif repo_id in legacy_security:
-                location, key_type_raw = legacy_security[repo_id]
+                location, key_type_raw, location_mtime = legacy_security[repo_id]
                 layout = "legacy"
                 has_security_info = True
             else:
@@ -261,11 +272,14 @@ class KnownReposMixIn:
             cache_entry = borg2_cache.get(repo_id) or legacy_cache.get(repo_id)
             has_cache = cache_entry is not None
             cache_size = None
-            cache_mtime = None
+            last_written = location_mtime
             location_mismatch = False
             if has_cache:
-                cache_size = scanner.dir_size(cache_entry)
-                cache_mtime = scanner.mtime(cache_entry / "config")
+                cache_size, cache_newest_ns = scanner.cache_stats(cache_entry)
+                if cache_newest_ns is not None:
+                    cache_newest = OutputTimestamp(safe_timestamp(cache_newest_ns))
+                    if last_written is None or cache_newest.ts > last_written.ts:
+                        last_written = cache_newest
                 if layout is None:
                     if cache_roots_coincide:
                         layout = _cache_layout(scanner, cache_entry)
@@ -297,7 +311,7 @@ class KnownReposMixIn:
                     "has_security_info": has_security_info,
                     "has_cache": has_cache,
                     "cache_size": cache_size,
-                    "cache_config_mtime": cache_mtime.isoformat() if cache_mtime else None,
+                    "last_written": last_written.isoformat() if last_written else None,
                     "key_file_count": len(keys.get(repo_id, ())),
                     "location_mismatch": location_mismatch,
                 }
@@ -333,7 +347,7 @@ class KnownReposMixIn:
                     format_file_size(repo["cache_size"]) if repo["has_cache"] else "-",
                     security,
                     str(repo["key_file_count"]) if repo["key_file_count"] else "-",
-                    repo["cache_config_mtime"][:19] if repo["cache_config_mtime"] else "-",
+                    repo["last_written"][:19] if repo["last_written"] else "-",
                     location,
                 )
             )
@@ -353,10 +367,15 @@ class KnownReposMixIn:
         files - without accessing any repository itself (-r/--repo has no effect). "Layout"
         is which state was found in (not the on-disk repository format, see "borg repo-info"
         for that) - a security-only repo gets "unknown" when $BORG_SECURITY_DIR makes the
-        borg2 and legacy security roots coincide; "Last written" is the cache config's mtime,
-        a best-effort last-used proxy, not an exact timestamp and not a staleness check on its
-        own; a mismatch between a legacy repo's known location and its cache's last location
-        is flagged; a key file's presence does not by itself mean the repository is still
+        borg2 and legacy security roots coincide.
+
+        "Last written" is a best-effort last-used proxy, not an exact timestamp and not a
+        staleness check on its own. It is the newest mtime found among the repository's
+        security info file (which records the repository's last known location) and, if a
+        local cache exists, any regular file in that cache - whichever of the two is more
+        recent.
+        A mismatch between a legacy repo's known location and its cache's last location is
+        flagged. A key file's presence does not by itself mean the repository is still
         openable. Use --json for a machine-readable version.
         """
         )

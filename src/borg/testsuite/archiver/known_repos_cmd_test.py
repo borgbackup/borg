@@ -2,11 +2,12 @@ import json
 import os
 import shutil
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from ...helpers import get_cache_dir, get_security_dir
+from ...helpers import get_cache_dir, get_security_dir, safe_timestamp
 from . import cmd, create_regular_file, exec_cmd, generate_archiver_tests, RK_ENCRYPTION, PURE_PYTHON_MSGPACK_WARNING
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -90,15 +91,16 @@ def test_known_repos_lists_repo_with_cache(archivers, request):
     assert repo["cache_size"] > 0
     assert repo["key_type"] == "aes256-ocb, sha256"
     assert repo["has_security_info"] is True
-    assert repo["cache_config_mtime"] is not None
+    assert repo["last_written"] is not None
     assert repo["location"] == info["location"]
     assert repo["key_file_count"] == 0  # repokey mode (the default) has no key file on disk
 
-    # the table's "Last written" column shows the same cache_config_mtime, at/after its header
+    # the table's "Last written" column shows the same last_written value, at/after its header
     lines = result.splitlines()
     header, row = lines[0], lines[1]
     written_col = header.index("Last written")
-    assert repo["cache_config_mtime"][:10] in row[written_col:]  # mtime's date part (YYYY-MM-DD)
+    location_col = header.index("Location")
+    assert row[written_col:location_col].strip() == repo["last_written"][:19]
 
 
 def test_known_repos_cache_without_security_info(archivers, request):
@@ -111,6 +113,18 @@ def test_known_repos_cache_without_security_info(archivers, request):
     assert security_path.startswith(os.environ["BORG_BASE_DIR"] + os.sep)
     shutil.rmtree(security_path, ignore_errors=True)
 
+    # Give the cache dir's regular files distinct mtimes so the assertion below can check
+    # which file's mtime last_written actually reports, not just that it is non-null.
+    cache_dir = get_cache_dir(repo_id, create=False)
+    newest_ts = 2_000_000_000  # 2033-05-18, after anything a fresh repo-create would leave behind
+    newest_file = os.path.join(cache_dir, "README")
+    assert os.path.isfile(newest_file)
+    os.utime(newest_file, (newest_ts, newest_ts))
+    for name in os.listdir(cache_dir):
+        fpath = os.path.join(cache_dir, name)
+        if os.path.isfile(fpath) and fpath != newest_file:
+            os.utime(fpath, (newest_ts - 3600, newest_ts - 3600))
+
     result_json = json.loads(cmd(archiver, "known-repos", "--json"))
     repo = result_json["repositories"][0]
     assert repo["layout"] == "borg2"  # discovered via the borg2 cache root even with no security info
@@ -118,15 +132,83 @@ def test_known_repos_cache_without_security_info(archivers, request):
     assert repo["has_security_info"] is False
     assert repo["key_type"] is None
     assert repo["location"] is None
+    # no location file to fall back to (it was removed along with the rest of the security dir),
+    # so last_written must be exactly the cache dir's own newest file mtime - not just non-null,
+    # and not e.g. config's mtime specifically.
+    assert datetime.fromisoformat(repo["last_written"]) == safe_timestamp(os.stat(newest_file).st_mtime_ns)
+
+
+def test_known_repos_last_written_is_newer_of_location_and_cache_mtime(archivers, request):
+    """last_written is the newer of the security info's location file mtime and the cache
+    directory's newest file mtime, whichever side was touched more recently - not just one
+    of the two, hardcoded.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    info = json.loads(cmd(archiver, "repo-info", "--json"))["repository"]
+    repo_id = info["id"]
+
+    location_path = get_security_dir(repo_id, create=False) + "/location"
+    cache_dir = get_cache_dir(repo_id, create=False)
+    cache_config_path = os.path.join(cache_dir, "config")
+    assert os.path.exists(location_path)
+    assert os.path.exists(cache_config_path)
+
+    def _set_cache_dir_mtime(ts):
+        # The cache dir has more than just "config" in it (e.g. "README"); last_written looks
+        # at the newest mtime of *any* file there, so every file must be backdated for case 1
+        # below to actually exercise "location is newer than the whole cache dir", not just
+        # "location is newer than config specifically".
+        for name in os.listdir(cache_dir):
+            fpath = os.path.join(cache_dir, name)
+            if os.path.isfile(fpath):
+                os.utime(fpath, (ts, ts))
+
+    # Case 1: location file is newer than anything in the cache dir -> last_written == location mtime.
+    old_ts = 1_000_000_000  # 2001-09-09, long before this test runs
+    _set_cache_dir_mtime(old_ts)
+    new_ts = old_ts + 3600
+    os.utime(location_path, (new_ts, new_ts))
+
+    repo = json.loads(cmd(archiver, "known-repos", "--json"))["repositories"][0]
+    assert datetime.fromisoformat(repo["last_written"]) == safe_timestamp(os.stat(location_path).st_mtime_ns)
+
+    # Case 2: a file in the cache dir other than "config" is newer than the location file ->
+    # last_written picks up on it too, even though "config" itself and the location file were
+    # not touched again. Covers both a flat file (as borg itself writes, e.g. "README") and a
+    # file in a subdirectory, to also exercise the recursive walk.
+    newer_ts = new_ts + 3600
+    other_cache_file = os.path.join(cache_dir, "README")
+    assert os.path.exists(other_cache_file)
+    os.utime(other_cache_file, (newer_ts, newer_ts))
+
+    repo = json.loads(cmd(archiver, "known-repos", "--json"))["repositories"][0]
+    assert datetime.fromisoformat(repo["last_written"]) == safe_timestamp(os.stat(other_cache_file).st_mtime_ns)
+
+    newest_ts = newer_ts + 3600
+    subdir = os.path.join(cache_dir, "chunks.archive.d")
+    os.makedirs(subdir, exist_ok=True)
+    subdir_file = os.path.join(subdir, "some_chunk")
+    with open(subdir_file, "w") as fd:
+        fd.write("x")
+    os.utime(subdir_file, (newest_ts, newest_ts))
+
+    repo = json.loads(cmd(archiver, "known-repos", "--json"))["repositories"][0]
+    assert datetime.fromisoformat(repo["last_written"]) == safe_timestamp(os.stat(subdir_file).st_mtime_ns)
 
 
 def test_known_repos_scans_legacy_v1_security_dir(archivers, request):
     """A v1-style security entry (legacy $BORG_CONFIG_DIR/security layout) is listed too, with
-    no cache: the table's "Last written" column shows "-", not a blank or error.
+    no cache: the table's "Last written" column shows the location file's own mtime.
     """
     archiver = request.getfixturevalue(archivers)
     legacy_repo_id = "a" * 64  # any syntactically valid 64-hex id; this test never opens a repo
     _write_legacy_security(legacy_repo_id, "/some/v1/repo/path")
+
+    from ...legacy.fs import get_security_dir as get_security_dir_legacy
+
+    location_path = os.path.join(get_security_dir_legacy(legacy_repo_id, create=False), "location")
+    expected_mtime = safe_timestamp(os.stat(location_path).st_mtime_ns)
 
     result_json = json.loads(cmd(archiver, "known-repos", "--json"))
     repos_by_id = {repo["id"]: repo for repo in result_json["repositories"]}
@@ -135,13 +217,15 @@ def test_known_repos_scans_legacy_v1_security_dir(archivers, request):
     assert legacy_repo["location"] == "/some/v1/repo/path"
     assert legacy_repo["key_type"] == "aes256-ctr, sha256 (legacy)"
     assert legacy_repo["has_cache"] is False
-    assert legacy_repo["cache_config_mtime"] is None
+    # no cache dir exists for this repo, so last_written must be exactly the location file's own
+    # mtime, not None/absent and not some unrelated fallback value.
+    assert datetime.fromisoformat(legacy_repo["last_written"]) == expected_mtime
 
     table_result = cmd(archiver, "known-repos")
     header, row = table_result.splitlines()[0], table_result.splitlines()[1]
     written_col = header.index("Last written")
     location_col = header.index("Location")
-    assert row[written_col:location_col].strip() == "-"
+    assert row[written_col:location_col].strip() == legacy_repo["last_written"][:19]
 
 
 def test_known_repos_unknown_key_type_is_labeled(archivers, request):

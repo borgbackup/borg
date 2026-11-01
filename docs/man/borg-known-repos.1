@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-known-repos" "1" "2026-10-13" "" "borg backup tool"
+.TH "borg-known-repos" "1" "2026-11-01" "" "borg backup tool"
 .SH Name
 borg-known-repos \- List repositories Borg has local state for (security info and/or cache).
 .SH SYNOPSIS
@@ -41,10 +41,15 @@ security info (key type, last known location), a local repository cache, and/or 
 files \- without accessing any repository itself (\-r/\-\-repo has no effect). \(dqLayout\(dq
 is which state was found in (not the on\-disk repository format, see \(dqborg repo\-info\(dq
 for that) \- a security\-only repo gets \(dqunknown\(dq when $BORG_SECURITY_DIR makes the
-borg2 and legacy security roots coincide; \(dqLast written\(dq is the cache config\(aqs mtime,
-a best\-effort last\-used proxy, not an exact timestamp and not a staleness check on its
-own; a mismatch between a legacy repo\(aqs known location and its cache\(aqs last location
-is flagged; a key file\(aqs presence does not by itself mean the repository is still
+borg2 and legacy security roots coincide.
+.sp
+\(dqLast written\(dq is a best\-effort last\-used proxy, not an exact timestamp and not a
+staleness check on its own. It is the newest mtime found among the repository\(aqs
+security info file (which records the repository\(aqs last known location) and, if a
+local cache exists, any regular file in that cache \- whichever of the two is more
+recent.
+A mismatch between a legacy repo\(aqs known location and its cache\(aqs last location is
+flagged. A key file\(aqs presence does not by itself mean the repository is still
 openable. Use \-\-json for a machine\-readable version.
 .SH OPTIONS
 .sp
@@ -68,13 +73,13 @@ $ borg known\-repos \-\-json
 {
     \(dqrepositories\(dq: [
         {
-            \(dqcache_config_mtime\(dq: \(dq2026\-10\-12T17:15:19.785785+09:00\(dq,
             \(dqcache_size\(dq: 180,
             \(dqhas_cache\(dq: true,
             \(dqhas_security_info\(dq: true,
             \(dqid\(dq: \(dq401606173d54eab22cd98de67278d093e3bae7b187da3af8c6430f18fa1112bb\(dq,
             \(dqkey_file_count\(dq: 0,
             \(dqkey_type\(dq: \(dqaes256\-ocb, sha256\(dq,
+            \(dqlast_written\(dq: \(dq2026\-10\-12T17:15:19.785785+09:00\(dq,
             \(dqlayout\(dq: \(dqborg2\(dq,
             \(dqlocation\(dq: \(dq/path/to/repo\(dq,
             \(dqlocation_mismatch\(dq: false

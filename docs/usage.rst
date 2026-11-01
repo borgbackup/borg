@@ -44,6 +44,7 @@ Usage
    usage/repo-delete
    usage/serve
    usage/version
+   usage/known-repos
    usage/compact
    usage/lock
    usage/key

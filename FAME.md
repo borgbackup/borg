@@ -1,11 +1,11 @@
 # Contributors
 
-376 people have contributed to Borg, with 11,619 commits in total.
+377 people have contributed to Borg, with 11,630 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-10-26 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-11-02 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,15 +21,15 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,890 | 108,174 | 534 |
+| Thomas Waldmann | 7,897 | 108,193 | 534 |
 | Marian Beermann | 1,140 | 7,534 | 156 |
 | Jonas Borgström | 560 | 941 | 38 |
-| Mrityunjay Raj | 319 | 15,832 | 117 |
+| Mrityunjay Raj | 319 | 15,826 | 117 |
 | Antoine Beaupré | 285 | 437 | 33 |
 | Andrey Bienkowski | 72 | 200 | 16 |
 | Ted Lawson | 71 | 4,357 | 39 |
+| dependabot[bot] | 64 | 47 | 14 |
 | Thalian | 63 | 560 | 28 |
-| dependabot[bot] | 62 | 35 | 11 |
 | Martin Hostettler | 46 | 2,558 | 9 |
 | Milkey Mouse | 42 | 239 | 12 |
 | Dan Christensen | 40 | 5 | 2 |
@@ -42,10 +42,10 @@ show up there, so the number understates early contributions.  Generated files
 | Michael Hanselmann | 22 | 71 | 3 |
 | Björn Ketelaars | 17 | 28 | 4 |
 | SanskritFritz | 17 | 0 | 0 |
+| ThomasWaldmann | 14 | 181 | 1 |
 | Lee Bousfield | 14 | 157 | 9 |
 | Alan Jenkins | 14 | 35 | 2 |
 | Daniel Rudolf | 13 | 213 | 14 |
-| ThomasWaldmann | 13 | 181 | 1 |
 | Robin Schneider | 13 | 18 | 8 |
 | Elmar Hoffmann | 12 | 90 | 6 |
 | Jürg Rast | 12 | 72 | 11 |
@@ -192,6 +192,7 @@ show up there, so the number understates early contributions.  Generated files
 | motwok | 2 | 0 | 0 |
 | sven | 2 | 0 | 0 |
 | user062 | 2 | 0 | 0 |
+| Kazuki Kanda | 1 | 1,162 | 9 |
 | Tarrailt | 1 | 362 | 7 |
 | axapaxa | 1 | 105 | 2 |
 | Benedikt Seidl | 1 | 103 | 1 |

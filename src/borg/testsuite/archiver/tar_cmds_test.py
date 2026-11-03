@@ -636,7 +636,7 @@ def test_roundtrip_pax_timestamps(archivers, request):
     mtime_ns = 1700000000_987654321  # float seconds would round this to ~240 ns
     os.utime(os.path.join(archiver.input_path, "file"), ns=(mtime_ns, mtime_ns))
     cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
-    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "create", "--atime", "src", "input")
     cmd(archiver, "export-tar", "src", "pax.tar", "--tar-format=PAX")
     cmd(archiver, "import-tar", "dst", "pax.tar")
 
@@ -649,8 +649,9 @@ def test_roundtrip_pax_timestamps(archivers, request):
     src_times, dst_times = get_times("src"), get_times("dst")
     assert dst_times == src_times
     with tarfile.open("pax.tar") as tar:
-        pax_mtime = tar.getmember("input/file").pax_headers["mtime"]
-    assert pax_mtime == f"{src_times['mtime'] // 10**9}.{src_times['mtime'] % 10**9:09d}"
+        ph = tar.getmember("input/file").pax_headers
+    for name in ("atime", "ctime", "mtime"):
+        assert ph[name] == f"{src_times[name] // 10**9}.{src_times[name] % 10**9:09d}"
 
 
 def test_import_tar_invalid_pax_timestamp(archivers, request):

@@ -53,6 +53,9 @@ class TestExclusiveLock:
     def test_checks(self, lockpath):
         with ExclusiveLock(lockpath, timeout=1) as lock:
             assert lock.is_locked() and lock.by_me()
+            assert not ExclusiveLock(lockpath, id=ID2).by_me()
+        # lock directory is gone now
+        assert not lock.is_locked() and not lock.by_me()
 
     def test_acquire_break_reacquire(self, lockpath):
         lock = ExclusiveLock(lockpath, id=ID1).acquire()

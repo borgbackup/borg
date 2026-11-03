@@ -2024,14 +2024,15 @@ class FilesystemObjectProcessors:
                 return status
 
 
-def tar_acl_to_borg(acl):
+def tar_acl_to_borg(acl, unknown_names=None):
     """Convert a POSIX ACL text from a tar PAX header (SCHILY.acl.*) to borg's ACL format.
 
     Borg separates entries by newlines and appends the numeric uid/gid as a 4th field to
     named user/group entries (user:name:perms:uid), see acl_get on Linux and FreeBSD.
     star appends it too, but separates entries by commas. GNU tar separates entries by
     newlines and does not append the numeric id, so we look it up locally (like borg create
-    does), falling back to the name.
+    does), falling back to the name. *unknown_names* is an optional set, the (tag, name) of
+    the entries whose name could not be looked up get added to it.
 
     Raise ValueError for an entry with an unknown tag or a wrong number of fields, as the
     platform code converting borg's ACL format at extract time relies on the field layout.
@@ -2048,7 +2049,12 @@ def tar_acl_to_borg(acl):
         named = tag in ("user", "group") and len(fields) > 1 and fields[1] != ""
         if named and len(fields) == 3:  # tag:name:perms -> append the numeric id
             name = fields[1]
-            fields.append(str(user2uid(name, name) if tag == "user" else group2gid(name, name)))
+            numeric_id = user2uid(name) if tag == "user" else group2gid(name)
+            if numeric_id is None:
+                if unknown_names is not None:
+                    unknown_names.add((tag, name))
+                numeric_id = name
+            fields.append(str(numeric_id))
         elif len(fields) != (4 if named else 3):  # tag:name:perms:id or tag::perms
             raise ValueError(f"invalid POSIX ACL entry: {entry!r}")
         entries.append(":".join(fields))
@@ -2085,6 +2091,7 @@ class TarfileObjectProcessors:
                 set_ec(EXIT_WARNING)
 
         self.print_warning = warning
+        self.unknown_acl_names = set()  # (tag, name) of POSIX ACL entries we already warned about
 
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
         self.chunker = get_chunker(*chunker_params, key=key, sparse=False)
@@ -2143,14 +2150,24 @@ class TarfileObjectProcessors:
                         bvalue = value.encode("utf-8", errors="surrogateescape")
                         xattrs[bkey] = bvalue
                     elif key in (SCHILY_ACL_ACCESS, SCHILY_ACL_DEFAULT):
+                        unknown_names = set()
                         try:
-                            acl = tar_acl_to_borg(value)
+                            acl = tar_acl_to_borg(value, unknown_names=unknown_names)
                         except ValueError as e:
                             self.print_warning(
                                 "%s: ignoring the %s PAX header: %s", remove_surrogates(item.path), key, e
                             )
                         else:
                             setattr(item, "acl_access" if key == SCHILY_ACL_ACCESS else "acl_default", acl)
+                            for tag, name in sorted(unknown_names - self.unknown_acl_names):
+                                self.print_warning(
+                                    "%s: POSIX ACL refers to unknown %s %r, extracting it will fail unless that %s exists",
+                                    remove_surrogates(item.path),
+                                    tag,
+                                    name,
+                                    tag,
+                                )
+                            self.unknown_acl_names |= unknown_names
                 if xattrs:
                     item.xattrs = xattrs
         if self.strip_components:

@@ -703,6 +703,27 @@ def test_import_tar_invalid_pax_acl(archivers, request):
         cmd(archiver, "extract", "dst")
 
 
+def test_import_tar_acl_unknown_name(archivers, request):
+    """import-tar warns once per user/group name in POSIX ACL PAX headers that is unknown locally."""
+    archiver = request.getfixturevalue(archivers)
+    acl = "user::rw-\nuser:nosuchuser-borgtest:rw-\ngroup::r--\nmask::rw-\nother::r--\n"
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        for name in ("file1", "file2"):
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.pax_headers = {SCHILY_ACL_ACCESS: acl}
+            tar.addfile(tarinfo, io.BytesIO())
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "dst", "input.tar", exit_code=EXIT_WARNING)
+    assert "file1: POSIX ACL refers to unknown user 'nosuchuser-borgtest'" in output
+    assert output.count("unknown user 'nosuchuser-borgtest'") == 1
+    # the ACL is stored nevertheless, with the name in place of the numeric id (like borg create does)
+    archive_obj, repository = open_archive(archiver.repository_path, "dst")
+    with repository:
+        acls = {item.path: item.acl_access for item in archive_obj.iter_items()}
+    expected = b"user::rw-\nuser:nosuchuser-borgtest:rw-:nosuchuser-borgtest\ngroup::r--\nmask::rw-\nother::r--"
+    assert acls == {"file1": expected, "file2": expected}
+
+
 def _sparse_entries(sizes):
     return [ChunkListEntry(id=bytes([i]) * 32, size=size) for i, size in enumerate(sizes)]
 

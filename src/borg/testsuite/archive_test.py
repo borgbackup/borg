@@ -893,6 +893,15 @@ def test_tar_acl_to_borg_invalid(acl):
         tar_acl_to_borg(acl)
 
 
+@pytest.mark.skipif(is_win32, reason="no name lookups on Windows")
+def test_tar_acl_to_borg_unknown_names():
+    unknown_names = set()
+    acl = "user::rw-\nuser:nosuchuser-borgtest:rw-\ngroup:nosuchgroup-borgtest:r--\ngroup:root:r--:0\nother::r--"
+    tar_acl_to_borg(acl, unknown_names=unknown_names)
+    # group:root has its id already, so no lookup is needed for it.
+    assert unknown_names == {("user", "nosuchuser-borgtest"), ("group", "nosuchgroup-borgtest")}
+
+
 def test_reject_non_sanitized_item():
     for path in rejected_dotdot_paths:
         with pytest.raises(ValueError, match="unexpected '..' element in path"):

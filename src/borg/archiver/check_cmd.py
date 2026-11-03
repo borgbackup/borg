@@ -72,10 +72,17 @@ class CheckMixIn:
             ):
                 raise CancelledByUser()
         if args.repo_only and any(
-            (args.verify_data, args.first, args.last, args.match_archives, args.format is not None)
+            (
+                args.verify_data,
+                args.first,
+                args.last,
+                args.match_archives,
+                getattr(args, "exclude_archives", None),
+                args.format is not None,
+            )
         ):
             raise CommandError(
-                "--repository-only contradicts --first, --last, -a / --match-archives, "
+                "--repository-only contradicts --first, --last, -a / --match-archives, --exclude-archives, "
                 "--verify-data and --format arguments."
             )
         if args.repo_only and args.find_lost_archives:
@@ -142,6 +149,7 @@ class CheckMixIn:
             repair=args.repair,
             find_lost_archives=args.find_lost_archives,
             match=args.match_archives,
+            exclude=getattr(args, "exclude_archives", None),
             sort_by=args.sort_by or "timestamp",
             first=args.first,
             last=args.last,

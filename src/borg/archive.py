@@ -2422,6 +2422,7 @@ class ArchiveChecker:
         repair=False,
         find_lost_archives=False,
         match=None,
+        exclude=None,
         sort_by="",
         first=0,
         last=0,
@@ -2438,6 +2439,7 @@ class ArchiveChecker:
         :param find_lost_archives: create archive directory entries that are missing
         :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param match: only check archives matching this pattern
+        :param exclude: exclude archives matching this pattern
         :param older/newer: only check archives older/newer than timedelta from now
         :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
@@ -3113,10 +3115,11 @@ class ArchiveChecker:
                 )
 
         sort_by = sort_by.split(",")
-        if any((first, last, match, older, newer, newest, oldest)):
+        if any((first, last, match, exclude, older, newer, newest, oldest)):
             archive_infos = self.manifest.archives.list(
                 sort_by=sort_by,
                 match=match,
+                exclude=exclude,
                 first=first,
                 last=last,
                 oldest=oldest,

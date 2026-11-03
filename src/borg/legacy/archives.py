@@ -99,9 +99,11 @@ class LegacyArchives:
                 host=info["hostname"],
             )
 
-    def _matching_info_tuples(self, match_patterns, match_end, *, deleted=False):
+    def _matching_info_tuples(self, match_patterns, match_end, *, exclude_patterns=None, deleted=False):
         archive_infos = list(self._info_tuples(deleted=deleted))
         if match_patterns:
+            if isinstance(match_patterns, str):
+                match_patterns = [match_patterns]
             assert isinstance(match_patterns, list), f"match_pattern is a {type(match_patterns)}"
             for match in match_patterns:
                 if match.startswith("aid:"):
@@ -131,6 +133,36 @@ class LegacyArchives:
                     regex = get_regex_from_pattern(match)
                     regex = re.compile(regex + match_end)
                     archive_infos = [x for x in archive_infos if regex.match(x.name) is not None]
+        if exclude_patterns:
+            if isinstance(exclude_patterns, str):
+                exclude_patterns = [exclude_patterns]
+            assert isinstance(exclude_patterns, list), f"exclude_pattern is a {type(exclude_patterns)}"
+            for exclude in exclude_patterns:
+                if exclude.startswith("aid:"):
+                    wanted_id = exclude.removeprefix("aid:")
+                    archive_infos = [x for x in archive_infos if not bin_to_hex(x.id).startswith(wanted_id)]
+                elif exclude.startswith("tags:"):
+                    wanted_tags = exclude.removeprefix("tags:")
+                    wanted_tags = [tag for tag in wanted_tags.split(",") if tag]
+                    archive_infos = [x for x in archive_infos if not (set(x.tags) >= set(wanted_tags))]
+                elif exclude.startswith("user:"):
+                    wanted_user = exclude.removeprefix("user:")
+                    archive_infos = [x for x in archive_infos if x.user != wanted_user]
+                elif exclude.startswith("host:"):
+                    wanted_host = exclude.removeprefix("host:")
+                    archive_infos = [x for x in archive_infos if x.host != wanted_host]
+                elif exclude.startswith("date:"):
+                    wanted_date = exclude.removeprefix("date:")
+                    try:
+                        date_matches = compile_date_pattern(wanted_date)
+                    except DatePatternError as exc:
+                        raise CommandError(f"Invalid date pattern: {exclude} ({exc})")
+                    archive_infos = [x for x in archive_infos if not date_matches(x.ts)]
+                else:
+                    exclude = exclude.removeprefix("name:")
+                    regex = get_regex_from_pattern(exclude)
+                    regex = re.compile(regex + match_end)
+                    archive_infos = [x for x in archive_infos if regex.match(x.name) is None]
         return archive_infos
 
     def count(self):
@@ -207,6 +239,7 @@ class LegacyArchives:
         self,
         *,
         match=None,
+        exclude=None,
         match_end=r"\Z",
         sort_by=(),
         reverse=False,
@@ -225,7 +258,7 @@ class LegacyArchives:
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
 
-        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted)
+        archive_infos = self._matching_info_tuples(match, match_end, exclude_patterns=exclude, deleted=deleted)
 
         if any([oldest, newest, older, newer]):
             archive_infos = filter_archives_by_date(
@@ -251,6 +284,7 @@ class LegacyArchives:
         return self.list(
             sort_by=args.sort_by.split(","),
             match=args.match_archives,
+            exclude=getattr(args, "exclude_archives", None),
             first=getattr(args, "first", None),
             last=getattr(args, "last", None),
             older=getattr(args, "older", None),
@@ -260,10 +294,14 @@ class LegacyArchives:
             deleted=getattr(args, "deleted", False),
         )
 
-    def get_one(self, match, *, match_end=r"\Z", deleted=False):
+    def get_one(self, match, *, exclude=None, match_end=r"\Z", deleted=False):
         """Get exactly one archive matching <match>."""
         assert match is not None
-        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted)
+        if isinstance(match, str):
+            match = [match]
+        if isinstance(exclude, str):
+            exclude = [exclude]
+        archive_infos = self._matching_info_tuples(match, match_end, exclude_patterns=exclude, deleted=deleted)
         if len(archive_infos) != 1:
             raise CommandError(f"{match} needed to match precisely one archive, but matched {len(archive_infos)}.")
         return archive_infos[0]

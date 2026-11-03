@@ -53,7 +53,7 @@ class ArchiveAnalyzer:
                 )
             # the decomposition is inherently repository-wide: "shared" and "unreferenced" can only
             # be determined by looking at every archive, so archive filters must not be applied.
-            filters = ["match_archives", "first", "last", "older", "newer", "oldest", "newest"]
+            filters = ["match_archives", "exclude_archives", "first", "last", "older", "newer", "oldest", "newest"]
             if any(getattr(self.args, name, None) for name in filters):
                 raise Error("--group-by analyzes the whole repository and cannot be combined with archive filters.")
             by_group = self.analyze_by_group(group_by)

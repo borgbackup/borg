@@ -54,7 +54,9 @@ def _archiveinfo(name, id_, ts=TS, *, username="", hostname="", tags=()):
 
 def _stub_matching_info_tuples(infos):
     ar, _, _ = _archives()
-    ar._matching_info_tuples = Mock(side_effect=lambda match_patterns, match_end, deleted=False: list(infos))
+    ar._matching_info_tuples = Mock(
+        side_effect=lambda match_patterns, match_end, exclude_patterns=None, deleted=False: list(infos)
+    )
     return ar
 
 
@@ -577,6 +579,84 @@ def test_list_match_end_custom():
     assert result == [i1]
 
 
+def test_list_exclude_name():
+    i1 = _archiveinfo("archive-a", _id(1))
+    i2 = _archiveinfo("archive-b", _id(2))
+    ar = _stub_info_tuples([i1, i2])
+    assert ar.list(exclude=["archive-a"]) == [i2]
+
+
+def test_list_exclude_name_prefix():
+    i1 = _archiveinfo("archive-a", _id(1))
+    i2 = _archiveinfo("other", _id(2))
+    ar = _stub_info_tuples([i1, i2])
+    assert ar.list(exclude=["name:archive-a"]) == [i2]
+
+
+def test_list_exclude_user():
+    i1 = _archiveinfo("a", _id(1), username="alice")
+    i2 = _archiveinfo("b", _id(2), username="bob")
+    ar = _stub_info_tuples([i1, i2])
+    assert ar.list(exclude=["user:alice"]) == [i2]
+
+
+def test_list_exclude_host():
+    i1 = _archiveinfo("a", _id(1), hostname="laptop")
+    i2 = _archiveinfo("b", _id(2), hostname="server")
+    ar = _stub_info_tuples([i1, i2])
+    assert ar.list(exclude=["host:laptop"]) == [i2]
+
+
+def test_list_exclude_tags():
+    i1 = _archiveinfo("a", _id(1), tags=("prod", "db"))
+    i2 = _archiveinfo("b", _id(2), tags=("dev",))
+    ar = _stub_info_tuples([i1, i2])
+    assert ar.list(exclude=["tags:prod"]) == [i2]
+
+
+def test_list_exclude_aid():
+    i1 = _archiveinfo("a", _id(1))
+    i2 = _archiveinfo("b", _id(2))
+    ar = _stub_info_tuples([i1, i2])
+    prefix = bin_to_hex(_id(1))[:4]
+    assert ar.list(exclude=[f"aid:{prefix}"]) == [i2]
+
+
+def test_list_exclude_date():
+    i1 = _archiveinfo("a", _id(1), ts=TS)
+    i2 = _archiveinfo("b", _id(2), ts=TS2)
+    ar = _stub_info_tuples([i1, i2])
+    assert ar.list(exclude=["date:2020-06"]) == [i2]
+
+
+def test_list_exclude_date_invalid_raises():
+    i1 = _archiveinfo("a", _id(1))
+    ar = _stub_info_tuples([i1])
+    with pytest.raises(CommandError, match="Invalid date pattern"):
+        ar.list(exclude=["date:not-a-date"])
+
+
+def test_list_exclude_multiple_patterns():
+    i1 = _archiveinfo("archive-a", _id(1), username="alice", hostname="laptop")
+    i2 = _archiveinfo("archive-b", _id(2), username="bob", hostname="server")
+    i3 = _archiveinfo("archive-c", _id(3), username="charlie", hostname="workstation")
+    ar = _stub_info_tuples([i1, i2, i3])
+    # OR semantics: excludes matching user:alice OR host:server
+    result = ar.list(exclude=["user:alice", "host:server"])
+    assert result == [i3]
+
+
+def test_list_match_and_exclude_combined():
+    i1 = _archiveinfo("prod-db-1", _id(1), username="alice", hostname="server")
+    i2 = _archiveinfo("prod-db-2", _id(2), username="bob", hostname="server")
+    i3 = _archiveinfo("prod-web-1", _id(3), username="alice", hostname="server")
+    i4 = _archiveinfo("dev-db-1", _id(4), username="alice", hostname="laptop")
+    ar = _stub_info_tuples([i1, i2, i3, i4])
+    # match prod-* on server, exclude username bob and exclude *web*
+    result = ar.list(match=["sh:prod-*", "host:server"], exclude=["user:bob", "sh:*web*"])
+    assert result == [i1]
+
+
 def test_get_one_exact_match():
     i1 = _archiveinfo("backup", _id(1))
     ar = _stub_info_tuples([i1])
@@ -603,6 +683,20 @@ def test_get_one_deleted_passes_flag():
     ar._info_tuples = Mock(side_effect=lambda deleted=False: iter([i1]))
     ar.get_one(["a"], deleted=True)
     ar._info_tuples.assert_called_once_with(deleted=True)
+
+
+def test_get_one_with_exclude():
+    i1 = _archiveinfo("backup-1", _id(1))
+    i2 = _archiveinfo("backup-2", _id(2))
+    ar = _stub_info_tuples([i1, i2])
+    assert ar.get_one(["sh:backup-*"], exclude=["backup-2"]) == i1
+
+
+def test_get_one_with_exclude_removes_target_raises():
+    i1 = _archiveinfo("backup-1", _id(1))
+    ar = _stub_info_tuples([i1])
+    with pytest.raises(CommandError, match=r"matched 0\."):
+        ar.get_one(["backup-1"], exclude=["backup-1"])
 
 
 def test_list_considering_raises_if_name_set():
@@ -672,3 +766,24 @@ def test_list_considering_multi_key_sort():
     )
     result = ar.list_considering(args)
     assert result == [i3, i2, i1]
+
+
+def test_list_considering_with_exclude_archives():
+    i1 = _archiveinfo("archive-a", _id(1))
+    i2 = _archiveinfo("other", _id(2))
+    ar = _stub_info_tuples([i1, i2])
+    args = Namespace(
+        name=None,
+        sort_by="name",
+        match_archives=None,
+        exclude_archives=["other"],
+        first=None,
+        last=None,
+        older=None,
+        newer=None,
+        oldest=None,
+        newest=None,
+        deleted=False,
+    )
+    result = ar.list_considering(args)
+    assert result == [i1]

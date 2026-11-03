@@ -1,7 +1,7 @@
 import os
 import re
 from datetime import UTC, datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 
@@ -107,11 +107,21 @@ def ns_to_pax_time(ns):
 
 
 def pax_time_to_ns(value):
-    """Parse a tar PAX header timestamp (decimal seconds string) into nanoseconds, return None if invalid."""
+    """Parse a tar PAX header timestamp (decimal seconds string) into nanoseconds, return None if invalid.
+
+    Out of range values are clamped like safe_ns does.
+    """
     try:
-        return safe_ns(int(Decimal(value).scaleb(9)))
-    except (InvalidOperation, ValueError, OverflowError):
+        seconds = Decimal(value)
+    except (ArithmeticError, ValueError):  # decimal.InvalidOperation is an ArithmeticError
         return None
+    if not seconds.is_finite():  # NaN, sNaN, Infinity
+        return None
+    # clamp before converting to int: a Decimal with a huge exponent (e.g. "1e999999") is cheap to
+    # compare, but int() would build an integer with that many digits, which takes very long.
+    # also, scaleb() overflows for exponents beyond the decimal context's limit.
+    seconds = min(max(seconds, Decimal(0)), Decimal(MAX_S))
+    return int(seconds.scaleb(9))
 
 
 def safe_timestamp(item_timestamp_ns):

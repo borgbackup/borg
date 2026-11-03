@@ -2399,6 +2399,7 @@ class ArchiveRecreater:
             and not target.recreate_rechunkify
             and comment is None
             and target_name is None
+            and self.timestamp is None
         ):
             # nothing to do
             return False

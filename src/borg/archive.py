@@ -34,7 +34,7 @@ from .helpers import Manifest
 from .helpers import hardlinkable
 from .helpers import ChunkIteratorFileWrapper, normalize_chunker_params, open_item
 from .helpers import Error, IntegrityError, set_ec
-from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
+from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns, on_different_mounts
 from .helpers import parse_timestamp, to_localtime
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, safe_decode, make_path_safe, remove_surrogates
@@ -253,6 +253,27 @@ def stat_update_check(st_old, st_curr):
         raise BackupRaceConditionError('file inode changed (race condition), skipping file')
     # looks ok, we are still dealing with the same thing - return current stat:
     return st_curr
+
+
+def is_automount(st_old, st_curr, parent_fd, fd):
+    """
+    Check whether opening the directory triggered an automount, see #6652.
+
+    stat() does not trigger an automount (e.g. autofs, systemd automount units or the ZFS
+    snapshot directories in .zfs/snapshot), but opening the directory does. st_old is then the
+    stat of the automount point and st_curr (the fstat() of fd) is the stat of the root directory
+    of the filesystem that got mounted there, so they look like a different inode.
+
+    We only accept this if both are directories and if fd (the opened directory) is on a
+    different mount than parent_fd (its parent directory).
+    """
+    if parent_fd is None or fd is None:
+        return False
+    if not (stat.S_ISDIR(st_old.st_mode) and stat.S_ISDIR(st_curr.st_mode)):
+        return False
+    if st_old.st_ino == st_curr.st_ino and st_old.st_dev == st_curr.st_dev:
+        return False
+    return on_different_mounts(parent_fd, fd) is True
 
 
 @contextmanager

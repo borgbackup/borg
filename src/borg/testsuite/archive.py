@@ -1,4 +1,5 @@
 import json
+import os
 from collections import OrderedDict
 from datetime import datetime, timezone
 from io import StringIO
@@ -9,7 +10,7 @@ import pytest
 from . import BaseTestCase
 from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
-from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
+from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid, is_automount
 from ..helpers import Manifest
 from ..helpers import msgpack
 from ..item import Item, ArchiveItem
@@ -303,6 +304,27 @@ def test_backup_io_iter():
     normal_iterator = Iterator(StopIteration)
     for _ in backup_io_iter(normal_iterator):
         assert False, 'StopIteration handled incorrectly'
+
+
+@pytest.mark.parametrize("mounted", [False, True, None])
+def test_is_automount(tmp_path, monkeypatch, mounted):
+    import borg.archive as archive_module
+
+    monkeypatch.setattr(archive_module, "on_different_mounts", lambda fd1, fd2: mounted)
+    (tmp_path / "dir1").mkdir()
+    (tmp_path / "dir2").mkdir()
+    (tmp_path / "file").touch()
+    st_dir1, st_dir2, st_file = (os.stat(tmp_path / name) for name in ("dir1", "dir2", "file"))
+    parent_fd, fd = 3, 4  # only passed through to on_different_mounts
+    # a different directory is only accepted if it is on a different mount than its parent:
+    assert is_automount(st_dir1, st_dir2, parent_fd, fd) is (mounted is True)
+    # the same directory is no automount, but the normal case:
+    assert is_automount(st_dir1, st_dir1, parent_fd, fd) is False
+    # a file type change is never accepted:
+    assert is_automount(st_file, st_dir2, parent_fd, fd) is False
+    assert is_automount(st_dir1, st_file, parent_fd, fd) is False
+    # without a parent fd (recursion roots), we can not check:
+    assert is_automount(st_dir1, st_dir2, None, fd) is False
 
 
 def test_get_item_uid_gid():

@@ -6,10 +6,12 @@ import sys
 import tempfile
 import unittest
 
+import pytest
+
 from ..platformflags import is_win32, is_linux, is_freebsd, is_netbsd, is_darwin, is_haiku
 from ..platform import acl_get, acl_set, swidth
 from ..platform import get_process_id, process_alive
-from ..platform import fdatasync, sync_dir
+from ..platform import fdatasync, sync_dir, on_different_mounts
 from . import BaseTestCase, unopened_tempfile
 from .locking import free_pid
 
@@ -314,3 +316,24 @@ def test_process_id():
     assert len(hostname) > 0
     assert pid > 0
     assert get_process_id() == (hostname, pid, tid)
+
+
+@pytest.mark.skipif(is_win32, reason="can not open directories on windows")
+def test_on_different_mounts(tmp_path):
+    (tmp_path / "subdir").mkdir()
+    # a directory that is usually a separately mounted filesystem (devtmpfs, devfs, procfs, tmpfs, ...):
+    candidates = [p for p in ("/dev", "/proc", "/tmp") if os.path.isdir(p)]
+    other_mount = next((p for p in candidates if os.stat(p).st_dev != os.stat("/").st_dev), None)
+    fds = {}
+    try:
+        for path in "/", other_mount, tmp_path, tmp_path / "subdir":
+            if path is not None:
+                fds[path] = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        assert on_different_mounts(fds[tmp_path], fds[tmp_path / "subdir"]) is False
+        assert on_different_mounts(fds[tmp_path], fds[tmp_path]) is False
+        if other_mount is None:
+            pytest.skip("found no separately mounted filesystem")
+        assert on_different_mounts(fds["/"], fds[other_mount]) is True
+    finally:
+        for fd in fds.values():
+            os.close(fd)

@@ -674,6 +674,9 @@ class TarMixIn:
         |              |                           | no ACLs/xattrs/bsdflags    |
         +--------------+---------------------------+----------------------------+
 
+        The PAX and GNU formats are lossy: BSD flags, NFSv4 ACLs (FreeBSD), extended ACLs
+        (macOS), birthtime and content digests are not exported. Only the BORG format has them.
+
         With ``--sparse``, files whose content contains runs of all-zero chunks are written
         as sparse tar members (GNU sparse format 1.0, as GNU tar creates it in POSIX mode),
         storing only a hole map and the non-zero data. This requires ``--tar-format BORG``

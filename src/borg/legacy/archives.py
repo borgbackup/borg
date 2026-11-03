@@ -269,6 +269,7 @@ class LegacyArchives:
         return archive_infos[0]
 
     def _set_raw_dict(self, d):
+        # d was validated by ManifestItem.update_internal: str keys, dict values with only "id" and "time".
         for k, v in d.items():
             assert isinstance(k, str)
             assert isinstance(v, dict) and "id" in v and "time" in v

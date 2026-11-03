@@ -521,6 +521,17 @@ class Lock:
                 threadid=lock["threadid"],
                 dt=datetime.datetime.fromisoformat(lock["time"]),
             )
+            # authenticated does not mean well-formed: check the types, the owner fields are
+            # passed to platform.process_alive() and the timestamp is compared to aware datetimes.
+            if not isinstance(lock["hostid"], str):
+                raise ValueError(f"invalid hostid: {lock['hostid']!r}")
+            for name in ("processid", "threadid"):
+                if not isinstance(lock[name], int) or isinstance(lock[name], bool):
+                    raise ValueError(f"invalid {name}: {lock[name]!r}")
+            if not 0 < lock["processid"] < 2**31:
+                raise ValueError(f"processid out of range: {lock['processid']!r}")
+            if lock["dt"].utcoffset() is None:
+                raise ValueError(f"timestamp without timezone: {lock['dt']!r}")
         except (IntegrityError, UnicodeDecodeError, ValueError, KeyError, TypeError) as err:
             logger.debug(f"LOCK-PARSE: unreadable lock object: {err!r}.")
             return None
@@ -534,6 +545,16 @@ class Lock:
             if (not only_exclusive or lock["exclusive"]) and (not only_mine or self._is_our_lock(lock)):
                 found_locks.append(lock)
         return found_locks
+
+    def _find_my_lock(self):
+        """
+        Return a list with the lock we currently hold, or an empty list if we hold none (or it is gone).
+
+        Other locks with our id are not ours: they are leftovers of a dead process with the same id
+        (e.g. pid reuse in containers with a fixed BORG_HOST_ID), they get removed when they become stale.
+        """
+        my_key = self.my_lock_key  # single read - a LockRefresher thread may rebind it concurrently
+        return [lock for lock in self._find_locks(only_mine=True) if lock["key"] == my_key]
 
     def acquire(self):
         # goal
@@ -610,14 +631,13 @@ class Lock:
 
     def release(self, *, ignore_not_found=False):
         self.last_refresh_dt = None
-        locks = self._find_locks(only_mine=True)
+        locks = self._find_my_lock()
         if not locks:
             if ignore_not_found:
                 logger.debug("LOCK-RELEASE: trying to release the lock, but none was found.")
                 return
             else:
                 raise NotLocked(self.repository)
-        assert len(locks) == 1
         lock = locks[0]
         logger.debug(f"LOCK-RELEASE: releasing lock: {lock}.")
         self._delete_lock(lock["key"], ignore_not_found=True, update_last_refresh=True)
@@ -642,8 +662,9 @@ class Lock:
         logger.debug(f"LOCK-MIGRATE: {old_id} -> {new_id}.")
         assert self.id == old_id
         assert len(new_id) == 3
-        old_locks = self._find_locks(only_mine=True)
-        assert len(old_locks) == 1
+        old_locks = self._find_my_lock()
+        if not old_locks:
+            raise LockTimeout(self.repository, LOCK_KILLED_MSG)
         self.id = new_id
         self._create_lock(exclusive=old_locks[0]["exclusive"], update_last_refresh=True)
         self._delete_lock(old_locks[0]["key"], update_last_refresh=False)

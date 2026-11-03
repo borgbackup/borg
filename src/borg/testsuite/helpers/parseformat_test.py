@@ -34,6 +34,7 @@ from ...helpers.parseformat import (
     eval_escapes,
     ChunkerParams,
     DigestAlgos,
+    FilesCacheMode,
     files_cache_mode_no_ctime,
     get_size_units,
     normalize_local_path,
@@ -917,6 +918,11 @@ def test_valid_chunkerparams(chunker_params, expected_return):
         "buzhash,23,19,21,4095",  # violates min <= mask <= max
         "buzhash,19,23,21,4096",  # even window size
         "buzhash,19,23,21",  # missing window_size (must not fall into old-style compat mode)
+        "buzhash,19,23,21,-1",  # window_size < 1
+        "buzhash,20,20,20,4095",  # window_size + 2^chunk_min + 1 > 2^chunk_max
+        "20,20,20,4095",  # dito, old-style compat mode
+        "buzhash64,19,23,21,0,2",  # window_size < 1
+        "buzhash64,19,23,21,-1,2",  # dito
         "buzhash64,20,20,20,4095,2",  # window_size + 2^chunk_min + 1 > 2^chunk_max
         "buzhash64,19,19,19,4095,2",  # dito, chunk_min == chunk_max
         "buzhash64,19,23,21,4095",  # missing nc_level
@@ -930,6 +936,61 @@ def test_valid_chunkerparams(chunker_params, expected_return):
 def test_invalid_chunkerparams(invalid_chunker_params):
     with pytest.raises(ArgumentTypeError):
         ChunkerParams(invalid_chunker_params)
+
+
+@pytest.mark.parametrize(
+    "chunker_params, expected_return",
+    [
+        (DEFAULT_CHUNKER_PARAMS, DEFAULT_CHUNKER_PARAMS),  # the default value of --chunker-params
+        (["default"], DEFAULT_CHUNKER_PARAMS),
+        (["buzhash", 19, 23, 21, 4095], ("buzhash", 19, 23, 21, 4095)),
+        ([19, 23, 21, 4095], ("buzhash", 19, 23, 21, 4095)),
+        (("fastcdc", 19, 23, 21, 2), ("fastcdc", 19, 23, 21, 2)),
+        (["fixed", "4096"], ("fixed", 4096, 0)),
+    ],
+)
+def test_valid_chunkerparams_sequence(chunker_params, expected_return):
+    # e.g. a YAML list from a config file: it is validated like the string form.
+    assert ChunkerParams(chunker_params) == expected_return
+
+
+@pytest.mark.parametrize(
+    "invalid_chunker_params",
+    [
+        [],
+        ["crap", 1, 2, 3, 4],
+        ["buzhash", 5, 7, 6, 4095],  # too small min. size
+        ("buzhash", 19, 23, 21, 4096),  # even window size
+        ["fastcdc", 20, 20, 20, 2],  # chunk_min == chunk_max
+        ["fixed", 63],  # too small block size
+    ],
+)
+def test_invalid_chunkerparams_sequence(invalid_chunker_params):
+    with pytest.raises(ArgumentTypeError):
+        ChunkerParams(invalid_chunker_params)
+
+
+@pytest.mark.parametrize(
+    "mode, expected_mode",
+    [
+        ("ctime,size,inode", "cis"),
+        ("cis", "cis"),
+        ("mtime,size", "ms"),
+        ("rechunk,ctime", "cr"),
+        ("disabled", "d"),
+        ("d", "d"),
+    ],
+)
+def test_files_cache_mode(mode, expected_mode):
+    assert FilesCacheMode(mode) == expected_mode
+
+
+@pytest.mark.parametrize(
+    "mode", ["size", "s", "size,inode", "ctime,mtime", "crap"]  # neither ctime nor mtime nor disabled
+)
+def test_invalid_files_cache_mode(mode):
+    with pytest.raises(ArgumentTypeError):
+        FilesCacheMode(mode)
 
 
 @pytest.mark.parametrize(

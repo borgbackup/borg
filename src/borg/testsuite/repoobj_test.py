@@ -1,9 +1,12 @@
+import types
+import zlib
+
 import pytest
 
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
 from ..crypto.key import AESOCBKey, AuthenticatedKey, CHPOKey, LegacyAuthenticatedKey, LegacyPlaintextKey
 from ..helpers import CompressionSpec
-from ..helpers.errors import Error, IntegrityError
+from ..helpers.errors import DecompressionError, Error, IntegrityError
 from ..repository import Repository
 from ..repoobj import (
     ASSERT_ID_PLACES,
@@ -162,6 +165,44 @@ def test_malformed_object_inconsistent_sizes(key):
         repo_objs.parse_meta(id, hdr, ro_type=ROBJ_FILE_STREAM)
     with pytest.raises(IntegrityError):
         repo_objs.parse(id, hdr, ro_type=ROBJ_FILE_STREAM)
+
+
+@pytest.mark.parametrize(
+    "field, damaged_value",
+    [
+        ("csize", lambda csize: csize + 1),  # csize does not match the data size
+        ("psize", lambda csize: csize + 1),  # psize is bigger than csize
+        ("psize", lambda csize: -1),
+        ("psize", lambda csize: str(csize)),
+    ],
+)
+def test_parse_rejects_inconsistent_sizes(key, field, damaged_value):
+    # authenticated metadata can still be inconsistent, e.g. if written by a broken borg client.
+    def compress(meta, data):
+        meta, data = LZ4().compress(meta, data)
+        meta[field] = damaged_value(meta["csize"])
+        return meta, data
+
+    repo_objs = RepoObj(key)
+    repo_objs.compressor = types.SimpleNamespace(compress=compress)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
+
+
+def test_parse_rejects_legacy_compression(key):
+    # the legacy zlib format (no ID bytes) only exists in borg 1.x repositories.
+    repo_objs = RepoObj(key)
+    data = b"foobar" * 10
+    id = repo_objs.id_hash(data)
+    data_compressed = zlib.compress(data)
+    cdata = repo_objs.format(
+        id, {}, data_compressed, compress=False, size=len(data), ctype=0x78, clevel=0x9C, ro_type=ROBJ_FILE_STREAM
+    )
+    with pytest.raises(DecompressionError):
+        repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
 
 
 def test_parse_header(key):

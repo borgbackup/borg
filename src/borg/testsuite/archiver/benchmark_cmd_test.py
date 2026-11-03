@@ -3,6 +3,7 @@ import re
 
 import pytest
 
+from ...archiver import Archiver
 from ...constants import *  # NOQA
 from ...helpers import CommandError
 from . import cmd, RK_ENCRYPTION
@@ -16,6 +17,16 @@ def test_benchmark_crud(archiver, monkeypatch):
     for prefix in ("C-Z-TEST", "R-Z-TEST", "U-Z-TEST", "D-Z-TEST", "C-R-TEST", "R-R-TEST", "U-R-TEST", "D-R-TEST"):
         assert prefix in output
     assert "MB/s" in output
+
+
+def test_benchmark_crud_failing_command(archiver, monkeypatch):
+    # an inner borg command failing on the user's repository is an error, not a borg bug.
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    monkeypatch.setenv("_BORG_BENCHMARK_CRUD_TEST", "YES")
+    monkeypatch.setattr(Archiver, "do_extract", lambda self, args: EXIT_WARNING)
+    # fork=False, so the monkeypatched do_extract is the one the benchmark uses
+    with pytest.raises(CommandError, match="extract failed with rc 1"):
+        cmd(archiver, "benchmark", "crud", archiver.input_path, fork=False)
 
 
 def test_benchmark_crud_json_lines(archiver, monkeypatch):

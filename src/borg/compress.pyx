@@ -281,7 +281,8 @@ cdef class CompressorBase:
 
     def check_fix_size(self, meta, data):
         if "size" in meta:
-            assert meta["size"] == len(data)
+            if meta["size"] != len(data):
+                raise DecompressionError(f'size mismatch: expected {meta["size"]} bytes, got {len(data)}')
         elif self.legacy_mode:
             meta["size"] = len(data)
         else:
@@ -411,7 +412,7 @@ class LZ4(DecidingCompressor):
             # borg2 stores the exact plaintext size in the (authenticated) object metadata:
             # decompress directly into the result bytes object - no scratch buffer, no copy,
             # no output size guessing. rsize != size means corrupt (or misdescribed) data,
-            # this also covers everything check_fix_size would assert.
+            # this also covers everything check_fix_size would check.
             ret = PyBytes_FromStringAndSize(NULL, size)
             dest = PyBytes_AsString(ret)
             osize = size
@@ -602,7 +603,8 @@ class ZLIB_legacy(CompressorBase):
 
     def decompress(self, meta, data):
         # note: for compatibility no super call, do not strip ID bytes
-        assert self.legacy_mode  # only borg 1.x repos have the legacy ZLIB format
+        if not self.legacy_mode:  # only borg 1.x repos have the legacy ZLIB format
+            raise DecompressionError('legacy zlib format is only supported for borg 1.x repositories')
         assert meta is None
         meta = {}
         meta["ctype"] = ZLIB.ID  # change to non-legacy ZLIB id
@@ -774,7 +776,8 @@ class ObfuscateSize(CompressorBase):
         return meta, obfuscated_data  # for borg2 it is enough that we have the payload size in meta["psize"]
 
     def decompress(self, meta, data):
-        assert self.legacy_mode  # borg2 never dispatches to this, only used for legacy mode
+        if not self.legacy_mode:  # borg2 objects store the inner compressor's ctype, only borg 1.x has this header
+            raise DecompressionError('obfuscation header is only supported for borg 1.x repositories')
         meta, obfuscated_data = super().decompress(meta, data)  # remove obfuscator ID header
         compr_size = self.header_fmt.unpack(obfuscated_data[0:self.header_len])[0]
         compressed_data = obfuscated_data[self.header_len:self.header_len+compr_size]

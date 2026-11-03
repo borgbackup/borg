@@ -10,13 +10,13 @@ import pytest
 
 from . import rejected_dotdot_paths, is_utime_fully_supported, make_test_key, set_test_key_on_open
 from ..cache import ChunkListEntry
-from ..constants import ROBJ_ARCHIVE_STREAM, ROBJ_FILE_STREAM, zeros
+from ..constants import MAX_DATA_SIZE, ROBJ_ARCHIVE_STREAM, ROBJ_FILE_STREAM, zeros
 from ..archive import Archive, CacheChunkBuffer, DownloadPipeline, RobustUnpacker, valid_msgpacked_dict
 from ..archive import ITEM_KEYS, Statistics
 from ..archive import zero_chunk_flags, zero_chunk_id, zero_chunk_ids
 from ..archive import BackupOSError, BackupRaceConditionError, backup_io, backup_io_iter, get_item_uid_gid
 from ..archive import stat_update_check, is_automount, tar_acl_to_borg
-from ..helpers import msgpack, StableDict
+from ..helpers import IntegrityError, msgpack, StableDict
 from ..repoobj import RepoObj
 from ..item import Item, ArchiveItem
 from ..manifest import Archives, Manifest
@@ -314,6 +314,31 @@ def test_download_pipeline_missing_chunk(replacement_chunk):
     chunk_list = [ChunkListEntry(id, len(data))]
     result = list(pipeline.fetch_many(chunk_list, ro_type=ROBJ_FILE_STREAM, replacement_chunk=replacement_chunk))
     assert result == [zeros[: len(data)] if replacement_chunk else None]
+
+
+def test_download_pipeline_size_mismatch():
+    # the size in a chunk list is repository data, too: if it does not match the (authentic) chunk data,
+    # that is an integrity error.
+    key = make_test_key(None)
+    repo_objs = RepoObj(key)
+    data = b"foobar" * 100
+    id = repo_objs.id_hash(data)
+    repository = MockFetchRepo({id: repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)})
+    pipeline = DownloadPipeline(repository, repo_objs)
+    with pytest.raises(IntegrityError, match="does not match data size"):
+        list(pipeline.fetch_many([ChunkListEntry(id, len(data) + 1)], ro_type=ROBJ_FILE_STREAM))
+
+
+@pytest.mark.parametrize("size", [-1, MAX_DATA_SIZE + 1])
+def test_download_pipeline_missing_chunk_invalid_size(size):
+    # an all-zero replacement chunk can not be made for an invalid size from the chunk list.
+    key = make_test_key(None)
+    repo_objs = RepoObj(key)
+    id = repo_objs.id_hash(b"foobar")
+    repository = MockFetchRepo({id: None})  # the object is gone
+    pipeline = DownloadPipeline(repository, repo_objs)
+    with pytest.raises(IntegrityError, match="invalid size"):
+        list(pipeline.fetch_many([ChunkListEntry(id, size)], ro_type=ROBJ_FILE_STREAM))
 
 
 def test_download_pipeline_zero_chunks_served_locally():
@@ -880,6 +905,16 @@ def test_reject_non_sanitized_item():
     for path in rejected_dotdot_paths:
         with pytest.raises(ValueError, match="unexpected '..' element in path"):
             Item(path=path, user="root", group="root")
+
+
+@pytest.mark.parametrize("items_keys", [{}, {"item_ptrs": [], "items": []}])
+def test_load_meta_needs_exactly_one_of_item_ptrs_items(items_keys):
+    archive = Archive.__new__(Archive)  # only _load_meta is tested, it needs no fully set up Archive
+    archive.repository, archive.repo_objs, archive.key = Mock(), Mock(), Mock()
+    archive.repo_objs.parse.return_value = (None, b"data")
+    archive.key.unpack_archive.return_value = {"version": 2, "name": "a"} | items_keys
+    with pytest.raises(IntegrityError, match="exactly one of item_ptrs, items"):
+        archive._load_meta(b"\x01" * 32)
 
 
 def test_archives_get_by_id_missing_returns_none():

@@ -6,7 +6,7 @@ from libc.string cimport memcmp
 from cpython.bytes cimport PyBytes_AsStringAndSize
 
 from .constants import ITEM_KEYS, ARCHIVE_KEYS
-from .helpers import StableDict
+from .helpers import StableDict, IntegrityError
 from .helpers import format_file_size
 from .helpers.fs import assert_sanitized_path, to_sanitized_path, map_chars, slashify
 from .helpers.msgpack import timestamp_to_int, int_to_timestamp, Timestamp
@@ -22,7 +22,8 @@ def fix_key(data, key, *, errors='strict'):
         value = data.pop(key)
         key = key.decode('utf-8', errors=errors)
         data[key] = value
-    assert isinstance(key, str)
+    if not isinstance(key, str):
+        raise IntegrityError(f'dict key is not a str, but {type(key).__name__}')
     return key
 
 
@@ -44,27 +45,34 @@ def fix_bytes_value(data, key):
     return value
 
 
+def check_list(v, what='list'):
+    """Raise IntegrityError if v is not a tuple or list."""
+    if not isinstance(v, (tuple, list)):
+        raise IntegrityError(f'{what} is not a list, but {type(v).__name__}')
+
+
 def fix_list_of_str(v):
     """Ensure that we have a list of str."""
-    assert isinstance(v, (tuple, list))
+    check_list(v)
     return [want_str(e) for e in v]
 
 
 def fix_list_of_bytes(v):
     """Ensure that we have a list of bytes."""
-    assert isinstance(v, (tuple, list))
+    check_list(v)
     return [want_bytes(e) for e in v]
 
 
 def fix_list_of_chunkentries(v):
     """Ensure that we have a list of valid chunk entries."""
-    assert isinstance(v, (tuple, list))
+    check_list(v, 'chunk list')
     chunks = []
     for ce in v:
-        assert isinstance(ce, (tuple, list))
-        assert len(ce) in (2, 3)  # id, size[, csize]
-        assert isinstance(ce[1], int)
-        assert len(ce) == 2 or isinstance(ce[2], int)
+        check_list(ce, 'chunk entry')
+        if len(ce) not in (2, 3):  # id, size[, csize]
+            raise IntegrityError(f'chunk entry has {len(ce)} elements, expected 2 or 3')
+        if not isinstance(ce[1], int) or (len(ce) == 3 and not isinstance(ce[2], int)):
+            raise IntegrityError(f'chunk entry size is not an int: {ce!r}')
         ce_fixed = [want_bytes(ce[0]), ce[1]]  # list! id, size only, drop csize
         chunks.append(ce_fixed)  # create a list of lists
     return chunks
@@ -72,15 +80,16 @@ def fix_list_of_chunkentries(v):
 
 def fix_tuple_of_str(v):
     """Ensure that we have a tuple of str."""
-    assert isinstance(v, (tuple, list))
+    check_list(v)
     return tuple(want_str(e) for e in v)
 
 
 def fix_tuple_of_str_and_int(v):
     """Ensure that we have a tuple of str or int."""
-    assert isinstance(v, (tuple, list))
+    check_list(v)
     t = tuple(e.decode() if isinstance(e, bytes) else e for e in v)
-    assert all(isinstance(e, (str, int)) for e in t), repr(t)
+    if not all(isinstance(e, (str, int)) for e in t):
+        raise IntegrityError(f'not a tuple of str or int: {t!r}')
     return t
 
 
@@ -91,8 +100,15 @@ def fix_timestamp(v):
     # legacy support
     if isinstance(v, bytes):  # was: bigint_to_int()
         v = int.from_bytes(v, 'little', signed=True)
-    assert isinstance(v, int)
+    if not isinstance(v, int):
+        raise IntegrityError(f'timestamp is not an int, but {type(v).__name__}')
     return int_to_timestamp(v)
+
+
+def check_version(v):
+    """Raise IntegrityError if the version v is not an int."""
+    if not isinstance(v, int):
+        raise IntegrityError(f'version is not an int, but {type(v).__name__}')
 
 
 def want_bytes(v, *, errors='surrogateescape'):
@@ -100,7 +116,8 @@ def want_bytes(v, *, errors='surrogateescape'):
     # legacy support: it being str can be caused by msgpack unpack decoding old data that was packed with use_bin_type=False
     if isinstance(v, str):
         v = v.encode('utf-8', errors=errors)
-    assert isinstance(v, bytes), f'not a bytes object, but {v!r}'
+    if not isinstance(v, bytes):
+        raise IntegrityError(f'not a bytes object, but {v!r}')
     return v
 
 
@@ -108,7 +125,8 @@ def want_str(v, *, errors='surrogateescape'):
     """Ensure that the value is str (decode if necessary)."""
     if isinstance(v, bytes):
         v = v.decode('utf-8', errors=errors)
-    assert isinstance(v, str), f'not a str object, but {v!r}'
+    if not isinstance(v, str):
+        raise IntegrityError(f'not a str object, but {v!r}')
     return v
 
 
@@ -427,7 +445,7 @@ cdef class EncryptedKey(PropDict):
         for k, v in list(d.items()):
             k = fix_key(d, k)
             if k == 'version':
-                assert isinstance(v, int)
+                check_version(v)
             if k in ('algorithm', 'argon2_type', 'label'):
                 v = fix_str_value(d, k)
             if k in ('salt', 'hash', 'data'):
@@ -461,14 +479,15 @@ cdef class Key(PropDict):
         for k, v in list(d.items()):
             k = fix_key(d, k)
             if k == 'version':
-                assert isinstance(v, int)
+                check_version(v)
             if k in ('repository_id', 'crypt_key', 'id_key'):
                 v = fix_bytes_value(d, k)
             self._dict[k] = v
         if 'crypt_key' not in self._dict:  # legacy, we're loading an old v1 key
             k = fix_bytes_value(d, 'enc_key') + fix_bytes_value(d, 'enc_hmac_key')
             assert isinstance(k, bytes), "k == %r" % k
-            assert len(k) in (32 + 32, 32 + 128)  # 256+256 or 256+1024 bits
+            if len(k) not in (32 + 32, 32 + 128):  # 256+256 or 256+1024 bits
+                raise IntegrityError(f'legacy key material has an invalid length: {len(k)}')
             self._dict['crypt_key'] = k
 
 cdef class ArchiveItem(PropDict):
@@ -517,7 +536,7 @@ cdef class ArchiveItem(PropDict):
         for k, v in list(d.items()):
             k = fix_key(d, k)
             if k == 'version':
-                assert isinstance(v, int)
+                check_version(v)
             if k in ('name', 'hostname', 'username', 'comment', 'cwd'):
                 v = fix_str_value(d, k)
             if k in ('start', 'end', 'time', 'time_end'):
@@ -560,29 +579,34 @@ cdef class ManifestItem(PropDict):
         for k, v in list(d.items()):
             k = fix_key(d, k)
             if k == 'version':
-                assert isinstance(v, int)
+                check_version(v)
             if k == 'archives':
                 ad = v
-                assert isinstance(ad, dict)
+                if not isinstance(ad, dict):
+                    raise IntegrityError(f'manifest archives is not a dict, but {type(ad).__name__}')
                 for ak, av in list(ad.items()):
                     ak = fix_key(ad, ak, errors='surrogateescape')
-                    assert isinstance(av, dict)
+                    if not isinstance(av, dict):
+                        raise IntegrityError(f'manifest archive entry is not a dict, but {type(av).__name__}')
                     for ik, iv in list(av.items()):
                         ik = fix_key(av, ik)
                         if ik == 'id':
                             fix_bytes_value(av, 'id')
                         if ik == 'time':
                             fix_str_value(av, 'time')
-                    assert set(av) == {'id', 'time'}
+                    if set(av) != {'id', 'time'}:
+                        raise IntegrityError(f'manifest archive entry has unexpected keys: {sorted(av)!r}')
             if k == 'timestamp':
                 v = fix_str_value(d, k, 'replace')
             if k == 'config':
                 cd = v
-                assert isinstance(cd, dict)
+                if not isinstance(cd, dict):
+                    raise IntegrityError(f'manifest config is not a dict, but {type(cd).__name__}')
                 for ck, cv in list(cd.items()):
                     ck = fix_key(cd, ck)
                     if ck == 'tam_required':
-                        assert isinstance(cv, bool)
+                        if not isinstance(cv, bool):
+                            raise IntegrityError(f'manifest tam_required is not a bool, but {type(cv).__name__}')
             if k == 'item_keys':
                 v = fix_tuple_of_str(v)
             self._dict[k] = v

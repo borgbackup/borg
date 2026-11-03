@@ -463,6 +463,34 @@ class TestLock:
         assert old_locks[0]["hostid"] == old_id[0]
         assert new_locks[0]["hostid"] == new_id[0]
 
+    def test_release_with_leftover_lock_of_same_id(self, lockstore):
+        # a not yet stale leftover lock with our id (e.g. pid reuse in a container with a fixed
+        # BORG_HOST_ID) is not ours: release() deletes only our lock and leaves the leftover alone.
+        now = datetime.datetime.now(datetime.UTC)
+        leftover_key = write_raw_lock(lockstore, ID1, exclusive=False, dt=now)
+        lock = Lock(lockstore, exclusive=False, id=ID1).acquire()
+        assert lock.my_lock_key != leftover_key
+        lock.release()
+        assert [info.name for info in lockstore.list("locks")] == [leftover_key]
+        with pytest.raises(NotLocked):
+            lock.release()
+
+    def test_migrate_lock_with_leftover_lock_of_same_id(self, lockstore):
+        now = datetime.datetime.now(datetime.UTC)
+        leftover_key = write_raw_lock(lockstore, ID1, exclusive=False, dt=now)
+        lock = Lock(lockstore, exclusive=False, id=ID1).acquire()
+        lock.migrate_lock(ID1, ID2)
+        keys = {info.name for info in lockstore.list("locks")}
+        assert keys == {leftover_key, lock.my_lock_key}
+        lock.release()
+        assert [info.name for info in lockstore.list("locks")] == [leftover_key]
+
+    def test_migrate_killed_lock(self, lockstore):
+        lock = Lock(lockstore, exclusive=True, id=ID1).acquire()
+        Lock(lockstore, id=ID2).break_lock()  # kill it, like another client would
+        with pytest.raises(LockTimeout):
+            lock.migrate_lock(ID1, ID2)
+
 
 def test_lock_object_is_sealed(lockstore):
     # neither the content nor the name of a lock object tells who uses the repository, see "Lock objects".
@@ -528,6 +556,32 @@ def foreign_key_lock():
     return other_key.encrypt_oneshot(b"", json.dumps(lock).encode(), aad=LOCK_AAD)
 
 
+def malformed_lock(**changes):
+    # a correctly sealed (authenticated) lock object with malformed content.
+    host, pid, thread = get_process_id()  # a local, alive owner: the owner fields get checked
+    now = datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds")
+    lock = dict(exclusive=True, hostid=host, processid=pid, threadid=thread, time=now)
+    lock.update(changes)
+    return seal(json.dumps(lock).encode())
+
+
+MALFORMED_LOCKS = [
+    dict(hostid=1),
+    dict(hostid=None),
+    dict(processid="1"),
+    dict(processid=True),
+    dict(processid=1.5),
+    dict(processid=0),
+    dict(processid=-1),
+    dict(processid=2**40),
+    dict(threadid="0"),
+    dict(threadid=False),
+    dict(threadid=None),
+    dict(time="2026-10-13T12:00:00.000"),  # no timezone
+    dict(time=0),
+]
+
+
 class TestUnreadableLock:
     @pytest.mark.parametrize("make_content", [plaintext_lock, foreign_key_lock, lambda: b"garbage"])
     @pytest.mark.parametrize("exclusive", [False, True])
@@ -586,3 +640,23 @@ class TestUnreadableLock:
         assert [info.name for info in lockstore.list("locks")] == [key]  # no lock of ours left behind
         Lock(lockstore, id=ID1).break_lock()
         assert list(lockstore.list("locks")) == []
+
+    @pytest.mark.parametrize("changes", MALFORMED_LOCKS)
+    def test_malformed(self, lockstore, changes):
+        # authenticated does not mean well-formed: fail closed, treat it as an unreadable exclusive lock.
+        key = write_unreadable_lock(lockstore, malformed_lock(**changes))
+        lock = Lock(lockstore, exclusive=False, id=ID1, timeout=0.2)
+        lock.retry_delay_min = lock.retry_delay_max = 0.05
+        locks = lock._get_locks()
+        assert locks[key]["unreadable"] and locks[key]["exclusive"]
+        with pytest.raises(LockTimeout, match=f"unreadable lock object locks/{key}"):
+            lock.acquire()
+        # break-lock can remove it.
+        Lock(lockstore, id=ID1).break_lock()
+        assert list(lockstore.list("locks")) == []
+
+    def test_wellformed(self, lockstore):
+        # the reference for test_malformed: without changes, the lock object is readable.
+        key = write_unreadable_lock(lockstore, malformed_lock())
+        locks = Lock(lockstore, id=ID1)._get_locks()
+        assert not locks[key]["unreadable"]

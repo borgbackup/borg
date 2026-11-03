@@ -1,5 +1,6 @@
 import os
 import re
+import types
 
 import pytest
 
@@ -10,6 +11,7 @@ from ...cache import list_chunkindex_hashes, write_chunkindex_to_repo
 from ...manifest import Manifest
 from ...compress import ZSTD, ZLIB, LZ4, CNONE
 from ...archiver.repo_compress_cmd import PackRecompressor
+from ...repoobj import RepoObj
 
 from .. import make_test_key
 from . import create_regular_file, cmd, open_repository, RK_ENCRYPTION
@@ -426,3 +428,27 @@ def test_transform_pack_unchanged_pack_untouched(tmp_path):
         assert {info.name for info in repository.store_list("packs")} == pack_names_before
         assert pdchunk(repository.get(H(0))) == b"WWWW"
         assert pdchunk(repository.get(H(1))) == b"XXXX"
+
+
+@pytest.mark.parametrize("ro_type", [None, 42, ROBJ_DONTCARE])
+def test_transform_rejects_invalid_type(tmp_path, ro_type):
+    # the type of a stored object comes from the repository, so it is validated before it is reused.
+    def compress(meta, data):
+        meta, data = LZ4().compress(meta, data)
+        if ro_type is None:
+            del meta["type"]
+        else:
+            meta["type"] = ro_type
+        return meta, data
+
+    location = os.fspath(tmp_path / "repo")
+    with Repository(location, exclusive=True, create=True, key_loader=make_test_key) as repository:
+        repo_objs = RepoObj(make_test_key(repository))
+        repo_objs.compressor = types.SimpleNamespace(compress=compress)
+        data = b"foobar" * 10
+        id = repo_objs.id_hash(data)
+        obj = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
+        repo_objs.compressor = CompressionSpec("zstd,3").compressor
+        recompressor = PackRecompressor(repository, types.SimpleNamespace(repo_objs=repo_objs), print_stats=False)
+        with pytest.raises(IntegrityError, match="invalid type"):
+            recompressor.transform(id, obj)

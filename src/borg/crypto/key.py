@@ -296,7 +296,8 @@ def legacy_key_factory(repository, manifest_chunk, *, other=False):
     crypted data is the key type byte (see identify_key).
     """
     manifest_data = RepoObj1.extract_crypted_data(manifest_chunk)
-    assert manifest_data, "manifest data must not be zero bytes long"
+    if not manifest_data:
+        raise IntegrityError("Manifest: empty object")
     key_cls = identify_key(manifest_data)
     key = key_cls.detect(repository, manifest_data, other=other)
     key.stored_type = manifest_data[0]
@@ -513,6 +514,9 @@ class AESKeyBase(KeyBase):
 
     CIPHERSUITE: Callable = None  # override in derived class
 
+    # crypt_key length (enc key + MAC key) per CIPHERSUITE, see init_ciphers.
+    CRYPT_KEY_LENGTH_FOR_SUITE = {low_level.AES256_CTR_HMAC_SHA256: 32 + 32, low_level.AES256_CTR_BLAKE2b: 32 + 128}
+
     logically_encrypted = True
 
     def encrypt(self, id, data, aad=b""):
@@ -544,6 +548,10 @@ class AESKeyBase(KeyBase):
         self.init_from_given_data(crypt_key=data[0:64], id_key=data[64:96], chunk_seed=chunk_seed)
 
     def init_ciphers(self, manifest_data=None):
+        # the key class is selected by the unauthenticated key type byte of the borg 1.x manifest (see
+        # identify_key), so the key material loaded from the borg key may belong to another crypto suite.
+        if len(self.crypt_key) != self.CRYPT_KEY_LENGTH_FOR_SUITE[self.CIPHERSUITE]:
+            raise IntegrityError("Manifest: key type does not match the key material of the borg key")
         enc_key, enc_hmac_key = self.crypt_key[0:32], self.crypt_key[32:]
         self.cipher = self.CIPHERSUITE(mac_key=enc_hmac_key, enc_key=enc_key, header_len=1, aad_offset=1)
         if manifest_data is None:
@@ -567,6 +575,7 @@ class FlexiKey:
     # have to infer their types across the module import cycle.
     chunk_seed: int
     crypt_key: bytes
+    CRYPT_KEY_LENGTHS: ClassVar[tuple[int, ...]]  # the crypt_key lengths init_from_given_data accepts
     empty_passphrase: bool
     id_key: bytes
     storage: str
@@ -617,6 +626,9 @@ class FlexiKey:
             key = Key(internal_dict=data)
             if key.version not in (1, 2):  # legacy: item.Key can still process v1 keys
                 raise UnsupportedKeyFormatError()
+            # the key lengths of all modes borg creates and of all borg 1.x modes (blake2: 32 + 128 and 128).
+            if len(key.crypt_key) not in (32 + 32, 32 + 128) or len(key.id_key) not in (32, 128):
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), "(repokey)")
             self.repository_id = key.repository_id
             self.crypt_key = key.crypt_key
             self.id_key = key.id_key
@@ -736,6 +748,13 @@ class FlexiKey:
             if other_key.copy_crypt_key:
                 # give the user the option to use the same authenticated encryption (AE) key
                 crypt_key = other_key.crypt_key
+                if len(crypt_key) not in key.CRYPT_KEY_LENGTHS:
+                    # e.g. the 32 + 128 bytes crypt key of a borg 1.x blake2 mode for an authenticated-* mode.
+                    lengths = " or ".join(str(length) for length in key.CRYPT_KEY_LENGTHS)
+                    raise Error(
+                        f"Copying the crypt key ({len(crypt_key)} bytes) to {key.ENC_NAME} is not possible, "
+                        f"it needs a crypt key of {lengths} bytes."
+                    )
             else:
                 # borg transfer re-encrypts all data anyway, thus we can default to a new, random AE key
                 crypt_key = os.urandom(64)
@@ -1189,6 +1208,8 @@ class AuthenticatedKeyBase(MACKeyBase, FlexiKey):
 
     _tag_key: bytes | None = None  # cache for the tag_key property
 
+    CRYPT_KEY_LENGTHS = (32 + 32,)  # see init_from_given_data
+
     @property
     def tag_key(self):
         # derived lazily (and cached): a key instance may also be built by copying the key
@@ -1244,7 +1265,7 @@ class AuthenticatedKeyBase(MACKeyBase, FlexiKey):
         self.logically_encrypted = False
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
-        assert len(crypt_key) == 32 + 32
+        assert len(crypt_key) in self.CRYPT_KEY_LENGTHS
         assert len(id_key) == 32
         assert isinstance(chunk_seed, int)
         self.crypt_key = crypt_key
@@ -1341,6 +1362,8 @@ class AEADKeyBase(KeyBase):
 
     MAX_IV = 2**48 - 1
 
+    CRYPT_KEY_LENGTHS = (32 + 32, 32 + 128)  # see init_from_given_data
+
     # Maximum amount of data (in 128bit cipher blocks, counting plaintext **and** AAD) that we
     # encrypt using one session key. When this is exceeded, we just start a new session (see
     # new_session): that is cheap (one sha256) and fully transparent, because the sessionID
@@ -1432,7 +1455,7 @@ class AEADKeyBase(KeyBase):
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
-        assert len(crypt_key) in (32 + 32, 32 + 128)
+        assert len(crypt_key) in self.CRYPT_KEY_LENGTHS
         assert len(id_key) in (32, 128)
         assert isinstance(chunk_seed, int)
         self.crypt_key = crypt_key

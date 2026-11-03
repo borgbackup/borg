@@ -1,3 +1,4 @@
+import json
 import random
 import time
 from pathlib import Path
@@ -373,3 +374,30 @@ class TestLockRoster:
         roster.migrate_lock(SHARED, old_id, new_id)  # fix the lock
         assert roster.id == new_id
         assert roster.get(SHARED) == {new_id}
+
+    @pytest.mark.parametrize(
+        "data",
+        [
+            [],  # not a dict
+            "foo",
+            {SHARED: 1},  # entries not a list
+            {SHARED: [1]},  # entry not a list
+            {SHARED: [["host", 1]]},  # entry too short
+            {SHARED: [[1, 1, 0]]},  # host not a str
+            {SHARED: [["host", "1", 0]]},  # pid not an int
+            {SHARED: [["host", True, 0]]},  # pid is a bool
+            {EXCLUSIVE: [["host", 1, None]]},  # thread not an int
+            {EXCLUSIVE: [[get_process_id()[0], 0, 0]]},  # pid out of range (local host: the pid gets checked)
+            {EXCLUSIVE: [[get_process_id()[0], 2**40, 0]]},  # dito
+        ],
+    )
+    @pytest.mark.parametrize("kill_stale_locks", [True, False])
+    def test_malformed(self, rosterpath, data, kill_stale_locks):
+        # a malformed roster file is treated like a corrupt one: as empty.
+        rosterpath.write_text(json.dumps(data))
+        roster = LockRoster(rosterpath, id=ID1)
+        roster.kill_stale_locks = kill_stale_locks
+        assert roster.load() == {}
+        assert roster.get(SHARED) == roster.get(EXCLUSIVE) == set()
+        roster.modify(SHARED, ADD)
+        assert roster.get(SHARED) == {ID1}

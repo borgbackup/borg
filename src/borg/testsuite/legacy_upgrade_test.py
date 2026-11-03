@@ -6,8 +6,11 @@ from argparse import Namespace
 from struct import Struct
 from unittest.mock import MagicMock
 
+import pytest
+
 from ..compress import ZLIB, ObfuscateSize
 from ..constants import CH_BUZHASH, REQUIRED_ITEM_KEYS
+from ..helpers import IntegrityError
 from ..item import Item
 from ..legacy.upgrade import UpgraderFrom12To20
 
@@ -112,6 +115,22 @@ def test_required_item_keys_always_present():
     item = _item()
     result = u.upgrade_item(item=item)
     assert all(k in result for k in REQUIRED_ITEM_KEYS)
+
+
+def test_missing_required_item_key_raises_integrity_error():
+    u, _, archive = _upgrader()
+    archive.name = "archive1"
+    item = Item(internal_dict={"path": "dir/file", "mode": stat.S_IFREG | 0o644})  # no mtime
+    with pytest.raises(IntegrityError, match="archive1.*dir/file.*missing required keys mtime"):
+        u.upgrade_item(item=item)
+
+
+def test_none_value_raises_integrity_error():
+    u, _, archive = _upgrader()
+    archive.name = "archive1"
+    item = _item(uid=None)
+    with pytest.raises(IntegrityError, match="archive1.*dir/file.*None value for uid"):
+        u.upgrade_item(item=item)
 
 
 # ── upgrade_archive_metadata ──────────────────────────────────────────────────

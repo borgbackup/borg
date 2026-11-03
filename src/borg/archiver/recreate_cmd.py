@@ -3,8 +3,8 @@ from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex, CompressionSpec
-from ..helpers import timestamp
-from ..helpers.argparsing import ArgumentParser
+from ..helpers import timestamp, Error
+from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 
 from ..logger import create_logger
 
@@ -38,6 +38,13 @@ class RecreateMixIn:
         )
         archive_infos = manifest.archives.list_considering(args)
         archive_infos = [ai for ai in archive_infos if "@PROT" not in ai.tags]
+        if not args.target:
+            # the recreated archives keep their names from the repository: check them before changing anything.
+            for archive_info in archive_infos:
+                try:
+                    archivename_validator(archive_info.name)
+                except ArgumentTypeError as err:
+                    raise Error(f"{err}, please rename the archive before recreate.") from None
         for archive_info in archive_infos:
             if recreater.is_temporary_archive(archive_info.name):
                 continue

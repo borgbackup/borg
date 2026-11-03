@@ -231,11 +231,12 @@ class RepoObj:
             ctype = meta_compressed["ctype"]
             clevel = meta_compressed["clevel"]
             csize = meta_compressed["csize"]  # always the overall size
-            assert csize == len(data_compressed)
-            psize = meta_compressed.get(
-                "psize", csize
-            )  # obfuscation: psize (payload size) is potentially less than csize.
-            assert psize <= csize
+            if csize != len(data_compressed):
+                raise IntegrityError(f"csize inconsistent: expected {csize} bytes, got {len(data_compressed)}")
+            # obfuscation: psize (payload size) is potentially less than csize.
+            psize = meta_compressed.get("psize", csize)
+            if not isinstance(psize, int) or isinstance(psize, bool) or not 0 <= psize <= csize:
+                raise IntegrityError(f"psize invalid: {psize!r} (csize: {csize})")
             compr_hdr = bytes((ctype, clevel))
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)

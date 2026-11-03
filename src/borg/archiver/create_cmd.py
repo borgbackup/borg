@@ -44,6 +44,20 @@ from ..logger import create_logger
 logger = create_logger()
 
 
+def strip_prefix_and_path(path):
+    """
+    Return (strip_prefix, path) for a path given by the user: the slashdot hack strip prefix (see
+    get_strip_prefix) and the normalized path.
+    """
+    strip_prefix = get_strip_prefix(path)
+    path = posixpath.normpath(path)
+    if strip_prefix is not None and not path.strip("/"):
+        # the slashdot hack points to the root directory, e.g. //./ (normpath keeps a leading "//"):
+        # like for /./, there is nothing to strip.
+        strip_prefix = None
+    return strip_prefix, path
+
+
 def stat_root(path):
     """
     stat a recursion root, following it if it is a symlink, see #4737.
@@ -223,9 +237,7 @@ class CreateMixIn:
                     pipe_bin = sys.stdin.buffer
                 pipe = TextIOWrapper(pipe_bin, errors="surrogateescape")
                 for path in iter_separated(pipe, paths_sep):
-                    path = slashify(path)
-                    strip_prefix = get_strip_prefix(path)
-                    path = posixpath.normpath(path)
+                    strip_prefix, path = strip_prefix_and_path(slashify(path))
                     try:
                         with backup_io("stat"):
                             # symlinks given this way are never followed, see #4737.
@@ -280,8 +292,7 @@ class CreateMixIn:
                             fso.stats.files_stats[status] += 1
                         continue
 
-                    strip_prefix = get_strip_prefix(path)
-                    path = posixpath.normpath(path)
+                    strip_prefix, path = strip_prefix_and_path(path)
                     try:
                         with backup_io("stat"):
                             st, followed = stat_root(path)

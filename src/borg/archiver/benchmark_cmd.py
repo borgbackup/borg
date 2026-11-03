@@ -22,6 +22,12 @@ class BenchmarkMixIn:
     def do_benchmark_crud(self, args):
         """Benchmark Create, Read, Update, Delete for archives."""
 
+        def check_rc(step, *rcs):
+            # the inner borg commands work on the user's repository: they can fail without a bug in borg.
+            for rc in rcs:
+                if rc != 0:
+                    raise CommandError(f"benchmark crud: {step} failed with rc {rc}.")
+
         def measurement_run(repo, path):
             # Suppress "Done. Run borg compact..." warnings from internal do_delete() calls —
             # they clutter benchmark output and are irrelevant here (repo is temporary).
@@ -48,7 +54,7 @@ class BenchmarkMixIn:
                 )
                 t_end = time.monotonic()
                 dt_create = t_end - t_start
-                assert rc == 0
+                check_rc("create (files cache disabled)", rc)
                 # now build files cache
                 rc1 = get_reset_ec(
                     self.do_create(
@@ -58,7 +64,7 @@ class BenchmarkMixIn:
                 rc2 = get_reset_ec(
                     self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud2"]))
                 )
-                assert rc1 == rc2 == 0
+                check_rc("create/delete (building the files cache)", rc1, rc2)
                 # measure a no-change update (archive1 is still present)
                 t_start = time.monotonic()
                 rc1 = get_reset_ec(
@@ -71,7 +77,7 @@ class BenchmarkMixIn:
                 rc2 = get_reset_ec(
                     self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud3"]))
                 )
-                assert rc1 == rc2 == 0
+                check_rc("create/delete (no-change update)", rc1, rc2)
                 # measure extraction (dry-run: without writing result to disk)
                 t_start = time.monotonic()
                 rc = get_reset_ec(
@@ -79,7 +85,7 @@ class BenchmarkMixIn:
                 )
                 t_end = time.monotonic()
                 dt_extract = t_end - t_start
-                assert rc == 0
+                check_rc("extract", rc)
                 # measure archive deletion (of LAST present archive with the data)
                 t_start = time.monotonic()
                 rc = get_reset_ec(
@@ -87,7 +93,7 @@ class BenchmarkMixIn:
                 )
                 t_end = time.monotonic()
                 dt_delete = t_end - t_start
-                assert rc == 0
+                check_rc("delete", rc)
                 return dt_create, dt_update, dt_extract, dt_delete
             finally:
                 archiver_logger.setLevel(original_level)

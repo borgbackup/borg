@@ -8,7 +8,7 @@ import pytest
 from ..compress import get_compressor, Compressor, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
 from ..compress import get_zstd_mt_workers, get_zstd_compressor, forget_zstd_compressors
 from ..compress import ZSTD_JOB_SIZE_MIN, ZSTD_MT_MIN_SIZE
-from ..helpers import Error
+from ..helpers import DecompressionError, Error
 from ..helpers import CompressionSpec
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
 from ..helpers.argparsing import ArgumentTypeError
@@ -128,6 +128,26 @@ def test_compressor(c_params):
     assert "clevel" in meta_d
     assert meta_d["csize"] == len(data_compressed)
     assert meta_d["size"] == len(DATA)
+
+
+@pytest.mark.parametrize("name", ["none", "lz4", "zstd", "zlib", "lzma"])
+def test_decompress_size_mismatch(name):
+    c = Compressor(name)
+    meta, data_compressed = c.compress({}, DATA)
+    meta["size"] += 1
+    with pytest.raises(DecompressionError):
+        c.decompress(meta, data_compressed)
+
+
+@pytest.mark.parametrize(
+    "ctype, clevel, data",
+    [(0x78, 0x9C, zlib.compress(DATA)), (0x04, 0xFF, bytes(10))],  # legacy zlib (no ID bytes)  # obfuscation header
+)
+def test_decompress_legacy_only_formats(ctype, clevel, data):
+    # borg2 repo object metadata gives ctype and clevel, see RepoObj.parse.
+    compressor_cls, level = Compressor.detect(bytes((ctype, clevel)))
+    with pytest.raises(DecompressionError):
+        compressor_cls(level=level).decompress({"ctype": ctype, "clevel": clevel, "csize": len(data)}, data)
 
 
 def test_auto():

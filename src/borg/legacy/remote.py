@@ -617,7 +617,11 @@ class LegacyRemoteRepository:
 
     def get_many(self, ids, read_data=True, raise_missing=True):
         # note: legacy remote protocol does not support raise_missing parameter, so we ignore it here
-        yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids])
+        for result in self.call_many("get", [{"id": id, "read_data": read_data} for id in ids]):
+            # for read_data=False, LegacyRepository.get returns None (a borg 1.x server ignores read_data).
+            if not isinstance(result, bytes) and not (result is None and not read_data):
+                raise UnexpectedRPCDataFormatFromServer(f"get result is {type(result).__name__}, not bytes".encode())
+            yield result
 
     def gather_many(self, ids, raise_missing=True):
         # a legacy repository has no packs, so this is just get_many (same interface as Repository).
@@ -741,7 +745,9 @@ class RepositoryServer:  # pragma: no cover
 
                 if shutdown_serve:
                     # shutdown wanted! get out of here after sending all log output.
-                    assert self.repository is None
+                    if self.repository is not None:
+                        # the client closed the connection without calling close() (borg 1.x clients do that).
+                        self.close()
                     return
 
                 # process new RPCs

@@ -288,6 +288,18 @@ class ExclusiveLock:
         self.id, self.unique_name = new_id, new_unique_name
 
 
+def is_roster_entry(entry):
+    """Return whether <entry> is a valid [host, pid, thread] roster entry."""
+    if not (isinstance(entry, list) and len(entry) == 3):
+        return False
+    host, pid, thread = entry
+    if not isinstance(host, str):
+        return False
+    if not all(isinstance(value, int) and not isinstance(value, bool) for value in (pid, thread)):
+        return False
+    return 0 < pid < 2**31
+
+
 class LockRoster:
     """
     A Lock Roster to track shared/exclusive lockers.
@@ -306,6 +318,12 @@ class LockRoster:
         try:
             with self.path.open() as f:
                 data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError("roster is not a dict")
+            for key in (SHARED, EXCLUSIVE):
+                entries = data.get(key, [])
+                if not isinstance(entries, list) or not all(is_roster_entry(entry) for entry in entries):
+                    raise ValueError(f"invalid {key} roster entries")
 
             # Just nuke the stale locks early on load
             if self.kill_stale_locks:

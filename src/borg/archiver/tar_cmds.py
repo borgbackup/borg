@@ -587,7 +587,12 @@ class TarMixIn:
             else:
                 name = make_path_safe(posixpath.normpath(tarinfo.name))
             # name is the same as the stored item path now, we show it in the file status output.
-            if tarinfo.isreg():
+            borg_item_version = tarinfo.pax_headers.get("BORG.item.version")
+            if borg_item_version not in (None, "1"):
+                # a BORG tar member with an item metadata format we do not know (see export-tar --tar-format=BORG).
+                status = "E"
+                self.print_warning("%s: Unsupported BORG.item.version %s", tarinfo.name, borg_item_version)
+            elif tarinfo.isreg():
                 status = tfo.process_file(tarinfo=tarinfo, status="A", type=stat.S_IFREG, tar=tar)
             elif tarinfo.isdir():
                 status = tfo.process_dir(tarinfo=tarinfo, status="d", type=stat.S_IFDIR)

@@ -188,13 +188,15 @@ def _get_birthtime_ns(path, follow_symlinks=False):
     cdef int result
     if isinstance(path, int):
         result = c_fstat(path, &stat_info)
+        if result != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno), "<FD %d>" % path)
     else:
         if follow_symlinks:
             result = c_stat(path, &stat_info)
         else:
             result = c_lstat(path, &stat_info)
-    if result != 0:
-        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+        if result != 0:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     return stat_info.st_birthtimespec.tv_sec * 1_000_000_000 + stat_info.st_birthtimespec.tv_nsec
 
 

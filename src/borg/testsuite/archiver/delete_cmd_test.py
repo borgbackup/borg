@@ -82,6 +82,21 @@ def test_delete_all_with_match_archives(archivers, request):
     assert cmd(archiver, "repo-list") == ""
 
 
+def test_delete_with_exclude_archives(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")
+    cmd(archiver, "create", "test2", "input")
+    cmd(archiver, "create", "test3", "input")
+    # delete with exclude: delete all matching sh:* except test1
+    cmd(archiver, "delete", "-a", "sh:*", "--exclude-archives", "test1")
+    output = cmd(archiver, "repo-list")
+    assert "test1" in output
+    assert "test2" not in output
+    assert "test3" not in output
+
+
 def test_delete_first_last(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

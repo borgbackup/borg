@@ -168,6 +168,7 @@ Version 2.0.0b26 (not released yet)
 
 New features:
 
+- add --exclude-archives option to filter out archives, #9936
 - encrypt/authenticate the files cache with the repository key, #5041
 - add BORG_LOCK_RECHECK_DELAY env var to set the lock race recheck delay, #9899
 - mount: add new mount options:

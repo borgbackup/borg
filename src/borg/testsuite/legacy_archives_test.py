@@ -406,6 +406,84 @@ def test_list_match_aid_ambiguous():
         la.list(match=[f"aid:{prefix}"])
 
 
+def test_list_exclude_name():
+    i1 = _archiveinfo("archive-a", _id(1))
+    i2 = _archiveinfo("archive-b", _id(2))
+    la = _make_list_target([i1, i2])
+    assert la.list(exclude=["archive-a"]) == [i2]
+
+
+def test_list_exclude_name_prefix():
+    i1 = _archiveinfo("archive-a", _id(1))
+    i2 = _archiveinfo("other", _id(2))
+    la = _make_list_target([i1, i2])
+    assert la.list(exclude=["name:archive-a"]) == [i2]
+
+
+def test_list_exclude_user():
+    i1 = _archiveinfo("a", _id(1), username="alice")
+    i2 = _archiveinfo("b", _id(2), username="bob")
+    la = _make_list_target([i1, i2])
+    assert la.list(exclude=["user:alice"]) == [i2]
+
+
+def test_list_exclude_host():
+    i1 = _archiveinfo("a", _id(1), hostname="laptop")
+    i2 = _archiveinfo("b", _id(2), hostname="server")
+    la = _make_list_target([i1, i2])
+    assert la.list(exclude=["host:laptop"]) == [i2]
+
+
+def test_list_exclude_date():
+    i1 = _archiveinfo("a", _id(1), ts=TS)
+    i2 = _archiveinfo("b", _id(2), ts=TS2)
+    la = _make_list_target([i1, i2])
+    assert la.list(exclude=["date:2020-06"]) == [i2]
+
+
+def test_list_exclude_date_invalid_raises():
+    i1 = _archiveinfo("a", _id(1))
+    la = _make_list_target([i1])
+    with pytest.raises(CommandError, match="Invalid date pattern"):
+        la.list(exclude=["date:not-a-date"])
+
+
+def test_list_exclude_tags():
+    i1 = _archiveinfo("a", _id(1), tags=("prod", "db"))
+    i2 = _archiveinfo("b", _id(2), tags=("dev",))
+    la = _make_list_target([i1, i2])
+    assert la.list(exclude=["tags:prod"]) == [i2]
+
+
+def test_list_exclude_aid():
+    from ..helpers.parseformat import bin_to_hex
+
+    i1 = _archiveinfo("a", _id(1))
+    i2 = _archiveinfo("b", _id(2))
+    la = _make_list_target([i1, i2])
+    prefix = bin_to_hex(_id(1))[:4]
+    assert la.list(exclude=[f"aid:{prefix}"]) == [i2]
+
+
+def test_list_exclude_multiple_patterns():
+    i1 = _archiveinfo("archive-a", _id(1), username="alice", hostname="laptop")
+    i2 = _archiveinfo("archive-b", _id(2), username="bob", hostname="server")
+    i3 = _archiveinfo("archive-c", _id(3), username="charlie", hostname="workstation")
+    la = _make_list_target([i1, i2, i3])
+    # OR semantics: excludes matching user:alice OR host:server
+    assert la.list(exclude=["user:alice", "host:server"]) == [i3]
+
+
+def test_list_match_and_exclude_combined():
+    i1 = _archiveinfo("prod-db-1", _id(1), username="alice", hostname="server")
+    i2 = _archiveinfo("prod-db-2", _id(2), username="bob", hostname="server")
+    i3 = _archiveinfo("prod-web-1", _id(3), username="alice", hostname="server")
+    i4 = _archiveinfo("dev-db-1", _id(4), username="alice", hostname="laptop")
+    la = _make_list_target([i1, i2, i3, i4])
+    result = la.list(match=["sh:prod-*", "host:server"], exclude=["user:bob", "sh:*web*"])
+    assert result == [i1]
+
+
 # ── get_one ───────────────────────────────────────────────────────────────────────
 
 
@@ -429,6 +507,20 @@ def test_get_one_multiple_matches_raises():
         la.get_one(["a"])
 
 
+def test_get_one_with_exclude():
+    i1 = _archiveinfo("backup-1", _id(1))
+    i2 = _archiveinfo("backup-2", _id(2))
+    la = _make_list_target([i1, i2])
+    assert la.get_one(["sh:backup-*"], exclude=["backup-2"]) == i1
+
+
+def test_get_one_with_exclude_removes_target_raises():
+    i1 = _archiveinfo("backup-1", _id(1))
+    la = _make_list_target([i1])
+    with pytest.raises(CommandError, match=r"matched 0"):
+        la.get_one(["backup-1"], exclude=["backup-1"])
+
+
 # ── list_considering ──────────────────────────────────────────────────────────────
 
 
@@ -447,6 +539,27 @@ def test_list_considering_delegates():
         name=None,
         sort_by="name",
         match_archives=None,
+        first=None,
+        last=None,
+        older=None,
+        newer=None,
+        oldest=None,
+        newest=None,
+        deleted=False,
+    )
+    result = la.list_considering(args)
+    assert result == [i1]
+
+
+def test_list_considering_with_exclude_archives():
+    i1 = _archiveinfo("archive-a", _id(1))
+    i2 = _archiveinfo("other", _id(2))
+    la = _make_list_target([i1, i2])
+    args = Namespace(
+        name=None,
+        sort_by="name",
+        match_archives=None,
+        exclude_archives=["other"],
         first=None,
         last=None,
         older=None,

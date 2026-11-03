@@ -411,7 +411,7 @@ class Archiver(
             value = getattr(args, name, None)
             if value is not None:
                 setattr(args, name, replace_placeholders(value))
-        for name in ("match_archives",):  # lists
+        for name in ("match_archives", "exclude_archives"):  # lists
             value = getattr(args, name, None)
             if value:
                 setattr(args, name, [replace_placeholders(elem) for elem in value])

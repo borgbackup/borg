@@ -910,6 +910,22 @@ def test_prune_name_and_match_archives_are_combined(archivers, request, backup_f
     assert output.count("host2") == 2  # host2 was not touched at all
 
 
+def test_prune_with_exclude_archives(archivers, request, backup_files, monkeypatch):
+    """Pruning can exclude archives matching patterns."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for host in ("host1", "host2"):
+        monkeypatch.setenv("BORG_HOSTNAME", host)
+        _create_archive_ts(archiver, backup_files, "home", 2024, 1, 1)
+        _create_archive_ts(archiver, backup_files, "home", 2024, 1, 2)
+    monkeypatch.delenv("BORG_HOSTNAME")
+    # home archives are candidates, but exclude host1
+    cmd(archiver, "prune", "home", "--exclude-archives", "host:host1", "--keep-daily=1")
+    output = cmd(archiver, "repo-list", "--format={hostname}{NL}")
+    assert output.count("host1") == 2  # host1 was excluded from pruning, both kept
+    assert output.count("host2") == 1  # host2 was pruned, keeping 1 daily
+
+
 @pytest.mark.parametrize("rule", PRUNING_RULES, ids=[rule.key for rule in PRUNING_RULES])
 def test_period_func_is_created_per_prune_invocation(rule):
     """Period grouping functions are per prune() invocation, they must not share state."""

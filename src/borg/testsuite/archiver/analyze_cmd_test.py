@@ -146,6 +146,8 @@ def test_analyze_group_by_rejects_filters(archivers, request):
 
     with pytest.raises(Error, match="cannot be combined with archive filters"):
         cmd(archiver, "analyze", "--group-by", "name", "-a", "sh:one")
+    with pytest.raises(Error, match="cannot be combined with archive filters"):
+        cmd(archiver, "analyze", "--group-by", "name", "--exclude-archives", "sh:one")
 
 
 def test_analyze_group_by_needs_a_key(archivers, request):

@@ -2103,7 +2103,11 @@ class TarfileObjectProcessors:
         else:
 
             def s_to_ns(s):
-                return safe_ns(int(float(s) * 1e9))
+                try:
+                    return safe_ns(int(float(s) * 1e9))
+                except (OverflowError, ValueError):
+                    # inf or nan: the tarfile module parses a pax mtime like "1e999" or "nan" without complaint.
+                    return 0
 
             # if the tar has names starting with "./", normalize them like borg create also does.
             # ./dir/file must become dir/file in the borg archive.

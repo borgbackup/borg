@@ -15,6 +15,7 @@ from ... import xattr
 from ...archiver.tar_cmds import chunks_to_sparse_info, gnu_sparse_10_map, SparseTarInfo
 from ...constants import *  # NOQA
 from ...helpers import Error
+from ...helpers.time import MAX_NS
 from ...item import ChunkListEntry
 from .. import changedir
 from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, open_archive, requires_hardlinks, RK_ENCRYPTION
@@ -666,6 +667,22 @@ def test_import_tar_invalid_pax_timestamp(archivers, request):
         item = next(archive_obj.iter_items())
     assert "atime" not in item
     assert item.ctime == 1700000000_500000000
+
+
+def test_import_tar_inf_nan_pax_mtime(archivers, request):
+    """import-tar survives pax mtime headers that the tarfile module parses into float inf / nan."""
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        for name, mtime in (("inf", "1e999"), ("nan", "nan")):
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.pax_headers = {"mtime": mtime}
+            tar.addfile(tarinfo, io.BytesIO())
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "import-tar", "dst", "input.tar")
+    archive_obj, repository = open_archive(archiver.repository_path, "dst")
+    with repository:
+        mtimes = {item.path: item.mtime for item in archive_obj.iter_items()}
+    assert mtimes == {"inf": MAX_NS, "nan": 0}  # "1e999" gets clamped, "nan" is unparsable
 
 
 def test_import_tar_invalid_pax_acl(archivers, request):

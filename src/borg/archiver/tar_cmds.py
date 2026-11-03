@@ -576,6 +576,7 @@ class TarMixIn:
             show_progress=args.progress,
             log_json=args.log_json,
             file_status_printer=self.print_file_status,
+            warning=self.print_warning,
             strip_components=strip_components,
         )
 

@@ -2032,6 +2032,9 @@ def tar_acl_to_borg(acl):
     star appends it too, but separates entries by commas. GNU tar separates entries by
     newlines and does not append the numeric id, so we look it up locally (like borg create
     does), falling back to the name.
+
+    Raise ValueError for an entry with an unknown tag or a wrong number of fields, as the
+    platform code converting borg's ACL format at extract time relies on the field layout.
     """
     entries = []
     for entry in acl.replace(",", "\n").split("\n"):
@@ -2039,9 +2042,15 @@ def tar_acl_to_borg(acl):
         if not entry:
             continue
         fields = entry.split(":")
-        if len(fields) == 3 and fields[1] and fields[0] in ("user", "group"):
+        tag = fields[0]
+        if tag not in ("user", "group", "mask", "other"):
+            raise ValueError(f"invalid POSIX ACL entry: {entry!r}")
+        named = tag in ("user", "group") and len(fields) > 1 and fields[1] != ""
+        if named and len(fields) == 3:  # tag:name:perms -> append the numeric id
             name = fields[1]
-            fields.append(str(user2uid(name, name) if fields[0] == "user" else group2gid(name, name)))
+            fields.append(str(user2uid(name, name) if tag == "user" else group2gid(name, name)))
+        elif len(fields) != (4 if named else 3):  # tag:name:perms:id or tag::perms
+            raise ValueError(f"invalid POSIX ACL entry: {entry!r}")
         entries.append(":".join(fields))
     return "\n".join(entries).encode("utf-8", errors="surrogateescape")
 
@@ -2058,6 +2067,7 @@ class TarfileObjectProcessors:
         show_progress,
         log_json,
         file_status_printer=None,
+        warning=None,
         digest_algos=DIGEST_ALGOS_DEFAULT,
         strip_components=0,
     ):
@@ -2068,6 +2078,13 @@ class TarfileObjectProcessors:
         self.show_progress = show_progress
         self.strip_components = strip_components
         self.print_file_status = file_status_printer or (lambda *args: None)
+        if warning is None:
+
+            def warning(msg, *args):
+                logger.warning(msg, *args)
+                set_ec(EXIT_WARNING)
+
+        self.print_warning = warning
 
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)
         self.chunker = get_chunker(*chunker_params, key=key, sparse=False)
@@ -2121,10 +2138,15 @@ class TarfileObjectProcessors:
                         bkey = key.encode("utf-8", errors="surrogateescape")
                         bvalue = value.encode("utf-8", errors="surrogateescape")
                         xattrs[bkey] = bvalue
-                    elif key == SCHILY_ACL_ACCESS:
-                        item.acl_access = tar_acl_to_borg(value)
-                    elif key == SCHILY_ACL_DEFAULT:
-                        item.acl_default = tar_acl_to_borg(value)
+                    elif key in (SCHILY_ACL_ACCESS, SCHILY_ACL_DEFAULT):
+                        try:
+                            acl = tar_acl_to_borg(value)
+                        except ValueError as e:
+                            self.print_warning(
+                                "%s: ignoring the %s PAX header: %s", remove_surrogates(item.path), key, e
+                            )
+                        else:
+                            setattr(item, "acl_access" if key == SCHILY_ACL_ACCESS else "acl_default", acl)
                 if xattrs:
                     item.xattrs = xattrs
         if self.strip_components:

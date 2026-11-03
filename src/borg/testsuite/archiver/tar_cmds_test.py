@@ -614,7 +614,7 @@ def test_export_tar_pax_xattr_name_not_utf8(archivers, request):
     xattr.setxattr(original_path, b"user.utf8", b"other")
     cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
     cmd(archiver, "create", "src", "input")
-    output = cmd(archiver, "export-tar", "src", "pax.tar", "--tar-format=PAX", exit_code=1)
+    output = cmd(archiver, "export-tar", "src", "pax.tar", "--tar-format=PAX", exit_code=EXIT_WARNING)
     assert "is not valid UTF-8, not exported" in output
     with tarfile.open("pax.tar") as tar:
         ph = tar.getmember("input/file").pax_headers
@@ -666,6 +666,24 @@ def test_import_tar_invalid_pax_timestamp(archivers, request):
         item = next(archive_obj.iter_items())
     assert "atime" not in item
     assert item.ctime == 1700000000_500000000
+
+
+def test_import_tar_invalid_pax_acl(archivers, request):
+    """import-tar ignores a malformed SCHILY.acl.* PAX header with a warning (stored, it would crash extract)."""
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        tarinfo = tarfile.TarInfo("file")
+        tarinfo.pax_headers = {SCHILY_ACL_ACCESS: "user::rw-\ngroup::r--\nother::r--\nuser:foo"}
+        tar.addfile(tarinfo, io.BytesIO())
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "dst", "input.tar", exit_code=EXIT_WARNING)
+    assert "file: ignoring the SCHILY.acl.access PAX header: invalid POSIX ACL entry: 'user:foo'" in output
+    archive_obj, repository = open_archive(archiver.repository_path, "dst")
+    with repository:
+        item = next(archive_obj.iter_items())
+    assert "acl_access" not in item
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
 
 
 def _sparse_entries(sizes):

@@ -599,6 +599,35 @@ def test_roundtrip_pax_xattrs(archivers, request):
     assert xa_value_extracted == xa_value
 
 
+def test_export_tar_pax_xattr_name_not_utf8(archivers, request):
+    """export-tar --tar-format=PAX skips xattrs with a non-UTF-8 name (PAX keywords must be UTF-8) with a warning."""
+    archiver = request.getfixturevalue(archivers)
+    if not xattr.is_enabled(archiver.input_path):
+        pytest.skip("xattrs not supported")
+    create_regular_file(archiver.input_path, "file")
+    original_path = os.path.join(archiver.input_path, "file").encode()
+    xa_key, xa_value = b"user.not-utf8-\xff", b"value"
+    try:
+        xattr.setxattr(original_path, xa_key, xa_value)
+    except OSError as e:
+        pytest.skip(f"can not set an xattr with a non-UTF-8 name here: {e}")
+    xattr.setxattr(original_path, b"user.utf8", b"other")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "create", "src", "input")
+    output = cmd(archiver, "export-tar", "src", "pax.tar", "--tar-format=PAX", exit_code=1)
+    assert "is not valid UTF-8, not exported" in output
+    with tarfile.open("pax.tar") as tar:
+        ph = tar.getmember("input/file").pax_headers
+    assert ph[SCHILY_XATTR + "user.utf8"] == "other"
+    assert not any(key.startswith(SCHILY_XATTR + "user.not-utf8") for key in ph)
+    # the BORG format has all item metadata in BORG.item.meta, so nothing is lost there (and no warning given).
+    cmd(archiver, "export-tar", "src", "borg.tar", "--tar-format=BORG")
+    cmd(archiver, "import-tar", "dst", "borg.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+        assert xattr.getxattr(os.path.abspath("input/file").encode(), xa_key) == xa_value
+
+
 def test_roundtrip_pax_timestamps(archivers, request):
     """export-tar --tar-format=PAX and import-tar keep the timestamps with exact ns precision."""
     archiver = request.getfixturevalue(archivers)

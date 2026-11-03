@@ -112,8 +112,11 @@ def item_to_tarinfo(item, hlm, *, warning=None):
     return tarinfo, needs_content
 
 
-def item_to_paxheaders(format, item):
-    """Transform (parts of) a Borg *item* into a pax_headers dict."""
+def item_to_paxheaders(format, item, *, warning=None):
+    """Transform (parts of) a Borg *item* into a pax_headers dict.
+
+    *warning* is an optional callback(format, *args) for reporting metadata that can not be represented.
+    """
     # PAX format
     # ----------
     # When using the PAX (POSIX) format, we can support some things that aren't possible
@@ -139,7 +142,14 @@ def item_to_paxheaders(format, item):
         for bkey, bvalue in item.xattrs.items():
             # we have bytes key and bytes value, but the tarfile code
             # expects str key and str value.
-            key = SCHILY_XATTR + bkey.decode("utf-8", errors="surrogateescape")
+            try:
+                # a pax header keyword must be valid UTF-8 (the tarfile module encodes it strictly),
+                # only the value may be arbitrary bytes (hdrcharset=BINARY).
+                key = SCHILY_XATTR + bkey.decode("utf-8")
+            except UnicodeDecodeError:
+                if format != "BORG" and warning is not None:  # the BORG format still has it in BORG.item.meta
+                    warning("%s: xattr name %r is not valid UTF-8, not exported", remove_surrogates(item.path), bkey)
+                continue
             value = bvalue.decode("utf-8", errors="surrogateescape")
             ph[key] = value
     # Add POSIX access and default ACL if present
@@ -499,7 +509,7 @@ class TarMixIn:
             tarinfo, needs_content = item_to_tarinfo(item, hlm, warning=self.print_warning)
             if tarinfo:
                 if args.tar_format in ("BORG", "PAX"):
-                    tarinfo.pax_headers = item_to_paxheaders(args.tar_format, item)
+                    tarinfo.pax_headers = item_to_paxheaders(args.tar_format, item, warning=self.print_warning)
                 if output_list:
                     logging.getLogger("borg.output.list").info(remove_surrogates(orig_path))
                 sparse_content = sparsify_tarinfo(item, tarinfo) if args.sparse and needs_content else None

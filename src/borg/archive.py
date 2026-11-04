@@ -2073,7 +2073,7 @@ class TarfileObjectProcessors:
         show_progress,
         log_json,
         file_status_printer=None,
-        warning=None,
+        warning,
         digest_algos=DIGEST_ALGOS_DEFAULT,
         strip_components=0,
     ):
@@ -2084,13 +2084,7 @@ class TarfileObjectProcessors:
         self.show_progress = show_progress
         self.strip_components = strip_components
         self.print_file_status = file_status_printer or (lambda *args: None)
-        if warning is None:
-
-            def warning(msg, *args):
-                logger.warning(msg, *args)
-                set_ec(EXIT_WARNING)
-
-        self.print_warning = warning
+        self.print_warning = warning  # callback(format, *args), like Archiver.print_warning
         self.unknown_acl_names = set()  # (tag, name) of POSIX ACL entries we already warned about
 
         self.stats = Statistics(output_json=log_json)  # threading: done by cache (including progress)

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # build borg.exe
-SETUPTOOLS_USE_DISTUTILS=stdlib pip install -e .
+pip install -e .
 pyinstaller -y scripts/borg.exe.spec
 
 # build sdist and wheel in dist/...
-SETUPTOOLS_USE_DISTUTILS=stdlib python -m build
+python -m build

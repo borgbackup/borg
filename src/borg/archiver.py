@@ -1908,7 +1908,7 @@ class Archiver:
             # any other mechanism relying on existing segment data not changing).
             # see issue #1867.
             repository.commit(compact=False)
-            return ret
+        return ret
 
     @with_repository(manifest=False, exclusive=True)
     def do_compact(self, args, repository):

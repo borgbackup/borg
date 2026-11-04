@@ -75,7 +75,7 @@ install_requires = [
     # Please note:
     # using any other msgpack version is not supported by borg development and
     # any feedback related to issues caused by this will be ignored.
-    'msgpack >=0.5.6, <=1.1.1, !=1.0.1',
+    'msgpack >=0.5.6, <=1.1.2, !=1.0.1',
     'packaging',
 ]
 
@@ -298,6 +298,7 @@ setup(
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: 3.13',
+        'Programming Language :: Python :: 3.14',
         'Topic :: Security :: Cryptography',
         'Topic :: System :: Archiving :: Backup',
     ],

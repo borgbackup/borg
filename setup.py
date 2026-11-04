@@ -63,8 +63,10 @@ system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
 prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
 system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
 
-# Number of threads to use for cythonize, not used on windows
-cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != 'spawn' else None
+# Number of threads to use for cythonize, not used on windows.
+# Only with the "fork" start method: "spawn" and "forkserver" (default on Linux since Python 3.14)
+# re-import setup.py in the worker processes, which recursively runs setup() there.
+cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() == 'fork' else None
 
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get('READTHEDOCS')

@@ -19,8 +19,17 @@ jobs:
           update: true
       - name: Install dependencies
         run: ./scripts/msys2-install-deps
+      - name: Build python venv
+        run: |
+          # msys2's python is externally managed (PEP 668), so pip-installed packages go into a venv.
+          # --system-site-packages: use the python packages installed via pacman.
+          python -m venv --system-site-packages env
+          . env/bin/activate
+          pip install pyinstaller==6.22.3
       - name: Build
-        run: ./scripts/msys2-build
+        run: |
+          . env/bin/activate
+          ./scripts/msys2-build
       - name: Test
         run: ./dist/borg.exe -V
       - uses: actions/upload-artifact@v4

@@ -1,9 +1,10 @@
+import builtins
 import re
 from collections import defaultdict, namedtuple
 from datetime import datetime
 from operator import attrgetter
 from collections.abc import Iterator, Sequence
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from borgstore.store import ObjectNotFound, ItemInfo
 
@@ -46,21 +47,28 @@ class NoManifestError(Error):
 class ArchiveInfo(namedtuple("ArchiveInfo", "name id ts tags host user", defaults=[(), None, None])):
     # metadata: the archive's parsed ArchiveItem if the archives lister had it at hand, None otherwise.
     # it is an attribute, not a field: it takes no part in equality and hashing (prune uses sets of infos).
-    metadata = None  # for instances made without __new__, e.g. by _make() / _replace()
+    metadata: ArchiveItem | None = None  # for instances made without __new__, e.g. by _make() / _replace()
 
-    def __new__(cls, *args, metadata=None, **kwargs):
+    name: str
+    id: bytes
+    ts: datetime
+    tags: tuple[str, ...]
+    host: str | None
+    user: str | None
+
+    def __new__(cls, *args: Any, metadata: ArchiveItem | None = None, **kwargs: Any) -> "ArchiveInfo":
         self = super().__new__(cls, *args, **kwargs)
         self.metadata = metadata
         return self
 
 
 # timestamp is a replacement for ts, archive is an alias for name (see SortBySpec)
-AI_HUMAN_SORT_KEYS = ["timestamp", "archive"] + list(ArchiveInfo._fields)
+AI_HUMAN_SORT_KEYS: list[str] = ["timestamp", "archive"] + list(ArchiveInfo._fields)
 AI_HUMAN_SORT_KEYS.remove("ts")
 
 # archive attributes describing what an archive contains and where it came from, usable to group
 # archives that belong together, e.g. for applying retention rules separately (see GroupBySpec).
-AI_GROUP_BY_KEYS = ["name", "host", "user", "tags"]
+AI_GROUP_BY_KEYS: list[str] = ["name", "host", "user", "tags"]
 
 
 def archive_group_key(archive_info: ArchiveInfo, group_by: Sequence[str]) -> tuple[str, ...]:
@@ -96,8 +104,14 @@ def format_group_key(key: tuple[str, ...], group_by: Sequence[str]) -> str:
     return ", ".join(f"{group_by_key}={value!r}" for group_by_key, value in zip(group_by, key))
 
 
-def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newest=None):
-    def get_first_and_last_archive_ts(archives_list):
+def filter_archives_by_date(
+    archives: list[ArchiveInfo],
+    older: str | None = None,
+    newer: str | None = None,
+    oldest: str | None = None,
+    newest: str | None = None,
+) -> list[ArchiveInfo]:
+    def get_first_and_last_archive_ts(archives_list: list[ArchiveInfo]) -> tuple[datetime, datetime]:
         timestamps = [x.ts for x in archives_list]
         return min(timestamps), max(timestamps)
 
@@ -138,37 +152,39 @@ class ArchivesInterface(Protocol):  # pragma: no cover
     can either be removed or kept as documentation of the Archives public API.
     """
 
-    def prepare(self, manifest, m) -> None: ...
-    def ids(self, *, deleted: bool = False) -> Iterator: ...
+    def prepare(self, manifest: "Manifest", m: Any) -> None: ...
+    def ids(self, *, deleted: bool = False) -> Iterator[bytes]: ...
     def count(self) -> int: ...
-    def names(self) -> Iterator: ...
+    def names(self) -> Iterator[str]: ...
     def exists(self, name: str) -> bool: ...
     def exists_id(self, id: bytes, *, deleted: bool = False) -> bool: ...
     def exists_name_and_id(self, name: str, id: bytes) -> bool: ...
-    def exists_name_and_ts(self, name: str, ts) -> bool: ...
-    def get(self, name: str, raw: bool = False): ...
-    def get_by_id(self, id: bytes, raw: bool = False, *, deleted: bool = False): ...
-    def create(self, name: str, id: bytes, ts, *, overwrite: bool = False) -> None: ...
+    def exists_name_and_ts(self, name: str, ts: datetime) -> bool: ...
+    def get(self, name: str, raw: bool = False) -> ArchiveInfo | dict[str, Any] | None: ...
+    def get_by_id(
+        self, id: bytes, raw: bool = False, *, deleted: bool = False
+    ) -> ArchiveInfo | dict[str, Any] | None: ...
+    def create(self, name: str, id: bytes, ts: datetime | str, *, overwrite: bool = False) -> None: ...
     def delete_by_id(self, id: bytes) -> None: ...
     def undelete_by_id(self, id: bytes) -> None: ...
     def nuke_by_id(self, id: bytes) -> None: ...
     def list(
         self,
         *,
-        match=None,
-        match_end=r"\Z",
-        sort_by=(),
-        reverse=False,
-        first=None,
-        last=None,
-        older=None,
-        newer=None,
-        oldest=None,
-        newest=None,
-        deleted=False,
-    ): ...
-    def list_considering(self, args, *, reverse=False): ...
-    def get_one(self, match, *, match_end=r"\Z", deleted=False): ...
+        match: Sequence[str] | None = None,
+        match_end: str = r"\Z",
+        sort_by: Sequence[str] = (),
+        reverse: bool = False,
+        first: int | None = None,
+        last: int | None = None,
+        older: str | None = None,
+        newer: str | None = None,
+        oldest: str | None = None,
+        newest: str | None = None,
+        deleted: bool = False,
+    ) -> builtins.list[ArchiveInfo]: ...
+    def list_considering(self, args: Any, *, reverse: bool = False) -> builtins.list[ArchiveInfo]: ...
+    def get_one(self, match: Sequence[str] | str, *, match_end: str = r"\Z", deleted: bool = False) -> ArchiveInfo: ...
 
 
 class Archives:
@@ -178,24 +194,27 @@ class Archives:
     Each archive has a separate entry in borgstore at archives/<hex-id>.
     """
 
-    def __init__(self, repository, manifest):
+    repository: Any
+    manifest: "Manifest"
+
+    def __init__(self, repository: Any, manifest: "Manifest") -> None:
         self.repository = repository
         self.manifest = manifest
 
-    def prepare(self, manifest, m):
+    def prepare(self, manifest: "Manifest", m: Any) -> None:
         pass  # only the legacy borg 1.x manifest has an archives list to load, see LegacyArchives
 
-    def ids(self, *, deleted=False):
+    def ids(self, *, deleted: bool = False) -> Iterator[bytes]:
         # yield the binary IDs of all archives
         try:
             infos = list(self.repository.store_list("archives", deleted=deleted))
         except ObjectNotFound:
             infos = []
         for info in infos:
-            info = ItemInfo(*info)  # RPC does not give us a NamedTuple
-            yield hex_to_bin(info.name)
+            item_info = ItemInfo(*info)  # RPC does not give us a NamedTuple
+            yield hex_to_bin(item_info.name)
 
-    def _get_archive_meta(self, id: bytes) -> tuple[dict, ArchiveItem | None]:
+    def _get_archive_meta(self, id: bytes) -> tuple[dict[str, Any], ArchiveItem | None]:
         # get all metadata directly from the ArchiveItem in the repo, see _parse_archive_meta.
         from .repository import Repository
 
@@ -205,10 +224,11 @@ class Archives:
             cdata = None
         return self._parse_archive_meta(id, cdata)
 
-    def _parse_archive_meta(self, id: bytes, cdata) -> tuple[dict, ArchiveItem | None]:
+    def _parse_archive_meta(self, id: bytes, cdata: bytes | None) -> tuple[dict[str, Any], ArchiveItem | None]:
         # parse the ArchiveItem repo object cdata (None: the object is missing) into the metadata dict,
         # return it together with the ArchiveItem (None if the object is missing or not valid).
         archive_item = None
+        metadata: dict[str, Any]
         if cdata is None:
             metadata = dict(
                 id=id,
@@ -253,14 +273,14 @@ class Archives:
                 )
         return metadata, archive_item
 
-    def _infos(self, *, deleted=False):
+    def _infos(self, *, deleted: bool = False) -> Iterator[tuple[dict[str, Any], ArchiveItem | None]]:
         # yield (info dict, ArchiveItem) of all archives, reading their metadata objects in batches
         # (see Repository.gather_many).
         ids = list(self.ids(deleted=deleted))
         for id, cdata in zip(ids, self.repository.gather_many(ids, raise_missing=False)):
             yield self._parse_archive_meta(id, cdata)
 
-    def _info_tuples(self, *, deleted=False):
+    def _info_tuples(self, *, deleted: bool = False) -> Iterator[ArchiveInfo]:
         for info, archive_item in self._infos(deleted=deleted):
             yield ArchiveInfo(
                 name=info["name"],
@@ -272,7 +292,9 @@ class Archives:
                 metadata=archive_item,
             )
 
-    def _matching_info_tuples(self, match_patterns, match_end, *, deleted=False):
+    def _matching_info_tuples(
+        self, match_patterns: Sequence[str] | None, match_end: str, *, deleted: bool = False
+    ) -> builtins.list[ArchiveInfo]:
         archive_infos = list(self._info_tuples(deleted=deleted))
         if match_patterns:
             assert isinstance(match_patterns, list), f"match_pattern is a {type(match_patterns)}"
@@ -284,8 +306,8 @@ class Archives:
                         raise CommandError("archive ID based match needs to match precisely one archive ID")
                 elif match.startswith("tags:"):
                     wanted_tags = match.removeprefix("tags:")
-                    wanted_tags = [tag for tag in wanted_tags.split(",") if tag]  # remove empty tags
-                    archive_infos = [x for x in archive_infos if set(x.tags) >= set(wanted_tags)]
+                    wanted_tags_list = [tag for tag in wanted_tags.split(",") if tag]  # remove empty tags
+                    archive_infos = [x for x in archive_infos if set(x.tags) >= set(wanted_tags_list)]
                 elif match.startswith("user:"):
                     wanted_user = match.removeprefix("user:")
                     archive_infos = [x for x in archive_infos if x.user == wanted_user]
@@ -299,33 +321,33 @@ class Archives:
                     except DatePatternError as exc:
                         raise CommandError(f"Invalid date pattern: {match} ({exc})")
                     archive_infos = [x for x in archive_infos if date_matches(x.ts)]
-                else:  #  do a match on the name
-                    match = match.removeprefix("name:")  # accept optional name: prefix
-                    regex = get_regex_from_pattern(match)
-                    regex = re.compile(regex + match_end)
+                else:  # do a match on the name
+                    name_match = match.removeprefix("name:")  # accept optional name: prefix
+                    regex_str = get_regex_from_pattern(name_match)
+                    regex = re.compile(regex_str + match_end)
                     archive_infos = [x for x in archive_infos if regex.match(x.name) is not None]
         return archive_infos
 
-    def count(self):
+    def count(self) -> int:
         # return the count of archives in the repo
         return len(list(self.ids()))
 
-    def names(self):
+    def names(self) -> Iterator[str]:
         # yield the names of all archives
         for archive_info, _ in self._infos():
             yield archive_info["name"]
 
-    def exists(self, name):
+    def exists(self, name: str) -> bool:
         # check if an archive with this name exists
         assert isinstance(name, str)
         return name in self.names()
 
-    def exists_id(self, id, *, deleted=False):
+    def exists_id(self, id: bytes, *, deleted: bool = False) -> bool:
         # check if an archive with this id exists
         assert isinstance(id, bytes)
         return id in self.ids(deleted=deleted)
 
-    def exists_name_and_id(self, name, id):
+    def exists_name_and_id(self, name: str, id: bytes) -> bool:
         # check if an archive with this name AND id exists
         assert isinstance(name, str)
         assert isinstance(id, bytes)
@@ -335,7 +357,7 @@ class Archives:
         else:
             return False
 
-    def exists_name_and_ts(self, name, ts):
+    def exists_name_and_ts(self, name: str, ts: datetime) -> bool:
         # check if an archive with this name AND timestamp exists
         assert isinstance(name, str)
         assert isinstance(ts, datetime)
@@ -345,7 +367,7 @@ class Archives:
         else:
             return False
 
-    def _lookup_name(self, name, raw=False):
+    def _lookup_name(self, name: str, raw: bool = False) -> ArchiveInfo | dict[str, Any]:
         assert isinstance(name, str)
         for archive_info, archive_item in self._infos():
             if archive_info["exists"] and archive_info["name"] == name:
@@ -365,14 +387,14 @@ class Archives:
         else:
             raise KeyError(name)
 
-    def get(self, name, raw=False):
+    def get(self, name: str, raw: bool = False) -> ArchiveInfo | dict[str, Any] | None:
         assert isinstance(name, str)
         try:
             return self._lookup_name(name, raw=raw)
         except KeyError:
             return None
 
-    def get_by_id(self, id, raw=False, *, deleted=False):
+    def get_by_id(self, id: bytes, raw: bool = False, *, deleted: bool = False) -> ArchiveInfo | dict[str, Any] | None:
         assert isinstance(id, bytes)
         if id in self.ids(deleted=deleted):  # check directory
             # looks like this archive id is in the archives directory, thus it is NOT deleted.
@@ -381,7 +403,7 @@ class Archives:
             if archive_info["exists"]:  # True means we have found Archive metadata in the repo.
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
-                    archive_info = ArchiveInfo(
+                    return ArchiveInfo(
                         name=archive_info["name"],
                         id=archive_info["id"],
                         ts=ts,
@@ -393,7 +415,7 @@ class Archives:
                 return archive_info
         return None  # id not in store, or archive metadata blob missing from repo
 
-    def create(self, name, id, ts, *, overwrite=False):
+    def create(self, name: str, id: bytes, ts: datetime | str, *, overwrite: bool = False) -> None:
         assert isinstance(name, str)
         assert isinstance(id, bytes)
         if isinstance(ts, datetime):
@@ -404,17 +426,17 @@ class Archives:
         # we only create a directory entry, its name points to the archive item:
         self.repository.store_store(f"archives/{bin_to_hex(id)}", b"")
 
-    def delete_by_id(self, id):
+    def delete_by_id(self, id: bytes) -> None:
         # soft-delete an archive
         assert isinstance(id, bytes)
         self.repository.store_move(f"archives/{bin_to_hex(id)}", delete=True)  # soft-delete
 
-    def undelete_by_id(self, id):
+    def undelete_by_id(self, id: bytes) -> None:
         # undelete an archive
         assert isinstance(id, bytes)
         self.repository.store_move(f"archives/{bin_to_hex(id)}", undelete=True)
 
-    def nuke_by_id(self, id):
+    def nuke_by_id(self, id: bytes) -> None:
         # really delete an already soft-deleted archive
         assert isinstance(id, bytes)
         self.repository.store_delete(f"archives/{bin_to_hex(id)}", deleted=True)
@@ -422,18 +444,18 @@ class Archives:
     def list(
         self,
         *,
-        match=None,
-        match_end=r"\Z",
-        sort_by=(),
-        reverse=False,
-        first=None,
-        last=None,
-        older=None,
-        newer=None,
-        oldest=None,
-        newest=None,
-        deleted=False,
-    ):
+        match: Sequence[str] | None = None,
+        match_end: str = r"\Z",
+        sort_by: Sequence[str] = (),
+        reverse: bool = False,
+        first: int | None = None,
+        last: int | None = None,
+        older: str | None = None,
+        newer: str | None = None,
+        oldest: str | None = None,
+        newest: str | None = None,
+        deleted: bool = False,
+    ) -> builtins.list[ArchiveInfo]:
         """
         Return list of ArchiveInfo instances according to the parameters.
 
@@ -470,7 +492,7 @@ class Archives:
             archive_infos.reverse()
         return archive_infos
 
-    def list_considering(self, args, *, reverse=False):
+    def list_considering(self, args: Any, *, reverse: bool = False) -> builtins.list[ArchiveInfo]:
         """
         get a list of archives, considering --first/last/prefix/match-archives/sort cmdline args
         """
@@ -479,10 +501,11 @@ class Archives:
             raise Error(
                 "Giving a specific name is incompatible with options --first, --last " "and -a / --match-archives."
             )
+        sort_by = args.sort_by.split(",") if hasattr(args, "sort_by") else ()
         return self.list(
-            sort_by=args.sort_by.split(","),
+            sort_by=sort_by,
             reverse=reverse,
-            match=args.match_archives,
+            match=getattr(args, "match_archives", None),
             first=getattr(args, "first", None),
             last=getattr(args, "last", None),
             older=getattr(args, "older", None),
@@ -492,10 +515,11 @@ class Archives:
             deleted=getattr(args, "deleted", False),
         )
 
-    def get_one(self, match, *, match_end=r"\Z", deleted=False):
+    def get_one(self, match: Sequence[str] | str, *, match_end: str = r"\Z", deleted: bool = False) -> ArchiveInfo:
         """get exactly one archive matching <match>"""
         assert match is not None
-        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted)
+        match_list = [match] if isinstance(match, str) else list(match)
+        archive_infos = self._matching_info_tuples(match_list, match_end, deleted=deleted)
         if len(archive_infos) != 1:
             raise CommandError(f"{match} needed to match precisely one archive, but matched {len(archive_infos)}.")
         return archive_infos[0]
@@ -513,24 +537,31 @@ class Manifest:
     still reads the manifest object, as it holds their archives list.
     """
 
-    MANIFEST_ID = b"\0" * 32  # legacy: the id of a borg 1.x repository's manifest object
+    MANIFEST_ID: bytes = b"\0" * 32  # legacy: the id of a borg 1.x repository's manifest object
 
-    def __init__(self, key, repository, ro_cls=RepoObj):
+    key: Any
+    repo_objs: RepoObj
+    repository: Any
+    archives: ArchivesInterface
+
+    def __init__(self, key: Any, repository: Any, ro_cls: type[RepoObj] = RepoObj) -> None:
         from .legacy.repository import LegacyRepository
         from .legacy.remote import LegacyRemoteRepository
         from .legacy.archives import LegacyArchives
 
         if isinstance(repository, (LegacyRepository, LegacyRemoteRepository)):
-            self.archives: ArchivesInterface = LegacyArchives(repository, self)
+            self.archives = LegacyArchives(repository, self)
         else:
-            self.archives: ArchivesInterface = Archives(repository, self)
+            self.archives = Archives(repository, self)
             repository.set_key(key)  # the key protects the repository's index/ and cache/ store objects
         self.key = key
         self.repo_objs = ro_cls(key)
         self.repository = repository
 
     @classmethod
-    def load(cls, repository, key=None, *, other=False, ro_cls=RepoObj):
+    def load(
+        cls, repository: Any, key: Any = None, *, other: bool = False, ro_cls: type[RepoObj] = RepoObj
+    ) -> "Manifest":
         """Return the Manifest of repository, loading its key (see key_factory) if key is not given."""
         from .crypto.key import key_factory  # crypto.key imports this module, hence the local import
         from .legacy.repository import LegacyRepository
@@ -543,7 +574,7 @@ class Manifest:
         return cls(key, repository, ro_cls=ro_cls)
 
     @classmethod
-    def _load_legacy(cls, repository, key, *, other, ro_cls):
+    def _load_legacy(cls, repository: Any, key: Any, *, other: bool, ro_cls: type[RepoObj]) -> "Manifest":
         # a borg 1.x repository: its manifest object identifies the key type and holds the archives list.
         from .item import ManifestItem
         from .crypto.key import legacy_key_factory

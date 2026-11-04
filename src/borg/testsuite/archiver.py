@@ -34,10 +34,10 @@ import borg
 import borg.helpers.errors
 from .. import xattr, helpers, platform
 from .. import archive as archive_module
-from ..archive import Archive, ChunkBuffer
+from ..archive import Archive, ChunkBuffer, ChunksProcessor, MetadataCollector
 from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNING
 from ..cache import Cache, LocalCache
-from ..chunker import has_seek_hole
+from ..chunker import has_seek_hole, ChunkerFixed
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_cipher_blocks
 from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError, ArchiveTAMRequiredError
@@ -1436,6 +1436,122 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         archive_list = self.cmd('list', '--json-lines', self.repository_location + '::test')
         paths = [json.loads(line)['path'] for line in archive_list.split('\n') if line]
         assert paths == ['input/file1', 'input/dir1', 'input/file4']
+
+    def _create_file_with_unique_chunks(self, name):
+        # 4 different blocks of 4096 bytes: with --chunker-params=fixed,4096, each block is one unique chunk.
+        blocks = [bytes([ord('A') + i]) * 4096 for i in range(4)]
+        self.create_regular_file(name, contents=b''.join(blocks))
+        return blocks
+
+    def _chunk_refcounts(self, blocks):
+        # the refcount of the chunk of each data block, 0 if there is no such chunk.
+        with self.open_repository() as repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, key, manifest) as cache:
+                ids = [key.id_hash(block) for block in blocks]
+                return [cache.chunks[id_].refcount if id_ in cache.chunks else 0 for id_ in ids]
+
+    def _patch_read_error(self, name, after_chunks):
+        # reading input/<name> fails with EIO after its first <after_chunks> chunks (needs the fixed chunker).
+        ino = os.stat(os.path.join(self.input_path, name)).st_ino
+        orig_chunkify = ChunkerFixed.chunkify
+
+        def chunkify(chunker, fd=None, fh=-1, fmap=None):
+            for i, chunk in enumerate(orig_chunkify(chunker, fd, fh, fmap)):
+                if i == after_chunks and os.fstat(fh).st_ino == ino:
+                    raise OSError(errno.EIO, 'simulated I/O error')
+                yield chunk
+
+        return patch.object(ChunkerFixed, 'chunkify', chunkify)
+
+    def _patch_ext_attrs_error(self, name):
+        # reading the extended attributes of input/<name> (done after reading its content) fails with EIO.
+        error_path = os.path.join('input', name)
+        orig_stat_ext_attrs = MetadataCollector.stat_ext_attrs
+
+        def stat_ext_attrs(collector, st, path, fd=None):
+            if path == error_path:
+                raise BackupOSError('extended stat (xattrs)', OSError(errno.EIO, 'simulated I/O error', path))
+            return orig_stat_ext_attrs(collector, st, path, fd=fd)
+
+        return patch.object(MetadataCollector, 'stat_ext_attrs', stat_ext_attrs)
+
+    def _patch_checkpoint_after_first_chunk(self, name):
+        # write a checkpoint (and thus a part file for input/<name>) right after the first chunk of input/<name>.
+        part_path = os.path.join('input', name)
+        orig_maybe_checkpoint = ChunksProcessor.maybe_checkpoint
+
+        def maybe_checkpoint(processor, item, from_chunk, part_number, forced=False):
+            forced = forced or (item.path == part_path and len(item.chunks) == 1)
+            return orig_maybe_checkpoint(processor, item, from_chunk, part_number, forced=forced)
+
+        return patch.object(ChunksProcessor, 'maybe_checkpoint', maybe_checkpoint)
+
+    def test_create_read_error_no_orphan_chunks(self):
+        # a read error in the middle of a file skips that file. the chunks we already stored for it must not
+        # stay in the repository as orphans (referenced by no archive, but with a refcount that never gets 0).
+        blocks = self._create_file_with_unique_chunks('file')
+        self.create_regular_file('other', contents=b'other contents')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with self._patch_read_error('file', after_chunks=2):
+            out = self.cmd('create', '--list', '--chunker-params=fixed,4096', self.repository_location + '::test',
+                           'input', exit_code=EXIT_WARNING)
+        assert 'E input/file' in out
+        assert self._chunk_refcounts(blocks) == [0, 0, 0, 0]
+        self.cmd('check', self.repository_location)  # would fail with "orphaned objects found"
+        out = self.cmd('list', '--short', self.repository_location + '::test')
+        assert out.splitlines() == ['input', 'input/other']
+
+    def test_create_ext_attrs_error_no_orphan_chunks(self):
+        # an error after the file content was read (here: reading the extended attributes) also skips that
+        # file, so the chunk references we already took for it must be dropped again.
+        blocks = self._create_file_with_unique_chunks('file')
+        time.sleep(1)  # other must have newer timestamps than file, so file is remembered in the files cache
+        self.create_regular_file('other', contents=b'other contents')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        create = ('create', '--list', '--chunker-params=fixed,4096')
+        # new file: we stored its chunks, but no archive references them.
+        with self._patch_ext_attrs_error('file'):
+            out = self.cmd(*create, self.repository_location + '::test1', 'input', exit_code=EXIT_WARNING)
+        assert 'E input/file' in out
+        assert self._chunk_refcounts(blocks) == [0, 0, 0, 0]
+        self.cmd('check', self.repository_location)  # would fail with "orphaned objects found"
+        self.cmd(*create, self.repository_location + '::test2', 'input')
+        assert self._chunk_refcounts(blocks) == [1, 1, 1, 1]
+        # unchanged file (files cache hit): we incref'd its chunks, but test3 does not reference them.
+        with self._patch_ext_attrs_error('file'):
+            out = self.cmd(*create, self.repository_location + '::test3', 'input', exit_code=EXIT_WARNING)
+        assert 'U input/file' in out
+        assert 'E input/file' in out
+        assert self._chunk_refcounts(blocks) == [1, 1, 1, 1]  # only referenced by test2
+
+    def test_create_read_error_with_part_files_no_orphan_chunks(self):
+        # if we already wrote a part file for a file, a later read error must only drop the references to the
+        # chunks added after that part file. the part file stays in the archive and still references its chunks.
+        blocks = self._create_file_with_unique_chunks('file')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with self._patch_checkpoint_after_first_chunk('file'), self._patch_read_error('file', after_chunks=2):
+            out = self.cmd('create', '--list', '--chunker-params=fixed,4096', self.repository_location + '::test',
+                           'input', exit_code=EXIT_WARNING)
+        assert 'E input/file' in out
+        assert self._chunk_refcounts(blocks) == [1, 0, 0, 0]  # 1st chunk: in part file, 2nd chunk: dropped
+        self.cmd('check', self.repository_location)
+        out = self.cmd('list', '--short', '--consider-part-files', self.repository_location + '::test')
+        assert out.splitlines() == ['input', 'input/file.borg_part_1']
+
+    def test_create_ext_attrs_error_with_part_files_no_orphan_chunks(self):
+        # if we wrote part files for a file and reading its extended attributes fails afterwards, only the
+        # references taken for the complete file item must be dropped. the part files still reference the chunks.
+        blocks = self._create_file_with_unique_chunks('file')
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        with self._patch_checkpoint_after_first_chunk('file'), self._patch_ext_attrs_error('file'):
+            out = self.cmd('create', '--list', '--chunker-params=fixed,4096', self.repository_location + '::test',
+                           'input', exit_code=EXIT_WARNING)
+        assert 'E input/file' in out
+        assert self._chunk_refcounts(blocks) == [1, 1, 1, 1]  # referenced by the 2 part files
+        self.cmd('check', self.repository_location)
+        out = self.cmd('list', '--short', '--consider-part-files', self.repository_location + '::test')
+        assert out.splitlines() == ['input', 'input/file.borg_part_1', 'input/file.borg_part_2']
 
     def test_create_paths_from_command(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -4814,6 +4930,22 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_create_automount(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_read_error_no_orphan_chunks(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_ext_attrs_error_no_orphan_chunks(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_read_error_with_part_files_no_orphan_chunks(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_ext_attrs_error_with_part_files_no_orphan_chunks(self):
         pass
 
     @unittest.skip('test_basic_functionality seems incompatible with fakeroot and/or the binary.')

@@ -1456,24 +1456,33 @@ class ChunksProcessor:
             del item.chunks_healthy
         from_chunk = 0
         part_number = 1
-        for chunk in chunk_iter:
-            item.chunks.append(chunk_processor(chunk))
-            if show_progress:
-                stats.show_progress(item=item, dt=0.2)
-            from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
-        else:
-            if part_number > 1:
-                if item.chunks[from_chunk:]:
-                    # if we already have created a part item inside this file, we want to put the final
-                    # chunks (if any) into a part item also (so all parts can be concatenated to get
-                    # the complete file):
-                    from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=True)
+        try:
+            for chunk in chunk_iter:
+                item.chunks.append(chunk_processor(chunk))
+                if show_progress:
+                    stats.show_progress(item=item, dt=0.2)
+                from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
+        except BackupError:
+            # reading the input failed, so the caller will skip this item (it will not be added to the archive).
+            # nothing will reference the chunks we added since the last part item (item.chunks[from_chunk:]),
+            # so drop our references to them - otherwise they would stay in the repository as orphans forever.
+            # the chunks before from_chunk are referenced by part items we already wrote, so keep them.
+            for chunk in item.chunks[from_chunk:]:
+                cache.chunk_decref(chunk.id, stats, wait=False)
+            item.chunks = []  # the item does not hold any chunk references any more
+            raise
+        if part_number > 1:
+            if item.chunks[from_chunk:]:
+                # if we already have created a part item inside this file, we want to put the final
+                # chunks (if any) into a part item also (so all parts can be concatenated to get
+                # the complete file):
+                from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=True)
 
-                # if we created part files, we have referenced all chunks from the part files,
-                # but we also will reference the same chunks also from the final, complete file:
-                for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
-                stats.nfiles_parts += part_number - 1
+            # if we created part files, we have referenced all chunks from the part files,
+            # but we also will reference the same chunks also from the final, complete file:
+            for chunk in item.chunks:
+                cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
+            stats.nfiles_parts += part_number - 1
 
 
 class FilesystemObjectProcessors:
@@ -1526,7 +1535,15 @@ class FilesystemObjectProcessors:
                 status = 'h'  # hardlink (to already seen inodes)
             else:
                 hardlink_master = True
-        yield item, status, hardlinked, hardlink_master
+        try:
+            yield item, status, hardlinked, hardlink_master
+        except BackupError:
+            # processing the item failed (e.g. reading the extended attributes after reading the file content),
+            # the caller will skip it, so we do not add it to the archive. drop the chunk references we already
+            # took for it, otherwise its chunks would stay in the repository as orphans forever.
+            for chunk in item.get('chunks', []):
+                self.cache.chunk_decref(chunk.id, self.stats, wait=False)
+            raise
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
         self.add_item(item, stats=self.stats)
         # ... and added to the archive, so we can remember it to refer to it later in the archive:

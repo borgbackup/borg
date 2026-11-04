@@ -22,6 +22,7 @@ from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, open_archive, re
 from . import create_test_files, create_regular_file
 from . import generate_archiver_tests
 from ...platform import acl_get, acl_set
+from ...platformflags import is_win32
 from ..platform.platform_test import skipif_not_linux, skipif_acls_not_working
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -650,8 +651,11 @@ def test_roundtrip_pax_timestamps(archivers, request):
     assert dst_times == src_times
     with tarfile.open("pax.tar") as tar:
         ph = tar.getmember("input/file").pax_headers
-    for name in ("atime", "ctime", "mtime"):
-        assert ph[name] == f"{src_times[name] // 10**9}.{src_times[name] % 10**9:09d}"
+    for name, ns in src_times.items():
+        if ns is None:  # e.g. no ctime on Windows
+            assert name not in ph
+        else:
+            assert ph[name] == f"{ns // 10**9}.{ns % 10**9:09d}"
 
 
 def test_import_tar_invalid_pax_timestamp(archivers, request):
@@ -704,6 +708,7 @@ def test_import_tar_invalid_pax_acl(archivers, request):
         cmd(archiver, "extract", "dst")
 
 
+@pytest.mark.skipif(is_win32, reason="no name lookups on Windows")
 def test_import_tar_acl_unknown_name(archivers, request):
     """import-tar warns once per user/group name in POSIX ACL PAX headers that is unknown locally."""
     archiver = request.getfixturevalue(archivers)

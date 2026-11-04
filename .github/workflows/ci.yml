@@ -39,8 +39,8 @@ jobs:
     timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: chartboost/ruff-action@v1
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+    - uses: chartboost/ruff-action@e18ae971ccee1b2d7bbef113930f00c670b78da4  # v1.0.0
 
 
   asan_ubsan:
@@ -50,14 +50,14 @@ jobs:
     needs: [lint]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
         fetch-tags: true
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
       with:
         python-version: '3.12'
 
@@ -158,19 +158,19 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
         fetch-tags: true
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip
-      uses: actions/cache@v4
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
@@ -254,13 +254,13 @@ jobs:
 
     - name: Attest binaries provenance (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
       with:
         subject-path: 'artifacts/*'
 
     - name: Upload binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: ${{ matrix.binary }}
         path: artifacts/*
@@ -273,7 +273,7 @@ jobs:
         tox --skip-missing-interpreters
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}
@@ -320,14 +320,14 @@ jobs:
 
     steps:
     - name: Check out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: 0
         fetch-tags: true
 
     - name: Test on ${{ matrix.display_name }}
       id: cross_os
-      uses: cross-platform-actions/action@v1.5.0
+      uses: cross-platform-actions/action@faa0c6197e94aacf1c5956460152c8380d3560a5  # v1.5.0
       env:
         DO_BINARIES: ${{ matrix.do_binaries }}
       with:
@@ -489,7 +489,7 @@ jobs:
 
     - name: Upload artifacts
       if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: ${{ matrix.artifact_prefix }}
         path: artifacts/*
@@ -497,6 +497,6 @@ jobs:
 
     - name: Attest provenance
       if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
       with:
         subject-path: 'artifacts/*'

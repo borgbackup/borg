@@ -5752,6 +5752,51 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         out = self.cmd('diff', self.repository_location + '::a', 'a', '--sort-by=invalid_field', fork=True, exit_code=2)
         assert 'unsupported sort field' in out or 'invalid choice' in out or 'unsupported' in out
 
+    def _create_archive_with_items(self, name, items):
+        # Inject raw Items directly into an archive, bypassing "borg create", so the owner
+        # metadata (uid/gid/user/group) can be controlled exactly (without needing root).
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, key, manifest) as cache:
+                archive = Archive(repository, key, manifest, name, cache=cache, create=True)
+                for item in items:
+                    archive.items_buffer.add(item)
+                archive.save()
+
+    def test_numeric_ids(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        def item(path, uid, gid, user, group):
+            return Item(path=path, mode=stat.S_IFREG | 0o644, mtime=0, ctime=0,
+                        uid=uid, gid=gid, user=user, group=group, chunks=[])
+
+        self._create_archive_with_items('a1', [
+            item('names_changed', 1000, 1000, 'alice', 'alice'),
+            item('ids_changed', 1000, 1000, 'alice', 'alice'),
+        ])
+        self._create_archive_with_items('a2', [
+            item('names_changed', 1000, 1000, 'bob', 'bob'),  # same uid/gid, different names
+            item('ids_changed', 2000, 2000, 'alice', 'alice'),  # different uid/gid, same names
+        ])
+
+        def changes_by_path(output):
+            return {j['path']: j['changes'] for j in (json.loads(line) for line in output.splitlines() if line)}
+
+        # without --numeric-ids, the user/group names are compared and reported
+        output = self.cmd('diff', self.repository_location + '::a1', 'a2', '--json-lines')
+        changes = changes_by_path(output)
+        assert {'type': 'owner', 'old_user': 'alice', 'old_group': 'alice',
+                'new_user': 'bob', 'new_group': 'bob'} in changes['names_changed']
+        assert 'ids_changed' not in changes  # names unchanged, so the item counts as equal
+
+        # with --numeric-ids, the numeric uid/gid are compared and reported instead
+        output = self.cmd('diff', self.repository_location + '::a1', 'a2', '--json-lines', '--numeric-ids')
+        changes = changes_by_path(output)
+        assert {'type': 'owner', 'old_user': 1000, 'old_group': 1000,
+                'new_user': 2000, 'new_group': 2000} in changes['ids_changed']
+        assert 'names_changed' not in changes  # uid/gid unchanged, so the item counts as equal
+
     def test_time_diffs(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file("test_file", size=10)

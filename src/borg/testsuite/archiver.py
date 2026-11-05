@@ -1208,6 +1208,50 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert os.stat('input/a/hardlink').st_nlink == 2
             assert os.stat('input/b/hardlink').st_nlink == 2
 
+    @requires_hardlinks
+    def test_extract_duplicate_hardlink_item(self):
+        # an archive can have the same hard link item twice (here: the same path given twice via stdin).
+        # extracting the duplicate must not remove the file that is the link target of its hard link group (#10393).
+        self.create_regular_file('file1', contents=b'123456')
+        os.link(os.path.join(self.input_path, 'file1'), os.path.join(self.input_path, 'file2'))
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', '--paths-from-stdin', self.repository_location + '::test',
+                 input=b'input/file1\ninput/file1\ninput/file2\n')
+        output = self.cmd('list', '--format={path}{NL}', self.repository_location + '::test')
+        assert output.splitlines() == ['input/file1'] * 2 + ['input/file2']
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert os.stat('input/file1').st_nlink == 2
+            assert os.stat('input/file2').st_nlink == 2
+            with open('input/file1', 'rb') as f:
+                assert f.read() == b'123456'
+            self.cmd('extract', self.repository_location + '::test', '--strip-components', '1')
+            assert os.stat('file1').st_nlink == 2
+            assert os.stat('file2').st_nlink == 2
+            with open('file1', 'rb') as f:
+                assert f.read() == b'123456'
+
+    @requires_hardlinks
+    @unittest.skipUnless(llfuse, 'llfuse not installed')
+    def test_fuse_mount_duplicate_hardlink_item(self):
+        # an archive can have the same hard link item twice (here: the same path given twice via stdin).
+        # the duplicate must not increase the link count of its hard link group (#10393).
+        self.create_regular_file('file1', contents=b'123456')
+        os.link(os.path.join(self.input_path, 'file1'), os.path.join(self.input_path, 'file2'))
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', '--paths-from-stdin', self.repository_location + '::test',
+                 input=b'input/file1\ninput/file1\ninput/file2\n')
+        mountpoint = os.path.join(self.tmpdir, 'mountpoint')
+        if sys.platform == 'darwin':
+            ignore_perms = ['-o', 'ignore_permissions,defer_permissions']
+        else:
+            ignore_perms = ['-o', 'ignore_permissions']
+        with self.fuse_mount(self.repository_location + '::test', mountpoint, *ignore_perms), \
+             changedir(mountpoint):
+            assert os.stat('input/file1').st_nlink == 2
+            assert os.stat('input/file2').st_nlink == 2
+            assert open('input/file1', 'rb').read() == b'123456'
+
     def test_extract_include_exclude(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=1024 * 80)
@@ -4409,6 +4453,20 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             assert os.stat('input/dir1/subdir/hardlink').st_nlink == 2
             assert os.stat('input/dir1/aaaa').st_nlink == 2
             assert os.stat('input/dir1/source2').st_nlink == 2
+
+    @requires_hardlinks
+    def test_export_tar_duplicate_hardlink_item(self):
+        # an archive can have the same hard link item twice (here: the same path given twice via stdin).
+        # export-tar must not add the duplicate as a hard link to itself (#10393).
+        self.create_regular_file('file1', contents=b'123456')
+        os.link(os.path.join(self.input_path, 'file1'), os.path.join(self.input_path, 'file2'))
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', '--paths-from-stdin', self.repository_location + '::test',
+                 input=b'input/file1\ninput/file1\ninput/file2\n')
+        self.cmd('export-tar', self.repository_location + '::test', 'output.tar')
+        with tarfile.open('output.tar') as tar:
+            members = [(m.name, m.type, m.linkname) for m in tar]
+        assert members == [('input/file1', tarfile.REGTYPE, ''), ('input/file2', tarfile.LNKTYPE, 'input/file1')]
 
     def test_import_tar(self):
         self.create_test_files()

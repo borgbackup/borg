@@ -1220,12 +1220,14 @@ Utilization of max. archive size: {csize_max:.0%}
             logger.warning('borg check --repair is required to free all space.')
 
     @staticmethod
-    def compare_archives_iter(print_warning, archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False):
+    def compare_archives_iter(print_warning, archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False,
+                              numeric_ids=False):
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
 
         :param matcher: PatternMatcher class to restrict results to only matching paths.
         :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
+        :param numeric_ids: Whether to compare/report numeric uid/gid instead of user/group names.
         """
 
         def hardlink_master_seen(item):
@@ -1249,6 +1251,7 @@ Utilization of max. archive size: {csize_max:.0%}
             return ItemDiff(item1, item2,
                             archive1.pipeline.fetch_many([c.id for c in item1.get('chunks', [])]),
                             archive2.pipeline.fetch_many([c.id for c in item2.get('chunks', [])]),
+                            numeric_ids=numeric_ids,
                             can_compare_chunk_ids=can_compare_chunk_ids,
                             content_only=content_only)
 

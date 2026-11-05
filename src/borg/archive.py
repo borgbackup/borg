@@ -917,6 +917,12 @@ Utilization of max. archive size: {csize_max:.0%}
         # overwrite files outside the extraction directory (e.g. /etc/passwd).
         self.safe_dirs.discard(path)  # path is about to be (re)created; never trust a stale entry for it
         self._check_safe_parent(item.path)
+        if 'source' in item and hardlinkable(item.mode):
+            source = os.path.join(dest, *item.source.split(os.sep)[stripped_components:])
+            if hardlink_masters.get(item.source, (None, source))[1] == path:
+                # duplicate item: path was extracted already and is the link target of its hard link group,
+                # removing it would lose the file (and hard linking it to itself can not work).
+                return
         # Attempt to remove existing files, ignore errors on failure.
         # A trailing "." component means the extraction directory itself (the archive's
         # "." item, as created by "borg create ARCHIVE ."). posix requires rmdir() to

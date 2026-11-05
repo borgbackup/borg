@@ -1149,6 +1149,10 @@ class Archiver:
                         linkname = source
                     else:
                         chunks, linkname = hardlink_masters.get(item.source, (None, source))
+                    if linkname == item.path:
+                        # duplicate item: path was added already and is the link target of its hard link group,
+                        # a hard link to itself would be useless (and some tar implementations refuse it).
+                        return None, stream
                     if linkname:
                         # Master was already added to the archive, add a hardlink reference to it.
                         tarinfo.type = tarfile.LNKTYPE

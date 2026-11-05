@@ -421,6 +421,10 @@ class FuseBackend:
         if 'source' in item and hardlinkable(item.mode):
             source = os.sep.join(item.source.split(os.sep)[stripped_components:])
             chunks, link_target = hardlink_masters.get(item.source, (None, source))
+            if link_target == path:
+                # duplicate item: path was added already and is the link target of its hard link group,
+                # adding it again would only increase the link count.
+                return
             if link_target:
                 # Hard link was extracted previously, just link
                 link_target = os.fsencode(link_target)

@@ -1,6 +1,7 @@
 import base64
 import errno
 import json
+import logging
 import os
 import posixpath
 import stat
@@ -3532,7 +3533,7 @@ class ArchiveRecreater:
         if delete_original:
             archive.delete()
         if self.stats:
-            log_multi(str(target), str(target.stats))
+            log_multi(str(target), str(target.stats), logger=logging.getLogger("borg.output.stats"))
 
     def matcher_add_tagged_dirs(self, archive):
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""

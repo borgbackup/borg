@@ -429,36 +429,68 @@ New features:
 
 Fixes:
 
+- fixed chunker: fix corruption caused by short reads (a short read is not EOF), #10565
+
+  Files returning short reads (e.g. --read-special from a FIFO) were
+  archived incompletely.
+- fixed chunker: ignore posix_fadvise() errors, e.g. ESPIPE for a FIFO, #10565
+- prepare_subprocess_env: remove all passphrase-related env vars, #6480
+- create:
+
+  - back up automounted directories, #6652
+  - do not archive an atime we caused ourselves, #6194
 - extract:
 
+  - report a failing close() of a destination file as a warning
   - remote: use deques for the RPC call queues (performance fix), #10450
   - never try to remove the extraction directory itself
-- recreate: keep chunker_params if not rechunkifying, #10127
+- recreate:
+
+  - also do the work if --timestamp is the only change requested
+  - keep chunker_params if not rechunkifying, #10127
+- import-tar: fix nfiles being counted twice for regular files
+- --bypass-lock: also skip the cache lock, #7255
+- fix false repo relocation warning on macOS due to NFC/NFD path differences, #2913
+- locking: fix broken exclusivity on Cygwin, #7218
+- macOS: fix TypeError when _get_birthtime_ns gets called with an FD
+- security: the same local repo dir accessed via another path is not a relocation, #8188
+- add_warning: store exceptions given as args as text, not the exception (uses much less memory)
+- fix daemonizing: don't lose an early notify signal from the background process
 - let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
 - repository: do not crash on missing segment files/dirs, #3225
 - remote: drain stderr in close(), avoid deadlock, #10165
 - ellipsis_truncate: pad a truncated string to the full width (CJK fix), #10481
-- haiku: tolerate failures reading the lock directory
+- Haiku: tolerate failures reading the lock directory
 - crc32_clmul: only feed full aligned blocks to the folding code, #10151
 
 Other changes:
 
-- support Python 3.15 and msgpack 1.2.3
-- hashindex: read/write buckets in <=256MiB slices, works around #6140
+- support Python 3.15
+- support msgpack up to 1.2.4
+- hashindex: read/write buckets in <= 256 MiB slices, works around #6140
 - platform: determine hostname / fqdn / hostid lazily, refs #9470
 - cache sync: log per-archive messages at debug level, #9659
+- crypto: raise IntegrityError for truncated AE envelopes
 - docs:
 
-  - fix init epilog about what none mode can (not) detect
+  - fix the init epilog about what "none" mode can (not) detect
   - FAQ: chunker params for SQLite databases, #5877
   - FAQ: document how to limit bandwidth in both directions, #8838
   - refactor return code docs, #9948
   - update README, #9931
   - new borg 1.4 demo screencast
+  - automated-local: support multiple backup drives, #9834
+  - list additional help topics in main borg help, #3432
+  - nanorst: do not require 2 empty lines at the end of a string after a code block, #9714
 - tests / CI:
 
   - fix inode-order dependence in test_multiple_link_exclusion, #8740
-  - CI: misc fixes and performance optimizations
+  - update and pin GitHub actions
+  - re-enable the Windows MSYS2 build
+  - use PyInstaller 6.22.3 for MSYS2 py314
+  - test_atime: do not create a hardlink (fix test on Cygwin)
+  - relax sparse file SEEK_DATA check
+  - speed up the prune tests
 
 
 Version 1.4.5 (2026-07-19)

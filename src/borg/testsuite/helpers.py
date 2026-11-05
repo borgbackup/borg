@@ -391,6 +391,11 @@ def test_chunkerparams():
             ChunkerParams('buzhash,5,7,6,4095')  # too small min. size
     with pytest.raises(ArgumentTypeError):
         ChunkerParams('buzhash,19,24,21,4095')  # too big max. size
+    with pytest.raises(ArgumentTypeError):
+        ChunkerParams('buzhash,10,12,11,4095')  # window_size + 2^chunk_min + 1 > 2^chunk_max
+    with pytest.raises(ArgumentTypeError):
+        ChunkerParams('19,19,19,4095')  # dito, chunk_min == chunk_max
+    assert ChunkerParams('10,13,11,4095') == ('buzhash', 10, 13, 11, 4095)  # just fits: 4095 + 1024 + 1 <= 8192
     if borg2:
         with pytest.raises(ArgumentTypeError):
             ChunkerParams('buzhash,23,19,21,4095')  # violates min <= mask <= max

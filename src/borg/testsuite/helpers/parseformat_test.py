@@ -898,6 +898,7 @@ def test_eval_escapes():
         ("19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
         ("buzhash,19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
         ("10,23,16,4095", ("buzhash", 10, 23, 16, 4095)),
+        ("10,13,11,4095", ("buzhash", 10, 13, 11, 4095)),  # just fits: 4095 + 1024 + 1 <= 8192
         ("buzhash64,19,23,21,4095,2", ("buzhash64", 19, 23, 21, 4095, 2)),
         ("fastcdc,19,23,21,2", ("fastcdc", 19, 23, 21, 2)),
         ("fixed,4096", ("fixed", 4096, 0)),
@@ -917,6 +918,8 @@ def test_valid_chunkerparams(chunker_params, expected_return):
         "buzhash,23,19,21,4095",  # violates min <= mask <= max
         "buzhash,19,23,21,4096",  # even window size
         "buzhash,19,23,21",  # missing window_size (must not fall into old-style compat mode)
+        "buzhash,10,12,11,4095",  # window_size + 2^chunk_min + 1 > 2^chunk_max
+        "19,19,19,4095",  # dito, chunk_min == chunk_max (old-style compat mode)
         "buzhash64,20,20,20,4095,2",  # window_size + 2^chunk_min + 1 > 2^chunk_max
         "buzhash64,19,19,19,4095,2",  # dito, chunk_min == chunk_max
         "buzhash64,19,23,21,4095",  # missing nc_level

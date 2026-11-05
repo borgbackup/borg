@@ -411,6 +411,10 @@ def ChunkerParams(s):
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
         if window_size % 2 == 0:
             raise ArgumentTypeError("window_size must be an uneven (odd) number")
+        # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
+        # a max. chunk size sized buffer, see the assertion in Chunker.__cinit__ (buzhash.pyx).
+        if window_size + 2**chunk_min + 1 > 2**chunk_max:
+            raise ArgumentTypeError("required: window_size + 2^chunk_min + 1 <= 2^chunk_max")
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
     raise ArgumentTypeError("invalid chunker params")
 

@@ -332,6 +332,23 @@ def test_recreate_list_output(archivers, request):
     assert "- input/file5" not in output
 
 
+def test_recreate_stats(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    cmd(archiver, "create", "test", "input")
+    # --stats must show the statistics without also giving --info.
+    output = cmd(archiver, "recreate", "-a", "test", "--stats", "-e", "input/file2")
+    cmd(archiver, "check")
+    assert "Archive name: test" in output
+    assert "Number of files: 1" in output
+    # Without --stats, no statistics are shown.
+    output = cmd(archiver, "recreate", "-a", "test", "-e", "input/file1")
+    cmd(archiver, "check")
+    assert "Number of files:" not in output
+
+
 def test_comment(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

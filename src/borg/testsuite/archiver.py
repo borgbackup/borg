@@ -4067,6 +4067,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in("input/file1", output)
         self.assert_not_in("x input/file5", output)
 
+    def test_recreate_stats(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file('file1', size=1024)
+        self.create_regular_file('file2', size=1024)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        # --stats must show the statistics without also giving --info.
+        output = self.cmd('recreate', '--stats', self.repository_location + '::test', '-e', 'input/file2')
+        self.check_cache()
+        self.assert_in('Archive name: test', output)
+        self.assert_in('This archive:', output)
+        self.assert_in('All archives:', output)
+        # Without --stats, no statistics are shown.
+        output = self.cmd('recreate', self.repository_location + '::test', '-e', 'input/file1')
+        self.check_cache()
+        self.assert_not_in('This archive:', output)
+
     def test_bad_filters(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test', 'input')

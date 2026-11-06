@@ -1,5 +1,6 @@
 import errno
 import json
+import logging
 import os
 import socket
 import stat
@@ -2565,7 +2566,7 @@ class ArchiveRecreater:
                       DASHES,
                       str(target.stats),
                       str(self.cache),
-                      DASHES)
+                      DASHES, logger=logging.getLogger('borg.output.stats'))
 
     def matcher_add_tagged_dirs(self, archive):
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""

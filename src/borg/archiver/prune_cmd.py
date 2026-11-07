@@ -12,6 +12,7 @@ from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
 from ..helpers import GroupBySpec
 from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
+from ..helpers.time import calculate_relative_offset
 from ..manifest import AI_GROUP_BY_KEYS, ArchiveInfo, format_group_key, group_archives
 
 from ..logger import create_logger
@@ -198,6 +199,18 @@ class PruneMixIn:
     @with_repository()
     def do_prune(self, args, repository, manifest):
         """Prune archives according to specified rules."""
+        from_timestamp = getattr(args, PRUNE_FROM.key)
+        base_timestamp = from_timestamp if from_timestamp is not None else datetime.now().astimezone()
+
+        for rule in PRUNING_RULES:
+            value = getattr(args, rule.key)
+            if not isinstance(value, str):
+                continue
+            try:
+                cutoff = calculate_relative_offset(value, base_timestamp, earlier=True)
+            except (ValueError, OverflowError) as error:
+                raise CommandError(f"Invalid retention interval {value!r} for {rule.key}: {error}") from None
+            setattr(args, rule.key, base_timestamp - cutoff)
         self._validate_prune_args(args)
 
         match = archive_match_patterns(args)
@@ -209,10 +222,6 @@ class PruneMixIn:
         # do not compete for the same retention slots.
         group_by = tuple(args.group_by.split(",")) if args.group_by else ()
         groups = group_archives(archives, group_by)
-
-        # All groups use the same reference timestamp, so interval based rules do not drift apart.
-        from_timestamp = getattr(args, PRUNE_FROM.key)
-        base_timestamp = from_timestamp if from_timestamp is not None else datetime.now().astimezone()
 
         # Archives to keep along with the rule that ensured them being kept
         keep = {}
@@ -465,7 +474,8 @@ class PruneMixIn:
         that time window. When ``--from`` is given together with an interval
         retention, the interval is measured backwards from that timestamp
         instead of from the current time. See ``Date and Time`` docs for exact
-        INTERVAL format.
+        INTERVAL format. Months and years are calendar-aware: a month before
+        March 31 is February 28 (or 29 in a leap year), at the same time of day.
 
         The ``--keep-secondly``, ``--keep-minutely``, ``--keep-hourly``,
         ``--keep-daily``, ``--keep-weekly``, ``--keep-monthly``,
@@ -505,7 +515,9 @@ class PruneMixIn:
         weekly interval is already covered by the daily one and so the weekly
         interval is effectively useless. An error is emitted upon running
         ``borg prune`` if such a combination of flags is given. The order of
-        flags on the command line is not significant.
+        flags on the command line is not significant. Calendar intervals are
+        compared at the reference timestamp: ``1m`` can be shorter than, equal
+        to, or longer than ``30d`` depending on the month.
 
 
         A practical approach for recurring backups is to use rules

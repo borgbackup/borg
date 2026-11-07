@@ -12,14 +12,14 @@ days going back to late 2025. Today, `borg create` took a little longer than
 usual. It's 16:12 now and you run `borg prune`.
 
 You want Borg to keep one archive per day for one week, four weekly archives,
-one archive per month for five months, and two yearly backups. For that, you
+one archive per month for six months, and two yearly backups. For that, you
 use the following command:
 
 ```
 borg prune \
   --keep-daily 1w \
   --keep-weekly 4 \
-  --keep-monthly 5m \
+  --keep-monthly 6m \
   --keep-yearly 2 \
   --from '2026-06-04 16:00'
 ```
@@ -49,6 +49,7 @@ archives kept by the `--keep-weekly` rule are marked by a "w" to the right,
 archives kept by the `--keep-monthly` rule are marked by a "m" to the right,
 archives kept by the `--keep-yearly` rule are marked by a "y" to the right, and
 archives kept by the `--from` rule are marked by a "x" to the right.
+An "n" marks a day when no backup was taken.
 
 
 Calendar view
@@ -59,7 +60,7 @@ Calendar view
                                              8  9 10 11 12 13 14
                                      15y16  15 16 17 18 19 20 21
                       17 18 19 20 21 22 23  22 23 24 25 26 27 28
-                      24 25 26 27 28 29 30  29 30 31y
+                      24 25 26 27 28 29 30  29 30 31m
 
                             2026
       January               February               March
@@ -68,28 +69,27 @@ Calendar view
 12 13 14 15 16 17 18   9 10 11 12 13 14 15   9 10 11 12 13 14 15
 19 20 21 22 23 24 25  16 17 18 19 20 21 22  16 17 18 19 20 21 22
 26 27 28 29 30 31m    23 24 25 26 27 28m    23 24 25 26 27 28 29
-                                            30m31
+                                            30m31n
 
        April                  May                   June
-       1  2  3  4  5               1  2  3w  1d 2d 3  4x
+       1  2  3  4  5               1  2  3w  1d 2d 3n 4x
  6  7  8  9 10 11 12   4  5  6  7  8  9 10w
 13 14 15 16 17 18 19  11 12 13 14 15 16 17w
-20 21 22 23 24 25 26  18 19 20 21 22 23w24
+20 21 22 23 24 25 26  18 19 20 21 22 23w24n
 27 28 29 30m          25 26 27 28d29d30d31d
 
 
 List view
 ---------
 
---keep-daily 1w     --keep-weekly 4     --keep-monthly 5m   --keep-yearly 2
+--keep-daily 1w     --keep-weekly 4     --keep-monthly 6m   --keep-yearly 2
 --------------------------------------------------------------------------------
-                                                            1. 2025-12-31
-                                                            2. 2025-11-15 (oldest)
+                                                            1. 2025-11-15 (oldest)
 1. 2026-06-02       1. 2026-05-23       1. 2026-04-30
 2. 2026-06-01       2. 2026-05-17       2. 2026-03-30
 3. 2026-05-31       3. 2026-05-10       3. 2026-02-28
 4. 2026-05-30       4. 2026-05-03       4. 2026-01-31
-5. 2026-05-29
+5. 2026-05-29                           5. 2025-12-31
 6. 2026-05-28
 
 2026-06-04 is additionally kept due to `--from`.
@@ -115,7 +115,7 @@ later reference time, e.g. `--from '2026-06-04 23:59:59'`.
 2026-05-31 is considered not only by `--keep-daily`, but by `--keep-weekly`
 and `--keep-monthly`, too. The archive is effectively kept by `--keep-daily`,
 but how this affects other rules differs between *count*- and *interval*-based
-policies. For *interval*-based rules like `--keep-monthly 5m` it has no effect:
+policies. For *interval*-based rules like `--keep-monthly 6m` it has no effect:
 The rule simply keeps one archive fewer in that case.
 
 For *count*-based rules like `--keep-weekly 4` it has an effect: The policy
@@ -133,21 +133,17 @@ Since 2026-05-24 and 2026-03-31 were skipped, Borg substitutes the next best
 candidate for each: 2026-05-23 fills the week 21 weekly slot, and 2026-03-30
 fills the March monthly slot.
 
-The `--keep-monthly 5m` window starts five calendar months before the
-reference time, on 2026-01-04 at 16:00. The archive from 2025-12-31 is
-outside this window, so it is not retained by `--keep-monthly`.
-
-Instead, `--keep-yearly 2` keeps 2025-12-31 as its yearly candidate. It
-also keeps the oldest archive, 2025-11-15, to fill the remaining slot.
+The `--keep-monthly 6m` window starts on 2025-12-04 at 16:00.
+The archive from 2025-12-31 falls within this window and is kept by
+`--keep-monthly`.
 
 Since interval rules define time windows rather than competing for a fixed
 number of slots, their interplay is simpler than count-based rules. An archive
 is kept by an interval rule as long as it falls within the specified window;
 the next rule simply considers whatever remains.
 
-Intervals and counts can be mixed freely. Yearly retention in this example is
-done by retention count instead of intervals. A count rule paired with interval
-rules behaves just as it would if all preceding rules were also counts:
-Archives already kept by earlier rules are excluded from consideration. In this
-example, the 2026 yearly slot is consumed by earlier rules. December 31
-fills the 2025 slot, and November 15 is retained as the oldest archive.
+Intervals and counts can be mixed freely. Archives already kept by earlier
+rules do not count again toward a count-based rule. Here, `--keep-monthly`
+keeps 2025-12-31, so it does not fill a `--keep-yearly` slot. The yearly
+rule keeps 2025-11-15 as the oldest remaining archive to preserve rolling
+backup semantics.

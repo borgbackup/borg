@@ -4,7 +4,7 @@ import logging
 import math
 from functools import partial, wraps
 import os
-from itertools import count, combinations
+from itertools import count
 from ._common import with_repository, Highlander, archive_match_patterns
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
@@ -202,16 +202,16 @@ class PruneMixIn:
         from_timestamp = getattr(args, PRUNE_FROM.key)
         base_timestamp = from_timestamp if from_timestamp is not None else datetime.now().astimezone()
 
-        for rule in PRUNING_RULES:
-            value = getattr(args, rule.key)
+        keep_args = {rule.key: getattr(args, rule.key) for rule in PRUNING_RULES if getattr(args, rule.key) is not None}
+        for name, value in keep_args.items():
             if not isinstance(value, str):
                 continue
             try:
                 cutoff = calculate_relative_offset(value, base_timestamp, earlier=True)
             except (ValueError, OverflowError) as error:
-                raise CommandError(f"Invalid retention interval {value!r} for {rule.key}: {error}") from None
-            setattr(args, rule.key, base_timestamp - cutoff)
-        self._validate_prune_args(args)
+                raise CommandError(f"Invalid retention interval {value!r} for {name}: {error}") from None
+            keep_args[name] = base_timestamp - cutoff
+        self._validate_prune_args(keep_args)
 
         match = archive_match_patterns(args)
         archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
@@ -228,7 +228,7 @@ class PruneMixIn:
         group_of = {}
         group_summaries = []
         for key, group in groups.items():
-            group_keep = self._compute_keep(group, args, base_timestamp)
+            group_keep = self._compute_keep(group, args, base_timestamp, keep_args)
             keep |= group_keep
             group_of.update(dict.fromkeys(group, key))
             group_summaries.append((key, len(group), len(group_keep)))
@@ -318,7 +318,7 @@ class PruneMixIn:
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")
 
-    def _compute_keep(self, archives, args, base_timestamp):
+    def _compute_keep(self, archives, args, base_timestamp, keep_args):
         """
         Apply the retention rules to *archives* (sorted by timestamp, newest first).
 
@@ -341,26 +341,20 @@ class PruneMixIn:
         # Apply each retention rule to all candidate archives. The
         # `previously_kept` parameter prevents later (coarser-grained) rules
         # from double-counting archives already retained by earlier rules.
-        active_rules = [
-            (rule, getattr(args, rule.key)) for rule in PRUNING_RULES if getattr(args, rule.key) is not None
-        ]
+        active_rules = [(rule, keep_args[rule.key]) for rule in PRUNING_RULES if rule.key in keep_args]
         for rule, n_or_interval in active_rules:
             keep |= prune(
                 archives=candidate_archives,
                 rule=rule,
                 n_or_interval=n_or_interval,
                 base_timestamp=base_timestamp,
-                keep_oldest=(
-                    rule == active_rules[-1][0]
-                ),  # Activate keep_oldest rule only for the largest active interval
+                keep_oldest=rule == active_rules[-1][0],
                 previously_kept=frozenset(keep),
             )
 
         return keep
 
-    def _validate_prune_args(self, args):
-        keep_args = {rule.key: getattr(args, rule.key) for rule in PRUNING_RULES if getattr(args, rule.key) is not None}
-
+    def _validate_prune_args(self, keep_args):
         if len(keep_args) == 0:
             raise CommandError(
                 'At least one of the "keep", "keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
@@ -374,26 +368,6 @@ class PruneMixIn:
                 '"keep-monthly", "keep-13weekly", "keep-3monthly", or "keep-yearly" settings have a positive value. '
                 "At least one must be non-zero."
             )
-
-        def lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val):
-            return (
-                f"The combination of \"{lo_arg}='{lo_val}'\" and \"{hi_arg}='{hi_val}'\" is invalid. It is effectively "
-                f"useless since every archive matched by {hi_arg} would have already been matched by {lo_arg}."
-            )
-
-        interval_args = [(arg, val) for arg, val in keep_args.items() if isinstance(val, timedelta) or val == -1]
-        for (lo_arg, lo_val), (hi_arg, hi_val) in combinations(interval_args, 2):
-            if hi_val == -1:
-                # 'Infinity' is always bigger
-                continue
-
-            if lo_val == -1 or lo_val >= hi_val:
-                raise CommandError(lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val))
-
-        int_args = [(arg, val) for arg, val in keep_args.items() if isinstance(val, int)]
-        for (lo_arg, lo_val), (hi_arg, hi_val) in combinations(int_args, 2):
-            if lo_val == -1:
-                raise CommandError(lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val))
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -474,8 +448,8 @@ class PruneMixIn:
         that time window. When ``--from`` is given together with an interval
         retention, the interval is measured backwards from that timestamp
         instead of from the current time. See ``Date and Time`` docs for exact
-        INTERVAL format. Months and years are calendar-aware: a month before
-        March 31 is February 28 (or 29 in a leap year), at the same time of day.
+        INTERVAL format. Months and years follow the calendar. One month before
+        2024-03-31 is 2024-02-29, at the same time of day.
 
         The ``--keep-secondly``, ``--keep-minutely``, ``--keep-hourly``,
         ``--keep-daily``, ``--keep-weekly``, ``--keep-monthly``,
@@ -508,16 +482,11 @@ class PruneMixIn:
         schemes, where the earliest backup in a retention window should survive until
         the next tier's interval naturally replaces it.
 
-        When using interval-based pruning with multiple ``--keep-*`` options,
-        the intervals must be specified in increasing length matching the
-        periods chosen. For example, ``--keep-daily 7d --keep-weekly 4w`` is
-        valid, but ``--keep-daily 30d --keep-weekly 7d`` is not, because the
-        weekly interval is already covered by the daily one and so the weekly
-        interval is effectively useless. An error is emitted upon running
-        ``borg prune`` if such a combination of flags is given. The order of
-        flags on the command line is not significant. Calendar intervals are
-        compared at the reference timestamp: ``1m`` can be shorter than, equal
-        to, or longer than ``30d`` depending on the month.
+        Retention rules may overlap. For example,
+        ``--keep-daily 30d --keep-weekly 7d`` is allowed. The weekly rule does
+        not keep additional archives because the daily rule already covers
+        its time window. The order of flags on the command line does not
+        change the order in which the rules are applied.
 
 
         A practical approach for recurring backups is to use rules

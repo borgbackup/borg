@@ -194,10 +194,8 @@ cdef class ChunkerBuzHash64(ChunkerBase):
         cdef uint64_t mask_s = self.mask_s, mask_l = self.mask_l
         cdef int nc_level = self.nc_level
         cdef size_t n, old_last, min_size = self.min_size, window_size = self.window_size
-        cdef size_t normal_size = self.normal_size, normal_pos
+        cdef size_t normal_size = self.normal_size, chunk_len
         cdef uint8_t* p
-        cdef uint8_t* stop_at
-        cdef uint8_t* nc_stop
         cdef size_t did_bytes, span
         cdef int kernel_id = self.kernel_id
 
@@ -234,29 +232,28 @@ cdef class ChunkerBuzHash64(ChunkerBase):
         # Normalized chunking: pick the mask based on how far we are into the current chunk.
         # While below normal_size use the strict mask (lower cut probability), afterward the
         # loose mask (higher cut probability). The mask is re-evaluated at the top of every
-        # iteration, so the transition is honored exactly at normal_pos. When nc is disabled,
-        # mask_s == mask_l == chunk_mask and the normal_pos cap is not applied, so this reduces
+        # iteration, so the transition is honored exactly at normal_size. When nc is disabled,
+        # mask_s == mask_l == chunk_mask and the normal_size cap is not applied, so this reduces
         # to the original single-mask behavior.
         mask = mask_s
-        normal_pos = 0
+        chunk_len = 0
         while True:
             if nc_level:
-                normal_pos = self.last + normal_size
-                mask = mask_s if self.position < normal_pos else mask_l
+                chunk_len = self.position - self.last
+                mask = mask_s if chunk_len < normal_size else mask_l
 
             if not (self.remaining > window_size and (sum & mask) and not (self.eof and self.remaining <= window_size)):
                 break
 
             p = self.data + self.position
-            stop_at = p + self.remaining - window_size
+            span = self.remaining - window_size
 
-            if nc_level and self.position < normal_pos:
-                # do not scan past the strict->loose transition; re-evaluate the mask there
-                nc_stop = self.data + normal_pos
-                if nc_stop < stop_at:
-                    stop_at = nc_stop
+            if nc_level and chunk_len < normal_size and normal_size - chunk_len < span:
+                # do not scan past the strict->loose transition; re-evaluate the mask there.
+                # This compares lengths, not positions: normal_size is a caller-given size_t
+                # and can be anything, self.last + normal_size might not even be representable.
+                span = normal_size - chunk_len
 
-            span = stop_at - p
             with nogil:
                 did_bytes = bz64_scan(self.table, self.table_rot, p, p + window_size,
                                       span, &sum, mask, kernel_id)

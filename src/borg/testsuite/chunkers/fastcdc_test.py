@@ -295,6 +295,28 @@ def test_chunkers_reject_invalid_params(algo, params):
         get_chunker(algo, *params, sparse=False)
 
 
+def test_huge_normal_size():
+    # A normal_size that no chunk can reach means that the strict mask is used throughout,
+    # which is the same as a single-mask chunker with nc_level more mask bits.
+    # normal_size is a size_t and may be anything up to SIZE_MAX: the chunkers must not
+    # derive a buffer position from it, that would wrap around and scan outside the buffer.
+    from ...chunkers import ChunkerBuzHash64, ChunkerToeplitzAES
+
+    huge = sys.maxsize * 2 + 1 - 4096  # close to SIZE_MAX
+    data = os.urandom(1024 * 1024)
+
+    def sizes(chunker):
+        return [c.meta["size"] for c in chunker.chunkify(BytesIO(data))]
+
+    assert sizes(ChunkerFastCDC(key0, 10, 16, 12, 2, normal_size=huge)) == sizes(ChunkerFastCDC(key0, 10, 16, 14, 0))
+    assert sizes(ChunkerBuzHash64(key0, 10, 16, 12, 4095, 2, normal_size=huge)) == sizes(
+        ChunkerBuzHash64(key0, 10, 16, 14, 4095, 0)
+    )
+    assert sizes(ChunkerToeplitzAES(key0, 10, 16, 12, 2, normal_size=huge)) == sizes(
+        ChunkerToeplitzAES(key0, 10, 16, 14, 0)
+    )
+
+
 @pytest.mark.parametrize("envvar", ["BORG_FASTCDC_KERNEL", "BORG_BUZHASH64_KERNEL", "BORG_AES_CHUNKER_KERNEL"])
 def test_kernel_env_rejects_unusable(envvar, monkeypatch):
     # A kernel that cannot run here must fail loudly instead of silently

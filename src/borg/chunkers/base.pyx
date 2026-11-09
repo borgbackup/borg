@@ -157,10 +157,9 @@ cdef class ChunkerBase:
         cdef uint64_t digest = 0, mask, mask_s = self.mask_s, mask_l = self.mask_l
         cdef int nc_level = self.nc_level
         cdef size_t n, old_last, min_size = self.min_size
-        cdef size_t normal_size = self.normal_size, normal_pos, chunk_len, span, did
+        cdef size_t normal_size = self.normal_size, chunk_len, span, did
         cdef int64_t r
         cdef uint8_t* p
-        cdef uint8_t* stop
 
         if self.done:
             if self.bytes_read == self.bytes_yielded:
@@ -207,14 +206,13 @@ cdef class ChunkerBase:
                 continue
 
             p = self.data + self.position
-            stop = p + self.remaining
-            if nc_level and chunk_len < normal_size:
-                # do not scan past the strict->loose transition; re-evaluate the mask there
-                normal_pos = self.last + normal_size
-                if (self.data + normal_pos) < stop:
-                    stop = self.data + normal_pos
+            span = self.remaining
+            if nc_level and chunk_len < normal_size and normal_size - chunk_len < span:
+                # do not scan past the strict->loose transition; re-evaluate the mask there.
+                # This compares lengths, not positions: normal_size is a caller-given size_t
+                # and can be anything, self.last + normal_size might not even be representable.
+                span = normal_size - chunk_len
 
-            span = stop - p
             r = self._scan(p, span, &digest, mask)
             if r == -2:
                 raise Exception(f"{self.algo}: OpenSSL EVP encryption failed")

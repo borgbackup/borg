@@ -376,7 +376,7 @@ def ChunkerParams(s):
         return CH_FASTCDC, chunk_min, chunk_max, chunk_mask, nc_level
     if algo in (CH_RABIN_AES, CH_GOLDILOCKS_AES, CH_TOEPLITZ_AES):
         # <algo>, chunk_min, chunk_max, chunk_mask, nc_level
-        # both UHF-then-PRF chunkers have a fixed 64-byte window, so there is no window_size field.
+        # the UHF-then-PRF chunkers have a fixed 64-byte window, so there is no window_size field.
         # nc_level is required; use nc_level 0 to disable normalized chunking.
         if count != 5:
             raise ArgumentTypeError(f"{algo} chunker params must be: {algo},chunk_min,chunk_max,chunk_mask,nc_level")

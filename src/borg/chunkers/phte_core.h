@@ -5,9 +5,12 @@
  * context plumbing are identical. This header holds everything that does not
  * depend on the rolling hash; phte_scan.h holds the scan template that does.
  *
- * Everything here is static (or static inline): each kernel is a separate
- * extension module and gets its own copy, so there is no cross-kernel call,
- * no indirection and no code-generation difference versus hand-copied code.
+ * Everything here is static (or static inline), except for the three
+ * phte_kernel_*() selection functions declared in phte_kernel.h, which the
+ * Cython modules call: each kernel is a separate extension module and gets its
+ * own copy, so there is no cross-kernel call, no indirection and no
+ * code-generation difference versus hand-copied code. For the same reason,
+ * two of the kernels can not be linked into one binary (duplicate symbols).
  */
 
 #ifndef BORG_PHTE_CORE_H

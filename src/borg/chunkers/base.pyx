@@ -50,8 +50,12 @@ cdef class ChunkerBase:
         """
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
-        assert max_size <= len(zeros)
-        assert min_size + 1 <= max_size, "too small max_size"
+        # The parameter checks here and in the subclasses raise ValueError rather than
+        # assert: the scan code relies on them for memory safety and python -O drops asserts.
+        if max_size > len(zeros):
+            raise ValueError("too big max_size")
+        if min_size + 1 > max_size:
+            raise ValueError("too small max_size")
 
         self.algo = algo
         self.chunk_mask = _mask_bits(hash_mask_bits, high_masks)
@@ -61,9 +65,10 @@ cdef class ChunkerBase:
         # probability). This concentrates chunk sizes around the target and reduces
         # chunk-size variance. nc_level == 0 disables it, keeping behavior byte-identical
         # to the single-mask chunker.
-        assert nc_level >= 0
-        assert hash_mask_bits - nc_level >= 1, "nc_level too large for hash_mask_bits"
-        assert hash_mask_bits + nc_level <= 48, "nc_level too large for hash_mask_bits"
+        if nc_level < 0:
+            raise ValueError("nc_level must not be negative")
+        if hash_mask_bits - nc_level < 1 or hash_mask_bits + nc_level > 48:
+            raise ValueError("nc_level too large for hash_mask_bits")
         self.nc_level = nc_level
         if nc_level:
             self.mask_s = _mask_bits(hash_mask_bits + nc_level, high_masks)

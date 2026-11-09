@@ -270,6 +270,31 @@ def expected_default_kernel(envvar, make, key, monkeypatch):
     raise AssertionError(f"none of {preference} is usable for {envvar} on {machine}")
 
 
+@pytest.mark.parametrize(
+    "algo, params",
+    [
+        (CH_FASTCDC, (10, 10, 10, 0)),  # min. chunk size + 1 does not fit into the max. chunk size
+        (CH_FASTCDC, (10, 25, 14, 0)),  # max. chunk size exceeds MAX_DATA_SIZE
+        (CH_FASTCDC, (10, 16, 14, -1)),  # negative nc_level
+        (CH_FASTCDC, (10, 16, 14, 14)),  # nc_level leaves no bits for the loose mask
+        (CH_BUZHASH, (10, 12, 11, 4095)),  # window + min. chunk size + 1 do not fit into the max. chunk size
+        (CH_BUZHASH, (10, 16, 14, -4095)),  # negative window size
+        (CH_BUZHASH64, (10, 12, 11, 4095, 0)),  # as for buzhash
+        (CH_BUZHASH64, (10, 16, 14, -4095, 0)),  # as for buzhash
+        (CH_TOEPLITZ_AES, (5, 16, 14, 0)),  # min. chunk size smaller than the 64-byte window
+        (CH_RABIN_AES, (5, 16, 14, 0)),
+        (CH_GOLDILOCKS_AES, (5, 16, 14, 0)),
+    ],
+)
+def test_chunkers_reject_invalid_params(algo, params):
+    # The chunkers' own parameter checks protect their scan code from reading outside
+    # the buffer, so they must raise even when asserts are off (python -O) and for
+    # callers that do not go through ChunkerParams. An assert would fail this test with
+    # an AssertionError.
+    with pytest.raises(ValueError):
+        get_chunker(algo, *params, sparse=False)
+
+
 @pytest.mark.parametrize("envvar", ["BORG_FASTCDC_KERNEL", "BORG_BUZHASH64_KERNEL", "BORG_AES_CHUNKER_KERNEL"])
 def test_kernel_env_rejects_unusable(envvar, monkeypatch):
     # A kernel that cannot run here must fail loudly instead of silently

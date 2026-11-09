@@ -1,11 +1,11 @@
 # Contributors
 
-377 people have contributed to Borg, with 11,630 commits in total.
+377 people have contributed to Borg, with 11,640 commits in total.
 Thanks to everyone who helped!
 
 ![Contributors by commit count](FAME.svg)
 
-Generated on 2026-11-02 by `scripts/fame.py`, which computes the statistics with
+Generated on 2026-11-09 by `scripts/fame.py`, which computes the statistics with
 [git-fame](https://github.com/casperdcl/git-fame), from the `master` branch
 only - commits that exist solely on other branches or in unmerged pull requests
 are not counted.
@@ -21,14 +21,14 @@ show up there, so the number understates early contributions.  Generated files
 
 | Contributor | Commits | Lines | Files |
 |:---|---:|---:|---:|
-| Thomas Waldmann | 7,897 | 108,193 | 534 |
+| Thomas Waldmann | 7,904 | 108,218 | 534 |
 | Marian Beermann | 1,140 | 7,534 | 156 |
 | Jonas Borgström | 560 | 941 | 38 |
 | Mrityunjay Raj | 319 | 15,826 | 117 |
 | Antoine Beaupré | 285 | 437 | 33 |
 | Andrey Bienkowski | 72 | 200 | 16 |
 | Ted Lawson | 71 | 4,357 | 39 |
-| dependabot[bot] | 64 | 47 | 14 |
+| dependabot[bot] | 66 | 47 | 14 |
 | Thalian | 63 | 560 | 28 |
 | Martin Hostettler | 46 | 2,558 | 9 |
 | Milkey Mouse | 42 | 239 | 12 |
@@ -42,7 +42,7 @@ show up there, so the number understates early contributions.  Generated files
 | Michael Hanselmann | 22 | 71 | 3 |
 | Björn Ketelaars | 17 | 28 | 4 |
 | SanskritFritz | 17 | 0 | 0 |
-| ThomasWaldmann | 14 | 181 | 1 |
+| ThomasWaldmann | 15 | 182 | 1 |
 | Lee Bousfield | 14 | 157 | 9 |
 | Alan Jenkins | 14 | 35 | 2 |
 | Daniel Rudolf | 13 | 213 | 14 |

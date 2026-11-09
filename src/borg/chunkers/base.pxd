@@ -18,7 +18,7 @@ cdef class ChunkerBase:
     cdef int done, eof
     cdef size_t min_size, buf_size, remaining, position, last
     cdef long long bytes_read, bytes_yielded
-    cdef readonly float chunking_time
+    cdef readonly double chunking_time  # a sum of many small increments, a C float would stop growing
     cdef object file_reader
     cdef size_t reader_block_size
     cdef bint sparse

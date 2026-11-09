@@ -32,7 +32,7 @@
 /* Results of bz64_kernel_select(). */
 #define BZ_KSEL_OK 0
 #define BZ_KSEL_UNKNOWN 1  /* not a kernel name on this platform */
-#define BZ_KSEL_NOTBUILT 2 /* known, but not compiled into this binary */
+#define BZ_KSEL_NOTBUILT 2 /* known, but not compiled into this binary (never returned, see fastcdc_impl.h) */
 #define BZ_KSEL_NOCPU 3    /* known and built, but this CPU cannot run it */
 
 /* Resolve a kernel name for this build; see fc_kernel_select(). */

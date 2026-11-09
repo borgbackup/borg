@@ -66,7 +66,7 @@ uint64_t ra_digest64(const RA_CTX *c, const uint8_t *q)
 #define PH_DIGEST64 ra_digest64
 #include "phte_scan.h"
 
-RA_CTX *ra_new(const uint64_t tables[RA_TABLES * 256], const uint8_t aes_key[16], int kernel)
+RA_CTX *ra_new(const uint64_t *tables, const uint8_t aes_key[16], int kernel)
 {
     RA_CTX *c = calloc(1, sizeof(RA_CTX));
     if (c == NULL)

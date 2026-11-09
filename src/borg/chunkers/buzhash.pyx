@@ -138,7 +138,10 @@ cdef class Chunker(ChunkerBase):
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
         self.table = NULL
         # see process, first while loop condition, first term must be able to get True:
-        assert hash_window_size + (1 << chunk_min_exp) + 1 <= (1 << chunk_max_exp), "too small max_size"
+        if hash_window_size < 0:
+            raise ValueError("hash_window_size must not be negative")
+        if hash_window_size + (1 << chunk_min_exp) + 1 > (1 << chunk_max_exp):
+            raise ValueError("too small max_size")
         self.window_size = hash_window_size
         self.table = buzhash_init_table(seed & 0xffffffff)
         # buzhash is single-mask (no normalized chunking): nc_level 0 makes
@@ -167,7 +170,7 @@ cdef class Chunker(ChunkerBase):
             else:
                 raise Exception("chunkifier byte count mismatch")
 
-        while self.remaining < min_size + window_size + 1 and not self.eof:  # see assert in Chunker init
+        while self.remaining < min_size + window_size + 1 and not self.eof:  # see check in __cinit__
             self.fill()
 
         # Here we either are at eof...

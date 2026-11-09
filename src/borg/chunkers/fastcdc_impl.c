@@ -409,14 +409,10 @@ int fc_kernel_select(const char *name, int *out_id)
         return FC_KSEL_OK;
     }
     if (strcmp(name, "avx512") == 0) {
-#ifndef FC_KIND_512
-        return FC_KSEL_NOTBUILT; /* compiler too old for the target attribute */
-#else
         if (!__builtin_cpu_supports("avx512f"))
             return FC_KSEL_NOCPU;
         *out_id = FC_K_VECTOR512;
         return FC_KSEL_OK;
-#endif
     }
 #endif
     return FC_KSEL_UNKNOWN;

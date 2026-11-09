@@ -336,8 +336,10 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        if window_size < 0:
+            raise ArgumentTypeError("window_size must not be negative")
         # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
-        # a max. chunk size sized buffer, see the assertion in ChunkerBuzHash64.__cinit__.
+        # a max. chunk size sized buffer, see the check in ChunkerBuzHash64.__cinit__.
         if window_size + 2**chunk_min + 1 > 2**chunk_max:
             raise ArgumentTypeError("required: window_size + 2^chunk_min + 1 <= 2^chunk_max")
         # normalized chunking switches the mask at the target size; it needs room below and above
@@ -364,7 +366,7 @@ def ChunkerParams(s):
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
         # the chunker needs one byte beyond the min. chunk size to fit into a max. chunk size
-        # sized buffer, see the assertion in ChunkerFastCDC.__cinit__.
+        # sized buffer, see the check in ChunkerBase._setup_common.
         if chunk_min >= chunk_max:
             raise ArgumentTypeError("required: chunk_min < chunk_max")
         if not (0 <= nc_level and chunk_mask - nc_level >= 1 and chunk_mask + nc_level <= 48):
@@ -374,7 +376,7 @@ def ChunkerParams(s):
         return CH_FASTCDC, chunk_min, chunk_max, chunk_mask, nc_level
     if algo in (CH_RABIN_AES, CH_GOLDILOCKS_AES, CH_TOEPLITZ_AES):
         # <algo>, chunk_min, chunk_max, chunk_mask, nc_level
-        # both UHF-then-PRF chunkers have a fixed 64-byte window, so there is no window_size field.
+        # the UHF-then-PRF chunkers have a fixed 64-byte window, so there is no window_size field.
         # nc_level is required; use nc_level 0 to disable normalized chunking.
         if count != 5:
             raise ArgumentTypeError(f"{algo} chunker params must be: {algo},chunk_min,chunk_max,chunk_mask,nc_level")
@@ -409,10 +411,12 @@ def ChunkerParams(s):
             raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
             raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+        if window_size < 0:
+            raise ArgumentTypeError("window_size must not be negative")
         if window_size % 2 == 0:
             raise ArgumentTypeError("window_size must be an uneven (odd) number")
         # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
-        # a max. chunk size sized buffer, see the assertion in Chunker.__cinit__ (buzhash.pyx).
+        # a max. chunk size sized buffer, see the check in Chunker.__cinit__ (buzhash.pyx).
         if window_size + 2**chunk_min + 1 > 2**chunk_max:
             raise ArgumentTypeError("required: window_size + 2^chunk_min + 1 <= 2^chunk_max")
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size

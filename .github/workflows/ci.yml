@@ -253,10 +253,31 @@ jobs:
         ls -l artifacts/
 
     - name: Attest binaries provenance (${{ matrix.binary }})
+      id: attest-binaries
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
       uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
       with:
         subject-path: 'artifacts/*'
+
+    - name: Name the sigstore bundle after the binaries (${{ matrix.binary }})
+      # The attestation is also stored in the GitHub attestations API, but
+      # fetching it from there needs a recent gh and a GitHub token - so the
+      # sigstore bundle rides along with the binaries and the release job
+      # attaches it to the release as <asset>.sigstore.jsonl, just like it does
+      # for the sdist, see .github/workflows/release.yml.
+      #
+      # One attestation covers both the single-file binary and the .tgz, so the
+      # same bundle is stored under both names - one for each asset.
+      if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      env:
+        BUNDLE_PATH: ${{ steps.attest-binaries.outputs.bundle-path }}
+      run: |
+        set -euxo pipefail
+        # the glob is expanded before the loop body creates any file:
+        for asset in artifacts/*; do
+          cp "$BUNDLE_PATH" "$asset.sigstore.jsonl"
+        done
+        ls -l artifacts/
 
     - name: Upload binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
@@ -487,6 +508,31 @@ jobs:
               ;;
           esac
 
+    - name: Attest provenance
+      id: attest-binaries
+      if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
+      with:
+        subject-path: 'artifacts/*'
+
+    - name: Name the sigstore bundle after the binaries
+      # The sigstore bundle rides along with the binaries and the release job
+      # attaches it to the release as <asset>.sigstore.jsonl - see the same step
+      # in native_tests for the details. One attestation covers both the
+      # single-file binary and the .tgz, so the same bundle is stored under both
+      # names - one for each asset. This is also why the attestation is made
+      # before the artifact is uploaded and not after it.
+      if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+      env:
+        BUNDLE_PATH: ${{ steps.attest-binaries.outputs.bundle-path }}
+      run: |
+        set -euxo pipefail
+        # the glob is expanded before the loop body creates any file:
+        for asset in artifacts/*; do
+          cp "$BUNDLE_PATH" "$asset.sigstore.jsonl"
+        done
+        ls -l artifacts/
+
     - name: Upload artifacts
       if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
@@ -495,8 +541,61 @@ jobs:
         path: artifacts/*
         if-no-files-found: ignore
 
-    - name: Attest provenance
-      if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
+
+  release:
+    # Build the sdist and draft the GitHub release with the binaries the jobs
+    # above built for this tag, see .github/workflows/release.yml.
+    #
+    # vm_tests is continue-on-error (a flaky BSD VM must not stop a release), so
+    # this waits for it, but only requires native_tests to have succeeded. A
+    # binary that did not get built is warned about while drafting the release.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') && needs.native_tests.result == 'success' }}
+    needs: [native_tests, vm_tests]
+
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    uses: ./.github/workflows/release.yml
+
+  pypi:
+    # Upload the sdist the release job built to PyPI.
+    #
+    # This job can not live in release.yml with the rest of the release code:
+    # PyPI trusted publishing does not work from a reusable workflow, see
+    # https://docs.pypi.org/trusted-publishers/troubleshooting/
+    #
+    # One-time setup, so that no API token has to be stored anywhere:
+    #  - on pypi.org, add a trusted publisher to the "borgbackup" project:
+    #    owner "borgbackup", repository "borg", workflow "ci.yml",
+    #    environment "pypi".
+    #  - create the "pypi" environment in the repository settings. Configuring
+    #    required reviewers for it makes this (irreversible) upload wait for an
+    #    approval, which is the last chance to stop a release.
+    if: ${{ startsWith(github.ref, 'refs/tags/') && needs.release.result == 'success' }}
+    needs: [release]
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/borgbackup/${{ github.ref_name }}
+
+    permissions:
+      contents: read
+      id-token: write  # trusted publishing
+
+    steps:
+    - name: Get the sdist built by the release job
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
-        subject-path: 'artifacts/*'
+        name: sdist
+        path: dist
+
+    - name: What we are about to upload
+      run: ls -l dist/
+
+    - name: Upload to PyPI
+      uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3

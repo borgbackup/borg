@@ -56,7 +56,7 @@ To check the GPG signature, download both the file and the corresponding
 signature (*.asc file) and then (on the shell) type, for example:
 
     gpg --recv-keys 9F88FB52FAF7B393
-    gpg --verify borgbackup.tar.gz.asc borgbackup.tar.gz
+    gpg --verify borg-linux64.asc borg-linux64
 
 The files are signed by:
 
@@ -82,6 +82,15 @@ Practical example (Linux, 1.4.3 tag):
 
 If verification succeeds, gh prints a summary stating the subject (your file),
 that it was attested by GitHub Actions, and the job/workflow reference.
+
+The source distribution (borgbackup-X.Y.Z.tar.gz, also on PyPI) is built on
+GitHub, too, and has a provenance attestation that is verified the same way:
+
+    gh attestation verify --repo borgbackup/borg --source-ref refs/tags/X.Y.Z borgbackup-X.Y.Z.tar.gz
+
+Its sigstore bundle is attached to the GitHub release as
+borgbackup-X.Y.Z.tar.gz.sigstore.jsonl, so it can also be verified offline
+(gh attestation verify --bundle) or with other sigstore tooling.
 
 
 Installing

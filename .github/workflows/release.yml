@@ -1,0 +1,224 @@
+# Release automation: build the source distribution and create a GitHub release
+# with it and the standalone binaries.
+#
+# This is called by ci.yml when a tag is pushed, and it deliberately runs as
+# part of that same workflow run: that is where the binaries for the tag are
+# built, and artifacts can only be downloaded within the run that created them.
+#
+# The GitHub release is created as a *draft* on purpose:
+#  - the release notes want a human,
+#  - and the binaries should be tried out before the release becomes visible.
+# Publishing the draft is a single click in the GitHub UI.
+#
+# Every release asset has a build provenance attestation, and the sigstore bundle
+# of each attestation is attached to the release as <asset>.sigstore.jsonl, for
+# offline verification. The sdist is attested here, the binaries by the jobs in
+# ci.yml that build them - those hand their bundles over in the artifact that
+# carries the binaries.
+#
+# The upload to PyPI is *not* done here, but by the "pypi" job in ci.yml: PyPI
+# trusted publishing can not be used from a reusable workflow, see
+# https://docs.pypi.org/trusted-publishers/troubleshooting/ - so that job has to
+# live in a workflow that is triggered by an event. This job hands the sdist
+# over to it as a workflow artifact.
+
+name: Release
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # The standalone binaries expected for a release: for every platform the
+  # single-file binary and, as a .tgz, the single-directory variant.  See the
+  # "binary" entries of the native_tests matrix and the "artifact_prefix"
+  # entries of the vm_tests matrix in ci.yml - keep in sync.
+  EXPECTED_ASSETS: >-
+    borg-linux-glibc235-x86_64-gh
+    borg-linux-glibc235-x86_64-gh.tgz
+    borg-linux-glibc235-arm64-gh
+    borg-linux-glibc235-arm64-gh.tgz
+    borg-macos-15-arm64-gh
+    borg-macos-15-arm64-gh.tgz
+    borg-macos-15-x86_64-gh
+    borg-macos-15-x86_64-gh.tgz
+    borg-freebsd-14-x86_64-gh
+    borg-freebsd-14-x86_64-gh.tgz
+
+jobs:
+  github_release:
+    name: Draft the GitHub release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    permissions:
+      contents: write      # to create the release
+      id-token: write      # to attest the sdist
+      attestations: write
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+        persist-credentials: false
+
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+      with:
+        python-version: '3.12'
+
+    - name: Install Linux packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config build-essential
+        sudo apt-get install -y libxxhash-dev
+
+    - name: Build the sdist
+      run: |
+        set -euxo pipefail
+        python -m pip install --upgrade pip build twine
+        # only a sdist: we do not publish wheels, they would be platform specific.
+        python -m build --sdist
+        twine check dist/*
+        ls -l dist/
+
+    - name: Check that the sdist has the version of the tag
+      # If the checkout is modified, setuptools-scm does not use the tag as the
+      # version, but silently guesses the next one and appends .devN. Such a
+      # release must not be uploaded to PyPI.
+      env:
+        TAG: ${{ github.ref_name }}
+      run: |
+        set -euxo pipefail
+        python - "$TAG" dist/borgbackup-*.tar.gz <<'EOF'
+        import sys
+        from packaging.utils import parse_sdist_filename
+        from packaging.version import Version
+        tag, sdist = sys.argv[1], sys.argv[2]
+        _, version = parse_sdist_filename(sdist.rpartition("/")[2])
+        if version != Version(tag):
+            raise SystemExit(f"sdist version {version} is not the tag version {tag} - modified checkout?")
+        print(f"sdist version {version} is the tag version.")
+        EOF
+
+    - name: Check that the sdist is complete and installable
+      # A release that cannot be installed from PyPI is the worst kind of
+      # release, and nothing else in CI ever installs borg from a sdist or
+      # without the development requirements.
+      run: |
+        set -euxo pipefail
+        python -m venv "$RUNNER_TEMP/venv-sdist"
+        "$RUNNER_TEMP/venv-sdist/bin/pip" install --upgrade pip
+        "$RUNNER_TEMP/venv-sdist/bin/pip" install dist/borgbackup-*.tar.gz
+        "$RUNNER_TEMP/venv-sdist/bin/borg" --version
+        "$RUNNER_TEMP/venv-sdist/bin/borg" --help > /dev/null
+
+    - name: Attest the sdist provenance
+      id: attest-sdist
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3.0.0
+      with:
+        subject-path: 'dist/*.tar.gz'
+
+    - name: Name the sigstore bundle after the sdist
+      # The attestation is also stored in the GitHub attestations API, but
+      # fetching it from there needs a recent gh and a GitHub token - so attach
+      # the sigstore bundle to the release as <sdist>.sigstore.jsonl, which
+      # allows offline/token-less verification with generic sigstore tooling
+      # (cosign, gh attestation verify --bundle).
+      env:
+        BUNDLE_PATH: ${{ steps.attest-sdist.outputs.bundle-path }}
+      run: |
+        set -euxo pipefail
+        sdist=$(basename dist/borgbackup-*.tar.gz)
+        cp "$BUNDLE_PATH" "dist/$sdist.sigstore.jsonl"
+
+    - name: Download the binaries built for this tag
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+      with:
+        path: assets
+        # the binary artifacts are all named like the binaries they contain
+        pattern: 'borg-*-gh'
+        merge-multiple: true
+
+    - name: Check that no binary is missing
+      run: |
+        set -uo pipefail
+        ls -l assets/ || true
+        missing=""
+        for asset in $EXPECTED_ASSETS; do
+          test -f "assets/$asset" || missing="$missing $asset"
+        done
+        if [ -n "$missing" ]; then
+          # not an error: vm_tests is continue-on-error, so e.g. a flaky FreeBSD
+          # VM should not stop the release - but do not lose it silently either.
+          echo "::warning::binaries missing from this release:$missing"
+        fi
+
+    - name: Create the draft release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ github.ref_name }}
+      run: |
+        set -euxo pipefail
+        # 1.4.0b1, 1.4.0rc1 and friends are pre-releases, 1.4.1 is not.
+        prerelease=""
+        case "$TAG" in *a*|*b*|*rc*) prerelease="--prerelease" ;; esac
+        cat > release-notes.md <<EOF
+        See the [changelog](https://github.com/borgbackup/borg/blob/$TAG/docs/changes.rst) for what changed in this release.
+
+        ### Installation
+
+        \`pip install borgbackup==$TAG\`, or use one of the standalone binaries below - they
+        contain everything they need and just have to be made executable.
+
+        For each platform there is a single-file binary (\`borg-*-gh\`) and, as a \`.tgz\`,
+        the same thing as a directory (\`borg-dir/borg.exe\`), which starts up faster.
+
+        The Linux binaries are built on Ubuntu 22.04, so your system needs at least
+        glibc 2.35 (the glibc version in the name).
+
+        The macOS binaries are built **without** FUSE support, so \`borg mount\` does
+        not work with them; install via \`pip\` instead if you need FUSE support.
+
+        All release assets have a [build provenance attestation](https://github.com/borgbackup/borg/attestations),
+        verifiable with \`gh attestation verify --owner borgbackup <file>\`.
+
+        Every attestation is additionally attached as a [sigstore](https://www.sigstore.dev/)
+        bundle \`<asset>.sigstore.jsonl\`, so it can be verified offline and without a
+        GitHub token, e.g. with cosign:
+
+        \`\`\`
+        cosign verify-blob borgbackup-$TAG.tar.gz \\
+          --bundle borgbackup-$TAG.tar.gz.sigstore.jsonl \\
+          --certificate-identity https://github.com/borgbackup/borg/.github/workflows/release.yml@refs/tags/$TAG \\
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com
+        \`\`\`
+
+        The binaries are built by \`ci.yml\`, not by \`release.yml\`, so their
+        \`--certificate-identity\` is
+        \`https://github.com/borgbackup/borg/.github/workflows/ci.yml@refs/tags/$TAG\`.
+        EOF
+        mkdir -p assets  # there may not have been any artifact to download
+        if gh release view "$TAG" > /dev/null 2>&1; then
+          # a re-run of this job: keep the (possibly already edited) release and
+          # just replace its assets.
+          gh release upload "$TAG" --clobber dist/*.tar.gz dist/*.sigstore.jsonl $(find assets -type f | sort)
+        else
+          gh release create "$TAG" \
+            --draft $prerelease \
+            --title "borg $TAG" \
+            --notes-file release-notes.md \
+            dist/*.tar.gz dist/*.sigstore.jsonl $(find assets -type f | sort)
+        fi
+        gh release view "$TAG" --json isDraft,isPrerelease,assets
+
+    - name: Keep the sdist for the PyPI upload
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: sdist
+        path: dist/*.tar.gz
+        if-no-files-found: error

@@ -22,6 +22,7 @@ from ...manifest import archive_group_key, format_group_key, group_archives
 from argparse import ArgumentTypeError
 
 from ...helpers import CommandError
+from ...helpers.time import calculate_relative_offset
 from ...manifest import ArchiveInfo
 from . import cmd, RK_ENCRYPTION, generate_archiver_tests
 
@@ -173,7 +174,7 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
         "--from=2026-06-04T16:00:00+00:00",
         "--keep-daily=1w",
         "--keep-weekly=4",
-        "--keep-monthly=5m",
+        "--keep-monthly=6m",
         "--keep-yearly=2",
     )
 
@@ -212,7 +213,6 @@ def test_prune_repository_example_interval(archivers, request, backup_files):
     for i, name in enumerate(monthly_kept, 1):
         assert re.search(rf"Keeping archive \(rule: monthly #{i}\):\s+{name}", output)
 
-    # No true yearly candidates remain; only the oldest archive fills the slot.
     assert re.search(r"Keeping archive \(rule: yearly\[oldest\] #1\):\s+backup_2025-11-15", output)
 
     # 05-27 was kept by daily yesterday (window started 05-26) but falls out
@@ -653,11 +653,13 @@ def test_prune_keep_monthly_int_or_interval(archivers, request, backup_files, ke
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     dt = datetime(2023, 12, 31, 0, 0, 0, tzinfo=timezone.utc)
-    _create_archive_dt(archiver, backup_files, "test-1", dt - timedelta(days=31))
-    _create_archive_dt(archiver, backup_files, "test-2", (dt - timedelta(days=62)).replace(microsecond=1))
-    _create_archive_dt(archiver, backup_files, "test-3", dt - timedelta(days=62))
-    _create_archive_dt(archiver, backup_files, "test-4", dt - timedelta(days=93))
-    _create_archive_dt(archiver, backup_files, "test-5", dt - timedelta(days=93, microseconds=1))
+    _create_archive_dt(archiver, backup_files, "test-1", datetime(2023, 11, 30, tzinfo=timezone.utc))
+    _create_archive_dt(archiver, backup_files, "test-2", datetime(2023, 10, 31, microsecond=1, tzinfo=timezone.utc))
+    _create_archive_dt(archiver, backup_files, "test-3", datetime(2023, 10, 31, tzinfo=timezone.utc))
+    _create_archive_dt(archiver, backup_files, "test-4", datetime(2023, 9, 30, tzinfo=timezone.utc))
+    _create_archive_dt(
+        archiver, backup_files, "test-5", datetime(2023, 9, 30, tzinfo=timezone.utc) - timedelta(microseconds=1)
+    )
     output = prune_ungrouped(archiver, "--list", "--dry-run", "--from", dt.isoformat(), keep_arg)
     assert re.search(r"Keeping archive \(rule: monthly #1\):\s+test-1", output)
     assert re.search(r"Keeping archive \(rule: monthly #2\):\s+test-2", output)
@@ -774,7 +776,7 @@ def test_prune_no_args(archivers, request):
         assert f"keep-{flag}" in output
 
 
-@pytest.mark.parametrize("keep_arg,value", list(product([rule.key for rule in PRUNING_RULES], ["0", "0S"])))
+@pytest.mark.parametrize("keep_arg,value", list(product([rule.key for rule in PRUNING_RULES], ["0", "0S", "0m", "0y"])))
 def test_prune_all_zero_args_one(archivers, request, keep_arg, value):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -793,16 +795,32 @@ def test_prune_all_zero_multiple_multiple(archivers, request):
 
 
 @pytest.mark.parametrize(
-    "lo_val,hi_val",
-    [("14d", "7d"), ("-1", "7d"), ("-1", "1"), ("-1", "-1"), ("all", "7d"), ("all", "1"), ("all", "-1")],
+    "hourly,daily,keep_old",
+    [
+        ("14d", "7d", False),
+        ("-1", "7d", True),
+        ("-1", "1", True),
+        ("-1", "-1", True),
+        ("all", "7d", True),
+        ("all", "1", True),
+        ("all", "-1", True),
+        ("30d", "7d", False),
+        ("12m", "1y", True),
+        ("1m", "30d", False),
+        ("365d", "1y", True),
+    ],
 )
-def test_prune_warns_on_redundant_interval_flags(archivers, request, lo_val, hi_val):
+def test_prune_allows_redundant_rules(archivers, request, backup_files, hourly, daily, keep_old):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    output = _cmd_prune_error(archiver, "--dry-run", f"--keep-hourly={lo_val}", f"--keep-daily={hi_val}")
-    assert "hourly=" in output
-    assert "daily=" in output
-    assert "effectively useless" in output
+    _create_archive_ts(archiver, backup_files, "old", 2025, 12, 1)
+    _create_archive_ts(archiver, backup_files, "recent", 2026, 1, 31)
+    prune_args = ("--from=2026-02-01T00:00:00+00:00", f"--keep-hourly={hourly}", f"--keep-daily={daily}")
+    output = json.loads(prune_ungrouped(archiver, "--json", "--dry-run", *prune_args))
+    assert {a["name"]: a["kept"] for a in output["archives"]} == {"old": keep_old, "recent": True}
+    prune_ungrouped(archiver, *prune_args)
+    archives = json.loads(cmd(archiver, "repo-list", "--json"))["archives"]
+    assert {a["name"] for a in archives} == ({"old", "recent"} if keep_old else {"recent"})
 
 
 @pytest.mark.parametrize("lo_val,hi_val", [("7d", "14d"), ("7d", "-1"), ("1", "-1"), ("7d", "all"), ("1", "all")])
@@ -861,17 +879,17 @@ def test_prune_from_prefiltered_archives_ignored_in_pruning(archivers, request, 
 
 def test_prune_interval_rolling_schedule_oldest_retention():
     daily_interval = timedelta(days=6)
-    monthly_interval = timedelta(days=31 * 3)  # Matching --keep-monthly=3m after argument parsing
     start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
     previous_archives = []
     archives = []
 
-    for day_offset in range(95):
+    for day_offset in range(93):
         backup_ts = start_date + timedelta(days=day_offset)
         previous_archives = archives
         archives = [mock_archive(backup_ts, day_offset), *archives]
 
+        monthly_interval = backup_ts - calculate_relative_offset("3m", backup_ts, earlier=True)
         keep = {}
         keep |= prune(archives, PRUNE_DAILY, daily_interval, backup_ts, False, keep)
         keep |= prune(archives, PRUNE_MONTHLY, monthly_interval, backup_ts, True, keep)
@@ -885,11 +903,8 @@ def test_prune_interval_rolling_schedule_oldest_retention():
 
         archives = sorted(keep.keys(), key=lambda a: a.ts, reverse=True)
 
-    # It is now 2024-04-04. On this final run jan-01 falls outside the
-    # 93d monthly interval and is pruned. It was kept until now by the
-    # oldest-retention rule — on 2024-04-03 it was exactly at the
-    # inclusive boundary and retained as oldest.
-
+    # 2024-01-01 is on the three-month boundary on 2024-04-01.
+    # It falls outside the window on 2024-04-02.
     assert previous_archives[-1].ts.strftime("%m-%d") == "01-01"
     assert archives[-1].ts.strftime("%m-%d") == "01-31"
 
@@ -1074,3 +1089,127 @@ def test_prune_group_by_invalid_key(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "prune", "--group-by", "bogus", "--keep-daily=1", exit_code=2)
     assert "Invalid group-by key: bogus" in output
+
+
+@pytest.mark.parametrize(
+    "reference,interval,cutoff",
+    [
+        ("2026-07-22", "12m", "2025-07-22"),
+        ("2026-07-22", "3y", "2023-07-22"),
+        ("2026-03-31", "1m", "2026-02-28"),
+        ("2024-03-31", "1m", "2024-02-29"),
+        ("2024-02-29", "1y", "2023-02-28"),
+        ("2026-01-31", "2m", "2025-11-30"),
+        ("2026-03-31T12:34:56.123456+05:30", "1m", "2026-02-28T12:34:56.123456+05:30"),
+    ],
+)
+def test_prune_calendar_interval(archivers, request, backup_files, reference, interval, cutoff):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    reference = datetime.fromisoformat(reference)
+    cutoff = datetime.fromisoformat(cutoff)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+        cutoff = cutoff.replace(tzinfo=timezone.utc)
+    archive_times = {
+        "too-old": cutoff - timedelta(microseconds=1),
+        "boundary": cutoff,
+        "inside": cutoff + timedelta(microseconds=1),
+        "from": reference,
+        "newer": reference + timedelta(microseconds=1),
+    }
+    for name, archive_time in archive_times.items():
+        _create_archive_dt(archiver, backup_files, name, archive_time)
+
+    prune_args = ("--from", reference.isoformat(), "--keep", interval)
+    output = json.loads(prune_ungrouped(archiver, "--json", "--dry-run", *prune_args))
+    assert {a["name"]: a["kept"] for a in output["archives"]} == {name: name != "too-old" for name in archive_times}
+    assert {a["name"] for a in json.loads(cmd(archiver, "repo-list", "--json"))["archives"]} == set(archive_times)
+
+    prune_ungrouped(archiver, *prune_args)
+    remaining = json.loads(cmd(archiver, "repo-list", "--json"))["archives"]
+    assert {a["name"] for a in remaining} == set(archive_times) - {"too-old"}
+
+
+@pytest.mark.parametrize(
+    "reference,weekly,monthly,cutoff",
+    [
+        ("2026-03-10", "4w", "1m", "2026-02-10"),
+        ("2026-04-10", "4w", "1m", "2026-03-10"),
+        ("2026-05-01", "13w", "3m", "2026-01-30"),
+        ("2026-05-31", "13w", "3m", "2026-02-28"),
+    ],
+)
+def test_prune_calendar_rule_combinations(archivers, request, backup_files, reference, weekly, monthly, cutoff):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    reference = datetime.fromisoformat(reference).replace(tzinfo=timezone.utc)
+    cutoff = datetime.fromisoformat(cutoff).replace(tzinfo=timezone.utc)
+    _create_archive_dt(archiver, backup_files, "old", cutoff - timedelta(microseconds=1))
+    _create_archive_dt(archiver, backup_files, "boundary", cutoff)
+    _create_archive_dt(archiver, backup_files, "from", reference)
+    prune_args = ("--from", reference.isoformat(), "--keep-weekly", weekly, "--keep-monthly", monthly)
+    output = json.loads(prune_ungrouped(archiver, "--json", "--dry-run", *prune_args))
+    assert {a["name"]: a["kept"] for a in output["archives"]} == {"old": False, "boundary": True, "from": True}
+    archives = json.loads(cmd(archiver, "repo-list", "--json"))["archives"]
+    assert {a["name"] for a in archives} == {"old", "boundary", "from"}
+    prune_ungrouped(archiver, *prune_args)
+    archives = json.loads(cmd(archiver, "repo-list", "--json"))["archives"]
+    assert {a["name"] for a in archives} == {"boundary", "from"}
+
+
+def test_prune_preserves_retention_args(archiver, backup_files, monkeypatch):
+    from ...archiver.prune_cmd import PruneMixIn
+
+    seen = []
+    original_compute_keep = PruneMixIn._compute_keep
+
+    def compute_keep(self, archives, args, *rest):
+        seen.append((args.keep, args.daily, args.monthly))
+        return original_compute_keep(self, archives, args, *rest)
+
+    monkeypatch.setattr(PruneMixIn, "_compute_keep", compute_keep)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for host in ("host1", "host2"):
+        monkeypatch.setenv("BORG_HOSTNAME", host)
+        _create_archive_ts(archiver, backup_files, "home", 2026, 3, 30)
+    cmd(
+        archiver,
+        "prune",
+        "--dry-run",
+        "--group-by=host",
+        "--from=2026-03-31T00:00:00+00:00",
+        "--keep=1m",
+        "--keep-daily=1",
+        "--keep-monthly=2m",
+    )
+    assert seen == [("1m", 1, "2m"), ("1m", 1, "2m")]
+
+
+def test_prune_calendar_interval_without_from(archiver, backup_files, monkeypatch):
+    from ...archiver import prune_cmd
+
+    reference = datetime(2026, 3, 1, tzinfo=timezone.utc)
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return reference.astimezone(tz)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    _create_archive_ts(archiver, backup_files, "too-old", 2026, 1, 31)
+    _create_archive_ts(archiver, backup_files, "boundary", 2026, 2, 1)
+    monkeypatch.setattr(prune_cmd, "datetime", FixedDatetime)
+    output = json.loads(prune_ungrouped(archiver, "--json", "--dry-run", "--keep", "1m"))
+    assert {a["name"]: a["kept"] for a in output["archives"]} == {"too-old": False, "boundary": True}
+
+
+@pytest.mark.parametrize("interval", ["99999y", "99999999999999999999d"])
+def test_prune_calendar_interval_out_of_range(archivers, request, backup_files, interval):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "untouched", backup_files)
+    output = _cmd_prune_error(archiver, "--keep", interval, "--from", "2026-07-22T00:00:00+00:00")
+    assert "Invalid retention interval" in output
+    archives = json.loads(cmd(archiver, "repo-list", "--json"))["archives"]
+    assert [a["name"] for a in archives] == ["untouched"]

@@ -175,12 +175,23 @@ module = [
     "msgpack.*",
     "llfuse",
     "pyfuse3",
+    "mfusepy",
     "trio",
+    "borghash.*",
+    "borgstore.*",
+    "textual.*",
+    "backports.*",
     "borg.crypto.low_level",
     "borg.legacy.crypto.low_level",
     "borg.platform.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "borg.manifest"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
 
 [tool.tox]
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools-scm[toml]"]

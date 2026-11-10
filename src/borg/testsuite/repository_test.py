@@ -1696,6 +1696,51 @@ def test_pack_writer_async_get_waits_for_inflight_store(tmp_path):
         assert repository.get(H(1)) == chunk1
 
 
+def create_repo_with_index(location):
+    # create a repository with one stored pack and a stored index, like after a first backup.
+    with Repository(location, exclusive=True, create=True) as repository:
+        repository.put(H(0), fchunk(b"FIRST", chunk_id=H(0)))
+        repository.flush()
+
+
+@pytest.mark.parametrize("permissions", ["no-delete", "write-only"])
+def test_pack_writer_keeps_identical_existing_pack(tmp_path, monkeypatch, permissions):
+    # an aborted session stored a pack, but not the index entries for its objects. a later session builds
+    # the same pack again: storing it would overwrite, which the permissions deny. the existing pack has the
+    # same contents (its name is their store hash), so it is kept and used instead (#10512).
+    location = os.fspath(tmp_path / "repo")
+    create_repo_with_index(location)
+    monkeypatch.setenv("BORG_REPO_PERMISSIONS", permissions)
+    chunk = fchunk(b"DATA", chunk_id=H(1))
+    with Repository(location, exclusive=True) as repository:
+        repository.put(H(1), chunk)
+        repository.flush()
+        pack_id = repository.chunks[H(1)].pack_id
+        packs = pack_names(repository)
+        repository._chunks = None  # aborted: the index entries are not persisted
+    with Repository(location, exclusive=True) as repository:
+        assert repository.chunks.get(H(1)) is None
+        repository.put(H(1), chunk)
+        repository.flush()
+        assert repository.chunks[H(1)].pack_id == pack_id
+        assert pack_names(repository) == packs
+
+
+def test_pack_writer_denied_store_over_different_existing_pack(tmp_path, monkeypatch):
+    # a stored object with the pack's name, but another size, is not the same pack: the store error is raised.
+    location = os.fspath(tmp_path / "repo")
+    chunk = fchunk(b"DATA", chunk_id=H(1))
+    pack_name = "packs/" + bin_to_hex(store_hash(chunk).digest())
+    create_repo_with_index(location)
+    with Repository(location, exclusive=True) as repository:
+        repository.store_store(pack_name, chunk[:-1])  # e.g. a truncated pack
+    monkeypatch.setenv("BORG_REPO_PERMISSIONS", "no-delete")
+    with pytest.raises(PermissionDenied):
+        with Repository(location, exclusive=True) as repository:
+            repository.put(H(1), chunk)
+            repository.flush()
+
+
 def test_get_read_data_false_with_range(tmp_path):
     # read_data=False with ChunkIndex entries limits the load to each object's boundary.
     hdr_size = RepoObj.obj_header.size

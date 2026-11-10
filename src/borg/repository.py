@@ -275,13 +275,30 @@ class PackWriter:
                 offset += obj_size
 
             self._trace("S", trace)
-            self.store.store("packs/" + bin_to_hex(pack_id), pack_data)
+            self._store_pack(pack_id, pack_data)
         except BaseException as exc:  # incl. KeyboardInterrupt: it must not vanish with the thread
             outcome.error = exc
         else:
             outcome.results = results
         finally:
             self._trace(">", trace)
+
+    def _store_pack(self, pack_id, pack_data):
+        """Store a pack, or keep the identical pack that already is stored under its name.
+
+        The pack name is the store hash of the pack bytes, so a stored pack with that name and size has the
+        same contents.  That happens if an aborted session stored the pack, but not the index entries for its
+        objects, and a later session builds the same pack again (e.g. in the authenticated modes, the objects
+        of unchanged input data are identical).  Overwriting is not needed then and the no-delete or
+        write-only repo permissions do not allow it, so the existing pack is kept (#10512).
+        """
+        name = "packs/" + bin_to_hex(pack_id)
+        try:
+            self.store.store(name, pack_data)
+        except StorePermissionDenied:
+            info = self.store.info(name)
+            if not (info.exists and info.size == len(pack_data)):
+                raise
 
     def _apply_outcome(self, outcome):
         """Apply one finished pack store to the ChunkIndex (calling thread only).

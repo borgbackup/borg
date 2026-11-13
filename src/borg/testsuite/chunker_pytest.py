@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+import signal
 import tempfile
 
 import pytest
@@ -185,6 +186,85 @@ def test_chunkify_pipe():
         t.join()
     assert b''.join(chunks) == data
     assert [len(c) for c in chunks] == [131072, 65536 + 123]
+
+
+# the EINTR tests send the signal to the main thread (which blocks in read()) with pthread_kill: a process-directed
+# signal (e.g. from setitimer) may be delivered to another thread (seen on NetBSD and OpenBSD), and then read()
+# is not interrupted at all.
+
+
+@pytest.mark.skipif(not hasattr(signal, 'pthread_kill'), reason='no signal.pthread_kill on this platform')
+def test_chunkify_eintr_retried():
+    # a signal handled while the buzhash chunker's C code blocks in read() makes read() fail with EINTR
+    # (Python installs its handlers without SA_RESTART) - the chunker must retry the read, not fail.
+    import threading
+    import time
+    data = os.urandom(3 * 65536 + 123)
+    r, w = os.pipe()
+    main_thread = threading.get_ident()
+    signals = []
+
+    def writer():
+        with os.fdopen(w, 'wb') as f:
+            for start in range(0, len(data), 65536):
+                for _ in range(5):  # writer pause: the chunker blocks in read() while the signals arrive
+                    time.sleep(0.02)
+                    signal.pthread_kill(main_thread, signal.SIGALRM)
+                f.write(data[start:start + 65536])
+                f.flush()
+
+    old_handler = signal.signal(signal.SIGALRM, lambda sig_no, stack: signals.append(sig_no))
+    t = threading.Thread(target=writer)
+    t.start()
+    try:
+        chunker = Chunker(0, 10, 16, 14, 4095)
+        chunks = cf(chunker.chunkify(None, r))
+    finally:
+        os.close(r)
+        t.join()  # before restoring the old handler: the writer sends no more signals after this
+        signal.signal(signal.SIGALRM, old_handler)
+    assert signals
+    assert b''.join(chunks) == data
+
+
+@pytest.mark.skipif(not hasattr(signal, 'pthread_kill'), reason='no signal.pthread_kill on this platform')
+def test_chunkify_eintr_handler_exception():
+    # if the signal handler raises (like for SIGTERM or a 2nd SIGINT), the chunker must not retry
+    # the read, but propagate the handler's exception right away (not only when more data comes in).
+    import threading
+
+    class SignalReceived(Exception):
+        pass
+
+    def handler(sig_no, stack):
+        raise SignalReceived
+
+    def writer():
+        # the pipe stays empty, so read() blocks when the signal arrives. only if the reader is still
+        # stuck after a long time, unblock it with some data and EOF (so a failing test does not hang).
+        with os.fdopen(w, 'wb') as f:
+            if not reader_done.wait(0.05):
+                signal.pthread_kill(main_thread, signal.SIGALRM)
+            if not reader_done.wait(5):
+                f.write(b'data')
+                unblocked.set()
+
+    reader_done, unblocked = threading.Event(), threading.Event()
+    r, w = os.pipe()
+    main_thread = threading.get_ident()
+    old_handler = signal.signal(signal.SIGALRM, handler)
+    t = threading.Thread(target=writer)
+    t.start()
+    try:
+        chunker = Chunker(0, 10, 16, 14, 4095)
+        with pytest.raises(SignalReceived):
+            cf(chunker.chunkify(None, r))
+    finally:
+        reader_done.set()
+        t.join()
+        signal.signal(signal.SIGALRM, old_handler)
+        os.close(r)
+    assert not unblocked.is_set()
 
 
 def test_buzhash_chunksize_distribution():

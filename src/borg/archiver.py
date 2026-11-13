@@ -653,6 +653,8 @@ class Archiver:
                     pipe_bin = sys.stdin.buffer
                 pipe = TextIOWrapper(pipe_bin, errors='surrogateescape')
                 for path in iter_separated(pipe, paths_sep):
+                    if sig_int:
+                        break  # the archive will not be saved, so stop processing items.
                     strip_prefix = get_strip_prefix(path)
                     path = os.path.normpath(path)
                     try:
@@ -668,11 +670,17 @@ class Archiver:
                         self.print_warning_instance(FileChangedWarning(path))
                     self.print_file_status(status, path)
                 if args.paths_from_command:
+                    if sig_int:
+                        # we stopped reading the command's output, so do not wait for it to finish
+                        # (it ignores SIGINT, see ignore_sigint).
+                        proc.terminate()
                     rc = proc.wait()
-                    if rc != 0:
+                    if rc != 0 and not sig_int:
                         raise CommandError(f'Command {args.paths[0]!r} exited with status {rc}')
             else:
                 for path in args.paths:
+                    if sig_int:
+                        break  # the archive will not be saved, so stop processing items.
                     if path == '-':  # stdin
                         path = args.stdin_name
                         mode = args.stdin_mode
@@ -713,15 +721,22 @@ class Archiver:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 archive.stats += fso.stats
-                if sig_int:
-                    # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
-                    # we already have a checkpoint archive in this case.
-                    raise Error("Got Ctrl-C / SIGINT.")
-                else:
-                    archive.save(comment=args.comment, timestamp=args.timestamp)
-                    if args.stats or args.quick_stats or args.json:
-                        self.print_archive_stats(manifest, cache, archive,
-                                                 output_json=args.json, quick_stats=args.quick_stats)
+                if sig_int and not sig_int.action_done():
+                    # the checkpoint for the Ctrl-C is only written while chunking file content, so it was
+                    # not written yet if no file content was chunked after the Ctrl-C - write it now.
+                    logger.info('checkpoint requested: starting checkpoint creation...')
+                    archive.write_checkpoint()
+                    sig_int.action_completed()
+                    logger.info('checkpoint requested: finished checkpoint creation!')
+            if sig_int:
+                # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
+                # we have a checkpoint archive in this case (and a dry run must not look complete).
+                raise Error("Got Ctrl-C / SIGINT.")
+            if not dry_run:
+                archive.save(comment=args.comment, timestamp=args.timestamp)
+                if args.stats or args.quick_stats or args.json:
+                    self.print_archive_stats(manifest, cache, archive,
+                                             output_json=args.json, quick_stats=args.quick_stats)
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -824,8 +839,9 @@ class Archiver:
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
-        if sig_int and sig_int.action_done():
-            # the user says "get out of here!" and we have already completed the desired action.
+        if sig_int:
+            # the user says "get out of here!" - the archive will not be saved, so stop processing items.
+            # do_create writes the checkpoint archive, if it was not already written while chunking.
             return
 
         status = None

@@ -223,6 +223,8 @@ class CreateMixIn:
                     pipe_bin = sys.stdin.buffer
                 pipe = TextIOWrapper(pipe_bin, errors="surrogateescape")
                 for path in iter_separated(pipe, paths_sep):
+                    if sig_int:
+                        break  # the archive will not be saved, so stop processing items.
                     path = slashify(path)
                     strip_prefix = get_strip_prefix(path)
                     path = posixpath.normpath(path)
@@ -250,12 +252,18 @@ class CreateMixIn:
                     if not dry_run and status is not None:
                         fso.stats.files_stats[status] += 1
                 if args.paths_from_command or args.paths_from_shell_command:
+                    if sig_int:
+                        # we stopped reading the command's output, so do not wait for it to finish
+                        # (it ignores SIGINT, see ignore_sigint).
+                        proc.terminate()
                     rc = proc.wait()
-                    if rc != 0:
+                    if rc != 0 and not sig_int:
                         raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
             else:
                 paths = list(args.pattern_roots) + list(args.paths)
                 for path in paths:
+                    if sig_int:
+                        break  # the archive will not be saved, so stop processing items.
                     if path == "":  # issue #5637
                         self.print_warning("An empty string was given as PATH, ignoring.")
                         continue
@@ -314,12 +322,12 @@ class CreateMixIn:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 archive.stats += fso.stats
-                if sig_int:
-                    # do not save the archive if the user ctrl-c-ed.
-                    raise Error("Got Ctrl-C / SIGINT.")
-                else:
-                    archive.tags = set(args.tags or [])
-                    archive.save(comment=args.comment, timestamp=args.timestamp)
+            if sig_int:
+                # do not save the archive if the user ctrl-c-ed (and do not present a dry run as complete).
+                raise Error("Got Ctrl-C / SIGINT.")
+            if not dry_run:
+                archive.tags = set(args.tags or [])
+                archive.save(comment=args.comment, timestamp=args.timestamp)
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -621,8 +629,8 @@ class CreateMixIn:
 
         This should only raise on critical errors. Per-item errors must be handled within this method.
         """
-        if sig_int and sig_int.action_done():
-            # the user says "get out of here!" and we have already completed the desired action.
+        if sig_int:
+            # the user says "get out of here!" - the archive will not be saved, so stop processing items.
             return
 
         status = None

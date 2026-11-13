@@ -221,8 +221,6 @@ def raising_signal_handler(exc_cls):
 class SigIntManager:
     def __init__(self):
         self._sig_int_triggered = False
-        self._action_triggered = False
-        self._action_done = False
         self.ctx = signal_handler("SIGINT", self.handler)
         self.debounce_interval = 20000000  # ns
         self.last = None  # monotonic time when we last processed SIGINT
@@ -230,20 +228,6 @@ class SigIntManager:
     def __bool__(self):
         # this will be True (and stay True) after the first Ctrl-C/SIGINT
         return self._sig_int_triggered
-
-    def action_triggered(self):
-        # this is True to indicate that the action shall be done
-        return self._action_triggered
-
-    def action_done(self):
-        # this will be True after the action has completed
-        return self._action_done
-
-    def action_completed(self):
-        # this must be called when the action triggered is completed,
-        # to avoid repeatedly triggering the action.
-        self._action_triggered = False
-        self._action_done = True
 
     def handler(self, sig_no, stack):
         # Ignore a SIGINT if it comes too quickly after the last one, e.g. because it
@@ -255,7 +239,6 @@ class SigIntManager:
         if self.last is None:  # first SIGINT
             self.last = now
             self._sig_int_triggered = True
-            self._action_triggered = True
         elif now - self.last >= self.debounce_interval:  # second SIGINT
             # restore the original signal handler for the 3rd+ SIGINT -
             # this implies that this handler here loses control!

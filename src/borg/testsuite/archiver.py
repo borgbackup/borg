@@ -25,6 +25,7 @@ from datetime import timezone
 from datetime import timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
+from contextlib import contextmanager
 from unittest.mock import patch
 from pathlib import Path
 
@@ -52,6 +53,7 @@ from ..helpers.errors import modern_ec
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, Error, CancelledByUser, RTError, CommandError
 from ..helpers import bin_to_hex, hex_to_bin
 from ..helpers import Buffer
+from ..helpers import sig_int
 from ..helpers import MAX_S
 from ..helpers import msgpack
 from ..helpers import flags_noatime, flags_normal
@@ -248,6 +250,30 @@ def test_disk_full(cmd):
             if rc != EXIT_SUCCESS:
                 print('check', rc, out)
             assert rc == EXIT_SUCCESS
+
+
+@contextmanager
+def ctrl_c_after_first_item():
+    """Simulate one Ctrl-C (SIGINT) right after create processed the first item.
+
+    Yields the list of paths create processed (and reported via print_file_status).
+    """
+    original_print_file_status = Archiver.print_file_status
+    paths = []
+
+    def print_file_status(self, status, path):
+        original_print_file_status(self, status, path)
+        if status is not None:  # None: the final status of this item was already printed
+            paths.append(path)
+            if not sig_int:
+                sig_int._sig_int_triggered = sig_int._action_triggered = True  # like SigIntManager.handler
+
+    try:
+        with patch.object(Archiver, 'print_file_status', print_file_status):
+            yield paths
+    finally:
+        # reset the global flags for the following tests
+        sig_int._sig_int_triggered = sig_int._action_triggered = sig_int._action_done = False
 
 
 class ArchiverTestCaseBase(BaseTestCase):
@@ -1513,6 +1539,58 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         output = self.cmd('create', '--paths-from-command', self.repository_location + '::test', exit_code=2)
         assert output.endswith('No command given.\n')
+
+    def test_create_ctrl_c_writes_checkpoint(self):
+        # after a Ctrl-C, create stops processing items and writes a checkpoint archive - also when no file content
+        # gets chunked any more (empty files here; the checkpoint is otherwise written while chunking), see #10625.
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        for i in range(10):
+            self.create_regular_file(f'dir{i}/file{i}')
+        with ctrl_c_after_first_item() as paths:
+            with pytest.raises(Error, match='Got Ctrl-C'):
+                # 2 roots: the 2nd one is not processed any more
+                self.cmd('create', self.repository_location + '::test', 'input', 'input/dir9')
+        files = [path for path in paths if re.fullmatch(r'input/dir\d/file\d', path)]
+        assert len(files) <= 1  # at most the file being processed at Ctrl-C time
+        archives = self.cmd('list', '--consider-checkpoints', '--format', '{archive}{NL}', self.repository_location)
+        assert archives.splitlines() == ['test.checkpoint']
+        checkpoint = self.cmd('list', '--format', '{path}{NL}', self.repository_location + '::test.checkpoint')
+        assert set(paths) <= set(checkpoint.splitlines())  # the checkpoint has all the items processed so far
+
+    def test_create_dry_run_ctrl_c(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        for i in range(10):
+            self.create_regular_file(f'dir{i}/file{i}')
+        with ctrl_c_after_first_item() as paths:
+            with pytest.raises(Error, match='Got Ctrl-C'):
+                self.cmd('create', '--dry-run', self.repository_location + '::test', 'input', 'input/dir9')
+        files = [path for path in paths if re.fullmatch(r'input/dir\d/file\d', path)]
+        assert len(files) <= 1
+
+    def test_create_paths_from_stdin_ctrl_c(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        for i in range(10):
+            self.create_regular_file(f'file{i}')
+        input_data = '\n'.join(f'input/file{i}' for i in range(10)).encode()
+        with ctrl_c_after_first_item() as paths:
+            with pytest.raises(Error, match='Got Ctrl-C'):
+                self.cmd('create', '--paths-from-stdin', self.repository_location + '::test', input=input_data)
+        assert paths == ['input/file0']
+        checkpoint = self.cmd('list', '--format', '{path}{NL}', self.repository_location + '::test.checkpoint')
+        assert checkpoint.splitlines() == ['input/file0']
+
+    def test_create_paths_from_command_ctrl_c(self):
+        # after a Ctrl-C, create stops reading the command's output and must not wait for the command to finish.
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file('file0')
+        # more output than borg reads in one go, then the command keeps running for a long time:
+        script = 'i=0; while [ $i -lt 2000 ]; do echo input/file0; i=$((i+1)); done; exec sleep 60'
+        start = time.monotonic()
+        with ctrl_c_after_first_item() as paths:
+            with pytest.raises(Error, match='Got Ctrl-C'):
+                self.cmd('create', '--paths-from-command', self.repository_location + '::test', '--', 'sh', '-c', script)
+        assert time.monotonic() - start < 30
+        assert paths == ['input/file0']
 
     def test_create_without_root(self):
         """test create without a root"""
@@ -4892,6 +4970,22 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_create_xattrs_errors(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_ctrl_c_writes_checkpoint(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_dry_run_ctrl_c(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_paths_from_stdin_ctrl_c(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_paths_from_command_ctrl_c(self):
         pass
 
     @unittest.skip('patches objects')

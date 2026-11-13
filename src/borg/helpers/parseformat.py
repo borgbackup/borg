@@ -142,7 +142,7 @@ def ChunkerParams(s):
         if window_size < 0:
             raise argparse.ArgumentTypeError('window_size must not be negative')
         # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
-        # a max. chunk size sized buffer, see the parameter checks in Chunker.__cinit__.
+        # a max. chunk size sized buffer, see the check in Chunker.__cinit__.
         if window_size + 2 ** chunk_min + 1 > 2 ** chunk_max:
             raise argparse.ArgumentTypeError('required: window_size + 2^chunk_min + 1 <= 2^chunk_max')
         if window_size % 2 == 0:

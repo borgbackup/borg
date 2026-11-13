@@ -284,7 +284,7 @@ chunker_process(Chunker *c)
             PyErr_SetString(PyExc_Exception, "chunkifier byte count mismatch");
         return NULL;
     }
-    while(c->remaining < min_size + window_size + 1 && !c->eof) {  /* see parameter checks in Chunker.__cinit__ */
+    while(c->remaining < min_size + window_size + 1 && !c->eof) {  /* see the check in Chunker.__cinit__ */
         if(!chunker_fill(c)) {
             return NULL;
         }

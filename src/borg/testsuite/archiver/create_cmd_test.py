@@ -2,11 +2,14 @@ import errno
 import hashlib
 import json
 import os
+import re
 import tempfile
 import shutil
 import socket
 import stat
 import subprocess
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,13 +19,14 @@ from blake3 import blake3
 from ... import platform
 from ... import xattr
 from ...constants import *  # NOQA
+from ...archiver import Archiver
 from ...constants import zeros
 from ...manifest import Manifest
 from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError, BackupBrokenSymlinkError
-from ...helpers import BackupWarning, Buffer, Error
+from ...helpers import BackupWarning, Buffer, Error, sig_int
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -511,6 +515,81 @@ def test_create_paths_from_shell_command(archivers, request):
     archive_list = cmd(archiver, "list", "test", "--json-lines")
     paths = [json.loads(line)["path"] for line in archive_list.split("\n") if line]
     assert paths == ["input/file1", "input/file2"]
+
+
+@contextmanager
+def ctrl_c_after_first_item():
+    """Simulate one Ctrl-C (SIGINT) right after create processed the first item.
+
+    Yields the list of paths create processed (and reported via print_file_status).
+    """
+    original_print_file_status = Archiver.print_file_status
+    paths = []
+
+    def print_file_status(self, status, path):
+        original_print_file_status(self, status, path)
+        if status is not None:  # None: the final status of this item was already printed
+            paths.append(path)
+            sig_int._sig_int_triggered = True
+
+    try:
+        with patch.object(Archiver, "print_file_status", print_file_status):
+            yield paths
+    finally:
+        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_create_ctrl_c_stops(archivers, request, dry_run):
+    # the archive is not saved after a Ctrl-C, so create must stop processing items - also when no
+    # file content gets chunked any more (empty files here), see #10625.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for i in range(10):
+        create_regular_file(archiver.input_path, f"dir{i}/file{i}")
+    dry_run_args = ["--dry-run"] if dry_run else []
+    with ctrl_c_after_first_item() as paths:
+        with pytest.raises(Error, match="Got Ctrl-C"):
+            # 2 roots: the 2nd one is not processed any more
+            cmd(archiver, "create", *dry_run_args, "test", "input", "input/dir9")
+    files = [path for path in paths if re.fullmatch(r"input/dir\d/file\d", path)]
+    assert len(files) <= 1  # at most the file being processed at Ctrl-C time
+    assert "test" not in cmd(archiver, "repo-list")
+
+
+def test_create_paths_from_stdin_ctrl_c_stops(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for i in range(10):
+        create_regular_file(archiver.input_path, f"file{i}")
+    input_data = "\n".join(f"input/file{i}" for i in range(10)).encode()
+    with ctrl_c_after_first_item() as paths:
+        with pytest.raises(Error, match="Got Ctrl-C"):
+            cmd(archiver, "create", "--paths-from-stdin", "test", input=input_data)
+    assert paths == ["input/file0"]
+    assert "test" not in cmd(archiver, "repo-list")
+
+
+@pytest.mark.skipif(is_win32, reason="uses sh")
+def test_create_paths_from_command_ctrl_c_stops(archivers, request):
+    # after a Ctrl-C, create stops reading the command's output and must not wait for the command to finish.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file0")
+    # more output than borg reads in one go, then the command keeps running for a long time:
+    script = "i=0; while [ $i -lt 2000 ]; do echo input/file0; i=$((i+1)); done; exec sleep 60"
+    start = time.monotonic()
+    with ctrl_c_after_first_item() as paths:
+        with pytest.raises(Error, match="Got Ctrl-C"):
+            cmd(archiver, "create", "--paths-from-command", "test", "--", "sh", "-c", script)
+    assert time.monotonic() - start < 30
+    assert paths == ["input/file0"]
 
 
 def test_create_without_root(archivers, request):

@@ -256,7 +256,7 @@ class PruneMixIn:
         num_archives_deleted = 0
         pi = ProgressIndicatorPercent(total=len(archives_to_prune), msg="Pruning archives %3.0f%%", msgid="prune")
         for archive_info in archives:
-            if sig_int and sig_int.action_done():
+            if sig_int:
                 break
             # get_item_data/format_item may internally load the archive from the repository,
             # so we must call it before deleting the archive.

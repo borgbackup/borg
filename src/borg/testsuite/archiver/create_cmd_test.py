@@ -552,7 +552,8 @@ def test_create_ctrl_c_stops(archivers, request, dry_run):
     dry_run_args = ["--dry-run"] if dry_run else []
     with ctrl_c_after_first_item() as paths:
         with pytest.raises(Error, match="Got Ctrl-C"):
-            cmd(archiver, "create", *dry_run_args, "test", "input")
+            # 2 roots: the 2nd one is not processed any more
+            cmd(archiver, "create", *dry_run_args, "test", "input", "input/dir9")
     files = [path for path in paths if re.fullmatch(r"input/dir\d/file\d", path)]
     assert len(files) <= 1  # at most the file being processed at Ctrl-C time
     assert "test" not in cmd(archiver, "repo-list")

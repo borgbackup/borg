@@ -233,3 +233,14 @@ def test_close_drains_stderr():
     assert rr.p is None
     assert p.returncode == 0  # the child could write all its output and terminated by itself
     assert rr.rx_bytes == 64 * 4096  # we have received all of the child's stderr output
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='remote repositories are not supported on Windows')
+def test_serve_connection_close_before_open(tmp_path):
+    """borg serve must not write its connection close message into the RPC protocol stream (stdout)."""
+    env = dict(os.environ, BORG_BASE_DIR=str(tmp_path))
+    p = Popen([sys.executable, '-m', 'borg.archiver', 'serve'], stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
+    stdout, stderr = p.communicate(timeout=60)  # closes stdin before the repository was opened
+    assert p.returncode == 0
+    assert stdout == b''
+    assert b'Got connection close before repository was opened.' in stderr

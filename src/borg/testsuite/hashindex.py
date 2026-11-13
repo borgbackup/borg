@@ -123,6 +123,11 @@ class HashIndexTestCase(BaseTestCase):
         second_half = list(idx.iteritems(marker=all[49][0]))
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])
+        # a marker must have the exact key size:
+        for idx in NSIndex(), ChunkIndex():
+            for marker in H(0)[:31], H(0) + b'x':
+                with self.assert_raises(AssertionError):
+                    idx.iteritems(marker=marker)
 
     def test_chunkindex_merge(self):
         idx1 = ChunkIndex()

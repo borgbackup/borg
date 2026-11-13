@@ -394,6 +394,8 @@ def test_chunkerparams():
     with pytest.raises(ArgumentTypeError):
         ChunkerParams('buzhash,10,12,11,4095')  # window_size + 2^chunk_min + 1 > 2^chunk_max
     with pytest.raises(ArgumentTypeError):
+        ChunkerParams('buzhash,19,23,21,-4095')  # negative window size
+    with pytest.raises(ArgumentTypeError):
         ChunkerParams('19,19,19,4095')  # dito, chunk_min == chunk_max
     assert ChunkerParams('10,13,11,4095') == ('buzhash', 10, 13, 11, 4095)  # just fits: 4095 + 1024 + 1 <= 8192
     if borg2:

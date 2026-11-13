@@ -212,6 +212,21 @@ def test_buzhash_chunksize_distribution():
     assert max_count < 10
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        (0, 10, 12, 11, 4095),  # window + min. chunk size + 1 do not fit into the max. chunk size
+        (0, 10, 16, 14, -4095),  # negative window size
+    ],
+)
+def test_chunker_reject_invalid_params(params):
+    # The Chunker's own parameter checks protect its scan code from reading outside the
+    # buffer, so they must raise even when asserts are off (python -O) and for callers
+    # that do not go through ChunkerParams. An assert would fail this test with an
+    # AssertionError.
+    with pytest.raises(ValueError):
+        Chunker(*params)
+
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
 def test_fuzz_chunkify(worker):

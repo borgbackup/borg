@@ -37,6 +37,29 @@ def test_recreate_exclude_caches(archivers, request):
     _assert_test_caches(archiver)
 
 
+def test_recreate_exclude_caches_multiple_archives_and_paths(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "work/CACHEDIR.TAG", contents=CACHE_TAG_CONTENTS)
+    create_regular_file(archiver.input_path, "work/cache.dat", contents=b"temp")
+    create_regular_file(archiver.input_path, "keep/file.txt", contents=b"keep")
+    cmd(archiver, "create", "arch1", "input")
+
+    os.unlink(os.path.join(archiver.input_path, "work", "CACHEDIR.TAG"))
+    os.unlink(os.path.join(archiver.input_path, "work", "cache.dat"))
+    create_regular_file(archiver.input_path, "work/important.txt", contents=b"important")
+    cmd(archiver, "create", "arch2", "input")
+
+    # Recreate with positional PATH and --exclude-caches across both archives:
+    cmd(archiver, "recreate", "--exclude-caches", "input")
+    list1 = cmd(archiver, "list", "arch1", "--short").splitlines()
+    list2 = cmd(archiver, "list", "arch2", "--short").splitlines()
+    assert "input/work/cache.dat" not in list1
+    assert "input/keep/file.txt" in list1
+    assert "input/work/important.txt" in list2
+    assert "input/keep/file.txt" in list2
+
+
 def test_recreate_exclude_tagged(archivers, request):
     archiver = request.getfixturevalue(archivers)
     _create_test_tagged(archiver)

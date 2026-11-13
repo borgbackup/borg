@@ -514,17 +514,24 @@ class Repository:
                 integrity = msgpack.unpack(fd)
         except FileNotFoundError:
             return
+        except msgpack.UnpackException as exc:
+            raise FileIntegrityError(f'{integrity_path}: {exc}') from None
+        if not isinstance(integrity, dict):
+            raise FileIntegrityError(integrity_path)
         if integrity.get(b'version') != 2:
             logger.warning('Unknown integrity data version %r in %s', integrity.get(b'version'), integrity_file)
             return
-        return integrity[key].decode()
+        try:
+            return integrity[key].decode()
+        except (KeyError, AttributeError, UnicodeDecodeError):
+            raise FileIntegrityError(integrity_path) from None
 
     def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
             return NSIndex()
         index_path = os.path.join(self.path, 'index.%d' % transaction_id)
-        integrity_data = self._read_integrity(transaction_id, b'index')
         try:
+            integrity_data = self._read_integrity(transaction_id, b'index')
             with IntegrityCheckedFile(index_path, write=False, integrity_data=integrity_data) as fd:
                 return NSIndex.read(fd)
         except (ValueError, OSError, FileIntegrityError) as exc:
@@ -573,8 +580,8 @@ class Repository:
                 self.io.cleanup(transaction_id)
             hints_path = os.path.join(self.path, 'hints.%d' % transaction_id)
             index_path = os.path.join(self.path, 'index.%d' % transaction_id)
-            integrity_data = self._read_integrity(transaction_id, b'hints')
             try:
+                integrity_data = self._read_integrity(transaction_id, b'hints')
                 with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
                     hints = msgpack.unpack(fd)
             except (msgpack.UnpackException, FileNotFoundError, FileIntegrityError) as e:

@@ -9,7 +9,8 @@ import tempfile
 
 from packaging.version import parse as parse_version
 
-from .helpers import prepare_subprocess_env
+from .constants import EXIT_WARNING
+from .helpers import prepare_subprocess_env, set_ec
 
 from .logger import create_logger
 
@@ -66,6 +67,9 @@ def get_all(path, follow_symlinks=False):
 
     The returned mapping maps xattr names (bytes) to values (bytes or None).
     None indicates, as an xattr value, an empty value, i.e. a value of length zero.
+
+    If getting a single xattr fails (other than it vanishing after listing), that xattr is
+    left out of the result, a warning is logged and the exit code is raised to EXIT_WARNING.
     """
     if isinstance(path, str):
         path = os.fsencode(path)
@@ -86,7 +90,9 @@ def get_all(path, follow_symlinks=False):
                 else:  # all others: warn, skip this single xattr name, continue processing other xattrs
                     # EPERM: we were not permitted to read this attribute
                     # EINVAL: maybe the xattr name is invalid or other issue, #6988
+                    # Buffer.MemoryLimitExceeded: the xattr value is too big for the xattr buffer
                     logger.warning('when getting extended attribute %s: %s', name.decode(errors='replace'), str(e))
+                    set_ec(EXIT_WARNING)
     except OSError as e:
         if e.errno in (errno.ENOTSUP, errno.EPERM):
             # if xattrs are not supported on the filesystem, we give up.

@@ -675,6 +675,56 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
             assert len(self.repository) == 1
             assert self.repository.get(H(0)) == b'foo'
 
+    def _write_integrity(self, data):
+        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        with open(integrity_path, 'wb') as fd:
+            fd.write(data)
+
+    def _modify_integrity(self, func):
+        integrity_path = os.path.join(self.repository.path, 'integrity.1')
+        with open(integrity_path, 'rb') as fd:
+            integrity = msgpack.unpack(fd)
+        func(integrity)
+        self._write_integrity(msgpack.packb(integrity))
+
+    def _check_repository_recovers(self):
+        with self.repository:
+            # The malformed integrity data prompted a rebuild of the index+hints.
+            assert len(self.repository) == 1
+            assert self.repository.get(H(0)) == b'foo'
+        with self.repository:
+            self.repository.put(H(1), b'bar')
+            self.repository.commit(compact=True)
+            assert self.repository.check()
+
+    def test_integrity_empty(self):
+        self._write_integrity(b'')
+        self._check_repository_recovers()
+
+    def test_integrity_garbage(self):
+        self._write_integrity(b'\xc1' * 8)  # 0xc1 is never used in msgpack
+        self._check_repository_recovers()
+
+    def test_integrity_not_a_dict(self):
+        self._write_integrity(msgpack.packb([1, 2, 3]))
+        self._check_repository_recovers()
+
+    def test_integrity_index_key_missing(self):
+        self._modify_integrity(lambda integrity: integrity.pop(b'index'))
+        self._check_repository_recovers()
+
+    def test_integrity_hints_key_missing(self):
+        self._modify_integrity(lambda integrity: integrity.pop(b'hints'))
+        self._check_repository_recovers()
+
+    def test_integrity_value_not_bytes(self):
+        self._modify_integrity(lambda integrity: integrity.update({b'index': 42}))
+        self._check_repository_recovers()
+
+    def test_integrity_value_not_utf8(self):
+        self._modify_integrity(lambda integrity: integrity.update({b'hints': b'\xff'}))
+        self._check_repository_recovers()
+
     def _subtly_corrupted_hints_setup(self):
         with self.repository:
             self.repository.append_only = True

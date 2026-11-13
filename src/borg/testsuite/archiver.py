@@ -51,6 +51,7 @@ from ..helpers import BackupError, BackupOSError, BackupWarning
 from ..helpers.errors import modern_ec
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, Error, CancelledByUser, RTError, CommandError
 from ..helpers import bin_to_hex, hex_to_bin
+from ..helpers import Buffer
 from ..helpers import MAX_S
 from ..helpers import msgpack
 from ..helpers import flags_noatime, flags_normal
@@ -1755,6 +1756,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with patch.object(os, 'fchown', patched_fchown):
                 self.cmd('extract', self.repository_location + '::test')
             assert xattr.getxattr(b'input/file', b'security.capability') == capabilities
+
+    def test_create_xattrs_errors(self):
+        if not xattr.is_enabled(self.input_path):
+            pytest.skip('xattrs not supported')
+        unpatched_getxattr = xattr.getxattr
+
+        def patched_getxattr(path, name, *args, **kwargs):
+            if name == b'user.big':
+                # A value too big for the xattr buffer.
+                raise Buffer.MemoryLimitExceeded(2**25, 2**24)
+            return unpatched_getxattr(path, name, *args, **kwargs)
+
+        self.create_regular_file('file')
+        xattr.setxattr(b'input/file', b'user.small', b'value')
+        xattr.setxattr(b'input/file', b'user.big', b'value')
+        self.cmd('init', self.repository_location, '--encryption=none')
+        with patch.object(xattr, 'getxattr', patched_getxattr):
+            out = self.cmd('create', self.repository_location + '::test', 'input', exit_code=EXIT_WARNING)
+        assert 'when getting extended attribute user.big' in out
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            assert xattr.getxattr(b'input/file', b'user.small') == b'value'
+            assert b'user.big' not in xattr.listxattr(b'input/file')
 
     @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason='xattr not supported on this system or on this version of '
                                                          'fakeroot')
@@ -4864,6 +4888,10 @@ class ArchiverTestCaseBinary(ArchiverTestCase):
 
     @unittest.skip('patches objects')
     def test_extract_capabilities(self):
+        pass
+
+    @unittest.skip('patches objects')
+    def test_create_xattrs_errors(self):
         pass
 
     @unittest.skip('patches objects')

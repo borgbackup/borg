@@ -8,11 +8,13 @@ import socket
 import stat
 import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from blake3 import blake3
 
 from ... import platform
+from ... import xattr
 from ...constants import *  # NOQA
 from ...constants import zeros
 from ...manifest import Manifest
@@ -20,7 +22,7 @@ from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError, BackupTimeoutError, BackupBrokenSymlinkError
-from ...helpers import BackupWarning, Error
+from ...helpers import BackupWarning, Buffer, Error
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -354,6 +356,33 @@ def test_create_no_permission_file(archivers, request):
     assert "input/file1" in out
     assert "input/file2" not in out  # it skipped file2
     assert "input/file3" in out
+
+
+def test_create_xattrs_errors(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    if not xattr.is_enabled(archiver.input_path):
+        pytest.skip("xattrs not supported")
+    unpatched_getxattr = xattr.getxattr
+
+    def patched_getxattr(path, name, *args, **kwargs):
+        if name == b"user.big":
+            # A value too big for the xattr buffer.
+            raise Buffer.MemoryLimitExceeded(2**25, 2**24)
+        return unpatched_getxattr(path, name, *args, **kwargs)
+
+    create_regular_file(archiver.input_path, "file")
+    xattr.setxattr(b"input/file", b"user.small", b"value")
+    xattr.setxattr(b"input/file", b"user.big", b"value")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with patch.object(xattr, "getxattr", patched_getxattr):
+        out = cmd(archiver, "create", "test", "input", exit_code=EXIT_WARNING)
+    assert "When getting extended attribute user.big" in out
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        assert xattr.getxattr(b"input/file", b"user.small") == b"value"
+        assert b"user.big" not in xattr.listxattr(b"input/file")
 
 
 def test_sanitized_stdin_name(archivers, request):

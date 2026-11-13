@@ -215,10 +215,8 @@ class RepositoryServer:  # pragma: no cover
     def serve(self):
         stdin_fd = sys.stdin.fileno()
         stdout_fd = sys.stdout.fileno()
-        stderr_fd = sys.stdout.fileno()
         os.set_blocking(stdin_fd, False)
         os.set_blocking(stdout_fd, True)
-        os.set_blocking(stderr_fd, True)
         unpacker = get_limited_unpacker('server')
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
@@ -228,8 +226,8 @@ class RepositoryServer:  # pragma: no cover
                     if self.repository is not None:
                         self.repository.close()
                     else:
-                        os_write(stderr_fd, 'Borg {}: Got connection close before repository was opened.\n'
-                                 .format(__version__).encode())
+                        # stdout carries only the RPC protocol, so this goes to the log (stderr):
+                        logging.warning('Borg %s: Got connection close before repository was opened.', __version__)
                     return
                 unpacker.feed(data)
                 for unpacked in unpacker:

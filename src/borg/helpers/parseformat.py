@@ -122,6 +122,8 @@ def ChunkerParams(s):
             # choose the block (chunk) size wisely: if you have a lot of data and you cut
             # it into very small chunks, you are asking for trouble!
             raise argparse.ArgumentTypeError('block_size must not be less than 64 Bytes')
+        if header_size < 0:
+            raise argparse.ArgumentTypeError('header_size must not be negative')
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
             raise argparse.ArgumentTypeError('block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE)
         return algo, block_size, header_size
@@ -140,7 +142,7 @@ def ChunkerParams(s):
         if window_size < 0:
             raise argparse.ArgumentTypeError('window_size must not be negative')
         # the chunker needs the hash window plus one byte beyond the min. chunk size to fit into
-        # a max. chunk size sized buffer, see the assertion in Chunker.__cinit__.
+        # a max. chunk size sized buffer, see the parameter checks in Chunker.__cinit__.
         if window_size + 2 ** chunk_min + 1 > 2 ** chunk_max:
             raise argparse.ArgumentTypeError('required: window_size + 2^chunk_min + 1 <= 2^chunk_max')
         if window_size % 2 == 0:

@@ -439,7 +439,8 @@ Fixes:
   ChunkerParams did not check the buzhash window size for negativity, so e.g.
   --chunker-params buzhash,10,23,16,-5 made borg crash with a SIGSEGV. The
   chunker now also raises ValueError for invalid parameters instead of using
-  asserts (which python -O drops).
+  asserts (which python -O drops). A negative fixed chunker header size is
+  rejected, too.
 - prepare_subprocess_env: remove all passphrase-related env vars, #6480
 - create:
 

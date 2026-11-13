@@ -408,6 +408,8 @@ def test_chunkerparams():
         ChunkerParams('fixed,%d,%d' % (MAX_DATA_SIZE + 1, 4096))  # too big block size
     with pytest.raises(ArgumentTypeError):
         ChunkerParams('fixed,%d,%d' % (4096, MAX_DATA_SIZE + 1))  # too big header size
+    with pytest.raises(ArgumentTypeError):
+        ChunkerParams('fixed,4096,-200')  # negative header size
 
 
 class MakePathSafeTestCase(BaseTestCase):

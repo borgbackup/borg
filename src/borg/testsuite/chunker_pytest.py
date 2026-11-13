@@ -227,6 +227,7 @@ def test_chunker_reject_invalid_params(params):
     with pytest.raises(ValueError):
         Chunker(*params)
 
+
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
 def test_fuzz_chunkify(worker):

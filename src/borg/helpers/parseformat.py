@@ -122,8 +122,6 @@ def ChunkerParams(s):
             # choose the block (chunk) size wisely: if you have a lot of data and you cut
             # it into very small chunks, you are asking for trouble!
             raise argparse.ArgumentTypeError('block_size must not be less than 64 Bytes')
-        if header_size < 0:
-            raise argparse.ArgumentTypeError('header_size must not be negative')
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
             raise argparse.ArgumentTypeError('block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE)
         return algo, block_size, header_size

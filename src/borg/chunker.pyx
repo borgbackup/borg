@@ -260,6 +260,7 @@ cdef class Chunker:
             raise ValueError("too big max_size")
         if hash_window_size < 0:
             raise ValueError("hash_window_size must not be negative")
+        # see chunker_process, first while loop condition, first term must be able to get True:
         if hash_window_size + min_size + 1 > max_size:
             raise ValueError("too small max_size")
         hash_mask = (1 << hash_mask_bits) - 1

@@ -1,4 +1,5 @@
 #include <Python.h>
+#include <errno.h>
 #include <fcntl.h>
 #if !defined(_MSC_VER)
 #   include <unistd.h>
@@ -172,6 +173,7 @@ static int
 chunker_fill(Chunker *c)
 {
     ssize_t n;
+    size_t wanted;
     PyObject *data;
     PyThreadState *thread_state;
 
@@ -189,8 +191,18 @@ chunker_fill(Chunker *c)
         off_t offset = c->bytes_read;
         #endif
 
-        // If we have an OS-level file descriptor, use an OS-level API
-        n = read(c->fh, c->data + c->position + c->remaining, n);
+        // If we have an OS-level file descriptor, use an OS-level API.
+        // Like Python's own I/O (PEP 475), retry a read() that a signal interrupted (EINTR):
+        // run the Python signal handlers first, and if one of them raises an exception
+        // (e.g. KeyboardInterrupt), propagate it instead of retrying.
+        wanted = n;
+        while((n = read(c->fh, c->data + c->position + c->remaining, wanted)) < 0 && errno == EINTR) {
+            PyEval_RestoreThread(thread_state);
+            if(PyErr_CheckSignals() < 0) {
+                return 0;
+            }
+            thread_state = PyEval_SaveThread();
+        }
         if(n > 0) {
             c->remaining += n;
             c->bytes_read += n;

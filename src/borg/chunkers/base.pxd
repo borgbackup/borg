@@ -3,6 +3,13 @@
 from libc.stdint cimport uint8_t, uint64_t, int64_t
 
 
+cdef inline int _check_size_exps(int chunk_min_exp, int chunk_max_exp) except -1:
+    """Raise ValueError unless 1 << chunk_min_exp and 1 << chunk_max_exp are well-defined C int shifts."""
+    if not (0 <= chunk_min_exp <= 30 and 0 <= chunk_max_exp <= 30):
+        raise ValueError("chunk size exponents must be in the range 0..30")
+    return 0
+
+
 cdef class ChunkerBase:
     # chunking parameters
     cdef str algo                 # chunker name, for error messages

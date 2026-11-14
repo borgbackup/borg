@@ -277,10 +277,14 @@ def expected_default_kernel(envvar, make, key, monkeypatch):
         (CH_FASTCDC, (10, 25, 14, 0)),  # max. chunk size exceeds MAX_DATA_SIZE
         (CH_FASTCDC, (10, 16, 14, -1)),  # negative nc_level
         (CH_FASTCDC, (10, 16, 14, 14)),  # nc_level leaves no bits for the loose mask
+        (CH_FASTCDC, (6, 40, 14, 0)),  # chunk size exponent too big for a C int shift
+        (CH_FASTCDC, (-1, 16, 14, 0)),  # negative chunk size exponent
         (CH_BUZHASH, (10, 12, 11, 4095)),  # window + min. chunk size + 1 do not fit into the max. chunk size
         (CH_BUZHASH, (10, 16, 14, -4095)),  # negative window size
+        (CH_BUZHASH, (6, 40, 7, 1)),  # chunk size exponent too big for a C int shift
         (CH_BUZHASH64, (10, 12, 11, 4095, 0)),  # as for buzhash
         (CH_BUZHASH64, (10, 16, 14, -4095, 0)),  # as for buzhash
+        (CH_BUZHASH64, (6, 40, 7, 1, 0)),  # as for buzhash
         (CH_TOEPLITZ_AES, (5, 16, 14, 0)),  # min. chunk size smaller than the 64-byte window
         (CH_RABIN_AES, (5, 16, 14, 0)),
         (CH_GOLDILOCKS_AES, (5, 16, 14, 0)),

@@ -69,6 +69,30 @@ def test_format_parse_roundtrip(key):
     assert data == got_data
 
 
+@pytest.mark.parametrize("key_class", [AuthenticatedKey, CHPOKey, AESOCBKey])
+@pytest.mark.parametrize("compression", ["none", "lz4"])
+def test_format_parts(key_class, compression):
+    # the parts joined are a valid object, the same format() returns.
+    key = key_class(None)
+    key.init_from_random_data()
+    key.init_ciphers()
+    repo_objs = RepoObj(key)
+    repo_objs.compressor = CompressionSpec(compression).compressor
+    data = b"foobar" * 100
+    id = repo_objs.id_hash(data)
+    parts = repo_objs.format_parts(id, {}, memoryview(data), ro_type=ROBJ_FILE_STREAM)
+    cdata = b"".join(parts)
+    got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
+    assert got_data == data
+    assert got_meta["size"] == len(data)
+    if key_class is AuthenticatedKey:
+        # deterministic envelope (no IV): format() gives the same bytes.
+        assert repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM) == cdata
+        if compression == "none":
+            # the not encrypted, not compressed payload is a part of its own, data is not copied.
+            assert parts[-1].obj is data
+
+
 def test_format_parse_roundtrip_borg1(legacy_key):  # legacy
     repo_objs = RepoObj1(legacy_key)
     data = b"foobar" * 10

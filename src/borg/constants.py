@@ -92,6 +92,11 @@ CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
 FILES_CACHE_MODE_UI_DEFAULT = 'ctime,size,inode'  # default for "borg create" command (CLI UI)
 FILES_CACHE_MODE_DISABLED = 'd'  # Most Borg commands do not use the files cache at all (disable).
 
+# tar related
+SCHILY_XATTR = 'SCHILY.xattr.'  # xattr key prefix in tar PAX headers
+SCHILY_ACL_ACCESS = 'SCHILY.acl.access'  # POSIX access ACL in tar PAX headers
+SCHILY_ACL_DEFAULT = 'SCHILY.acl.default'  # POSIX default ACL in tar PAX headers
+
 # return codes returned by borg command
 EXIT_SUCCESS = 0  # everything done, no problems
 EXIT_WARNING = 1  # reached normal end of operation, but there were issues (generic warning)

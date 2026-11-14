@@ -12,7 +12,7 @@ from libc.stdlib cimport malloc, free
 
 from ..crypto.low_level import CSPRNG
 
-from .base cimport ChunkerBase
+from .base cimport ChunkerBase, _check_size_exps
 
 cdef extern from "buzhash64_impl.h":
     size_t bz64_scan(const uint64_t *table, const uint64_t *table_rot,
@@ -149,6 +149,7 @@ cdef class ChunkerBuzHash64(ChunkerBase):
         cdef uint64_t lenmod
         self.table = NULL
         self.table_rot = NULL
+        _check_size_exps(chunk_min_exp, chunk_max_exp)
         # see process, first while loop condition, first term must be able to get True:
         if hash_window_size < 0:
             raise ValueError("hash_window_size must not be negative")

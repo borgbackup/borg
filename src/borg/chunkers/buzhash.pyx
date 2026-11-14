@@ -7,7 +7,7 @@ import cython
 from libc.stdint cimport uint8_t, uint32_t
 from libc.stdlib cimport malloc, free
 
-from .base cimport ChunkerBase
+from .base cimport ChunkerBase, _check_size_exps
 
 # Cyclic polynomial / buzhash
 #
@@ -137,6 +137,7 @@ cdef class Chunker(ChunkerBase):
 
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
         self.table = NULL
+        _check_size_exps(chunk_min_exp, chunk_max_exp)
         # see process, first while loop condition, first term must be able to get True:
         if hash_window_size < 0:
             raise ValueError("hash_window_size must not be negative")

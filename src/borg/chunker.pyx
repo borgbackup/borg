@@ -254,9 +254,15 @@ cdef class Chunker:
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
-        assert max_size <= len(zeros)
+        # The parameter checks raise ValueError rather than assert: the scan code relies on
+        # them to stay inside the buffer and python -O drops asserts.
+        if max_size > len(zeros):
+            raise ValueError("too big max_size")
+        if hash_window_size < 0:
+            raise ValueError("hash_window_size must not be negative")
         # see chunker_process, first while loop condition, first term must be able to get True:
-        assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
+        if hash_window_size + min_size + 1 > max_size:
+            raise ValueError("too small max_size")
         hash_mask = (1 << hash_mask_bits) - 1
         self.chunker = chunker_init(hash_window_size, hash_mask, min_size, max_size, seed & 0xffffffff)
         if not self.chunker:

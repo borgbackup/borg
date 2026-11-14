@@ -297,6 +297,8 @@ def test_buzhash_chunksize_distribution():
     [
         (0, 10, 12, 11, 4095),  # window + min. chunk size + 1 do not fit into the max. chunk size
         (0, 10, 16, 14, -4095),  # negative window size
+        (0, 6, 40, 7, 1),  # chunk size exponent too big for a C int shift
+        (0, -1, 16, 14, 1),  # negative chunk size exponent
     ],
 )
 def test_chunker_reject_invalid_params(params):

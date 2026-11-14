@@ -3,3 +3,6 @@ repos:
   rev: v0.0.287
   hooks:
     - id: ruff
+      # Use only this repo's config: without --config, this ruff version also parses any
+      # pyproject.toml in parent directories and fails on newer settings it can't parse.
+      args: [--config, pyproject.toml]

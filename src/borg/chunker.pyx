@@ -252,6 +252,9 @@ cdef class Chunker:
     cdef _Chunker *chunker
 
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
+        # 1 << chunk_min_exp and 1 << chunk_max_exp are C int shifts, so the exponents must be checked first:
+        if not (0 <= chunk_min_exp <= 30 and 0 <= chunk_max_exp <= 30):
+            raise ValueError("chunk size exponents must be in the range 0..30")
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         # The parameter checks raise ValueError rather than assert: the scan code relies on

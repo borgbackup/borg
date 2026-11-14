@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from ...helpers.time import safe_ns, safe_s, safe_timestamp, SUPPORT_32BIT_PLATFORMS, calculate_relative_offset
 from ...helpers.time import format_time, format_time_ns, OutputTimestamp
-from ...helpers.time import ns_to_pax_time, pax_time_to_ns, parse_local_timestamp
+from ...helpers.time import ns_to_pax_time, pax_time_to_ns, parse_local_timestamp, MAX_NS
 from ...helpers import time as time_module
 
 
@@ -99,10 +99,15 @@ def test_ns_to_pax_time(ns, expected):
         ("1700000000.987654321", 1700000000_987654321),
         ("1700000000", 1700000000_000000000),
         ("1700000000.5", 1700000000_500000000),
-        ("-1.5", 0),  # safe_ns clamps
+        ("-1.5", 0),  # clamped like safe_ns does
+        ("1e30", MAX_NS),
+        ("1e999999", MAX_NS),  # must not build a 1-million-digit integer
+        ("-1e999999", 0),
+        ("1e3000000", MAX_NS),  # beyond the decimal context's exponent limit
         ("", None),
         ("garbage", None),
         ("NaN", None),
+        ("sNaN", None),
         ("Infinity", None),
     ],
 )

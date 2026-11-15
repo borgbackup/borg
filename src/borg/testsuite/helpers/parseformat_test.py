@@ -930,6 +930,7 @@ def test_valid_chunkerparams(chunker_params, expected_return):
         "fixed,63",  # too small block size
         "fixed,%d,%d" % (MAX_DATA_SIZE + 1, 4096),  # too big block size
         "fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1),  # too big header size
+        "fixed,4096,-1",  # negative header size
     ],
 )
 def test_invalid_chunkerparams(invalid_chunker_params):

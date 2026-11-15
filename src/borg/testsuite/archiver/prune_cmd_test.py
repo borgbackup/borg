@@ -4,6 +4,7 @@ import pytest
 import re
 from operator import attrgetter
 from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
 from ...constants import *  # NOQA
 from ...archiver.prune_cmd import (
     PRUNING_RULES,
@@ -17,11 +18,11 @@ from ...archiver.prune_cmd import (
     PRUNE_YEARLY,
     unique_period_func,
 )
-from ...helpers import GroupBySpec
-from ...manifest import archive_group_key, format_group_key, group_archives
+from ...helpers import GroupBySpec, sig_int
+from ...manifest import Archives, archive_group_key, format_group_key, group_archives
 from argparse import ArgumentTypeError
 
-from ...helpers import CommandError
+from ...helpers import CommandError, Error
 from ...manifest import ArchiveInfo
 from . import cmd, RK_ENCRYPTION, generate_archiver_tests
 
@@ -68,6 +69,33 @@ def test_prune_repository(archivers, request, backup_files):
     assert "test1" not in output
     # The latest archive must still be there:
     assert "test2" in output
+
+
+def test_prune_ctrl_c_stops(archivers, request, backup_files):
+    # a Ctrl-C (SIGINT) stops pruning further archives.
+    archiver = request.getfixturevalue(archivers)
+    if archiver.EXE:
+        pytest.skip("Skipping binary test due to patch objects")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for i in range(4):
+        _create_archive_ts(archiver, backup_files, f"test{i}", 2026, 1, i + 1)
+    original_delete_by_id = Archives.delete_by_id
+    deleted = []
+
+    def delete_by_id(self, id):
+        original_delete_by_id(self, id)
+        deleted.append(id)
+        sig_int._sig_int_triggered = True  # one Ctrl-C after the first archive was pruned
+
+    try:
+        with patch.object(Archives, "delete_by_id", delete_by_id):
+            with pytest.raises(Error, match="Got Ctrl-C"):
+                prune_ungrouped(archiver, "--keep-daily=1")
+    finally:
+        sig_int._sig_int_triggered = False  # reset the global flag for the following tests
+    assert len(deleted) == 1
+    output = cmd(archiver, "repo-list")
+    assert [f"test{i}" in output for i in range(4)] == [True, True, False, True]  # test3 kept, test2 pruned
 
 
 # This test must match docs/misc/prune-example.txt

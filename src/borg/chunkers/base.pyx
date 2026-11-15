@@ -48,6 +48,7 @@ cdef class ChunkerBase:
         (hashes with uniform output, e.g. buzhash64 or the AES chunkers) or the high bits
         (Gear-style hashes, which accumulate information in their high bits).
         """
+        _check_size_exps(chunk_min_exp, chunk_max_exp)
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         # The parameter checks here and in the subclasses raise ValueError rather than

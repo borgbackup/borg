@@ -429,48 +429,74 @@ New features:
 
 Fixes:
 
-- fixed chunker: fix corruption caused by short reads (a short read is not EOF), #10565
+- fixed chunker: fix silent truncation of archived files, #10565.
 
-  Files returning short reads (e.g. --read-special from a FIFO) were
-  archived incompletely.
+  Files returning short reads (e.g. --read-special from a FIFO) were archived
+  incompletely. A short read does not imply EOF!
 - fixed chunker: ignore posix_fadvise() errors, e.g. ESPIPE for a FIFO, #10565
-- fixed chunker: reject a negative --chunker-params window size, refs #10603
+- buzhash chunker: retry read() on EINTR, #10617.
 
-  ChunkerParams did not check the buzhash window size for negativity, so e.g.
-  --chunker-params buzhash,10,23,16,-5 made borg crash with a SIGSEGV. The
-  chunker now also raises ValueError for invalid parameters instead of using
-  asserts (which python -O drops).
+  Previously, a signal (first Ctrl-C / SIGINT, SIGUSR1, SIGINFO) arriving
+  during a read dropped the file being read from the archive with a read error.
+- chunkers: improve validation of chunker params to avoid crashes
+- xattrs: failing to get an xattr is now a warning rc (was: success rc), #10612.
+
+  Fixed half-silent loss of metadata: for xattrs that could not be read (e.g.
+  because they were too big or access was denied), borg emitted a warning,
+  but did not exit with a warning rc.
 - prepare_subprocess_env: remove all passphrase-related env vars, #6480
 - create:
 
-  - back up automounted directories, #6652
+  - back up automounted directories, #6652.
+
+    borg used to skip automounted directories (and their contents) because it
+    suspected a race condition (the inode of the mountpoint directory changed
+    when it was opened).
   - do not archive an atime we caused ourselves, #6194
+  - Ctrl-C writes the checkpoint and stops, #10625
 - extract:
 
   - report a failing close() of a destination file as a warning
   - remote: use deques for the RPC call queues (performance fix), #10450
   - never try to remove the extraction directory itself
+  - skip a hard link item that refers to itself, see #10393
 - recreate:
 
   - also do the work if --timestamp is the only change requested
   - keep chunker_params if not rechunkifying, #10127
+  - show --stats output without --info
 - import-tar: fix nfiles being counted twice for regular files
+- diff: fix --numeric-ids having no effect
+- serve: log the "connection closed before repository was opened" message to stderr, not stdout
 - --bypass-lock: also skip the cache lock, #7255
-- fix false repo relocation warning on macOS due to NFC/NFD path differences, #2913
+- fix a false repo relocation warning on macOS due to NFC/NFD path differences, #2913
 - locking: fix broken exclusivity on Cygwin, #7218
 - macOS: fix TypeError when _get_birthtime_ns gets called with an FD
 - security: the same local repo dir accessed via another path is not a relocation, #8188
 - add_warning: store exceptions given as args as text, not the exception (uses much less memory)
 - fix daemonizing: don't lose an early notify signal from the background process
 - let Ctrl-C / SIGINT abort interactive prompts (y/n and passphrase), #8521
-- repository: do not crash on missing segment files/dirs, #3225
-- remote: drain stderr in close(), avoid deadlock, #10165
+- repository:
+
+  - do not crash on missing segment files/dirs, #3225
+  - rebuild index/hints if integrity.N is malformed
+- remote: drain stderr in close() to avoid a deadlock, #10165
 - ellipsis_truncate: pad a truncated string to the full width (CJK fix), #10481
 - Haiku: tolerate failures reading the lock directory
 - crc32_clmul: only feed full aligned blocks to the folding code, #10151
+- hashindex: check the marker length in iteritems()
 
 Other changes:
 
+- Release automation for sdist, GitHub release and PyPI (similar as in already
+  done for borg2 beta releases).
+
+  Support PyPI's new security tab with provenance attestation.
+
+  On GitHub releases, every release asset now comes with the sigstore bundle
+  of its provenance attestation as <asset>.sigstore.jsonl.
+
+  Release assets are no longer built and GPG-signed locally.
 - support Python 3.15
 - support msgpack up to 1.2.4
 - hashindex: read/write buckets in <= 256 MiB slices, works around #6140
@@ -486,16 +512,16 @@ Other changes:
   - update README, #9931
   - new borg 1.4 demo screencast
   - automated-local: support multiple backup drives, #9834
-  - list additional help topics in main borg help, #3432
+  - list additional help topics in the main borg help, #3432
   - nanorst: do not require 2 empty lines at the end of a string after a code block, #9714
 - tests / CI:
 
   - fix inode-order dependence in test_multiple_link_exclusion, #8740
-  - update and pin GitHub actions
+  - update and pin GitHub Actions
   - re-enable the Windows MSYS2 build
   - use PyInstaller 6.22.3 for MSYS2 py314
-  - test_atime: do not create a hardlink (fix test on Cygwin)
-  - relax sparse file SEEK_DATA check
+  - test_atime: do not create a hard link (fixes the test on Cygwin)
+  - relax the sparse file SEEK_DATA check
   - speed up the prune tests
 
 

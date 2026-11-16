@@ -414,8 +414,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.6 (not released yet)
---------------------------------
+Version 1.4.6rc1 (2026-11-16)
+-----------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.

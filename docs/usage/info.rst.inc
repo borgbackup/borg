@@ -21,6 +21,8 @@ borg info
     +-----------------------------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--json``                            | format output as JSON                                                                                                             |
     +-----------------------------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--quick-stats``                     | skip the repository-wide "All archives" statistics                                                                                |
+    +-----------------------------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                          |
     |                                                                                                                                                                                                                                                         |
     | :ref:`common_options`                                                                                                                                                                                                                                   |
@@ -53,7 +55,8 @@ borg info
 
 
     options
-        --json     format output as JSON
+        --json            format output as JSON
+        --quick-stats     skip the repository-wide "All archives" statistics
 
 
     :ref:`common_options`
@@ -85,3 +88,7 @@ Borg archives can only contain a limited amount of file metadata.
 The size of an archive relative to this limit depends on a number of factors,
 mainly the number of files, the lengths of paths and other metadata stored for files.
 This is shown as *utilization of maximum supported archive size*.
+
+Computing the repository-wide "All archives" statistics is slow, because it needs to
+read the metadata of all archives in the repository. If you do not need them, use
+``--quick-stats`` to skip them.

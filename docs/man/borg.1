@@ -1,6 +1,6 @@
 '\" t
 .\" Man page generated from reStructuredText
-.\" by the Docutils 0.22.4 manpage writer.
+.\" by the Docutils 0.23 manpage writer.
 .
 .
 .nr rst2man-indent-level 0
@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg" "1" "2026-07-18" "" "borg backup tool"
+.TH "borg" "1" "2026-11-16" "" "borg backup tool"
 .SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -338,40 +338,61 @@ _
 T{
 1
 T}	T{
-generic warning (operation reached its normal end, but there were warnings \-\-
-you should check the log, logged as WARNING)
+generic warning (operation reached its normal end, but there
+were warnings \- you should check the log; logged as WARNING)
 T}
 _
 T{
 2
 T}	T{
-generic error (like a fatal error, a local or remote exception, the operation
-did not reach its normal end, logged as ERROR)
+generic error (such as a fatal error or a local/remote exception;
+the operation did not reach its normal end; logged as ERROR)
 T}
 _
 T{
 3..99
 T}	T{
-specific error (enabled by BORG_EXIT_CODES=modern)
+specific error (enabled by \fBBORG_EXIT_CODES=modern\fP,
+see below; logged as ERROR)
 T}
 _
 T{
 100..127
 T}	T{
-specific warning (enabled by BORG_EXIT_CODES=modern)
+specific warning (enabled by \fBBORG_EXIT_CODES=modern\fP,
+see below; logged as WARNING)
 T}
 _
 T{
 128+N
 T}	T{
-killed by signal N (e.g. 137 == kill \-9)
+terminated by signal N (e.g. 130 == SIGINT, Ctrl+C, or kill \-2;
+logged as ERROR)
 T}
 .TE
 .sp
 If you use \fB\-\-show\-rc\fP, the return code is also logged at the indicated
 level as the last log entry.
 .sp
-The modern exit codes (return codes, \(dqrc\(dq) are documented there: \fImsgid\fP
+Borg categorizes return codes into groups and exits with the more severe
+group: signals (rc 128+N) are more severe than errors (rc 2 and 3..99),
+which take precedence over warnings (rc 1 and 100..127), and lastly
+success (rc 0).
+.sp
+Borg 1 exits with the generic error (rc 2) and warning (rc 1) codes
+by default. If you want Borg 1 to exit with specific error (rc 3..99)
+and warning (rc 100..127) codes instead (like Borg 2 does), set the
+\fBBORG_EXIT_CODES=modern\fP environment variable.
+.sp
+If modern exit codes are enabled (\fBBORG_EXIT_CODES=modern\fP):
+Within the signal and error groups, the first signal or error determines
+the final return code. Within the warning group, Borg returns the specific
+warning code (rc 100..127) if there were one or more warnings of the same
+kind. If warnings of different kinds occurred, Borg returns the generic
+warning code (rc 1) instead. All errors and warnings are still logged
+individually.
+.sp
+For a list of all specific error and warning codes, see \fImsgid\fP\&.
 .SS Environment Variables
 .sp
 Borg uses some environment variables for automation:
@@ -390,6 +411,10 @@ When set, use the value to answer the passphrase question for encrypted reposito
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo.
 See also BORG_NEW_PASSPHRASE.
+Borg removes the passphrase\-related variables (BORG_PASSPHRASE, BORG_NEW_PASSPHRASE,
+BORG_PASSCOMMAND and BORG_PASSPHRASE_FD) from the environment of the subprocesses it
+starts (like the command given in BORG_PASSCOMMAND, \fB\-\-paths\-from\-command\fP /
+\fB\-\-content\-from\-command\fP commands, tar filter commands and \fBborg with\-lock\fP commands).
 .TP
 .B BORG_PASSCOMMAND
 When set, use the standard output of the command (trailing newlines are stripped) to answer the

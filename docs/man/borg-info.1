@@ -1,5 +1,5 @@
 .\" Man page generated from reStructuredText
-.\" by the Docutils 0.22.4 manpage writer.
+.\" by the Docutils 0.23 manpage writer.
 .
 .
 .nr rst2man-indent-level 0
@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-info" "1" "2026-07-18" "" "borg backup tool"
+.TH "borg-info" "1" "2026-11-16" "" "borg backup tool"
 .SH Name
 borg-info \- Show archive details such as disk space used
 .SH SYNOPSIS
@@ -51,6 +51,10 @@ Borg archives can only contain a limited amount of file metadata.
 The size of an archive relative to this limit depends on a number of factors,
 mainly the number of files, the lengths of paths and other metadata stored for files.
 This is shown as \fIutilization of maximum supported archive size\fP\&.
+.sp
+Computing the repository\-wide \(dqAll archives\(dq statistics is slow, because it needs to
+read the metadata of all archives in the repository. If you do not need them, use
+\fB\-\-quick\-stats\fP to skip them.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -65,6 +69,9 @@ repository or archive to display information about
 .TP
 .B  \-\-json
 format output as JSON
+.TP
+.B  \-\-quick\-stats
+skip the repository\-wide \(dqAll archives\(dq statistics
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

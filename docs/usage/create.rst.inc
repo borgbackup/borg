@@ -314,6 +314,9 @@ subvolumes of a Btrfs file system (different device numbers from the parent but 
 macOS examples are the APFS mounts of a typical macOS installation.
 Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
+Automount points (e.g. autofs, systemd automount units, ZFS ``.zfs/snapshot/*``) get mounted when
+borg opens them. For these, borg uses the device number of the filesystem that got mounted there.
+
 
 Error handling
 ++++++++++++++

@@ -1,6 +1,6 @@
 '\" t
 .\" Man page generated from reStructuredText
-.\" by the Docutils 0.22.4 manpage writer.
+.\" by the Docutils 0.23 manpage writer.
 .
 .
 .nr rst2man-indent-level 0
@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-init" "1" "2026-07-18" "" "borg backup tool"
+.TH "borg-init" "1" "2026-11-16" "" "borg backup tool"
 .SH Name
 borg-init \- Initialize an empty repository
 .SH SYNOPSIS
@@ -196,12 +196,15 @@ repo, you can\(aqt use any of the other modes.
 \fBAbout modes without encryption:\fP
 .sp
 Avoid using \fBnone\fP mode. If you think about using \fBnone\fP mode,
-please reconsider and be absolutely sure. Using any mode other than
-\fBnone\fP allows Borg to detect accidental corruption or malicious
-tampering with the repo. It also prevents denial\-of\-service attacks
-against clients. Instead of \fBnone\fP mode, you likely want to use
-\fBauthenticated\fP mode, or \fBrepokey\fP or \fBkeyfile\fP modes with an
-empty passphrase instead (see below).
+please reconsider and be absolutely sure. \fBnone\fP mode still detects
+accidental corruption (via CRC32 and the SHA\-256 chunk IDs, e.g. when
+extracting or running \fBborg check \-\-verify\-data\fP), but as no secret
+key is involved, it cannot detect malicious tampering with the repo.
+Any other mode allows Borg to detect such tampering (as long as the
+attacker does not have the key and its passphrase) and also prevents
+denial\-of\-service attacks against clients. Instead of \fBnone\fP mode,
+you likely want to use \fBauthenticated\fP mode, or \fBrepokey\fP or
+\fBkeyfile\fP modes with an empty passphrase instead (see below).
 .sp
 If you don\(aqt want to encrypt your data, use \fBauthenticated\fP or
 \fBauthenticated\-blake2\fP modes. These modes require a passphrase in

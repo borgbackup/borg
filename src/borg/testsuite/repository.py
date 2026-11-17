@@ -812,7 +812,12 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         self.repository.io.delete_segment(segment)
 
     def delete_segment_dir(self, segment_dir):
-        shutil.rmtree(os.path.join(self.tmppath, 'repository', 'data', str(segment_dir)))
+        # delete the segment files via the repository, so it first closes the fds it has open for them
+        # (Windows can not remove a file that is still open).
+        dir_path = os.path.join(self.tmppath, 'repository', 'data', str(segment_dir))
+        for name in os.listdir(dir_path):
+            self.delete_segment(int(name))
+        os.rmdir(dir_path)
 
     def set_segments_per_dir(self, segments_per_dir):
         # note: only call this on a repository that does not have any segment files yet.

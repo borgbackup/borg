@@ -69,6 +69,7 @@ from . import has_lchflags, has_mknod, llfuse
 from . import BaseTestCase, changedir, environment_variable, filter_xattrs, same_ts_ns, granularity_sleep
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected, is_darwin, is_freebsd, is_netbsd, is_win32, is_haiku
+from ..platformflags import is_cygwin
 from .upgrader import make_attic_repo
 from . import key
 
@@ -821,7 +822,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     pass  # not seekable / not readable (fifo, directory, ...)
             return fd
 
-        self.create_test_files()
+        # No hardlinks: input/hardlink would share the inode with input/file1 (an executable), and on cygwin,
+        # extracting it (creating a hard link to an executable file) updates the atime of the inode.
+        self.create_test_files(create_hardlinks=False)
         if not updates_atime('input/file1'):
             pytest.skip('filesystem does not update the atime when reading')
         os.utime('input/file1', (atime, mtime))
@@ -1073,6 +1076,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(os.path.join(security_dir, 'location')) as fd:
             assert fd.read() == Location(self.repository_location).canonical_path()
 
+    @pytest.mark.skipif(is_win32, reason='no remote repository locations on Windows')
     def test_repository_previously_remote(self):
         # a repository previously accessed via a URL, now accessed via a local path, is a relocation.
         if self.prefix:
@@ -2078,7 +2082,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'All archives:' not in info_repo
         assert 'Chunk index:' not in info_repo
         info_archive = self.cmd('info', '--quick-stats', self.repository_location + '::test')
-        assert 'Archive name: test\n' in info_archive
+        assert 'Archive name: test' in info_archive.splitlines()
         assert 'This archive:' in info_archive
         assert 'All archives:' not in info_archive
         assert 'Chunk index:' not in info_archive
@@ -2777,7 +2781,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('create', '--list', '--filter=AM', self.repository_location + '::test3', 'input')
         self.assert_in('file1', output)
 
-    @pytest.mark.skipif(not are_fifos_supported(), reason='FIFOs not supported')
+    @pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason='FIFOs not supported, hangs on cygwin')
     def test_create_read_special_symlink(self):
         from threading import Thread
 
@@ -3187,12 +3191,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output_2 = self.cmd('list', '--format', '{archive:<36} {time} [{id}]{NL}', self.repository_location)
         self.assertEqual(output_1, output_2)
         output_1 = self.cmd('list', '--short', self.repository_location)
-        self.assertEqual(output_1, 'test-1\ntest-2\n')
+        self.assertEqual(output_1, 'test-1' + os.linesep + 'test-2' + os.linesep)
         output_1 = self.cmd('list', '--format', '{barchive}/', self.repository_location)
         self.assertEqual(output_1, 'test-1/test-2/')
         output_3 = self.cmd('list', '--format', '{name} {comment}{NL}', self.repository_location)
-        self.assert_in('test-1 comment 1\n', output_3)
-        self.assert_in('test-2 comment 2\n', output_3)
+        self.assert_in('test-1 comment 1', output_3.splitlines())
+        self.assert_in('test-2 comment 2', output_3.splitlines())
 
     def test_list_hash(self):
         self.create_regular_file('empty_file', size=0)
@@ -5081,7 +5085,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.cmd('check', '--repair', self.repository_location, exit_code=0)
         self.assert_in('New missing file chunk detected', output)
         self.cmd('check', self.repository_location, exit_code=0)
-        output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
+        output = self.cmd('list', '--format={health}#{path}{NL}', self.repository_location + '::archive1', exit_code=0)
         self.assert_in('broken#', output)
         # check that the file in the old archives has now a different chunk list without the killed chunk.
         # also check that the correct original chunks list is preserved in item.chunks_healthy.
@@ -5120,7 +5124,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 else:
                     self.fail('should not happen')
         # list is also all-healthy again
-        output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
+        output = self.cmd('list', '--format={health}#{path}{NL}', self.repository_location + '::archive1', exit_code=0)
         self.assert_not_in('broken#', output)
         # check should be fine now (and not show it has healed anything).
         output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
@@ -5570,7 +5574,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
     def test_chunks_archive(self):
         self.cmd('create', self.repository_location + '::test1', 'input')
         # Find ID of test1 so we can corrupt it later :)
-        target_id = self.cmd('list', self.repository_location, '--format={id}{LF}').strip()
+        target_id = self.cmd('list', self.repository_location, '--format={id}{NL}').strip()
         self.cmd('create', self.repository_location + '::test2', 'input')
 
         # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d

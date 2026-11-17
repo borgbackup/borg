@@ -45,6 +45,6 @@ jobs:
         # so it needs the credentials that actions/checkout leaves behind.
         - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         - name: Create backport pull requests
-          uses: korthout/backport-action@0ebd44f9c79a4a0a171200dcdcceec3ed9ca732f  # v4.7.1
+          uses: korthout/backport-action@ad272ff24e4a8593bf18a951a154ae6af93b26b8  # v5.0.0
           with:
             label_pattern: '^port/(.+)$'

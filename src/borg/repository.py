@@ -153,7 +153,7 @@ def build_rest_backend(location):
 class PackWriter:
     """Buffers chunks into a pack file and writes it to the store when full.
 
-    add() buffers a (chunk_id, cdata) pair and marks the chunk pending (F_PENDING), unless
+    add() buffers a (chunk_id, parts) pair and marks the chunk pending (F_PENDING), unless
     its index entry already has a resolved pack location (a re-put of a stored chunk keeps
     that location, so the chunk stays readable, also if an abort drops the buffered copy);
     when the pack is full, it is built, hashed and stored, and each entry's pack_id,
@@ -200,7 +200,7 @@ class PackWriter:
         # BORG_PACK_TRACE=yes prints store-thread lifecycle markers to stderr, see _trace.
         self.trace_store = os.environ.get("BORG_PACK_TRACE", "no") == "yes"
         self._chunks = chunks  # used when there is no repository
-        self._pieces = []  # list of (chunk_id, cdata)
+        self._pieces = []  # list of (chunk_id, parts): parts is a tuple of bytes, joined they are the object
         self._size = 0  # byte size of buffered pieces
         self._inflight = None  # (thread, outcome) of the pack store-thread, at most one in flight
 
@@ -215,14 +215,21 @@ class PackWriter:
     def add(self, chunk_id, cdata):
         """Buffer a chunk.
 
+        cdata is the repo object as bytes or as a list of parts (see RepoObj.format_parts). The pack
+        is only built later, so a part that is not bytes (e.g. a memoryview into a buffer the caller
+        reuses) is copied here; bytes parts are buffered as they are.
+
         When the chunk fills the pack, the pack is written and the results of the
         *previously* written pack (with async_store) or of this pack (without) are
         returned as a list of (chunk_id, pack_id, obj_offset, obj_size) tuples.
         Returns None when there is nothing to report.
         """
+        if not isinstance(cdata, list):
+            cdata = [cdata]
+        parts = tuple(part if isinstance(part, bytes) else bytes(part) for part in cdata)
         self.chunks.add(chunk_id, 0)  # size: plaintext chunk size, set by the cache layer
-        self._pieces.append((chunk_id, cdata))
-        self._size += len(cdata)
+        self._pieces.append((chunk_id, parts))
+        self._size += sum(len(part) for part in parts)
         if (self.max_count is not None and len(self._pieces) >= self.max_count) or (
             self.max_size is not None and self._size >= self.max_size
         ):
@@ -257,9 +264,10 @@ class PackWriter:
         """
         self._trace("<", trace)
         try:
-            # Build the pack bytes once by joining all pieces (avoids O(n^2) copies
-            # that incremental string concatenation would cause in Python).
-            pack_data = b"".join(cdata for _, cdata in pieces)
+            # Build the pack bytes once by joining all parts of all pieces (avoids O(n^2) copies
+            # that incremental string concatenation would cause in Python, and the per-object
+            # copies that joining each object's parts first would cause).
+            pack_data = b"".join([part for _, parts in pieces for part in parts])
 
             # Name the pack by the store hash of its bytes: the name commits to the stored content,
             # so borgstore can verify and cache the file.
@@ -269,8 +277,8 @@ class PackWriter:
             # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
             results = []
             offset = 0
-            for chunk_id, cdata in pieces:
-                obj_size = len(cdata)
+            for chunk_id, parts in pieces:
+                obj_size = sum(len(part) for part in parts)
                 results.append((chunk_id, pack_id, offset, obj_size))
                 offset += obj_size
 
@@ -2205,6 +2213,9 @@ class Repository:
     def put(self, id, data):
         """put a repo object
 
+        data is the repo object as bytes or as a list of parts (see RepoObj.format_parts), which
+        put() does not keep a reference to beyond its return (see PackWriter.add).
+
         Buffers the chunk in the pack writer.  When the chunk fills the pack and
         triggers a pack write, returns a list of (chunk_id, pack_id, obj_offset, obj_size)
         tuples, one per written chunk; otherwise returns None.  With the background
@@ -2212,7 +2223,7 @@ class Repository:
         pack, whose store was joined before handing off the current one.
         """
         self._lock_refresh()
-        data_size = len(data)
+        data_size = sum(len(part) for part in data) if isinstance(data, list) else len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
         # PackWriter shares this repository's index, so add() triggers the lazy build itself.

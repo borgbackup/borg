@@ -512,6 +512,35 @@ def test_sort_by_all_keys_with_directions(archivers, request, sort_key):
         assert seen_paths == expected_paths
 
 
+def test_sort_by_deleted_and_added_items(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    create_regular_file(archiver.input_path, "removed_newer", size=10)
+    create_regular_file(archiver.input_path, "modified_file", size=10)
+    os.utime("input/removed_newer", (2000000000, 2000000000))
+    os.utime("input/modified_file", (1500000000, 1500000000))
+    cmd(archiver, "create", "a0", "input")
+
+    os.unlink("input/removed_newer")
+    os.unlink("input/modified_file")
+    create_regular_file(archiver.input_path, "modified_file", size=20)
+    create_regular_file(archiver.input_path, "added_older", size=10)
+    os.utime("input/added_older", (1000000000, 1000000000))
+    os.utime("input/modified_file", (1600000000, 1600000000))
+    cmd(archiver, "create", "a1", "input")
+
+    # Removed item should fall back to its ARCHIVE1 mtime (2000000000) rather than 0 from deleted_item.
+    output = cmd(archiver, "diff", "a0", "a1", "--sort-by=>mtime,path", "--content-only")
+    paths = [line.split()[-1] for line in output.splitlines()]
+    assert paths == ["input/removed_newer", "input/modified_file", "input/added_older"]
+
+    # Added and removed items have no timestamp diff (0), so modified_file (+100000000s) sorts first for >mtime_diff.
+    output = cmd(archiver, "diff", "a0", "a1", "--sort-by=>mtime_diff,path", "--content-only")
+    paths = [line.split()[-1] for line in output.splitlines()]
+    assert paths == ["input/modified_file", "input/added_older", "input/removed_newer"]
+
+
 @pytest.mark.skipif(
     not are_hardlinks_supported() or is_win32, reason="hardlinks not supported or not available on windows"
 )

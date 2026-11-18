@@ -19,7 +19,11 @@ class UnDeleteMixIn:
         dry_run = args.dry_run
         manifest = Manifest.load(repository)
         if args.name:
-            archive_infos = [manifest.archives.get_one(archive_match_patterns(args), deleted=True)]
+            archive_infos = [
+                manifest.archives.get_one(
+                    archive_match_patterns(args), exclude=getattr(args, "exclude_archives", None), deleted=True
+                )
+            ]
         else:
             args.deleted = True
             archive_infos = manifest.archives.list_considering(args)
@@ -29,7 +33,17 @@ class UnDeleteMixIn:
         # any explicitly given archive filter counts as a deliberate selection;
         # all these args are falsy when not given (--first / --last are PositiveInt, defaulting to None).
         any_filters_given = any(
-            (args.name, args.match_archives, args.first, args.last, args.oldest, args.newest, args.older, args.newer)
+            (
+                args.name,
+                args.match_archives,
+                getattr(args, "exclude_archives", None),
+                args.first,
+                args.last,
+                args.oldest,
+                args.newest,
+                args.older,
+                args.newer,
+            )
         )
         if not any_filters_given:
             raise CommandError("Aborting: if you really want to undelete all archives, please use -a 'sh:*'.")

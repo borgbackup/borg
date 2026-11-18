@@ -313,6 +313,12 @@ class HelpMixIn:
         in the repository. It can be given multiple times; an archive is only considered if it
         matches all given patterns.
 
+        The ``--exclude-archives`` option excludes archives matching a given pattern. It can be
+        given multiple times; an archive is excluded if it matches any given pattern.
+
+        When combined, an archive is only considered if it matches all ``--match-archives`` patterns
+        and none of the ``--exclude-archives`` patterns.
+
         Commands that also accept an archive NAME as a positional argument treat that NAME like
         an additional pattern, so NAME and ``--match-archives`` can be combined to narrow down the
         selection, e.g. ``borg prune home -a host:myhost``. NAME accepts the same prefixes as the
@@ -406,12 +412,16 @@ class HelpMixIn:
             # archive creation date match
             borg delete -a 'date:2025-01'
             borg delete -a 'date:2025-01-01T14:30Z'
-            borg delete -a 'date:2025-01-01T09:30[America/New_York]'\n\n"""
+            borg delete -a 'date:2025-01-01T09:30[America/New_York]'
+
+            # exclude archives matching a pattern:
+            borg repo-list --exclude-archives 'sh:*tmp*'
+            borg repo-list -a 'host:kenny-pc' --exclude-archives 'tags:experimental'\n\n"""
     )
     helptext["placeholders"] = textwrap.dedent(
         """
         Repository URLs, the archive name arguments (``NAME``, ``OLDNAME``, ``NEWNAME``,
-        ``ARCHIVE1``, ``ARCHIVE2``), ``-a`` / ``--match-archives``, ``--comment`` and
+        ``ARCHIVE1``, ``ARCHIVE2``), ``-a`` / ``--match-archives``, ``--exclude-archives``, ``--comment`` and
         ``BORG_REMOTE_PATH`` values support these placeholders:
 
         {hostname}

@@ -27,6 +27,28 @@ def test_repo_list_glob(archivers, request, backup_files):
     assert "something-else" not in output
 
 
+def test_repo_list_exclude_archives(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test-1", backup_files)
+    cmd(archiver, "create", "something-else-than-test-1", backup_files)
+    cmd(archiver, "create", "test-2", backup_files)
+    output = cmd(archiver, "repo-list", "--exclude-archives=test-2")
+    assert "test-1" in output
+    assert "test-2" not in output
+    assert "something-else" in output
+    # Multiple excludes: OR semantics
+    output = cmd(archiver, "repo-list", "--exclude-archives=test-1", "--exclude-archives=sh:something-*")
+    assert "test-1" not in output
+    assert "test-2" in output
+    assert "something-else" not in output
+    # Combined with --match-archives
+    output = cmd(archiver, "repo-list", "--match-archives=sh:test-*", "--exclude-archives=test-2")
+    assert "test-1" in output
+    assert "test-2" not in output
+    assert "something-else" not in output
+
+
 def test_archives_format(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

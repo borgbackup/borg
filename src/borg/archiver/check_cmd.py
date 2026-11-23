@@ -335,8 +335,10 @@ class CheckMixIn:
            salvages each pack that fails its store hash (a pack is named by the hash of its
            content): the pack is replaced by one holding only its objects whose header,
            metadata and data authenticate with the key, the rest is dropped and the index
-           entries of the dropped objects are removed. A pack in which no object
-           authenticates is left in place and reported. If the index is corrupt, a full
+           entries of the dropped objects are removed. If no object in the pack authenticates,
+           the pack is deleted and its index entries are removed, provided other objects in the
+           repository authenticated in the same run; otherwise it is left in place and reported.
+           If the index is corrupt, a full
            ``borg check --repair`` then rebuilds it from the packs in the archive check
            (which does so on every ``--repair`` run). With ``--repository-only``, the
            repository check rebuilds it, provided no pack is left corrupt. Either rebuild

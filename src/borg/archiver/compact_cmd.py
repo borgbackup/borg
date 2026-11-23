@@ -601,9 +601,10 @@ class CompactMixIn:
 
             ``borg compact`` does not rewrite or merge packs that ``borg check`` recorded as corrupt
             and warns about them. ``borg check --repair`` salvages such a pack: it replaces it by a pack
-            holding only the objects that authenticate with the key, which drops the corrupt chunks and
-            any damage outside a chunk (e.g. bytes appended to the pack). A pack in which no object
-            authenticates stays recorded corrupt and ``borg compact`` warns about it on every run.
+            holding only the objects that authenticate with the key (or deletes it if none do and other
+            objects in the repository authenticated), which drops the corrupt chunks and any damage
+            outside a chunk (e.g. bytes appended to the pack). A pack that could not be salvaged stays
+            recorded corrupt and ``borg compact`` warns about it on every run.
 
             You usually do not want to run ``borg compact`` after every write operation, but
             either regularly (e.g., once a month, possibly together with ``borg check``) or

@@ -3838,6 +3838,36 @@ def test_salvage_pack_leaves_a_pack_alone_if_nothing_authenticates(salvage_repos
     assert index_contents(salvage_repository.chunks) == index_before
 
 
+def test_salvage_pack_deletes_a_pack_if_nothing_authenticates_and_allowed(salvage_repository):
+    repo_objs = plain_repo_objs()
+    other_id, other_obj = real_chunk(repo_objs, b"Z" * 100)
+    other_pack_id = store_damaged_pack(salvage_repository, [(other_id, other_obj)], listed=[0])
+    objs = three_objects(repo_objs)
+    flip = [last_byte_offset(objs, i) for i in range(3)]
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=flip)
+    pack_size = sum(len(obj) for _, obj in objs)
+    list(salvage_repository.get_many([objs[0][0]]))  # loads the pack into the pack cache
+    called = []
+
+    result = salvage(
+        salvage_repository,
+        repo_objs,
+        pack_id,
+        before_old_pack_delete=lambda: called.append(len(salvage_repository.chunks)),
+        delete_if_empty=True,
+    )
+
+    assert result.status == SALVAGE_DONE
+    assert result.new_pack_id is None
+    assert result.kept == []
+    assert result.dropped_bytes == pack_size
+    assert set(result.removed_ids) == {chunk_id for chunk_id, _ in objs}
+    assert called == [4]  # called before chunks was updated
+    assert store_contents(salvage_repository) == {bin_to_hex(other_pack_id): other_obj}
+    assert pack_id not in salvage_repository._pack_cache
+    assert list(salvage_repository.chunks.keys()) == [other_id]
+
+
 @pytest.mark.parametrize("tail", [b"x" * 10, b"junk" * 100], ids=["shorter-than-a-header", "longer"])
 def test_salvage_pack_drops_uncovered_trailing_bytes(salvage_repository, tail):
     repo_objs = plain_repo_objs()
@@ -3886,11 +3916,13 @@ def test_salvage_pack_refuses_without_write_permission(salvage_repository):
     assert index_contents(salvage_repository.chunks) == index_before
 
 
-def test_salvage_pack_leaves_a_pack_alone_if_two_reads_differ(salvage_repository, monkeypatch):
-    # the first load has an extra flipped byte in object 0, the second load does not.
+@pytest.mark.parametrize("all_corrupt", [False, True], ids=["some-kept", "none-kept"])
+def test_salvage_pack_leaves_a_pack_alone_if_two_reads_differ(salvage_repository, monkeypatch, all_corrupt):
+    # the first load has an extra flipped byte (leaving either one kept object or none), the second does not.
     repo_objs = plain_repo_objs()
     objs = three_objects(repo_objs)
-    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=[last_byte_offset(objs, 1)])
+    flip = [last_byte_offset(objs, i) for i in range(1, 3)] if all_corrupt else [last_byte_offset(objs, 1)]
+    pack_id = store_damaged_pack(salvage_repository, objs, listed=range(3), flip=flip)
     packs_before, index_before = store_contents(salvage_repository), index_contents(salvage_repository.chunks)
     load = salvage_repository.store.load
     loads = []
@@ -3906,7 +3938,7 @@ def test_salvage_pack_leaves_a_pack_alone_if_two_reads_differ(salvage_repository
 
     monkeypatch.setattr(salvage_repository.store, "load", flaky_load)
 
-    result = salvage(salvage_repository, repo_objs, pack_id)
+    result = salvage(salvage_repository, repo_objs, pack_id, delete_if_empty=all_corrupt)
 
     assert result.status == SALVAGE_READS_DIFFER
     assert len(loads) == 2
@@ -4335,6 +4367,59 @@ def test_check_repair_leaves_a_pack_nothing_in_which_authenticates(tmp_path, cap
         assert f"Corrupt pack {bin_to_hex(pack_id)} was not salvaged: {SALVAGE_NOTHING_AUTHENTICATES}." in caplog.text
         assert pack_names(repository) == {bin_to_hex(pack_id)}
         assert PackTracker.load(repository).corrupt_ids() == [pack_id]
+
+
+def test_check_repair_deletes_empty_corrupt_pack_when_other_objects_authenticate(tmp_path, caplog):
+    # a corrupt pack in which nothing authenticates is deleted when another pack authenticates,
+    # and left untouched if the authenticator rejects everything (e.g. broken authenticator or wrong key).
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    (objs_a, pack_a), (objs_b, pack_b) = create_repo_with_real_packs(location, repo_objs, packs=2)
+    with Repository(location, exclusive=True) as repository:
+        damage_pack(repository, pack_a, flip=[last_byte_offset(objs_a, i) for i in range(3)])
+    # guard: broken authenticator rejects the intact pack too, so the corrupt pack stays untouched.
+    with Repository(location, exclusive=True) as repository:
+        with caplog.at_level(logging.ERROR, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=True, authenticate=lambda cid, obj: False) is False
+        assert f"Corrupt pack {bin_to_hex(pack_a)} was not salvaged: {SALVAGE_NOTHING_AUTHENTICATES}." in caplog.text
+        assert pack_names(repository) == {bin_to_hex(pack_a), bin_to_hex(pack_b)}
+    # working authenticator proves itself on pack_b, so pack_a is deleted and its index entries removed.
+    caplog.clear()
+    with Repository(location, exclusive=True) as repository:
+        with caplog.at_level(logging.WARNING, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=True) is False
+        assert f"Salvaged corrupt pack {bin_to_hex(pack_a)}: deleted pack (no object authenticated)" in caplog.text
+        assert "corrupt pack(s) salvaged, chunks may be lost" in caplog.text
+        assert pack_names(repository) == {bin_to_hex(pack_b)}
+        assert PackTracker.load(repository).corrupt_ids() == []
+        assert not chunkindex_is_invalid(repository)
+    with Repository(location, exclusive=True) as repository:
+        for chunk_id, _ in objs_a:
+            assert chunk_id not in repository.chunks
+        for chunk_id, _ in objs_b:
+            assert chunk_id in repository.chunks
+        assert repository.check(repair=False) is True
+
+
+def test_check_repair_deletes_empty_corrupt_pack_deferred_until_other_pack_authenticates(tmp_path, caplog):
+    # no intact packs: the corrupt pack with no authenticating object sorts before the partially
+    # salvageable one, so it is deferred and deleted once the second pack authenticates objects.
+    repo_objs = plain_repo_objs()
+    location = os.fspath(tmp_path / "repo")
+    packs = sorted(create_repo_with_real_packs(location, repo_objs, packs=2), key=lambda item: item[1])
+    (objs_empty, pack_empty), (objs_partial, pack_partial) = packs
+    with Repository(location, exclusive=True) as repository:
+        damage_pack(repository, pack_empty, flip=[last_byte_offset(objs_empty, i) for i in range(3)])
+        damage_pack(repository, pack_partial, flip=[last_byte_offset(objs_partial, 1)])
+    new_partial = store_hash(objs_partial[0][1] + objs_partial[2][1]).digest()
+    with Repository(location, exclusive=True) as repository:
+        with caplog.at_level(logging.WARNING, logger="borg.repository"):
+            assert check_repair(repository, repo_objs, repo_only=True) is False
+        assert f"Salvaged corrupt pack {bin_to_hex(pack_empty)}: deleted pack (no object authenticated)" in caplog.text
+        assert pack_names(repository) == {bin_to_hex(new_partial)}
+        assert PackTracker.load(repository).corrupt_ids() == []
+    with Repository(location, exclusive=True) as repository:
+        assert repository.check(repair=False) is True
 
 
 def test_check_repair_does_not_salvage_with_a_pack_store_cache(tmp_path, caplog, monkeypatch):

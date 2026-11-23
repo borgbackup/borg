@@ -718,13 +718,13 @@ def remove_missing_pack_entries(chunks, missing_pack_ids):
 
 # Repository.salvage_pack outcomes.
 SALVAGE_INTACT = "intact"  # the pack's store hash matches its name
-SALVAGE_DONE = "salvaged"  # the pack was replaced by one holding only its authenticated objects
-SALVAGE_NOTHING_AUTHENTICATES = "nothing authenticates"  # no object in the pack authenticates
+SALVAGE_DONE = "salvaged"  # the pack was replaced by one holding only its authenticated objects, or deleted
+SALVAGE_NOTHING_AUTHENTICATES = "nothing authenticates"  # no object in the pack authenticates (left unchanged)
 SALVAGE_READS_DIFFER = "reads differ"  # two reads of the pack disagree
 SALVAGE_READ_ERROR = "read error"  # reading the pack failed
 
 # status: one of the SALVAGE_* outcomes.
-# new_pack_id: id of the replacement pack (SALVAGE_DONE), else None.
+# new_pack_id: id of the replacement pack (SALVAGE_DONE with kept objects), else None.
 # kept: (chunk_id, obj_offset, obj_size) of each object in the replacement pack, else [].
 # dropped_bytes: number of bytes of the old pack left out of the replacement pack, else 0.
 # removed_ids: chunk ids whose chunk index entries were removed, else [].
@@ -1960,7 +1960,7 @@ class Repository:
         elif not repair:
             logger.error(f"{done} {mode} repository check, errors found{so_far}.")
         elif invalid_pack_names or corrupt_ids:
-            # corrupt packs not salvaged, e.g. packs in which no object authenticates.
+            # corrupt packs not salvaged, e.g. read error, differing reads, or nothing authenticated in the repo.
             if repo_only:
                 logger.error(f"{done} {mode} repository check, corrupt pack(s) left{so_far}.")
             else:
@@ -2607,7 +2607,9 @@ class Repository:
         self.store_delete(pack_key)
         return new_pack_id, len(pack_data)
 
-    def salvage_pack(self, pack_id, *, validate, authenticate, chunks=None, before_old_pack_delete=None):
+    def salvage_pack(
+        self, pack_id, *, validate, authenticate, chunks=None, before_old_pack_delete=None, delete_if_empty=False
+    ):
         """Replace pack <pack_id> by a pack holding only the objects in it that authenticate.
 
         A pack is named by the store hash (STORE_HASH_NAME) of its content.
@@ -2620,9 +2622,15 @@ class Repository:
             It must verify the tags of both slots.
         chunks: the ChunkIndex to update. Default: self.chunks.
         before_old_pack_delete: callable without arguments, called once after the replacement pack is
-            stored and before chunks is updated and the old pack is deleted; use it to invalidate stored
-            chunk indexes for crash safety (see #9748). Not called if the old pack is not deleted, see
-            SALVAGE_DONE.
+            stored (if any) and before chunks is updated and the old pack is deleted; use it to invalidate
+            stored chunk indexes for crash safety (see #9748). Not called if the old pack is not deleted,
+            see SALVAGE_DONE.
+        delete_if_empty: whether to delete the pack and remove its index entries if no object authenticates,
+            or a zero-argument callable returning that bool (called only when no object authenticates and
+            both loads returned the same bytes). Default: False (return SALVAGE_NOTHING_AUTHENTICATES and
+            leave the pack and index unchanged). Callers should enable this only once another object has
+            authenticated with the same validator and authenticator, so a broken validator/authenticator or
+            wrong key leaves packs untouched.
 
         Every object the walk yields and authenticate accepts is kept, whether the chunk index lists
         it or not. Everything else is dropped: objects authenticate rejects, byte ranges the walk
@@ -2633,13 +2641,17 @@ class Repository:
         - SALVAGE_READS_DIFFER: the loaded bytes hash to the pack's name although the store hash did
           not, or a second load of the pack differs from the first, e.g. due to corruption in memory
           or in transfer. Objects are dropped only if both loads return the same bytes.
+        - SALVAGE_NOTHING_AUTHENTICATES: both loads returned the same bytes, no object authenticated,
+          and delete_if_empty was false.
         - SALVAGE_READ_ERROR: reading the pack raised OSError, StoreBackendConnectionError or
           ReadRangeError. All reads happen before the first store change.
-        - SALVAGE_DONE: the replacement pack is stored, before_old_pack_delete is called, chunks is
-          updated, then the old pack is deleted. If the replacement pack has the old pack's name
-          (the kept bytes are the undamaged pack), storing it overwrites the old pack, and
-          before_old_pack_delete and the delete are skipped. An exception in one of these steps leaves
-          the steps before it done.
+        - SALVAGE_DONE: if any object authenticated, the replacement pack is stored,
+          before_old_pack_delete is called, chunks is updated, then the old pack is deleted. If no
+          object authenticated (and delete_if_empty is true), no replacement pack is stored
+          (new_pack_id is None), before_old_pack_delete is called, chunks is updated and the old pack
+          is deleted. If the replacement pack has the old pack's name (the kept bytes are the undamaged
+          pack), storing it overwrites the old pack, and before_old_pack_delete and the delete are
+          skipped. An exception in one of these steps leaves the steps before it done.
 
         The chunk index update: an entry of this pack is pointed at the kept object at its offset,
         or else at a kept copy of the same chunk id, or else removed. A kept object whose chunk id
@@ -2677,25 +2689,31 @@ class Repository:
             for chunk_id, offset, size in reader.iter_headers(validate=validate):
                 if authenticate(chunk_id, reader.read(offset, size)):
                     kept_old.append((chunk_id, offset, size))
-            if not kept_old:
-                return unchanged(SALVAGE_NOTHING_AUTHENTICATES)
             if self.store.load(pack_key) != pack_contents:
                 return unchanged(SALVAGE_READS_DIFFER)
         except (OSError, StoreBackendConnectionError, ReadRangeError) as exc:
             logger.warning(f"pack {pack_hex}: {exc}, not salvaging it.")
             return unchanged(SALVAGE_READ_ERROR)
 
-        new_pack_data = b"".join(pack_contents[offset : offset + size] for _, offset, size in kept_old)
-        # equal to pack_id if the kept bytes are the undamaged pack, e.g. when the damage is appended bytes.
-        new_pack_id = store_hash(new_pack_data).digest()
-        kept = []  # (chunk_id, new offset, size)
-        new_offset = 0
-        for chunk_id, _, size in kept_old:
-            kept.append((chunk_id, new_offset, size))
-            new_offset += size
-        dropped_bytes = len(pack_contents) - len(new_pack_data)
+        if not kept_old and not (delete_if_empty() if callable(delete_if_empty) else delete_if_empty):
+            return unchanged(SALVAGE_NOTHING_AUTHENTICATES)
 
-        self.store_store("packs/" + bin_to_hex(new_pack_id), new_pack_data)
+        if kept_old:
+            new_pack_data = b"".join(pack_contents[offset : offset + size] for _, offset, size in kept_old)
+            # equal to pack_id if the kept bytes are the undamaged pack, e.g. when the damage is appended bytes.
+            new_pack_id = store_hash(new_pack_data).digest()
+            kept = []  # (chunk_id, new offset, size)
+            new_offset = 0
+            for chunk_id, _, size in kept_old:
+                kept.append((chunk_id, new_offset, size))
+                new_offset += size
+            dropped_bytes = len(pack_contents) - len(new_pack_data)
+            self.store_store("packs/" + bin_to_hex(new_pack_id), new_pack_data)
+        else:
+            new_pack_id = None
+            kept = []
+            dropped_bytes = len(pack_contents)
+
         if before_old_pack_delete is not None and new_pack_id != pack_id:
             before_old_pack_delete()
 
@@ -2732,18 +2750,64 @@ class Repository:
         self._pack_cache.pop(pack_id, None)
         return SalvageResult(SALVAGE_DONE, new_pack_id, kept, dropped_bytes, removed_ids)
 
+    def _authenticate_any_object(self, pack_ids, *, validate, authenticate, max_objects=16):
+        """Return True if at least one object in pack_ids passes validate and authenticate.
+
+        Walks at most max_objects objects across pack_ids without resyncing: intact packs hold
+        objects back to back from offset 0, so a working validator and authenticator succeed on the
+        first object, while a broken one or wrong key stops after a bounded number of reads.
+        """
+        packs = sorted(pack_ids)
+        hdr_size = RepoObj.obj_header.size
+        checked = 0
+        for i, pack_id in enumerate(packs):
+            if checked >= max_objects or sig_int:
+                break
+            self._lock_refresh()
+            per_pack = max(1, (max_objects - checked) // (len(packs) - i))
+            pack_checked = 0
+            try:
+                info = self.store.info("packs/" + bin_to_hex(pack_id))
+                if not info.exists:
+                    continue
+                reader = PackReader(self.store, pack_id, pack_size=info.size)
+                for chunk_id, offset, size in reader.iter_headers():
+                    if sig_int:
+                        break
+                    obj = reader.read(offset, size)
+                    hdr, _ = RepoObj.parse_header(obj)
+                    if (
+                        len(obj) == size
+                        and hdr is not None
+                        and hdr.meta_size <= MAX_VALIDATED_META_SIZE
+                        and validate(chunk_id, obj[: hdr_size + hdr.meta_size])
+                        and authenticate(chunk_id, obj)
+                    ):
+                        return True
+                    checked += 1
+                    pack_checked += 1
+                    if checked >= max_objects or pack_checked >= per_pack:
+                        break
+            except (IntegrityError, OSError, StoreBackendConnectionError, ReadRangeError, StoreObjectNotFound):
+                continue
+        return False
+
     def _salvage_corrupt_packs(self, tracker, present_pack_ids, chunks, *, validate, authenticate):
         """Salvage each pack in packs/ that tracker records corrupt with salvage_pack.
 
         tracker: the PackTracker. The record of a salvaged pack is dropped, a pack that reads intact is
             recorded intact and counted (see the return value).
         present_pack_ids: the set of pack ids in packs/. Only these packs are salvaged. The id of a
-            salvaged pack is replaced by the id of its replacement pack.
+            salvaged pack is replaced by the id of its replacement pack (or removed if the pack was
+            deleted because no object in it authenticated).
         chunks: the ChunkIndex read from the index/ fragments, or None if it could not be read. It is
             updated and, after a salvage, stored, so the repository index is current as soon as this
             returns. If None, salvage_pack updates an empty ChunkIndex, which is not stored, and the
             stored index stays marked invalid (see write_chunkindex_invalid).
         validate, authenticate: passed to salvage_pack. If authenticate is None, no pack is salvaged.
+            A corrupt pack in which no object authenticates is deleted (and its index entries removed)
+            only if another object in the repository authenticated with validate and authenticate in
+            this run; otherwise it is left unchanged.
 
         Returns (number of packs salvaged, number of those that may have lost chunks, number of packs that
         read intact). A salvage may have lost chunks if it removed index entries, or if chunks is None.
@@ -2780,26 +2844,33 @@ class Repository:
                 write_chunkindex_invalid(self)
                 marked = True
 
+        intact_pack_ids = present_pack_ids - set(corrupt_ids)
+        authenticated = False  # True once any object passed validate and authenticate in this run
+        probed_intact = False
+        reread_intact_ids = []  # packs that read corrupt, then intact during salvage
+        nothing_authenticated = []  # corrupt packs deferred until we know whether anything else authenticates
+
+        def can_delete_empty():
+            nonlocal authenticated, probed_intact
+            if authenticated:
+                return True
+            if not probed_intact:
+                probed_intact = True
+                if intact_pack_ids:
+                    authenticated = self._authenticate_any_object(
+                        intact_pack_ids, validate=validate, authenticate=authenticate
+                    )
+            return authenticated
+
         salvaged = lossy = reread_intact = 0
-        pi = ProgressIndicatorPercent(
-            total=len(corrupt_ids), msg="Salvaging packs %3.0f%%", msgid="check.salvage_packs"
-        )
-        for pack_id in corrupt_ids:
-            if sig_int:
-                logger.info(f"Interrupted pack salvage, {salvaged} pack(s) salvaged so far.")
-                break
-            pi.show(increase=1)
+
+        def apply_result(pack_id, result, *, defer_empty):
+            nonlocal authenticated, salvaged, lossy, reread_intact
             pack_hex = bin_to_hex(pack_id)
-            result = self.salvage_pack(
-                pack_id,
-                validate=validate,
-                authenticate=authenticate,
-                chunks=index,
-                before_old_pack_delete=mark_index_invalid,
-            )
             if result.status == SALVAGE_INTACT:
                 tracker.record(pack_id, True)
                 reread_intact += 1
+                reread_intact_ids.append(pack_id)
                 logger.warning(
                     f"Pack {pack_hex} read corrupt, then intact; it is kept as it is. The storage or the "
                     "transfer may be unreliable."
@@ -2810,19 +2881,70 @@ class Repository:
                 lossy += bool(result.removed_ids or chunks is None)
                 tracker.forget(pack_id)  # pack_id is deleted, or holds the replacement pack
                 present_pack_ids.discard(pack_id)
-                present_pack_ids.add(result.new_pack_id)
-                logger.warning(
-                    f"Salvaged corrupt pack {pack_hex}: kept {len(result.kept)} object(s) in pack "
-                    f"{bin_to_hex(result.new_pack_id)}, dropped {result.dropped_bytes} byte(s), removed "
-                    f"{len(result.removed_ids)} index entry(s)."
-                )
+                if result.new_pack_id is not None:
+                    authenticated = True
+                    present_pack_ids.add(result.new_pack_id)
+                    logger.warning(
+                        f"Salvaged corrupt pack {pack_hex}: kept {len(result.kept)} object(s) in pack "
+                        f"{bin_to_hex(result.new_pack_id)}, dropped {result.dropped_bytes} byte(s), removed "
+                        f"{len(result.removed_ids)} index entry(s)."
+                    )
+                else:
+                    logger.warning(
+                        f"Salvaged corrupt pack {pack_hex}: deleted pack (no object authenticated), "
+                        f"dropped {result.dropped_bytes} byte(s), removed {len(result.removed_ids)} index entry(s)."
+                    )
                 for chunk_id in result.removed_ids:
                     logger.debug(f"Removed index entry: {bin_to_hex(chunk_id)}")
+            elif defer_empty and result.status == SALVAGE_NOTHING_AUTHENTICATES:
+                nothing_authenticated.append(pack_id)
             else:
                 logger.error(f"Corrupt pack {pack_hex} was not salvaged: {result.status}.")
+
+        pi = ProgressIndicatorPercent(
+            total=len(corrupt_ids), msg="Salvaging packs %3.0f%%", msgid="check.salvage_packs"
+        )
+        for pack_id in corrupt_ids:
+            if sig_int:
+                logger.info(f"Interrupted pack salvage, {salvaged} pack(s) salvaged so far.")
+                break
+            pi.show(increase=1)
+            result = self.salvage_pack(
+                pack_id,
+                validate=validate,
+                authenticate=authenticate,
+                chunks=index,
+                before_old_pack_delete=mark_index_invalid,
+                delete_if_empty=can_delete_empty,
+            )
+            apply_result(pack_id, result, defer_empty=True)
         else:
             pi.show(current=len(corrupt_ids))  # finish at 100%
         pi.finish()
+        if nothing_authenticated and not sig_int:
+            if not authenticated and reread_intact_ids:
+                authenticated = self._authenticate_any_object(
+                    reread_intact_ids, validate=validate, authenticate=authenticate
+                )
+            if authenticated:
+                for pack_id in nothing_authenticated:
+                    if sig_int:
+                        logger.info(f"Interrupted pack salvage, {salvaged} pack(s) salvaged so far.")
+                        break
+                    result = self.salvage_pack(
+                        pack_id,
+                        validate=validate,
+                        authenticate=authenticate,
+                        chunks=index,
+                        before_old_pack_delete=mark_index_invalid,
+                        delete_if_empty=True,
+                    )
+                    apply_result(pack_id, result, defer_empty=False)
+            else:
+                for pack_id in nothing_authenticated:
+                    logger.error(
+                        f"Corrupt pack {bin_to_hex(pack_id)} was not salvaged: {SALVAGE_NOTHING_AUTHENTICATES}."
+                    )
         if chunks is None:
             return salvaged, lossy, reread_intact
         if salvaged:

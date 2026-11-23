@@ -254,9 +254,10 @@ class RepoCompressMixIn:
 
         ``borg repo-compress`` does not rewrite packs that ``borg check`` recorded as corrupt
         and warns about them. ``borg check --repair`` salvages such a pack: it replaces it by a pack
-        holding only the objects that authenticate with the key, which drops the corrupt chunks and any
-        damage outside a chunk (e.g. bytes appended to the pack). A pack in which no object authenticates
-        stays recorded corrupt and is not rewritten.
+        holding only the objects that authenticate with the key (or deletes it if none do and other
+        objects in the repository authenticated), which drops the corrupt chunks and any damage
+        outside a chunk (e.g. bytes appended to the pack). A pack that could not be salvaged stays
+        recorded corrupt and is not rewritten.
 
         Rewriting a pack invalidates every client's cached chunk index, so the next borg
         operation of each client will re-fetch the chunk index from the repository.

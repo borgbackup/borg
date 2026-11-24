@@ -111,9 +111,10 @@ def get_runtime_dir(*subdirs, create=True):
 
     Any additional path components are appended to the runtime directory.
     """
-    runtime_dir = os.environ.get(
-        "BORG_RUNTIME_DIR", join_base_dir(".cache", "borg") or platformdirs.user_runtime_dir("borg", appauthor=False)
-    )
+    runtime_dir = os.environ.get("BORG_RUNTIME_DIR")
+    if runtime_dir is None:
+        # Only ask platformdirs if needed: it raises PermissionError if it does not find a safe runtime directory.
+        runtime_dir = join_base_dir(".cache", "borg") or platformdirs.user_runtime_dir("borg", appauthor=False)
     if subdirs:
         runtime_dir = str(Path(runtime_dir).joinpath(*subdirs))
     if create:

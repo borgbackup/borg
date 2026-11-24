@@ -31,7 +31,7 @@ from ...helpers.fs import (
     input_map_check_size,
 )
 from ...helpers.errors import Error
-from ...platform import is_win32, is_darwin
+from ...platform import is_win32, is_darwin, is_haiku
 from .. import are_fifos_supported, are_hardlinks_supported
 from .. import rejected_dotdot_paths
 
@@ -183,18 +183,36 @@ def test_get_runtime_dir(monkeypatch):
     else:
         monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
         monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
-        uid = str(os.getuid())
-        assert get_runtime_dir(create=False) in [
-            os.path.join("/run/user", uid, "borg"),  # Linux
-            os.path.join("/var/run/user", uid, "borg"),  # FreeBSD/NetBSD
-            os.path.join("/tmp/run/user", uid, "borg"),  # OpenBSD
-            # platformdirs falls back to a TMPDIR-based path if the platform default is not writable
-            os.path.join(tempfile.gettempdir(), f"runtime-{uid}", "borg"),
-        ]
-        monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
-        assert get_runtime_dir(create=False) == os.path.join("/var/tmp/.cache", "borg")
+        # Haiku has no /run/user and its /tmp is writable by all users without having the sticky bit set, so
+        # platformdirs does not find a safe runtime directory there and raises PermissionError.
+        if not is_haiku:
+            uid = str(os.getuid())
+            assert get_runtime_dir(create=False) in [
+                os.path.join("/run/user", uid, "borg"),  # Linux
+                os.path.join("/var/run/user", uid, "borg"),  # FreeBSD/NetBSD
+                os.path.join("/tmp/run/user", uid, "borg"),  # OpenBSD
+                # platformdirs falls back to a TMPDIR-based path if the platform default is not writable
+                os.path.join(tempfile.gettempdir(), f"runtime-{uid}", "borg"),
+            ]
+            monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
+            assert get_runtime_dir(create=False) == os.path.join("/var/tmp/.cache", "borg")
         monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
         assert get_runtime_dir(create=False) == "/var/tmp"
+
+
+def test_get_runtime_dir_without_platformdirs(monkeypatch, tmp_path):
+    """BORG_RUNTIME_DIR and BORG_BASE_DIR work even if platformdirs does not find a safe runtime directory"""
+
+    def user_runtime_dir(*args, **kwargs):
+        raise PermissionError("no safe runtime directory")
+
+    monkeypatch.setattr("platformdirs.user_runtime_dir", user_runtime_dir)
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    monkeypatch.setenv("BORG_RUNTIME_DIR", str(tmp_path / "runtime"))
+    assert get_runtime_dir(create=False) == str(tmp_path / "runtime")
+    monkeypatch.delenv("BORG_RUNTIME_DIR")
+    monkeypatch.setenv("BORG_BASE_DIR", str(tmp_path))
+    assert get_runtime_dir(create=False) == str(tmp_path / ".cache" / "borg")
 
 
 def test_get_cache_dir_subdirs(monkeypatch, tmp_path):

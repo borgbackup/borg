@@ -831,21 +831,21 @@ jobs:
             artifact_prefix: borg-freebsd-15-x86_64-gh
 
           - os: netbsd
-            version: '11.0'
+            version: '11.1'
             display_name: NetBSD
             pyver: '3.14'
             do_binaries: false
 
           - os: openbsd
-            version: '7.9'
+            version: '8.0'
             display_name: OpenBSD
-            pyver: '3.13'
+            pyver: '3.14'
             do_binaries: false
             # extra RAM for the mfs-backed TMPDIR, see the openbsd test step
             memory: 12G
 
           - os: omnios
-            version: 'r151056'
+            version: 'r151060'
             display_name: OmniOS
             pyver: '3.13'
             do_binaries: false
@@ -970,7 +970,7 @@ jobs:
             netbsd)
               arch="$(uname -m)"
               sudo -E mkdir -p /usr/pkg/etc/pkgin
-              echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/11.0/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+              echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/11.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
               sudo -E pkgin update
               sudo -E pkgin -y upgrade
               sudo -E pkgin -y install lz4 git
@@ -1009,15 +1009,14 @@ jobs:
               sudo chmod 1777 /mfs
               export TMPDIR=/mfs
 
-              # 7.9 has no python 3.14 pkg yet - move to 3.14 + update pyver when it ships (#9470)
               sudo -E pkg_add lz4 git rust openssl%3.5 py3-pip py3-virtualenv py3-tox
 
               export BORG_OPENSSL_NAME=eopenssl35
-              tox -e py313-none
+              tox -e py314-none
               ;;
 
             omnios)
-              # r151056 has no python-314 pkg yet - move to 3.14 + update pyver when it ships (#9470)
+              # r151060 has no python-314 pkg yet - move to 3.14 + update pyver when it ships (#9470)
               sudo pkg install gcc14 git pkg-config python-313 gnu-make gnu-coreutils rust
               sudo ln -sf /usr/bin/python3.13 /usr/bin/python3
               sudo ln -sf /usr/bin/python3.13-config /usr/bin/python3-config

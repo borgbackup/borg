@@ -3427,6 +3427,7 @@ class ArchiveRecreater:
         self.cache = cache
 
         self.matcher = matcher
+        self.base_matcher_items = list(matcher._items)
         self.exclude_caches = exclude_caches
         self.exclude_if_present = exclude_if_present or []
         self.keep_exclude_tags = keep_exclude_tags
@@ -3449,6 +3450,7 @@ class ArchiveRecreater:
         self.print_file_status = file_status_printer or (lambda *args: None)
 
     def recreate(self, archive_info, target_name, delete_original, comment=None):
+        self.matcher._items = list(self.base_matcher_items)
         archive = self.open_archive(archive_info)
         target = self.create_target(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
@@ -3540,7 +3542,8 @@ class ArchiveRecreater:
 
         def exclude(dir, tag_item):
             if self.keep_exclude_tags:
-                tag_files.append(PathPrefixPattern(tag_item.path, recurse_dir=False))
+                if matcher.match(tag_item.path):
+                    tag_files.append(PathPrefixPattern(tag_item.path, recurse_dir=False))
                 tagged_dirs.append(FnmatchPattern(dir + "/", recurse_dir=False))
             else:
                 tagged_dirs.append(PathPrefixPattern(dir, recurse_dir=False))
@@ -3559,8 +3562,11 @@ class ArchiveRecreater:
                 file = open_item(archive, item)
                 if file.read(len(CACHE_TAG_CONTENTS)) == CACHE_TAG_CONTENTS:
                     exclude(dir, item)
+        include_items = [item for item in matcher._items if item[0] in matcher.include_patterns]
+        matcher._items = [item for item in matcher._items if item[0] not in matcher.include_patterns]
         matcher.add(tag_files, IECommand.Include)
         matcher.add(tagged_dirs, IECommand.ExcludeNoRecurse)
+        matcher._items.extend(include_items)
 
     def create_target(self, archive, target_name):
         """Create target archive."""

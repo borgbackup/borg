@@ -980,7 +980,7 @@ def test_check_repair_rebuilds_corrupt_index(archivers, request, mode, message):
     assert "archive1" in cmd(archiver, "repo-list")  # and remains usable
 
 
-def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, request):
+def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, request, tmp_path, monkeypatch):
     # A corrupt index and a pack the salvage can not fix: a full --repair rebuilds and stores the index in
     # the archives check. The pack stays recorded corrupt, so a following check still fails on it, refs #10434.
     archiver = request.getfixturevalue(archivers)
@@ -988,13 +988,15 @@ def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, reques
     with open_repository(archiver) as repository:
         bad_pack = sorted(info.name for info in repository.store_list("packs"))[0]
         name = f"packs/{bad_pack}"
-        # zero the whole pack: no object in it authenticates, so the salvage leaves it as it is.
-        repository.store_store(name, bytes(len(repository.store_load(name))))
+        repository.store_store(name, corrupt(repository.store_load(name), -1))
         for info in repository.store_list("index"):  # rot every index fragment
             name = f"index/{info.name}"
             repository.store_store(name, corrupt(repository.store_load(name), 0))
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert f"Corrupt pack {bad_pack} was not salvaged: nothing authenticates." in output
+    # BORG_STORE_CACHE makes the salvage refuse to touch packs, leaving bad_pack corrupt.
+    with monkeypatch.context() as m:
+        m.setenv("BORG_STORE_CACHE", os.fspath(tmp_path / "store_cache"))
+        output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+    assert "Not salvaging 1 corrupt pack(s): BORG_STORE_CACHE is set." in output
     assert "corrupt pack(s) left; index corrupt, the archives check rebuilds it from the packs." in output
     with open_repository(archiver) as repository:
         index_infos = list(repository.store_list("index"))
@@ -1004,6 +1006,27 @@ def test_check_repair_rebuilds_corrupt_index_with_corrupt_pack(archivers, reques
     output = cmd(archiver, "check", "-v", exit_code=1)
     assert "Checked 1 index files (0 errors)" in output
     assert f"Corrupt pack: {bad_pack}" in output
+
+
+def test_check_repair_deletes_corrupt_archive_metadata_pack(archivers, request):
+    # A single-object archive metadata pack with a flipped bit: no object in it authenticates, so
+    # --repair deletes it (other objects authenticate), removes the broken archive, and subsequent
+    # check and compact succeed (#10479).
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive2")
+    with repository:
+        meta_pack = bin_to_hex(repository.chunks[archive.id].pack_id)
+        corrupt_chunk_on_disk(repository, archive.id)
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert f"Salvaged corrupt pack {meta_pack}: deleted pack (no object authenticated)" in output
+    assert "Deleting broken archive" in output
+    assert meta_pack not in list_packs(archiver)
+    cmd(archiver, "check", exit_code=0)
+    cmd(archiver, "compact", exit_code=0)
+    archives = cmd(archiver, "repo-list", exit_code=0)
+    assert "archive1" in archives
+    assert "archive2" not in archives
 
 
 def test_check_repair_walks_packs_once_for_corrupt_index(archiver, monkeypatch):
@@ -1579,8 +1602,9 @@ def test_repair_finish_reads_no_pack_after_deleting_a_whole_pack(archiver, monke
 
     walked = record_finish_walks(monkeypatch)
     findings = record_verify_findings(monkeypatch)
+    # --archives-only: the repository check salvages the pack, which drops the defect chunk.
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):  # see test_repair_finish_reads_only_the_rewritten_pack
-        output = cmd(archiver, "check", "--repair", "--verify-data", "--info", exit_code=0)
+        output = cmd(archiver, "check", "--repair", "--archives-only", "--verify-data", "--info", exit_code=0)
     assert f"{bin_to_hex(defect_id)}, integrity error" in output
     assert findings == [False]
     assert "pack(s) written by the repair." not in output

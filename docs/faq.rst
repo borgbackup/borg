@@ -434,7 +434,8 @@ The recommended order of operations is:
 
    At the repository level, it salvages each corrupt pack: the pack is replaced by one
    holding only the objects whose header, metadata and data still authenticate with
-   the key. It rebuilds the chunk index and removes the index entries of the chunks
+   the key (or deleted if none do and other objects in the repository authenticated).
+   It rebuilds the chunk index and removes the index entries of the chunks
    stored in missing packs.
 
    At the archive level, it might remove archives whose archive metadata chunk is

@@ -126,8 +126,9 @@ content, so a pack damaged in the store keeps failing the store-level check that
 ``borg check`` runs over ``packs/`` until it is rewritten. ``borg check --repair``
 rewrites it before any index rebuild: it replaces the pack by one holding only the
 blobs the walk finds and whose metadata and data slots both authenticate, which
-drops the damaged bytes (see ``Repository.salvage_pack``). A pack in which no blob
-authenticates is left as it is.
+drops the damaged bytes (see ``Repository.salvage_pack``). If no blob
+authenticates, the pack is deleted provided other blobs in the repository
+authenticated in the same run; otherwise it is left as it is.
 
 ``OBJ_MAGIC`` occurs inside the payloads as well, so the scan accepts a candidate
 only when it validates like any walked header. Validating needs the key, which

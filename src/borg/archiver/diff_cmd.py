@@ -178,6 +178,8 @@ class DiffMixIn:
                     return removed
             # timestamp diffs
             if field in ("ctime_diff", "mtime_diff"):
+                if d._item1 is None or d._item1.get("deleted") or d._item2 is None or d._item2.get("deleted"):
+                    return 0
                 ts = field.split("_")[0]
                 t1 = d._item1.get(ts, 0)
                 t2 = d._item2.get(ts, 0)
@@ -189,10 +191,10 @@ class DiffMixIn:
                     return 0
                 return it.get_size()
             # direct attributes from current item (prefer item2)
-            it = d._item2 or d._item1
+            it = d._item1 if (d._item2 is None or d._item2.get("deleted")) else d._item2
             attr_defaults = {"user": "", "group": "", "uid": -1, "gid": -1, "ctime": 0, "mtime": 0}
             if field in attr_defaults:
-                if it is None:
+                if it is None or it.get("deleted"):
                     return attr_defaults[field]
                 return it.get(field, attr_defaults[field])
             raise ValueError(f"Invalid field name: {field}")

@@ -241,7 +241,7 @@ class LegacyArchives:
             archive_infos.reverse()
         return archive_infos
 
-    def list_considering(self, args):
+    def list_considering(self, args, *, reverse=False):
         """Get a list of archives, considering --first/last/prefix/match-archives/sort cmdline args."""
         name = getattr(args, "name", None)
         if name is not None:
@@ -250,6 +250,7 @@ class LegacyArchives:
             )
         return self.list(
             sort_by=args.sort_by.split(","),
+            reverse=reverse,
             match=args.match_archives,
             first=getattr(args, "first", None),
             last=getattr(args, "last", None),

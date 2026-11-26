@@ -908,6 +908,18 @@ def test_check_format_repository_only(archivers, request, monkeypatch):
     cmd(archiver, "check", "--repository-only", exit_code=0)
 
 
+def test_check_exclude_archives_repository_only(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    if archiver.FORK_DEFAULT:
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "check", "--repository-only", "--exclude-archives", "test", exit_code=expected_ec)
+        assert "--repository-only contradicts" in output
+    else:
+        with pytest.raises(CommandError, match="--repository-only contradicts"):
+            cmd(archiver, "check", "--repository-only", "--exclude-archives", "test")
+
+
 def test_check_format_invalid_format_string(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)

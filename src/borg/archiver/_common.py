@@ -434,14 +434,20 @@ def define_archive_filters_group(
     filters_group = subparser.add_argument_group(
         "Archive filters", "Archive filters can be applied to repository targets."
     )
-    group = filters_group.add_mutually_exclusive_group()
-    group.add_argument(
+    filters_group.add_argument(
         "-a",
         "--match-archives",
         metavar="PATTERN",
         dest="match_archives",
         action="append",
         help='only consider archives matching all patterns. See "borg help match-archives".',
+    )
+    filters_group.add_argument(
+        "--exclude-archives",
+        metavar="PATTERN",
+        dest="exclude_archives",
+        action="append",
+        help='exclude archives matching any pattern. See "borg help match-archives".',
     )
 
     if sort_by:

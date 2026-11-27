@@ -815,6 +815,7 @@ cdef class CSPRNG:
         # Initialize the cipher
         if not EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.key, self.iv):
             EVP_CIPHER_CTX_free(self.ctx)
+            self.ctx = NULL
             raise CryptoError("Failed to initialize AES-CTR cipher")
 
     def __dealloc__(self):

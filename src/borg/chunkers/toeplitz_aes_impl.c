@@ -84,7 +84,7 @@ uint64_t tp_digest64(const TP_CTX *c, const uint8_t *q)
 #define PH_DIGEST64 tp_digest64
 #include "phte_scan.h"
 
-TP_CTX *tp_new(const uint64_t tables[TP_TABLES * 256], const uint8_t aes_key[16], int kernel)
+TP_CTX *tp_new(const uint64_t *tables, const uint8_t aes_key[16], int kernel)
 {
     TP_CTX *c = calloc(1, sizeof(TP_CTX));
     if (c == NULL)

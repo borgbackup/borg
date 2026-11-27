@@ -36,12 +36,11 @@ set the reference timestamp for interval calculation.
     # Do a dry-run without actually deleting anything.
     $ borg prune -v --list --dry-run --keep-daily=7 --keep-weekly=4
 
-    # Similar to the above, but only apply to the archive series named '{hostname}':
-    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 '{hostname}'
+    # Similar to the above, but only apply to the archive series named 'backup-sys-home':
+    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 backup-sys-home
 
-    # Similar to the above, but apply to archive names starting with the hostname
-    # of the machine followed by a '-' character:
-    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 -a 'sh:{hostname}-*'
+    # Similar to the above, but only apply to archives created on this machine:
+    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 -a 'host:{hostname}'
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:

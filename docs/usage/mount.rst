@@ -59,7 +59,7 @@ borgfs
     $ echo '/mnt/backup /tmp/myrepo fuse.borgfs defaults,noauto 0 0' >> /etc/fstab
     $ mount /tmp/myrepo
     $ ls /tmp/myrepo
-    root-2016-02-01 root-2016-02-15
+    root-1f7b3c2a  root-9e4d0b58
 
 .. Note::
 

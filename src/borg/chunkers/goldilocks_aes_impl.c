@@ -171,7 +171,7 @@ uint64_t gl_digest64(const GL_CTX *c, const uint8_t *q)
 #define PH_DIGEST64 gl_digest64
 #include "phte_scan.h"
 
-GL_CTX *gl_new(const uint64_t tables[GL_TABLES * 256], uint64_t k1, uint64_t k2,
+GL_CTX *gl_new(const uint64_t *tables, uint64_t k1, uint64_t k2,
                const uint8_t aes_key[16], int kernel)
 {
     GL_CTX *c = calloc(1, sizeof(GL_CTX));

@@ -3,6 +3,13 @@
 from libc.stdint cimport uint8_t, uint64_t, int64_t
 
 
+cdef inline int _check_size_exps(int chunk_min_exp, int chunk_max_exp) except -1:
+    """Raise ValueError unless 1 << chunk_min_exp and 1 << chunk_max_exp are well-defined C int shifts."""
+    if not (0 <= chunk_min_exp <= 30 and 0 <= chunk_max_exp <= 30):
+        raise ValueError("chunk size exponents must be in the range 0..30")
+    return 0
+
+
 cdef class ChunkerBase:
     # chunking parameters
     cdef str algo                 # chunker name, for error messages
@@ -18,7 +25,7 @@ cdef class ChunkerBase:
     cdef int done, eof
     cdef size_t min_size, buf_size, remaining, position, last
     cdef long long bytes_read, bytes_yielded
-    cdef readonly float chunking_time
+    cdef readonly double chunking_time  # a sum of many small increments, a C float would stop growing
     cdef object file_reader
     cdef size_t reader_block_size
     cdef bint sparse

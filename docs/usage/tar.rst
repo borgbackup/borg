@@ -7,25 +7,25 @@ Examples
 ::
 
     # Export as an uncompressed tar archive
-    $ borg export-tar Monday Monday.tar
+    $ borg export-tar docs docs.tar
 
     # Import an uncompressed tar archive
-    $ borg import-tar Monday Monday.tar
+    $ borg import-tar docs docs.tar
 
     # Exclude some file types and compress using gzip
-    $ borg export-tar Monday Monday.tar.gz --exclude '*.so'
+    $ borg export-tar docs docs.tar.gz --exclude '*.so'
 
     # Use a higher compression level with gzip
-    $ borg export-tar --tar-filter="gzip -9" Monday Monday.tar.gz
+    $ borg export-tar --tar-filter="gzip -9" docs docs.tar.gz
 
     # Copy an archive from repoA to repoB
     $ borg -r repoA export-tar --tar-format=BORG archive - | borg -r repoB import-tar archive -
 
     # Export a tar, but instead of storing it on disk, upload it to a remote site using curl
-    $ borg export-tar Monday - | curl --data-binary @- https://somewhere/to/POST
+    $ borg export-tar docs - | curl --data-binary @- https://somewhere/to/POST
 
     # Remote extraction via 'tarpipe'
-    $ borg export-tar Monday - | ssh somewhere "cd extracted; tar x"
+    $ borg export-tar docs - | ssh somewhere "cd extracted; tar x"
 
     # Export sparse files (e.g. disk images) as sparse tar members (GNU sparse format 1.0)
     $ borg export-tar --sparse disk-images disk-images.tar

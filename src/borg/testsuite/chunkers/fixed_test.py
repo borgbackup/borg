@@ -78,6 +78,34 @@ def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
     assert expected_content == got_chunks
 
 
+def test_chunkify_pipe():
+    # reading from a pipe via the OS-level file handle: reads come up short and posix_fadvise()
+    # fails with ESPIPE (e.g. on Linux) - neither must make the chunker stop or fail.
+    import threading
+    import time
+
+    data = os.urandom(3 * 65536 + 123)
+    r, w = os.pipe()
+
+    def writer():
+        with os.fdopen(w, "wb") as f:
+            for start in range(0, len(data), 65536):
+                f.write(data[start : start + 65536])
+                f.flush()
+                time.sleep(0.05)  # writer pause: reads on the other side come up short
+
+    t = threading.Thread(target=writer)
+    t.start()
+    try:
+        chunker = ChunkerFixed(131072, sparse=False)
+        chunks = cf(chunker.chunkify(None, r))
+    finally:
+        os.close(r)
+        t.join()
+    assert b"".join(chunks) == data
+    assert [len(c) for c in chunks] == [131072, 65536 + 123]
+
+
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
 @pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
 def test_fuzz_fixed(worker):

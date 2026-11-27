@@ -33,7 +33,8 @@ cdef class ChunkerPHTE(ChunkerBase):
         # the rolling window needs 64 bytes of in-chunk history at the first
         # possible cut position (min_size), so the minimum chunk size must be
         # at least the window size:
-        assert chunk_min_exp >= 6, "chunk_min_exp must be >= 6 (2^6 = 64 = window size)"
+        if chunk_min_exp < 6:
+            raise ValueError("chunk_min_exp must be >= 6 (2^6 = 64 = window size)")
         self.kernel_str = "unknown"
         # the AES output is uniform, so contiguous low-bit masks are fine
         return self._setup_common(algo, chunk_min_exp, chunk_max_exp, hash_mask_bits,

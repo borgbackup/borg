@@ -1,6 +1,7 @@
 import base64
 import errno
 import json
+import logging
 import os
 import posixpath
 import stat
@@ -3204,6 +3205,16 @@ class ArchiveChecker:
                 archive = ArchiveItem(internal_dict=archive)
                 if archive.version != 2:
                     raise Exception("Unknown archive metadata version")
+                if "item_ptrs" not in archive or "items" in archive:
+                    logger.error(f"Archive metadata block {archive_id_hex} is invalid: needs item_ptrs and no items")
+                    self.error_found = True
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
+                    record_result(archive_id, found_before)
+                    continue
                 items_buffer = ChunkBuffer(self.key)
                 items_buffer.write_chunk = add_callback
                 complete = False
@@ -3522,7 +3533,7 @@ class ArchiveRecreater:
         if delete_original:
             archive.delete()
         if self.stats:
-            log_multi(str(target), str(target.stats))
+            log_multi(str(target), str(target.stats), logger=logging.getLogger("borg.output.stats"))
 
     def matcher_add_tagged_dirs(self, archive):
         """Add excludes to the matcher created by exclude_cache and exclude_if_present."""

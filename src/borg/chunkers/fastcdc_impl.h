@@ -28,13 +28,16 @@
 /* Results of fc_kernel_select(). */
 #define FC_KSEL_OK 0
 #define FC_KSEL_UNKNOWN 1  /* not a kernel name on this platform */
-#define FC_KSEL_NOTBUILT 2 /* known, but not compiled into this binary */
+#define FC_KSEL_NOTBUILT 2 /* known, but not compiled into this binary (see below) */
 #define FC_KSEL_NOCPU 3    /* known and built, but this CPU cannot run it */
 
 /* Resolve a kernel name for this build. On FC_KSEL_OK the id is stored in
- * *out_id, otherwise *out_id is left alone. The three failures are kept apart
- * because they need different fixes: a typo, too old a compiler, or the wrong
- * CPU. */
+ * *out_id, otherwise *out_id is left alone. The failures are kept apart
+ * because they need different fixes: a typo or the wrong CPU.
+ * FC_KSEL_NOTBUILT (too old a compiler) is never returned: a compiler that can
+ * build this file at all builds all of a platform's kernels. The code exists
+ * because the kernel selectors share their result codes (see kernel_env.py)
+ * and the AES chunkers' selector does return it. */
 int fc_kernel_select(const char *name, int *out_id);
 
 /* Comma-separated list of the kernel names this build accepts, for error

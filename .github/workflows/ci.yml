@@ -57,7 +57,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Set up Python
-      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
       with:
         python-version: '3.11'
     - name: Install dependencies
@@ -83,7 +83,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
       with:
         python-version: '3.12'
 
@@ -197,7 +197,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -883,7 +883,7 @@ jobs:
         # a normal boot takes < 1 minute; since 1.4.0 the action bounds
         # waiting for boot itself, this is just an additional safety net.
         timeout-minutes: 15
-        uses: cross-platform-actions/action@e0b9770014ba65d5e0815f15b74031c3a635f641  # v1.6.0
+        uses: cross-platform-actions/action@82668f1fbd89d9c99487604f822cbf6716f124d3  # v1.7.0
         with:
           operating_system: ${{ matrix.os }}
           version: ${{ matrix.version }}
@@ -1378,4 +1378,4 @@ jobs:
       run: ls -l dist/
 
     - name: Upload to PyPI
-      uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+      uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3

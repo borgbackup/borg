@@ -428,14 +428,10 @@ int bz64_kernel_select(const char *name, int *out_id)
         return BZ_KSEL_OK;
     }
     if (strcmp(name, "avx512") == 0) {
-#ifndef BZ_KIND_512
-        return BZ_KSEL_NOTBUILT; /* compiler too old for the target attribute */
-#else
         if (!__builtin_cpu_supports("avx512f"))
             return BZ_KSEL_NOCPU;
         *out_id = BZ_K_VECTOR512;
         return BZ_KSEL_OK;
-#endif
     }
 #endif
     return BZ_KSEL_UNKNOWN;

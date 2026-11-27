@@ -13,7 +13,7 @@ Dynamic Completions
 The following argument types have intelligent, context-aware completion:
 
 1. Archive names/IDs (archivename_validator):
-   - Completes archive names by default (e.g., "my-backup-2024")
+   - Completes archive names by default (e.g., "my-backup")
    - Completes archive IDs when prefixed with "aid:" (e.g., "aid:12345678")
    - In zsh and fish, shows archive metadata (name, timestamp, user@host) as descriptions
      (tcsh has no completion descriptions)

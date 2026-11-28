@@ -128,6 +128,30 @@ class RepoObj:
         clevel: int = None,
         ro_type: str = None,
     ) -> bytes:
+        """Build a repo object from metadata and data (maybe compress, then encrypt), see format_parts."""
+        return b"".join(
+            self.format_parts(id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type)
+        )
+
+    def format_parts(
+        self,
+        id: bytes,
+        meta: dict,
+        data: bytes,
+        compress: bool = True,
+        size: int = None,
+        ctype: int = None,
+        clevel: int = None,
+        ro_type: str = None,
+    ) -> list[bytes | memoryview]:
+        """Like format(), but return the repo object as a list of parts that, joined, give the object.
+
+        This avoids copying the encrypted data just to concatenate it with the header and the metadata:
+        Repository.put accepts the parts and the PackWriter joins them into the pack once (#10058).
+
+        A part may be *data* itself (e.g. with an "authenticated-*" key and data that did not get
+        compressed), so the parts are only valid as long as the caller's *data* buffer is.
+        """
         assert isinstance(ro_type, str)
         assert ro_type != ROBJ_DONTCARE
         meta["type"] = ro_type
@@ -149,12 +173,13 @@ class RepoObj:
             data_compressed = data  # is already compressed, is NOT prefixed by type/level bytes
             meta["csize"] = len(data_compressed)
         header_aad = OBJ_MAGIC + bytes([OBJ_VERSION]) + id
-        data_encrypted = self.key.encrypt(id, data_compressed, aad=header_aad + DATA_AAD_TAG)
+        data_parts = self.key.encrypt_parts(id, data_compressed, aad=header_aad + DATA_AAD_TAG)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed, aad=header_aad + META_AAD_TAG)
-        hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, id, len(meta_encrypted), len(data_encrypted))
+        data_size = sum(len(part) for part in data_parts)
+        hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, id, len(meta_encrypted), data_size)
         hdr_packed = self.obj_header.pack(*hdr)
-        return hdr_packed + meta_encrypted + data_encrypted
+        return [hdr_packed + meta_encrypted, *data_parts]
 
     def parse_meta(self, id: bytes, cdata: bytes | memoryview, ro_type: str) -> dict:
         # when calling parse_meta, enough cdata needs to be supplied to contain completely the

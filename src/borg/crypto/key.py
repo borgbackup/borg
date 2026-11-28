@@ -425,6 +425,14 @@ class KeyBase:
     def encrypt(self, id, data, aad=b""):
         pass
 
+    def encrypt_parts(self, id, data, aad=b""):
+        """Like encrypt(), but return the envelope as a list of parts, see RepoObj.format_parts.
+
+        The parts joined are what encrypt() returns. A part may be *data* itself (not copied), so it
+        is only valid as long as the caller's *data* buffer is.
+        """
+        return [self.encrypt(id, data, aad=aad)]
+
     def encrypt_oneshot(self, id, data, aad=b""):
         """Like encrypt(), but safe to call from any thread, concurrently with encrypt(), see AEADKeyBase."""
         raise NotImplementedError
@@ -1134,9 +1142,14 @@ class MACKeyBase(KeyBase):
         return b"".join([header, len(aad_full).to_bytes(2, "big"), aad_full])
 
     def encrypt(self, id, data, aad=b""):
+        return b"".join(self.encrypt_parts(id, data, aad=aad))
+
+    def encrypt_parts(self, id, data, aad=b""):
+        # the payload is not encrypted, so the envelope is the header + tag, followed by data itself:
+        # returning data as a separate part avoids copying the whole payload just to prepend 34 bytes.
         header = self.TYPE_STR + b"\0"  # TYPE + reserved
         tag = self.mac(self._tag_prefix(header, aad, id), data)
-        return b"".join([header, tag, data])
+        return [header + tag, data]
 
     def encrypt_oneshot(self, id, data, aad=b""):
         # encrypt() has no state (it just computes a MAC), so it is safe to call from any thread already.

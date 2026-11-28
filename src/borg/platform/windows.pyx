@@ -9,15 +9,7 @@ from .base import SyncFile as BaseSyncFile
 from .base import MountEntry
 
 
-cdef extern from 'windows.h':
-    ctypedef void* HANDLE
-    ctypedef int BOOL
-    ctypedef unsigned long DWORD
 
-    BOOL CloseHandle(HANDLE hObject)
-    HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dbProcessId)
-
-    cdef extern int PROCESS_QUERY_INFORMATION
 
 
 # Win32 API constants for CreateFileW
@@ -40,7 +32,8 @@ FILETIME_EPOCH_OFFSET_NS = 11644473600 * 1000000000
 # SetFileTime gives a special meaning to 0 ("do not change") and to all bits set
 # ("do not update this timestamp for this handle any more"), so avoid these values.
 FILETIME_MIN, FILETIME_MAX = 1, 0xFFFFFFFFFFFFFFFE
-
+ERROR_ACCESS_DENIED = 5
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 _CreateFileW = _kernel32.CreateFileW
 _CreateFileW.restype = ctypes.wintypes.HANDLE
@@ -62,6 +55,10 @@ _SetFileTime.argtypes = [
     ctypes.POINTER(ctypes.wintypes.FILETIME),
     ctypes.POINTER(ctypes.wintypes.FILETIME),
 ]
+_OpenProcess = _kernel32.OpenProcess
+_OpenProcess.restype = ctypes.wintypes.HANDLE
+_OpenProcess.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.wintypes.DWORD]
+
 INVALID_HANDLE_VALUE = ctypes.wintypes.HANDLE(-1).value
 
 
@@ -182,14 +179,17 @@ def process_alive(host, pid, thread):
     """
     Check whether the (host, pid, thread_id) combination corresponds to a process potentially alive.
     """
-    if host.split('@')[0].lower() != platform.node().lower():
+    if host.split("@")[0].lower() != platform.node().lower():
         # If not running on the same node, assume the process is running.
         return True
 
-    # If the process can be opened, the process is alive.
-    handle = OpenProcess(PROCESS_QUERY_INFORMATION, False, pid)
-    if handle != NULL:
-        CloseHandle(handle)
+    # If the process can be opened (or access is denied because it belongs to
+    # another/elevated user), the process is alive.
+    handle = _OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if handle:
+        _CloseHandle(handle)
+        return True
+    if ctypes.get_last_error() == ERROR_ACCESS_DENIED:
         return True
     return False
 

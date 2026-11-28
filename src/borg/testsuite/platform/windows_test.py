@@ -140,3 +140,31 @@ def test_set_times_nonexistent(tmp_path):
     """set_times raises OSError if there is no such file."""
     with pytest.raises(OSError):
         set_times(str(tmp_path / "nonexistent"), atime_ns=ATIME_NS, mtime_ns=MTIME_NS)
+
+
+def test_process_alive_access_denied(monkeypatch):
+    """process_alive treats ERROR_ACCESS_DENIED (e.g. elevated/SYSTEM process) as alive."""
+    import ctypes
+    import platform
+    from borg.platform import windows
+
+    def fake_open_process(access, inherit, pid):
+        ctypes.set_last_error(windows.ERROR_ACCESS_DENIED)
+        return None
+
+    monkeypatch.setattr(windows, "_OpenProcess", fake_open_process)
+    assert windows.process_alive(platform.node(), 4, 0) is True
+
+
+def test_process_alive_dead_process(monkeypatch):
+    """process_alive returns False when OpenProcess fails with a non-access-denied error."""
+    import ctypes
+    import platform
+    from borg.platform import windows
+
+    def fake_open_process(access, inherit, pid):
+        ctypes.set_last_error(87)  # ERROR_INVALID_PARAMETER
+        return None
+
+    monkeypatch.setattr(windows, "_OpenProcess", fake_open_process)
+    assert windows.process_alive(platform.node(), 999999, 0) is False

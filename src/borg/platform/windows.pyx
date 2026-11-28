@@ -9,9 +9,6 @@ from .base import SyncFile as BaseSyncFile
 from .base import MountEntry
 
 
-
-
-
 # Win32 API constants for CreateFileW
 GENERIC_READ = 0x80000000
 GENERIC_WRITE = 0x40000000
@@ -25,15 +22,19 @@ FILE_ATTRIBUTE_NORMAL = 0x80
 FILE_FLAG_WRITE_THROUGH = 0x80000000
 FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
 FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+ERROR_ACCESS_DENIED = 5
 ERROR_FILE_EXISTS = 80
+
+
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 # a FILETIME counts 100ns intervals since 1601-01-01, our timestamps count ns since 1970-01-01.
 FILETIME_EPOCH_OFFSET_NS = 11644473600 * 1000000000
 # SetFileTime gives a special meaning to 0 ("do not change") and to all bits set
 # ("do not update this timestamp for this handle any more"), so avoid these values.
 FILETIME_MIN, FILETIME_MAX = 1, 0xFFFFFFFFFFFFFFFE
-ERROR_ACCESS_DENIED = 5
-PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+
 _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 _CreateFileW = _kernel32.CreateFileW
 _CreateFileW.restype = ctypes.wintypes.HANDLE
@@ -179,7 +180,7 @@ def process_alive(host, pid, thread):
     """
     Check whether the (host, pid, thread_id) combination corresponds to a process potentially alive.
     """
-    if host.split("@")[0].lower() != platform.node().lower():
+    if host.split('@')[0].lower() != platform.node().lower():
         # If not running on the same node, assume the process is running.
         return True
 

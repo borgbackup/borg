@@ -876,6 +876,32 @@ def test_tar_acl_to_borg(acl, expected):
     assert tar_acl_to_borg(acl) == expected.encode()
 
 
+@pytest.mark.parametrize(
+    "acl",
+    [
+        "user:foo",  # too few fields: the Linux acl_set code would crash on this at extract time
+        "user:foo:rw-:0:x",  # too many fields
+        "user::rw-:0",  # an id for an unnamed entry
+        "mask:x:rw-:0",
+        "bogus::rw-",  # unknown tag
+        "rw-",
+        "user::rw-\ngroup::r--\nother::r--\nuser:foo",  # one invalid entry spoils it all
+    ],
+)
+def test_tar_acl_to_borg_invalid(acl):
+    with pytest.raises(ValueError, match="invalid POSIX ACL entry"):
+        tar_acl_to_borg(acl)
+
+
+@pytest.mark.skipif(is_win32, reason="no name lookups on Windows")
+def test_tar_acl_to_borg_unknown_names():
+    unknown_names = set()
+    acl = "user::rw-\nuser:nosuchuser-borgtest:rw-\ngroup:nosuchgroup-borgtest:r--\ngroup:root:r--:0\nother::r--"
+    tar_acl_to_borg(acl, unknown_names=unknown_names)
+    # group:root has its id already, so no lookup is needed for it.
+    assert unknown_names == {("user", "nosuchuser-borgtest"), ("group", "nosuchgroup-borgtest")}
+
+
 def test_reject_non_sanitized_item():
     for path in rejected_dotdot_paths:
         with pytest.raises(ValueError, match="unexpected '..' element in path"):

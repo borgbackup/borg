@@ -15,12 +15,14 @@ from ... import xattr
 from ...archiver.tar_cmds import chunks_to_sparse_info, gnu_sparse_10_map, SparseTarInfo
 from ...constants import *  # NOQA
 from ...helpers import Error
+from ...helpers.time import MAX_NS
 from ...item import ChunkListEntry
 from .. import changedir
 from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, open_archive, requires_hardlinks, RK_ENCRYPTION
 from . import create_test_files, create_regular_file
 from . import generate_archiver_tests
 from ...platform import acl_get, acl_set
+from ...platformflags import is_win32
 from ..platform.platform_test import skipif_not_linux, skipif_acls_not_working
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
@@ -599,6 +601,35 @@ def test_roundtrip_pax_xattrs(archivers, request):
     assert xa_value_extracted == xa_value
 
 
+def test_export_tar_pax_xattr_name_not_utf8(archivers, request):
+    """export-tar --tar-format=PAX skips xattrs with a non-UTF-8 name (PAX keywords must be UTF-8) with a warning."""
+    archiver = request.getfixturevalue(archivers)
+    if not xattr.is_enabled(archiver.input_path):
+        pytest.skip("xattrs not supported")
+    create_regular_file(archiver.input_path, "file")
+    original_path = os.path.join(archiver.input_path, "file").encode()
+    xa_key, xa_value = b"user.not-utf8-\xff", b"value"
+    try:
+        xattr.setxattr(original_path, xa_key, xa_value)
+    except OSError as e:
+        pytest.skip(f"can not set an xattr with a non-UTF-8 name here: {e}")
+    xattr.setxattr(original_path, b"user.utf8", b"other")
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "create", "src", "input")
+    output = cmd(archiver, "export-tar", "src", "pax.tar", "--tar-format=PAX", exit_code=EXIT_WARNING)
+    assert "is not valid UTF-8, not exported" in output
+    with tarfile.open("pax.tar") as tar:
+        ph = tar.getmember("input/file").pax_headers
+    assert ph[SCHILY_XATTR + "user.utf8"] == "other"
+    assert not any(key.startswith(SCHILY_XATTR + "user.not-utf8") for key in ph)
+    # the BORG format has all item metadata in BORG.item.meta, so nothing is lost there (and no warning given).
+    cmd(archiver, "export-tar", "src", "borg.tar", "--tar-format=BORG")
+    cmd(archiver, "import-tar", "dst", "borg.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+        assert xattr.getxattr(os.path.abspath("input/file").encode(), xa_key) == xa_value
+
+
 def test_roundtrip_pax_timestamps(archivers, request):
     """export-tar --tar-format=PAX and import-tar keep the timestamps with exact ns precision."""
     archiver = request.getfixturevalue(archivers)
@@ -606,7 +637,7 @@ def test_roundtrip_pax_timestamps(archivers, request):
     mtime_ns = 1700000000_987654321  # float seconds would round this to ~240 ns
     os.utime(os.path.join(archiver.input_path, "file"), ns=(mtime_ns, mtime_ns))
     cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
-    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "create", "--atime", "src", "input")
     cmd(archiver, "export-tar", "src", "pax.tar", "--tar-format=PAX")
     cmd(archiver, "import-tar", "dst", "pax.tar")
 
@@ -619,8 +650,12 @@ def test_roundtrip_pax_timestamps(archivers, request):
     src_times, dst_times = get_times("src"), get_times("dst")
     assert dst_times == src_times
     with tarfile.open("pax.tar") as tar:
-        pax_mtime = tar.getmember("input/file").pax_headers["mtime"]
-    assert pax_mtime == f"{src_times['mtime'] // 10**9}.{src_times['mtime'] % 10**9:09d}"
+        ph = tar.getmember("input/file").pax_headers
+    for name, ns in src_times.items():
+        if ns is None:  # e.g. no ctime on Windows
+            assert name not in ph
+        else:
+            assert ph[name] == f"{ns // 10**9}.{ns % 10**9:09d}"
 
 
 def test_import_tar_invalid_pax_timestamp(archivers, request):
@@ -637,6 +672,62 @@ def test_import_tar_invalid_pax_timestamp(archivers, request):
         item = next(archive_obj.iter_items())
     assert "atime" not in item
     assert item.ctime == 1700000000_500000000
+
+
+def test_import_tar_inf_nan_pax_mtime(archivers, request):
+    """import-tar survives pax mtime headers that the tarfile module parses into float inf / nan."""
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        for name, mtime in (("inf", "1e999"), ("nan", "nan")):
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.pax_headers = {"mtime": mtime}
+            tar.addfile(tarinfo, io.BytesIO())
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    cmd(archiver, "import-tar", "dst", "input.tar")
+    archive_obj, repository = open_archive(archiver.repository_path, "dst")
+    with repository:
+        mtimes = {item.path: item.mtime for item in archive_obj.iter_items()}
+    assert mtimes == {"inf": MAX_NS, "nan": 0}  # "1e999" gets clamped, "nan" is unparsable
+
+
+def test_import_tar_invalid_pax_acl(archivers, request):
+    """import-tar ignores a malformed SCHILY.acl.* PAX header with a warning (stored, it would crash extract)."""
+    archiver = request.getfixturevalue(archivers)
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        tarinfo = tarfile.TarInfo("file")
+        tarinfo.pax_headers = {SCHILY_ACL_ACCESS: "user::rw-\ngroup::r--\nother::r--\nuser:foo"}
+        tar.addfile(tarinfo, io.BytesIO())
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "dst", "input.tar", exit_code=EXIT_WARNING)
+    assert "file: ignoring the SCHILY.acl.access PAX header: invalid POSIX ACL entry: 'user:foo'" in output
+    archive_obj, repository = open_archive(archiver.repository_path, "dst")
+    with repository:
+        item = next(archive_obj.iter_items())
+    assert "acl_access" not in item
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+
+
+@pytest.mark.skipif(is_win32, reason="no name lookups on Windows")
+def test_import_tar_acl_unknown_name(archivers, request):
+    """import-tar warns once per user/group name in POSIX ACL PAX headers that is unknown locally."""
+    archiver = request.getfixturevalue(archivers)
+    acl = "user::rw-\nuser:nosuchuser-borgtest:rw-\ngroup::r--\nmask::rw-\nother::r--\n"
+    with tarfile.open("input.tar", "w", format=tarfile.PAX_FORMAT) as tar:
+        for name in ("file1", "file2"):
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.pax_headers = {SCHILY_ACL_ACCESS: acl}
+            tar.addfile(tarinfo, io.BytesIO())
+    cmd(archiver, "repo-create", "--encryption=authenticated-sha256")
+    output = cmd(archiver, "import-tar", "dst", "input.tar", exit_code=EXIT_WARNING)
+    assert "file1: POSIX ACL refers to unknown user 'nosuchuser-borgtest'" in output
+    assert output.count("unknown user 'nosuchuser-borgtest'") == 1
+    # the ACL is stored nevertheless, with the name in place of the numeric id (like borg create does)
+    archive_obj, repository = open_archive(archiver.repository_path, "dst")
+    with repository:
+        acls = {item.path: item.acl_access for item in archive_obj.iter_items()}
+    expected = b"user::rw-\nuser:nosuchuser-borgtest:rw-:nosuchuser-borgtest\ngroup::r--\nmask::rw-\nother::r--"
+    assert acls == {"file1": expected, "file2": expected}
 
 
 def _sparse_entries(sizes):
